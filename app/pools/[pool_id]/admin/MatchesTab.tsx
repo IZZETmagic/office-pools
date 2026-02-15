@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import type { PoolData, MatchData, MemberData, PredictionData } from './page'
-import { Card } from '@/components/ui/Card'
+import type { PoolData, MatchData, MemberData, PredictionData, SettingsData } from '../types'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { calculatePoints, DEFAULT_POOL_SETTINGS } from '../results/points'
+import type { PoolSettings } from '../results/points'
 
 type MatchesTabProps = {
   pool: PoolData
@@ -16,11 +16,11 @@ type MatchesTabProps = {
   predictions: PredictionData[]
   setPredictions: (predictions: PredictionData[]) => void
   setMembers: (members: MemberData[]) => void
+  settings: SettingsData | null
 }
 
 type ModalState =
   | { type: 'none' }
-  | { type: 'enter_result'; match: MatchData }
   | { type: 'view_predictions'; match: MatchData }
 
 function getStatusBadgeVariant(
@@ -59,9 +59,8 @@ export function MatchesTab({
   predictions,
   setPredictions,
   setMembers,
+  settings,
 }: MatchesTabProps) {
-  const supabase = createClient()
-
   // Filters
   const [stageFilter, setStageFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -69,16 +68,6 @@ export function MatchesTab({
 
   // Modal
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
-
-  // Result entry form
-  const [homeScore, setHomeScore] = useState('')
-  const [awayScore, setAwayScore] = useState('')
-  const [resultType, setResultType] = useState<'ft' | 'et' | 'pso'>('ft')
-  const [psoHome, setPsoHome] = useState('')
-  const [psoAway, setPsoAway] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Get unique stages and groups
   const stages = [...new Set(matches.map((m) => m.stage))]
@@ -99,171 +88,45 @@ export function MatchesTab({
     return true
   })
 
-  function openResultModal(match: MatchData) {
-    setHomeScore(match.home_score_ft?.toString() ?? '')
-    setAwayScore(match.away_score_ft?.toString() ?? '')
-    setPsoHome(match.home_score_pso?.toString() ?? '')
-    setPsoAway(match.away_score_pso?.toString() ?? '')
-    setResultType(
-      match.home_score_pso !== null ? 'pso' : 'ft'
-    )
-    setError(null)
-    setSuccess(null)
-    setModal({ type: 'enter_result', match })
-  }
-
-  async function handleSaveResult() {
-    if (modal.type !== 'enter_result') return
-    const match = modal.match
-
-    const hScore = parseInt(homeScore)
-    const aScore = parseInt(awayScore)
-
-    if (isNaN(hScore) || isNaN(aScore) || hScore < 0 || aScore < 0) {
-      setError('Scores must be non-negative integers.')
-      return
-    }
-
-    if (resultType === 'pso') {
-      const pH = parseInt(psoHome)
-      const pA = parseInt(psoAway)
-      if (isNaN(pH) || isNaN(pA) || pH < 0 || pA < 0) {
-        setError('Penalty shootout scores must be non-negative integers.')
-        return
-      }
-      if (pH === pA) {
-        setError('Penalty shootout scores cannot be tied.')
-        return
-      }
-    }
-
-    setSaving(true)
-    setError(null)
-
-    const updateData: Record<string, unknown> = {
-      home_score_ft: hScore,
-      away_score_ft: aScore,
-      status: 'completed',
-      is_completed: true,
-      completed_at: new Date().toISOString(),
-    }
-
-    if (resultType === 'pso') {
-      updateData.home_score_pso = parseInt(psoHome)
-      updateData.away_score_pso = parseInt(psoAway)
-    } else {
-      updateData.home_score_pso = null
-      updateData.away_score_pso = null
-    }
-
-    const { error: updateError } = await supabase
-      .from('matches')
-      .update(updateData)
-      .eq('match_id', match.match_id)
-
-    if (updateError) {
-      setError(updateError.message)
-      setSaving(false)
-      return
-    }
-
-    // Refresh matches data
-    const { data: refreshedMatches } = await supabase
-      .from('matches')
-      .select(
-        `*, home_team:teams!matches_home_team_id_fkey(country_name), away_team:teams!matches_away_team_id_fkey(country_name)`
-      )
-      .eq('tournament_id', pool.tournament_id)
-      .order('match_number', { ascending: true })
-
-    if (refreshedMatches) {
-      setMatches(
-        refreshedMatches.map((m: any) => ({
-          ...m,
-          home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
-          away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-        }))
-      )
-    }
-
-    // Refresh members to get updated points/ranks
-    const { data: refreshedMembers } = await supabase
-      .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email)')
-      .eq('pool_id', pool.pool_id)
-      .order('current_rank', { ascending: true, nullsFirst: false })
-
-    if (refreshedMembers) {
-      setMembers(refreshedMembers as MemberData[])
-    }
-
-    const matchPredictions = predictions.filter(
-      (p) => p.match_id === match.match_id
-    )
-    setSuccess(
-      `Match result saved. Points calculated for ${matchPredictions.length} predictions.`
-    )
-    setSaving(false)
-
-    // Close modal after short delay
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
-  }
-
-  async function handleCancelMatch(match: MatchData) {
-    if (!confirm('Are you sure you want to mark this match as cancelled?')) return
-
-    const { error } = await supabase
-      .from('matches')
-      .update({ status: 'cancelled' })
-      .eq('match_id', match.match_id)
-
-    if (error) {
-      alert('Failed to cancel match: ' + error.message)
-      return
-    }
-
-    setMatches(
-      matches.map((m) =>
-        m.match_id === match.match_id ? { ...m, status: 'cancelled' } : m
-      )
-    )
-  }
-
   function openPredictionsModal(match: MatchData) {
     setModal({ type: 'view_predictions', match })
   }
 
-  // Calculate points for a single prediction against actual scores
-  function calcPoints(
-    predH: number,
-    predA: number,
-    actH: number,
-    actA: number
-  ): { points: number; label: string; icon: string } {
-    if (predH === actH && predA === actA) {
-      return { points: 5, label: 'Exact', icon: '🎯' }
-    }
-    const predDiff = predH - predA
-    const actDiff = actH - actA
-    const predWinner = predH > predA ? 'H' : predH < predA ? 'A' : 'D'
-    const actWinner = actH > actA ? 'H' : actH < actA ? 'A' : 'D'
-    if (predWinner === actWinner && predDiff === actDiff) {
-      return { points: 3, label: 'Winner+GD', icon: '✓' }
-    }
-    if (predWinner === actWinner) {
-      return { points: 1, label: 'Winner', icon: '✓' }
-    }
-    return { points: 0, label: 'Wrong', icon: '✗' }
-  }
+  // Build pool settings for the calculatePoints function
+  const poolSettings: PoolSettings = settings
+    ? {
+        ...DEFAULT_POOL_SETTINGS,
+        ...settings,
+        pso_exact_score: settings.pso_exact_score ?? 0,
+        pso_correct_difference: settings.pso_correct_difference ?? 0,
+        pso_correct_result: settings.pso_correct_result ?? 0,
+      }
+    : DEFAULT_POOL_SETTINGS
+
+  // Stats
+  const completedCount = matches.filter((m) => m.is_completed).length
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Match Results</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">Match Results</h2>
 
-      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
+      {/* Info banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-6">
+        <p className="text-sm text-blue-700">
+          Match results are managed by Super Admins and apply globally across all pools.
+          You can view match details and member predictions below.
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="flex gap-3 mb-6 text-sm">
+        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+          {completedCount} Completed
+        </span>
+        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+          {matches.length - completedCount} Remaining
+        </span>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
@@ -311,34 +174,83 @@ export function MatchesTab({
         )}
       </div>
 
-      {/* Matches table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Matches - Mobile card view */}
+      <div className="sm:hidden space-y-2">
+        {filteredMatches.length === 0 ? (
+          <p className="text-center text-gray-600 py-8">No matches found with current filters.</p>
+        ) : (
+          filteredMatches.map((match) => {
+            const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
+            const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+            const matchPredCount = predictions.filter((p) => p.match_id === match.match_id).length
+            const matchDate = new Date(match.match_date)
+            return (
+              <div key={match.match_id} className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
+                    <Badge variant="blue">{getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}</Badge>
+                  </div>
+                  <Badge variant={getStatusBadgeVariant(match.status)}>{match.status}</Badge>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-gray-900">{home}</span>
+                    <span className="text-gray-400 mx-1.5 text-xs">vs</span>
+                    <span className="text-sm font-medium text-gray-900">{away}</span>
+                  </div>
+                  {match.is_completed && (
+                    <span className="font-bold text-gray-900 text-sm shrink-0 ml-2">
+                      {match.home_score_ft}-{match.away_score_ft}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>{matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{matchPredCount} predictions</span>
+                    <button
+                      onClick={() => openPredictionsModal(match)}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Matches table - Desktop */}
+      <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   Stage
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
                   Score
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
                   Predictions
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -346,7 +258,7 @@ export function MatchesTab({
             <tbody className="divide-y divide-gray-200">
               {filteredMatches.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-600">
                     No matches found with current filters.
                   </td>
                 </tr>
@@ -384,7 +296,7 @@ export function MatchesTab({
                           day: 'numeric',
                         })}
                         <br />
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-500">
                           {matchDate.toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
@@ -395,7 +307,7 @@ export function MatchesTab({
                         <span className="font-medium text-gray-900">
                           {home}
                         </span>
-                        <span className="text-gray-400 mx-2">vs</span>
+                        <span className="text-gray-500 mx-2">vs</span>
                         <span className="font-medium text-gray-900">
                           {away}
                         </span>
@@ -411,46 +323,25 @@ export function MatchesTab({
                           <span className="font-bold text-gray-900">
                             {match.home_score_ft} - {match.away_score_ft}
                             {match.home_score_pso !== null && (
-                              <span className="text-xs text-gray-400 block">
+                              <span className="text-xs text-gray-500 block">
                                 PSO: {match.home_score_pso}-{match.away_score_pso}
                               </span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-gray-500">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">
                         {matchPredCount}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
-                          {match.status !== 'cancelled' && (
-                            <button
-                              onClick={() => openResultModal(match)}
-                              className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium transition"
-                            >
-                              {match.is_completed
-                                ? 'Edit Result'
-                                : 'Enter Result'}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => openPredictionsModal(match)}
-                            className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
-                          >
-                            View
-                          </button>
-                          {match.status !== 'completed' &&
-                            match.status !== 'cancelled' && (
-                              <button
-                                onClick={() => handleCancelMatch(match)}
-                                className="text-xs px-3 py-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 font-medium transition"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                        </div>
+                        <button
+                          onClick={() => openPredictionsModal(match)}
+                          className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
+                        >
+                          View Predictions
+                        </button>
                       </td>
                     </tr>
                   )
@@ -461,179 +352,14 @@ export function MatchesTab({
         </div>
       </div>
 
-      {/* Enter/Edit Result Modal */}
-      {modal.type === 'enter_result' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {modal.match.is_completed ? 'Edit' : 'Enter'} Match Result
-            </h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Match #{modal.match.match_number}:{' '}
-              {modal.match.home_team?.country_name ||
-                modal.match.home_team_placeholder ||
-                'TBD'}{' '}
-              vs{' '}
-              {modal.match.away_team?.country_name ||
-                modal.match.away_team_placeholder ||
-                'TBD'}
-              <br />
-              {getStageName(modal.match.stage)}
-              {modal.match.group_letter
-                ? ` ${modal.match.group_letter}`
-                : ''}{' '}
-              -{' '}
-              {new Date(modal.match.match_date).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </p>
-
-            {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
-
-            {/* Score inputs */}
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  {modal.match.home_team?.country_name ||
-                    modal.match.home_team_placeholder ||
-                    'Home'}
-                </p>
-                <input
-                  type="number"
-                  min="0"
-                  value={homeScore}
-                  onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                />
-              </div>
-              <span className="text-2xl font-bold text-gray-400 mt-6">-</span>
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  {modal.match.away_team?.country_name ||
-                    modal.match.away_team_placeholder ||
-                    'Away'}
-                </p>
-                <input
-                  type="number"
-                  min="0"
-                  value={awayScore}
-                  onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                />
-              </div>
-            </div>
-
-            {/* Match completion type */}
-            {modal.match.stage !== 'group' && (
-              <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Match completed after:
-                </p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="resultType"
-                      value="ft"
-                      checked={resultType === 'ft'}
-                      onChange={() => setResultType('ft')}
-                      className="text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Full Time (90 minutes)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="resultType"
-                      value="et"
-                      checked={resultType === 'et'}
-                      onChange={() => setResultType('et')}
-                      className="text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Extra Time (120 minutes)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="resultType"
-                      value="pso"
-                      checked={resultType === 'pso'}
-                      onChange={() => setResultType('pso')}
-                      className="text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Penalty Shootout
-                    </span>
-                  </label>
-                </div>
-
-                {/* PSO score inputs */}
-                {resultType === 'pso' && (
-                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500 mb-1">PSO</p>
-                      <input
-                        type="number"
-                        min="0"
-                        value={psoHome}
-                        onChange={(e) => setPsoHome(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                      />
-                    </div>
-                    <span className="text-lg font-bold text-gray-400 mt-4">
-                      -
-                    </span>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500 mb-1">PSO</p>
-                      <input
-                        type="number"
-                        min="0"
-                        value={psoAway}
-                        onChange={(e) => setPsoAway(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="gray"
-                onClick={() => setModal({ type: 'none' })}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="green"
-                onClick={handleSaveResult}
-                loading={saving}
-                loadingText="Saving..."
-              >
-                Save &amp; Calculate Points
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* View Predictions Modal */}
       {modal.type === 'view_predictions' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-900 mb-1">
               Predictions for Match #{modal.match.match_number}
             </h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-600 mb-4">
               {modal.match.home_team?.country_name ||
                 modal.match.home_team_placeholder ||
                 'TBD'}{' '}
@@ -660,7 +386,7 @@ export function MatchesTab({
               )
               if (matchPreds.length === 0) {
                 return (
-                  <p className="text-gray-500 text-sm py-4">
+                  <p className="text-gray-600 text-sm py-4">
                     No predictions for this match.
                   </p>
                 )
@@ -688,12 +414,30 @@ export function MatchesTab({
                         modal.match.home_score_ft !== null &&
                         modal.match.away_score_ft !== null
                       ) {
-                        pointsInfo = calcPoints(
+                        const hasPso =
+                          modal.match.home_score_pso !== null &&
+                          modal.match.away_score_pso !== null
+                        const result = calculatePoints(
                           pred.predicted_home_score,
                           pred.predicted_away_score,
                           modal.match.home_score_ft,
-                          modal.match.away_score_ft
+                          modal.match.away_score_ft,
+                          modal.match.stage,
+                          poolSettings,
+                          hasPso
+                            ? {
+                                actualHomePso: modal.match.home_score_pso!,
+                                actualAwayPso: modal.match.away_score_pso!,
+                                predictedHomePso: pred.predicted_home_pso,
+                                predictedAwayPso: pred.predicted_away_pso,
+                              }
+                            : undefined
                         )
+                        pointsInfo = {
+                          points: result.points,
+                          label: result.type === 'exact' ? 'Exact' : result.type === 'winner_gd' ? 'Winner+GD' : result.type === 'winner' ? 'Winner' : 'Wrong',
+                          icon: result.type === 'exact' ? '🎯' : result.type === 'miss' ? '✗' : '✓',
+                        }
                         if (pointsInfo.label === 'Exact') exactCount++
                         else if (pointsInfo.points > 0) winnerCount++
                         else wrongCount++
@@ -706,14 +450,23 @@ export function MatchesTab({
                         >
                           <span className="text-sm text-gray-700">{name}</span>
                           <div className="flex items-center gap-3">
-                            <span className="font-mono font-bold text-gray-900">
-                              {pred.predicted_home_score}-
-                              {pred.predicted_away_score}
-                            </span>
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-gray-900">
+                                {pred.predicted_home_score}-
+                                {pred.predicted_away_score}
+                              </span>
+                              {modal.match.home_score_pso !== null &&
+                                pred.predicted_home_pso != null &&
+                                pred.predicted_away_pso != null && (
+                                  <span className="text-xs text-purple-600 font-mono ml-1">
+                                    (PSO: {pred.predicted_home_pso}-{pred.predicted_away_pso})
+                                  </span>
+                                )}
+                            </div>
                             {pointsInfo && (
                               <span
                                 className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                  pointsInfo.points === 5
+                                  pointsInfo.label === 'Exact'
                                     ? 'bg-green-100 text-green-700'
                                     : pointsInfo.points > 0
                                       ? 'bg-yellow-100 text-yellow-700'

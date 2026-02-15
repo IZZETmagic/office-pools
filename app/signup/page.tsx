@@ -145,8 +145,15 @@ export default function SignupPage() {
         {/* Link to login page for existing users */}
         <p className="text-center text-gray-600 mt-4">
           Already have an account?{' '}
-          <Link href="/signup" className="text-blue-600 hover:underline font-semibold">
+          <Link href="/login" className="text-blue-600 hover:underline font-semibold">
             Sign in
+          </Link>
+        </p>
+
+        {/* Back to landing page */}
+        <p className="text-center mt-3">
+          <Link href="/" className="text-sm text-gray-500 hover:underline">
+            ← Back to home
           </Link>
         </p>
 

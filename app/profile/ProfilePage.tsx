@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
+import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // =====================
 // TYPES
@@ -65,6 +66,7 @@ type ProfilePageProps = {
   memberCounts: Record<string, number>
   predictions: Prediction[]
   totalMatchCount: number
+  poolSettingsMap: Record<string, any>
 }
 
 // =====================
@@ -143,6 +145,7 @@ export default function ProfilePage({
   memberCounts,
   predictions,
   totalMatchCount,
+  poolSettingsMap,
 }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('edit')
   const router = useRouter()
@@ -158,17 +161,17 @@ export default function ProfilePage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation bar */}
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link href="/dashboard" className="text-xl font-bold text-gray-900">
-          ⚽ World Cup Pool
+      <nav className="bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+        <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-gray-900">
+          World Cup Pool
         </Link>
         <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
-          ← Back to Dashboard
+          &larr; Dashboard
         </Link>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        <h2 className="text-3xl font-bold text-gray-900 mb-8">My Profile</h2>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">My Profile</h2>
 
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left sidebar */}
@@ -183,7 +186,7 @@ export default function ProfilePage({
                   {profile.full_name || profile.username}
                 </h3>
                 <p className="text-sm text-gray-500">@{profile.username}</p>
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-gray-500 mt-2">
                   Member since {formatMemberSince(profile.created_at)}
                 </p>
               </div>
@@ -191,12 +194,12 @@ export default function ProfilePage({
 
             {/* Navigation tabs */}
             <Card padding="md" className="!p-2">
-              <div className="flex flex-row md:flex-col gap-1">
+              <div className="flex flex-row md:flex-col gap-1 overflow-x-auto">
                 {tabs.map(tab => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+                    className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition flex items-center gap-2 whitespace-nowrap ${
                       activeTab === tab.key
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-700 hover:bg-gray-100'
@@ -227,6 +230,7 @@ export default function ProfilePage({
               <PredictionHistoryTab
                 predictions={predictions}
                 poolMemberships={poolMemberships}
+                poolSettingsMap={poolSettingsMap}
               />
             )}
             {activeTab === 'settings' && (
@@ -347,7 +351,7 @@ function EditProfileTab({
   return (
     <Card>
       <h3 className="text-2xl font-bold text-gray-900 mb-1">Edit Profile</h3>
-      <p className="text-gray-500 text-sm mb-6">Update your personal information</p>
+      <p className="text-gray-600 text-sm mb-6">Update your personal information</p>
 
       {error && <Alert variant="error">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
@@ -367,7 +371,7 @@ function EditProfileTab({
               maxLength={20}
             />
             {usernameStatus === 'checking' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Checking...</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">Checking...</span>
             )}
             {usernameStatus === 'available' && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600">✓ Available</span>
@@ -537,32 +541,32 @@ function StatisticsTab({
     <div className="space-y-6">
       <div>
         <h3 className="text-2xl font-bold text-gray-900 mb-1">Your Statistics</h3>
-        <p className="text-gray-500 text-sm mb-6">Your performance across all pools</p>
+        <p className="text-gray-600 text-sm mb-6">Your performance across all pools</p>
       </div>
 
       {/* Overview stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <p className="text-sm text-gray-500 mb-1">Total Pools</p>
-          <p className="text-3xl font-bold text-blue-600">{totalPools}</p>
-          <p className="text-xs text-gray-400">Active</p>
+          <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Pools</p>
+          <p className="text-2xl sm:text-3xl font-bold text-blue-600">{totalPools}</p>
+          <p className="text-xs text-gray-500">Active</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500 mb-1">Total Points</p>
-          <p className="text-3xl font-bold text-green-600">{totalPoints}</p>
-          <p className="text-xs text-gray-400">Across all pools</p>
+          <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Points</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-600">{totalPoints}</p>
+          <p className="text-xs text-gray-500">Across all pools</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500 mb-1">Predictions</p>
-          <p className="text-3xl font-bold text-purple-600">{totalPredictions}</p>
-          <p className="text-xs text-gray-400">Submitted</p>
+          <p className="text-xs sm:text-sm text-gray-600 mb-1">Predictions</p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-600">{totalPredictions}</p>
+          <p className="text-xs text-gray-500">Submitted</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500 mb-1">Best Rank</p>
-          <p className="text-3xl font-bold text-amber-600">
+          <p className="text-xs sm:text-sm text-gray-600 mb-1">Best Rank</p>
+          <p className="text-2xl sm:text-3xl font-bold text-amber-600">
             {bestPool ? `#${bestPool.current_rank}` : '--'}
           </p>
-          <p className="text-xs text-gray-400 truncate">
+          <p className="text-xs text-gray-500 truncate">
             {bestPool ? bestPool.pool_name : 'No rank yet'}
           </p>
         </Card>
@@ -576,11 +580,11 @@ function StatisticsTab({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 text-gray-500 font-medium">Pool Name</th>
-                  <th className="text-center py-3 px-2 text-gray-500 font-medium">Rank</th>
-                  <th className="text-center py-3 px-2 text-gray-500 font-medium">Points</th>
-                  <th className="text-center py-3 px-2 text-gray-500 font-medium">Predictions</th>
-                  <th className="text-center py-3 px-2 text-gray-500 font-medium">Accuracy</th>
+                  <th className="text-left py-3 px-2 text-gray-700 font-medium">Pool Name</th>
+                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Rank</th>
+                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Points</th>
+                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Predictions</th>
+                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Accuracy</th>
                 </tr>
               </thead>
               <tbody>
@@ -588,7 +592,7 @@ function StatisticsTab({
                   <tr key={pool.pool_id} className="border-b border-gray-100">
                     <td className="py-3 px-2">
                       <Link
-                        href={`/pools/${pool.pool_id}/leaderboard`}
+                        href={`/pools/${pool.pool_id}`}
                         className="text-blue-600 hover:underline font-medium"
                       >
                         {pool.pool_name}
@@ -609,7 +613,7 @@ function StatisticsTab({
                       {pool.accuracy !== null ? (
                         <span className="font-semibold text-gray-900">{pool.accuracy}%</span>
                       ) : (
-                        <span className="text-gray-400">--</span>
+                        <span className="text-gray-500">--</span>
                       )}
                     </td>
                   </tr>
@@ -652,7 +656,7 @@ function StatisticsTab({
           </div>
           {totals.accuracy !== null && (
             <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-600">
                 Overall Accuracy:{' '}
                 <span className="text-lg font-bold text-gray-900">{totals.accuracy}%</span>
               </p>
@@ -664,8 +668,8 @@ function StatisticsTab({
       {/* Empty state */}
       {poolStats.length === 0 && (
         <Card padding="lg" className="text-center">
-          <p className="text-gray-500 text-lg mb-2">No statistics yet</p>
-          <p className="text-gray-400">Join a pool and make predictions to see your stats.</p>
+          <p className="text-gray-600 text-lg mb-2">No statistics yet</p>
+          <p className="text-gray-500">Join a pool and make predictions to see your stats.</p>
         </Card>
       )}
     </div>
@@ -675,16 +679,16 @@ function StatisticsTab({
 function AccuracyRow({ label, icon, count, total }: { label: string; icon: string; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-6 text-center">{icon}</span>
-      <span className="text-sm text-gray-700 w-32">{label}</span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2">
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span className="w-5 sm:w-6 text-center text-sm">{icon}</span>
+      <span className="text-xs sm:text-sm text-gray-700 w-20 sm:w-32 shrink-0">{label}</span>
+      <div className="flex-1 bg-gray-100 rounded-full h-2 min-w-0">
         <div
           className="bg-blue-500 rounded-full h-2 transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-sm text-gray-600 w-20 text-right">
+      <span className="text-xs sm:text-sm text-gray-600 w-16 sm:w-20 text-right shrink-0">
         {count} ({pct}%)
       </span>
     </div>
@@ -698,9 +702,11 @@ function AccuracyRow({ label, icon, count, total }: { label: string; icon: strin
 function PredictionHistoryTab({
   predictions,
   poolMemberships,
+  poolSettingsMap,
 }: {
   predictions: Prediction[]
   poolMemberships: PoolMembership[]
+  poolSettingsMap: Record<string, any>
 }) {
   const [poolFilter, setPoolFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -708,7 +714,7 @@ function PredictionHistoryTab({
   const [currentPage, setCurrentPage] = useState(1)
   const perPage = 20
 
-  // Build member_id to pool map
+  // Build member_id to pool map and pool settings map
   const memberToPool = useMemo(() => {
     const map: Record<string, PoolMembership> = {}
     for (const pm of poolMemberships) {
@@ -716,6 +722,18 @@ function PredictionHistoryTab({
     }
     return map
   }, [poolMemberships])
+
+  // Build member_id to pool settings
+  const memberToSettings = useMemo(() => {
+    const map: Record<string, PoolSettings> = {}
+    for (const pm of poolMemberships) {
+      const raw = poolSettingsMap[pm.pool_id]
+      map[pm.member_id] = raw
+        ? { ...DEFAULT_POOL_SETTINGS, ...raw }
+        : DEFAULT_POOL_SETTINGS
+    }
+    return map
+  }, [poolMemberships, poolSettingsMap])
 
   // Get unique stages from predictions
   const stages = useMemo(() => {
@@ -733,22 +751,26 @@ function PredictionHistoryTab({
       let classification: 'exact' | 'winner_gd' | 'winner' | 'incorrect' | 'pending' = 'pending'
       let pointsDisplay = 'Pending'
 
-      if (m.status === 'completed' && m.home_score_ft !== null && m.away_score_ft !== null) {
-        const predictedWinner = getMatchWinner(pred.predicted_home_score, pred.predicted_away_score)
-        const actualWinner = getMatchWinner(m.home_score_ft, m.away_score_ft)
+      if ((m.status === 'completed' || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
+        const settings = memberToSettings[pred.member_id] ?? DEFAULT_POOL_SETTINGS
+        const result = calculatePoints(
+          pred.predicted_home_score,
+          pred.predicted_away_score,
+          m.home_score_ft,
+          m.away_score_ft,
+          m.stage,
+          settings
+        )
 
-        if (pred.predicted_home_score === m.home_score_ft && pred.predicted_away_score === m.away_score_ft) {
+        if (result.type === 'exact') {
           classification = 'exact'
-          pointsDisplay = `+${pred.points_awarded ?? 5} 🎯`
-        } else if (
-          predictedWinner === actualWinner &&
-          (pred.predicted_home_score - pred.predicted_away_score) === (m.home_score_ft - m.away_score_ft)
-        ) {
+          pointsDisplay = `+${result.points} 🎯`
+        } else if (result.type === 'winner_gd') {
           classification = 'winner_gd'
-          pointsDisplay = `+${pred.points_awarded ?? 3} ✓`
-        } else if (predictedWinner === actualWinner) {
+          pointsDisplay = `+${result.points} ✓`
+        } else if (result.type === 'winner') {
           classification = 'winner'
-          pointsDisplay = `+${pred.points_awarded ?? 1} ✓`
+          pointsDisplay = `+${result.points} ✓`
         } else {
           classification = 'incorrect'
           pointsDisplay = '+0 ✗'
@@ -757,7 +779,7 @@ function PredictionHistoryTab({
 
       return { ...pred, classification, pointsDisplay }
     })
-  }, [predictions])
+  }, [predictions, memberToSettings])
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -811,7 +833,7 @@ function PredictionHistoryTab({
     <div className="space-y-6">
       <div>
         <h3 className="text-2xl font-bold text-gray-900 mb-1">Prediction History</h3>
-        <p className="text-gray-500 text-sm mb-6">All your predictions across all pools</p>
+        <p className="text-gray-600 text-sm mb-6">All your predictions across all pools</p>
       </div>
 
       {/* Filters */}
@@ -819,7 +841,7 @@ function PredictionHistoryTab({
         <div className="flex flex-wrap gap-4">
           {/* Pool filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Pool</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Pool</label>
             <select
               value={poolFilter}
               onChange={e => handleFilterChange(setPoolFilter, e.target.value)}
@@ -834,7 +856,7 @@ function PredictionHistoryTab({
 
           {/* Status filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
             <div className="flex gap-1">
               {(['all', 'correct', 'incorrect', 'pending'] as const).map(status => (
                 <button
@@ -854,7 +876,7 @@ function PredictionHistoryTab({
 
           {/* Stage filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Stage</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Stage</label>
             <select
               value={stageFilter}
               onChange={e => handleFilterChange(setStageFilter, e.target.value)}
@@ -872,17 +894,17 @@ function PredictionHistoryTab({
       {/* Predictions table */}
       <Card>
         {paginated.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No predictions found matching your filters.</p>
+          <p className="text-gray-600 text-center py-8">No predictions found matching your filters.</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Match</th>
-                    <th className="text-center py-3 px-2 text-gray-500 font-medium">Your Prediction</th>
-                    <th className="text-center py-3 px-2 text-gray-500 font-medium">Result</th>
-                    <th className="text-center py-3 px-2 text-gray-500 font-medium">Points</th>
+                    <th className="text-left py-3 px-2 text-gray-700 font-medium">Match</th>
+                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Your Prediction</th>
+                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Result</th>
+                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Points</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -898,7 +920,7 @@ function PredictionHistoryTab({
                       <tr key={pred.prediction_id} className={`border-b border-gray-100 ${rowBg(pred.classification)}`}>
                         <td className="py-3 px-2">
                           <p className="font-medium text-gray-900">{homeTeam} vs {awayTeam}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-500">
                             {formatDate(m.match_date)} &middot; {formatStage(m.stage)}
                             {m.group_letter ? ` (Group ${m.group_letter})` : ''}
                           </p>
@@ -918,7 +940,7 @@ function PredictionHistoryTab({
                             <span className="text-red-600">{pred.pointsDisplay}</span>
                           )}
                           {pred.classification === 'pending' && (
-                            <span className="text-gray-400">{pred.pointsDisplay}</span>
+                            <span className="text-gray-500">{pred.pointsDisplay}</span>
                           )}
                         </td>
                       </tr>
@@ -931,7 +953,7 @@ function PredictionHistoryTab({
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-600">
                   Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, filtered.length)} of {filtered.length}
                 </p>
                 <div className="flex gap-2">
@@ -1063,7 +1085,7 @@ function AccountSettingsTab({
     <div className="space-y-6">
       <div>
         <h3 className="text-2xl font-bold text-gray-900 mb-1">Account Settings</h3>
-        <p className="text-gray-500 text-sm mb-6">Manage your account and security</p>
+        <p className="text-gray-600 text-sm mb-6">Manage your account and security</p>
       </div>
 
       {/* Security section */}
@@ -1072,7 +1094,7 @@ function AccountSettingsTab({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-700">Password</p>
-            <p className="text-xs text-gray-400">Change your account password</p>
+            <p className="text-xs text-gray-500">Change your account password</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowPasswordModal(true)}>
             Change Password
@@ -1105,7 +1127,7 @@ function AccountSettingsTab({
       {/* Danger zone */}
       <Card className="!border !border-red-200">
         <h4 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h4>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-600 mb-4">
           Permanently delete your account and all your data. This action cannot be undone.
         </p>
         <Button
@@ -1119,8 +1141,8 @@ function AccountSettingsTab({
 
       {/* Password change modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
 
             {passwordError && <Alert variant="error">{passwordError}</Alert>}
@@ -1173,8 +1195,8 @@ function AccountSettingsTab({
 
       {/* Delete account modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-red-600 mb-2">Delete Account - PERMANENT</h3>
             <p className="text-sm text-gray-600 mb-4">
               Are you absolutely sure? This will:

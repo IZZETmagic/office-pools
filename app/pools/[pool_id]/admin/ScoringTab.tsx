@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolData, SettingsData, MatchData, MemberData } from './page'
+import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -28,6 +28,10 @@ const DEFAULTS = {
   semi_final_multiplier: 2,
   third_place_multiplier: 1.5,
   final_multiplier: 3,
+  pso_enabled: true,
+  pso_exact_score: 100,
+  pso_correct_difference: 75,
+  pso_correct_result: 50,
 }
 
 export function ScoringTab({
@@ -75,6 +79,20 @@ export function ScoringTab({
     settings?.final_multiplier ?? DEFAULTS.final_multiplier
   )
 
+  // PSO state
+  const [psoEnabled, setPsoEnabled] = useState(
+    settings?.pso_enabled ?? DEFAULTS.pso_enabled
+  )
+  const [psoExact, setPsoExact] = useState(
+    settings?.pso_exact_score ?? DEFAULTS.pso_exact_score
+  )
+  const [psoDiff, setPsoDiff] = useState(
+    settings?.pso_correct_difference ?? DEFAULTS.pso_correct_difference
+  )
+  const [psoResult, setPsoResult] = useState(
+    settings?.pso_correct_result ?? DEFAULTS.pso_correct_result
+  )
+
   // UI state
   const [saving, setSaving] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
@@ -84,6 +102,7 @@ export function ScoringTab({
   const [expandGroup, setExpandGroup] = useState(true)
   const [expandKnockout, setExpandKnockout] = useState(true)
   const [expandMultipliers, setExpandMultipliers] = useState(true)
+  const [expandPso, setExpandPso] = useState(true)
 
   const completedMatchCount = matches.filter((m) => m.is_completed).length
   const memberCount = members.length
@@ -101,6 +120,10 @@ export function ScoringTab({
     r16Mult <= 0 || qfMult <= 0 || sfMult <= 0 || tpMult <= 0 || finalMult <= 0
       ? 'Multipliers must be positive'
       : null
+  const psoWarning =
+    psoEnabled && (psoExact < psoDiff || psoDiff < psoResult)
+      ? 'Exact Score should be >= Winner+GD >= Winner Only'
+      : null
 
   function resetDefaults() {
     setGroupExact(DEFAULTS.group_exact_score)
@@ -114,6 +137,10 @@ export function ScoringTab({
     setSfMult(DEFAULTS.semi_final_multiplier)
     setTpMult(DEFAULTS.third_place_multiplier)
     setFinalMult(DEFAULTS.final_multiplier)
+    setPsoEnabled(DEFAULTS.pso_enabled)
+    setPsoExact(DEFAULTS.pso_exact_score)
+    setPsoDiff(DEFAULTS.pso_correct_difference)
+    setPsoResult(DEFAULTS.pso_correct_result)
   }
 
   async function handleSave() {
@@ -133,6 +160,10 @@ export function ScoringTab({
       semi_final_multiplier: sfMult,
       third_place_multiplier: tpMult,
       final_multiplier: finalMult,
+      pso_enabled: psoEnabled,
+      pso_exact_score: psoExact,
+      pso_correct_difference: psoDiff,
+      pso_correct_result: psoResult,
       updated_at: new Date().toISOString(),
     }
 
@@ -231,31 +262,35 @@ export function ScoringTab({
     suffix?: string
   }) {
     return (
-      <div className="flex items-center gap-4">
-        <label className="text-sm text-gray-700 w-52 shrink-0">{label}</label>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-        />
-        <div className="flex items-center gap-1.5 shrink-0">
+      <div>
+        <label className="text-sm text-gray-700 block mb-1.5 sm:hidden">{label}</label>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <label className="text-sm text-gray-700 w-52 shrink-0 hidden sm:block">{label}</label>
           <input
-            type="number"
+            type="range"
             min={min}
             max={max}
             step={step}
             value={value}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value)
-              if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)))
-            }}
-            className="w-16 h-8 text-center text-sm font-bold border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            onChange={(e) => onChange(parseFloat(e.target.value))}
+            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600 min-w-0"
           />
-          <span className="text-xs text-gray-500 w-10">{suffix}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <input
+              type="number"
+              min={min}
+              max={max}
+              step={step}
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value)
+                if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)))
+              }}
+              className="w-14 sm:w-16 h-8 text-center text-sm font-bold border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            />
+            <span className="text-xs text-gray-600 w-10">{suffix}</span>
+          </div>
         </div>
       </div>
     )
@@ -271,7 +306,7 @@ export function ScoringTab({
       {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Current scoring display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Card>
           <h3 className="font-semibold text-gray-900 mb-3">
             Group Stage Scoring
@@ -279,15 +314,15 @@ export function ScoringTab({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">🎯 Exact Score</span>
-              <span className="font-bold">{groupExact} points</span>
+              <span className="font-bold text-gray-900">{groupExact} points</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">✓ Correct Winner + GD</span>
-              <span className="font-bold">{groupDiff} points</span>
+              <span className="font-bold text-gray-900">{groupDiff} points</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">✓ Correct Winner Only</span>
-              <span className="font-bold">{groupResult} point{groupResult !== 1 ? 's' : ''}</span>
+              <span className="font-bold text-gray-900">{groupResult} point{groupResult !== 1 ? 's' : ''}</span>
             </div>
           </div>
         </Card>
@@ -299,39 +334,63 @@ export function ScoringTab({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">🎯 Exact Score</span>
-              <span className="font-bold">{koExact} points</span>
+              <span className="font-bold text-gray-900">{koExact} points</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">✓ Correct Winner + GD</span>
-              <span className="font-bold">{koDiff} points</span>
+              <span className="font-bold text-gray-900">{koDiff} points</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">✓ Correct Winner Only</span>
-              <span className="font-bold">{koResult} point{koResult !== 1 ? 's' : ''}</span>
+              <span className="font-bold text-gray-900">{koResult} point{koResult !== 1 ? 's' : ''}</span>
             </div>
             <hr className="my-2" />
-            <p className="text-xs text-gray-500 font-medium mb-1">Stage Multipliers:</p>
+            <p className="text-xs text-gray-600 font-medium mb-1">Stage Multipliers:</p>
             <div className="flex justify-between">
               <span className="text-gray-600">Round of 16</span>
-              <span className="font-bold">{r16Mult}x</span>
+              <span className="font-bold text-gray-900">{r16Mult}x</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Quarter Final</span>
-              <span className="font-bold">{qfMult}x</span>
+              <span className="font-bold text-gray-900">{qfMult}x</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Semi Final</span>
-              <span className="font-bold">{sfMult}x</span>
+              <span className="font-bold text-gray-900">{sfMult}x</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Third Place</span>
-              <span className="font-bold">{tpMult}x</span>
+              <span className="font-bold text-gray-900">{tpMult}x</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Final</span>
-              <span className="font-bold">{finalMult}x</span>
+              <span className="font-bold text-gray-900">{finalMult}x</span>
             </div>
           </div>
+        </Card>
+
+        <Card>
+          <h3 className="font-semibold text-gray-900 mb-3">
+            Penalty Shootout
+          </h3>
+          {psoEnabled ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">🎯 Exact PSO Score</span>
+                <span className="font-bold text-gray-900">{psoExact} points</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">✓ Correct Winner + GD</span>
+                <span className="font-bold text-gray-900">{psoDiff} points</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">✓ Correct Winner Only</span>
+                <span className="font-bold text-gray-900">{psoResult} point{psoResult !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">Disabled</p>
+          )}
         </Card>
       </div>
 
@@ -481,7 +540,7 @@ export function ScoringTab({
                 step={0.5}
                 suffix="x"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-600">
                 Example: {koExact} points (exact) x {finalMult} (final) ={' '}
                 {koExact * finalMult} points
               </p>
@@ -492,11 +551,69 @@ export function ScoringTab({
           )}
         </div>
 
-        {/* Penalty Shootout - Phase 2 */}
-        <div className="mb-4 border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
-          <p className="text-sm font-semibold text-gray-400">
-            ▶ Penalty Shootout Scoring (Coming Soon - Phase 2)
-          </p>
+        {/* Penalty Shootout Scoring */}
+        <div className="mb-6">
+          <button
+            onClick={() => setExpandPso(!expandPso)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3 hover:text-blue-600"
+          >
+            <span>{expandPso ? '▼' : '▶'}</span>
+            Penalty Shootout Scoring
+          </button>
+          {expandPso && (
+            <div className="space-y-4 pl-4">
+              <div className="flex items-center gap-3">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={psoEnabled}
+                    onChange={(e) => setPsoEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+                <span className="text-sm text-gray-700">
+                  Enable penalty shootout scoring
+                </span>
+              </div>
+              <p className="text-xs text-gray-600">
+                When enabled, bonus points are awarded for predicting the penalty shootout score in knockout matches that go to penalties.
+              </p>
+              <div className={psoEnabled ? '' : 'opacity-40 pointer-events-none'}>
+                <SliderInput
+                  label="Exact PSO Score:"
+                  value={psoExact}
+                  onChange={setPsoExact}
+                  min={5}
+                  max={200}
+                  step={5}
+                />
+                <div className="mt-4">
+                  <SliderInput
+                    label="Correct Winner + GD:"
+                    value={psoDiff}
+                    onChange={setPsoDiff}
+                    min={5}
+                    max={200}
+                    step={5}
+                  />
+                </div>
+                <div className="mt-4">
+                  <SliderInput
+                    label="Correct Winner Only:"
+                    value={psoResult}
+                    onChange={setPsoResult}
+                    min={5}
+                    max={200}
+                    step={5}
+                  />
+                </div>
+              </div>
+              {psoWarning && (
+                <p className="text-sm text-orange-500">{psoWarning}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bonus Points - Phase 2 */}
@@ -510,7 +627,7 @@ export function ScoringTab({
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
           <Button variant="gray" onClick={resetDefaults}>
             Reset to Defaults
           </Button>
@@ -525,7 +642,7 @@ export function ScoringTab({
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
           Manual Recalculation
         </h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-600 mb-4">
           If points seem incorrect, you can manually recalculate all points
           using current rules.
         </p>
@@ -541,8 +658,8 @@ export function ScoringTab({
 
       {/* Confirmation Modal */}
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-3">
               Confirm Scoring Changes
             </h3>
@@ -554,10 +671,10 @@ export function ScoringTab({
               <li>Recalculate points for ALL members</li>
               <li>Update leaderboard rankings</li>
             </ul>
-            <p className="text-sm text-gray-500 mb-2">
+            <p className="text-sm text-gray-600 mb-2">
               Affected matches: {completedMatchCount} completed matches
             </p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-600 mb-4">
               Affected members: {memberCount} members
             </p>
             <p className="text-sm text-orange-500 font-medium mb-4">

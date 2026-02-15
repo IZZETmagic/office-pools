@@ -30,6 +30,7 @@ type Props = {
   memberId: string
   existingPredictions: Prediction[]
   isPastDeadline: boolean
+  psoEnabled: boolean
 }
 
 export default function PredictionsFlow({
@@ -38,6 +39,7 @@ export default function PredictionsFlow({
   memberId,
   existingPredictions,
   isPastDeadline,
+  psoEnabled,
 }: Props) {
   // =============================================
   // STATE
@@ -488,7 +490,7 @@ export default function PredictionsFlow({
                     ? 'bg-blue-600 text-white'
                     : isCompleted
                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {STAGE_LABELS[stage]}
@@ -524,6 +526,7 @@ export default function PredictionsFlow({
           resolvedMatches={getResolvedMatchesForStage('round_32')}
           predictions={predictions}
           onUpdatePrediction={updatePrediction}
+          psoEnabled={psoEnabled}
         />
       )}
 
@@ -533,6 +536,7 @@ export default function PredictionsFlow({
           resolvedMatches={getResolvedMatchesForStage('round_16')}
           predictions={predictions}
           onUpdatePrediction={updatePrediction}
+          psoEnabled={psoEnabled}
         />
       )}
 
@@ -542,6 +546,7 @@ export default function PredictionsFlow({
           resolvedMatches={getResolvedMatchesForStage('quarter_final')}
           predictions={predictions}
           onUpdatePrediction={updatePrediction}
+          psoEnabled={psoEnabled}
         />
       )}
 
@@ -551,6 +556,7 @@ export default function PredictionsFlow({
           resolvedMatches={getResolvedMatchesForStage('semi_final')}
           predictions={predictions}
           onUpdatePrediction={updatePrediction}
+          psoEnabled={psoEnabled}
         />
       )}
 
@@ -560,6 +566,7 @@ export default function PredictionsFlow({
           resolvedMatches={getResolvedMatchesForStage('finals')}
           predictions={predictions}
           onUpdatePrediction={updatePrediction}
+          psoEnabled={psoEnabled}
         />
       )}
 
@@ -578,7 +585,7 @@ export default function PredictionsFlow({
 
       {/* Navigation buttons */}
       {stageName !== 'summary' && (
-        <div className="mt-8 flex gap-3">
+        <div className="mt-6 sm:mt-8 flex gap-2 sm:gap-3">
           {currentStage > 0 && (
             <Button variant="outline" size="lg" onClick={goBack}>
               Back
@@ -589,11 +596,11 @@ export default function PredictionsFlow({
             size="lg"
             onClick={goNext}
             disabled={!canProceed}
-            className="flex-1"
+            className="flex-1 text-sm sm:text-base"
           >
             {canProceed
               ? `Proceed to ${STAGE_LABELS[STAGES[currentStage + 1]] || 'Summary'}`
-              : `Complete all ${STAGE_LABELS[stageName]?.toLowerCase()} predictions to proceed`
+              : `Complete all ${STAGE_LABELS[stageName]?.toLowerCase()} predictions`
             }
           </Button>
         </div>

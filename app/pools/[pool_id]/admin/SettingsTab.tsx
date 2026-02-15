@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolData, MemberData } from './page'
+import type { PoolData, MemberData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -237,7 +237,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       return
     }
 
-    router.push('/pools?message=Pool+deleted+successfully')
+    router.push('/dashboard')
   }
 
   // Quick deadline options
@@ -309,7 +309,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
           </FormField>
 
           <div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-600">
               Pool Code:{' '}
               <span className="font-mono font-bold text-gray-900">
                 {pool.pool_code}
@@ -374,7 +374,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               </span>
             </p>
             {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-600">
                 Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
               </p>
             )}
@@ -501,7 +501,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       </Card>
 
       {/* Danger Zone */}
-      <div className="border-2 border-red-300 rounded-lg p-6 bg-red-50">
+      <div className="border-2 border-red-300 rounded-lg p-4 sm:p-6 bg-red-50">
         <h3 className="text-lg font-semibold text-red-600 mb-4">
           Danger Zone
         </h3>
@@ -546,8 +546,8 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-red-600 mb-3">
               Delete Pool - PERMANENT ACTION
             </h3>

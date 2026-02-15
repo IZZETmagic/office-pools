@@ -80,14 +80,14 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                 onClick={() => toggleGroup(letter)}
                 className="w-full flex items-center justify-between text-left"
               >
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-gray-900">Group {letter}</h3>
-                  <span className="text-xs text-gray-400">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 shrink-0">Group {letter}</h3>
+                  <span className="text-xs text-gray-500 truncate hidden sm:inline">
                     {gTeams.map(t => t.country_name).join(', ')}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <span className="text-xs text-gray-600">
                     {groupPredicted}/{groupTotal}
                   </span>
                   {groupPredicted === groupTotal && groupTotal > 0 ? (
@@ -98,7 +98,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                     <Badge variant="gray">Not Started</Badge>
                   )}
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -168,9 +168,9 @@ function MatchRow({
   }
 
   return (
-    <div className="flex items-center gap-2 py-2">
+    <div className="flex items-center gap-1.5 sm:gap-2 py-2">
       {/* Match info */}
-      <div className="hidden sm:block text-xs text-gray-400 w-16 shrink-0">
+      <div className="hidden sm:block text-xs text-gray-500 w-16 shrink-0">
         #{match.match_number}
         <br />
         {new Date(match.match_date).toLocaleDateString('en-US', {
@@ -180,8 +180,8 @@ function MatchRow({
       </div>
 
       {/* Home team */}
-      <div className="flex-1 text-right">
-        <span className="text-sm font-medium text-gray-900">{homeTeam}</span>
+      <div className="flex-1 text-right min-w-0">
+        <span className="text-xs sm:text-sm font-medium text-gray-900 truncate block">{homeTeam}</span>
       </div>
 
       {/* Score inputs */}
@@ -189,25 +189,27 @@ function MatchRow({
         <input
           type="number"
           min="0"
+          inputMode="numeric"
           value={prediction?.home ?? ''}
           placeholder="-"
           onChange={(e) => handleScoreChange('home', e.target.value)}
-          className="w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+          className="w-10 sm:w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
         />
-        <span className="text-gray-400 font-bold text-xs">vs</span>
+        <span className="text-gray-500 font-bold text-[10px] sm:text-xs">vs</span>
         <input
           type="number"
           min="0"
+          inputMode="numeric"
           value={prediction?.away ?? ''}
           placeholder="-"
           onChange={(e) => handleScoreChange('away', e.target.value)}
-          className="w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+          className="w-10 sm:w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
         />
       </div>
 
       {/* Away team */}
-      <div className="flex-1 text-left">
-        <span className="text-sm font-medium text-gray-900">{awayTeam}</span>
+      <div className="flex-1 text-left min-w-0">
+        <span className="text-xs sm:text-sm font-medium text-gray-900 truncate block">{awayTeam}</span>
       </div>
     </div>
   )

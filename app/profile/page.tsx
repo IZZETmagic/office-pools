@@ -92,6 +92,19 @@ export default async function ProfileServerPage() {
     predictions = predictionData ?? []
   }
 
+  // Get pool settings for each pool (needed for accurate points display)
+  const poolSettingsMap: Record<string, any> = {}
+  for (const pool of poolMemberships) {
+    const { data: settings } = await supabase
+      .from('pool_settings')
+      .select('*')
+      .eq('pool_id', pool.pool_id)
+      .single()
+    if (settings) {
+      poolSettingsMap[pool.pool_id] = settings
+    }
+  }
+
   // Get total match counts per pool's tournament for prediction ratio
   // We'll get all matches since all pools share the same tournament
   const { count: totalMatchCount } = await supabase
@@ -111,6 +124,7 @@ export default async function ProfileServerPage() {
       memberCounts={memberCounts}
       predictions={predictions}
       totalMatchCount={totalMatchCount ?? 0}
+      poolSettingsMap={poolSettingsMap}
     />
   )
 }

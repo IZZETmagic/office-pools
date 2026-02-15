@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const protectedRoutes = ['/dashboard', '/pools', '/profile']
 
 // Routes that authenticated users should be redirected away from
-const authRoutes = ['/login', '/signup']
+const authRoutes = ['/login', '/signup', '/forgot-password']
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({

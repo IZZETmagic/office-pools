@@ -99,6 +99,13 @@ export default function LoginPage() {
             />
           </FormField>
 
+          {/* Forgot password link */}
+          <div className="text-right">
+            <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+
           {/* Submit button - shows "Signing in..." while loading */}
           <Button type="submit" fullWidth loading={loading} loadingText="Signing in...">
             Sign In
@@ -110,6 +117,13 @@ export default function LoginPage() {
           Don't have an account?{' '}
           <Link href="/signup" className="text-blue-600 hover:underline font-semibold">
             Sign up
+          </Link>
+        </p>
+
+        {/* Back to landing page */}
+        <p className="text-center mt-3">
+          <Link href="/" className="text-sm text-gray-500 hover:underline">
+            ← Back to home
           </Link>
         </p>
 

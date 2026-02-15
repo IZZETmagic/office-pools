@@ -100,18 +100,27 @@ export function ResultsView({
     let sum = 0
     for (const m of matches) {
       if (
-        m.status === 'completed' &&
+        (m.status === 'completed' || m.status === 'live') &&
         m.home_score_ft !== null &&
         m.away_score_ft !== null &&
         m.prediction
       ) {
+        const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
         const res = calculatePoints(
           m.prediction.predicted_home_score,
           m.prediction.predicted_away_score,
           m.home_score_ft,
           m.away_score_ft,
           m.stage,
-          poolSettings
+          poolSettings,
+          hasPso
+            ? {
+                actualHomePso: m.home_score_pso!,
+                actualAwayPso: m.away_score_pso!,
+                predictedHomePso: m.prediction.predicted_home_pso,
+                predictedAwayPso: m.prediction.predicted_away_pso,
+              }
+            : undefined
         )
         sum += res.points
       }
@@ -124,10 +133,10 @@ export function ResultsView({
       {/* ── Points summary ── */}
       <div className="mb-6 p-4 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">Your Total Points</p>
+          <p className="text-sm text-gray-600">Your Total Points</p>
           <p className="text-3xl font-extrabold text-blue-600">{totalPoints}</p>
         </div>
-        <div className="text-right text-xs text-gray-400">
+        <div className="text-right text-xs text-gray-500">
           <p>{statusCounts.completed} completed</p>
           {statusCounts.live > 0 && <p>{statusCounts.live} live</p>}
           <p>
@@ -137,7 +146,7 @@ export function ResultsView({
       </div>
 
       {/* ── Stage tabs ── */}
-      <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-200 pb-3">
+      <div className="flex gap-1 mb-4 border-b border-gray-200 pb-3 overflow-x-auto">
         {STAGE_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -145,7 +154,7 @@ export function ResultsView({
               setStageTab(tab.key)
               if (tab.key !== 'group') setGroupFilter('all')
             }}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
               stageTab === tab.key
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -206,12 +215,12 @@ export function ResultsView({
       {/* ── Match cards grid ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400 text-lg">
+          <p className="text-gray-500 text-lg">
             No matches found for this filter.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {filtered.map((match) => (
             <MatchCard
               key={match.match_id}

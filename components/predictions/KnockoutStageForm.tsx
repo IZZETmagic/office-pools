@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import {
   Match,
   PredictionMap,
@@ -22,9 +21,10 @@ type Props = {
   resolvedMatches: ResolvedMatch[]
   predictions: PredictionMap
   onUpdatePrediction: (matchId: string, score: ScoreEntry) => void
+  psoEnabled: boolean
 }
 
-export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdatePrediction }: Props) {
+export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdatePrediction, psoEnabled }: Props) {
   const stageLabel = STAGE_LABELS[stage] || stage
   const totalMatches = resolvedMatches.length
   const predictedMatches = resolvedMatches.filter(rm => {
@@ -32,9 +32,11 @@ export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdat
     if (!pred) return false
     // A knockout match with a draw needs PSO resolution to count as complete
     if (pred.home === pred.away) {
-      const hasPso = pred.homePso != null && pred.awayPso != null && pred.homePso !== pred.awayPso
-      const hasWinner = pred.winnerTeamId != null
-      return hasPso || hasWinner
+      if (psoEnabled) {
+        return pred.homePso != null && pred.awayPso != null && pred.homePso !== pred.awayPso
+      } else {
+        return pred.winnerTeamId != null
+      }
     }
     return true
   }).length
@@ -62,17 +64,13 @@ export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdat
             awayTeam={awayTeam}
             prediction={predictions.get(match.match_id)}
             onUpdate={onUpdatePrediction}
+            psoEnabled={psoEnabled}
           />
         ))}
       </div>
     </div>
   )
 }
-
-// =============================================
-// PSO option type
-// =============================================
-type PsoOption = 'exact' | 'winner' | 'skip'
 
 // =============================================
 // KNOCKOUT MATCH CARD
@@ -84,25 +82,18 @@ function KnockoutMatchCard({
   awayTeam,
   prediction,
   onUpdate,
+  psoEnabled,
 }: {
   match: Match
   homeTeam: GroupStanding | null
   awayTeam: GroupStanding | null
   prediction: ScoreEntry | undefined
   onUpdate: (matchId: string, score: ScoreEntry) => void
+  psoEnabled: boolean
 }) {
   const homeName = homeTeam?.country_name || match.home_team_placeholder || 'TBD'
   const awayName = awayTeam?.country_name || match.away_team_placeholder || 'TBD'
   const bothResolved = homeTeam !== null && awayTeam !== null
-
-  // Determine initial PSO option from existing prediction
-  const initialPsoOption = (): PsoOption => {
-    if (!prediction) return 'winner'
-    if (prediction.homePso != null && prediction.awayPso != null) return 'exact'
-    if (prediction.winnerTeamId != null) return 'winner'
-    return 'winner'
-  }
-  const [psoOption, setPsoOption] = useState<PsoOption>(initialPsoOption)
 
   const isDraw = prediction != null && prediction.home === prediction.away
   const hasPrediction = prediction != null
@@ -131,7 +122,7 @@ function KnockoutMatchCard({
 
   const handlePsoScoreChange = (team: 'homePso' | 'awayPso', value: string) => {
     const numValue = value === '' ? null : parseInt(value)
-    if (numValue !== null && (isNaN(numValue) || numValue < 0 || numValue > 10)) return
+    if (numValue !== null && (isNaN(numValue) || numValue < 0 || numValue > 20)) return
 
     const current = prediction || { home: 0, away: 0 }
     onUpdate(match.match_id, {
@@ -151,45 +142,13 @@ function KnockoutMatchCard({
     })
   }
 
-  const handlePsoOptionChange = (option: PsoOption) => {
-    setPsoOption(option)
-    const current = prediction || { home: 0, away: 0 }
-
-    if (option === 'exact') {
-      // Clear winner, keep or init PSO scores
-      onUpdate(match.match_id, {
-        ...current,
-        winnerTeamId: null,
-        homePso: current.homePso ?? null,
-        awayPso: current.awayPso ?? null,
-      })
-    } else if (option === 'winner') {
-      // Clear PSO scores, set default winner
-      const defaultWinner = homeTeam?.team_id || null
-      onUpdate(match.match_id, {
-        ...current,
-        homePso: null,
-        awayPso: null,
-        winnerTeamId: current.winnerTeamId || defaultWinner,
-      })
-    } else {
-      // Skip: clear all PSO fields
-      onUpdate(match.match_id, {
-        ...current,
-        homePso: null,
-        awayPso: null,
-        winnerTeamId: null,
-      })
-    }
-  }
-
   const stageLabel = match.stage === 'third_place'
     ? 'Third Place'
     : match.stage === 'final'
     ? 'Final'
     : match.stage.replace(/_/g, ' ')
 
-  // PSO validation
+  // PSO validation: scores can't be tied
   const psoTied = prediction?.homePso != null && prediction?.awayPso != null && prediction.homePso === prediction.awayPso
 
   return (
@@ -200,7 +159,7 @@ function KnockoutMatchCard({
           <Badge variant={match.stage === 'final' ? 'green' : match.stage === 'third_place' ? 'yellow' : 'blue'}>
             {stageLabel}
           </Badge>
-          <span className="text-xs text-gray-400">Match #{match.match_number}</span>
+          <span className="text-xs text-gray-500">Match #{match.match_number}</span>
         </div>
         <div className="text-right">
           <p className="text-xs text-gray-500">
@@ -212,25 +171,25 @@ function KnockoutMatchCard({
             })}
           </p>
           {match.venue && (
-            <p className="text-xs text-gray-400">{match.venue}</p>
+            <p className="text-xs text-gray-500">{match.venue}</p>
           )}
         </div>
       </div>
 
       {/* Full time label */}
       {isDraw && (
-        <p className="text-xs text-gray-500 font-medium mb-1 text-center">Full Time</p>
+        <p className="text-xs text-gray-600 font-medium mb-1 text-center">Full Time</p>
       )}
 
       {/* Teams and score inputs */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Home team */}
-        <div className="flex-1 text-right">
-          <p className={`text-base font-semibold ${bothResolved ? 'text-gray-900' : 'text-gray-400'}`}>
+        <div className="flex-1 text-right min-w-0">
+          <p className={`text-sm sm:text-base font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
             {homeName}
           </p>
           {homeTeam && (
-            <p className="text-xs text-gray-400">Group {homeTeam.group_letter}</p>
+            <p className="text-xs text-gray-500">Group {homeTeam.group_letter}</p>
           )}
         </div>
 
@@ -239,31 +198,33 @@ function KnockoutMatchCard({
           <input
             type="number"
             min="0"
+            inputMode="numeric"
             value={prediction?.home ?? ''}
             placeholder="-"
             disabled={!bothResolved}
             onChange={(e) => handleScoreChange('home', e.target.value)}
-            className="w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-11 sm:w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-base sm:text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
-          <span className="text-gray-400 font-bold">-</span>
+          <span className="text-gray-500 font-bold">-</span>
           <input
             type="number"
             min="0"
+            inputMode="numeric"
             value={prediction?.away ?? ''}
             placeholder="-"
             disabled={!bothResolved}
             onChange={(e) => handleScoreChange('away', e.target.value)}
-            className="w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-11 sm:w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-base sm:text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
 
         {/* Away team */}
-        <div className="flex-1 text-left">
-          <p className={`text-base font-semibold ${bothResolved ? 'text-gray-900' : 'text-gray-400'}`}>
+        <div className="flex-1 text-left min-w-0">
+          <p className={`text-sm sm:text-base font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
             {awayName}
           </p>
           {awayTeam && (
-            <p className="text-xs text-gray-400">Group {awayTeam.group_letter}</p>
+            <p className="text-xs text-gray-500">Group {awayTeam.group_letter}</p>
           )}
         </div>
       </div>
@@ -272,106 +233,78 @@ function KnockoutMatchCard({
       {bothResolved && hasPrediction && isDraw && (
         <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-200">
           <div className="bg-blue-50 rounded-lg p-4">
-            {/* PSO Header */}
-            <div className="mb-3">
-              <p className="text-sm font-semibold text-gray-900">Penalty Shootout</p>
-              <p className="text-xs text-gray-500">Predict the penalty shootout outcome for bonus points</p>
-            </div>
-
-            {/* PSO Options */}
-            <div className="space-y-3">
-              {/* Option 1: Exact PSO scores */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`pso-${match.match_id}`}
-                  checked={psoOption === 'exact'}
-                  onChange={() => handlePsoOptionChange('exact')}
-                  className="mt-1 shrink-0"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">Predict exact PSO score</p>
-                  {psoOption === 'exact' && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs text-gray-600 w-20 text-right truncate">{homeName}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={prediction?.homePso ?? ''}
-                        placeholder="-"
-                        onChange={(e) => handlePsoScoreChange('homePso', e.target.value)}
-                        className="w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
-                      />
-                      <span className="text-gray-400 text-xs font-bold">-</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={prediction?.awayPso ?? ''}
-                        placeholder="-"
-                        onChange={(e) => handlePsoScoreChange('awayPso', e.target.value)}
-                        className="w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
-                      />
-                      <span className="text-xs text-gray-600 w-20 truncate">{awayName}</span>
-                    </div>
-                  )}
-                  {psoOption === 'exact' && psoTied && (
-                    <p className="text-xs text-red-600 mt-1">PSO scores cannot be equal - one team must win</p>
-                  )}
+            {psoEnabled ? (
+              /* PSO ENABLED: Show exact score inputs (required) */
+              <>
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-gray-900">Penalty Shootout Score</p>
+                  <p className="text-xs text-gray-600">Predict the exact penalty shootout score</p>
                 </div>
-              </label>
-
-              {/* Option 2: Just pick the winner */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`pso-${match.match_id}`}
-                  checked={psoOption === 'winner'}
-                  onChange={() => handlePsoOptionChange('winner')}
-                  className="mt-1 shrink-0"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">Just pick the winner</p>
-                  {psoOption === 'winner' && (
-                    <div className="mt-2">
-                      <select
-                        value={prediction?.winnerTeamId || ''}
-                        onChange={(e) => handleWinnerChange(e.target.value)}
-                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select winner...</option>
-                        {homeTeam && (
-                          <option value={homeTeam.team_id}>{homeName}</option>
-                        )}
-                        {awayTeam && (
-                          <option value={awayTeam.team_id}>{awayName}</option>
-                        )}
-                      </select>
-                    </div>
-                  )}
+                <div className="flex items-center gap-1.5 sm:gap-2 justify-center">
+                  <span className="text-xs text-gray-600 w-16 sm:w-20 text-right truncate">{homeName}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    inputMode="numeric"
+                    value={prediction?.homePso ?? ''}
+                    placeholder="-"
+                    onChange={(e) => handlePsoScoreChange('homePso', e.target.value)}
+                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+                  />
+                  <span className="text-gray-500 text-xs font-bold">-</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    inputMode="numeric"
+                    value={prediction?.awayPso ?? ''}
+                    placeholder="-"
+                    onChange={(e) => handlePsoScoreChange('awayPso', e.target.value)}
+                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+                  />
+                  <span className="text-xs text-gray-600 w-16 sm:w-20 truncate">{awayName}</span>
                 </div>
-              </label>
-
-              {/* Option 3: Skip PSO */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`pso-${match.match_id}`}
-                  checked={psoOption === 'skip'}
-                  onChange={() => handlePsoOptionChange('skip')}
-                  className="mt-1 shrink-0"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">Skip PSO prediction</p>
-                  {psoOption === 'skip' && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      You must select a PSO winner for tied knockout matches to proceed
-                    </p>
-                  )}
+                {psoTied && (
+                  <p className="text-xs text-red-600 mt-2 text-center">PSO scores cannot be equal - one team must win</p>
+                )}
+                {(prediction?.homePso == null || prediction?.awayPso == null) && (
+                  <p className="text-xs text-amber-600 mt-2 text-center">PSO score is required for tied knockout matches</p>
+                )}
+              </>
+            ) : (
+              /* PSO DISABLED: Show simple winner selection */
+              <>
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-gray-900">If this match goes to penalties, who wins?</p>
                 </div>
-              </label>
-            </div>
+                <div className="flex gap-4 justify-center">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`pso-winner-${match.match_id}`}
+                      checked={prediction?.winnerTeamId === homeTeam?.team_id}
+                      onChange={() => homeTeam && handleWinnerChange(homeTeam.team_id)}
+                      className="shrink-0"
+                    />
+                    <span className="text-sm font-medium text-gray-800">{homeName}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`pso-winner-${match.match_id}`}
+                      checked={prediction?.winnerTeamId === awayTeam?.team_id}
+                      onChange={() => awayTeam && handleWinnerChange(awayTeam.team_id)}
+                      className="shrink-0"
+                    />
+                    <span className="text-sm font-medium text-gray-800">{awayName}</span>
+                  </label>
+                </div>
+                {!prediction?.winnerTeamId && (
+                  <p className="text-xs text-amber-600 mt-2 text-center">Please select a winner for tied knockout matches</p>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

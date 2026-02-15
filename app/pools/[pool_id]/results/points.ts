@@ -50,12 +50,18 @@ export const DEFAULT_POOL_SETTINGS: PoolSettings = {
 // POINTS CALCULATION FOR MATCH RESULTS
 // =============================================
 
+export type PsoResult = {
+  psoPoints: number
+  psoType: 'exact' | 'winner_gd' | 'winner' | 'miss'
+}
+
 export type PointsResult = {
   points: number
   basePoints: number
   multiplier: number
   label: string
   type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+  pso?: PsoResult
 }
 
 /**
@@ -88,11 +94,48 @@ function getStageMultiplier(stage: string, settings: PoolSettings): number {
 }
 
 /**
+ * Calculate PSO bonus points when a match goes to penalties.
+ */
+function calculatePsoPoints(
+  predictedHomePso: number,
+  predictedAwayPso: number,
+  actualHomePso: number,
+  actualAwayPso: number,
+  settings: PoolSettings
+): PsoResult {
+  // Exact PSO score
+  if (predictedHomePso === actualHomePso && predictedAwayPso === actualAwayPso) {
+    return { psoPoints: settings.pso_exact_score, psoType: 'exact' }
+  }
+
+  const predictedWinner = getWinner(predictedHomePso, predictedAwayPso)
+  const actualWinner = getWinner(actualHomePso, actualAwayPso)
+
+  // Must have correct PSO winner for any PSO points
+  if (predictedWinner !== actualWinner) {
+    return { psoPoints: 0, psoType: 'miss' }
+  }
+
+  // Correct winner + correct goal difference
+  const predictedGD = predictedHomePso - predictedAwayPso
+  const actualGD = actualHomePso - actualAwayPso
+  if (predictedGD === actualGD) {
+    return { psoPoints: settings.pso_correct_difference, psoType: 'winner_gd' }
+  }
+
+  // Correct winner only
+  return { psoPoints: settings.pso_correct_result, psoType: 'winner' }
+}
+
+/**
  * Calculate points earned for a single prediction using pool settings.
  *
  * Group stage uses group_* settings with no multiplier.
  * Knockout stages use knockout_* settings with a stage multiplier.
  * Round of 32 uses knockout base values at 1x (no multiplier field in DB).
+ *
+ * When PSO is enabled and the match went to penalties, bonus PSO points
+ * are added on top of the FT points.
  */
 export function calculatePoints(
   predictedHome: number,
@@ -100,7 +143,13 @@ export function calculatePoints(
   actualHome: number,
   actualAway: number,
   stage: string,
-  settings: PoolSettings
+  settings: PoolSettings,
+  pso?: {
+    actualHomePso: number
+    actualAwayPso: number
+    predictedHomePso: number | null
+    predictedAwayPso: number | null
+  }
 ): PointsResult {
   const isGroupStage = stage === 'group'
 
@@ -118,16 +167,36 @@ export function calculatePoints(
   // Multiplier (only for knockout, and round_32 defaults to 1x)
   const multiplier = isGroupStage ? 1 : getStageMultiplier(stage, settings)
 
+  // Calculate PSO bonus if applicable
+  let psoResult: PsoResult | undefined
+  if (
+    settings.pso_enabled &&
+    pso &&
+    pso.predictedHomePso != null &&
+    pso.predictedAwayPso != null
+  ) {
+    psoResult = calculatePsoPoints(
+      pso.predictedHomePso,
+      pso.predictedAwayPso,
+      pso.actualHomePso,
+      pso.actualAwayPso,
+      settings
+    )
+  }
+
+  const psoBonus = psoResult?.psoPoints ?? 0
+
   // 1. Exact score
   if (predictedHome === actualHome && predictedAway === actualAway) {
     const base = exactBase
-    const pts = Math.floor(base * multiplier)
+    const pts = Math.floor(base * multiplier) + psoBonus
     return {
       points: pts,
       basePoints: base,
       multiplier,
       label: `Exact! +${pts}`,
       type: 'exact',
+      pso: psoResult,
     }
   }
 
@@ -137,11 +206,12 @@ export function calculatePoints(
   // Must have correct winner (or both draws) for any points
   if (predictedWinner !== actualWinner) {
     return {
-      points: 0,
+      points: 0 + psoBonus,
       basePoints: 0,
       multiplier,
-      label: 'Miss +0',
+      label: psoBonus > 0 ? `Miss FT, +${psoBonus} PSO` : 'Miss +0',
       type: 'miss',
+      pso: psoResult,
     }
   }
 
@@ -150,24 +220,26 @@ export function calculatePoints(
   const actualGD = actualHome - actualAway
   if (predictedGD === actualGD) {
     const base = gdBase
-    const pts = Math.floor(base * multiplier)
+    const pts = Math.floor(base * multiplier) + psoBonus
     return {
       points: pts,
       basePoints: base,
       multiplier,
       label: `Winner + GD +${pts}`,
       type: 'winner_gd',
+      pso: psoResult,
     }
   }
 
   // 3. Correct winner only
   const base = winnerBase
-  const pts = Math.floor(base * multiplier)
+  const pts = Math.floor(base * multiplier) + psoBonus
   return {
     points: pts,
     basePoints: base,
     multiplier,
     label: `Winner +${pts}`,
     type: 'winner',
+    pso: psoResult,
   }
 }
