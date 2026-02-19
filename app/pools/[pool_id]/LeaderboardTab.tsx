@@ -2,13 +2,21 @@
 
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
-import type { MemberData } from './types'
+import type { MemberData, PlayerScoreData } from './types'
 
 type LeaderboardTabProps = {
   members: MemberData[]
+  playerScores: PlayerScoreData[]
 }
 
-export function LeaderboardTab({ members }: LeaderboardTabProps) {
+export function LeaderboardTab({ members, playerScores }: LeaderboardTabProps) {
+  // Build lookup map for player scores
+  const scoreMap = new Map<string, PlayerScoreData>()
+  for (const ps of playerScores) {
+    scoreMap.set(ps.member_id, ps)
+  }
+
+  const hasBonusPoints = playerScores.some(ps => ps.bonus_points > 0)
   // Sort by rank
   const sorted = [...members].sort(
     (a, b) => (a.current_rank ?? 999) - (b.current_rank ?? 999)
@@ -63,7 +71,13 @@ export function LeaderboardTab({ members }: LeaderboardTabProps) {
               {/* Points */}
               <div className="flex-shrink-0 text-right">
                 <div className="text-lg font-bold text-blue-600">{member.total_points || 0}</div>
-                <div className="text-[10px] text-gray-500 uppercase">pts</div>
+                {hasBonusPoints && scoreMap.has(member.member_id) ? (
+                  <div className="text-[10px] text-gray-500">
+                    {scoreMap.get(member.member_id)!.match_points} + {scoreMap.get(member.member_id)!.bonus_points} bonus
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-gray-500 uppercase">pts</div>
+                )}
               </div>
             </div>
           )
@@ -81,8 +95,18 @@ export function LeaderboardTab({ members }: LeaderboardTabProps) {
               <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Player
               </th>
+              {hasBonusPoints && (
+                <>
+                  <th className="px-3 md:px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Match
+                  </th>
+                  <th className="px-3 md:px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Bonus
+                  </th>
+                </>
+              )}
               <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Points
+                Total
               </th>
               <th className="px-4 md:px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Role
@@ -93,6 +117,7 @@ export function LeaderboardTab({ members }: LeaderboardTabProps) {
             {sorted.map((member, index) => {
               const rank = member.current_rank || index + 1
               const isTopThree = rank <= 3
+              const ps = scoreMap.get(member.member_id)
 
               return (
                 <tr key={member.member_id} className={isTopThree ? 'bg-yellow-50' : ''}>
@@ -114,6 +139,20 @@ export function LeaderboardTab({ members }: LeaderboardTabProps) {
                       )}
                     </div>
                   </td>
+                  {hasBonusPoints && (
+                    <>
+                      <td className="px-3 md:px-4 py-4 whitespace-nowrap text-right">
+                        <span className="text-sm font-medium text-gray-700">
+                          {ps?.match_points ?? member.total_points ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-3 md:px-4 py-4 whitespace-nowrap text-right">
+                        <span className="text-sm font-medium text-green-600">
+                          {ps?.bonus_points ?? 0}
+                        </span>
+                      </td>
+                    </>
+                  )}
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                     <span className="text-xl font-bold text-blue-600">
                       {member.total_points || 0}

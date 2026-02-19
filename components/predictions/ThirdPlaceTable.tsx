@@ -6,9 +6,12 @@ import { Card } from '@/components/ui/Card'
 
 type Props = {
   rankedThirds: ThirdPlaceTeam[]
+  showConductScore?: boolean
+  annexCOptionNumber?: number | null
+  annexCQualifyingGroups?: string[] | null
 }
 
-export function ThirdPlaceTable({ rankedThirds }: Props) {
+export function ThirdPlaceTable({ rankedThirds, showConductScore, annexCOptionNumber, annexCQualifyingGroups }: Props) {
   if (rankedThirds.length === 0) return null
 
   const hasAnyData = rankedThirds.some(t => t.played > 0)
@@ -34,6 +37,9 @@ export function ThirdPlaceTable({ rankedThirds }: Props) {
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8 hidden sm:table-cell">GA</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8">GD</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-8 sm:w-10 font-bold">Pts</th>
+              {showConductScore && (
+                <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8 hidden sm:table-cell" title="Fair Play (Conduct Score)">FP</th>
+              )}
               <th className="text-center py-2 pl-1 sm:pl-2 w-20 sm:w-24 hidden sm:table-cell">Status</th>
             </tr>
           </thead>
@@ -71,6 +77,11 @@ export function ThirdPlaceTable({ rankedThirds }: Props) {
                     {team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}
                   </td>
                   <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-gray-900">{team.points}</td>
+                  {showConductScore && (
+                    <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600 hidden sm:table-cell">
+                      {team.conductScore ?? 0}
+                    </td>
+                  )}
                   <td className="text-center py-2 pl-1 sm:pl-2 hidden sm:table-cell">{statusBadge}</td>
                 </tr>
               )
@@ -84,6 +95,16 @@ export function ThirdPlaceTable({ rankedThirds }: Props) {
         <p className="text-xs text-gray-500 mt-2 text-center">
           Top 8 qualify for the Round of 32
         </p>
+      )}
+
+      {/* Annex C option indicator */}
+      {annexCOptionNumber != null && annexCQualifyingGroups && (
+        <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
+          <p className="text-xs text-blue-800">
+            <span className="font-semibold">FIFA Annex C Option #{annexCOptionNumber}</span>
+            {' '}applies (Groups: {annexCQualifyingGroups.join(', ')})
+          </p>
+        </div>
       )}
     </Card>
   )

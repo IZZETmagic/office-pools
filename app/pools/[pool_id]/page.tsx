@@ -9,6 +9,7 @@ import type {
   PredictionData,
   TeamData,
   ExistingPrediction,
+  PlayerScoreData,
 } from './types'
 
 export default async function PoolPage({
@@ -97,6 +98,33 @@ export default async function PoolPage({
   const settings = settingsRes.data as SettingsData | null
   const teams = (teamsRes.data || []) as TeamData[]
 
+  // Fetch conduct data for group stage tiebreakers
+  const [{ data: conductRes }, { data: playerScoresRes }] = await Promise.all([
+    supabase
+      .from('match_conduct')
+      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    supabase
+      .from('player_scores')
+      .select('member_id, match_points, bonus_points, total_points')
+      .in('member_id', members.map(m => m.member_id)),
+  ])
+
+  const conductData = (conductRes || []) as {
+    match_id: string
+    team_id: string
+    yellow_cards: number
+    indirect_red_cards: number
+    direct_red_cards: number
+    yellow_direct_red_cards: number
+  }[]
+
+  const playerScores = (playerScoresRes || []) as {
+    member_id: string
+    match_points: number
+    bonus_points: number
+    total_points: number
+  }[]
+
   // Fetch user's predictions (for results + predictions tabs)
   const { data: userPredictions } = await supabase
     .from('predictions')
@@ -124,6 +152,9 @@ export default async function PoolPage({
 
   const psoEnabled = settings?.pso_enabled ?? true
 
+  // Get the current member's submission state
+  const currentMember = members.find(m => m.member_id === membership.member_id)
+
   return (
     <PoolDetail
       pool={pool}
@@ -133,11 +164,17 @@ export default async function PoolPage({
       userPredictions={(userPredictions || []) as ExistingPrediction[]}
       allPredictions={allPredictions}
       teams={teams}
+      conductData={conductData}
+      playerScores={playerScores}
       memberId={membership.member_id}
       currentUserId={userData.user_id}
       isAdmin={isAdmin}
       isPastDeadline={isPastDeadline}
       psoEnabled={psoEnabled}
+      hasSubmitted={currentMember?.has_submitted_predictions ?? false}
+      submittedAt={currentMember?.predictions_submitted_at ?? null}
+      lastSavedAt={currentMember?.predictions_last_saved_at ?? null}
+      predictionsLocked={currentMember?.predictions_locked ?? false}
     />
   )
 }

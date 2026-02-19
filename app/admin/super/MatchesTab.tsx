@@ -49,6 +49,39 @@ function getStageName(stage: string): string {
   return names[stage] || stage
 }
 
+function CardInput({
+  label,
+  value,
+  onChange,
+  color,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  color: 'yellow' | 'amber' | 'red' | 'rose'
+}) {
+  const colorMap = {
+    yellow: 'bg-yellow-400',
+    amber: 'bg-amber-500',
+    red: 'bg-red-600',
+    rose: 'bg-rose-700',
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`w-3 h-4 rounded-sm ${colorMap[color]} flex-shrink-0`} />
+      <label className="text-xs text-gray-600 flex-1 min-w-0">{label}</label>
+      <input
+        type="number"
+        min="0"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-14 h-7 text-center text-sm font-medium border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent text-gray-900"
+      />
+    </div>
+  )
+}
+
 export function MatchesTab({
   matches,
   setMatches,
@@ -80,6 +113,17 @@ export function MatchesTab({
   const [resetReason, setResetReason] = useState('')
   const [resetting, setResetting] = useState(false)
 
+  // Conduct / Fair Play card entry (group stage only)
+  const [showConductFields, setShowConductFields] = useState(false)
+  const [homeYellowCards, setHomeYellowCards] = useState('0')
+  const [homeIndirectReds, setHomeIndirectReds] = useState('0')
+  const [homeDirectReds, setHomeDirectReds] = useState('0')
+  const [homeYellowDirectReds, setHomeYellowDirectReds] = useState('0')
+  const [awayYellowCards, setAwayYellowCards] = useState('0')
+  const [awayIndirectReds, setAwayIndirectReds] = useState('0')
+  const [awayDirectReds, setAwayDirectReds] = useState('0')
+  const [awayYellowDirectReds, setAwayYellowDirectReds] = useState('0')
+
   // Stats
   const completedCount = matches.filter((m) => m.is_completed).length
   const scheduledCount = matches.filter((m) => m.status === 'scheduled').length
@@ -104,7 +148,7 @@ export function MatchesTab({
     return true
   })
 
-  function openResultModal(match: SuperMatchData) {
+  async function openResultModal(match: SuperMatchData) {
     setHomeScore(match.home_score_ft?.toString() ?? '')
     setAwayScore(match.away_score_ft?.toString() ?? '')
     setPsoHome(match.home_score_pso?.toString() ?? '')
@@ -112,6 +156,43 @@ export function MatchesTab({
     setResultType(match.home_score_pso !== null ? 'pso' : 'ft')
     setError(null)
     setSuccess(null)
+
+    // Reset conduct fields
+    setHomeYellowCards('0')
+    setHomeIndirectReds('0')
+    setHomeDirectReds('0')
+    setHomeYellowDirectReds('0')
+    setAwayYellowCards('0')
+    setAwayIndirectReds('0')
+    setAwayDirectReds('0')
+    setAwayYellowDirectReds('0')
+    setShowConductFields(false)
+
+    // Fetch existing conduct data for group stage matches
+    if (match.stage === 'group' && match.home_team_id && match.away_team_id) {
+      const { data: conductData } = await supabase
+        .from('match_conduct')
+        .select('*')
+        .eq('match_id', match.match_id)
+
+      if (conductData && conductData.length > 0) {
+        setShowConductFields(true)
+        for (const row of conductData) {
+          if (row.team_id === match.home_team_id) {
+            setHomeYellowCards(row.yellow_cards?.toString() ?? '0')
+            setHomeIndirectReds(row.indirect_red_cards?.toString() ?? '0')
+            setHomeDirectReds(row.direct_red_cards?.toString() ?? '0')
+            setHomeYellowDirectReds(row.yellow_direct_red_cards?.toString() ?? '0')
+          } else if (row.team_id === match.away_team_id) {
+            setAwayYellowCards(row.yellow_cards?.toString() ?? '0')
+            setAwayIndirectReds(row.indirect_red_cards?.toString() ?? '0')
+            setAwayDirectReds(row.direct_red_cards?.toString() ?? '0')
+            setAwayYellowDirectReds(row.yellow_direct_red_cards?.toString() ?? '0')
+          }
+        }
+      }
+    }
+
     setModal({ type: 'enter_result', match })
   }
 
@@ -198,6 +279,12 @@ export function MatchesTab({
         await supabase.rpc('recalculate_all_pool_points', {
           pool_id_param: pool.pool_id,
         })
+        // Also recalculate bonus points
+        try {
+          await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+        } catch (e) {
+          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+        }
       }
     }
 
@@ -316,12 +403,63 @@ export function MatchesTab({
       return
     }
 
+    // Save conduct data for group stage matches
+    if (match.stage === 'group' && match.home_team_id && match.away_team_id) {
+      const conductRows = [
+        {
+          match_id: match.match_id,
+          team_id: match.home_team_id,
+          yellow_cards: parseInt(homeYellowCards) || 0,
+          indirect_red_cards: parseInt(homeIndirectReds) || 0,
+          direct_red_cards: parseInt(homeDirectReds) || 0,
+          yellow_direct_red_cards: parseInt(homeYellowDirectReds) || 0,
+        },
+        {
+          match_id: match.match_id,
+          team_id: match.away_team_id,
+          yellow_cards: parseInt(awayYellowCards) || 0,
+          indirect_red_cards: parseInt(awayIndirectReds) || 0,
+          direct_red_cards: parseInt(awayDirectReds) || 0,
+          yellow_direct_red_cards: parseInt(awayYellowDirectReds) || 0,
+        },
+      ]
+
+      const { error: conductError } = await supabase
+        .from('match_conduct')
+        .upsert(conductRows, { onConflict: 'match_id,team_id' })
+
+      if (conductError) {
+        console.error('Failed to save conduct data:', conductError)
+      }
+    }
+
+    // Recalculate bonus points for all pools linked to this tournament
+    const { data: pools } = await supabase
+      .from('pools')
+      .select('pool_id')
+      .eq('tournament_id', match.tournament_id)
+
+    let bonusInfo = ''
+    if (pools && pools.length > 0) {
+      for (const pool of pools) {
+        try {
+          const res = await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+          if (res.ok) {
+            const data = await res.json()
+            bonusInfo = ` Bonus: ${data.totalBonusEntries} entries (${data.totalBonusPoints} pts).`
+          }
+        } catch (e) {
+          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+        }
+      }
+    }
+
     await refreshMatches()
 
     const result = rpcResult as { predictions_processed?: number } | null
     const processed = result?.predictions_processed ?? 0
     setSuccess(
-      `Match result saved. Points calculated for ${processed} predictions across all pools.`
+      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}`
     )
     setSaving(false)
 
@@ -352,6 +490,22 @@ export function MatchesTab({
       setError(rpcError.message)
       setResetting(false)
       return
+    }
+
+    // Recalculate bonus points for all pools after reset
+    const { data: pools } = await supabase
+      .from('pools')
+      .select('pool_id')
+      .eq('tournament_id', match.tournament_id)
+
+    if (pools) {
+      for (const pool of pools) {
+        try {
+          await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+        } catch (e) {
+          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+        }
+      }
     }
 
     await Promise.all([refreshMatches(), refreshAuditLogs()])
@@ -743,6 +897,67 @@ export function MatchesTab({
                         onChange={(e) => setPsoAway(e.target.value)}
                         className="w-16 h-10 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
                       />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fair Play Cards (group stage only) */}
+            {modal.match.stage === 'group' && (
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={() => setShowConductFields(!showConductFields)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition"
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform ${showConductFields ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                  Fair Play Cards (Optional)
+                </button>
+
+                {showConductFields && (
+                  <div className="mt-3 bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-4">
+                      Enter card counts per team. Each count represents distinct player incidents.
+                      Used as FIFA tiebreaker in group standings.
+                    </p>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Home team cards */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700 mb-3">
+                          {modal.match.home_team?.country_name || 'Home'}
+                        </p>
+                        <div className="space-y-2">
+                          <CardInput label="Yellow cards" value={homeYellowCards} onChange={setHomeYellowCards} color="yellow" />
+                          <CardInput label="2nd Yellow (indirect red)" value={homeIndirectReds} onChange={setHomeIndirectReds} color="amber" />
+                          <CardInput label="Direct red cards" value={homeDirectReds} onChange={setHomeDirectReds} color="red" />
+                          <CardInput label="Yellow + Direct red" value={homeYellowDirectReds} onChange={setHomeYellowDirectReds} color="rose" />
+                        </div>
+                      </div>
+                      {/* Away team cards */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700 mb-3">
+                          {modal.match.away_team?.country_name || 'Away'}
+                        </p>
+                        <div className="space-y-2">
+                          <CardInput label="Yellow cards" value={awayYellowCards} onChange={setAwayYellowCards} color="yellow" />
+                          <CardInput label="2nd Yellow (indirect red)" value={awayIndirectReds} onChange={setAwayIndirectReds} color="amber" />
+                          <CardInput label="Direct red cards" value={awayDirectReds} onChange={setAwayDirectReds} color="red" />
+                          <CardInput label="Yellow + Direct red" value={awayYellowDirectReds} onChange={setAwayYellowDirectReds} color="rose" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-[10px] text-gray-400 space-y-0.5">
+                      <p>Yellow = -1 | 2nd Yellow (indirect red) = -3 | Direct red = -4 | Yellow + Direct red = -5</p>
+                      <p>Only one deduction per player per match (the highest). Higher score (closer to 0) is better.</p>
                     </div>
                   </div>
                 )}

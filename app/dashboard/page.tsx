@@ -28,6 +28,8 @@ export default async function DashboardPage() {
       total_points,
       current_rank,
       has_submitted_predictions,
+      predictions_submitted_at,
+      predictions_last_saved_at,
       joined_at,
       pools!inner(
         pool_id,
@@ -140,16 +142,22 @@ export default async function DashboardPage() {
         }
       }
 
+      // Count predicted matches
+      const predictedMatches = predictions?.length ?? 0
+
       return {
         ...pool,
         role: m.role,
         total_points: calculatedPoints,
         current_rank: m.current_rank,
         has_submitted_predictions: m.has_submitted_predictions,
+        predictions_submitted_at: m.predictions_submitted_at,
+        predictions_last_saved_at: m.predictions_last_saved_at,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         totalMatches: totalMatches ?? 0,
         completedMatches: completedMatches?.length ?? 0,
+        predictedMatches,
       }
     })
   )

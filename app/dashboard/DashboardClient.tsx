@@ -26,10 +26,13 @@ type PoolCardData = {
   total_points: number
   current_rank: number | null
   has_submitted_predictions: boolean
+  predictions_submitted_at: string | null
+  predictions_last_saved_at: string | null
   joined_at: string
   memberCount: number
   totalMatches: number
   completedMatches: number
+  predictedMatches: number
 }
 
 type ActivityItem = {
@@ -195,20 +198,60 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
         </div>
       </div>
 
+      {/* Prediction progress bar */}
+      {pool.totalMatches > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-gray-600">
+              Predictions: <span className="font-bold">{pool.predictedMatches}/{pool.totalMatches}</span>
+            </span>
+            {pool.has_submitted_predictions ? (
+              <span className="text-green-600 font-semibold">Submitted</span>
+            ) : pool.predictedMatches > 0 ? (
+              <span className="text-amber-600 font-semibold">Draft</span>
+            ) : (
+              <span className="text-gray-500">Not started</span>
+            )}
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                pool.has_submitted_predictions
+                  ? 'bg-green-500'
+                  : pool.predictedMatches === pool.totalMatches
+                  ? 'bg-blue-500'
+                  : 'bg-amber-500'
+              }`}
+              style={{ width: `${Math.round((pool.predictedMatches / pool.totalMatches) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Status indicators */}
       <div className="flex items-center justify-between mb-3 text-xs">
         <span className={deadline.className}>{deadline.text}</span>
-        {pool.has_submitted_predictions ? (
-          <span className="text-green-600 font-semibold">Predictions submitted</span>
-        ) : (
-          <span className="text-amber-600 font-semibold">Predictions pending</span>
-        )}
       </div>
 
-      {/* CTA */}
-      <Button href={`/pools/${pool.pool_id}`} variant="primary" size="sm" fullWidth>
-        View Pool
-      </Button>
+      {/* CTA buttons — dynamic based on prediction status */}
+      <div className="flex gap-2">
+        <Button
+          href={`/pools/${pool.pool_id}`}
+          variant="primary"
+          size="sm"
+          fullWidth
+        >
+          View Pool
+        </Button>
+        <Button
+          href={`/pools/${pool.pool_id}?tab=predictions`}
+          variant="outline"
+          size="sm"
+          fullWidth
+        >
+          Predictions
+        </Button>
+      </div>
     </Card>
   )
 }
@@ -418,19 +461,19 @@ export function DashboardClient({
 
         {/* Quick stats */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card>
+          <Card className="text-center">
             <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Pools</p>
             <p className="text-2xl sm:text-3xl font-bold text-blue-600">{totalPools}</p>
           </Card>
-          <Card>
-            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Points</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-600">{totalPoints}</p>
-          </Card>
-          <Card>
+          <Card className="text-center">
             <p className="text-xs sm:text-sm text-gray-600 mb-1">Best Rank</p>
             <p className="text-2xl sm:text-3xl font-bold text-purple-600">
               {bestRank ? `#${bestRank}` : '--'}
             </p>
+          </Card>
+          <Card className="text-center">
+            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Points</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600">{totalPoints}</p>
           </Card>
         </div>
 
@@ -534,6 +577,41 @@ export function DashboardClient({
           </Card>
         </div>
 
+        {/* Resume Predictions Banner */}
+        {(() => {
+          const incompleteDrafts = pools.filter(
+            p => !p.has_submitted_predictions && p.predictedMatches > 0 && p.predictedMatches < p.totalMatches
+          )
+          if (incompleteDrafts.length === 0) return null
+          return (
+            <div className="mb-6 sm:mb-8 bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-amber-600 text-xl shrink-0">&#9888;</span>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-amber-800 mb-1">You have incomplete predictions!</h4>
+                  <div className="space-y-1.5">
+                    {incompleteDrafts.map(pool => (
+                      <div key={pool.pool_id} className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-amber-700 truncate">
+                          {pool.pool_name}: <strong>{pool.predictedMatches}/{pool.totalMatches}</strong> ({Math.round((pool.predictedMatches / pool.totalMatches) * 100)}%)
+                        </span>
+                        <Button
+                          href={`/pools/${pool.pool_id}?tab=predictions`}
+                          variant="primary"
+                          size="sm"
+                          className="shrink-0"
+                        >
+                          Resume
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* My Pools section */}
         <div className="mb-8">
           <h3 className="text-xl font-bold text-gray-900 mb-4">My Pools</h3>
@@ -545,7 +623,24 @@ export function DashboardClient({
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pools.map((pool) => (
+              {[...pools].sort((a, b) => {
+                // Sort: incomplete drafts first, then not started, then submitted, then by deadline
+                const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
+                  ? 0  // incomplete draft
+                  : !a.has_submitted_predictions && a.predictedMatches === 0
+                  ? 1  // not started
+                  : 2  // submitted
+                const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
+                  ? 0
+                  : !b.has_submitted_predictions && b.predictedMatches === 0
+                  ? 1
+                  : 2
+                if (aScore !== bScore) return aScore - bScore
+                // Secondary: by deadline (soonest first)
+                const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
+                const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
+                return aDeadline - bDeadline
+              }).map((pool) => (
                 <PoolCard key={pool.pool_id} pool={pool} />
               ))}
             </div>

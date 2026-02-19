@@ -11,6 +11,8 @@ import {
   GroupStanding,
   ThirdPlaceTeam,
   rankThirdPlaceTeams,
+  getAnnexCInfo,
+  isPredictionComplete,
 } from '@/lib/tournament'
 import { StandingsTable } from './StandingsTable'
 import { ThirdPlaceTable } from './ThirdPlaceTable'
@@ -22,10 +24,11 @@ type Props = {
   teams: Team[]
   predictions: PredictionMap
   allGroupStandings: Map<string, GroupStanding[]>
-  onUpdatePrediction: (matchId: string, score: ScoreEntry) => void
+  onUpdatePrediction?: (matchId: string, score: ScoreEntry) => void
+  readOnly?: boolean
 }
 
-export function GroupStageForm({ matches, teams, predictions, allGroupStandings, onUpdatePrediction }: Props) {
+export function GroupStageForm({ matches, teams, predictions, allGroupStandings, onUpdatePrediction, readOnly }: Props) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['A']))
 
   const groupMatches = matches.filter(m => m.stage === 'group')
@@ -44,7 +47,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
 
   // Count predictions
   const totalGroupMatches = groupMatches.length
-  const predictedGroupMatches = groupMatches.filter(m => predictions.has(m.match_id)).length
+  const predictedGroupMatches = groupMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
 
   return (
     <div>
@@ -67,7 +70,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
             .sort((a, b) => a.match_number - b.match_number)
           const gTeams = teams.filter(t => t.group_letter === letter)
           const isExpanded = expandedGroups.has(letter)
-          const groupPredicted = gMatches.filter(m => predictions.has(m.match_id)).length
+          const groupPredicted = gMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
           const groupTotal = gMatches.length
 
           const standings = allGroupStandings.get(letter) || []
@@ -119,6 +122,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                         match={match}
                         prediction={predictions.get(match.match_id)}
                         onUpdate={onUpdatePrediction}
+                        readOnly={readOnly}
                       />
                     ))}
                   </div>
@@ -133,9 +137,16 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
       </div>
 
       {/* Third-place teams ranking */}
-      {predictedGroupMatches > 0 && (
-        <ThirdPlaceTable rankedThirds={rankThirdPlaceTeams(allGroupStandings)} />
-      )}
+      {predictedGroupMatches > 0 && (() => {
+        const annexCInfo = getAnnexCInfo(allGroupStandings)
+        return (
+          <ThirdPlaceTable
+            rankedThirds={rankThirdPlaceTeams(allGroupStandings)}
+            annexCOptionNumber={annexCInfo?.optionNumber}
+            annexCQualifyingGroups={annexCInfo?.qualifyingGroups}
+          />
+        )
+      })()}
     </div>
   )
 }
@@ -148,68 +159,95 @@ function MatchRow({
   match,
   prediction,
   onUpdate,
+  readOnly,
 }: {
   match: Match
   prediction: ScoreEntry | undefined
-  onUpdate: (matchId: string, score: ScoreEntry) => void
+  onUpdate?: (matchId: string, score: ScoreEntry) => void
+  readOnly?: boolean
 }) {
   const homeTeam = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
   const awayTeam = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
 
   const handleScoreChange = (team: 'home' | 'away', value: string) => {
-    const numValue = value === '' ? 0 : parseInt(value)
-    if (isNaN(numValue) || numValue < 0) return
+    if (readOnly || !onUpdate) return
+    const numValue = value === '' ? null : parseInt(value)
+    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return
 
-    const current = prediction || { home: 0, away: 0 }
+    const current = prediction || { home: null, away: null }
     onUpdate(match.match_id, {
       ...current,
       [team]: numValue,
     })
   }
 
+  // Format date/time in AST (UTC-4)
+  const matchDate = new Date(match.match_date)
+  const dateStr = matchDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Atlantic/Bermuda',
+  })
+  const timeStr = matchDate.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Atlantic/Bermuda',
+    timeZoneName: 'short',
+  })
+
+  // Split venue into stadium and city
+  const venueParts = match.venue?.split(', ') || []
+  const stadium = venueParts[0] || ''
+  const city = venueParts.slice(1).join(', ') || ''
+
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2 py-2">
-      {/* Match info */}
-      <div className="hidden sm:block text-xs text-gray-500 w-16 shrink-0">
-        #{match.match_number}
+    <div className="py-2 sm:py-2.5 flex items-center gap-1 sm:gap-1.5 flex-nowrap">
+      <span className="text-[10px] sm:text-xs text-gray-400 shrink-0 mr-0.5 sm:mr-2">#{match.match_number}</span>
+      <div className="hidden sm:block shrink-0 w-[108px] text-xs text-gray-500 leading-tight">
+        <span className="font-medium text-gray-700">{dateStr}</span>
         <br />
-        {new Date(match.match_date).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        })}
+        <span>{timeStr}</span>
       </div>
 
       {/* Home team */}
-      <div className="flex-1 text-right min-w-0">
-        <span className="text-xs sm:text-sm font-medium text-gray-900 truncate block">{homeTeam}</span>
+      <div className="flex-1 basis-0 text-right min-w-0">
+        <span className="text-[11px] sm:text-sm font-medium text-gray-900 truncate block">{homeTeam}</span>
       </div>
 
       {/* Score inputs */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0">
         <input
           type="number"
           min="0"
           inputMode="numeric"
           value={prediction?.home ?? ''}
           placeholder="-"
+          disabled={readOnly}
           onChange={(e) => handleScoreChange('home', e.target.value)}
-          className="w-10 sm:w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
         />
-        <span className="text-gray-500 font-bold text-[10px] sm:text-xs">vs</span>
+        <span className="text-gray-400 font-bold text-[10px]">v</span>
         <input
           type="number"
           min="0"
           inputMode="numeric"
           value={prediction?.away ?? ''}
           placeholder="-"
+          disabled={readOnly}
           onChange={(e) => handleScoreChange('away', e.target.value)}
-          className="w-10 sm:w-12 h-9 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
         />
       </div>
 
       {/* Away team */}
-      <div className="flex-1 text-left min-w-0">
-        <span className="text-xs sm:text-sm font-medium text-gray-900 truncate block">{awayTeam}</span>
+      <div className="flex-1 basis-0 text-left min-w-0">
+        <span className="text-[11px] sm:text-sm font-medium text-gray-900 truncate block">{awayTeam}</span>
+      </div>
+
+      <div className="hidden sm:block shrink-0 w-[100px] text-xs text-gray-500 text-right leading-tight">
+        <span className="font-medium text-gray-700 truncate block">{city}</span>
+        <span className="truncate block">{stadium}</span>
       </div>
     </div>
   )

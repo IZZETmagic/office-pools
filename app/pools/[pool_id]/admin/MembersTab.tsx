@@ -1,13 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolData, MemberData, PredictionData, MatchData } from '../types'
+import type { PoolData, MemberData, PredictionData, MatchData, TeamData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { Input } from '@/components/ui/Input'
+import {
+  getKnockoutWinner,
+  type GroupStanding,
+  type PredictionMap,
+  type Match,
+  type Team,
+} from '@/lib/tournament'
+import { resolveFullBracket } from '@/lib/bracketResolver'
 
 type MembersTabProps = {
   pool: PoolData
@@ -15,6 +23,7 @@ type MembersTabProps = {
   setMembers: (members: MemberData[]) => void
   predictions: PredictionData[]
   matches: MatchData[]
+  teams: TeamData[]
   currentUserId: string
 }
 
@@ -25,6 +34,7 @@ type ModalState =
   | { type: 'promote'; member: MemberData }
   | { type: 'demote'; member: MemberData }
   | { type: 'remove'; member: MemberData }
+  | { type: 'unlock_predictions'; member: MemberData }
 
 export function MembersTab({
   pool,
@@ -32,6 +42,7 @@ export function MembersTab({
   setMembers,
   predictions,
   matches,
+  teams,
   currentUserId,
 }: MembersTabProps) {
   const supabase = createClient()
@@ -147,6 +158,11 @@ export function MembersTab({
       return
     }
 
+    // Recalculate leaderboard ranks to close any gaps
+    await supabase.rpc('recalculate_pool_leaderboard', {
+      p_pool_id: pool.pool_id,
+    })
+
     setSuccess(`${member.users.username} removed from pool.`)
     await refreshMembers()
     setLoading(false)
@@ -180,6 +196,29 @@ export function MembersTab({
     setModal({ type: 'none' })
     setPointAdjustment(0)
     setAdjustReason('')
+  }
+
+  async function handleUnlockPredictions(member: MemberData) {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/predictions/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: member.member_id }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to unlock predictions')
+      }
+
+      setSuccess(`Predictions unlocked for ${member.users.username}. They can now edit and resubmit.`)
+      await refreshMembers()
+    } catch (err: any) {
+      setError(err.message || 'Failed to unlock predictions')
+    }
+    setLoading(false)
+    setModal({ type: 'none' })
   }
 
   function copyPoolCode() {
@@ -314,6 +353,9 @@ export function MembersTab({
                         setRemoveConfirmed(false)
                         setModal({ type: 'remove', member })
                         break
+                      case 'unlock_predictions':
+                        setModal({ type: 'unlock_predictions', member })
+                        break
                     }
                   }}
                   className="text-xs px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-700 cursor-pointer"
@@ -321,6 +363,7 @@ export function MembersTab({
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
                   <option value="adjust_points">Adjust Points</option>
+                  {member.has_submitted_predictions && <option value="unlock_predictions">Unlock Predictions</option>}
                   {member.role === 'player' && <option value="promote">Promote</option>}
                   {member.role === 'admin' && adminCount > 1 && <option value="demote">Demote</option>}
                   {member.role === 'player' && <option value="remove">Remove</option>}
@@ -445,6 +488,9 @@ export function MembersTab({
                                 setRemoveConfirmed(false)
                                 setModal({ type: 'remove', member })
                                 break
+                              case 'unlock_predictions':
+                                setModal({ type: 'unlock_predictions', member })
+                                break
                             }
                           }}
                           className="text-xs px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-700 cursor-pointer"
@@ -456,6 +502,7 @@ export function MembersTab({
                             View Predictions
                           </option>
                           <option value="adjust_points">Adjust Points</option>
+                          {member.has_submitted_predictions && <option value="unlock_predictions">Unlock Predictions</option>}
                           {member.role === 'player' && (
                             <option value="promote">Promote to Admin</option>
                           )}
@@ -478,96 +525,13 @@ export function MembersTab({
 
       {/* View Predictions Modal */}
       {modal.type === 'view_predictions' && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {modal.member.users.full_name || modal.member.users.username}
-              &apos;s Predictions
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Total points: {modal.member.total_points ?? 0}
-            </p>
-
-            {(() => {
-              const memberPreds = predictions.filter(
-                (p) => p.member_id === modal.member.member_id
-              )
-              if (memberPreds.length === 0) {
-                return (
-                  <p className="text-gray-600 text-sm py-4">
-                    No predictions submitted.
-                  </p>
-                )
-              }
-
-              // Group by stage
-              const byStage: Record<string, typeof memberPreds> = {}
-              memberPreds.forEach((pred) => {
-                const match = matches.find(
-                  (m) => m.match_id === pred.match_id
-                )
-                const stage = match?.stage || 'unknown'
-                if (!byStage[stage]) byStage[stage] = []
-                byStage[stage].push(pred)
-              })
-
-              const stageNames: Record<string, string> = {
-                group: 'Group Stage',
-                round_32: 'Round of 32',
-                round_16: 'Round of 16',
-                quarter_final: 'Quarter Final',
-                semi_final: 'Semi Final',
-                third_place: 'Third Place',
-                final: 'Final',
-              }
-
-              return Object.entries(byStage).map(([stage, preds]) => (
-                <div key={stage} className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                    {stageNames[stage] || stage}
-                  </h4>
-                  <div className="space-y-1">
-                    {preds.map((pred) => {
-                      const match = matches.find(
-                        (m) => m.match_id === pred.match_id
-                      )
-                      if (!match) return null
-                      const home =
-                        match.home_team?.country_name ||
-                        match.home_team_placeholder ||
-                        'TBD'
-                      const away =
-                        match.away_team?.country_name ||
-                        match.away_team_placeholder ||
-                        'TBD'
-
-                      return (
-                        <div
-                          key={pred.prediction_id}
-                          className="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm"
-                        >
-                          <span className="text-gray-600">
-                            #{match.match_number}: {home} vs {away}
-                          </span>
-                          <span className="font-mono font-bold text-gray-900">
-                            {pred.predicted_home_score}-
-                            {pred.predicted_away_score}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))
-            })()}
-
-            <div className="mt-4 flex justify-end">
-              <Button variant="gray" onClick={() => setModal({ type: 'none' })}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ViewPredictionsModal
+          member={modal.member}
+          predictions={predictions}
+          matches={matches}
+          teams={teams}
+          onClose={() => setModal({ type: 'none' })}
+        />
       )}
 
       {/* Adjust Points Modal */}
@@ -731,6 +695,48 @@ export function MembersTab({
         </div>
       )}
 
+      {/* Unlock Predictions Modal */}
+      {modal.type === 'unlock_predictions' && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">
+              Unlock Predictions
+            </h3>
+            <p className="text-sm text-gray-600 mb-2">
+              Unlock predictions for{' '}
+              <span className="font-bold">{modal.member.users.username}</span>?
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800">
+                This will allow them to edit and resubmit their predictions. Only use this for special circumstances (e.g., technical issues).
+              </p>
+            </div>
+            {modal.member.predictions_submitted_at && (
+              <p className="text-xs text-gray-500 mb-4">
+                Originally submitted: {new Date(modal.member.predictions_submitted_at).toLocaleString()}
+              </p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="gray"
+                onClick={() => setModal({ type: 'none' })}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => handleUnlockPredictions(modal.member)}
+                loading={loading}
+                loadingText="Unlocking..."
+              >
+                Unlock Predictions
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Remove Modal */}
       {modal.type === 'remove' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
@@ -780,6 +786,308 @@ export function MembersTab({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// =============================================
+// VIEW PREDICTIONS MODAL
+// =============================================
+
+function ViewPredictionsModal({
+  member,
+  predictions,
+  matches,
+  teams,
+  onClose,
+}: {
+  member: MemberData
+  predictions: PredictionData[]
+  matches: MatchData[]
+  teams: TeamData[]
+  onClose: () => void
+}) {
+  const memberPreds = predictions.filter(
+    (p) => p.member_id === member.member_id
+  )
+
+  // Convert matches to tournament Match type for resolution functions
+  const tournamentMatches: Match[] = matches.map((m) => ({
+    match_id: m.match_id,
+    match_number: m.match_number,
+    stage: m.stage,
+    group_letter: m.group_letter,
+    match_date: m.match_date,
+    venue: m.venue,
+    status: m.status,
+    home_team_id: m.home_team_id,
+    away_team_id: m.away_team_id,
+    home_team_placeholder: m.home_team_placeholder,
+    away_team_placeholder: m.away_team_placeholder,
+    home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+    away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+  }))
+
+  // Convert teams to tournament Team type
+  const tournamentTeams: Team[] = teams.map((t) => ({
+    team_id: t.team_id,
+    country_name: t.country_name,
+    country_code: t.country_code,
+    group_letter: t.group_letter,
+    fifa_ranking_points: t.fifa_ranking_points,
+    flag_url: t.flag_url,
+  }))
+
+  // Build this member's PredictionMap
+  const predictionMap: PredictionMap = useMemo(() => {
+    const map: PredictionMap = new Map()
+    for (const pred of memberPreds) {
+      map.set(pred.match_id, {
+        home: pred.predicted_home_score,
+        away: pred.predicted_away_score,
+        homePso: pred.predicted_home_pso,
+        awayPso: pred.predicted_away_pso,
+        winnerTeamId: pred.predicted_winner_team_id,
+      })
+    }
+    return map
+  }, [memberPreds])
+
+  // Resolve full bracket from this member's predictions
+  const bracket = useMemo(() => {
+    return resolveFullBracket({
+      matches: tournamentMatches,
+      predictionMap,
+      teams: tournamentTeams,
+    })
+  }, [tournamentMatches, predictionMap, tournamentTeams])
+
+  const allGroupStandings = bracket.allGroupStandings
+  const knockoutTeamMap = bracket.knockoutTeamMap
+  const champion = bracket.champion
+
+  // Stage order for display
+  const stageOrder = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+  const stageNames: Record<string, string> = {
+    group: 'Group Stage',
+    round_32: 'Round of 32',
+    round_16: 'Round of 16',
+    quarter_final: 'Quarter Finals',
+    semi_final: 'Semi Finals',
+    third_place: 'Third Place',
+    final: 'Final',
+  }
+
+  // Group predictions by stage
+  const predsByStage: Record<string, PredictionData[]> = {}
+  memberPreds.forEach((pred) => {
+    const match = matches.find((m) => m.match_id === pred.match_id)
+    const stage = match?.stage || 'unknown'
+    if (!predsByStage[stage]) predsByStage[stage] = []
+    predsByStage[stage].push(pred)
+  })
+
+  // Export predictions as CSV
+  function exportToCsv() {
+    const headers = ['Match #', 'Stage', 'Home Team', 'Home Score', 'Away Score', 'Away Team', 'PSO Home', 'PSO Away']
+    const rows: string[][] = []
+
+    for (const stage of stageOrder) {
+      const preds = predsByStage[stage]
+      if (!preds || preds.length === 0) continue
+
+      const sorted = [...preds].sort((a, b) => {
+        const ma = matches.find((m) => m.match_id === a.match_id)
+        const mb = matches.find((m) => m.match_id === b.match_id)
+        return (ma?.match_number ?? 0) - (mb?.match_number ?? 0)
+      })
+
+      for (const pred of sorted) {
+        const match = matches.find((m) => m.match_id === pred.match_id)
+        if (!match) continue
+
+        const homeName = getTeamName(match, 'home')
+        const awayName = getTeamName(match, 'away')
+
+        rows.push([
+          String(match.match_number),
+          stageNames[stage] || stage,
+          homeName,
+          String(pred.predicted_home_score),
+          String(pred.predicted_away_score),
+          awayName,
+          pred.predicted_home_pso != null ? String(pred.predicted_home_pso) : '',
+          pred.predicted_away_pso != null ? String(pred.predicted_away_pso) : '',
+        ])
+      }
+    }
+
+    // Add champion row
+    if (champion) {
+      rows.push([])
+      rows.push(['Predicted Champion', champion.country_name])
+    }
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const username = member.users.username
+    link.href = url
+    link.download = `${username}_predictions.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Resolve team name for a match
+  function getTeamName(match: MatchData, side: 'home' | 'away'): string {
+    // Group stage: use actual team names
+    if (match.stage === 'group') {
+      return side === 'home'
+        ? match.home_team?.country_name || 'TBD'
+        : match.away_team?.country_name || 'TBD'
+    }
+    // Knockout: resolve from member's predictions
+    const resolved = knockoutTeamMap.get(match.match_number)
+    if (resolved) {
+      const team = side === 'home' ? resolved.home : resolved.away
+      if (team) return team.country_name
+    }
+    return 'TBD'
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 sm:p-6 pb-3 border-b border-gray-100 shrink-0">
+          <h3 className="text-xl font-bold text-gray-900">
+            {member.users.full_name || member.users.username}&apos;s Predictions
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Total points: {member.total_points ?? 0}
+          </p>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 p-4 sm:px-6">
+          {memberPreds.length === 0 ? (
+            <p className="text-gray-600 text-sm py-4">
+              No predictions submitted.
+            </p>
+          ) : (
+            <>
+              {stageOrder.map((stage) => {
+                const preds = predsByStage[stage]
+                if (!preds || preds.length === 0) return null
+
+                // Sort by match number
+                const sorted = [...preds].sort((a, b) => {
+                  const ma = matches.find((m) => m.match_id === a.match_id)
+                  const mb = matches.find((m) => m.match_id === b.match_id)
+                  return (ma?.match_number ?? 0) - (mb?.match_number ?? 0)
+                })
+
+                return (
+                  <div key={stage} className="mb-5">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      {stageNames[stage] || stage}
+                    </h4>
+                    <div className="space-y-1">
+                      {sorted.map((pred) => {
+                        const match = matches.find(
+                          (m) => m.match_id === pred.match_id
+                        )
+                        if (!match) return null
+
+                        const homeName = getTeamName(match, 'home')
+                        const awayName = getTeamName(match, 'away')
+                        const isDraw = pred.predicted_home_score === pred.predicted_away_score
+                        const isKnockout = match.stage !== 'group'
+
+                        return (
+                          <div
+                            key={pred.prediction_id}
+                            className="bg-gray-50 rounded-lg px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              {/* Match number */}
+                              <span className="text-xs font-mono text-gray-400 shrink-0 w-7 text-right">
+                                #{match.match_number}
+                              </span>
+
+                              {/* Home team */}
+                              <span className="flex-1 text-right text-sm font-medium text-gray-800 truncate">
+                                {homeName}
+                              </span>
+
+                              {/* Score */}
+                              <span className="font-mono font-bold text-gray-900 text-sm shrink-0 px-1">
+                                {pred.predicted_home_score} - {pred.predicted_away_score}
+                              </span>
+
+                              {/* Away team */}
+                              <span className="flex-1 text-left text-sm font-medium text-gray-800 truncate">
+                                {awayName}
+                              </span>
+                            </div>
+
+                            {/* PSO for knockout draws */}
+                            {isKnockout && isDraw && pred.predicted_home_pso != null && pred.predicted_away_pso != null && (
+                              <p className="text-xs text-blue-600 font-medium text-center mt-0.5">
+                                PSO: {pred.predicted_home_pso} - {pred.predicted_away_pso}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Champion highlight */}
+              {champion && (
+                <div className="mt-2 text-center p-4 rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-indigo-200">
+                  <div className="text-3xl mb-1">&#127942;</div>
+                  <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-0.5">
+                    Predicted Champion
+                  </p>
+                  <h4 className="text-xl font-bold text-gray-900">
+                    {champion.country_name}
+                  </h4>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 sm:px-6 pt-3 border-t border-gray-100 shrink-0">
+          <div className="flex justify-between">
+            {memberPreds.length > 0 ? (
+              <button
+                onClick={exportToCsv}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export CSV
+              </button>
+            ) : (
+              <div />
+            )}
+            <Button variant="gray" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

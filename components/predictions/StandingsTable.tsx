@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/Badge'
 type Props = {
   standings: GroupStanding[]
   groupLetter: string
+  showConductScore?: boolean
 }
 
-export function StandingsTable({ standings, groupLetter }: Props) {
+export function StandingsTable({ standings, groupLetter, showConductScore }: Props) {
   if (standings.length === 0) return null
 
   const hasAnyPredictions = standings.some(s => s.played > 0)
@@ -32,6 +33,9 @@ export function StandingsTable({ standings, groupLetter }: Props) {
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8 hidden sm:table-cell">GA</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8">GD</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-8 sm:w-10 font-bold">Pts</th>
+              {showConductScore && (
+                <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8 hidden sm:table-cell" title="Fair Play (Conduct Score)">FP</th>
+              )}
               <th className="text-center py-2 pl-1 sm:pl-2 w-20 sm:w-24 hidden sm:table-cell">Status</th>
             </tr>
           </thead>
@@ -69,6 +73,11 @@ export function StandingsTable({ standings, groupLetter }: Props) {
                     {team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}
                   </td>
                   <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-gray-900">{team.points}</td>
+                  {showConductScore && (
+                    <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600 hidden sm:table-cell">
+                      {team.conductScore ?? 0}
+                    </td>
+                  )}
                   <td className="text-center py-2 pl-1 sm:pl-2 hidden sm:table-cell">{statusBadge}</td>
                 </tr>
               )

@@ -31,6 +31,8 @@ type Props = {
   onEditStage: (stageIndex: number) => void
   onSubmit: () => void
   submitting: boolean
+  hasSubmitted?: boolean
+  readOnly?: boolean
 }
 
 export function SummaryView({
@@ -42,6 +44,8 @@ export function SummaryView({
   onEditStage,
   onSubmit,
   submitting,
+  hasSubmitted,
+  readOnly,
 }: Props) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
@@ -73,11 +77,12 @@ export function SummaryView({
     <div>
       {/* Champion highlight */}
       {champion && (
-        <Card padding="lg" className="mb-8 text-center bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300">
-          <p className="text-sm text-yellow-700 font-medium mb-1">Your Predicted Champion</p>
+        <div className="mb-8 text-center p-6 rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-indigo-200 shadow-sm">
+          <div className="text-4xl mb-2">&#127942;</div>
+          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-1">Your Predicted Champion</p>
           <h2 className="text-3xl font-bold text-gray-900">{champion.country_name}</h2>
-          <p className="text-sm text-gray-600 mt-1">Group {champion.group_letter}</p>
-        </Card>
+          <p className="text-sm text-gray-500 mt-1">Group {champion.group_letter}</p>
+        </div>
       )}
 
       {/* Group Stage Section */}
@@ -86,7 +91,7 @@ export function SummaryView({
         matchCount={matches.filter(m => m.stage === 'group').length}
         isExpanded={expandedSections.has('group')}
         onToggle={() => toggleSection('group')}
-        onEdit={() => onEditStage(0)}
+        onEdit={readOnly ? undefined : () => onEditStage(0)}
       />
       {expandedSections.has('group') && (
         <div className="mb-4 space-y-4">
@@ -124,7 +129,7 @@ export function SummaryView({
               matchCount={stageMatches.length}
               isExpanded={expandedSections.has(stage)}
               onToggle={() => toggleSection(stage)}
-              onEdit={() => onEditStage(stageEditMap[stage] ?? 0)}
+              onEdit={readOnly ? undefined : () => onEditStage(stageEditMap[stage] ?? 0)}
             />
             {expandedSections.has(stage) && (
               <div className="mb-4 space-y-2">
@@ -142,14 +147,14 @@ export function SummaryView({
                           </div>
                           <div className="px-2 sm:px-4 text-center shrink-0">
                             <span className="text-base sm:text-lg font-bold text-gray-900">
-                              {pred ? `${pred.home} - ${pred.away}` : '? - ?'}
+                              {pred && pred.home != null && pred.away != null ? `${pred.home} - ${pred.away}` : '? - ?'}
                             </span>
-                            {pred && pred.home === pred.away && (pred.homePso != null && pred.awayPso != null) && (
+                            {pred && pred.home != null && pred.away != null && pred.home === pred.away && (pred.homePso != null && pred.awayPso != null) && (
                               <p className="text-xs text-blue-600 font-medium">
                                 PSO: {pred.homePso} - {pred.awayPso}
                               </p>
                             )}
-                            {pred && pred.home === pred.away && pred.winnerTeamId && !(pred.homePso != null && pred.awayPso != null) && (
+                            {pred && pred.home != null && pred.away != null && pred.home === pred.away && pred.winnerTeamId && !(pred.homePso != null && pred.awayPso != null) && (
                               <p className="text-xs text-blue-600 font-medium">
                                 PSO: {pred.winnerTeamId === homeTeam?.team_id ? homeTeam?.country_name : awayTeam?.country_name} wins
                               </p>
@@ -170,24 +175,34 @@ export function SummaryView({
         )
       })}
 
-      {/* Submit button */}
-      <div className="mt-8 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p className="text-sm text-amber-800">
-            Once submitted, predictions cannot be changed after the deadline. Please review all your predictions before submitting.
-          </p>
+      {/* Submit button or submitted message */}
+      {hasSubmitted ? (
+        <div className="mt-8">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+            <p className="text-sm font-semibold text-green-800">
+              Your predictions have been submitted. Good luck!
+            </p>
+          </div>
         </div>
-        <Button
-          variant="green"
-          size="lg"
-          fullWidth
-          onClick={onSubmit}
-          loading={submitting}
-          loadingText="Submitting..."
-        >
-          Submit All Predictions
-        </Button>
-      </div>
+      ) : !readOnly ? (
+        <div className="mt-8 space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-sm text-amber-800">
+              Once submitted, predictions cannot be changed. Please review all your predictions before submitting.
+            </p>
+          </div>
+          <Button
+            variant="green"
+            size="lg"
+            fullWidth
+            onClick={onSubmit}
+            loading={submitting}
+            loadingText="Submitting..."
+          >
+            Submit All Predictions
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -207,7 +222,7 @@ function SectionHeader({
   matchCount: number
   isExpanded: boolean
   onToggle: () => void
-  onEdit: () => void
+  onEdit?: () => void
 }) {
   return (
     <div className="flex items-center justify-between py-3 mb-2">
@@ -227,13 +242,15 @@ function SectionHeader({
         <h3 className="text-lg font-bold text-gray-900">{title}</h3>
         <Badge variant="gray">{matchCount} matches</Badge>
       </button>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-      >
-        Edit
-      </button>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+        >
+          Edit
+        </button>
+      )}
     </div>
   )
 }

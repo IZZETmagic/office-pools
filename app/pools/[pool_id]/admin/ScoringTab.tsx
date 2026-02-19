@@ -32,6 +32,24 @@ const DEFAULTS = {
   pso_exact_score: 100,
   pso_correct_difference: 75,
   pso_correct_result: 50,
+  // Bonus: Group Standings
+  bonus_group_winner_and_runnerup: 150,
+  bonus_group_winner_only: 100,
+  bonus_group_runnerup_only: 50,
+  bonus_both_qualify_swapped: 75,
+  bonus_one_qualifies_wrong_position: 25,
+  // Bonus: Overall Qualification
+  bonus_all_16_qualified: 75,
+  bonus_12_15_qualified: 50,
+  bonus_8_11_qualified: 25,
+  // Bonus: Bracket & Tournament
+  bonus_correct_bracket_pairing: 25,
+  bonus_match_winner_correct: 50,
+  bonus_champion_correct: 1000,
+  bonus_second_place_correct: 25,
+  bonus_third_place_correct: 25,
+  bonus_best_player_correct: 100,
+  bonus_top_scorer_correct: 100,
 }
 
 export function ScoringTab({
@@ -93,9 +111,55 @@ export function ScoringTab({
     settings?.pso_correct_result ?? DEFAULTS.pso_correct_result
   )
 
+  // Bonus: Group Standings state
+  const [bonusGroupWinnerAndRunnerup, setBonusGroupWinnerAndRunnerup] = useState(
+    settings?.bonus_group_winner_and_runnerup ?? DEFAULTS.bonus_group_winner_and_runnerup
+  )
+  const [bonusGroupWinnerOnly, setBonusGroupWinnerOnly] = useState(
+    settings?.bonus_group_winner_only ?? DEFAULTS.bonus_group_winner_only
+  )
+  const [bonusGroupRunnerupOnly, setBonusGroupRunnerupOnly] = useState(
+    settings?.bonus_group_runnerup_only ?? DEFAULTS.bonus_group_runnerup_only
+  )
+  const [bonusBothQualifySwapped, setBonusBothQualifySwapped] = useState(
+    settings?.bonus_both_qualify_swapped ?? DEFAULTS.bonus_both_qualify_swapped
+  )
+  const [bonusOneQualifiesWrongPos, setBonusOneQualifiesWrongPos] = useState(
+    settings?.bonus_one_qualifies_wrong_position ?? DEFAULTS.bonus_one_qualifies_wrong_position
+  )
+
+  // Bonus: Overall Qualification state
+  const [bonusAllQualified, setBonusAllQualified] = useState(
+    settings?.bonus_all_16_qualified ?? DEFAULTS.bonus_all_16_qualified
+  )
+  const [bonus75PctQualified, setBonus75PctQualified] = useState(
+    settings?.bonus_12_15_qualified ?? DEFAULTS.bonus_12_15_qualified
+  )
+  const [bonus50PctQualified, setBonus50PctQualified] = useState(
+    settings?.bonus_8_11_qualified ?? DEFAULTS.bonus_8_11_qualified
+  )
+
+  // Bonus: Bracket & Tournament state
+  const [bonusBracketPairing, setBonusBracketPairing] = useState(
+    settings?.bonus_correct_bracket_pairing ?? DEFAULTS.bonus_correct_bracket_pairing
+  )
+  const [bonusMatchWinner, setBonusMatchWinner] = useState(
+    settings?.bonus_match_winner_correct ?? DEFAULTS.bonus_match_winner_correct
+  )
+  const [bonusChampion, setBonusChampion] = useState(
+    settings?.bonus_champion_correct ?? DEFAULTS.bonus_champion_correct
+  )
+  const [bonusSecondPlace, setBonusSecondPlace] = useState(
+    settings?.bonus_second_place_correct ?? DEFAULTS.bonus_second_place_correct
+  )
+  const [bonusThirdPlace, setBonusThirdPlace] = useState(
+    settings?.bonus_third_place_correct ?? DEFAULTS.bonus_third_place_correct
+  )
+
   // UI state
   const [saving, setSaving] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
+  const [recalculatingBonus, setRecalculatingBonus] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -103,6 +167,9 @@ export function ScoringTab({
   const [expandKnockout, setExpandKnockout] = useState(true)
   const [expandMultipliers, setExpandMultipliers] = useState(true)
   const [expandPso, setExpandPso] = useState(true)
+  const [expandBonusGroup, setExpandBonusGroup] = useState(true)
+  const [expandBonusQualification, setExpandBonusQualification] = useState(true)
+  const [expandBonusKnockout, setExpandBonusKnockout] = useState(true)
 
   const completedMatchCount = matches.filter((m) => m.is_completed).length
   const memberCount = members.length
@@ -141,6 +208,20 @@ export function ScoringTab({
     setPsoExact(DEFAULTS.pso_exact_score)
     setPsoDiff(DEFAULTS.pso_correct_difference)
     setPsoResult(DEFAULTS.pso_correct_result)
+    // Bonus
+    setBonusGroupWinnerAndRunnerup(DEFAULTS.bonus_group_winner_and_runnerup)
+    setBonusGroupWinnerOnly(DEFAULTS.bonus_group_winner_only)
+    setBonusGroupRunnerupOnly(DEFAULTS.bonus_group_runnerup_only)
+    setBonusBothQualifySwapped(DEFAULTS.bonus_both_qualify_swapped)
+    setBonusOneQualifiesWrongPos(DEFAULTS.bonus_one_qualifies_wrong_position)
+    setBonusAllQualified(DEFAULTS.bonus_all_16_qualified)
+    setBonus75PctQualified(DEFAULTS.bonus_12_15_qualified)
+    setBonus50PctQualified(DEFAULTS.bonus_8_11_qualified)
+    setBonusBracketPairing(DEFAULTS.bonus_correct_bracket_pairing)
+    setBonusMatchWinner(DEFAULTS.bonus_match_winner_correct)
+    setBonusChampion(DEFAULTS.bonus_champion_correct)
+    setBonusSecondPlace(DEFAULTS.bonus_second_place_correct)
+    setBonusThirdPlace(DEFAULTS.bonus_third_place_correct)
   }
 
   async function handleSave() {
@@ -164,6 +245,20 @@ export function ScoringTab({
       pso_exact_score: psoExact,
       pso_correct_difference: psoDiff,
       pso_correct_result: psoResult,
+      // Bonus fields
+      bonus_group_winner_and_runnerup: bonusGroupWinnerAndRunnerup,
+      bonus_group_winner_only: bonusGroupWinnerOnly,
+      bonus_group_runnerup_only: bonusGroupRunnerupOnly,
+      bonus_both_qualify_swapped: bonusBothQualifySwapped,
+      bonus_one_qualifies_wrong_position: bonusOneQualifiesWrongPos,
+      bonus_all_16_qualified: bonusAllQualified,
+      bonus_12_15_qualified: bonus75PctQualified,
+      bonus_8_11_qualified: bonus50PctQualified,
+      bonus_correct_bracket_pairing: bonusBracketPairing,
+      bonus_match_winner_correct: bonusMatchWinner,
+      bonus_champion_correct: bonusChampion,
+      bonus_second_place_correct: bonusSecondPlace,
+      bonus_third_place_correct: bonusThirdPlace,
       updated_at: new Date().toISOString(),
     }
 
@@ -242,6 +337,44 @@ export function ScoringTab({
 
     setSuccess('Points recalculated successfully.')
     setRecalculating(false)
+  }
+
+  async function handleRecalculateBonus() {
+    setRecalculatingBonus(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, {
+        method: 'POST',
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setError('Bonus recalculation failed: ' + (data.error || res.statusText))
+        setRecalculatingBonus(false)
+        return
+      }
+
+      const data = await res.json()
+
+      // Refresh members
+      const { data: refreshedMembers } = await supabase
+        .from('pool_members')
+        .select('*, users!inner(user_id, username, full_name, email)')
+        .eq('pool_id', pool.pool_id)
+        .order('current_rank', { ascending: true, nullsFirst: false })
+
+      if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
+
+      setSuccess(
+        `Bonus points recalculated: ${data.membersProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`
+      )
+    } catch (err: any) {
+      setError('Bonus recalculation failed: ' + (err.message || 'Network error'))
+    }
+
+    setRecalculatingBonus(false)
   }
 
   function SliderInput({
@@ -616,14 +749,182 @@ export function ScoringTab({
           )}
         </div>
 
-        {/* Bonus Points - Phase 2 */}
+        {/* Bonus: Group Standings */}
+        <div className="mb-6">
+          <button
+            onClick={() => setExpandBonusGroup(!expandBonusGroup)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3 hover:text-blue-600"
+          >
+            <span>{expandBonusGroup ? '▼' : '▶'}</span>
+            Bonus: Group Standings
+          </button>
+          {expandBonusGroup && (
+            <div className="space-y-4 pl-4">
+              <p className="text-xs text-gray-600">
+                Awarded per group when all group matches are completed. Compares predicted group standings (derived from match predictions) against actual results.
+              </p>
+              <SliderInput
+                label="Winner AND Runner-up correct:"
+                value={bonusGroupWinnerAndRunnerup}
+                onChange={setBonusGroupWinnerAndRunnerup}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Winner only correct:"
+                value={bonusGroupWinnerOnly}
+                onChange={setBonusGroupWinnerOnly}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Both qualify, positions swapped:"
+                value={bonusBothQualifySwapped}
+                onChange={setBonusBothQualifySwapped}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Runner-up only correct:"
+                value={bonusGroupRunnerupOnly}
+                onChange={setBonusGroupRunnerupOnly}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="One qualifies, wrong position:"
+                value={bonusOneQualifiesWrongPos}
+                onChange={setBonusOneQualifiesWrongPos}
+                min={0}
+                max={500}
+                step={25}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Bonus: Overall Qualification */}
+        <div className="mb-6">
+          <button
+            onClick={() => setExpandBonusQualification(!expandBonusQualification)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3 hover:text-blue-600"
+          >
+            <span>{expandBonusQualification ? '▼' : '▶'}</span>
+            Bonus: Overall Qualification
+          </button>
+          {expandBonusQualification && (
+            <div className="space-y-4 pl-4">
+              <p className="text-xs text-gray-600">
+                Awarded once when all 48 group matches are completed. Based on how many of the 32 qualifying teams were predicted correctly.
+              </p>
+              <SliderInput
+                label="All qualified teams correct:"
+                value={bonusAllQualified}
+                onChange={setBonusAllQualified}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="75%+ qualified correct:"
+                value={bonus75PctQualified}
+                onChange={setBonus75PctQualified}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="50%+ qualified correct:"
+                value={bonus50PctQualified}
+                onChange={setBonus50PctQualified}
+                min={0}
+                max={500}
+                step={25}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Bonus: Knockout & Tournament */}
+        <div className="mb-6">
+          <button
+            onClick={() => setExpandBonusKnockout(!expandBonusKnockout)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3 hover:text-blue-600"
+          >
+            <span>{expandBonusKnockout ? '▼' : '▶'}</span>
+            Bonus: Knockout &amp; Tournament
+          </button>
+          {expandBonusKnockout && (
+            <div className="space-y-4 pl-4">
+              <p className="text-xs text-gray-600">
+                Bracket pairing and match winner bonuses are awarded as knockout matches are played. Podium bonuses are awarded when the tournament champion, runner-up, and third place are confirmed.
+              </p>
+              <SliderInput
+                label="Correct R32 bracket pairing:"
+                value={bonusBracketPairing}
+                onChange={setBonusBracketPairing}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Correct knockout match winner:"
+                value={bonusMatchWinner}
+                onChange={setBonusMatchWinner}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Champion correct:"
+                value={bonusChampion}
+                onChange={setBonusChampion}
+                min={0}
+                max={2000}
+                step={50}
+              />
+              <SliderInput
+                label="Runner-up correct:"
+                value={bonusSecondPlace}
+                onChange={setBonusSecondPlace}
+                min={0}
+                max={500}
+                step={25}
+              />
+              <SliderInput
+                label="Third place correct:"
+                value={bonusThirdPlace}
+                onChange={setBonusThirdPlace}
+                min={0}
+                max={500}
+                step={25}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Coming Soon — Best Player & Top Scorer */}
         <div className="mb-6 border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
           <p className="text-sm font-semibold text-gray-400">
-            ▶ Bonus Points (Coming Soon - Phase 2)
+            Bonus: Best Player &amp; Top Scorer
+            <span className="ml-2 inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">
+              Coming Soon
+            </span>
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Group predictions, bracket accuracy, etc.
-          </p>
+          <div className="mt-2 space-y-2 opacity-40 pointer-events-none">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 w-52 shrink-0">Best Player correct:</span>
+              <span className="text-sm font-bold text-gray-400">100 points</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 w-52 shrink-0">Top Scorer correct:</span>
+              <span className="text-sm font-bold text-gray-400">100 points</span>
+            </div>
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -646,14 +947,24 @@ export function ScoringTab({
           If points seem incorrect, you can manually recalculate all points
           using current rules.
         </p>
-        <Button
-          variant="outline"
-          onClick={handleManualRecalculate}
-          loading={recalculating}
-          loadingText="Recalculating..."
-        >
-          Recalculate All Points
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            variant="outline"
+            onClick={handleManualRecalculate}
+            loading={recalculating}
+            loadingText="Recalculating..."
+          >
+            Recalculate Match Points
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRecalculateBonus}
+            loading={recalculatingBonus}
+            loadingText="Recalculating Bonus..."
+          >
+            Recalculate Bonus Points
+          </Button>
+        </div>
       </Card>
 
       {/* Confirmation Modal */}
@@ -667,10 +978,13 @@ export function ScoringTab({
               You are about to change the scoring system. This will:
             </p>
             <ul className="text-sm text-gray-600 space-y-1 mb-4 list-disc pl-5">
-              <li>Update point values in pool settings</li>
-              <li>Recalculate points for ALL members</li>
+              <li>Update scoring and bonus point values</li>
+              <li>Recalculate match points for ALL members</li>
               <li>Update leaderboard rankings</li>
             </ul>
+            <p className="text-xs text-gray-500 mb-4">
+              Note: Use "Recalculate Bonus Points" separately to update bonus scores with new values.
+            </p>
             <p className="text-sm text-gray-600 mb-2">
               Affected matches: {completedMatchCount} completed matches
             </p>

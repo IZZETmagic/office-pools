@@ -176,10 +176,11 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
         </div>
 
         <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Overall Qualification Bonus</p>
+        <p className="text-xs text-gray-500 mb-2">Awarded once when all 48 group matches are completed, based on how many of the 32 qualifying teams were predicted correctly.</p>
         <div className="divide-y divide-gray-100">
-          <PointsRow label="All 16 qualified teams correct" value={s.bonus_all_16_qualified} />
-          <PointsRow label="12-15 qualified teams correct" value={s.bonus_12_15_qualified} />
-          <PointsRow label="8-11 qualified teams correct" value={s.bonus_8_11_qualified} />
+          <PointsRow label="All qualified teams correct" value={s.bonus_all_16_qualified} />
+          <PointsRow label="75%+ qualified teams correct" value={s.bonus_12_15_qualified} />
+          <PointsRow label="50%+ qualified teams correct" value={s.bonus_8_11_qualified} />
         </div>
       </Card>
 
@@ -199,8 +200,22 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
           <PointsRow label="Champion correct" value={s.bonus_champion_correct} />
           <PointsRow label="Runner-up correct" value={s.bonus_second_place_correct} />
           <PointsRow label="Third place correct" value={s.bonus_third_place_correct} />
-          <PointsRow label="Best player correct" value={s.bonus_best_player_correct} />
-          <PointsRow label="Top scorer correct" value={s.bonus_top_scorer_correct} />
+        </div>
+
+        <div className="mt-4 opacity-40">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Coming Soon
+          </p>
+          <div className="divide-y divide-gray-100">
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm text-gray-400">Best player correct</span>
+              <span className="text-sm font-bold text-gray-400">{s.bonus_best_player_correct ?? 100} pts</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm text-gray-400">Top scorer correct</span>
+              <span className="text-sm font-bold text-gray-400">{s.bonus_top_scorer_correct ?? 100} pts</span>
+            </div>
+          </div>
         </div>
       </Card>
 

@@ -34,6 +34,18 @@ body {
   display: none;
 }
 
+/* Toast slide-in animation */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Prevent iOS zoom on input focus (inputs < 16px trigger zoom) */
 @media screen and (max-width: 640px) {
   input[type="text"],

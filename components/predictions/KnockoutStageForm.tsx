@@ -20,16 +20,17 @@ type Props = {
   stage: string
   resolvedMatches: ResolvedMatch[]
   predictions: PredictionMap
-  onUpdatePrediction: (matchId: string, score: ScoreEntry) => void
+  onUpdatePrediction?: (matchId: string, score: ScoreEntry) => void
   psoEnabled: boolean
+  readOnly?: boolean
 }
 
-export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdatePrediction, psoEnabled }: Props) {
+export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdatePrediction, psoEnabled, readOnly }: Props) {
   const stageLabel = STAGE_LABELS[stage] || stage
   const totalMatches = resolvedMatches.length
   const predictedMatches = resolvedMatches.filter(rm => {
     const pred = predictions.get(rm.match.match_id)
-    if (!pred) return false
+    if (!pred || pred.home == null || pred.away == null) return false
     // A knockout match with a draw needs PSO resolution to count as complete
     if (pred.home === pred.away) {
       if (psoEnabled) {
@@ -65,6 +66,7 @@ export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdat
             prediction={predictions.get(match.match_id)}
             onUpdate={onUpdatePrediction}
             psoEnabled={psoEnabled}
+            readOnly={readOnly}
           />
         ))}
       </div>
@@ -83,26 +85,29 @@ function KnockoutMatchCard({
   prediction,
   onUpdate,
   psoEnabled,
+  readOnly,
 }: {
   match: Match
   homeTeam: GroupStanding | null
   awayTeam: GroupStanding | null
   prediction: ScoreEntry | undefined
-  onUpdate: (matchId: string, score: ScoreEntry) => void
+  onUpdate?: (matchId: string, score: ScoreEntry) => void
   psoEnabled: boolean
+  readOnly?: boolean
 }) {
   const homeName = homeTeam?.country_name || match.home_team_placeholder || 'TBD'
   const awayName = awayTeam?.country_name || match.away_team_placeholder || 'TBD'
   const bothResolved = homeTeam !== null && awayTeam !== null
 
-  const isDraw = prediction != null && prediction.home === prediction.away
-  const hasPrediction = prediction != null
+  const isDraw = prediction != null && prediction.home != null && prediction.away != null && prediction.home === prediction.away
+  const hasPrediction = prediction != null && prediction.home != null && prediction.away != null
 
   const handleScoreChange = (team: 'home' | 'away', value: string) => {
-    const numValue = value === '' ? 0 : parseInt(value)
-    if (isNaN(numValue) || numValue < 0) return
+    if (readOnly || !onUpdate) return
+    const numValue = value === '' ? null : parseInt(value)
+    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return
 
-    const current = prediction || { home: 0, away: 0 }
+    const current = prediction || { home: null, away: null }
     const newScore: ScoreEntry = {
       ...current,
       [team]: numValue,
@@ -111,7 +116,7 @@ function KnockoutMatchCard({
     // If scores are no longer a draw, clear PSO fields
     const newHome = team === 'home' ? numValue : current.home
     const newAway = team === 'away' ? numValue : current.away
-    if (newHome !== newAway) {
+    if (newHome != null && newAway != null && newHome !== newAway) {
       newScore.homePso = null
       newScore.awayPso = null
       newScore.winnerTeamId = null
@@ -121,19 +126,21 @@ function KnockoutMatchCard({
   }
 
   const handlePsoScoreChange = (team: 'homePso' | 'awayPso', value: string) => {
+    if (readOnly || !onUpdate) return
     const numValue = value === '' ? null : parseInt(value)
     if (numValue !== null && (isNaN(numValue) || numValue < 0 || numValue > 20)) return
 
-    const current = prediction || { home: 0, away: 0 }
+    const current = prediction || { home: null, away: null }
     onUpdate(match.match_id, {
       ...current,
       [team]: numValue,
-      winnerTeamId: null, // Clear winner when entering exact scores
+      winnerTeamId: null,
     })
   }
 
   const handleWinnerChange = (winnerId: string) => {
-    const current = prediction || { home: 0, away: 0 }
+    if (readOnly || !onUpdate) return
+    const current = prediction || { home: null, away: null }
     onUpdate(match.match_id, {
       ...current,
       homePso: null,
@@ -151,83 +158,88 @@ function KnockoutMatchCard({
   // PSO validation: scores can't be tied
   const psoTied = prediction?.homePso != null && prediction?.awayPso != null && prediction.homePso === prediction.awayPso
 
+  // Format date/time in AST (UTC-4)
+  const matchDate = new Date(match.match_date)
+  const dateStr = matchDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Atlantic/Bermuda',
+  })
+  const timeStr = matchDate.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Atlantic/Bermuda',
+    timeZoneName: 'short',
+  })
+
+  // Split venue into stadium and city
+  const venueParts = match.venue?.split(', ') || []
+  const stadium = venueParts[0] || ''
+  const city = venueParts.slice(1).join(', ') || ''
+
   return (
     <Card padding="md">
-      {/* Match header */}
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-2">
-          <Badge variant={match.stage === 'final' ? 'green' : match.stage === 'third_place' ? 'yellow' : 'blue'}>
-            {stageLabel}
-          </Badge>
-          <span className="text-xs text-gray-500">Match #{match.match_number}</span>
+      {/* Single row: Match#, Date/Time, Home, Score, Away, City/Stadium */}
+      <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap">
+        <span className="text-[10px] sm:text-xs text-gray-400 shrink-0 mr-0.5 sm:mr-2">#{match.match_number}</span>
+        <div className="hidden sm:block shrink-0 w-[108px] text-xs text-gray-500 leading-tight">
+          <span className="font-medium text-gray-700">{dateStr}</span>
+          <br />
+          <span>{timeStr}</span>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-500">
-            {new Date(match.match_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </p>
-          {match.venue && (
-            <p className="text-xs text-gray-500">{match.venue}</p>
-          )}
-        </div>
-      </div>
 
-      {/* Full time label */}
-      {isDraw && (
-        <p className="text-xs text-gray-600 font-medium mb-1 text-center">Full Time</p>
-      )}
-
-      {/* Teams and score inputs */}
-      <div className="flex items-center gap-2 sm:gap-3">
         {/* Home team */}
-        <div className="flex-1 text-right min-w-0">
-          <p className={`text-sm sm:text-base font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
+        <div className="flex-1 basis-0 text-right min-w-0">
+          <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
             {homeName}
           </p>
-          {homeTeam && (
-            <p className="text-xs text-gray-500">Group {homeTeam.group_letter}</p>
-          )}
+          {homeTeam && <p className="text-[10px] text-gray-400 hidden sm:block">Group {homeTeam.group_letter}</p>}
         </div>
 
         {/* Score inputs */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <input
             type="number"
             min="0"
             inputMode="numeric"
             value={prediction?.home ?? ''}
             placeholder="-"
-            disabled={!bothResolved}
+            disabled={!bothResolved || readOnly}
             onChange={(e) => handleScoreChange('home', e.target.value)}
-            className="w-11 sm:w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-base sm:text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
-          <span className="text-gray-500 font-bold">-</span>
+          <span className="text-gray-400 font-bold text-[10px]">v</span>
           <input
             type="number"
             min="0"
             inputMode="numeric"
             value={prediction?.away ?? ''}
             placeholder="-"
-            disabled={!bothResolved}
+            disabled={!bothResolved || readOnly}
             onChange={(e) => handleScoreChange('away', e.target.value)}
-            className="w-11 sm:w-14 h-10 px-1 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-base sm:text-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
 
         {/* Away team */}
-        <div className="flex-1 text-left min-w-0">
-          <p className={`text-sm sm:text-base font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
+        <div className="flex-1 basis-0 text-left min-w-0">
+          <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-gray-900' : 'text-gray-500'}`}>
             {awayName}
           </p>
-          {awayTeam && (
-            <p className="text-xs text-gray-500">Group {awayTeam.group_letter}</p>
-          )}
+          {awayTeam && <p className="text-[10px] text-gray-400 hidden sm:block">Group {awayTeam.group_letter}</p>}
+        </div>
+
+        <div className="hidden sm:block shrink-0 w-[100px] text-xs text-gray-500 text-right leading-tight">
+          <span className="font-medium text-gray-700 truncate block">{city}</span>
+          <span className="truncate block">{stadium}</span>
         </div>
       </div>
+
+      {/* Full time label */}
+      {isDraw && (
+        <p className="text-xs text-gray-600 font-medium mt-2 mb-1 text-center">Full Time</p>
+      )}
 
       {/* PSO Section - only for draws in knockout matches */}
       {bothResolved && hasPrediction && isDraw && (
@@ -249,8 +261,9 @@ function KnockoutMatchCard({
                     inputMode="numeric"
                     value={prediction?.homePso ?? ''}
                     placeholder="-"
+                    disabled={readOnly}
                     onChange={(e) => handlePsoScoreChange('homePso', e.target.value)}
-                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   <span className="text-gray-500 text-xs font-bold">-</span>
                   <input
@@ -260,8 +273,9 @@ function KnockoutMatchCard({
                     inputMode="numeric"
                     value={prediction?.awayPso ?? ''}
                     placeholder="-"
+                    disabled={readOnly}
                     onChange={(e) => handlePsoScoreChange('awayPso', e.target.value)}
-                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm"
+                    className="w-10 sm:w-12 h-8 px-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   <span className="text-xs text-gray-600 w-16 sm:w-20 truncate">{awayName}</span>
                 </div>
@@ -279,21 +293,23 @@ function KnockoutMatchCard({
                   <p className="text-sm font-semibold text-gray-900">If this match goes to penalties, who wins?</p>
                 </div>
                 <div className="flex gap-4 justify-center">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className={`flex items-center gap-2 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <input
                       type="radio"
                       name={`pso-winner-${match.match_id}`}
                       checked={prediction?.winnerTeamId === homeTeam?.team_id}
+                      disabled={readOnly}
                       onChange={() => homeTeam && handleWinnerChange(homeTeam.team_id)}
                       className="shrink-0"
                     />
                     <span className="text-sm font-medium text-gray-800">{homeName}</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className={`flex items-center gap-2 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <input
                       type="radio"
                       name={`pso-winner-${match.match_id}`}
                       checked={prediction?.winnerTeamId === awayTeam?.team_id}
+                      disabled={readOnly}
                       onChange={() => awayTeam && handleWinnerChange(awayTeam.team_id)}
                       className="shrink-0"
                     />

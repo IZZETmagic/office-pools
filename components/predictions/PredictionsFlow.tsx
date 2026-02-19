@@ -12,40 +12,64 @@ import {
   STAGES,
   STAGE_LABELS,
   GROUP_LETTERS,
-  calculateGroupStandings,
-  resolveAllR32Matches,
   getKnockoutWinner,
-  getKnockoutLoser,
   isStageComplete,
+  isPredictionComplete,
 } from '@/lib/tournament'
+import { resolveFullBracket } from '@/lib/bracketResolver'
 import { GroupStageForm } from './GroupStageForm'
 import { KnockoutStageForm } from './KnockoutStageForm'
 import { SummaryView } from './SummaryView'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 
 type Props = {
   matches: Match[]
   teams: Team[]
   memberId: string
+  poolId: string
   existingPredictions: Prediction[]
   isPastDeadline: boolean
   psoEnabled: boolean
+  hasSubmitted: boolean
+  submittedAt: string | null
+  lastSavedAt: string | null
+  predictionsLocked: boolean
+  onUnsavedChangesRef?: React.RefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>
+}
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
+// Stage match count helpers
+const STAGE_MATCH_STAGES: Record<string, string[]> = {
+  group: ['group'],
+  round_32: ['round_32'],
+  round_16: ['round_16'],
+  quarter_final: ['quarter_final'],
+  semi_final: ['semi_final'],
+  finals: ['third_place', 'final'],
 }
 
 export default function PredictionsFlow({
   matches,
   teams,
   memberId,
+  poolId,
   existingPredictions,
   isPastDeadline,
   psoEnabled,
+  hasSubmitted: initialHasSubmitted,
+  submittedAt: initialSubmittedAt,
+  lastSavedAt: initialLastSavedAt,
+  predictionsLocked,
+  onUnsavedChangesRef,
 }: Props) {
   // =============================================
   // STATE
   // =============================================
 
-  const [currentStage, setCurrentStage] = useState(0) // index into STAGES
+  const [currentStage, setCurrentStage] = useState(0)
   const [predictions, setPredictions] = useState<PredictionMap>(() => {
     const map = new Map<string, ScoreEntry>()
     for (const p of existingPredictions) {
@@ -61,9 +85,17 @@ export default function PredictionsFlow({
   })
 
   const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [hasSubmitted, setHasSubmitted] = useState(initialHasSubmitted)
+  const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt)
+  const [lastSavedAt, setLastSavedAt] = useState(initialLastSavedAt)
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
+  const [recoveryData, setRecoveryData] = useState<Record<string, ScoreEntry> | null>(null)
+  const [recoveryTimestamp, setRecoveryTimestamp] = useState<number | null>(null)
 
   // Track existing prediction IDs for upsert logic
   const existingPredictionIds = useRef(
@@ -71,10 +103,50 @@ export default function PredictionsFlow({
   )
 
   const supabase = createClient()
+  const { showToast } = useToast()
 
-  // Auto-save timer
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Expose unsaved changes state to parent for nav warning
+  useEffect(() => {
+    if (onUnsavedChangesRef) {
+      (onUnsavedChangesRef as React.MutableRefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>).current = {
+        hasUnsaved: () => pendingChanges.current,
+        save: () => savePredictions(),
+      }
+    }
+  })
+
+  // Track unsaved changes
   const pendingChanges = useRef(false)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const periodicSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSavedPredictions = useRef(new Map(predictions))
+
+  // =============================================
+  // COMPUTED: PROGRESS
+  // =============================================
+
+  const totalMatches = matches.length
+  const predictedCount = Array.from(predictions.values()).filter(p => isPredictionComplete(p)).length
+  const progressPercent = totalMatches > 0 ? Math.round((predictedCount / totalMatches) * 100) : 0
+
+  const stageProgress = useMemo(() => {
+    const progress: { stage: string; label: string; predicted: number; total: number }[] = []
+    for (const [stageKey, matchStages] of Object.entries(STAGE_MATCH_STAGES)) {
+      const stageMatches = matches.filter(m => matchStages.includes(m.stage))
+      const stagePredicted = stageMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
+      progress.push({
+        stage: stageKey,
+        label: STAGE_LABELS[stageKey] || stageKey,
+        predicted: stagePredicted,
+        total: stageMatches.length,
+      })
+    }
+    return progress
+  }, [matches, predictions])
+
+  const hasUnsavedChanges = useMemo(() => {
+    return pendingChanges.current
+  }, [predictions, saveStatus])
 
   // =============================================
   // PREDICTION UPDATE HANDLER
@@ -87,178 +159,151 @@ export default function PredictionsFlow({
       return next
     })
     pendingChanges.current = true
+    setSaveStatus('idle')
 
-    // Reset auto-save timer
+    // Debounced auto-save (500ms)
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
       if (pendingChanges.current) {
         savePredictions()
       }
-    }, 30000)
+    }, 500)
   }, [])
 
   // =============================================
-  // COMPUTED: GROUP STANDINGS
+  // PERIODIC SAVE (every 60s safety net)
   // =============================================
 
-  const allGroupStandings = useMemo(() => {
-    const standings = new Map<string, GroupStanding[]>()
-    for (const letter of GROUP_LETTERS) {
-      const gMatches = matches.filter(m => m.stage === 'group' && m.group_letter === letter)
-      standings.set(letter, calculateGroupStandings(letter, gMatches, predictions, teams))
+  useEffect(() => {
+    periodicSaveTimer.current = setInterval(() => {
+      if (pendingChanges.current && !saving) {
+        savePredictions()
+      }
+    }, 60000)
+
+    return () => {
+      if (periodicSaveTimer.current) clearInterval(periodicSaveTimer.current)
     }
-    return standings
+  }, [saving])
+
+  // =============================================
+  // BEFOREUNLOAD WARNING
+  // =============================================
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pendingChanges.current) {
+        e.preventDefault()
+        // Trigger a save attempt
+        savePredictions()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+      if (periodicSaveTimer.current) clearInterval(periodicSaveTimer.current)
+    }
+  }, [])
+
+  // =============================================
+  // OFFLINE DETECTION
+  // =============================================
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine)
+
+    const handleOnline = () => {
+      setIsOnline(true)
+      showToast('Back online. Syncing...', 'info')
+      // Sync any pending changes
+      if (pendingChanges.current) {
+        savePredictions()
+      }
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+      showToast('You\'re offline. Predictions will save when reconnected.', 'warning', { duration: 6000 })
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  // =============================================
+  // LOCALSTORAGE RECOVERY ON MOUNT
+  // =============================================
+
+  useEffect(() => {
+    try {
+      const backup = localStorage.getItem(`predictions_backup_${poolId}`)
+      if (backup) {
+        const parsed = JSON.parse(backup)
+        // Check if it has a timestamp wrapper or is raw data
+        const data = parsed.timestamp ? parsed.predictions : parsed
+        const timestamp = parsed.timestamp || Date.now()
+        const ageInHours = (Date.now() - timestamp) / (1000 * 60 * 60)
+
+        if (ageInHours < 24 && data && Object.keys(data).length > 0) {
+          setRecoveryData(data)
+          setRecoveryTimestamp(timestamp)
+          setShowRecoveryModal(true)
+        } else {
+          // Stale backup, discard
+          localStorage.removeItem(`predictions_backup_${poolId}`)
+        }
+      }
+    } catch {
+      // Corrupted backup, discard
+      localStorage.removeItem(`predictions_backup_${poolId}`)
+    }
+  }, [poolId])
+
+  const handleRecoverBackup = () => {
+    if (recoveryData) {
+      const next = new Map(predictions)
+      for (const [matchId, scores] of Object.entries(recoveryData)) {
+        next.set(matchId, scores as ScoreEntry)
+      }
+      setPredictions(next)
+      pendingChanges.current = true
+      localStorage.removeItem(`predictions_backup_${poolId}`)
+      setShowRecoveryModal(false)
+      setRecoveryData(null)
+      showToast('Predictions recovered! Saving...', 'success')
+      // Trigger save of recovered data
+      setTimeout(() => savePredictions(), 500)
+    }
+  }
+
+  const handleDiscardBackup = () => {
+    localStorage.removeItem(`predictions_backup_${poolId}`)
+    setShowRecoveryModal(false)
+    setRecoveryData(null)
+    showToast('Backup discarded', 'info')
+  }
+
+  // =============================================
+  // COMPUTED: FULL BRACKET (groups, knockout, champion)
+  // =============================================
+
+  const bracket = useMemo(() => {
+    return resolveFullBracket({ matches, predictionMap: predictions, teams })
   }, [matches, predictions, teams])
 
-  // =============================================
-  // COMPUTED: R32 RESOLUTIONS
-  // =============================================
-
-  const r32Resolutions = useMemo(() => {
-    return resolveAllR32Matches(allGroupStandings)
-  }, [allGroupStandings])
-
-  // =============================================
-  // COMPUTED: FULL KNOCKOUT BRACKET
-  // =============================================
-
-  // Build a map of match_number -> { homeTeam, awayTeam } for all knockout matches
-  const knockoutTeamMap = useMemo(() => {
-    const map = new Map<number, { home: GroupStanding | null; away: GroupStanding | null }>()
-
-    // R32: from group results
-    for (const [matchNum, teams] of r32Resolutions) {
-      map.set(matchNum, teams)
-    }
-
-    // Helper to get match by number
-    const getMatch = (num: number) => matches.find(m => m.match_number === num)
-
-    // R16 (matches 89-96): winners of R32 matches
-    // The matches table has home_team_placeholder like "Winner Match 73"
-    const r16Matches = matches.filter(m => m.stage === 'round_16').sort((a, b) => a.match_number - b.match_number)
-    for (const m of r16Matches) {
-      const homeMatchNum = extractMatchNumber(m.home_team_placeholder)
-      const awayMatchNum = extractMatchNumber(m.away_team_placeholder)
-
-      const homeSource = homeMatchNum ? map.get(homeMatchNum) : null
-      const awaySource = awayMatchNum ? map.get(awayMatchNum) : null
-
-      const homeSourceMatch = homeMatchNum ? getMatch(homeMatchNum) : null
-      const awaySourceMatch = awayMatchNum ? getMatch(awayMatchNum) : null
-
-      const home = homeSourceMatch && homeSource
-        ? getKnockoutWinner(homeSourceMatch.match_id, predictions, homeSource.home, homeSource.away)
-        : null
-      const away = awaySourceMatch && awaySource
-        ? getKnockoutWinner(awaySourceMatch.match_id, predictions, awaySource.home, awaySource.away)
-        : null
-
-      map.set(m.match_number, { home, away })
-    }
-
-    // QF (matches 97-100)
-    const qfMatches = matches.filter(m => m.stage === 'quarter_final').sort((a, b) => a.match_number - b.match_number)
-    for (const m of qfMatches) {
-      const homeMatchNum = extractMatchNumber(m.home_team_placeholder)
-      const awayMatchNum = extractMatchNumber(m.away_team_placeholder)
-
-      const homeSource = homeMatchNum ? map.get(homeMatchNum) : null
-      const awaySource = awayMatchNum ? map.get(awayMatchNum) : null
-
-      const homeSourceMatch = homeMatchNum ? getMatch(homeMatchNum) : null
-      const awaySourceMatch = awayMatchNum ? getMatch(awayMatchNum) : null
-
-      const home = homeSourceMatch && homeSource
-        ? getKnockoutWinner(homeSourceMatch.match_id, predictions, homeSource.home, homeSource.away)
-        : null
-      const away = awaySourceMatch && awaySource
-        ? getKnockoutWinner(awaySourceMatch.match_id, predictions, awaySource.home, awaySource.away)
-        : null
-
-      map.set(m.match_number, { home, away })
-    }
-
-    // SF (matches 101-102)
-    const sfMatches = matches.filter(m => m.stage === 'semi_final').sort((a, b) => a.match_number - b.match_number)
-    for (const m of sfMatches) {
-      const homeMatchNum = extractMatchNumber(m.home_team_placeholder)
-      const awayMatchNum = extractMatchNumber(m.away_team_placeholder)
-
-      const homeSource = homeMatchNum ? map.get(homeMatchNum) : null
-      const awaySource = awayMatchNum ? map.get(awayMatchNum) : null
-
-      const homeSourceMatch = homeMatchNum ? getMatch(homeMatchNum) : null
-      const awaySourceMatch = awayMatchNum ? getMatch(awayMatchNum) : null
-
-      const home = homeSourceMatch && homeSource
-        ? getKnockoutWinner(homeSourceMatch.match_id, predictions, homeSource.home, homeSource.away)
-        : null
-      const away = awaySourceMatch && awaySource
-        ? getKnockoutWinner(awaySourceMatch.match_id, predictions, awaySource.home, awaySource.away)
-        : null
-
-      map.set(m.match_number, { home, away })
-    }
-
-    // Third place: losers of semi-finals
-    const thirdMatch = matches.find(m => m.stage === 'third_place')
-    if (thirdMatch) {
-      const homeMatchNum = extractMatchNumber(thirdMatch.home_team_placeholder)
-      const awayMatchNum = extractMatchNumber(thirdMatch.away_team_placeholder)
-
-      const homeSource = homeMatchNum ? map.get(homeMatchNum) : null
-      const awaySource = awayMatchNum ? map.get(awayMatchNum) : null
-
-      const homeSourceMatch = homeMatchNum ? getMatch(homeMatchNum) : null
-      const awaySourceMatch = awayMatchNum ? getMatch(awayMatchNum) : null
-
-      const home = homeSourceMatch && homeSource
-        ? getKnockoutLoser(homeSourceMatch.match_id, predictions, homeSource.home, homeSource.away)
-        : null
-      const away = awaySourceMatch && awaySource
-        ? getKnockoutLoser(awaySourceMatch.match_id, predictions, awaySource.home, awaySource.away)
-        : null
-
-      map.set(thirdMatch.match_number, { home, away })
-    }
-
-    // Final: winners of semi-finals
-    const finalMatch = matches.find(m => m.stage === 'final')
-    if (finalMatch) {
-      const homeMatchNum = extractMatchNumber(finalMatch.home_team_placeholder)
-      const awayMatchNum = extractMatchNumber(finalMatch.away_team_placeholder)
-
-      const homeSource = homeMatchNum ? map.get(homeMatchNum) : null
-      const awaySource = awayMatchNum ? map.get(awayMatchNum) : null
-
-      const homeSourceMatch = homeMatchNum ? getMatch(homeMatchNum) : null
-      const awaySourceMatch = awayMatchNum ? getMatch(awayMatchNum) : null
-
-      const home = homeSourceMatch && homeSource
-        ? getKnockoutWinner(homeSourceMatch.match_id, predictions, homeSource.home, homeSource.away)
-        : null
-      const away = awaySourceMatch && awaySource
-        ? getKnockoutWinner(awaySourceMatch.match_id, predictions, awaySource.home, awaySource.away)
-        : null
-
-      map.set(finalMatch.match_number, { home, away })
-    }
-
-    return map
-  }, [matches, predictions, r32Resolutions, allGroupStandings])
-
-  // =============================================
-  // COMPUTED: CHAMPION
-  // =============================================
-
-  const champion = useMemo(() => {
-    const finalMatch = matches.find(m => m.stage === 'final')
-    if (!finalMatch) return null
-    const finalTeams = knockoutTeamMap.get(finalMatch.match_number)
-    if (!finalTeams) return null
-    return getKnockoutWinner(finalMatch.match_id, predictions, finalTeams.home, finalTeams.away)
-  }, [matches, predictions, knockoutTeamMap])
+  const allGroupStandings = bracket.allGroupStandings
+  const knockoutTeamMap = bracket.knockoutTeamMap
+  const champion = bracket.champion
 
   // =============================================
   // BUILD RESOLVED MATCHES FOR EACH KNOCKOUT STAGE
@@ -281,7 +326,6 @@ export default function PredictionsFlow({
       })
   }, [matches, knockoutTeamMap])
 
-  // Build knockout resolutions for summary view
   const knockoutResolutionsForSummary = useMemo(() => {
     const result = new Map<string, { match: Match; homeTeam: GroupStanding | null; awayTeam: GroupStanding | null; winner: GroupStanding | null }>()
     const knockoutMatches = matches.filter(m => m.stage !== 'group')
@@ -296,93 +340,141 @@ export default function PredictionsFlow({
   }, [matches, predictions, knockoutTeamMap])
 
   // =============================================
-  // SAVE PREDICTIONS
+  // SAVE PREDICTIONS (via API)
   // =============================================
 
   const savePredictions = async () => {
+    if (saving || hasSubmitted) return
+
+    // If offline, save to localStorage immediately
+    if (!navigator.onLine) {
+      try {
+        const backup: Record<string, ScoreEntry> = {}
+        for (const [k, v] of predictions) backup[k] = v
+        localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+          predictions: backup,
+          timestamp: Date.now(),
+        }))
+        showToast('Saved locally. Will sync when online.', 'warning')
+      } catch {}
+      return
+    }
+
     setSaving(true)
+    setSaveStatus('saving')
     setError(null)
     pendingChanges.current = false
 
-    try {
-      const toInsert: {
-        member_id: string
-        match_id: string
-        predicted_home_score: number
-        predicted_away_score: number
-        predicted_home_pso: number | null
-        predicted_away_pso: number | null
-        predicted_winner_team_id: string | null
-      }[] = []
-      const toUpdate: {
-        prediction_id: string
-        predicted_home_score: number
-        predicted_away_score: number
-        predicted_home_pso: number | null
-        predicted_away_pso: number | null
-        predicted_winner_team_id: string | null
-      }[] = []
+    const predictionsPayload: {
+      matchId: string
+      predictionId?: string
+      homeScore: number
+      awayScore: number
+      homePso?: number | null
+      awayPso?: number | null
+      winnerTeamId?: string | null
+    }[] = []
 
-      for (const [matchId, scores] of predictions) {
-        const existingId = existingPredictionIds.current.get(matchId)
-        if (existingId) {
-          toUpdate.push({
-            prediction_id: existingId,
-            predicted_home_score: scores.home,
-            predicted_away_score: scores.away,
-            predicted_home_pso: scores.homePso ?? null,
-            predicted_away_pso: scores.awayPso ?? null,
-            predicted_winner_team_id: scores.winnerTeamId ?? null,
-          })
-        } else {
-          toInsert.push({
-            member_id: memberId,
-            match_id: matchId,
-            predicted_home_score: scores.home,
-            predicted_away_score: scores.away,
-            predicted_home_pso: scores.homePso ?? null,
-            predicted_away_pso: scores.awayPso ?? null,
-            predicted_winner_team_id: scores.winnerTeamId ?? null,
-          })
+    for (const [matchId, scores] of predictions) {
+      // Only save predictions where at least one score has been entered
+      if (scores.home == null && scores.away == null) continue
+      const existingId = existingPredictionIds.current.get(matchId)
+      predictionsPayload.push({
+        matchId,
+        predictionId: existingId,
+        homeScore: scores.home ?? 0,
+        awayScore: scores.away ?? 0,
+        homePso: scores.homePso ?? null,
+        awayPso: scores.awayPso ?? null,
+        winnerTeamId: scores.winnerTeamId ?? null,
+      })
+    }
+
+    // Auto-retry with exponential backoff (3 attempts)
+    let lastError: string = 'Failed to save'
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)))
+          setSaveStatus('saving')
         }
-      }
 
-      if (toInsert.length > 0) {
-        const { data: inserted, error: insertError } = await supabase
-          .from('predictions')
-          .insert(toInsert)
-          .select('match_id, prediction_id')
+        const res = await fetch(`/api/pools/${poolId}/predictions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ predictions: predictionsPayload }),
+        })
 
-        if (insertError) throw insertError
+        // Session expiry detection
+        if (res.status === 401) {
+          setSaveStatus('error')
+          setError('Session expired. Please log in again.')
+          showToast('Session expired. Redirecting to login...', 'error', { duration: 3000 })
+          // Save to localStorage before redirect
+          try {
+            const backup: Record<string, ScoreEntry> = {}
+            for (const [k, v] of predictions) backup[k] = v
+            localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+              predictions: backup,
+              timestamp: Date.now(),
+            }))
+          } catch {}
+          setTimeout(() => { window.location.href = '/login' }, 2000)
+          setSaving(false)
+          return
+        }
 
-        // Update local tracking
-        if (inserted) {
-          for (const row of inserted) {
-            existingPredictionIds.current.set(row.match_id, row.prediction_id)
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Failed to save')
+        }
+
+        const data = await res.json()
+
+        // Track newly inserted IDs
+        if (data.insertedIds) {
+          for (const { match_id, prediction_id } of data.insertedIds) {
+            existingPredictionIds.current.set(match_id, prediction_id)
           }
         }
+
+        setLastSavedAt(data.lastSaved)
+        setSaveStatus('saved')
+        lastSavedPredictions.current = new Map(predictions)
+
+        // Clear any localStorage backup on successful save
+        try { localStorage.removeItem(`predictions_backup_${poolId}`) } catch {}
+
+        // Reset to idle after 3 seconds
+        setTimeout(() => {
+          setSaveStatus(prev => prev === 'saved' ? 'idle' : prev)
+        }, 3000)
+
+        setSaving(false)
+        return // Success — exit retry loop
+      } catch (err: any) {
+        lastError = err.message || 'Failed to save'
+        if (attempt < 2) {
+          showToast(`Save failed. Retrying... (${attempt + 2}/3)`, 'warning')
+        }
       }
-
-      for (const pred of toUpdate) {
-        const { error: updateError } = await supabase
-          .from('predictions')
-          .update({
-            predicted_home_score: pred.predicted_home_score,
-            predicted_away_score: pred.predicted_away_score,
-            predicted_home_pso: pred.predicted_home_pso,
-            predicted_away_pso: pred.predicted_away_pso,
-            predicted_winner_team_id: pred.predicted_winner_team_id,
-          })
-          .eq('prediction_id', pred.prediction_id)
-
-        if (updateError) throw updateError
-      }
-
-      setSaving(false)
-    } catch (err: any) {
-      setError(err.message || 'Failed to save predictions')
-      setSaving(false)
     }
+
+    // All retries exhausted — save to localStorage
+    setSaveStatus('error')
+    setError(lastError)
+
+    try {
+      const backup: Record<string, ScoreEntry> = {}
+      for (const [k, v] of predictions) backup[k] = v
+      localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+        predictions: backup,
+        timestamp: Date.now(),
+      }))
+      showToast('Could not save to server. Predictions saved locally.', 'error', { duration: 6000 })
+    } catch {}
+
+    setSaving(false)
   }
 
   // =============================================
@@ -394,11 +486,27 @@ export default function PredictionsFlow({
     setError(null)
 
     try {
+      // Save first
       await savePredictions()
-      setSuccess('Predictions submitted successfully!')
-      setSubmitting(false)
+
+      // Then submit
+      const res = await fetch(`/api/pools/${poolId}/predictions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit predictions')
+      }
+
+      setHasSubmitted(true)
+      setSubmittedAt(data.submittedAt)
+      setShowSubmitModal(false)
     } catch (err: any) {
       setError(err.message || 'Failed to submit predictions')
+    } finally {
       setSubmitting(false)
     }
   }
@@ -451,35 +559,83 @@ export default function PredictionsFlow({
   }
 
   // =============================================
-  // RENDER
+  // READ-ONLY MODE CHECK
   // =============================================
 
-  if (isPastDeadline) {
+  const isReadOnly = hasSubmitted || predictionsLocked || isPastDeadline
+
+  // =============================================
+  // RENDER: LOCKED / SUBMITTED / DEADLINE STATES
+  // =============================================
+
+  if (isPastDeadline && !hasSubmitted) {
     return (
-      <Alert variant="error">
-        The prediction deadline has passed. You can no longer submit or edit predictions.
-      </Alert>
+      <div>
+        <StatusBanner
+          type="locked"
+          message="The prediction deadline has passed. You can no longer submit or edit predictions."
+        />
+        {predictedCount > 0 && (
+          <div className="mt-4">
+            <ProgressBar predicted={predictedCount} total={totalMatches} stageProgress={stageProgress} />
+          </div>
+        )}
+      </div>
     )
   }
 
   return (
     <div>
-      {/* Progress indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-gray-600">
-            Stage {currentStage + 1} of {STAGES.length}
-          </p>
-          {saving && (
-            <p className="text-xs text-blue-600">Saving...</p>
-          )}
-        </div>
+      {/* Status Banner */}
+      {hasSubmitted && (
+        <StatusBanner
+          type="submitted"
+          message={`Your predictions were submitted${submittedAt ? ` on ${formatDate(submittedAt)}` : ''}. Good luck!`}
+        />
+      )}
 
-        {/* Stage pills */}
+      {predictionsLocked && !hasSubmitted && (
+        <StatusBanner
+          type="locked"
+          message="Your predictions have been locked by the pool admin."
+        />
+      )}
+
+      {/* Progress Indicator */}
+      <ProgressBar
+        predicted={predictedCount}
+        total={totalMatches}
+        stageProgress={stageProgress}
+        lastSavedAt={lastSavedAt}
+        saveStatus={saveStatus}
+        status={hasSubmitted ? 'submitted' : 'draft'}
+        submittedAt={submittedAt}
+      />
+
+      {/* Error message */}
+      {error && (
+        <Alert variant="error" className="mt-4">
+          {error}
+          {saveStatus === 'error' && (
+            <button
+              onClick={() => { setError(null); savePredictions() }}
+              className="ml-2 underline font-medium"
+            >
+              Retry
+            </button>
+          )}
+        </Alert>
+      )}
+
+      {/* Stage navigation pills */}
+      <div className="mt-6 mb-6">
         <div className="flex gap-1 overflow-x-auto pb-2">
           {STAGES.map((stage, idx) => {
             const isCurrent = idx === currentStage
-            const isCompleted = idx < currentStage
+            const stageKeys = STAGE_MATCH_STAGES[stage]
+            const stageMatchCount = stageKeys ? matches.filter(m => stageKeys.includes(m.stage)).length : 0
+            const stagePredCount = stageKeys ? matches.filter(m => stageKeys.includes(m.stage) && isPredictionComplete(predictions.get(m.match_id))).length : 0
+            const isComplete = stageMatchCount > 0 && stagePredCount === stageMatchCount
             return (
               <button
                 key={stage}
@@ -488,21 +644,22 @@ export default function PredictionsFlow({
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                   isCurrent
                     ? 'bg-blue-600 text-white'
-                    : isCompleted
+                    : isComplete
                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : stagePredCount > 0
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {STAGE_LABELS[stage]}
+                {stage !== 'summary' && stageMatchCount > 0 && (
+                  <span className="ml-1 opacity-70">{stagePredCount}/{stageMatchCount}</span>
+                )}
               </button>
             )
           })}
         </div>
       </div>
-
-      {/* Error / Success messages */}
-      {error && <Alert variant="error">{error}</Alert>}
-      {success && <Alert variant="success">{success}</Alert>}
 
       {/* Stage title */}
       <h3 className="text-2xl font-bold text-gray-900 mb-6">
@@ -516,7 +673,8 @@ export default function PredictionsFlow({
           teams={teams}
           predictions={predictions}
           allGroupStandings={allGroupStandings}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -525,8 +683,9 @@ export default function PredictionsFlow({
           stage="round_32"
           resolvedMatches={getResolvedMatchesForStage('round_32')}
           predictions={predictions}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
           psoEnabled={psoEnabled}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -535,8 +694,9 @@ export default function PredictionsFlow({
           stage="round_16"
           resolvedMatches={getResolvedMatchesForStage('round_16')}
           predictions={predictions}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
           psoEnabled={psoEnabled}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -545,8 +705,9 @@ export default function PredictionsFlow({
           stage="quarter_final"
           resolvedMatches={getResolvedMatchesForStage('quarter_final')}
           predictions={predictions}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
           psoEnabled={psoEnabled}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -555,8 +716,9 @@ export default function PredictionsFlow({
           stage="semi_final"
           resolvedMatches={getResolvedMatchesForStage('semi_final')}
           predictions={predictions}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
           psoEnabled={psoEnabled}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -565,8 +727,9 @@ export default function PredictionsFlow({
           stage="finals"
           resolvedMatches={getResolvedMatchesForStage('finals')}
           predictions={predictions}
-          onUpdatePrediction={updatePrediction}
+          onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
           psoEnabled={psoEnabled}
+          readOnly={isReadOnly}
         />
       )}
 
@@ -578,31 +741,291 @@ export default function PredictionsFlow({
           knockoutResolutions={knockoutResolutionsForSummary}
           champion={champion}
           onEditStage={goToStage}
-          onSubmit={submitPredictions}
+          onSubmit={() => setShowSubmitModal(true)}
           submitting={submitting}
+          hasSubmitted={hasSubmitted}
+          readOnly={isReadOnly}
         />
       )}
 
-      {/* Navigation buttons */}
+      {/* Navigation buttons — Back left, Proceed right */}
       {stageName !== 'summary' && (
-        <div className="mt-6 sm:mt-8 flex gap-2 sm:gap-3">
-          {currentStage > 0 && (
-            <Button variant="outline" size="lg" onClick={goBack}>
-              Back
-            </Button>
-          )}
+        <div className="mt-6 sm:mt-8 flex items-center justify-between">
+          <div>
+            {currentStage > 0 && (
+              <Button variant="outline" size="sm" onClick={goBack}>
+                Back
+              </Button>
+            )}
+          </div>
           <Button
             variant="primary"
-            size="lg"
+            size="sm"
             onClick={goNext}
             disabled={!canProceed}
-            className="flex-1 text-sm sm:text-base"
           >
             {canProceed
               ? `Proceed to ${STAGE_LABELS[STAGES[currentStage + 1]] || 'Summary'}`
               : `Complete all ${STAGE_LABELS[stageName]?.toLowerCase()} predictions`
             }
           </Button>
+        </div>
+      )}
+
+      {/* Submit Confirmation Modal — full-screen on mobile, centered on desktop */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
+          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Submit Final Predictions?
+            </h3>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800">
+                Once submitted, you <strong>cannot</strong> make changes to your predictions.
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-gray-700">
+                Progress: <strong>{predictedCount} / {totalMatches}</strong> matches ({progressPercent}%)
+              </p>
+            </div>
+            {predictedCount < totalMatches && (
+              <Alert variant="error" className="mb-4">
+                You have not predicted all matches. You must complete all {totalMatches} predictions before submitting.
+              </Alert>
+            )}
+            <div className="flex gap-3">
+              <Button
+                variant="gray"
+                onClick={() => setShowSubmitModal(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="green"
+                onClick={submitPredictions}
+                disabled={submitting || predictedCount < totalMatches}
+                loading={submitting}
+                loadingText="Submitting..."
+                className="flex-1"
+              >
+                Submit Predictions
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recovery Modal — recover unsaved predictions from localStorage */}
+      {showRecoveryModal && recoveryData && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Recover Unsaved Predictions?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              We found predictions from{' '}
+              <strong>{recoveryTimestamp ? timeAgo(new Date(recoveryTimestamp).toISOString()) : 'earlier'}</strong>
+              {' '}that weren&apos;t saved to the server. Would you like to recover them?
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>{Object.keys(recoveryData).length}</strong> predictions found in local backup.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="gray"
+                onClick={handleDiscardBackup}
+                className="flex-1"
+              >
+                Discard
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRecoverBackup}
+                className="flex-1"
+              >
+                Recover
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium shadow-md">
+          You&apos;re offline. Predictions will save when you reconnect.
+        </div>
+      )}
+
+      {/* Sticky bottom progress bar on mobile */}
+      {stageName !== 'summary' && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 sm:hidden z-40">
+          <div className="flex items-center gap-2">
+            <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${progressPercent === 100 ? 'bg-green-500' : 'bg-blue-600'}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-600 whitespace-nowrap">
+              {predictedCount}/{totalMatches}
+            </span>
+            {saveStatus === 'saving' && (
+              <span className="text-[10px] text-gray-400 whitespace-nowrap">Saving...</span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-[10px] text-green-600 whitespace-nowrap">{'\u2713'}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom spacer for mobile sticky bar */}
+      {stageName !== 'summary' && (
+        <div className="h-12 sm:hidden" />
+      )}
+    </div>
+  )
+}
+
+// =============================================
+// STATUS BANNER COMPONENT
+// =============================================
+
+function StatusBanner({ type, message }: { type: 'submitted' | 'locked'; message: string }) {
+  const styles = {
+    submitted: 'bg-green-50 border-green-200 text-green-800',
+    locked: 'bg-gray-50 border-gray-200 text-gray-800',
+  }
+  const icons = {
+    submitted: (
+      <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    locked: (
+      <svg className="w-5 h-5 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
+  }
+
+  return (
+    <div className={`flex items-center gap-3 p-4 rounded-lg border ${styles[type]} mb-4`}>
+      {icons[type]}
+      <p className="text-sm font-medium">{message}</p>
+    </div>
+  )
+}
+
+// =============================================
+// PROGRESS BAR COMPONENT
+// =============================================
+
+function ProgressBar({
+  predicted,
+  total,
+  stageProgress,
+  lastSavedAt,
+  saveStatus,
+  status,
+  submittedAt,
+}: {
+  predicted: number
+  total: number
+  stageProgress: { stage: string; label: string; predicted: number; total: number }[]
+  lastSavedAt?: string | null
+  saveStatus?: SaveStatus
+  status?: 'draft' | 'submitted'
+  submittedAt?: string | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const percent = total > 0 ? Math.round((predicted / total) * 100) : 0
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
+      {/* Single row: label, status badge, progress bar, count, save status, details toggle */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+        {/* Label + status badge */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <h4 className="text-xs sm:text-sm font-semibold text-gray-700">Progress</h4>
+          {status === 'submitted' && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-green-100 text-green-700">
+              Submitted
+            </span>
+          )}
+          {status === 'draft' && predicted > 0 && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-amber-100 text-amber-700">
+              Draft
+            </span>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex-1 min-w-[80px]">
+          <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                percent === 100 ? 'bg-green-500' : 'bg-blue-600'
+              }`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Count */}
+        <span className="text-xs font-medium text-gray-600 whitespace-nowrap shrink-0">
+          {predicted}/{total}
+        </span>
+
+        {/* Save status */}
+        <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap shrink-0">
+          {saveStatus === 'saving' && 'Saving...'}
+          {saveStatus === 'saved' && '\u2713 Saved'}
+          {saveStatus === 'error' && (
+            <span className="text-red-600">Failed</span>
+          )}
+          {(!saveStatus || saveStatus === 'idle') && lastSavedAt && `Saved ${timeAgo(lastSavedAt)}`}
+          {(!saveStatus || saveStatus === 'idle') && !lastSavedAt && status !== 'submitted' && predicted > 0 && 'Unsaved'}
+          {status === 'submitted' && submittedAt && `${timeAgo(submittedAt)}`}
+        </span>
+
+        {/* Details toggle */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] sm:text-xs text-blue-600 hover:text-blue-800 font-medium shrink-0"
+        >
+          {expanded ? 'Hide' : 'Details'}
+        </button>
+      </div>
+
+      {/* Expanded: per-stage breakdown */}
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+          {stageProgress.map(sp => {
+            const isComplete = sp.total > 0 && sp.predicted === sp.total
+            const isPartial = sp.predicted > 0 && sp.predicted < sp.total
+            return (
+              <div key={sp.stage} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className={isComplete ? 'text-green-600' : isPartial ? 'text-amber-600' : 'text-gray-400'}>
+                    {isComplete ? '\u2705' : isPartial ? '\u231B' : '\u25CB'}
+                  </span>
+                  <span className="text-gray-700">{sp.label}</span>
+                </div>
+                <span className={`font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>
+                  {sp.predicted} / {sp.total}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -613,9 +1036,29 @@ export default function PredictionsFlow({
 // HELPERS
 // =============================================
 
-function extractMatchNumber(placeholder: string | null): number | null {
-  if (!placeholder) return null
-  // Match patterns like "Winner Match 73", "Loser Match 101", "W73", etc.
-  const match = placeholder.match(/(?:Match\s*)?(\d+)/i)
-  return match ? parseInt(match[1]) : null
+function timeAgo(dateStr: string) {
+  const now = new Date()
+  const then = new Date(dateStr)
+  const diffMs = now.getTime() - then.getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffSec < 10) return 'just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 30) return `${diffDays}d ago`
+  return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

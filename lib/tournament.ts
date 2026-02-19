@@ -1,3 +1,5 @@
+import { lookupAnnexC, ANNEX_C_COLUMN_TO_MATCH, type AnnexCAssignment } from './annexC'
+
 // =============================================
 // TYPES
 // =============================================
@@ -38,13 +40,18 @@ export type Prediction = {
 }
 
 export type ScoreEntry = {
-  home: number
-  away: number
+  home: number | null
+  away: number | null
   homePso?: number | null
   awayPso?: number | null
   winnerTeamId?: string | null
 }
 export type PredictionMap = Map<string, ScoreEntry>
+
+/** Check if a prediction has both scores filled in */
+export function isPredictionComplete(pred: ScoreEntry | undefined): pred is ScoreEntry & { home: number; away: number } {
+  return pred != null && pred.home != null && pred.away != null
+}
 
 export type GroupStanding = {
   team_id: string
@@ -61,6 +68,36 @@ export type GroupStanding = {
   goalsAgainst: number
   goalDifference: number
   points: number
+  conductScore?: number // Fair Play points: 0 = best (no cards), negative = worse
+}
+
+export type MatchConductData = {
+  match_id: string
+  team_id: string
+  yellow_cards: number
+  indirect_red_cards: number
+  direct_red_cards: number
+  yellow_direct_red_cards: number
+}
+
+/** Calculate cumulative conduct score for a team from conduct records.
+ *  Returns 0 (best) or negative number (worse). */
+export function calculateConductScore(
+  teamId: string,
+  conductRecords: MatchConductData[]
+): number {
+  let score = 0
+  for (const record of conductRecords) {
+    if (record.team_id === teamId) {
+      score -= (
+        record.yellow_cards * 1 +
+        record.indirect_red_cards * 3 +
+        record.direct_red_cards * 4 +
+        record.yellow_direct_red_cards * 5
+      )
+    }
+  }
+  return score
 }
 
 export type ThirdPlaceTeam = GroupStanding & {
@@ -128,7 +165,8 @@ export function calculateGroupStandings(
   groupLetter: string,
   groupMatches: Match[],
   predictions: PredictionMap,
-  teams: Team[]
+  teams: Team[],
+  conductData?: MatchConductData[]
 ): GroupStanding[] {
   const groupTeams = teams.filter(t => t.group_letter === groupLetter)
 
@@ -153,7 +191,7 @@ export function calculateGroupStandings(
 
   for (const match of groupMatches) {
     const pred = predictions.get(match.match_id)
-    if (!pred || pred.home === undefined || pred.away === undefined) continue
+    if (!pred || pred.home == null || pred.away == null) continue
     if (match.home_team_id == null || match.away_team_id == null) continue
 
     const home = standingsMap.get(match.home_team_id)
@@ -186,6 +224,9 @@ export function calculateGroupStandings(
   for (const s of standings) {
     s.goalDifference = s.goalsFor - s.goalsAgainst
     s.points = s.wins * 3 + s.draws
+    if (conductData) {
+      s.conductScore = calculateConductScore(s.team_id, conductData)
+    }
   }
 
   // Sort with tiebreakers
@@ -253,7 +294,7 @@ function resolveH2HTiebreaker(
 
   for (const match of h2hMatches) {
     const pred = predictions.get(match.match_id)
-    if (!pred || match.home_team_id == null || match.away_team_id == null) continue
+    if (!pred || pred.home == null || pred.away == null || match.home_team_id == null || match.away_team_id == null) continue
 
     const homeStats = h2hStats.get(match.home_team_id)
     const awayStats = h2hStats.get(match.away_team_id)
@@ -288,7 +329,11 @@ function resolveH2HTiebreaker(
     if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference
     // 5. Overall goals scored
     if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor
-    // 6. FIFA ranking points
+    // 6. Team conduct score (Fair Play: higher/closer to 0 is better)
+    const aConductScore = a.conductScore ?? 0
+    const bConductScore = b.conductScore ?? 0
+    if (bConductScore !== aConductScore) return bConductScore - aConductScore
+    // 7. FIFA ranking points
     return b.fifa_ranking_points - a.fifa_ranking_points
   })
 }
@@ -308,11 +353,15 @@ export function rankThirdPlaceTeams(
     }
   }
 
-  // Sort by: points desc, GD desc, GF desc, FIFA ranking desc
+  // Sort by: points desc, GD desc, GF desc, conduct score desc, FIFA ranking desc
   const sorted = [...thirdPlaceTeams].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points
     if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference
     if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor
+    // Team conduct score (Fair Play: higher/closer to 0 is better)
+    const aConductScore = a.conductScore ?? 0
+    const bConductScore = b.conductScore ?? 0
+    if (bConductScore !== aConductScore) return bConductScore - aConductScore
     return b.fifa_ranking_points - a.fifa_ranking_points
   })
 
@@ -370,10 +419,11 @@ function resolveSlot(
   return null
 }
 
-// Full R32 resolution with proper allocation of third-place teams.
-// Uses backtracking to guarantee a valid assignment where each
-// third-place team is used exactly once, even when greedy allocation
-// would fail due to constraint conflicts between matches.
+// Full R32 resolution using FIFA Annex C for third-place team assignment.
+// Annex C defines exactly 495 deterministic mappings (one per C(12,8) combination)
+// that specify which third-place team plays which group winner based on which
+// 8 groups supplied qualifying third-place teams.
+// Falls back to backtracking when Annex C cannot be applied (incomplete data).
 export function resolveAllR32Matches(
   allGroupStandings: Map<string, GroupStanding[]>
 ): Map<number, { home: GroupStanding | null; away: GroupStanding | null }> {
@@ -390,7 +440,32 @@ export function resolveAllR32Matches(
     result.set(matchNum, { home, away })
   }
 
-  // Collect all third-place slots that need assignment
+  // Try Annex C deterministic assignment first
+  if (best8.length === 8) {
+    const qualifyingGroups = best8.map(t => t.group_letter)
+    const annexC = lookupAnnexC(qualifyingGroups)
+
+    if (annexC) {
+      // Build map: group letter → third-place team
+      const thirdByGroup = new Map<string, ThirdPlaceTeam>()
+      for (const team of best8) {
+        thirdByGroup.set(team.group_letter, team)
+      }
+
+      // Apply Annex C assignments
+      for (const [column, thirdGroupLetter] of Object.entries(annexC.assignment) as [keyof AnnexCAssignment, string][]) {
+        const matchNum = ANNEX_C_COLUMN_TO_MATCH[column]
+        const team = thirdByGroup.get(thirdGroupLetter) ?? null
+        const current = result.get(matchNum)!
+        // Third-place team is always the away team in these matches
+        result.set(matchNum, { home: current.home, away: team })
+      }
+
+      return result
+    }
+  }
+
+  // Fallback: backtracking (used when < 8 third-place teams or Annex C lookup fails)
   const thirdSlots: { matchNum: number; side: 'home' | 'away'; eligible: string[] }[] = []
   for (const matchNum of matchNumbers) {
     const mapping = R32_MATCHUPS[matchNum]
@@ -402,36 +477,31 @@ export function resolveAllR32Matches(
     }
   }
 
-  // Solve third-place assignment via backtracking
-  const assignment = new Map<number, ThirdPlaceTeam>() // slot index -> team
+  const assignment = new Map<number, ThirdPlaceTeam>()
   const usedTeamIds = new Set<string>()
 
   function backtrack(slotIdx: number): boolean {
-    if (slotIdx === thirdSlots.length) return true // all slots filled
+    if (slotIdx === thirdSlots.length) return true
 
     const slot = thirdSlots[slotIdx]
-    // Try each best-8 team in ranked order (preserves preference for higher-ranked teams)
     for (const team of best8) {
       if (usedTeamIds.has(team.team_id)) continue
       if (!slot.eligible.includes(team.group_letter)) continue
 
-      // Try assigning this team
       usedTeamIds.add(team.team_id)
       assignment.set(slotIdx, team)
 
       if (backtrack(slotIdx + 1)) return true
 
-      // Backtrack
       usedTeamIds.delete(team.team_id)
       assignment.delete(slotIdx)
     }
 
-    return false // no valid assignment for this slot
+    return false
   }
 
   backtrack(0)
 
-  // Apply the solved assignment back to the result
   for (let i = 0; i < thirdSlots.length; i++) {
     const slot = thirdSlots[i]
     const team = assignment.get(i) ?? null
@@ -444,6 +514,33 @@ export function resolveAllR32Matches(
   }
 
   return result
+}
+
+/**
+ * Returns information about which Annex C option is active for the current standings.
+ * Useful for display/debugging in admin views and ThirdPlaceTable.
+ */
+export function getAnnexCInfo(
+  allGroupStandings: Map<string, GroupStanding[]>
+): { qualifyingGroups: string[]; optionNumber: number; assignments: Record<string, string> } | null {
+  const best8 = getBest8ThirdPlaceTeams(allGroupStandings)
+  if (best8.length !== 8) return null
+
+  const qualifyingGroups = best8.map(t => t.group_letter)
+  const annexC = lookupAnnexC(qualifyingGroups)
+  if (!annexC) return null
+
+  // Build human-readable assignments: "1A → 3E" style
+  const assignments: Record<string, string> = {}
+  for (const [column, group] of Object.entries(annexC.assignment)) {
+    assignments[column] = group
+  }
+
+  return {
+    qualifyingGroups: [...qualifyingGroups].sort(),
+    optionNumber: annexC.option,
+    assignments,
+  }
 }
 
 function resolveNonThirdSlot(
@@ -473,7 +570,7 @@ export function getKnockoutWinner(
 ): GroupStanding | null {
   if (!homeTeam || !awayTeam) return null
   const pred = predictions.get(matchId)
-  if (!pred) return null
+  if (!pred || pred.home == null || pred.away == null) return null
 
   // Full-time winner
   if (pred.home > pred.away) return homeTeam
@@ -520,7 +617,7 @@ export function countPredictedMatches(
     ? matches.filter(m => m.stage === 'third_place' || m.stage === 'final')
     : matches.filter(m => m.stage === stage)
   const total = stageMatches.length
-  const predicted = stageMatches.filter(m => predictions.has(m.match_id)).length
+  const predicted = stageMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
   return { predicted, total }
 }
 
@@ -539,7 +636,7 @@ export function isStageComplete(
       : matches.filter(m => m.stage === stage)
     for (const match of stageMatches) {
       const pred = predictions.get(match.match_id)
-      if (!pred) return false
+      if (!pred || pred.home == null || pred.away == null) return false
       if (pred.home === pred.away) {
         // Draw: must have PSO scores or winner team ID
         const hasPso = pred.homePso != null && pred.awayPso != null && pred.homePso !== pred.awayPso

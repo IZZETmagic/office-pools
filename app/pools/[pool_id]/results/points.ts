@@ -24,6 +24,26 @@ export type PoolSettings = {
   pso_exact_score: number
   pso_correct_difference: number
   pso_correct_result: number
+  // Bonus: Group Standings
+  bonus_group_winner_and_runnerup: number | null
+  bonus_group_winner_only: number | null
+  bonus_group_runnerup_only: number | null
+  bonus_both_qualify_swapped: number | null
+  bonus_one_qualifies_wrong_position: number | null
+  // Bonus: Overall Qualification
+  bonus_all_16_qualified: number | null
+  bonus_12_15_qualified: number | null
+  bonus_8_11_qualified: number | null
+  // Bonus: Bracket & Tournament
+  bonus_correct_bracket_pairing: number | null
+  bonus_match_winner_correct: number | null
+  bonus_champion_correct: number | null
+  bonus_second_place_correct: number | null
+  bonus_third_place_correct: number | null
+  bonus_best_player_correct: number | null
+  bonus_top_scorer_correct: number | null
+  // Bracket pairing mode
+  bracket_pairing_mode: string | null
 }
 
 export const DEFAULT_POOL_SETTINGS: PoolSettings = {
@@ -44,6 +64,23 @@ export const DEFAULT_POOL_SETTINGS: PoolSettings = {
   pso_exact_score: 0,
   pso_correct_difference: 0,
   pso_correct_result: 0,
+  // Bonus defaults (match DB defaults)
+  bonus_group_winner_and_runnerup: 150,
+  bonus_group_winner_only: 100,
+  bonus_group_runnerup_only: 50,
+  bonus_both_qualify_swapped: 75,
+  bonus_one_qualifies_wrong_position: 25,
+  bonus_all_16_qualified: 75,
+  bonus_12_15_qualified: 50,
+  bonus_8_11_qualified: 25,
+  bonus_correct_bracket_pairing: 25,
+  bonus_match_winner_correct: 50,
+  bonus_champion_correct: 1000,
+  bonus_second_place_correct: 25,
+  bonus_third_place_correct: 25,
+  bonus_best_player_correct: 100,
+  bonus_top_scorer_correct: 100,
+  bracket_pairing_mode: 'actual',
 }
 
 // =============================================

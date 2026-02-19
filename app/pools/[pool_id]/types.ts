@@ -24,6 +24,7 @@ export type MemberData = {
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_locked: boolean
+  predictions_last_saved_at: string | null
   total_points: number
   current_rank: number | null
   last_rank_update: string | null
@@ -77,6 +78,26 @@ export type SettingsData = {
   pso_exact_score: number | null
   pso_correct_difference: number | null
   pso_correct_result: number | null
+  // Bonus: Group Standings
+  bonus_group_winner_and_runnerup: number | null
+  bonus_group_winner_only: number | null
+  bonus_group_runnerup_only: number | null
+  bonus_both_qualify_swapped: number | null
+  bonus_one_qualifies_wrong_position: number | null
+  // Bonus: Overall Qualification
+  bonus_all_16_qualified: number | null
+  bonus_12_15_qualified: number | null
+  bonus_8_11_qualified: number | null
+  // Bonus: Bracket & Tournament
+  bonus_correct_bracket_pairing: number | null
+  bonus_match_winner_correct: number | null
+  bonus_champion_correct: number | null
+  bonus_second_place_correct: number | null
+  bonus_third_place_correct: number | null
+  bonus_best_player_correct: number | null
+  bonus_top_scorer_correct: number | null
+  // Bracket pairing mode
+  bracket_pairing_mode: string | null
   created_at: string
   updated_at: string
 }
@@ -89,6 +110,7 @@ export type PredictionData = {
   predicted_away_score: number
   predicted_home_pso: number | null
   predicted_away_pso: number | null
+  predicted_winner_team_id: string | null
 }
 
 export type TeamData = {
@@ -98,6 +120,13 @@ export type TeamData = {
   group_letter: string
   fifa_ranking_points: number
   flag_url: string | null
+}
+
+export type PlayerScoreData = {
+  member_id: string
+  match_points: number
+  bonus_points: number
+  total_points: number
 }
 
 export type ExistingPrediction = {

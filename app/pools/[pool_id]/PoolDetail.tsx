@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { Button } from '@/components/ui/Button'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
+import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import PredictionsFlow from '@/components/predictions/PredictionsFlow'
 import { MembersTab } from './admin/MembersTab'
@@ -19,7 +22,9 @@ import type {
   PredictionData,
   TeamData,
   ExistingPrediction,
+  PlayerScoreData,
 } from './types'
+import type { MatchConductData } from '@/lib/tournament'
 
 // =====================
 // TAB DEFINITIONS
@@ -28,6 +33,7 @@ type Tab =
   | 'leaderboard'
   | 'predictions'
   | 'results'
+  | 'standings'
   | 'scoring_rules'
   | 'members'
   | 'scoring_config'
@@ -37,6 +43,7 @@ const USER_TABS: { key: Tab; label: string }[] = [
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
+  { key: 'standings', label: 'Standings' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -57,11 +64,17 @@ type PoolDetailProps = {
   userPredictions: ExistingPrediction[]
   allPredictions: PredictionData[]
   teams: TeamData[]
+  conductData: MatchConductData[]
+  playerScores: PlayerScoreData[]
   memberId: string
   currentUserId: string
   isAdmin: boolean
   isPastDeadline: boolean
   psoEnabled: boolean
+  hasSubmitted: boolean
+  submittedAt: string | null
+  lastSavedAt: string | null
+  predictionsLocked: boolean
 }
 
 // =====================
@@ -75,18 +88,61 @@ export function PoolDetail({
   userPredictions,
   allPredictions: initialAllPredictions,
   teams,
+  conductData,
+  playerScores,
   memberId,
   currentUserId,
   isAdmin,
   isPastDeadline,
   psoEnabled,
+  hasSubmitted,
+  submittedAt,
+  lastSavedAt,
+  predictionsLocked,
 }: PoolDetailProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('leaderboard')
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get('tab') as Tab) || 'leaderboard'
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
   const [pool, setPool] = useState(initialPool)
   const [members, setMembers] = useState(initialMembers)
   const [matches] = useState(initialMatches)
   const [settings, setSettings] = useState(initialSettings)
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
+  const [showNavWarning, setShowNavWarning] = useState(false)
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null)
+
+  // Ref to check PredictionsFlow unsaved state
+  const predictionsRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
+
+  const handleTabSwitch = useCallback((tab: Tab) => {
+    // If leaving predictions tab with unsaved changes, show warning
+    if (activeTab === 'predictions' && tab !== 'predictions' && predictionsRef.current?.hasUnsaved()) {
+      setPendingTab(tab)
+      setShowNavWarning(true)
+      return
+    }
+    setActiveTab(tab)
+  }, [activeTab])
+
+  const handleSaveAndLeave = async () => {
+    if (predictionsRef.current) {
+      await predictionsRef.current.save()
+    }
+    if (pendingTab) setActiveTab(pendingTab)
+    setShowNavWarning(false)
+    setPendingTab(null)
+  }
+
+  const handleLeaveWithoutSaving = () => {
+    if (pendingTab) setActiveTab(pendingTab)
+    setShowNavWarning(false)
+    setPendingTab(null)
+  }
+
+  const handleCancelNav = () => {
+    setShowNavWarning(false)
+    setPendingTab(null)
+  }
 
   // Build pool settings for points calculation
   const poolSettings: PoolSettings = settings
@@ -141,7 +197,7 @@ export function PoolDetail({
             {USER_TABS.map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => handleTabSwitch(tab.key)}
                 className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
                   activeTab === tab.key
                     ? 'border-blue-600 text-blue-600'
@@ -162,7 +218,7 @@ export function PoolDetail({
                 {ADMIN_TABS.map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => handleTabSwitch(tab.key)}
                     className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
                       activeTab === tab.key
                         ? 'border-amber-600 text-amber-600'
@@ -181,7 +237,7 @@ export function PoolDetail({
       {/* Tab content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {activeTab === 'leaderboard' && (
-          <LeaderboardTab members={members} />
+          <LeaderboardTab members={members} playerScores={playerScores} />
         )}
 
         {activeTab === 'predictions' && (
@@ -189,9 +245,15 @@ export function PoolDetail({
             matches={predictionsMatches}
             teams={teams}
             memberId={memberId}
+            poolId={pool.pool_id}
             existingPredictions={userPredictions}
             isPastDeadline={isPastDeadline}
             psoEnabled={psoEnabled}
+            hasSubmitted={hasSubmitted}
+            submittedAt={submittedAt}
+            lastSavedAt={lastSavedAt}
+            predictionsLocked={predictionsLocked}
+            onUnsavedChangesRef={predictionsRef}
           />
         )}
 
@@ -200,6 +262,14 @@ export function PoolDetail({
             matches={matches}
             predictions={userPredictionsList}
             poolSettings={poolSettings}
+          />
+        )}
+
+        {activeTab === 'standings' && (
+          <StandingsTab
+            matches={matches}
+            teams={teams}
+            conductData={conductData}
           />
         )}
 
@@ -215,6 +285,7 @@ export function PoolDetail({
             setMembers={setMembers}
             predictions={allPredictions}
             matches={matches}
+            teams={teams}
             currentUserId={currentUserId}
           />
         )}
@@ -238,6 +309,30 @@ export function PoolDetail({
           />
         )}
       </main>
+
+      {/* Navigation Warning Modal */}
+      {showNavWarning && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
+          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Unsaved Changes</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              You have unsaved predictions. What would you like to do?
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button variant="primary" onClick={handleSaveAndLeave} fullWidth>
+                Save &amp; Leave
+              </Button>
+              <Button variant="outline" onClick={handleLeaveWithoutSaving} fullWidth>
+                Leave Without Saving
+              </Button>
+              <Button variant="gray" onClick={handleCancelNav} fullWidth>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
