@@ -129,6 +129,17 @@ export type PlayerScoreData = {
   total_points: number
 }
 
+export type BonusScoreData = {
+  bonus_score_id: string
+  member_id: string
+  bonus_type: string
+  bonus_category: string
+  related_group_letter: string | null
+  related_match_id: string | null
+  points_earned: number
+  description: string
+}
+
 export type ExistingPrediction = {
   match_id: string
   predicted_home_score: number

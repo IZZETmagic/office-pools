@@ -991,7 +991,7 @@ function ProgressBar({
           {saveStatus === 'error' && (
             <span className="text-red-600">Failed</span>
           )}
-          {(!saveStatus || saveStatus === 'idle') && lastSavedAt && `Saved ${timeAgo(lastSavedAt)}`}
+          {(!saveStatus || saveStatus === 'idle') && lastSavedAt && status !== 'submitted' && `Saved ${timeAgo(lastSavedAt)}`}
           {(!saveStatus || saveStatus === 'idle') && !lastSavedAt && status !== 'submitted' && predicted > 0 && 'Unsaved'}
           {status === 'submitted' && submittedAt && `${timeAgo(submittedAt)}`}
         </span>

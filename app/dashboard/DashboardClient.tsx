@@ -23,6 +23,8 @@ type PoolCardData = {
   prediction_deadline: string | null
   tournament_id: string
   role: string
+  match_points: number
+  bonus_points: number
   total_points: number
   current_rank: number | null
   has_submitted_predictions: boolean
@@ -174,7 +176,11 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
       <div className="grid grid-cols-3 gap-2 mb-3 text-center">
         <div className="bg-gray-50 rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-blue-600">{pool.total_points ?? 0}</p>
-          <p className="text-xs text-gray-500">Points</p>
+          {pool.bonus_points > 0 ? (
+            <p className="text-[10px] text-gray-500">{pool.match_points} + {pool.bonus_points} bonus</p>
+          ) : (
+            <p className="text-xs text-gray-500">Points</p>
+          )}
         </div>
         <div className="bg-gray-50 rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-gray-900">
@@ -433,7 +439,7 @@ export function DashboardClient({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation bar */}
-      <nav className="bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+      <nav className="sticky top-0 z-10 bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-gray-900">
           World Cup Pool
         </Link>

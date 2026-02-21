@@ -10,6 +10,7 @@ import type {
   TeamData,
   ExistingPrediction,
   PlayerScoreData,
+  BonusScoreData,
 } from './types'
 
 export default async function PoolPage({
@@ -99,13 +100,17 @@ export default async function PoolPage({
   const teams = (teamsRes.data || []) as TeamData[]
 
   // Fetch conduct data for group stage tiebreakers
-  const [{ data: conductRes }, { data: playerScoresRes }] = await Promise.all([
+  const [{ data: conductRes }, { data: playerScoresRes }, { data: bonusScoresRes }] = await Promise.all([
     supabase
       .from('match_conduct')
       .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
     supabase
       .from('player_scores')
       .select('member_id, match_points, bonus_points, total_points')
+      .in('member_id', members.map(m => m.member_id)),
+    supabase
+      .from('bonus_scores')
+      .select('bonus_score_id, member_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
       .in('member_id', members.map(m => m.member_id)),
   ])
 
@@ -125,24 +130,24 @@ export default async function PoolPage({
     total_points: number
   }[]
 
+  const bonusScores = (bonusScoresRes || []) as BonusScoreData[]
+
   // Fetch user's predictions (for results + predictions tabs)
   const { data: userPredictions } = await supabase
     .from('predictions')
     .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
     .eq('member_id', membership.member_id)
 
-  // Fetch all predictions (for admin tabs - only if admin)
+  // Fetch all predictions (needed for admin tabs + leaderboard bonus computation)
   let allPredictions: PredictionData[] = []
-  if (isAdmin) {
-    const memberIds = members.map((m) => m.member_id)
-    if (memberIds.length > 0) {
-      const { data: predData } = await supabase
-        .from('predictions')
-        .select('*')
-        .in('member_id', memberIds)
+  const memberIds = members.map((m) => m.member_id)
+  if (memberIds.length > 0) {
+    const { data: predData } = await supabase
+      .from('predictions')
+      .select('*')
+      .in('member_id', memberIds)
 
-      allPredictions = (predData || []) as PredictionData[]
-    }
+    allPredictions = (predData || []) as PredictionData[]
   }
 
   // Check deadline
@@ -166,6 +171,7 @@ export default async function PoolPage({
       teams={teams}
       conductData={conductData}
       playerScores={playerScores}
+      bonusScores={bonusScores}
       memberId={membership.member_id}
       currentUserId={userData.user_id}
       isAdmin={isAdmin}

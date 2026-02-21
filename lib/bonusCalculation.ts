@@ -122,7 +122,7 @@ function calculateGroupStandingsBonuses(
   for (const letter of GROUP_LETTERS) {
     // Check if all 6 group matches are completed
     const groupMatches = matches.filter(m => m.stage === 'group' && m.group_letter === letter)
-    const allCompleted = groupMatches.length >= 3 && groupMatches.every(m => m.is_completed)
+    const allCompleted = groupMatches.length >= 6 && groupMatches.every(m => m.is_completed)
     if (!allCompleted) continue
 
     const predicted = predictedBracket.allGroupStandings.get(letter)

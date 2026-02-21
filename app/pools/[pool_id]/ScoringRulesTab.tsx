@@ -110,7 +110,7 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
         </div>
         <div className="mt-4 bg-blue-50 rounded-lg px-4 py-3">
           <p className="text-xs text-blue-800">
-            <strong>How it works:</strong> If the actual score is 2-1, predicting 2-1 earns {s.group_exact_score} pts (exact). Predicting 3-2 earns {s.group_correct_difference} pts (correct winner + goal difference of 1). Predicting 1-0 earns {s.group_correct_result} pts (correct winner only). Only the highest tier applies.
+            <strong>How it works:</strong> If the actual score is 2-1, predicting 2-1 earns {s.group_exact_score} pts (exact). Predicting 3-2 earns {s.group_correct_difference} pts (correct winner + goal difference of 1). Predicting 2-0 earns {s.group_correct_result} pts (correct winner only). Only the highest tier applies.
           </p>
         </div>
       </Card>
@@ -233,7 +233,7 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
           </div>
           <div className="flex items-start gap-3">
             <span className="shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
-            <p><strong>Knockout Multipliers:</strong> Later rounds are worth more. The Final has a {s.final_multiplier}x multiplier.</p>
+            <p><strong>Knockout Multipliers:</strong> Later rounds are worth more. The Final has an {s.final_multiplier}x multiplier.</p>
           </div>
           {s.pso_enabled && (
             <div className="flex items-start gap-3">

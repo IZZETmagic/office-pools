@@ -146,7 +146,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
         <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
         <div className="flex gap-3 text-sm">
           <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-medium">

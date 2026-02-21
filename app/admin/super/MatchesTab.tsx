@@ -113,6 +113,10 @@ export function MatchesTab({
   const [resetReason, setResetReason] = useState('')
   const [resetting, setResetting] = useState(false)
 
+  // Manual advancement
+  const [advancing, setAdvancing] = useState(false)
+  const [advanceResult, setAdvanceResult] = useState<string | null>(null)
+
   // Conduct / Fair Play card entry (group stage only)
   const [showConductFields, setShowConductFields] = useState(false)
   const [homeYellowCards, setHomeYellowCards] = useState('0')
@@ -456,10 +460,34 @@ export function MatchesTab({
 
     await refreshMatches()
 
+    // Trigger team advancement for knockout matches
+    let advanceInfo = ''
+    try {
+      const advanceRes = await fetch('/api/admin/advance-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger: match.stage === 'group' ? 'group_complete' : 'knockout_result',
+          match_id: match.match_id,
+        }),
+      })
+      if (advanceRes.ok) {
+        const advanceData = await advanceRes.json()
+        if (advanceData.advanced.length > 0) {
+          advanceInfo = ` Teams advanced: ${advanceData.advanced.map(
+            (a: any) => `#${a.match_number} ${a.side}: ${a.country_name}`
+          ).join(', ')}.`
+          await refreshMatches()
+        }
+      }
+    } catch (e) {
+      console.error('Failed to advance teams:', e)
+    }
+
     const result = rpcResult as { predictions_processed?: number } | null
     const processed = result?.predictions_processed ?? 0
     setSuccess(
-      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}`
+      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}${advanceInfo}`
     )
     setSaving(false)
 
@@ -510,7 +538,29 @@ export function MatchesTab({
 
     await Promise.all([refreshMatches(), refreshAuditLogs()])
 
-    setSuccess('Match has been reset. All affected pool points recalculated.')
+    // Clear advanced teams from downstream matches
+    let clearInfo = ''
+    try {
+      const advanceRes = await fetch('/api/admin/advance-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger: 'match_reset',
+          match_id: match.match_id,
+        }),
+      })
+      if (advanceRes.ok) {
+        const advanceData = await advanceRes.json()
+        if (advanceData.cleared.length > 0) {
+          clearInfo = ` Cleared ${advanceData.cleared.length} team advancement(s).`
+          await refreshMatches()
+        }
+      }
+    } catch (e) {
+      console.error('Failed to clear advanced teams:', e)
+    }
+
+    setSuccess(`Match has been reset. All affected pool points recalculated.${clearInfo}`)
     setResetting(false)
 
     setTimeout(() => {
@@ -519,11 +569,38 @@ export function MatchesTab({
     }, 2000)
   }
 
+  async function handleManualAdvance() {
+    if (!confirm('Run team advancement for all completed matches?')) return
+    setAdvancing(true)
+    setAdvanceResult(null)
+    try {
+      const res = await fetch('/api/admin/advance-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'manual' }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAdvanceResult(data.message)
+        if (data.advanced.length > 0) {
+          await refreshMatches()
+        }
+      } else {
+        const err = await res.json()
+        setAdvanceResult(`Error: ${err.error}`)
+      }
+    } catch (e) {
+      setAdvanceResult('Failed to advance teams.')
+    }
+    setAdvancing(false)
+    setTimeout(() => setAdvanceResult(null), 5000)
+  }
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Match Results</h2>
-        <div className="flex gap-3 text-sm">
+        <div className="flex gap-3 items-center text-sm">
           <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
             {completedCount} Completed
           </span>
@@ -535,9 +612,17 @@ export function MatchesTab({
           <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
             {scheduledCount} Scheduled
           </span>
+          <button
+            onClick={handleManualAdvance}
+            disabled={advancing}
+            className="px-4 py-1.5 bg-purple-600 text-white rounded-full font-medium text-sm hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {advancing ? 'Advancing...' : 'Advance Teams'}
+          </button>
         </div>
       </div>
 
+      {advanceResult && <Alert variant="success" className="mb-4">{advanceResult}</Alert>}
       {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Filters */}
@@ -637,7 +722,7 @@ export function MatchesTab({
                   return (
                     <tr key={match.match_id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
                           #{match.match_number}
                         </span>
                       </td>

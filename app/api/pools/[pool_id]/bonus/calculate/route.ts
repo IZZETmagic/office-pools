@@ -112,12 +112,12 @@ export async function POST(
     country_code: t.country_code?.trim() || '',
   }))
 
-  // 5. Process each member with submitted predictions
-  const submittedMembers = members.filter(m => m.has_submitted_predictions)
+  // 5. Process each member that has predictions
+  // Don't rely solely on has_submitted_predictions flag — check actual prediction data
   let totalBonusEntries = 0
   let totalBonusPoints = 0
 
-  for (const member of submittedMembers) {
+  for (const member of members) {
     // Fetch this member's predictions
     const { data: predictions } = await supabase
       .from('predictions')
@@ -197,7 +197,7 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    membersProcessed: submittedMembers.length,
+    membersProcessed: members.length,
     totalBonusEntries,
     totalBonusPoints,
   })
@@ -233,12 +233,17 @@ async function populateGroupPredictions(
     }
 
     // Upsert: try to find existing row first
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from('group_predictions')
       .select('group_prediction_id')
       .eq('member_id', memberId)
       .eq('group_letter', letter)
       .single()
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error(`Error looking up group_predictions for member ${memberId}, group ${letter}:`, lookupError)
+      continue
+    }
 
     if (existing) {
       await supabase
@@ -274,11 +279,16 @@ async function populateSpecialPredictions(
   }
 
   // Upsert
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('special_predictions')
     .select('special_prediction_id')
     .eq('member_id', memberId)
     .single()
+
+  if (lookupError && lookupError.code !== 'PGRST116') {
+    console.error(`Error looking up special_predictions for member ${memberId}:`, lookupError)
+    return
+  }
 
   if (existing) {
     await supabase

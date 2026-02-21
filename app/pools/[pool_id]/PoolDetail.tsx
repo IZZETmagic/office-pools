@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
@@ -23,6 +24,7 @@ import type {
   TeamData,
   ExistingPrediction,
   PlayerScoreData,
+  BonusScoreData,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -66,6 +68,7 @@ type PoolDetailProps = {
   teams: TeamData[]
   conductData: MatchConductData[]
   playerScores: PlayerScoreData[]
+  bonusScores: BonusScoreData[]
   memberId: string
   currentUserId: string
   isAdmin: boolean
@@ -90,6 +93,7 @@ export function PoolDetail({
   teams,
   conductData,
   playerScores,
+  bonusScores,
   memberId,
   currentUserId,
   isAdmin,
@@ -105,14 +109,31 @@ export function PoolDetail({
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
   const [pool, setPool] = useState(initialPool)
   const [members, setMembers] = useState(initialMembers)
-  const [matches] = useState(initialMatches)
+  const [matches, setMatches] = useState(initialMatches)
   const [settings, setSettings] = useState(initialSettings)
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
   const [showNavWarning, setShowNavWarning] = useState(false)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
 
+  // Sync server-refreshed props into local state
+  useEffect(() => { setPool(initialPool) }, [initialPool])
+  useEffect(() => { setMembers(initialMembers) }, [initialMembers])
+  useEffect(() => { setMatches(initialMatches) }, [initialMatches])
+  useEffect(() => { setSettings(initialSettings) }, [initialSettings])
+  useEffect(() => { setAllPredictions(initialAllPredictions) }, [initialAllPredictions])
+
   // Ref to check PredictionsFlow unsaved state
   const predictionsRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
+
+  // Auto-refresh data on leaderboard, results, and standings tabs
+  const router = useRouter()
+  useEffect(() => {
+    const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'standings']
+    if (!autoRefreshTabs.includes(activeTab)) return
+
+    const interval = setInterval(() => router.refresh(), 30000)
+    return () => clearInterval(interval)
+  }, [activeTab, router])
 
   const handleTabSwitch = useCallback((tab: Tab) => {
     // If leaving predictions tab with unsaved changes, show warning
@@ -175,8 +196,9 @@ export function PoolDetail({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation bar */}
-      <nav className="bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4">
+      {/* Sticky header: navigation bar + tab navigation */}
+      <div className="sticky top-0 z-10 bg-white shadow-sm">
+      <nav className="px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="text-sm sm:text-base text-gray-600 hover:text-gray-900 font-medium shrink-0">
             &larr; <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Back</span>
@@ -191,7 +213,7 @@ export function PoolDetail({
       </nav>
 
       {/* Tab navigation */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+      <div className="border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-2 sm:px-6">
           <div className="flex gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
             {USER_TABS.map((tab) => (
@@ -233,11 +255,21 @@ export function PoolDetail({
           </div>
         </div>
       </div>
+      </div>
 
       {/* Tab content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {activeTab === 'leaderboard' && (
-          <LeaderboardTab members={members} playerScores={playerScores} />
+          <LeaderboardTab
+            members={members}
+            playerScores={playerScores}
+            bonusScores={bonusScores}
+            matches={matches}
+            teams={teams}
+            conductData={conductData}
+            allPredictions={allPredictions}
+            poolSettings={poolSettings}
+          />
         )}
 
         {activeTab === 'predictions' && (
@@ -262,6 +294,14 @@ export function PoolDetail({
             matches={matches}
             predictions={userPredictionsList}
             poolSettings={poolSettings}
+            teams={teams}
+            conductData={conductData}
+            userPredictions={userPredictions}
+            bonusScores={bonusScores}
+            isAdmin={isAdmin}
+            members={members}
+            allPredictions={allPredictions}
+            currentMemberId={memberId}
           />
         )}
 

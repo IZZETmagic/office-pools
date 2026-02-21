@@ -51,7 +51,8 @@ export function SuperAdminDashboard({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation bar */}
+      {/* Sticky header: navigation bar + stats bar + tab navigation */}
+      <div className="sticky top-0 z-10">
       <nav className="bg-gray-900 shadow-lg px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white font-medium shrink-0">
@@ -92,7 +93,7 @@ export function SuperAdminDashboard({
       </div>
 
       {/* Tab navigation */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex gap-0.5 sm:gap-1 overflow-x-auto">
             {TABS.map((tab) => (
@@ -110,6 +111,7 @@ export function SuperAdminDashboard({
             ))}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Tab content */}

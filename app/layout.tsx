@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import FeedbackButton from "@/components/ui/FeedbackButton";
+import Footer from "@/components/ui/Footer";
 import { ToastProvider } from "@/components/ui/Toast";
 
 const geistSans = Geist({
@@ -31,6 +32,7 @@ export default function RootLayout({
       >
         <ToastProvider>
           {children}
+          <Footer />
           <FeedbackButton />
         </ToastProvider>
       </body>

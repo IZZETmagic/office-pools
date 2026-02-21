@@ -161,7 +161,7 @@ export default function ProfilePage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation bar */}
-      <nav className="bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+      <nav className="sticky top-0 z-10 bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-gray-900">
           World Cup Pool
         </Link>

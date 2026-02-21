@@ -3,7 +3,8 @@
 import { ResultsView } from './results/ResultsView'
 import type { ResultMatch } from './results/MatchCard'
 import type { PoolSettings } from './results/points'
-import type { MatchData } from './types'
+import type { MatchData, TeamData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from './types'
+import type { MatchConductData } from '@/lib/tournament'
 
 type ResultsTabProps = {
   matches: MatchData[]
@@ -15,9 +16,30 @@ type ResultsTabProps = {
     predicted_away_pso: number | null
   }[]
   poolSettings: PoolSettings
+  // Group standings comparison props
+  teams: TeamData[]
+  conductData: MatchConductData[]
+  userPredictions: ExistingPrediction[]
+  bonusScores: BonusScoreData[]
+  isAdmin: boolean
+  members: MemberData[]
+  allPredictions: PredictionData[]
+  currentMemberId: string
 }
 
-export function ResultsTab({ matches, predictions, poolSettings }: ResultsTabProps) {
+export function ResultsTab({
+  matches,
+  predictions,
+  poolSettings,
+  teams,
+  conductData,
+  userPredictions,
+  bonusScores,
+  isAdmin,
+  members,
+  allPredictions,
+  currentMemberId,
+}: ResultsTabProps) {
   // Build prediction lookup
   const predictionMap = new Map(
     predictions.map((p) => [p.match_id, p])
@@ -58,5 +80,20 @@ export function ResultsTab({ matches, predictions, poolSettings }: ResultsTabPro
     )
   }
 
-  return <ResultsView matches={resultMatches} poolSettings={poolSettings} />
+  return (
+    <ResultsView
+      matches={resultMatches}
+      poolSettings={poolSettings}
+      // Group standings comparison props
+      rawMatches={matches}
+      teams={teams}
+      conductData={conductData}
+      userPredictions={userPredictions}
+      bonusScores={bonusScores}
+      isAdmin={isAdmin}
+      members={members}
+      allPredictions={allPredictions}
+      currentMemberId={currentMemberId}
+    />
+  )
 }
