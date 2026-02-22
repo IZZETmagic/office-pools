@@ -1166,30 +1166,16 @@ function AccountSettingsTab({
     setDeleteLoading(true)
 
     try {
-      const memberIds = poolMemberships.map(pm => pm.member_id)
+      const response = await fetch('/api/account/delete', {
+        method: 'DELETE',
+      })
 
-      if (memberIds.length > 0) {
-        const { error: predError } = await supabase
-          .from('predictions')
-          .delete()
-          .in('member_id', memberIds)
-        if (predError) throw predError
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete account')
       }
 
-      const { error: memberError } = await supabase
-        .from('pool_members')
-        .delete()
-        .eq('user_id', profile.user_id)
-      if (memberError) throw memberError
-
-      const { error: userError } = await supabase
-        .from('users')
-        .delete()
-        .eq('user_id', profile.user_id)
-      if (userError) throw userError
-
-      await supabase.auth.signOut()
-      router.push('/?deleted=true')
+      router.push('/account-deleted')
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to delete account.')
       setDeleteLoading(false)
@@ -1410,7 +1396,7 @@ function AccountSettingsTab({
                 <ul className="text-sm text-danger-700 space-y-1">
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-danger-400 rounded-full shrink-0" />
-                    Delete all your predictions
+                    Delete all your predictions and scores
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-danger-400 rounded-full shrink-0" />
@@ -1418,7 +1404,7 @@ function AccountSettingsTab({
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-danger-400 rounded-full shrink-0" />
-                    Permanently delete your account
+                    Permanently delete your account and login
                   </li>
                 </ul>
               </div>

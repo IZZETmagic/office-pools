@@ -15,19 +15,19 @@ export default function Footer() {
   }, [])
 
   return (
-    <footer className="bg-neutral-900 text-neutral-400 py-12">
+    <footer className="bg-neutral-900 text-neutral-400 py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isLoggedIn ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-8`}>
-          <div>
+        <div className={`grid grid-cols-2 ${isLoggedIn ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-6 sm:gap-8`}>
+          <div className="col-span-2 sm:col-span-1">
             <span className="text-white text-lg font-bold">&#9917; Sport Pool</span>
-            <p className="mt-3 text-sm">
+            <p className="mt-2 sm:mt-3 text-sm">
               The ultimate FIFA World Cup 2026 prediction pool platform.
             </p>
           </div>
           {!isLoggedIn && (
             <div>
-              <h4 className="text-white font-semibold mb-3">Product</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-white font-semibold mb-2 sm:mb-3">Product</h4>
+              <ul className="space-y-1.5 sm:space-y-2 text-sm">
                 <li>
                   <a href="#features" className="hover:text-white transition">
                     Features
@@ -42,8 +42,8 @@ export default function Footer() {
             </div>
           )}
           <div>
-            <h4 className="text-white font-semibold mb-3">Support</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-white font-semibold mb-2 sm:mb-3">Support</h4>
+            <ul className="space-y-1.5 sm:space-y-2 text-sm">
               <li>
                 <a href="#faq" className="hover:text-white transition">
                   FAQ
@@ -57,8 +57,8 @@ export default function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3">Legal</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-white font-semibold mb-2 sm:mb-3">Legal</h4>
+            <ul className="space-y-1.5 sm:space-y-2 text-sm">
               <li>
                 <a href="#" className="hover:text-white transition">
                   Privacy
@@ -72,7 +72,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="mt-10 pt-8 border-t border-neutral-800 text-center text-sm">
+        <div className="mt-6 sm:mt-10 pt-6 sm:pt-8 border-t border-neutral-800 text-center text-sm">
           &copy; 2026 Sport Pool. All rights reserved.
         </div>
       </div>
