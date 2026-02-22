@@ -77,19 +77,22 @@ function formatDeadline(deadline: string | null) {
   const now = new Date()
   const daysUntil = Math.floor((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
+  const formatted = deadlineDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
   if (daysUntil < 0) {
-    return { text: 'Deadline passed', className: 'text-danger-600 font-semibold' }
+    return { text: `${formatted} (closed)`, className: 'text-danger-600 font-semibold' }
   } else if (daysUntil === 0) {
-    return { text: 'Today!', className: 'text-danger-600 font-semibold' }
+    return { text: `${formatted} (today!)`, className: 'text-danger-600 font-semibold' }
+  } else if (daysUntil === 1) {
+    return { text: `${formatted} (1 day)`, className: 'text-warning-600 font-semibold' }
   } else if (daysUntil < 7) {
-    return { text: `${daysUntil} days left`, className: 'text-warning-600 font-semibold' }
+    return { text: `${formatted} (${daysUntil} days)`, className: 'text-warning-600 font-semibold' }
   } else {
-    const formatted = deadlineDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return { text: `${formatted} (${daysUntil}d)`, className: 'text-neutral-600' }
+    return { text: `${formatted} (${daysUntil} days)`, className: 'text-neutral-600' }
   }
 }
 
@@ -150,7 +153,7 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
   return (
     <Card>
       {/* Header */}
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start mb-5">
         <div className="min-w-0 flex-1 mr-3">
           <h4 className="text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
           <div className="flex items-center gap-2 mt-0.5">
@@ -173,30 +176,24 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+      <div className="grid grid-cols-3 gap-2 mb-5 text-center">
         <div className="bg-neutral-50 rounded-lg py-2 px-1">
-          <p className="text-lg font-bold text-primary-600">{pool.total_points ?? 0}</p>
-          {pool.bonus_points > 0 ? (
-            <p className="text-[10px] text-neutral-500">{pool.match_points} + {pool.bonus_points} bonus</p>
-          ) : (
-            <p className="text-xs text-neutral-500">Points</p>
-          )}
+          <p className="text-lg font-bold text-neutral-900">{pool.total_points ?? 0}</p>
+          <p className="text-xs text-neutral-500">Total Points</p>
         </div>
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
-          <p className="text-lg font-bold text-neutral-900">
+        <div className="bg-neutral-50 rounded-lg py-2 px-1 flex items-center justify-center">
+          <span className="text-lg font-bold text-neutral-900 inline-flex items-center gap-1 whitespace-nowrap">
             {pool.current_rank ? (
               <>
-                {pool.current_rank === 1 && '🥇'}
-                {pool.current_rank === 2 && '🥈'}
-                {pool.current_rank === 3 && '🥉'}
-                {pool.current_rank > 3 && `#${pool.current_rank}`}
-                {pool.current_rank <= 3 && ` #${pool.current_rank}`}
+                {pool.current_rank <= 3 && (
+                  <span>{pool.current_rank === 1 ? '🥇' : pool.current_rank === 2 ? '🥈' : '🥉'}</span>
+                )}
+                <span>#{pool.current_rank}<span className="text-neutral-400 font-normal"> / {pool.memberCount}</span></span>
               </>
             ) : (
-              '--'
+              <span>--<span className="text-neutral-400 font-normal"> / {pool.memberCount}</span></span>
             )}
-          </p>
-          <p className="text-xs text-neutral-500">of {pool.memberCount}</p>
+          </span>
         </div>
         <div className="bg-neutral-50 rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.completedMatches}/{pool.totalMatches}</p>
@@ -206,20 +203,9 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
 
       {/* Prediction progress bar */}
       {pool.totalMatches > 0 && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-neutral-600">
-              Predictions: <span className="font-bold">{pool.predictedMatches}/{pool.totalMatches}</span>
-            </span>
-            {pool.has_submitted_predictions ? (
-              <span className="text-success-600 font-semibold">Submitted</span>
-            ) : pool.predictedMatches > 0 ? (
-              <span className="text-warning-600 font-semibold">Draft</span>
-            ) : (
-              <span className="text-neutral-500">Not started</span>
-            )}
-          </div>
-          <div className="h-2 bg-neutral-200 rounded-full overflow-hidden">
+        <div className="mb-5 flex items-center gap-2 text-xs">
+          <span className="text-neutral-600 shrink-0">Predictions:</span>
+          <div className="h-2 bg-neutral-200 rounded-full overflow-hidden flex-1">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
                 pool.has_submitted_predictions
@@ -231,11 +217,19 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
               style={{ width: `${Math.round((pool.predictedMatches / pool.totalMatches) * 100)}%` }}
             />
           </div>
+          {pool.has_submitted_predictions ? (
+            <span className="text-success-600 font-semibold shrink-0">Submitted</span>
+          ) : pool.predictedMatches > 0 ? (
+            <span className="text-warning-600 font-semibold shrink-0">Draft</span>
+          ) : (
+            <span className="text-neutral-500 shrink-0">Not started</span>
+          )}
         </div>
       )}
 
       {/* Status indicators */}
-      <div className="flex items-center justify-between mb-3 text-xs">
+      <div className="mb-5 text-xs">
+        <span className="text-neutral-500">Pool closes: </span>
         <span className={deadline.className}>{deadline.text}</span>
       </div>
 
