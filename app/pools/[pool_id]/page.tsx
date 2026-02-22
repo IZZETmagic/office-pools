@@ -31,7 +31,7 @@ export default async function PoolPage({
   // STEP 2: Look up user_id from users table
   const { data: userData } = await supabase
     .from('users')
-    .select('user_id')
+    .select('user_id, is_super_admin')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -181,6 +181,7 @@ export default async function PoolPage({
       submittedAt={currentMember?.predictions_submitted_at ?? null}
       lastSavedAt={currentMember?.predictions_last_saved_at ?? null}
       predictionsLocked={currentMember?.predictions_locked ?? false}
+      isSuperAdmin={userData.is_super_admin ?? false}
     />
   )
 }

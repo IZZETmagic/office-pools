@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { AppHeader } from '@/components/ui/AppHeader'
 import type {
   SuperMatchData,
   SuperUserData,
@@ -51,22 +51,15 @@ export function SuperAdminDashboard({
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Sticky header: navigation bar + stats bar + tab navigation */}
-      <div className="sticky top-0 z-10">
-      <nav className="bg-neutral-900 shadow-lg px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-sm text-neutral-300 hover:text-white font-medium shrink-0">
-            &larr; <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Back</span>
-          </Link>
-          <div className="text-center min-w-0 mx-2">
-            <h1 className="text-sm sm:text-lg font-bold text-white truncate">
-              Super Admin
-            </h1>
-            <p className="text-[10px] sm:text-xs text-danger-400 font-medium">Full System Access</p>
-          </div>
-          <div className="w-12 sm:w-20 shrink-0" />
+      <AppHeader breadcrumbs={[{ label: 'Super Admin' }]} isSuperAdmin />
+
+      {/* Sticky admin status bar + stats + tab navigation */}
+      <div className="sticky top-[57px] z-[9]">
+      <div className="bg-neutral-900 px-4 sm:px-6 py-1.5 sm:py-2">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-[10px] sm:text-xs text-danger-400 font-medium">Full System Access</p>
         </div>
-      </nav>
+      </div>
 
       {/* Quick stats bar */}
       <div className="bg-neutral-800 border-b border-neutral-700 px-4 sm:px-6 py-2 sm:py-3">

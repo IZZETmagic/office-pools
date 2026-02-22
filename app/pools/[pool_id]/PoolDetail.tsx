@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
+import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
 import { StandingsTab } from './StandingsTab'
@@ -78,6 +77,7 @@ type PoolDetailProps = {
   submittedAt: string | null
   lastSavedAt: string | null
   predictionsLocked: boolean
+  isSuperAdmin?: boolean
 }
 
 // =====================
@@ -103,10 +103,24 @@ export function PoolDetail({
   submittedAt,
   lastSavedAt,
   predictionsLocked,
+  isSuperAdmin,
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const initialTab = (searchParams.get('tab') as Tab) || 'leaderboard'
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+
+  // Sync tab state on browser back/forward (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      const tab = (params.get('tab') as Tab) || 'leaderboard'
+      setActiveTab(tab)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   const [pool, setPool] = useState(initialPool)
   const [members, setMembers] = useState(initialMembers)
   const [matches, setMatches] = useState(initialMatches)
@@ -126,7 +140,6 @@ export function PoolDetail({
   const predictionsRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
 
   // Auto-refresh data on leaderboard, results, and standings tabs
-  const router = useRouter()
   useEffect(() => {
     const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
@@ -135,6 +148,18 @@ export function PoolDetail({
     return () => clearInterval(interval)
   }, [activeTab, router])
 
+  const switchTab = useCallback((tab: Tab) => {
+    setActiveTab(tab)
+    // Update URL without full navigation so back/forward works
+    const url = new URL(window.location.href)
+    if (tab === 'leaderboard') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', tab)
+    }
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
   const handleTabSwitch = useCallback((tab: Tab) => {
     // If leaving predictions tab with unsaved changes, show warning
     if (activeTab === 'predictions' && tab !== 'predictions' && predictionsRef.current?.hasUnsaved()) {
@@ -142,20 +167,20 @@ export function PoolDetail({
       setShowNavWarning(true)
       return
     }
-    setActiveTab(tab)
-  }, [activeTab])
+    switchTab(tab)
+  }, [activeTab, switchTab])
 
   const handleSaveAndLeave = async () => {
     if (predictionsRef.current) {
       await predictionsRef.current.save()
     }
-    if (pendingTab) setActiveTab(pendingTab)
+    if (pendingTab) switchTab(pendingTab)
     setShowNavWarning(false)
     setPendingTab(null)
   }
 
   const handleLeaveWithoutSaving = () => {
-    if (pendingTab) setActiveTab(pendingTab)
+    if (pendingTab) switchTab(pendingTab)
     setShowNavWarning(false)
     setPendingTab(null)
   }
@@ -197,65 +222,67 @@ export function PoolDetail({
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Sticky header: navigation bar + tab navigation */}
-      <div className="sticky top-0 z-10 bg-white shadow-sm">
-      <nav className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-sm sm:text-base text-neutral-600 hover:text-neutral-900 font-medium shrink-0">
-            &larr; <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Back</span>
-          </Link>
-          <div className="flex items-center gap-1.5 sm:gap-2 justify-center min-w-0 mx-2">
-            <h1 className="text-base sm:text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h1>
+      {/* Shared app header with breadcrumbs + pool badges */}
+      <AppHeader
+        breadcrumbs={[
+          { label: pool.pool_name },
+        ]}
+        badges={
+          <>
             <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
             {isAdmin && <Badge variant="blue">Admin</Badge>}
-          </div>
-          <div className="w-12 sm:w-20 shrink-0" />
-        </div>
-      </nav>
+          </>
+        }
+        isSuperAdmin={isSuperAdmin}
+      />
 
       {/* Tab navigation */}
-      <div className="border-b border-neutral-200">
-        <div className="max-w-6xl mx-auto px-2 sm:px-6">
-          <div className="flex gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
-            {USER_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => handleTabSwitch(tab.key)}
-                className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
-                  activeTab === tab.key
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-neutral-600 hover:text-neutral-700 hover:border-neutral-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+      <div className="sticky top-[57px] z-[9] bg-white shadow-sm">
+        {/* Tab navigation with scroll indicators */}
+        <div className="border-b border-neutral-200 relative">
+          <div className="max-w-6xl mx-auto px-2 sm:px-6">
+            <div className="flex gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
+              {USER_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => handleTabSwitch(tab.key)}
+                  className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
+                    activeTab === tab.key
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-neutral-600 hover:text-neutral-700 hover:border-neutral-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
 
-            {isAdmin && (
-              <>
-                {/* Divider */}
-                <div className="flex items-center px-1 sm:px-2">
-                  <div className="h-5 w-px bg-neutral-300" />
-                </div>
+              {isAdmin && (
+                <>
+                  {/* Divider */}
+                  <div className="flex items-center px-1 sm:px-2">
+                    <div className="h-5 w-px bg-neutral-300" />
+                  </div>
 
-                {ADMIN_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => handleTabSwitch(tab.key)}
-                    className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
-                      activeTab === tab.key
-                        ? 'border-warning-600 text-warning-600'
-                        : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </>
-            )}
+                  {ADMIN_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => handleTabSwitch(tab.key)}
+                      className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
+                        activeTab === tab.key
+                          ? 'border-warning-600 text-warning-600'
+                          : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
+          {/* Scroll fade indicators for mobile */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none sm:hidden" />
         </div>
-      </div>
       </div>
 
       {/* Tab content */}

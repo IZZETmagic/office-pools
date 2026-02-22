@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
+import { AppHeader } from '@/components/ui/AppHeader'
 
 // =====================
 // TYPES
@@ -57,9 +58,21 @@ type UpcomingMatch = {
   away_team_placeholder: string | null
 }
 
+type LiveMatch = UpcomingMatch & {
+  home_score_ft: number | null
+  away_score_ft: number | null
+  prediction: {
+    predicted_home_score: number
+    predicted_away_score: number
+  } | null
+  predicted_home_team_name: string | null
+  predicted_away_team_name: string | null
+}
+
 type DashboardClientProps = {
-  user: { user_id: string; username: string; full_name: string }
+  user: { user_id: string; username: string; full_name: string; is_super_admin?: boolean }
   pools: PoolCardData[]
+  liveMatches: LiveMatch[]
   upcomingMatches: UpcomingMatch[]
   activities: ActivityItem[]
   totalPools: number
@@ -70,6 +83,18 @@ type DashboardClientProps = {
 // =====================
 // HELPERS
 // =====================
+function getInitials(fullName: string | null, username: string): string {
+  if (fullName) {
+    return fullName
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+  return username.slice(0, 2).toUpperCase()
+}
+
 function formatDeadline(deadline: string | null) {
   if (!deadline) return { text: 'No deadline set', className: 'text-neutral-500' }
 
@@ -262,6 +287,7 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
 export function DashboardClient({
   user,
   pools,
+  liveMatches,
   upcomingMatches,
   activities,
   totalPools,
@@ -438,50 +464,44 @@ export function DashboardClient({
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Navigation bar */}
-      <nav className="sticky top-0 z-10 bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-        <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-neutral-900">
-          World Cup Pool
-        </Link>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link href="/profile" className="text-sm text-neutral-600 hover:text-neutral-900 font-medium">
-            Profile
-          </Link>
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="text-sm text-neutral-600 hover:text-neutral-900 font-medium"
-            >
-              Sign Out
-            </button>
-          </form>
-        </div>
-      </nav>
+      <AppHeader isSuperAdmin={user.is_super_admin} />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        {/* Welcome header */}
-        <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-1">
-          Welcome, {user.full_name || user.username || 'Player'}!
-        </h2>
-        <p className="text-neutral-600 mb-6 sm:mb-8">Your World Cup Pool Dashboard</p>
+      {/* Hero header */}
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+          <div className="flex items-center gap-5">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 shadow-lg shrink-0">
+              {getInitials(user.full_name, user.username)}
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+                Welcome, {user.full_name || user.username || 'Player'}!
+              </h2>
+              <p className="text-primary-100 text-sm sm:text-base">@{user.username}</p>
+            </div>
+          </div>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card className="text-center">
-            <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Pools</p>
-            <p className="text-2xl sm:text-3xl font-bold text-primary-600">{totalPools}</p>
-          </Card>
-          <Card className="text-center">
-            <p className="text-xs sm:text-sm text-neutral-600 mb-1">Best Rank</p>
-            <p className="text-2xl sm:text-3xl font-bold text-accent-500">
-              {bestRank ? `#${bestRank}` : '--'}
-            </p>
-          </Card>
-          <Card className="text-center">
-            <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Points</p>
-            <p className="text-2xl sm:text-3xl font-bold text-success-600">{totalPoints}</p>
-          </Card>
+          {/* Quick stats in hero */}
+          <div className="grid grid-cols-3 gap-3 mt-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
+              <p className="text-xs text-primary-200">Total Pools</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">
+                {bestRank ? `#${bestRank}` : '--'}
+              </p>
+              <p className="text-xs text-primary-200">Best Rank</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{totalPoints}</p>
+              <p className="text-xs text-primary-200">Total Points</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
         {/* Resume Predictions Banner */}
         {(() => {
@@ -586,6 +606,104 @@ export function DashboardClient({
             </div>
           )}
         </div>
+
+        {/* Live Matches — only shown when there are live matches */}
+        {liveMatches.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-danger-500" />
+              </span>
+              <h3 className="text-xl font-bold text-neutral-900">Live Matches</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {liveMatches.map((match) => {
+                const homeTeam = (match.home_team as any)?.country_name ?? match.home_team_placeholder ?? 'TBD'
+                const awayTeam = (match.away_team as any)?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                const isKnockout = match.stage !== 'group'
+                return (
+                  <Card key={match.match_id} className="border-danger-200 bg-danger-50/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-neutral-500">
+                        {formatStage(match.stage)} &middot; Match #{match.match_number}
+                      </p>
+                      <Badge variant="yellow">
+                        <span className="flex items-center gap-1">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
+                          </span>
+                          LIVE
+                        </span>
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 text-right pr-3">
+                        <p className="font-semibold text-neutral-900">{homeTeam}</p>
+                        {match.prediction && (
+                          <p className="text-xs text-neutral-500 mt-0.5">
+                            {isKnockout ? (
+                              <>
+                                {match.predicted_home_team_name && (
+                                  <span className="text-neutral-400">{match.predicted_home_team_name}{' '}</span>
+                                )}
+                                <span className="font-semibold text-neutral-600">
+                                  {match.prediction.predicted_home_score}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                Your prediction{' '}
+                                <span className="font-semibold text-neutral-600">
+                                  {match.prediction.predicted_home_score}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-lg shadow-sm border border-neutral-200">
+                        <span className="text-xl font-bold text-neutral-900">{match.home_score_ft ?? 0}</span>
+                        <span className="text-neutral-400">-</span>
+                        <span className="text-xl font-bold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                      </div>
+                      <div className="flex-1 pl-3">
+                        <p className="font-semibold text-neutral-900">{awayTeam}</p>
+                        {match.prediction && (
+                          <p className="text-xs text-neutral-500 mt-0.5">
+                            {isKnockout ? (
+                              <>
+                                <span className="font-semibold text-neutral-600">
+                                  {match.prediction.predicted_away_score}
+                                </span>
+                                {match.predicted_away_team_name && (
+                                  <span className="text-neutral-400">{' '}{match.predicted_away_team_name}</span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-neutral-600">
+                                  {match.prediction.predicted_away_score}
+                                </span>
+                                {' '}Your prediction
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {match.match_date && (
+                      <p className="text-xs text-neutral-500 mt-2 text-center">
+                        Started {formatDateTime(match.match_date)}
+                      </p>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Two column layout: Upcoming matches + Activity feed */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
