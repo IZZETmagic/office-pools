@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Button } from '@/components/ui/Button'
+import { AuthLayout } from '@/components/ui/AuthLayout'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -46,66 +47,56 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+    <AuthLayout>
+      <h2 className="text-3xl font-bold text-neutral-900 mb-2">Set new password</h2>
+      <p className="text-neutral-500 mb-8">Enter your new password below.</p>
 
-        <h1 className="text-3xl font-bold text-neutral-900 mb-2 text-center">
-          Set New Password
-        </h1>
-        <p className="text-center text-neutral-600 mb-6">
-          Enter your new password below.
-        </p>
+      {error && <Alert variant="error">{error}</Alert>}
 
-        {error && (
-          <Alert variant="error">{error}</Alert>
-        )}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormField label="New Password">
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="Enter new password"
+            minLength={8}
+          />
+        </FormField>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="New Password">
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter new password"
-              minLength={8}
-            />
-          </FormField>
+        <FormField label="Confirm Password">
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            placeholder="Confirm new password"
+            minLength={8}
+          />
+        </FormField>
 
-          <FormField label="Confirm Password">
-            <Input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              placeholder="Confirm new password"
-              minLength={8}
-            />
-          </FormField>
+        <div className="bg-neutral-100 border border-neutral-200 rounded-lg p-4">
+          <p className="text-sm font-medium text-neutral-700 mb-2">Password requirements:</p>
+          <ul className="text-sm text-neutral-600 space-y-1">
+            <li className={password.length >= 8 ? 'text-success-600' : ''}>
+              {password.length >= 8 ? '\u2713' : '\u2022'} At least 8 characters
+            </li>
+            <li>{'\u2022'} Mix of letters and numbers recommended</li>
+          </ul>
+        </div>
 
-          {/* Password requirements */}
-          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-neutral-700 mb-2">Password requirements:</p>
-            <ul className="text-sm text-neutral-600 space-y-1">
-              <li className={password.length >= 8 ? 'text-success-600' : ''}>
-                {password.length >= 8 ? '\u2713' : '\u2022'} At least 8 characters
-              </li>
-              <li>{'\u2022'} Mix of letters and numbers recommended</li>
-            </ul>
-          </div>
-
-          <Button
-            type="submit"
-            fullWidth
-            loading={loading}
-            loadingText="Resetting Password..."
-            disabled={password.length < 8}
-          >
-            Reset Password
-          </Button>
-        </form>
-
-      </div>
-    </div>
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          loading={loading}
+          loadingText="Resetting Password..."
+          disabled={password.length < 8}
+        >
+          Reset Password
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }

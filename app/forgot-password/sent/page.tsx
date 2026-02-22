@@ -1,9 +1,10 @@
 import Link from 'next/link'
+import { AuthLayout } from '@/components/ui/AuthLayout'
 
 export default function EmailSentPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center space-y-6">
+    <AuthLayout>
+      <div className="text-center space-y-6">
 
         {/* Success icon */}
         <div className="mx-auto w-16 h-16 bg-success-100 rounded-full flex items-center justify-center">
@@ -13,9 +14,9 @@ export default function EmailSentPage() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900">Check Your Email</h1>
+          <h2 className="text-3xl font-bold text-neutral-900">Check your email</h2>
           <p className="mt-2 text-neutral-600">
-            We've sent a password reset link to your email address.
+            We&apos;ve sent a password reset link to your email address.
           </p>
         </div>
 
@@ -25,7 +26,7 @@ export default function EmailSentPage() {
             Click the link in the email to reset your password.
           </p>
           <p className="text-sm text-neutral-700 font-medium">
-            Didn't receive the email?
+            Didn&apos;t receive the email?
           </p>
           <ul className="mt-1 text-sm text-neutral-600 list-disc list-inside">
             <li>Check your spam folder</li>
@@ -50,6 +51,6 @@ export default function EmailSentPage() {
         </div>
 
       </div>
-    </div>
+    </AuthLayout>
   )
 }

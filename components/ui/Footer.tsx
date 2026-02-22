@@ -2,10 +2,14 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+
+const HIDDEN_ROUTES = ['/login', '/signup']
 
 export default function Footer() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     const supabase = createClient()
@@ -14,16 +18,18 @@ export default function Footer() {
     })
   }, [])
 
+  if (HIDDEN_ROUTES.includes(pathname)) return null
+
   return (
     <footer className="bg-neutral-900 text-neutral-400 py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`grid grid-cols-2 ${isLoggedIn ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-6 sm:gap-8`}>
-          <div className="col-span-2 sm:col-span-1">
-            <span className="text-white text-lg font-bold">&#9917; Sport Pool</span>
-            <p className="mt-2 sm:mt-3 text-sm">
-              The ultimate FIFA World Cup 2026 prediction pool platform.
-            </p>
-          </div>
+        <div className="mb-6 sm:mb-8">
+          <span className="text-white text-lg font-bold">&#9917; Sport Pool</span>
+          <p className="mt-2 sm:mt-3 text-sm">
+            The ultimate FIFA World Cup 2026 prediction pool platform.
+          </p>
+        </div>
+        <div className={`grid ${isLoggedIn ? 'grid-cols-2 sm:grid-cols-2' : 'grid-cols-3 sm:grid-cols-3'} gap-6 sm:gap-8`}>
           {!isLoggedIn && (
             <div>
               <h4 className="text-white font-semibold mb-2 sm:mb-3">Product</h4>
