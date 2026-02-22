@@ -6,7 +6,7 @@ export default function FeedbackButton() {
       href="https://docs.google.com/forms/d/e/1FAIpQLSdYWKCdg11UZixjBgSiRpeeiOPT3RkYEHG17k8VRYRvYNQxbA/viewform?usp=publish-editor"
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-white shadow-lg transition-all hover:bg-blue-700 hover:shadow-xl active:scale-95 sm:px-5"
+      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary-600 px-4 py-3 text-white shadow-lg transition-all hover:bg-primary-700 hover:shadow-xl active:scale-95 sm:px-5"
       aria-label="Send feedback"
     >
       <svg

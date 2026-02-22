@@ -643,12 +643,12 @@ export default function PredictionsFlow({
                 onClick={() => goToStage(idx)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                   isCurrent
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-primary-600 text-white'
                     : isComplete
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    ? 'bg-success-100 text-success-700 hover:bg-success-200'
                     : stagePredCount > 0
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-warning-100 text-warning-700 hover:bg-warning-200'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                 }`}
               >
                 {STAGE_LABELS[stage]}
@@ -662,7 +662,7 @@ export default function PredictionsFlow({
       </div>
 
       {/* Stage title */}
-      <h3 className="text-2xl font-bold text-gray-900 mb-6">
+      <h3 className="text-2xl font-bold text-neutral-900 mb-6">
         {STAGE_LABELS[stageName]}
       </h3>
 
@@ -777,16 +777,16 @@ export default function PredictionsFlow({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
           <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Submit Final Predictions?
             </h3>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-amber-800">
+            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-warning-800">
                 Once submitted, you <strong>cannot</strong> make changes to your predictions.
               </p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 mb-4">
-              <p className="text-sm text-gray-700">
+            <div className="bg-neutral-50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-neutral-700">
                 Progress: <strong>{predictedCount} / {totalMatches}</strong> matches ({progressPercent}%)
               </p>
             </div>
@@ -823,16 +823,16 @@ export default function PredictionsFlow({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
           <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Recover Unsaved Predictions?
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-neutral-600 mb-4">
               We found predictions from{' '}
               <strong>{recoveryTimestamp ? timeAgo(new Date(recoveryTimestamp).toISOString()) : 'earlier'}</strong>
               {' '}that weren&apos;t saved to the server. Would you like to recover them?
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-primary-800">
                 <strong>{Object.keys(recoveryData).length}</strong> predictions found in local backup.
               </p>
             </div>
@@ -858,29 +858,29 @@ export default function PredictionsFlow({
 
       {/* Offline Banner */}
       {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-warning-500 text-white text-center py-2 px-4 text-sm font-medium shadow-md">
           You&apos;re offline. Predictions will save when you reconnect.
         </div>
       )}
 
       {/* Sticky bottom progress bar on mobile */}
       {stageName !== 'summary' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 sm:hidden z-40">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 p-3 sm:hidden z-40">
           <div className="flex items-center gap-2">
-            <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-2 flex-1 bg-neutral-200 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${progressPercent === 100 ? 'bg-green-500' : 'bg-blue-600'}`}
+                className={`h-full rounded-full transition-all duration-300 ${progressPercent === 100 ? 'bg-success-500' : 'bg-primary-600'}`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <span className="text-xs text-gray-600 whitespace-nowrap">
+            <span className="text-xs text-neutral-600 whitespace-nowrap">
               {predictedCount}/{totalMatches}
             </span>
             {saveStatus === 'saving' && (
-              <span className="text-[10px] text-gray-400 whitespace-nowrap">Saving...</span>
+              <span className="text-[10px] text-neutral-400 whitespace-nowrap">Saving...</span>
             )}
             {saveStatus === 'saved' && (
-              <span className="text-[10px] text-green-600 whitespace-nowrap">{'\u2713'}</span>
+              <span className="text-[10px] text-success-600 whitespace-nowrap">{'\u2713'}</span>
             )}
           </div>
         </div>
@@ -900,17 +900,17 @@ export default function PredictionsFlow({
 
 function StatusBanner({ type, message }: { type: 'submitted' | 'locked'; message: string }) {
   const styles = {
-    submitted: 'bg-green-50 border-green-200 text-green-800',
-    locked: 'bg-gray-50 border-gray-200 text-gray-800',
+    submitted: 'bg-success-50 border-success-200 text-success-800',
+    locked: 'bg-neutral-50 border-neutral-200 text-neutral-800',
   }
   const icons = {
     submitted: (
-      <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-5 h-5 text-success-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
     locked: (
-      <svg className="w-5 h-5 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-5 h-5 text-neutral-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
     ),
@@ -949,19 +949,19 @@ function ProgressBar({
   const percent = total > 0 ? Math.round((predicted / total) * 100) : 0
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
+    <div className="bg-white border border-neutral-200 rounded-lg p-3 sm:p-4">
       {/* Single row: label, status badge, progress bar, count, save status, details toggle */}
       <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
         {/* Label + status badge */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <h4 className="text-xs sm:text-sm font-semibold text-gray-700">Progress</h4>
+          <h4 className="text-xs sm:text-sm font-semibold text-neutral-700">Progress</h4>
           {status === 'submitted' && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-green-100 text-green-700">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-success-100 text-success-700">
               Submitted
             </span>
           )}
           {status === 'draft' && predicted > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-amber-100 text-amber-700">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-warning-100 text-warning-700">
               Draft
             </span>
           )}
@@ -969,10 +969,10 @@ function ProgressBar({
 
         {/* Progress bar */}
         <div className="flex-1 min-w-[80px]">
-          <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-neutral-200 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                percent === 100 ? 'bg-green-500' : 'bg-blue-600'
+                percent === 100 ? 'bg-success-500' : 'bg-primary-600'
               }`}
               style={{ width: `${percent}%` }}
             />
@@ -980,16 +980,16 @@ function ProgressBar({
         </div>
 
         {/* Count */}
-        <span className="text-xs font-medium text-gray-600 whitespace-nowrap shrink-0">
+        <span className="text-xs font-medium text-neutral-600 whitespace-nowrap shrink-0">
           {predicted}/{total}
         </span>
 
         {/* Save status */}
-        <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap shrink-0">
+        <span className="text-[10px] sm:text-xs text-neutral-500 whitespace-nowrap shrink-0">
           {saveStatus === 'saving' && 'Saving...'}
           {saveStatus === 'saved' && '\u2713 Saved'}
           {saveStatus === 'error' && (
-            <span className="text-red-600">Failed</span>
+            <span className="text-danger-600">Failed</span>
           )}
           {(!saveStatus || saveStatus === 'idle') && lastSavedAt && status !== 'submitted' && `Saved ${timeAgo(lastSavedAt)}`}
           {(!saveStatus || saveStatus === 'idle') && !lastSavedAt && status !== 'submitted' && predicted > 0 && 'Unsaved'}
@@ -1000,7 +1000,7 @@ function ProgressBar({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="text-[10px] sm:text-xs text-blue-600 hover:text-blue-800 font-medium shrink-0"
+          className="text-[10px] sm:text-xs text-primary-600 hover:text-primary-800 font-medium shrink-0"
         >
           {expanded ? 'Hide' : 'Details'}
         </button>
@@ -1008,19 +1008,19 @@ function ProgressBar({
 
       {/* Expanded: per-stage breakdown */}
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5">
           {stageProgress.map(sp => {
             const isComplete = sp.total > 0 && sp.predicted === sp.total
             const isPartial = sp.predicted > 0 && sp.predicted < sp.total
             return (
               <div key={sp.stage} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
-                  <span className={isComplete ? 'text-green-600' : isPartial ? 'text-amber-600' : 'text-gray-400'}>
+                  <span className={isComplete ? 'text-success-600' : isPartial ? 'text-warning-600' : 'text-neutral-400'}>
                     {isComplete ? '\u2705' : isPartial ? '\u231B' : '\u25CB'}
                   </span>
-                  <span className="text-gray-700">{sp.label}</span>
+                  <span className="text-neutral-700">{sp.label}</span>
                 </div>
-                <span className={`font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>
+                <span className={`font-medium ${isComplete ? 'text-success-600' : 'text-neutral-500'}`}>
                   {sp.predicted} / {sp.total}
                 </span>
               </div>

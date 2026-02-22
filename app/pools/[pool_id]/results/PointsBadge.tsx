@@ -3,10 +3,10 @@
 import { type PointsResult } from './points'
 
 const badgeStyles: Record<PointsResult['type'], string> = {
-  exact: 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-  winner_gd: 'bg-green-100 text-green-800 border border-green-300',
-  winner: 'bg-blue-100 text-blue-800 border border-blue-300',
-  miss: 'bg-gray-50 text-gray-500 border border-gray-200',
+  exact: 'bg-accent-100 text-accent-700 border border-accent-500',
+  winner_gd: 'bg-success-100 text-success-800 border border-success-500',
+  winner: 'bg-primary-100 text-primary-800 border border-primary-500',
+  miss: 'bg-neutral-50 text-neutral-500 border border-neutral-200',
 }
 
 const icons: Record<PointsResult['type'], string> = {
@@ -44,12 +44,12 @@ export function PointsBadge({ result }: { result: PointsResult }) {
         <span>+{ftPoints}</span>
       </span>
       {showMultiplier && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-neutral-500">
           {result.basePoints} x {result.multiplier}x
         </span>
       )}
       {result.pso && result.pso.psoPoints > 0 && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600">
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-500">
           +{result.pso.psoPoints} {psoTypeLabels[result.pso.psoType]}
         </span>
       )}

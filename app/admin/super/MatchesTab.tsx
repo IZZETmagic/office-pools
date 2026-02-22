@@ -61,22 +61,22 @@ function CardInput({
   color: 'yellow' | 'amber' | 'red' | 'rose'
 }) {
   const colorMap = {
-    yellow: 'bg-yellow-400',
-    amber: 'bg-amber-500',
-    red: 'bg-red-600',
-    rose: 'bg-rose-700',
+    yellow: 'bg-warning-400',
+    amber: 'bg-warning-500',
+    red: 'bg-danger-600',
+    rose: 'bg-danger-700',
   }
 
   return (
     <div className="flex items-center gap-2">
       <span className={`w-3 h-4 rounded-sm ${colorMap[color]} flex-shrink-0`} />
-      <label className="text-xs text-gray-600 flex-1 min-w-0">{label}</label>
+      <label className="text-xs text-neutral-600 flex-1 min-w-0">{label}</label>
       <input
         type="number"
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-14 h-7 text-center text-sm font-medium border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent text-gray-900"
+        className="w-14 h-7 text-center text-sm font-medium border border-neutral-300 rounded focus:ring-1 focus:ring-danger-500 focus:border-transparent text-neutral-900"
       />
     </div>
   )
@@ -599,23 +599,23 @@ export function MatchesTab({
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Match Results</h2>
+        <h2 className="text-2xl font-bold text-neutral-900">Match Results</h2>
         <div className="flex gap-3 items-center text-sm">
-          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+          <span className="px-3 py-1 bg-success-100 text-success-700 rounded-full font-medium">
             {completedCount} Completed
           </span>
           {liveCount > 0 && (
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+            <span className="px-3 py-1 bg-warning-100 text-warning-700 rounded-full font-medium">
               {liveCount} Live
             </span>
           )}
-          <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+          <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">
             {scheduledCount} Scheduled
           </span>
           <button
             onClick={handleManualAdvance}
             disabled={advancing}
-            className="px-4 py-1.5 bg-purple-600 text-white rounded-full font-medium text-sm hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 bg-accent-500 text-white rounded-full font-medium text-sm hover:bg-accent-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {advancing ? 'Advancing...' : 'Advance Teams'}
           </button>
@@ -633,7 +633,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -646,7 +646,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -659,7 +659,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -675,35 +675,35 @@ export function MatchesTab({
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Stage
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Score
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-neutral-200">
               {filteredMatches.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-600">
+                  <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
                     No matches found with current filters.
                   </td>
                 </tr>
@@ -720,9 +720,9 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-gray-50">
+                    <tr key={match.match_id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
                         </span>
                       </td>
@@ -732,13 +732,13 @@ export function MatchesTab({
                           {match.group_letter ? ` ${match.group_letter}` : ''}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-neutral-600 whitespace-nowrap">
                         {matchDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })}
                         <br />
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-neutral-500">
                           {matchDate.toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
@@ -746,11 +746,11 @@ export function MatchesTab({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-neutral-900">
                           {home}
                         </span>
-                        <span className="text-gray-500 mx-2">vs</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-neutral-500 mx-2">vs</span>
+                        <span className="font-medium text-neutral-900">
                           {away}
                         </span>
                       </td>
@@ -761,24 +761,24 @@ export function MatchesTab({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {match.is_completed ? (
-                          <span className="font-bold text-gray-900">
+                          <span className="font-bold text-neutral-900">
                             {match.home_score_ft} - {match.away_score_ft}
                             {match.home_score_pso !== null && (
-                              <span className="text-xs text-gray-500 block">
+                              <span className="text-xs text-neutral-500 block">
                                 PSO: {match.home_score_pso}-
                                 {match.away_score_pso}
                               </span>
                             )}
                           </span>
                         ) : match.status === 'live' && match.home_score_ft !== null ? (
-                          <span className="font-bold text-yellow-700">
+                          <span className="font-bold text-warning-700">
                             {match.home_score_ft} - {match.away_score_ft}
-                            <span className="text-xs text-yellow-500 block">
+                            <span className="text-xs text-warning-500 block">
                               provisional
                             </span>
                           </span>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-neutral-500">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -786,7 +786,7 @@ export function MatchesTab({
                           {match.status === 'scheduled' && (
                             <button
                               onClick={() => handleSetMatchStatus(match, 'live')}
-                              className="text-xs px-3 py-1.5 rounded bg-yellow-500 text-white hover:bg-yellow-600 font-medium transition"
+                              className="text-xs px-3 py-1.5 rounded bg-warning-500 text-white hover:bg-warning-600 font-medium transition"
                             >
                               Set Live
                             </button>
@@ -795,13 +795,13 @@ export function MatchesTab({
                             <>
                               <button
                                 onClick={() => openLiveScoreModal(match)}
-                                className="text-xs px-3 py-1.5 rounded bg-yellow-500 text-white hover:bg-yellow-600 font-medium transition"
+                                className="text-xs px-3 py-1.5 rounded bg-warning-500 text-white hover:bg-warning-600 font-medium transition"
                               >
                                 Update Score
                               </button>
                               <button
                                 onClick={() => handleSetMatchStatus(match, 'scheduled')}
-                                className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
+                                className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-medium transition"
                               >
                                 Set Scheduled
                               </button>
@@ -810,7 +810,7 @@ export function MatchesTab({
                           {match.status !== 'cancelled' && (
                             <button
                               onClick={() => openResultModal(match)}
-                              className="text-xs px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 font-medium transition"
+                              className="text-xs px-3 py-1.5 rounded bg-danger-600 text-white hover:bg-danger-700 font-medium transition"
                             >
                               {match.is_completed
                                 ? 'Edit Result'
@@ -820,7 +820,7 @@ export function MatchesTab({
                           {match.is_completed && (
                             <button
                               onClick={() => openResetModal(match)}
-                              className="text-xs px-3 py-1.5 rounded bg-gray-800 text-white hover:bg-gray-900 font-medium transition"
+                              className="text-xs px-3 py-1.5 rounded bg-neutral-800 text-white hover:bg-neutral-900 font-medium transition"
                             >
                               Reset
                             </button>
@@ -841,12 +841,12 @@ export function MatchesTab({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 bg-red-500 rounded-full" />
-              <h3 className="text-xl font-bold text-gray-900">
+              <span className="w-2 h-2 bg-danger-500 rounded-full" />
+              <h3 className="text-xl font-bold text-neutral-900">
                 {modal.match.is_completed ? 'Edit' : 'Enter'} Match Result
               </h3>
             </div>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-neutral-600 mb-2">
               Match #{modal.match.match_number}:{' '}
               {modal.match.home_team?.country_name ||
                 modal.match.home_team_placeholder ||
@@ -856,7 +856,7 @@ export function MatchesTab({
                 modal.match.away_team_placeholder ||
                 'TBD'}
             </p>
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs text-neutral-500 mb-6">
               {getStageName(modal.match.stage)}
               {modal.match.group_letter
                 ? ` ${modal.match.group_letter}`
@@ -869,7 +869,7 @@ export function MatchesTab({
               })}
             </p>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-4 text-xs text-amber-700">
+            <div className="bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4 text-xs text-warning-700">
               This will calculate/recalculate points for ALL pools linked to this tournament.
             </div>
 
@@ -879,7 +879,7 @@ export function MatchesTab({
             {/* Score inputs */}
             <div className="flex items-center justify-center gap-4 mb-6">
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
+                <p className="text-sm font-medium text-neutral-600 mb-2">
                   {modal.match.home_team?.country_name ||
                     modal.match.home_team_placeholder ||
                     'Home'}
@@ -889,12 +889,12 @@ export function MatchesTab({
                   min="0"
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                 />
               </div>
-              <span className="text-2xl font-bold text-gray-500 mt-6">-</span>
+              <span className="text-2xl font-bold text-neutral-500 mt-6">-</span>
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
+                <p className="text-sm font-medium text-neutral-600 mb-2">
                   {modal.match.away_team?.country_name ||
                     modal.match.away_team_placeholder ||
                     'Away'}
@@ -904,7 +904,7 @@ export function MatchesTab({
                   min="0"
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                 />
               </div>
             </div>
@@ -912,7 +912,7 @@ export function MatchesTab({
             {/* Match completion type (knockout only) */}
             {modal.match.stage !== 'group' && (
               <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-2">
+                <p className="text-sm font-medium text-neutral-700 mb-2">
                   Match completed after:
                 </p>
                 <div className="space-y-2">
@@ -923,9 +923,9 @@ export function MatchesTab({
                       value="ft"
                       checked={resultType === 'ft'}
                       onChange={() => setResultType('ft')}
-                      className="text-red-600"
+                      className="text-danger-600"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-neutral-700">
                       Full Time (90 minutes)
                     </span>
                   </label>
@@ -936,9 +936,9 @@ export function MatchesTab({
                       value="et"
                       checked={resultType === 'et'}
                       onChange={() => setResultType('et')}
-                      className="text-red-600"
+                      className="text-danger-600"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-neutral-700">
                       Extra Time (120 minutes)
                     </span>
                   </label>
@@ -949,9 +949,9 @@ export function MatchesTab({
                       value="pso"
                       checked={resultType === 'pso'}
                       onChange={() => setResultType('pso')}
-                      className="text-red-600"
+                      className="text-danger-600"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-neutral-700">
                       Penalty Shootout
                     </span>
                   </label>
@@ -959,28 +959,28 @@ export function MatchesTab({
 
                 {/* PSO score inputs */}
                 {resultType === 'pso' && (
-                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 rounded-lg">
                     <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">PSO</p>
+                      <p className="text-xs text-neutral-600 mb-1">PSO</p>
                       <input
                         type="number"
                         min="0"
                         value={psoHome}
                         onChange={(e) => setPsoHome(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
+                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                       />
                     </div>
-                    <span className="text-lg font-bold text-gray-500 mt-4">
+                    <span className="text-lg font-bold text-neutral-500 mt-4">
                       -
                     </span>
                     <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">PSO</p>
+                      <p className="text-xs text-neutral-600 mb-1">PSO</p>
                       <input
                         type="number"
                         min="0"
                         value={psoAway}
                         onChange={(e) => setPsoAway(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
+                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                       />
                     </div>
                   </div>
@@ -994,7 +994,7 @@ export function MatchesTab({
                 <button
                   type="button"
                   onClick={() => setShowConductFields(!showConductFields)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition"
+                  className="flex items-center gap-2 text-sm font-medium text-neutral-700 hover:text-neutral-900 transition"
                 >
                   <svg
                     className={`w-4 h-4 transition-transform ${showConductFields ? 'rotate-180' : ''}`}
@@ -1009,15 +1009,15 @@ export function MatchesTab({
                 </button>
 
                 {showConductFields && (
-                  <div className="mt-3 bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-4">
+                  <div className="mt-3 bg-neutral-50 rounded-lg p-4">
+                    <p className="text-xs text-neutral-500 mb-4">
                       Enter card counts per team. Each count represents distinct player incidents.
                       Used as FIFA tiebreaker in group standings.
                     </p>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Home team cards */}
                       <div>
-                        <p className="text-xs font-semibold text-gray-700 mb-3">
+                        <p className="text-xs font-semibold text-neutral-700 mb-3">
                           {modal.match.home_team?.country_name || 'Home'}
                         </p>
                         <div className="space-y-2">
@@ -1029,7 +1029,7 @@ export function MatchesTab({
                       </div>
                       {/* Away team cards */}
                       <div>
-                        <p className="text-xs font-semibold text-gray-700 mb-3">
+                        <p className="text-xs font-semibold text-neutral-700 mb-3">
                           {modal.match.away_team?.country_name || 'Away'}
                         </p>
                         <div className="space-y-2">
@@ -1040,7 +1040,7 @@ export function MatchesTab({
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 text-[10px] text-gray-400 space-y-0.5">
+                    <div className="mt-3 text-[10px] text-neutral-400 space-y-0.5">
                       <p>Yellow = -1 | 2nd Yellow (indirect red) = -3 | Direct red = -4 | Yellow + Direct red = -5</p>
                       <p>Only one deduction per player per match (the highest). Higher score (closer to 0) is better.</p>
                     </div>
@@ -1075,12 +1075,12 @@ export function MatchesTab({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse" />
-              <h3 className="text-xl font-bold text-gray-900">
+              <span className="w-3 h-3 bg-warning-500 rounded-full animate-pulse" />
+              <h3 className="text-xl font-bold text-neutral-900">
                 Update Live Score
               </h3>
             </div>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-neutral-600 mb-2">
               Match #{modal.match.match_number}:{' '}
               {modal.match.home_team?.country_name ||
                 modal.match.home_team_placeholder ||
@@ -1090,7 +1090,7 @@ export function MatchesTab({
                 modal.match.away_team_placeholder ||
                 'TBD'}
             </p>
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs text-neutral-500 mb-6">
               {getStageName(modal.match.stage)}
               {modal.match.group_letter
                 ? ` ${modal.match.group_letter}`
@@ -1103,7 +1103,7 @@ export function MatchesTab({
               })}
             </p>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-4 text-xs text-yellow-700">
+            <div className="bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4 text-xs text-warning-700">
               This updates the provisional score and recalculates leaderboards in real time.
               The match will remain &quot;Live&quot; until you finalize it with &quot;Enter Result&quot;.
             </div>
@@ -1114,7 +1114,7 @@ export function MatchesTab({
             {/* Score inputs */}
             <div className="flex items-center justify-center gap-4 mb-6">
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
+                <p className="text-sm font-medium text-neutral-600 mb-2">
                   {modal.match.home_team?.country_name ||
                     modal.match.home_team_placeholder ||
                     'Home'}
@@ -1124,12 +1124,12 @@ export function MatchesTab({
                   min="0"
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-gray-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-lg focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
                 />
               </div>
-              <span className="text-2xl font-bold text-gray-500 mt-6">-</span>
+              <span className="text-2xl font-bold text-neutral-500 mt-6">-</span>
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-600 mb-2">
+                <p className="text-sm font-medium text-neutral-600 mb-2">
                   {modal.match.away_team?.country_name ||
                     modal.match.away_team_placeholder ||
                     'Away'}
@@ -1139,7 +1139,7 @@ export function MatchesTab({
                   min="0"
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-gray-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-lg focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
                 />
               </div>
             </div>
@@ -1155,7 +1155,7 @@ export function MatchesTab({
               <button
                 onClick={handleUpdateLiveScore}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-yellow-500 hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-warning-500 hover:bg-warning-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Updating...' : 'Update Score & Recalculate'}
               </button>
@@ -1169,22 +1169,22 @@ export function MatchesTab({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
             <div className="flex items-center gap-2 mb-4">
-              <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse" />
-              <h3 className="text-xl font-bold text-red-700">
+              <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
+              <h3 className="text-xl font-bold text-danger-700">
                 Reset Match Result
               </h3>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-700 font-medium mb-2">
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-danger-700 font-medium mb-2">
                 WARNING: This is a destructive action!
               </p>
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-danger-600">
                 Resetting Match #{modal.match.match_number} (
                 {modal.match.home_team?.country_name || 'TBD'} vs{' '}
                 {modal.match.away_team?.country_name || 'TBD'}) will:
               </p>
-              <ul className="list-disc list-inside text-sm text-red-600 mt-2 space-y-1">
+              <ul className="list-disc list-inside text-sm text-danger-600 mt-2 space-y-1">
                 <li>Clear the match score ({modal.match.home_score_ft}-{modal.match.away_score_ft}
                   {modal.match.home_score_pso !== null && ` PSO: ${modal.match.home_score_pso}-${modal.match.away_score_pso}`})
                 </li>
@@ -1198,7 +1198,7 @@ export function MatchesTab({
             {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Reason for reset
               </label>
               <input
@@ -1206,20 +1206,20 @@ export function MatchesTab({
                 value={resetReason}
                 onChange={(e) => setResetReason(e.target.value)}
                 placeholder="e.g., Incorrect score entered"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type <span className="font-bold text-red-600">RESET</span> to confirm
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Type <span className="font-bold text-danger-600">RESET</span> to confirm
               </label>
               <input
                 type="text"
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="RESET"
-                className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-danger-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 
@@ -1234,7 +1234,7 @@ export function MatchesTab({
               <button
                 onClick={handleResetMatch}
                 disabled={resetting || resetConfirmText !== 'RESET'}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-danger-600 hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {resetting ? 'Resetting...' : 'Reset Match'}
               </button>

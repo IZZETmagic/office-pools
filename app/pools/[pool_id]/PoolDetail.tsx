@@ -183,6 +183,7 @@ export function PoolDetail({
     predicted_away_score: p.predicted_away_score,
     predicted_home_pso: p.predicted_home_pso,
     predicted_away_pso: p.predicted_away_pso,
+    predicted_winner_team_id: p.predicted_winner_team_id,
   }))
 
   // Transform matches for predictions flow (needs home_team/away_team with flag_url)
@@ -195,16 +196,16 @@ export function PoolDetail({
   const tabs = isAdmin ? [...USER_TABS, ...ADMIN_TABS] : USER_TABS
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Sticky header: navigation bar + tab navigation */}
       <div className="sticky top-0 z-10 bg-white shadow-sm">
       <nav className="px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-sm sm:text-base text-gray-600 hover:text-gray-900 font-medium shrink-0">
+          <Link href="/dashboard" className="text-sm sm:text-base text-neutral-600 hover:text-neutral-900 font-medium shrink-0">
             &larr; <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Back</span>
           </Link>
           <div className="flex items-center gap-1.5 sm:gap-2 justify-center min-w-0 mx-2">
-            <h1 className="text-base sm:text-lg font-bold text-gray-900 truncate">{pool.pool_name}</h1>
+            <h1 className="text-base sm:text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h1>
             <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
             {isAdmin && <Badge variant="blue">Admin</Badge>}
           </div>
@@ -213,7 +214,7 @@ export function PoolDetail({
       </nav>
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-neutral-200">
         <div className="max-w-6xl mx-auto px-2 sm:px-6">
           <div className="flex gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
             {USER_TABS.map((tab) => (
@@ -222,8 +223,8 @@ export function PoolDetail({
                 onClick={() => handleTabSwitch(tab.key)}
                 className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
                   activeTab === tab.key
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-700 hover:border-neutral-300'
                 }`}
               >
                 {tab.label}
@@ -234,7 +235,7 @@ export function PoolDetail({
               <>
                 {/* Divider */}
                 <div className="flex items-center px-1 sm:px-2">
-                  <div className="h-5 w-px bg-gray-300" />
+                  <div className="h-5 w-px bg-neutral-300" />
                 </div>
 
                 {ADMIN_TABS.map((tab) => (
@@ -243,8 +244,8 @@ export function PoolDetail({
                     onClick={() => handleTabSwitch(tab.key)}
                     className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
                       activeTab === tab.key
-                        ? 'border-amber-600 text-amber-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-warning-600 text-warning-600'
+                        : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
                     }`}
                   >
                     {tab.label}
@@ -355,8 +356,8 @@ export function PoolDetail({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
           <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Unsaved Changes</h3>
-            <p className="text-sm text-gray-600 mb-5">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">Unsaved Changes</h3>
+            <p className="text-sm text-neutral-600 mb-5">
               You have unsaved predictions. What would you like to do?
             </p>
             <div className="flex flex-col gap-2">

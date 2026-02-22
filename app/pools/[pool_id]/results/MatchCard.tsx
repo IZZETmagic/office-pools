@@ -21,6 +21,8 @@ export type ResultMatch = {
   away_score_pso: number | null
   home_team_placeholder: string | null
   away_team_placeholder: string | null
+  home_team_id: string | null
+  away_team_id: string | null
   home_team: { country_name: string; country_code: string } | null
   away_team: { country_name: string; country_code: string } | null
   prediction: {
@@ -28,7 +30,11 @@ export type ResultMatch = {
     predicted_away_score: number
     predicted_home_pso: number | null
     predicted_away_pso: number | null
+    predicted_winner_team_id: string | null
   } | null
+  // Predicted teams for knockout matches (resolved from user's bracket)
+  predicted_home_team_name: string | null
+  predicted_away_team_name: string | null
 }
 
 // =============================================
@@ -55,12 +61,12 @@ function getCardBackground(result: PointsResult | null): string {
   if (!result) return 'bg-white'
   switch (result.type) {
     case 'exact':
-      return 'bg-yellow-50/60'
+      return 'bg-accent-50/60'
     case 'winner_gd':
     case 'winner':
-      return 'bg-green-50/60'
+      return 'bg-success-50/60'
     case 'miss':
-      return 'bg-red-50/40'
+      return 'bg-danger-50/40'
   }
 }
 
@@ -109,42 +115,44 @@ export function MatchCard({
   const awayName =
     match.away_team?.country_name || match.away_team_placeholder || 'TBD'
 
+  const isKnockout = match.stage !== 'group'
+
   return (
     <div
-      className={`rounded-lg shadow border border-gray-200 overflow-hidden ${getCardBackground(pointsResult)}`}
+      className={`rounded-lg shadow border border-neutral-200 overflow-hidden ${getCardBackground(pointsResult)}`}
     >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50/80">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-100 bg-neutral-50/80">
         {/* Stage + match number */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold text-primary-700 bg-primary-100 px-2 py-0.5 rounded-full">
             {getStageLabel(match.stage, match.group_letter)}
           </span>
-          <span className="text-xs text-gray-500">#{match.match_number}</span>
+          <span className="text-xs text-neutral-500">#{match.match_number}</span>
         </div>
 
         {/* Date */}
-        <span className="text-xs text-gray-600 hidden sm:block">
+        <span className="text-xs text-neutral-600 hidden sm:block">
           {formatDate(match.match_date)}
         </span>
 
         {/* Status badge */}
         {isCompleted && (
-          <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold text-success-700 bg-success-100 px-2 py-0.5 rounded-full">
             Final
           </span>
         )}
         {isLive && (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-700 bg-danger-100 px-2 py-0.5 rounded-full">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
             </span>
             LIVE
           </span>
         )}
         {!isCompleted && !isLive && (
-          <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
             Upcoming
           </span>
         )}
@@ -152,7 +160,7 @@ export function MatchCard({
 
       {/* ── Date (mobile only) ── */}
       <div className="px-4 pt-2 sm:hidden">
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-neutral-600">
           {formatDate(match.match_date)}
         </span>
       </div>
@@ -162,28 +170,34 @@ export function MatchCard({
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2">
           {/* Home team */}
           <div className="text-right">
-            <p className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
+            <p className="text-sm sm:text-base font-bold text-neutral-900 leading-tight">
               {homeName}
             </p>
             {hasPrediction ? (
               <div className="mt-1">
-                <p className="text-xs text-gray-500">
-                  Your prediction:{' '}
-                  <span className="font-semibold text-gray-600">
-                    {match.prediction!.predicted_home_score}
-                  </span>
-                </p>
-                {hasPsoScores && match.prediction!.predicted_home_pso != null && (
-                  <p className="text-xs text-purple-400">
-                    PSO:{' '}
-                    <span className="font-semibold text-purple-600">
-                      {match.prediction!.predicted_home_pso}
+                {isKnockout ? (
+                  <>
+                    <p className="text-xs text-neutral-400">
+                      {match.predicted_home_team_name ? match.predicted_home_team_name + ' ' : ''}
+                      <span className="font-semibold">{match.prediction!.predicted_home_score}</span>
+                    </p>
+                    {hasPsoScores && match.prediction!.predicted_home_pso != null && (
+                      <p className="text-xs text-neutral-400">
+                        PSO: <span className="font-semibold">{match.prediction!.predicted_home_pso}</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-neutral-500">
+                    Your prediction{' '}
+                    <span className="font-semibold text-neutral-600">
+                      {match.prediction!.predicted_home_score}
                     </span>
                   </p>
                 )}
               </div>
             ) : isCompleted ? (
-              <p className="text-xs text-gray-500 italic mt-1">No prediction</p>
+              <p className="text-xs text-neutral-400 italic mt-1">No prediction</p>
             ) : null}
           </div>
 
@@ -191,70 +205,76 @@ export function MatchCard({
           <div className="text-center px-3">
             {hasActualScores ? (
               <div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 tabular-nums">
+                <p className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tabular-nums">
                   {match.home_score_ft}{' '}
-                  <span className="text-gray-400">-</span>{' '}
+                  <span className="text-neutral-400">-</span>{' '}
                   {match.away_score_ft}
                 </p>
                 {hasPsoScores && (
-                  <p className="text-xs font-semibold text-purple-600 mt-0.5">
+                  <p className="text-xs font-semibold text-accent-500 mt-0.5">
                     PSO: {match.home_score_pso} - {match.away_score_pso}
                   </p>
                 )}
               </div>
             ) : isCompleted ? (
-              <p className="text-sm text-gray-500 italic">Result pending</p>
+              <p className="text-sm text-neutral-500 italic">Result pending</p>
             ) : hasPrediction ? (
-              <p className="text-lg sm:text-xl font-bold text-gray-400 tabular-nums">
+              <p className="text-lg sm:text-xl font-bold text-neutral-400 tabular-nums">
                 {match.prediction!.predicted_home_score}{' '}
-                <span className="text-gray-200">-</span>{' '}
+                <span className="text-neutral-200">-</span>{' '}
                 {match.prediction!.predicted_away_score}
               </p>
             ) : (
-              <p className="text-lg font-bold text-gray-200">vs</p>
+              <p className="text-lg font-bold text-neutral-200">vs</p>
             )}
           </div>
 
           {/* Away team */}
           <div className="text-left">
-            <p className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
+            <p className="text-sm sm:text-base font-bold text-neutral-900 leading-tight">
               {awayName}
             </p>
             {hasPrediction ? (
               <div className="mt-1">
-                <p className="text-xs text-gray-500">
-                  Your prediction:{' '}
-                  <span className="font-semibold text-gray-600">
-                    {match.prediction!.predicted_away_score}
-                  </span>
-                </p>
-                {hasPsoScores && match.prediction!.predicted_away_pso != null && (
-                  <p className="text-xs text-purple-400">
-                    PSO:{' '}
-                    <span className="font-semibold text-purple-600">
-                      {match.prediction!.predicted_away_pso}
+                {isKnockout ? (
+                  <>
+                    <p className="text-xs text-neutral-400">
+                      <span className="font-semibold">{match.prediction!.predicted_away_score}</span>
+                      {match.predicted_away_team_name ? ' ' + match.predicted_away_team_name : ''}
+                    </p>
+                    {hasPsoScores && match.prediction!.predicted_away_pso != null && (
+                      <p className="text-xs text-neutral-400">
+                        <span className="font-semibold">{match.prediction!.predicted_away_pso}</span> PSO
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-neutral-500">
+                    <span className="font-semibold text-neutral-600">
+                      {match.prediction!.predicted_away_score}
                     </span>
+                    {' '}Your prediction
                   </p>
                 )}
               </div>
             ) : isCompleted ? (
-              <p className="text-xs text-gray-500 italic mt-1">No prediction</p>
+              <p className="text-xs text-neutral-400 italic mt-1">No prediction</p>
             ) : null}
           </div>
         </div>
       </div>
 
-      {/* ── Footer (completed + live matches with scores) ── */}
-      {(isCompleted || (isLive && hasActualScores)) && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100">
-          <span className="text-xs text-gray-500 truncate max-w-[60%]">
+      {/* ── Footer ── */}
+      {(match.venue || pointsResult || ((isCompleted || isLive) && !hasPrediction)) && (
+        <div className="flex items-center justify-between px-4 py-2 border-t border-neutral-100">
+          <span className="text-xs text-neutral-500 truncate max-w-[60%]">
             {match.venue || ''}
           </span>
           <div>
             {pointsResult ? (
               <PointsBadge result={pointsResult} />
-            ) : !hasPrediction ? (
-              <span className="text-xs text-gray-500 italic">
+            ) : (isCompleted || isLive) && !hasPrediction ? (
+              <span className="text-xs text-neutral-500 italic">
                 No prediction
               </span>
             ) : null}

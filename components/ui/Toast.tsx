@@ -54,10 +54,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const variantStyles: Record<ToastVariant, string> = {
-    success: 'bg-green-600 text-white',
-    error: 'bg-red-600 text-white',
-    warning: 'bg-amber-500 text-white',
-    info: 'bg-gray-800 text-white',
+    success: 'bg-success-600 text-white',
+    error: 'bg-danger-600 text-white',
+    warning: 'bg-warning-500 text-white',
+    info: 'bg-neutral-800 text-white',
   }
 
   const variantIcons: Record<ToastVariant, string> = {

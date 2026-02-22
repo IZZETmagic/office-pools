@@ -53,9 +53,9 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
     <div>
       {/* Progress counter */}
       <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          <span className="font-bold text-gray-900">{predictedGroupMatches}</span> of{' '}
-          <span className="font-bold text-gray-900">{totalGroupMatches}</span> matches predicted
+        <p className="text-sm text-neutral-600">
+          <span className="font-bold text-neutral-900">{predictedGroupMatches}</span> of{' '}
+          <span className="font-bold text-neutral-900">{totalGroupMatches}</span> matches predicted
         </p>
         {predictedGroupMatches === totalGroupMatches && totalGroupMatches > 0 && (
           <Badge variant="green">All group matches predicted</Badge>
@@ -84,13 +84,13 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                 className="w-full flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  <h3 className="text-base sm:text-lg font-bold text-gray-900 shrink-0">Group {letter}</h3>
-                  <span className="text-xs text-gray-500 truncate hidden sm:inline">
+                  <h3 className="text-base sm:text-lg font-bold text-neutral-900 shrink-0">Group {letter}</h3>
+                  <span className="text-xs text-neutral-500 truncate hidden sm:inline">
                     {gTeams.map(t => t.country_name).join(', ')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                  <span className="text-xs text-gray-600">
+                  <span className="text-xs text-neutral-600">
                     {groupPredicted}/{groupTotal}
                   </span>
                   {groupPredicted === groupTotal && groupTotal > 0 ? (
@@ -101,7 +101,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                     <Badge variant="gray">Not Started</Badge>
                   )}
                   <svg
-                    className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -113,7 +113,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
 
               {/* Accordion body */}
               {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="mt-4 pt-4 border-t border-neutral-100">
                   {/* Matches */}
                   <div className="space-y-3">
                     {gMatches.map(match => (
@@ -203,16 +203,16 @@ function MatchRow({
 
   return (
     <div className="py-2 sm:py-2.5 flex items-center gap-1 sm:gap-1.5 flex-nowrap">
-      <span className="text-[10px] sm:text-xs text-gray-400 shrink-0 mr-0.5 sm:mr-2">#{match.match_number}</span>
-      <div className="hidden sm:block shrink-0 w-[108px] text-xs text-gray-500 leading-tight">
-        <span className="font-medium text-gray-700">{dateStr}</span>
+      <span className="text-[10px] sm:text-xs text-neutral-400 shrink-0 mr-0.5 sm:mr-2">#{match.match_number}</span>
+      <div className="hidden sm:block shrink-0 w-[108px] text-xs text-neutral-500 leading-tight">
+        <span className="font-medium text-neutral-700">{dateStr}</span>
         <br />
         <span>{timeStr}</span>
       </div>
 
       {/* Home team */}
       <div className="flex-1 basis-0 text-right min-w-0">
-        <span className="text-[11px] sm:text-sm font-medium text-gray-900 truncate block">{homeTeam}</span>
+        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate block">{homeTeam}</span>
       </div>
 
       {/* Score inputs */}
@@ -225,9 +225,9 @@ function MatchRow({
           placeholder="-"
           disabled={readOnly}
           onChange={(e) => handleScoreChange('home', e.target.value)}
-          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-neutral-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900 font-bold text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed"
         />
-        <span className="text-gray-400 font-bold text-[10px]">v</span>
+        <span className="text-neutral-400 font-bold text-[10px]">v</span>
         <input
           type="number"
           min="0"
@@ -236,17 +236,17 @@ function MatchRow({
           placeholder="-"
           disabled={readOnly}
           onChange={(e) => handleScoreChange('away', e.target.value)}
-          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-bold text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-9 sm:w-11 h-8 sm:h-9 px-0.5 text-center border border-neutral-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900 font-bold text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed"
         />
       </div>
 
       {/* Away team */}
       <div className="flex-1 basis-0 text-left min-w-0">
-        <span className="text-[11px] sm:text-sm font-medium text-gray-900 truncate block">{awayTeam}</span>
+        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate block">{awayTeam}</span>
       </div>
 
-      <div className="hidden sm:block shrink-0 w-[100px] text-xs text-gray-500 text-right leading-tight">
-        <span className="font-medium text-gray-700 truncate block">{city}</span>
+      <div className="hidden sm:block shrink-0 w-[100px] text-xs text-neutral-500 text-right leading-tight">
+        <span className="font-medium text-neutral-700 truncate block">{city}</span>
         <span className="truncate block">{stadium}</span>
       </div>
     </div>

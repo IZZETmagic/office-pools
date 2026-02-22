@@ -4,6 +4,7 @@ import "./globals.css";
 import FeedbackButton from "@/components/ui/FeedbackButton";
 import Footer from "@/components/ui/Footer";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,14 +28,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Prevent flash-of-wrong-theme by reading localStorage before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            if (localStorage.getItem('sport-pool-theme') === 'classic') {
+              document.documentElement.classList.add('theme-classic');
+            }
+          } catch(e) {}
+        `}} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ToastProvider>
-          {children}
-          <Footer />
-          <FeedbackButton />
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            {children}
+            <Footer />
+            <FeedbackButton />
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

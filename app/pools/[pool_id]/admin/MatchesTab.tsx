@@ -108,11 +108,11 @@ export function MatchesTab({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Match Results</h2>
+      <h2 className="text-2xl font-bold text-neutral-900 mb-4">Match Results</h2>
 
       {/* Info banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-6">
-        <p className="text-sm text-blue-700">
+      <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 mb-6">
+        <p className="text-sm text-primary-700">
           Match results are managed by Super Admins and apply globally across all pools.
           You can view match details and member predictions below.
         </p>
@@ -120,10 +120,10 @@ export function MatchesTab({
 
       {/* Stats */}
       <div className="flex gap-3 mb-6 text-sm">
-        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+        <span className="px-3 py-1 bg-success-100 text-success-700 rounded-full font-medium">
           {completedCount} Completed
         </span>
-        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+        <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">
           {matches.length - completedCount} Remaining
         </span>
       </div>
@@ -136,7 +136,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -149,7 +149,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -162,7 +162,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -177,7 +177,7 @@ export function MatchesTab({
       {/* Matches - Mobile card view */}
       <div className="sm:hidden space-y-2">
         {filteredMatches.length === 0 ? (
-          <p className="text-center text-gray-600 py-8">No matches found with current filters.</p>
+          <p className="text-center text-neutral-600 py-8">No matches found with current filters.</p>
         ) : (
           filteredMatches.map((match) => {
             const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
@@ -185,33 +185,33 @@ export function MatchesTab({
             const matchPredCount = predictions.filter((p) => p.match_id === match.match_id).length
             const matchDate = new Date(match.match_date)
             return (
-              <div key={match.match_id} className="bg-white border border-gray-200 rounded-lg p-3">
+              <div key={match.match_id} className="bg-white border border-neutral-200 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
+                    <span className="text-xs font-mono bg-neutral-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
                     <Badge variant="blue">{getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}</Badge>
                   </div>
                   <Badge variant={getStatusBadgeVariant(match.status)}>{match.status}</Badge>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-gray-900">{home}</span>
-                    <span className="text-gray-400 mx-1.5 text-xs">vs</span>
-                    <span className="text-sm font-medium text-gray-900">{away}</span>
+                    <span className="text-sm font-medium text-neutral-900">{home}</span>
+                    <span className="text-neutral-400 mx-1.5 text-xs">vs</span>
+                    <span className="text-sm font-medium text-neutral-900">{away}</span>
                   </div>
                   {match.is_completed && (
-                    <span className="font-bold text-gray-900 text-sm shrink-0 ml-2">
+                    <span className="font-bold text-neutral-900 text-sm shrink-0 ml-2">
                       {match.home_score_ft}-{match.away_score_ft}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-neutral-500">
                   <span>{matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                   <div className="flex items-center gap-2">
                     <span>{matchPredCount} predictions</span>
                     <button
                       onClick={() => openPredictionsModal(match)}
-                      className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
+                      className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-medium"
                     >
                       View
                     </button>
@@ -227,38 +227,38 @@ export function MatchesTab({
       <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Stage
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Score
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Predictions
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-neutral-200">
               {filteredMatches.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-600">
+                  <td colSpan={8} className="px-4 py-8 text-center text-neutral-600">
                     No matches found with current filters.
                   </td>
                 </tr>
@@ -278,9 +278,9 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-gray-50">
+                    <tr key={match.match_id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-xs font-mono bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
                         </span>
                       </td>
@@ -290,13 +290,13 @@ export function MatchesTab({
                           {match.group_letter ? ` ${match.group_letter}` : ''}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-neutral-600 whitespace-nowrap">
                         {matchDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })}
                         <br />
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-neutral-500">
                           {matchDate.toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
@@ -304,11 +304,11 @@ export function MatchesTab({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-neutral-900">
                           {home}
                         </span>
-                        <span className="text-gray-500 mx-2">vs</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-neutral-500 mx-2">vs</span>
+                        <span className="font-medium text-neutral-900">
                           {away}
                         </span>
                       </td>
@@ -320,25 +320,25 @@ export function MatchesTab({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {match.is_completed ? (
-                          <span className="font-bold text-gray-900">
+                          <span className="font-bold text-neutral-900">
                             {match.home_score_ft} - {match.away_score_ft}
                             {match.home_score_pso !== null && (
-                              <span className="text-xs text-gray-500 block">
+                              <span className="text-xs text-neutral-500 block">
                                 PSO: {match.home_score_pso}-{match.away_score_pso}
                               </span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-neutral-500">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                      <td className="px-4 py-3 text-center text-sm text-neutral-600">
                         {matchPredCount}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => openPredictionsModal(match)}
-                          className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
+                          className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-medium transition"
                         >
                           View Predictions
                         </button>
@@ -356,10 +356,10 @@ export function MatchesTab({
       {modal.type === 'view_predictions' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">
+            <h3 className="text-xl font-bold text-neutral-900 mb-1">
               Predictions for Match #{modal.match.match_number}
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-neutral-600 mb-4">
               {modal.match.home_team?.country_name ||
                 modal.match.home_team_placeholder ||
                 'TBD'}{' '}
@@ -370,8 +370,8 @@ export function MatchesTab({
             </p>
 
             {modal.match.is_completed && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4">
-                <p className="text-sm font-medium text-blue-700">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 mb-4">
+                <p className="text-sm font-medium text-primary-700">
                   Actual Result: {modal.match.home_score_ft} -{' '}
                   {modal.match.away_score_ft}
                   {modal.match.home_score_pso !== null &&
@@ -386,7 +386,7 @@ export function MatchesTab({
               )
               if (matchPreds.length === 0) {
                 return (
-                  <p className="text-gray-600 text-sm py-4">
+                  <p className="text-neutral-600 text-sm py-4">
                     No predictions for this match.
                   </p>
                 )
@@ -446,19 +446,19 @@ export function MatchesTab({
                       return (
                         <div
                           key={pred.prediction_id}
-                          className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2"
+                          className="flex items-center justify-between bg-neutral-50 rounded-lg px-4 py-2"
                         >
-                          <span className="text-sm text-gray-700">{name}</span>
+                          <span className="text-sm text-neutral-700">{name}</span>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <span className="font-mono font-bold text-gray-900">
+                              <span className="font-mono font-bold text-neutral-900">
                                 {pred.predicted_home_score}-
                                 {pred.predicted_away_score}
                               </span>
                               {modal.match.home_score_pso !== null &&
                                 pred.predicted_home_pso != null &&
                                 pred.predicted_away_pso != null && (
-                                  <span className="text-xs text-purple-600 font-mono ml-1">
+                                  <span className="text-xs text-accent-500 font-mono ml-1">
                                     (PSO: {pred.predicted_home_pso}-{pred.predicted_away_pso})
                                   </span>
                                 )}
@@ -467,10 +467,10 @@ export function MatchesTab({
                               <span
                                 className={`text-xs font-medium px-2 py-0.5 rounded ${
                                   pointsInfo.label === 'Exact'
-                                    ? 'bg-green-100 text-green-700'
+                                    ? 'bg-success-100 text-success-700'
                                     : pointsInfo.points > 0
-                                      ? 'bg-yellow-100 text-yellow-700'
-                                      : 'bg-red-100 text-red-600'
+                                      ? 'bg-warning-100 text-warning-700'
+                                      : 'bg-danger-100 text-danger-600'
                                 }`}
                               >
                                 {pointsInfo.icon} +{pointsInfo.points}
@@ -484,13 +484,13 @@ export function MatchesTab({
 
                   {modal.match.is_completed && (
                     <div className="flex gap-4 text-sm border-t pt-3">
-                      <span className="text-green-600">
+                      <span className="text-success-600">
                         🎯 Exact: {exactCount}
                       </span>
-                      <span className="text-yellow-600">
+                      <span className="text-warning-600">
                         ✓ Winner: {winnerCount}
                       </span>
-                      <span className="text-red-500">
+                      <span className="text-danger-500">
                         ✗ Wrong: {wrongCount}
                       </span>
                     </div>

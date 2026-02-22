@@ -229,14 +229,14 @@ export function MembersTab({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Pool Members</h2>
+      <h2 className="text-2xl font-bold text-neutral-900 mb-6">Pool Members</h2>
 
       {error && (
         <Alert variant="error" className="mb-4">
           {error}
           <button
             onClick={() => setError(null)}
-            className="ml-2 text-red-800 font-bold"
+            className="ml-2 text-danger-800 font-bold"
           >
             x
           </button>
@@ -247,7 +247,7 @@ export function MembersTab({
           {success}
           <button
             onClick={() => setSuccess(null)}
-            className="ml-2 text-green-800 font-bold"
+            className="ml-2 text-success-800 font-bold"
           >
             x
           </button>
@@ -256,16 +256,16 @@ export function MembersTab({
 
       {/* Invite Section */}
       <Card className="mb-6">
-        <h3 className="font-semibold text-gray-900 mb-3">Invite Members</h3>
+        <h3 className="font-semibold text-neutral-900 mb-3">Invite Members</h3>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Pool Code:</span>
-            <span className="font-mono font-bold text-lg text-gray-900 bg-gray-100 px-3 py-1 rounded">
+            <span className="text-sm text-neutral-600">Pool Code:</span>
+            <span className="font-mono font-bold text-lg text-neutral-900 bg-neutral-100 px-3 py-1 rounded">
               {pool.pool_code}
             </span>
             <button
               onClick={copyPoolCode}
-              className="text-xs px-3 py-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium transition"
+              className="text-xs px-3 py-1.5 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 font-medium transition"
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>
@@ -285,7 +285,7 @@ export function MembersTab({
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="rank">Sort by Rank</option>
           <option value="points">Sort by Points</option>
@@ -301,22 +301,22 @@ export function MembersTab({
           return (
             <div
               key={member.member_id}
-              className={`rounded-lg border p-3 ${isCurrentUser ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}
+              className={`rounded-lg border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-white border-neutral-200'}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-500">#{member.current_rank || '-'}</span>
-                    <span className="text-sm font-medium text-gray-900 truncate">
+                    <span className="text-sm font-bold text-neutral-500">#{member.current_rank || '-'}</span>
+                    <span className="text-sm font-medium text-neutral-900 truncate">
                       {member.users.username}
-                      {isCurrentUser && <span className="text-xs text-blue-500 ml-1">(you)</span>}
+                      {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{member.users.full_name}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">{member.users.full_name}</p>
                 </div>
-                <span className="text-lg font-bold text-blue-600 shrink-0">{member.total_points ?? 0}</span>
+                <span className="text-lg font-bold text-primary-600 shrink-0">{member.total_points ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
                 <div className="flex items-center gap-1.5">
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
@@ -358,7 +358,7 @@ export function MembersTab({
                         break
                     }
                   }}
-                  className="text-xs px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-700 cursor-pointer"
+                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-white text-neutral-700 cursor-pointer"
                 >
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
@@ -378,62 +378,62 @@ export function MembersTab({
       <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Rank
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Member
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
                   Points
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Predictions
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Role
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-neutral-200">
               {filteredMembers.map((member) => {
                 const isCurrentUser = member.user_id === currentUserId
 
                 return (
                   <tr
                     key={member.member_id}
-                    className={isCurrentUser ? 'bg-blue-50' : 'hover:bg-gray-50'}
+                    className={isCurrentUser ? 'bg-primary-50' : 'hover:bg-neutral-50'}
                   >
                     <td className="px-4 py-3">
-                      <span className="text-sm font-bold text-gray-900">
+                      <span className="text-sm font-bold text-neutral-900">
                         #{member.current_rank || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-neutral-900">
                           {member.users.username}
                           {isCurrentUser && (
-                            <span className="text-xs text-blue-500 ml-1">
+                            <span className="text-xs text-primary-500 ml-1">
                               (you)
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-neutral-600">
                           {member.users.full_name}
                         </p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-lg font-bold text-blue-600">
+                      <span className="text-lg font-bold text-primary-600">
                         {member.total_points ?? 0}
                       </span>
                     </td>
@@ -451,7 +451,7 @@ export function MembersTab({
                         {member.role === 'admin' ? 'Admin' : 'Player'}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-neutral-600">
                       {new Date(member.joined_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -493,7 +493,7 @@ export function MembersTab({
                                 break
                             }
                           }}
-                          className="text-xs px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-700 cursor-pointer"
+                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-white text-neutral-700 cursor-pointer"
                         >
                           <option value="" disabled>
                             Actions
@@ -538,14 +538,14 @@ export function MembersTab({
       {modal.type === 'adjust_points' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
+            <h3 className="text-xl font-bold text-neutral-900 mb-4">
               Adjust Points - {modal.member.users.username}
             </h3>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-neutral-600">
                 Current points:{' '}
                 <span className="font-bold">
                   {modal.member.total_points ?? 0}
@@ -554,13 +554,13 @@ export function MembersTab({
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Adjustment
               </label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPointAdjustment((p) => p - 1)}
-                  className="w-10 h-10 rounded border border-gray-300 text-lg font-bold text-gray-700 hover:bg-gray-100"
+                  className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
                 >
                   -
                 </button>
@@ -570,11 +570,11 @@ export function MembersTab({
                   onChange={(e) =>
                     setPointAdjustment(parseInt(e.target.value) || 0)
                   }
-                  className="w-24 h-10 text-center border border-gray-300 rounded-lg font-bold text-lg text-gray-900"
+                  className="w-24 h-10 text-center border border-neutral-300 rounded-lg font-bold text-lg text-neutral-900"
                 />
                 <button
                   onClick={() => setPointAdjustment((p) => p + 1)}
-                  className="w-10 h-10 rounded border border-gray-300 text-lg font-bold text-gray-700 hover:bg-gray-100"
+                  className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
                 >
                   +
                 </button>
@@ -582,7 +582,7 @@ export function MembersTab({
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Reason (required)
               </label>
               <textarea
@@ -590,13 +590,13 @@ export function MembersTab({
                 onChange={(e) => setAdjustReason(e.target.value)}
                 placeholder="Explain the reason for this adjustment..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-neutral-600 mb-4">
               New total:{' '}
-              <span className="font-bold text-blue-600">
+              <span className="font-bold text-primary-600">
                 {(modal.member.total_points ?? 0) + pointAdjustment}
               </span>
             </p>
@@ -629,15 +629,15 @@ export function MembersTab({
       {modal.type === 'promote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">
+            <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Promote to Admin
             </h3>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-neutral-600 mb-2">
               Are you sure you want to make{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               an admin?
             </p>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-neutral-600 mb-4">
               Admins can edit pool settings, manage scoring rules, and manage
               members.
             </p>
@@ -666,10 +666,10 @@ export function MembersTab({
       {modal.type === 'demote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">
+            <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Demote to Player
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to demote{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               to a regular player?
@@ -699,20 +699,20 @@ export function MembersTab({
       {modal.type === 'unlock_predictions' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">
+            <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Unlock Predictions
             </h3>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-neutral-600 mb-2">
               Unlock predictions for{' '}
               <span className="font-bold">{modal.member.users.username}</span>?
             </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-amber-800">
+            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-warning-800">
                 This will allow them to edit and resubmit their predictions. Only use this for special circumstances (e.g., technical issues).
               </p>
             </div>
             {modal.member.predictions_submitted_at && (
-              <p className="text-xs text-gray-500 mb-4">
+              <p className="text-xs text-neutral-500 mb-4">
                 Originally submitted: {new Date(modal.member.predictions_submitted_at).toLocaleString()}
               </p>
             )}
@@ -741,21 +741,21 @@ export function MembersTab({
       {modal.type === 'remove' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-red-600 mb-3">
+            <h3 className="text-lg font-bold text-danger-600 mb-3">
               Remove Member
             </h3>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-neutral-600 mb-2">
               Are you sure you want to remove{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               from this pool?
             </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-red-600">
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-danger-600">
                 This will delete all their predictions. This action cannot be
                 undone.
               </p>
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-700 mb-4 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-neutral-700 mb-4 cursor-pointer">
               <input
                 type="checkbox"
                 checked={removeConfirmed}
@@ -778,7 +778,7 @@ export function MembersTab({
               <button
                 onClick={() => handleRemove(modal.member)}
                 disabled={!removeConfirmed || loading}
-                className="px-4 py-2 text-sm rounded-lg font-semibold bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Removing...' : 'Remove Member'}
               </button>
@@ -964,11 +964,11 @@ function ViewPredictionsModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 sm:p-6 pb-3 border-b border-gray-100 shrink-0">
-          <h3 className="text-xl font-bold text-gray-900">
+        <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
+          <h3 className="text-xl font-bold text-neutral-900">
             {member.users.full_name || member.users.username}&apos;s Predictions
           </h3>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-neutral-600 mt-1">
             Total points: {member.total_points ?? 0}
           </p>
         </div>
@@ -976,7 +976,7 @@ function ViewPredictionsModal({
         {/* Scrollable content */}
         <div className="overflow-y-auto flex-1 p-4 sm:px-6">
           {memberPreds.length === 0 ? (
-            <p className="text-gray-600 text-sm py-4">
+            <p className="text-neutral-600 text-sm py-4">
               No predictions submitted.
             </p>
           ) : (
@@ -994,7 +994,7 @@ function ViewPredictionsModal({
 
                 return (
                   <div key={stage} className="mb-5">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">
                       {stageNames[stage] || stage}
                     </h4>
                     <div className="space-y-1">
@@ -1012,33 +1012,33 @@ function ViewPredictionsModal({
                         return (
                           <div
                             key={pred.prediction_id}
-                            className="bg-gray-50 rounded-lg px-3 py-2"
+                            className="bg-neutral-50 rounded-lg px-3 py-2"
                           >
                             <div className="flex items-center gap-2">
                               {/* Match number */}
-                              <span className="text-xs font-mono text-gray-400 shrink-0 w-7 text-right">
+                              <span className="text-xs font-mono text-neutral-400 shrink-0 w-7 text-right">
                                 #{match.match_number}
                               </span>
 
                               {/* Home team */}
-                              <span className="flex-1 text-right text-sm font-medium text-gray-800 truncate">
+                              <span className="flex-1 text-right text-sm font-medium text-neutral-800 truncate">
                                 {homeName}
                               </span>
 
                               {/* Score */}
-                              <span className="font-mono font-bold text-gray-900 text-sm shrink-0 px-1">
+                              <span className="font-mono font-bold text-neutral-900 text-sm shrink-0 px-1">
                                 {pred.predicted_home_score} - {pred.predicted_away_score}
                               </span>
 
                               {/* Away team */}
-                              <span className="flex-1 text-left text-sm font-medium text-gray-800 truncate">
+                              <span className="flex-1 text-left text-sm font-medium text-neutral-800 truncate">
                                 {awayName}
                               </span>
                             </div>
 
                             {/* PSO for knockout draws */}
                             {isKnockout && isDraw && pred.predicted_home_pso != null && pred.predicted_away_pso != null && (
-                              <p className="text-xs text-blue-600 font-medium text-center mt-0.5">
+                              <p className="text-xs text-primary-600 font-medium text-center mt-0.5">
                                 PSO: {pred.predicted_home_pso} - {pred.predicted_away_pso}
                               </p>
                             )}
@@ -1052,12 +1052,12 @@ function ViewPredictionsModal({
 
               {/* Champion highlight */}
               {champion && (
-                <div className="mt-2 text-center p-4 rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-indigo-200">
+                <div className="mt-2 text-center p-4 rounded-xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-50 border border-accent-100">
                   <div className="text-3xl mb-1">&#127942;</div>
-                  <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-0.5">
+                  <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-0.5">
                     Predicted Champion
                   </p>
-                  <h4 className="text-xl font-bold text-gray-900">
+                  <h4 className="text-xl font-bold text-neutral-900">
                     {champion.country_name}
                   </h4>
                 </div>
@@ -1067,12 +1067,12 @@ function ViewPredictionsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:px-6 pt-3 border-t border-gray-100 shrink-0">
+        <div className="p-4 sm:px-6 pt-3 border-t border-neutral-100 shrink-0">
           <div className="flex justify-between">
             {memberPreds.length > 0 ? (
               <button
                 onClick={exportToCsv}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5"
+                className="text-sm text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

@@ -147,12 +147,12 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+        <h2 className="text-2xl font-bold text-neutral-900">User Management</h2>
         <div className="flex gap-3 text-sm">
-          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-medium">
+          <span className="px-3 py-1 bg-danger-100 text-danger-700 rounded-full font-medium">
             {superAdminCount} Super Admin{superAdminCount !== 1 ? 's' : ''}
           </span>
-          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium">
+          <span className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full font-medium">
             {users.length} Total Users
           </span>
         </div>
@@ -167,13 +167,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white w-64 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -185,35 +185,35 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Email
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Role
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Last Login
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-neutral-200">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-600">
+                  <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
                     No users found.
                   </td>
                 </tr>
@@ -223,26 +223,26 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                   return (
                     <tr
                       key={user.user_id}
-                      className={`hover:bg-gray-50 ${isCurrentUser ? 'bg-red-50/30' : ''}`}
+                      className={`hover:bg-neutral-50 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
                     >
                       <td className="px-4 py-3">
                         <div>
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-neutral-900">
                             {user.username}
                           </span>
                           {isCurrentUser && (
-                            <span className="ml-2 text-xs text-red-500 font-medium">
+                            <span className="ml-2 text-xs text-danger-500 font-medium">
                               (You)
                             </span>
                           )}
                           {user.full_name && (
-                            <p className="text-xs text-gray-600">
+                            <p className="text-xs text-neutral-600">
                               {user.full_name}
                             </p>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600">
                         {user.email}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -257,14 +257,14 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                           {user.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600">
                         {new Date(user.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
                         })}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600">
                         {user.last_login
                           ? new Date(user.last_login).toLocaleDateString(
                               'en-US',
@@ -285,8 +285,8 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                                 }
                                 className={`text-xs px-3 py-1.5 rounded font-medium transition ${
                                   user.is_super_admin
-                                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    : 'bg-red-600 text-white hover:bg-red-700'
+                                    ? 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                                    : 'bg-danger-600 text-white hover:bg-danger-700'
                                 }`}
                               >
                                 {user.is_super_admin
@@ -297,8 +297,8 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                                 onClick={() => handleToggleActive(user)}
                                 className={`text-xs px-3 py-1.5 rounded font-medium transition ${
                                   user.is_active
-                                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                                    ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
+                                    : 'bg-success-50 text-success-600 hover:bg-success-100'
                                 }`}
                               >
                                 {user.is_active ? 'Deactivate' : 'Reactivate'}
@@ -321,20 +321,20 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
             <div className="flex items-center gap-2 mb-4">
-              <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse" />
-              <h3 className="text-xl font-bold text-red-700">
+              <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
+              <h3 className="text-xl font-bold text-danger-700">
                 Promote to Super Admin
               </h3>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-700 font-medium mb-2">
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-danger-700 font-medium mb-2">
                 WARNING: This grants full system access!
               </p>
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-danger-600">
                 Promoting <strong>{modal.user.username}</strong> ({modal.user.email}) to Super Admin will give them:
               </p>
-              <ul className="list-disc list-inside text-sm text-red-600 mt-2 space-y-1">
+              <ul className="list-disc list-inside text-sm text-danger-600 mt-2 space-y-1">
                 <li>Access to enter and edit match results globally</li>
                 <li>Ability to reset match scores</li>
                 <li>Power to manage all users and pools</li>
@@ -346,15 +346,15 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
             {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type <span className="font-bold text-red-600">PROMOTE</span> to confirm
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Type <span className="font-bold text-danger-600">PROMOTE</span> to confirm
               </label>
               <input
                 type="text"
                 value={promoteConfirm}
                 onChange={(e) => setPromoteConfirm(e.target.value)}
                 placeholder="PROMOTE"
-                className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-danger-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 
@@ -369,7 +369,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
               <button
                 onClick={handleConfirmPromote}
                 disabled={saving || promoteConfirm !== 'PROMOTE'}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-danger-600 hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Promoting...' : 'Promote to Super Admin'}
               </button>

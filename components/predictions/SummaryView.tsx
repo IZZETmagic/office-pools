@@ -77,11 +77,11 @@ export function SummaryView({
     <div>
       {/* Champion highlight */}
       {champion && (
-        <div className="mb-8 text-center p-6 rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-indigo-200 shadow-sm">
+        <div className="mb-8 text-center p-6 rounded-xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-100 border border-accent-100 shadow-sm">
           <div className="text-4xl mb-2">&#127942;</div>
-          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-1">Your Predicted Champion</p>
-          <h2 className="text-3xl font-bold text-gray-900">{champion.country_name}</h2>
-          <p className="text-sm text-gray-500 mt-1">Group {champion.group_letter}</p>
+          <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-1">Your Predicted Champion</p>
+          <h2 className="text-3xl font-bold text-neutral-900">{champion.country_name}</h2>
+          <p className="text-sm text-neutral-500 mt-1">Group {champion.group_letter}</p>
         </div>
       )}
 
@@ -141,27 +141,27 @@ export function SummaryView({
                       <Card key={match.match_id} padding="md">
                         <div className="flex items-center justify-between">
                           <div className="flex-1 text-right min-w-0">
-                            <span className={`text-xs sm:text-sm font-medium truncate block ${winner?.team_id === homeTeam?.team_id ? 'text-green-700 font-bold' : 'text-gray-700'}`}>
+                            <span className={`text-xs sm:text-sm font-medium truncate block ${winner?.team_id === homeTeam?.team_id ? 'text-success-700 font-bold' : 'text-neutral-700'}`}>
                               {homeTeam?.country_name || 'TBD'}
                             </span>
                           </div>
                           <div className="px-2 sm:px-4 text-center shrink-0">
-                            <span className="text-base sm:text-lg font-bold text-gray-900">
+                            <span className="text-base sm:text-lg font-bold text-neutral-900">
                               {pred && pred.home != null && pred.away != null ? `${pred.home} - ${pred.away}` : '? - ?'}
                             </span>
                             {pred && pred.home != null && pred.away != null && pred.home === pred.away && (pred.homePso != null && pred.awayPso != null) && (
-                              <p className="text-xs text-blue-600 font-medium">
+                              <p className="text-xs text-primary-600 font-medium">
                                 PSO: {pred.homePso} - {pred.awayPso}
                               </p>
                             )}
                             {pred && pred.home != null && pred.away != null && pred.home === pred.away && pred.winnerTeamId && !(pred.homePso != null && pred.awayPso != null) && (
-                              <p className="text-xs text-blue-600 font-medium">
+                              <p className="text-xs text-primary-600 font-medium">
                                 PSO: {pred.winnerTeamId === homeTeam?.team_id ? homeTeam?.country_name : awayTeam?.country_name} wins
                               </p>
                             )}
                           </div>
                           <div className="flex-1 text-left min-w-0">
-                            <span className={`text-xs sm:text-sm font-medium truncate block ${winner?.team_id === awayTeam?.team_id ? 'text-green-700 font-bold' : 'text-gray-700'}`}>
+                            <span className={`text-xs sm:text-sm font-medium truncate block ${winner?.team_id === awayTeam?.team_id ? 'text-success-700 font-bold' : 'text-neutral-700'}`}>
                               {awayTeam?.country_name || 'TBD'}
                             </span>
                           </div>
@@ -178,16 +178,16 @@ export function SummaryView({
       {/* Submit button or submitted message */}
       {hasSubmitted ? (
         <div className="mt-8">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p className="text-sm font-semibold text-green-800">
+          <div className="bg-success-50 border border-success-200 rounded-lg p-4 text-center">
+            <p className="text-sm font-semibold text-success-800">
               Your predictions have been submitted. Good luck!
             </p>
           </div>
         </div>
       ) : !readOnly ? (
         <div className="mt-8 space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="text-sm text-amber-800">
+          <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+            <p className="text-sm text-warning-800">
               Once submitted, predictions cannot be changed. Please review all your predictions before submitting.
             </p>
           </div>
@@ -232,21 +232,21 @@ function SectionHeader({
         className="flex items-center gap-2"
       >
         <svg
-          className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+        <h3 className="text-lg font-bold text-neutral-900">{title}</h3>
         <Badge variant="gray">{matchCount} matches</Badge>
       </button>
       {onEdit && (
         <button
           type="button"
           onClick={onEdit}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          className="text-sm text-primary-600 hover:text-primary-800 font-medium"
         >
           Edit
         </button>

@@ -16,13 +16,13 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
 
   return (
     <div className="mt-4">
-      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+      <h4 className="text-sm font-semibold text-neutral-700 mb-2">
         Group {groupLetter} Standings
       </h4>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-gray-700 text-[10px] sm:text-xs">
+            <tr className="border-b border-neutral-200 text-neutral-700 text-[10px] sm:text-xs">
               <th className="text-left py-2 pr-1 sm:pr-2 w-5 sm:w-6">#</th>
               <th className="text-left py-2 pr-1 sm:pr-2">Team</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8">P</th>
@@ -47,10 +47,10 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
 
               if (hasAnyPredictions) {
                 if (pos <= 2) {
-                  rowClass = 'bg-green-50'
+                  rowClass = 'bg-success-50'
                   statusBadge = <Badge variant="green">Qualified</Badge>
                 } else if (pos === 3) {
-                  rowClass = 'bg-yellow-50'
+                  rowClass = 'bg-warning-50'
                   statusBadge = <Badge variant="yellow">Possible</Badge>
                 } else {
                   statusBadge = <Badge variant="gray">Eliminated</Badge>
@@ -58,23 +58,23 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
               }
 
               return (
-                <tr key={team.team_id} className={`border-b border-gray-100 text-xs sm:text-sm ${rowClass}`}>
-                  <td className="py-2 pr-1 sm:pr-2 text-gray-600 font-medium">{pos}</td>
-                  <td className="py-2 pr-1 sm:pr-2 font-medium text-gray-900 whitespace-nowrap text-xs sm:text-sm">
+                <tr key={team.team_id} className={`border-b border-neutral-100 text-xs sm:text-sm ${rowClass}`}>
+                  <td className="py-2 pr-1 sm:pr-2 text-neutral-600 font-medium">{pos}</td>
+                  <td className="py-2 pr-1 sm:pr-2 font-medium text-neutral-900 whitespace-nowrap text-xs sm:text-sm">
                     {team.country_name}
                   </td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600">{team.played}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600">{team.wins}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600">{team.draws}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600">{team.losses}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600 hidden sm:table-cell">{team.goalsFor}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600 hidden sm:table-cell">{team.goalsAgainst}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600">
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.played}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.wins}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.draws}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.losses}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{team.goalsFor}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{team.goalsAgainst}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">
                     {team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}
                   </td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-gray-900">{team.points}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-neutral-900">{team.points}</td>
                   {showConductScore && (
-                    <td className="text-center py-2 px-0.5 sm:px-1 text-gray-600 hidden sm:table-cell">
+                    <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">
                       {team.conductScore ?? 0}
                     </td>
                   )}

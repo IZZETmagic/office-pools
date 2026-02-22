@@ -50,42 +50,42 @@ export function SuperAdminDashboard({
   const activePools = pools.filter((p) => p.status === 'open' || p.status === 'active').length
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Sticky header: navigation bar + stats bar + tab navigation */}
       <div className="sticky top-0 z-10">
-      <nav className="bg-gray-900 shadow-lg px-4 sm:px-6 py-3 sm:py-4">
+      <nav className="bg-neutral-900 shadow-lg px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white font-medium shrink-0">
+          <Link href="/dashboard" className="text-sm text-neutral-300 hover:text-white font-medium shrink-0">
             &larr; <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Back</span>
           </Link>
           <div className="text-center min-w-0 mx-2">
             <h1 className="text-sm sm:text-lg font-bold text-white truncate">
               Super Admin
             </h1>
-            <p className="text-[10px] sm:text-xs text-red-400 font-medium">Full System Access</p>
+            <p className="text-[10px] sm:text-xs text-danger-400 font-medium">Full System Access</p>
           </div>
           <div className="w-12 sm:w-20 shrink-0" />
         </div>
       </nav>
 
       {/* Quick stats bar */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 sm:px-6 py-2 sm:py-3">
+      <div className="bg-neutral-800 border-b border-neutral-700 px-4 sm:px-6 py-2 sm:py-3">
         <div className="max-w-7xl mx-auto flex gap-4 sm:gap-8 text-xs sm:text-sm overflow-x-auto">
-          <div className="text-gray-300 whitespace-nowrap">
+          <div className="text-neutral-300 whitespace-nowrap">
             Matches:{' '}
             <span className="text-white font-bold">
               {completedMatches}/{totalMatches}
             </span>
           </div>
-          <div className="text-gray-300 whitespace-nowrap">
+          <div className="text-neutral-300 whitespace-nowrap">
             Users:{' '}
             <span className="text-white font-bold">{activeUsers}</span>
           </div>
-          <div className="text-gray-300 whitespace-nowrap">
+          <div className="text-neutral-300 whitespace-nowrap">
             Pools:{' '}
             <span className="text-white font-bold">{activePools}</span>
           </div>
-          <div className="text-gray-300 whitespace-nowrap">
+          <div className="text-neutral-300 whitespace-nowrap">
             Audit:{' '}
             <span className="text-white font-bold">{auditLogs.length}</span>
           </div>
@@ -93,7 +93,7 @@ export function SuperAdminDashboard({
       </div>
 
       {/* Tab navigation */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white border-b border-neutral-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex gap-0.5 sm:gap-1 overflow-x-auto">
             {TABS.map((tab) => (
@@ -102,8 +102,8 @@ export function SuperAdminDashboard({
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
                   activeTab === tab.key
-                    ? 'border-red-600 text-red-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-danger-600 text-danger-600'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-700 hover:border-neutral-300'
                 }`}
               >
                 {tab.icon} {tab.label}

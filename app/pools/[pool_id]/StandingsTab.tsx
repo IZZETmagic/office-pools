@@ -170,15 +170,15 @@ function BracketCell({
 
   return (
     <div
-      className="absolute border border-gray-300 rounded bg-white shadow-sm overflow-hidden"
+      className="absolute border border-neutral-300 rounded bg-white shadow-sm overflow-hidden"
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
     >
       {/* Home team row */}
       <div
-        className={`flex items-center justify-between px-1 border-b border-gray-100 ${
+        className={`flex items-center justify-between px-1 border-b border-neutral-100 ${
           match.winnerSide === 'home'
-            ? 'bg-green-50 font-semibold text-green-800'
-            : 'text-gray-700'
+            ? 'bg-success-50 font-semibold text-success-800'
+            : 'text-neutral-700'
         }`}
         style={{ height: CELL_H / 2 - 0.5, fontSize: 10, lineHeight: '12px' }}
       >
@@ -190,7 +190,7 @@ function BracketCell({
             <span className="font-bold tabular-nums">
               {match.homeScore}
               {match.homePso !== null && (
-                <span className="text-[8px] text-gray-400">({match.homePso})</span>
+                <span className="text-[8px] text-neutral-400">({match.homePso})</span>
               )}
             </span>
           )}
@@ -201,8 +201,8 @@ function BracketCell({
       <div
         className={`flex items-center justify-between px-1 ${
           match.winnerSide === 'away'
-            ? 'bg-green-50 font-semibold text-green-800'
-            : 'text-gray-700'
+            ? 'bg-success-50 font-semibold text-success-800'
+            : 'text-neutral-700'
         }`}
         style={{ height: CELL_H / 2 - 0.5, fontSize: 10, lineHeight: '12px' }}
       >
@@ -214,7 +214,7 @@ function BracketCell({
             <span className="font-bold tabular-nums">
               {match.awayScore}
               {match.awayPso !== null && (
-                <span className="text-[8px] text-gray-400">({match.awayPso})</span>
+                <span className="text-[8px] text-neutral-400">({match.awayPso})</span>
               )}
             </span>
           )}
@@ -225,10 +225,10 @@ function BracketCell({
       {(match.isLive || match.isCompleted) && (
         <div className="absolute top-0 right-0">
           {match.isLive && (
-            <span className="text-[7px] font-bold text-red-600 bg-red-50 px-0.5 rounded-bl animate-pulse">LIVE</span>
+            <span className="text-[7px] font-bold text-danger-600 bg-danger-50 px-0.5 rounded-bl animate-pulse">LIVE</span>
           )}
           {match.isCompleted && !match.isLive && (
-            <span className="text-[7px] font-medium text-green-600 bg-green-50 px-0.5 rounded-bl">FT</span>
+            <span className="text-[7px] font-medium text-success-600 bg-success-50 px-0.5 rounded-bl">FT</span>
           )}
         </div>
       )}
@@ -358,7 +358,7 @@ function KnockoutBracket({
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Knockout Bracket</h2>
+        <h2 className="text-xl font-bold text-neutral-900">Knockout Bracket</h2>
         {completedKnockout > 0 && (
           <Badge variant="green">
             {completedKnockout}/{totalKnockout} played
@@ -385,8 +385,8 @@ function KnockoutBracket({
               key={i}
               className={`absolute text-center font-bold uppercase tracking-wider ${
                 h.label === 'Final'
-                  ? 'text-[9px] text-amber-600'
-                  : 'text-[9px] text-gray-400'
+                  ? 'text-[9px] text-warning-600'
+                  : 'text-[9px] text-neutral-400'
               }`}
               style={{ left: h.x, top: 0, width: CELL_W }}
             >
@@ -465,7 +465,7 @@ function KnockoutBracket({
             className="absolute text-center"
             style={{ left: centerX, top: pos.sfY + CELL_H + 8, width: CELL_W }}
           >
-            <div className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">3rd Place</div>
+            <div className="text-[8px] font-bold text-neutral-400 uppercase mb-0.5">3rd Place</div>
             <div className="relative" style={{ width: CELL_W, height: CELL_H }}>
               <BracketCell match={buildBracketMatch(103, matchMap)} x={0} y={0} />
             </div>
@@ -583,18 +583,18 @@ export function StandingsTab({ matches, teams, conductData }: StandingsTabProps)
       {/* ================================ */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Group Standings</h2>
+          <h2 className="text-xl font-bold text-neutral-900">Group Standings</h2>
           <Badge variant="blue">Actual Results</Badge>
         </div>
 
         {!hasAnyCompletedGroupMatch ? (
           <Card padding="lg" className="text-center">
-            <p className="text-gray-500">No group stage matches have been completed yet.</p>
-            <p className="text-xs text-gray-400 mt-1">Standings will appear here once match results are entered.</p>
+            <p className="text-neutral-500">No group stage matches have been completed yet.</p>
+            <p className="text-xs text-neutral-400 mt-1">Standings will appear here once match results are entered.</p>
           </Card>
         ) : (
           <>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-xs text-blue-700">
+            <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 mb-4 text-xs text-primary-700">
               Based on actual match results. FP (Fair Play) is the Team Conduct Score used as a FIFA tiebreaker.
             </div>
 

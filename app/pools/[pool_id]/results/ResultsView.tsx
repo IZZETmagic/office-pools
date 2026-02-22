@@ -34,10 +34,10 @@ const STAGE_TABS: { key: StageTab; label: string }[] = [
 ]
 
 const STATUS_OPTIONS: { key: StatusFilter; label: string; color: string }[] = [
-  { key: 'all', label: 'All', color: 'bg-gray-100 text-gray-700' },
-  { key: 'completed', label: 'Completed', color: 'bg-green-100 text-green-700' },
-  { key: 'live', label: 'Live', color: 'bg-red-100 text-red-700' },
-  { key: 'upcoming', label: 'Upcoming', color: 'bg-gray-100 text-gray-600' },
+  { key: 'all', label: 'All', color: 'bg-neutral-100 text-neutral-700' },
+  { key: 'completed', label: 'Completed', color: 'bg-success-100 text-success-700' },
+  { key: 'live', label: 'Live', color: 'bg-danger-100 text-danger-700' },
+  { key: 'upcoming', label: 'Upcoming', color: 'bg-neutral-100 text-neutral-600' },
 ]
 
 // =============================================
@@ -224,17 +224,17 @@ export function ResultsView({
   return (
     <div>
       {/* ── Points summary ── */}
-      <div className="mb-6 p-4 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-between">
+      <div className="mb-6 p-4 bg-white rounded-lg shadow border border-neutral-200 flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-600">Your Total Points</p>
-          <p className="text-3xl font-extrabold text-blue-600">{totalPoints}</p>
+          <p className="text-sm text-neutral-600">Your Total Points</p>
+          <p className="text-3xl font-extrabold text-primary-600">{totalPoints}</p>
           {bonusPoints > 0 && (
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-neutral-500 mt-0.5">
               {matchPoints} match + {bonusPoints} bonus
             </p>
           )}
         </div>
-        <div className="text-right text-xs text-gray-500">
+        <div className="text-right text-xs text-neutral-500">
           <p>{statusCounts.completed} completed</p>
           {statusCounts.live > 0 && <p>{statusCounts.live} live</p>}
           <p>
@@ -244,7 +244,7 @@ export function ResultsView({
       </div>
 
       {/* ── Stage tabs ── */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200 pb-3 overflow-x-auto">
+      <div className="flex gap-1 mb-4 border-b border-neutral-200 pb-3 overflow-x-auto">
         {STAGE_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -254,8 +254,8 @@ export function ResultsView({
             }}
             className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
               stageTab === tab.key
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary-600 text-white'
+                : 'text-neutral-600 hover:bg-neutral-100'
             }`}
           >
             {tab.label}
@@ -274,12 +274,12 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
                   ? opt.key === 'all'
-                    ? 'bg-gray-800 text-white'
+                    ? 'bg-neutral-800 text-white'
                     : opt.key === 'completed'
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-success-600 text-white'
                       : opt.key === 'live'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-600 text-white'
+                        ? 'bg-danger-600 text-white'
+                        : 'bg-neutral-600 text-white'
                   : opt.color + ' hover:opacity-80'
               }`}
             >
@@ -298,7 +298,7 @@ export function ResultsView({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-md bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-white text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
             <option value="all">All Groups</option>
             {GROUP_LETTERS.map((g) => (
@@ -329,7 +329,7 @@ export function ResultsView({
       {/* ── Match cards grid ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">
+          <p className="text-neutral-500 text-lg">
             No matches found for this filter.
           </p>
         </div>

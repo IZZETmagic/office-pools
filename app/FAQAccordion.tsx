@@ -44,18 +44,18 @@ export function FAQAccordion() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <div className="max-w-3xl mx-auto divide-y divide-gray-200">
+    <div className="max-w-3xl mx-auto divide-y divide-neutral-200">
       {faqs.map((faq, i) => (
         <div key={i}>
           <button
             onClick={() => setOpenIndex(openIndex === i ? null : i)}
             className="w-full flex items-center justify-between py-5 text-left cursor-pointer"
           >
-            <span className="text-lg font-medium text-gray-900">
+            <span className="text-lg font-medium text-neutral-900">
               {faq.question}
             </span>
             <svg
-              className={`w-5 h-5 text-gray-500 shrink-0 ml-4 transition-transform duration-200 ${
+              className={`w-5 h-5 text-neutral-500 shrink-0 ml-4 transition-transform duration-200 ${
                 openIndex === i ? 'rotate-180' : ''
               }`}
               fill="none"
@@ -71,7 +71,7 @@ export function FAQAccordion() {
               openIndex === i ? 'max-h-40 pb-5' : 'max-h-0'
             }`}
           >
-            <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+            <p className="text-neutral-600 leading-relaxed">{faq.answer}</p>
           </div>
         </div>
       ))}

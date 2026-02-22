@@ -4,12 +4,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
 
   // Sign the user out of Supabase (clears their auth cookie)
   await supabase.auth.signOut()
 
   // Redirect them to the home page after signing out
-  return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'))
+  const { origin } = new URL(request.url)
+  return NextResponse.redirect(new URL('/', origin))
 }

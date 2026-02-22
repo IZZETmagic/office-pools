@@ -48,6 +48,15 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
+      // Update last_login timestamp in public users table
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from('users')
+          .update({ last_login: new Date().toISOString() })
+          .eq('auth_user_id', user.id)
+      }
+
       // Login succeeded! Redirect to dashboard
       router.push('/dashboard')
       router.refresh() // Forces Next.js to re-check auth state
@@ -59,13 +68,13 @@ export default function LoginPage() {
   // =====================
   return (
     // Full screen blue gradient background
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
 
       {/* White card container */}
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
 
         {/* Page title */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+        <h1 className="text-3xl font-bold text-neutral-900 mb-6 text-center">
           Sign In
         </h1>
 
@@ -101,7 +110,7 @@ export default function LoginPage() {
 
           {/* Forgot password link */}
           <div className="text-right">
-            <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+            <Link href="/forgot-password" className="text-sm text-primary-600 hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -113,16 +122,16 @@ export default function LoginPage() {
         </form>
 
         {/* Link to signup page for new users */}
-        <p className="text-center text-gray-600 mt-4">
+        <p className="text-center text-neutral-600 mt-4">
           Don't have an account?{' '}
-          <Link href="/signup" className="text-blue-600 hover:underline font-semibold">
+          <Link href="/signup" className="text-primary-600 hover:underline font-semibold">
             Sign up
           </Link>
         </p>
 
         {/* Back to landing page */}
         <p className="text-center mt-3">
-          <Link href="/" className="text-sm text-gray-500 hover:underline">
+          <Link href="/" className="text-sm text-neutral-500 hover:underline">
             ← Back to home
           </Link>
         </p>

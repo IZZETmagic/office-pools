@@ -5,10 +5,10 @@ type BadgeProps = {
 }
 
 const variantClasses = {
-  blue: 'bg-blue-100 text-blue-700',
-  green: 'bg-green-100 text-green-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  gray: 'bg-gray-100 text-gray-600',
+  blue: 'bg-primary-100 text-primary-700',
+  green: 'bg-success-100 text-success-700',
+  yellow: 'bg-warning-100 text-warning-700',
+  gray: 'bg-neutral-100 text-neutral-600',
 }
 
 export function Badge({ variant = 'blue', children, className }: BadgeProps) {

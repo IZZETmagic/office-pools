@@ -18,10 +18,10 @@ type PointsBreakdownModalProps = {
 const CATEGORY_ORDER = ['group_standings', 'qualification', 'bracket', 'tournament'] as const
 
 const CATEGORY_CONFIG: Record<string, { label: string; bgClass: string; textClass: string }> = {
-  group_standings: { label: 'Group Standings', bgClass: 'bg-blue-100', textClass: 'text-blue-700' },
-  qualification: { label: 'Overall Qualification', bgClass: 'bg-indigo-100', textClass: 'text-indigo-700' },
-  bracket: { label: 'Bracket & Match Winners', bgClass: 'bg-amber-100', textClass: 'text-amber-700' },
-  tournament: { label: 'Tournament Podium', bgClass: 'bg-purple-100', textClass: 'text-purple-700' },
+  group_standings: { label: 'Group Standings', bgClass: 'bg-primary-100', textClass: 'text-primary-700' },
+  qualification: { label: 'Overall Qualification', bgClass: 'bg-accent-100', textClass: 'text-accent-700' },
+  bracket: { label: 'Bracket & Match Winners', bgClass: 'bg-warning-100', textClass: 'text-warning-700' },
+  tournament: { label: 'Tournament Podium', bgClass: 'bg-accent-100', textClass: 'text-accent-700' },
 }
 
 // =============================================
@@ -71,23 +71,21 @@ export function PointsBreakdownModal({
     >
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold text-gray-900 truncate">{playerName}</h2>
-            <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {rank && (
+              <span className="text-2xl font-bold text-primary-600 flex-shrink-0 bg-primary-50 rounded-lg px-2.5 py-1">#{rank}</span>
+            )}
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-neutral-900 truncate">{playerName}</h2>
               {username && member.users?.full_name && (
-                <span className="text-sm text-gray-500">@{username}</span>
-              )}
-              {rank && (
-                <Badge variant="blue">
-                  #{rank}
-                </Badge>
+                <span className="text-sm text-neutral-500">@{username}</span>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex-shrink-0 p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -100,42 +98,42 @@ export function PointsBreakdownModal({
         <div className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <div className="text-[11px] sm:text-xs font-medium text-blue-600 uppercase tracking-wide">Match</div>
-              <div className="text-xl sm:text-2xl font-bold text-blue-700 mt-1">{matchPoints}</div>
+            <div className="bg-primary-50 rounded-lg p-3 text-center">
+              <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">Match</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{matchPoints}</div>
             </div>
-            <div className="bg-green-50 rounded-lg p-3 text-center">
-              <div className="text-[11px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Bonus</div>
-              <div className="text-xl sm:text-2xl font-bold text-green-700 mt-1">{bonusPoints}</div>
+            <div className="bg-success-50 rounded-lg p-3 text-center">
+              <div className="text-[11px] sm:text-xs font-medium text-success-600 uppercase tracking-wide">Bonus</div>
+              <div className="text-xl sm:text-2xl font-bold text-success-700 mt-1">{bonusPoints}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center border-2 border-gray-200">
-              <div className="text-[11px] sm:text-xs font-medium text-gray-600 uppercase tracking-wide">Total</div>
-              <div className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalPoints}</div>
+            <div className="bg-neutral-50 rounded-lg p-3 text-center border-2 border-neutral-200">
+              <div className="text-[11px] sm:text-xs font-medium text-neutral-600 uppercase tracking-wide">Total</div>
+              <div className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1">{totalPoints}</div>
             </div>
           </div>
 
           {/* Formula display */}
-          <div className="text-center text-sm text-gray-500">
-            <span className="text-blue-600 font-medium">{matchPoints}</span>
+          <div className="text-center text-sm text-neutral-500">
+            <span className="text-primary-600 font-medium">{matchPoints}</span>
             {' '}match pts
             {' + '}
-            <span className="text-green-600 font-medium">{bonusPoints}</span>
+            <span className="text-success-600 font-medium">{bonusPoints}</span>
             {' '}bonus pts
             {' = '}
-            <span className="text-gray-900 font-bold">{totalPoints}</span>
+            <span className="text-neutral-900 font-bold">{totalPoints}</span>
             {' '}total
           </div>
 
           {/* Bonus Points Breakdown */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-semibold text-neutral-900 uppercase tracking-wider mb-3">
               Bonus Points Breakdown
             </h3>
 
             {bonusScores.length === 0 ? (
-              <div className="text-center py-6 bg-gray-50 rounded-lg">
-                <div className="text-gray-400 text-sm">No bonus points earned yet</div>
-                <div className="text-gray-400 text-xs mt-1">
+              <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                <div className="text-neutral-400 text-sm">No bonus points earned yet</div>
+                <div className="text-neutral-400 text-xs mt-1">
                   Bonus points are calculated as tournament stages complete
                 </div>
               </div>
@@ -147,12 +145,12 @@ export function PointsBreakdownModal({
                   const subtotal = categorySubtotals.get(category) ?? 0
                   const config = CATEGORY_CONFIG[category] ?? {
                     label: category,
-                    bgClass: 'bg-gray-100',
-                    textClass: 'text-gray-700',
+                    bgClass: 'bg-neutral-100',
+                    textClass: 'text-neutral-700',
                   }
 
                   return (
-                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={category} className="border border-neutral-200 rounded-lg overflow-hidden">
                       {/* Category header */}
                       <div className={`flex items-center justify-between px-3 py-2 ${config.bgClass}`}>
                         <span className={`text-sm font-semibold ${config.textClass}`}>
@@ -164,16 +162,16 @@ export function PointsBreakdownModal({
                       </div>
 
                       {/* Individual entries */}
-                      <div className="divide-y divide-gray-100">
+                      <div className="divide-y divide-neutral-100">
                         {entries.map((entry, i) => (
                           <div
                             key={`${entry.bonus_type}-${entry.related_group_letter}-${entry.related_match_id}-${i}`}
                             className="flex items-start justify-between px-3 py-2.5 text-sm"
                           >
-                            <span className="text-gray-700 pr-3 leading-snug">
+                            <span className="text-neutral-700 pr-3 leading-snug">
                               {entry.description}
                             </span>
-                            <span className="text-gray-900 font-semibold flex-shrink-0">
+                            <span className="text-neutral-900 font-semibold flex-shrink-0">
                               +{entry.points_earned}
                             </span>
                           </div>
@@ -187,15 +185,6 @@ export function PointsBreakdownModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 sm:px-6 py-3 border-t border-gray-100 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -73,13 +73,13 @@ export default function SignupPage() {
   // =====================
   return (
     // Full screen blue gradient background
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
 
       {/* White card container */}
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
 
         {/* Page title */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+        <h1 className="text-3xl font-bold text-neutral-900 mb-6 text-center">
           Create Account
         </h1>
 
@@ -143,16 +143,16 @@ export default function SignupPage() {
         </form>
 
         {/* Link to login page for existing users */}
-        <p className="text-center text-gray-600 mt-4">
+        <p className="text-center text-neutral-600 mt-4">
           Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline font-semibold">
+          <Link href="/login" className="text-primary-600 hover:underline font-semibold">
             Sign in
           </Link>
         </p>
 
         {/* Back to landing page */}
         <p className="text-center mt-3">
-          <Link href="/" className="text-sm text-gray-500 hover:underline">
+          <Link href="/" className="text-sm text-neutral-500 hover:underline">
             ← Back to home
           </Link>
         </p>

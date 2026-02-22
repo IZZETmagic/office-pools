@@ -263,12 +263,12 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Pool Settings</h2>
+      <h2 className="text-2xl font-bold text-neutral-900 mb-6">Pool Settings</h2>
 
       {error && (
         <Alert variant="error" className="mb-4">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-800 font-bold">
+          <button onClick={() => setError(null)} className="ml-2 text-danger-800 font-bold">
             x
           </button>
         </Alert>
@@ -276,7 +276,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       {success && (
         <Alert variant="success" className="mb-4">
           {success}
-          <button onClick={() => setSuccess(null)} className="ml-2 text-green-800 font-bold">
+          <button onClick={() => setSuccess(null)} className="ml-2 text-success-800 font-bold">
             x
           </button>
         </Alert>
@@ -284,7 +284,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
       {/* Pool Information */}
       <Card className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Pool Information
         </h3>
 
@@ -304,14 +304,14 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your pool..."
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
             />
           </FormField>
 
           <div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-neutral-600">
               Pool Code:{' '}
-              <span className="font-mono font-bold text-gray-900">
+              <span className="font-mono font-bold text-neutral-900">
                 {pool.pool_code}
               </span>
             </p>
@@ -327,9 +327,9 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
                     value={s}
                     checked={status === s}
                     onChange={() => setStatus(s)}
-                    className="text-blue-600"
+                    className="text-primary-600"
                   />
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-neutral-700">
                     {s === 'open'
                       ? 'Open (accepting new members)'
                       : s === 'closed'
@@ -353,13 +353,13 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
       {/* Prediction Deadline */}
       <Card className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Prediction Deadline
         </h3>
 
         {currentDeadline && (
           <div className="mb-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-neutral-600">
               Current Deadline:{' '}
               <span className="font-medium">
                 {currentDeadline.toLocaleDateString('en-US', {
@@ -374,12 +374,12 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               </span>
             </p>
             {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-neutral-600">
                 Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
               </p>
             )}
             {timeUntilDeadline !== null && timeUntilDeadline <= 0 && (
-              <p className="text-sm text-red-500 font-medium">
+              <p className="text-sm text-danger-500 font-medium">
                 Deadline has passed
               </p>
             )}
@@ -388,25 +388,25 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
         <div className="flex gap-3 mb-4 flex-wrap">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
               Date
             </label>
             <input
               type="date"
               value={deadlineDate}
               onChange={(e) => setDeadlineDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
               Time
             </label>
             <input
               type="time"
               value={deadlineTime}
               onChange={(e) => setDeadlineTime(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -414,19 +414,19 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setQuickDeadline('tournament_start')}
-            className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
           >
             Tournament Start (Jun 11)
           </button>
           <button
             onClick={() => setQuickDeadline('one_day_before')}
-            className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
           >
             1 Day Before Start
           </button>
           <button
             onClick={() => setQuickDeadline('one_week_before')}
-            className="text-xs px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
           >
             1 Week Before Start
           </button>
@@ -443,7 +443,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
       {/* Privacy Settings */}
       <Card className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Privacy Settings
         </h3>
 
@@ -456,9 +456,9 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
                   name="privacy"
                   checked={!isPrivate}
                   onChange={() => setIsPrivate(false)}
-                  className="text-blue-600"
+                  className="text-primary-600"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-neutral-700">
                   Public (anyone with code can join)
                 </span>
               </label>
@@ -468,9 +468,9 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
                   name="privacy"
                   checked={isPrivate}
                   onChange={() => setIsPrivate(true)}
-                  className="text-blue-600"
+                  className="text-primary-600"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-neutral-700">
                   Private (requires admin approval)
                 </span>
               </label>
@@ -501,42 +501,42 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       </Card>
 
       {/* Danger Zone */}
-      <div className="border-2 border-red-300 rounded-lg p-4 sm:p-6 bg-red-50">
-        <h3 className="text-lg font-semibold text-red-600 mb-4">
+      <div className="border-2 border-danger-300 rounded-lg p-4 sm:p-6 bg-danger-50">
+        <h3 className="text-lg font-semibold text-danger-600 mb-4">
           Danger Zone
         </h3>
 
         <div className="space-y-4">
           {/* Archive */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-1">
+            <h4 className="text-sm font-semibold text-neutral-900 mb-1">
               Archive Pool
             </h4>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-neutral-600 mb-3">
               Archive this pool to preserve data but prevent new activity.
             </p>
             <button
               onClick={handleArchivePool}
-              className="px-4 py-2 text-sm rounded-lg font-semibold bg-orange-500 text-white hover:bg-orange-600 transition"
+              className="px-4 py-2 text-sm rounded-lg font-semibold bg-warning-500 text-white hover:bg-warning-600 transition"
             >
               Archive Pool
             </button>
           </div>
 
-          <hr className="border-red-200" />
+          <hr className="border-danger-200" />
 
           {/* Delete */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-1">
+            <h4 className="text-sm font-semibold text-neutral-900 mb-1">
               Delete Pool
             </h4>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-neutral-600 mb-3">
               Permanently delete this pool and all data. This action CANNOT be
               undone.
             </p>
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 text-sm rounded-lg font-semibold bg-red-600 text-white hover:bg-red-700 transition"
+              className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition"
             >
               Delete Pool
             </button>
@@ -548,19 +548,19 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-red-600 mb-3">
+            <h3 className="text-lg font-bold text-danger-600 mb-3">
               Delete Pool - PERMANENT ACTION
             </h3>
 
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-neutral-600 mb-3">
               You are about to PERMANENTLY DELETE:
             </p>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <p className="text-sm font-bold text-red-700 mb-2">
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-4">
+              <p className="text-sm font-bold text-danger-700 mb-2">
                 {pool.pool_name}
               </p>
-              <ul className="text-sm text-red-600 space-y-1">
+              <ul className="text-sm text-danger-600 space-y-1">
                 <li>- {members.length} members will lose access</li>
                 <li>- All predictions will be deleted</li>
                 <li>- All member data will be deleted</li>
@@ -577,7 +577,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               />
             </FormField>
 
-            <p className="text-sm text-red-600 font-bold mt-3 mb-4">
+            <p className="text-sm text-danger-600 font-bold mt-3 mb-4">
               THIS WILL DELETE EVERYTHING
             </p>
 
@@ -595,7 +595,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               <button
                 onClick={handleDeletePool}
                 disabled={deleteConfirmName !== pool.pool_name || deleting}
-                className="px-4 py-2 text-sm rounded-lg font-semibold bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleting
                   ? 'Deleting...'

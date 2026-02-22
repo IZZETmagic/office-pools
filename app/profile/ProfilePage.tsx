@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
+import { useTheme } from '@/components/ThemeProvider'
 import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // =====================
@@ -159,19 +160,19 @@ export default function ProfilePage({
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Navigation bar */}
       <nav className="sticky top-0 z-10 bg-white shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-        <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-gray-900">
+        <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-neutral-900">
           World Cup Pool
         </Link>
-        <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
+        <Link href="/dashboard" className="text-sm text-neutral-600 hover:text-neutral-900 font-medium">
           &larr; Dashboard
         </Link>
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">My Profile</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-6 sm:mb-8">My Profile</h2>
 
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left sidebar */}
@@ -182,11 +183,11 @@ export default function ProfilePage({
                 <div className={`w-[120px] h-[120px] rounded-full ${getAvatarColor(profile.username)} flex items-center justify-center text-white text-3xl font-bold mb-4`}>
                   {getInitials(profile.full_name, profile.username)}
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-neutral-900">
                   {profile.full_name || profile.username}
                 </h3>
-                <p className="text-sm text-gray-500">@{profile.username}</p>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-sm text-neutral-500">@{profile.username}</p>
+                <p className="text-xs text-neutral-500 mt-2">
                   Member since {formatMemberSince(profile.created_at)}
                 </p>
               </div>
@@ -201,8 +202,8 @@ export default function ProfilePage({
                     onClick={() => setActiveTab(tab.key)}
                     className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition flex items-center gap-2 whitespace-nowrap ${
                       activeTab === tab.key
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-primary-600 text-white'
+                        : 'text-neutral-700 hover:bg-neutral-100'
                     }`}
                   >
                     <span>{tab.icon}</span>
@@ -350,8 +351,8 @@ function EditProfileTab({
 
   return (
     <Card>
-      <h3 className="text-2xl font-bold text-gray-900 mb-1">Edit Profile</h3>
-      <p className="text-gray-600 text-sm mb-6">Update your personal information</p>
+      <h3 className="text-2xl font-bold text-neutral-900 mb-1">Edit Profile</h3>
+      <p className="text-neutral-600 text-sm mb-6">Update your personal information</p>
 
       {error && <Alert variant="error">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
@@ -371,13 +372,13 @@ function EditProfileTab({
               maxLength={20}
             />
             {usernameStatus === 'checking' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">Checking...</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500">Checking...</span>
             )}
             {usernameStatus === 'available' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600">✓ Available</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-success-600">✓ Available</span>
             )}
             {usernameStatus === 'taken' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600">✗ Taken</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-danger-600">✗ Taken</span>
             )}
           </div>
         </FormField>
@@ -402,7 +403,7 @@ function EditProfileTab({
             placeholder="your@email.com"
           />
           {emailChanged && (
-            <p className="text-xs text-amber-600 mt-1">
+            <p className="text-xs text-warning-600 mt-1">
               You will need to verify your new email address.
             </p>
           )}
@@ -540,33 +541,33 @@ function StatisticsTab({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-1">Your Statistics</h3>
-        <p className="text-gray-600 text-sm mb-6">Your performance across all pools</p>
+        <h3 className="text-2xl font-bold text-neutral-900 mb-1">Your Statistics</h3>
+        <p className="text-neutral-600 text-sm mb-6">Your performance across all pools</p>
       </div>
 
       {/* Overview stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Pools</p>
-          <p className="text-2xl sm:text-3xl font-bold text-blue-600">{totalPools}</p>
-          <p className="text-xs text-gray-500">Active</p>
+          <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Pools</p>
+          <p className="text-2xl sm:text-3xl font-bold text-primary-600">{totalPools}</p>
+          <p className="text-xs text-neutral-500">Active</p>
         </Card>
         <Card>
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Points</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600">{totalPoints}</p>
-          <p className="text-xs text-gray-500">Across all pools</p>
+          <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Points</p>
+          <p className="text-2xl sm:text-3xl font-bold text-success-600">{totalPoints}</p>
+          <p className="text-xs text-neutral-500">Across all pools</p>
         </Card>
         <Card>
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Predictions</p>
-          <p className="text-2xl sm:text-3xl font-bold text-purple-600">{totalPredictions}</p>
-          <p className="text-xs text-gray-500">Submitted</p>
+          <p className="text-xs sm:text-sm text-neutral-600 mb-1">Predictions</p>
+          <p className="text-2xl sm:text-3xl font-bold text-accent-500">{totalPredictions}</p>
+          <p className="text-xs text-neutral-500">Submitted</p>
         </Card>
         <Card>
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Best Rank</p>
-          <p className="text-2xl sm:text-3xl font-bold text-amber-600">
+          <p className="text-xs sm:text-sm text-neutral-600 mb-1">Best Rank</p>
+          <p className="text-2xl sm:text-3xl font-bold text-warning-600">
             {bestPool ? `#${bestPool.current_rank}` : '--'}
           </p>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-xs text-neutral-500 truncate">
             {bestPool ? bestPool.pool_name : 'No rank yet'}
           </p>
         </Card>
@@ -575,45 +576,45 @@ function StatisticsTab({
       {/* Pool breakdown table */}
       {poolStats.length > 0 && (
         <Card>
-          <h4 className="text-lg font-semibold text-gray-900 mb-4">Pool Performance</h4>
+          <h4 className="text-lg font-semibold text-neutral-900 mb-4">Pool Performance</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 text-gray-700 font-medium">Pool Name</th>
-                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Rank</th>
-                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Points</th>
-                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Predictions</th>
-                  <th className="text-center py-3 px-2 text-gray-700 font-medium">Accuracy</th>
+                <tr className="border-b border-neutral-200">
+                  <th className="text-left py-3 px-2 text-neutral-700 font-medium">Pool Name</th>
+                  <th className="text-center py-3 px-2 text-neutral-700 font-medium">Rank</th>
+                  <th className="text-center py-3 px-2 text-neutral-700 font-medium">Points</th>
+                  <th className="text-center py-3 px-2 text-neutral-700 font-medium">Predictions</th>
+                  <th className="text-center py-3 px-2 text-neutral-700 font-medium">Accuracy</th>
                 </tr>
               </thead>
               <tbody>
                 {poolStats.map(pool => (
-                  <tr key={pool.pool_id} className="border-b border-gray-100">
+                  <tr key={pool.pool_id} className="border-b border-neutral-100">
                     <td className="py-3 px-2">
                       <Link
                         href={`/pools/${pool.pool_id}`}
-                        className="text-blue-600 hover:underline font-medium"
+                        className="text-primary-600 hover:underline font-medium"
                       >
                         {pool.pool_name}
                       </Link>
                     </td>
-                    <td className="text-center py-3 px-2 text-gray-700">
+                    <td className="text-center py-3 px-2 text-neutral-700">
                       {pool.current_rank
                         ? `#${pool.current_rank}/${memberCounts[pool.pool_id] ?? '?'}`
                         : '--'}
                     </td>
-                    <td className="text-center py-3 px-2 font-semibold text-gray-900">
+                    <td className="text-center py-3 px-2 font-semibold text-neutral-900">
                       {pool.total_points}
                     </td>
-                    <td className="text-center py-3 px-2 text-gray-700">
+                    <td className="text-center py-3 px-2 text-neutral-700">
                       {pool.totalPredictions}/{totalMatchCount}
                     </td>
                     <td className="text-center py-3 px-2">
                       {pool.accuracy !== null ? (
-                        <span className="font-semibold text-gray-900">{pool.accuracy}%</span>
+                        <span className="font-semibold text-neutral-900">{pool.accuracy}%</span>
                       ) : (
-                        <span className="text-gray-500">--</span>
+                        <span className="text-neutral-500">--</span>
                       )}
                     </td>
                   </tr>
@@ -627,7 +628,7 @@ function StatisticsTab({
       {/* Prediction accuracy breakdown */}
       {totals.completed > 0 && (
         <Card>
-          <h4 className="text-lg font-semibold text-gray-900 mb-4">Prediction Accuracy</h4>
+          <h4 className="text-lg font-semibold text-neutral-900 mb-4">Prediction Accuracy</h4>
           <div className="space-y-3">
             <AccuracyRow
               label="Exact Scores"
@@ -655,10 +656,10 @@ function StatisticsTab({
             />
           </div>
           {totals.accuracy !== null && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 pt-4 border-t border-neutral-200">
+              <p className="text-sm text-neutral-600">
                 Overall Accuracy:{' '}
-                <span className="text-lg font-bold text-gray-900">{totals.accuracy}%</span>
+                <span className="text-lg font-bold text-neutral-900">{totals.accuracy}%</span>
               </p>
             </div>
           )}
@@ -668,8 +669,8 @@ function StatisticsTab({
       {/* Empty state */}
       {poolStats.length === 0 && (
         <Card padding="lg" className="text-center">
-          <p className="text-gray-600 text-lg mb-2">No statistics yet</p>
-          <p className="text-gray-500">Join a pool and make predictions to see your stats.</p>
+          <p className="text-neutral-600 text-lg mb-2">No statistics yet</p>
+          <p className="text-neutral-500">Join a pool and make predictions to see your stats.</p>
         </Card>
       )}
     </div>
@@ -681,14 +682,14 @@ function AccuracyRow({ label, icon, count, total }: { label: string; icon: strin
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <span className="w-5 sm:w-6 text-center text-sm">{icon}</span>
-      <span className="text-xs sm:text-sm text-gray-700 w-20 sm:w-32 shrink-0">{label}</span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2 min-w-0">
+      <span className="text-xs sm:text-sm text-neutral-700 w-20 sm:w-32 shrink-0">{label}</span>
+      <div className="flex-1 bg-neutral-100 rounded-full h-2 min-w-0">
         <div
-          className="bg-blue-500 rounded-full h-2 transition-all"
+          className="bg-primary-500 rounded-full h-2 transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs sm:text-sm text-gray-600 w-16 sm:w-20 text-right shrink-0">
+      <span className="text-xs sm:text-sm text-neutral-600 w-16 sm:w-20 text-right shrink-0">
         {count} ({pct}%)
       </span>
     </div>
@@ -821,10 +822,10 @@ function PredictionHistoryTab({
 
   const rowBg = (classification: string) => {
     switch (classification) {
-      case 'exact': return 'bg-amber-50'
+      case 'exact': return 'bg-warning-50'
       case 'winner_gd':
-      case 'winner': return 'bg-green-50'
-      case 'incorrect': return 'bg-red-50'
+      case 'winner': return 'bg-success-50'
+      case 'incorrect': return 'bg-danger-50'
       default: return ''
     }
   }
@@ -832,8 +833,8 @@ function PredictionHistoryTab({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-1">Prediction History</h3>
-        <p className="text-gray-600 text-sm mb-6">All your predictions across all pools</p>
+        <h3 className="text-2xl font-bold text-neutral-900 mb-1">Prediction History</h3>
+        <p className="text-neutral-600 text-sm mb-6">All your predictions across all pools</p>
       </div>
 
       {/* Filters */}
@@ -841,11 +842,11 @@ function PredictionHistoryTab({
         <div className="flex flex-wrap gap-4">
           {/* Pool filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Pool</label>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Pool</label>
             <select
               value={poolFilter}
               onChange={e => handleFilterChange(setPoolFilter, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white"
             >
               <option value="all">All Pools</option>
               {poolMemberships.map(pm => (
@@ -856,7 +857,7 @@ function PredictionHistoryTab({
 
           {/* Status filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Status</label>
             <div className="flex gap-1">
               {(['all', 'correct', 'incorrect', 'pending'] as const).map(status => (
                 <button
@@ -864,8 +865,8 @@ function PredictionHistoryTab({
                   onClick={() => handleFilterChange(setStatusFilter, status)}
                   className={`px-3 py-2 text-sm rounded-lg font-medium transition ${
                     statusFilter === status
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                   }`}
                 >
                   {status === 'all' ? 'All' : status === 'correct' ? 'Correct ✓' : status === 'incorrect' ? 'Incorrect ✗' : 'Pending'}
@@ -876,11 +877,11 @@ function PredictionHistoryTab({
 
           {/* Stage filter */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Stage</label>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Stage</label>
             <select
               value={stageFilter}
               onChange={e => handleFilterChange(setStageFilter, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white"
             >
               <option value="all">All Stages</option>
               {stages.map(stage => (
@@ -894,17 +895,17 @@ function PredictionHistoryTab({
       {/* Predictions table */}
       <Card>
         {paginated.length === 0 ? (
-          <p className="text-gray-600 text-center py-8">No predictions found matching your filters.</p>
+          <p className="text-neutral-600 text-center py-8">No predictions found matching your filters.</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-2 text-gray-700 font-medium">Match</th>
-                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Your Prediction</th>
-                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Result</th>
-                    <th className="text-center py-3 px-2 text-gray-700 font-medium">Points</th>
+                  <tr className="border-b border-neutral-200">
+                    <th className="text-left py-3 px-2 text-neutral-700 font-medium">Match</th>
+                    <th className="text-center py-3 px-2 text-neutral-700 font-medium">Your Prediction</th>
+                    <th className="text-center py-3 px-2 text-neutral-700 font-medium">Result</th>
+                    <th className="text-center py-3 px-2 text-neutral-700 font-medium">Points</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -917,30 +918,30 @@ function PredictionHistoryTab({
                       : '-'
 
                     return (
-                      <tr key={pred.prediction_id} className={`border-b border-gray-100 ${rowBg(pred.classification)}`}>
+                      <tr key={pred.prediction_id} className={`border-b border-neutral-100 ${rowBg(pred.classification)}`}>
                         <td className="py-3 px-2">
-                          <p className="font-medium text-gray-900">{homeTeam} vs {awayTeam}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="font-medium text-neutral-900">{homeTeam} vs {awayTeam}</p>
+                          <p className="text-xs text-neutral-500">
                             {formatDate(m.match_date)} &middot; {formatStage(m.stage)}
                             {m.group_letter ? ` (Group ${m.group_letter})` : ''}
                           </p>
                         </td>
-                        <td className="text-center py-3 px-2 font-semibold text-gray-900">
+                        <td className="text-center py-3 px-2 font-semibold text-neutral-900">
                           {pred.predicted_home_score}-{pred.predicted_away_score}
                         </td>
-                        <td className="text-center py-3 px-2 text-gray-700">{result}</td>
+                        <td className="text-center py-3 px-2 text-neutral-700">{result}</td>
                         <td className="text-center py-3 px-2 font-medium">
                           {pred.classification === 'exact' && (
-                            <span className="text-amber-600">{pred.pointsDisplay}</span>
+                            <span className="text-warning-600">{pred.pointsDisplay}</span>
                           )}
                           {(pred.classification === 'winner_gd' || pred.classification === 'winner') && (
-                            <span className="text-green-600">{pred.pointsDisplay}</span>
+                            <span className="text-success-600">{pred.pointsDisplay}</span>
                           )}
                           {pred.classification === 'incorrect' && (
-                            <span className="text-red-600">{pred.pointsDisplay}</span>
+                            <span className="text-danger-600">{pred.pointsDisplay}</span>
                           )}
                           {pred.classification === 'pending' && (
-                            <span className="text-gray-500">{pred.pointsDisplay}</span>
+                            <span className="text-neutral-500">{pred.pointsDisplay}</span>
                           )}
                         </td>
                       </tr>
@@ -952,22 +953,22 @@ function PredictionHistoryTab({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-200">
+                <p className="text-sm text-neutral-600">
                   Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, filtered.length)} of {filtered.length}
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm rounded border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm rounded border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
@@ -996,6 +997,8 @@ function AccountSettingsTab({
   supabase: any
   router: any
 }) {
+  const { theme, toggleTheme } = useTheme()
+
   // Password change state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -1084,17 +1087,17 @@ function AccountSettingsTab({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-1">Account Settings</h3>
-        <p className="text-gray-600 text-sm mb-6">Manage your account and security</p>
+        <h3 className="text-2xl font-bold text-neutral-900 mb-1">Account Settings</h3>
+        <p className="text-neutral-600 text-sm mb-6">Manage your account and security</p>
       </div>
 
       {/* Security section */}
       <Card>
-        <h4 className="text-lg font-semibold text-gray-900 mb-4">Security</h4>
+        <h4 className="text-lg font-semibold text-neutral-900 mb-4">Security</h4>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-700">Password</p>
-            <p className="text-xs text-gray-500">Change your account password</p>
+            <p className="text-sm font-medium text-neutral-700">Password</p>
+            <p className="text-xs text-neutral-500">Change your account password</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowPasswordModal(true)}>
             Change Password
@@ -1102,38 +1105,67 @@ function AccountSettingsTab({
         </div>
       </Card>
 
-      {/* Preferences section (coming soon) */}
+      {/* Appearance */}
+      <Card>
+        <h4 className="text-lg font-semibold text-neutral-900 mb-4">Appearance</h4>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-neutral-700">Color Palette</p>
+            <p className="text-xs text-neutral-500">
+              {theme === 'new' ? 'Modern palette with emerald, slate & gold tones' : 'Classic palette with green, gray & purple tones'}
+            </p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="relative inline-flex h-8 w-[120px] items-center rounded-full border border-neutral-300 bg-neutral-100 p-0.5 transition-colors"
+          >
+            <span
+              className={`absolute top-0.5 h-7 w-[58px] rounded-full bg-primary-600 shadow transition-transform duration-200 ${
+                theme === 'classic' ? 'translate-x-[58px]' : 'translate-x-0'
+              }`}
+            />
+            <span className={`relative z-10 flex-1 text-center text-xs font-medium transition-colors ${theme === 'new' ? 'text-white' : 'text-neutral-600'}`}>
+              Modern
+            </span>
+            <span className={`relative z-10 flex-1 text-center text-xs font-medium transition-colors ${theme === 'classic' ? 'text-white' : 'text-neutral-600'}`}>
+              Classic
+            </span>
+          </button>
+        </div>
+      </Card>
+
+      {/* Notifications (coming soon) */}
       <Card>
         <div className="flex items-center gap-2 mb-4">
-          <h4 className="text-lg font-semibold text-gray-900">Preferences</h4>
+          <h4 className="text-lg font-semibold text-neutral-900">Notifications</h4>
           <Badge variant="gray">Coming Soon</Badge>
         </div>
         <div className="space-y-3 opacity-50">
           <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-gray-300" />
-            <span className="text-sm text-gray-700">Match result notifications</span>
+            <input type="checkbox" disabled className="rounded border-neutral-300" />
+            <span className="text-sm text-neutral-700">Match result notifications</span>
           </label>
           <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-gray-300" />
-            <span className="text-sm text-gray-700">Deadline reminders</span>
+            <input type="checkbox" disabled className="rounded border-neutral-300" />
+            <span className="text-sm text-neutral-700">Deadline reminders</span>
           </label>
           <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-gray-300" />
-            <span className="text-sm text-gray-700">Rank change alerts</span>
+            <input type="checkbox" disabled className="rounded border-neutral-300" />
+            <span className="text-sm text-neutral-700">Rank change alerts</span>
           </label>
         </div>
       </Card>
 
       {/* Danger zone */}
-      <Card className="!border !border-red-200">
-        <h4 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h4>
-        <p className="text-sm text-gray-600 mb-4">
+      <Card className="!border !border-danger-200">
+        <h4 className="text-lg font-semibold text-danger-600 mb-2">Danger Zone</h4>
+        <p className="text-sm text-neutral-600 mb-4">
           Permanently delete your account and all your data. This action cannot be undone.
         </p>
         <Button
           variant="gray"
           onClick={() => setShowDeleteModal(true)}
-          className="!bg-red-600 !text-white hover:!bg-red-700"
+          className="!bg-danger-600 !text-white hover:!bg-danger-700"
         >
           Delete My Account
         </Button>
@@ -1143,7 +1175,7 @@ function AccountSettingsTab({
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
+            <h3 className="text-xl font-bold text-neutral-900 mb-4">Change Password</h3>
 
             {passwordError && <Alert variant="error">{passwordError}</Alert>}
             {passwordSuccess && <Alert variant="success">{passwordSuccess}</Alert>}
@@ -1197,11 +1229,11 @@ function AccountSettingsTab({
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-red-600 mb-2">Delete Account - PERMANENT</h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <h3 className="text-xl font-bold text-danger-600 mb-2">Delete Account - PERMANENT</h3>
+            <p className="text-sm text-neutral-600 mb-4">
               Are you absolutely sure? This will:
             </p>
-            <ul className="text-sm text-gray-600 mb-4 space-y-1">
+            <ul className="text-sm text-neutral-600 mb-4 space-y-1">
               <li>• Delete all your predictions</li>
               <li>• Remove you from all pools</li>
               <li>• Permanently delete your account</li>
@@ -1238,7 +1270,7 @@ function AccountSettingsTab({
                 disabled={deleteLoading || deleteConfirmation !== profile.username}
                 loading={deleteLoading}
                 loadingText="Deleting..."
-                className="!bg-red-600 !text-white hover:!bg-red-700 disabled:!bg-red-300"
+                className="!bg-danger-600 !text-white hover:!bg-danger-700 disabled:!bg-danger-300"
               >
                 I Understand, Delete My Account
               </Button>

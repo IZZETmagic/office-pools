@@ -35,13 +35,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+        <h1 className="text-3xl font-bold text-neutral-900 mb-2 text-center">
           Reset Password
         </h1>
-        <p className="text-center text-gray-600 mb-6">
+        <p className="text-center text-neutral-600 mb-6">
           Enter your email and we'll send you a link to reset your password.
         </p>
 
@@ -65,9 +65,9 @@ export default function ForgotPasswordPage() {
           </Button>
         </form>
 
-        <p className="text-center text-gray-600 mt-4">
+        <p className="text-center text-neutral-600 mt-4">
           Remember your password?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline font-semibold">
+          <Link href="/login" className="text-primary-600 hover:underline font-semibold">
             Back to Login
           </Link>
         </p>
