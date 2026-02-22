@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
@@ -220,6 +220,43 @@ export function PoolDetail({
 
   const tabs = isAdmin ? [...USER_TABS, ...ADMIN_TABS] : USER_TABS
 
+  // Swipe navigation for mobile
+  const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
+  }, [])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const elapsed = Date.now() - touchStartRef.current.time
+    touchStartRef.current = null
+
+    // Only trigger on fast, deliberate horizontal swipes
+    // Must travel >60px horizontally, be more horizontal than vertical, and complete within 300ms
+    if (Math.abs(deltaX) < 60 || Math.abs(deltaY) > Math.abs(deltaX) || elapsed > 300) return
+
+    // Ignore swipes that started on interactive elements (inputs, textareas, selects, scrollable tables)
+    const target = e.target as HTMLElement
+    if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll')) return
+
+    const currentIndex = allTabKeys.indexOf(activeTab)
+    if (currentIndex === -1) return
+
+    const nextIndex = deltaX < 0
+      ? Math.min(currentIndex + 1, allTabKeys.length - 1)  // swipe left = next tab
+      : Math.max(currentIndex - 1, 0)                       // swipe right = prev tab
+
+    if (nextIndex !== currentIndex) {
+      handleTabSwitch(allTabKeys[nextIndex])
+    }
+  }, [activeTab, allTabKeys, handleTabSwitch])
+
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Shared app header with breadcrumbs + pool badges */}
@@ -237,19 +274,18 @@ export function PoolDetail({
       />
 
       {/* Tab navigation */}
-      <div className="sticky top-[57px] z-[9] bg-white shadow-sm">
-        {/* Tab navigation with scroll indicators */}
-        <div className="border-b border-neutral-200 relative">
+      <div className="sticky top-[57px] z-[9] bg-white">
+        <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
-            <div className="flex gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
               {USER_TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => handleTabSwitch(tab.key)}
-                  className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.key
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-neutral-600 hover:text-neutral-700 hover:border-neutral-300'
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
                   {tab.label}
@@ -258,7 +294,6 @@ export function PoolDetail({
 
               {isAdmin && (
                 <>
-                  {/* Divider */}
                   <div className="flex items-center px-1 sm:px-2">
                     <div className="h-5 w-px bg-neutral-300" />
                   </div>
@@ -267,10 +302,10 @@ export function PoolDetail({
                     <button
                       key={tab.key}
                       onClick={() => handleTabSwitch(tab.key)}
-                      className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition border-b-2 ${
+                      className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                         activeTab === tab.key
-                          ? 'border-warning-600 text-warning-600'
-                          : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                          ? 'bg-warning-600 text-white shadow-sm'
+                          : 'text-neutral-700 hover:bg-neutral-100'
                       }`}
                     >
                       {tab.label}
@@ -280,102 +315,106 @@ export function PoolDetail({
               )}
             </div>
           </div>
-          {/* Scroll fade indicators for mobile */}
+          {/* Scroll fade indicator for mobile */}
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none sm:hidden" />
         </div>
       </div>
 
       {/* Tab content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {activeTab === 'leaderboard' && (
-          <LeaderboardTab
-            members={members}
-            playerScores={playerScores}
-            bonusScores={bonusScores}
-            matches={matches}
-            teams={teams}
-            conductData={conductData}
-            allPredictions={allPredictions}
-            poolSettings={poolSettings}
-          />
-        )}
+      <main
+        className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+            {activeTab === 'leaderboard' && (
+              <LeaderboardTab
+                members={members}
+                playerScores={playerScores}
+                bonusScores={bonusScores}
+                matches={matches}
+                teams={teams}
+                conductData={conductData}
+                allPredictions={allPredictions}
+                poolSettings={poolSettings}
+              />
+            )}
 
-        {activeTab === 'predictions' && (
-          <PredictionsFlow
-            matches={predictionsMatches}
-            teams={teams}
-            memberId={memberId}
-            poolId={pool.pool_id}
-            existingPredictions={userPredictions}
-            isPastDeadline={isPastDeadline}
-            psoEnabled={psoEnabled}
-            hasSubmitted={hasSubmitted}
-            submittedAt={submittedAt}
-            lastSavedAt={lastSavedAt}
-            predictionsLocked={predictionsLocked}
-            onUnsavedChangesRef={predictionsRef}
-          />
-        )}
+            {activeTab === 'predictions' && (
+              <PredictionsFlow
+                matches={predictionsMatches}
+                teams={teams}
+                memberId={memberId}
+                poolId={pool.pool_id}
+                existingPredictions={userPredictions}
+                isPastDeadline={isPastDeadline}
+                psoEnabled={psoEnabled}
+                hasSubmitted={hasSubmitted}
+                submittedAt={submittedAt}
+                lastSavedAt={lastSavedAt}
+                predictionsLocked={predictionsLocked}
+                onUnsavedChangesRef={predictionsRef}
+              />
+            )}
 
-        {activeTab === 'results' && (
-          <ResultsTab
-            matches={matches}
-            predictions={userPredictionsList}
-            poolSettings={poolSettings}
-            teams={teams}
-            conductData={conductData}
-            userPredictions={userPredictions}
-            bonusScores={bonusScores}
-            isAdmin={isAdmin}
-            members={members}
-            allPredictions={allPredictions}
-            currentMemberId={memberId}
-          />
-        )}
+            {activeTab === 'results' && (
+              <ResultsTab
+                matches={matches}
+                predictions={userPredictionsList}
+                poolSettings={poolSettings}
+                teams={teams}
+                conductData={conductData}
+                userPredictions={userPredictions}
+                bonusScores={bonusScores}
+                isAdmin={isAdmin}
+                members={members}
+                allPredictions={allPredictions}
+                currentMemberId={memberId}
+              />
+            )}
 
-        {activeTab === 'standings' && (
-          <StandingsTab
-            matches={matches}
-            teams={teams}
-            conductData={conductData}
-          />
-        )}
+            {activeTab === 'standings' && (
+              <StandingsTab
+                matches={matches}
+                teams={teams}
+                conductData={conductData}
+              />
+            )}
 
-        {activeTab === 'scoring_rules' && (
-          <ScoringRulesTab settings={settings} />
-        )}
+            {activeTab === 'scoring_rules' && (
+              <ScoringRulesTab settings={settings} />
+            )}
 
-        {/* Admin tabs */}
-        {activeTab === 'members' && isAdmin && (
-          <MembersTab
-            pool={pool}
-            members={members}
-            setMembers={setMembers}
-            predictions={allPredictions}
-            matches={matches}
-            teams={teams}
-            currentUserId={currentUserId}
-          />
-        )}
+            {/* Admin tabs */}
+            {activeTab === 'members' && isAdmin && (
+              <MembersTab
+                pool={pool}
+                members={members}
+                setMembers={setMembers}
+                predictions={allPredictions}
+                matches={matches}
+                teams={teams}
+                currentUserId={currentUserId}
+              />
+            )}
 
-        {activeTab === 'scoring_config' && isAdmin && (
-          <ScoringTab
-            pool={pool}
-            settings={settings}
-            setSettings={setSettings}
-            matches={matches}
-            members={members}
-            setMembers={setMembers}
-          />
-        )}
+            {activeTab === 'scoring_config' && isAdmin && (
+              <ScoringTab
+                pool={pool}
+                settings={settings}
+                setSettings={setSettings}
+                matches={matches}
+                members={members}
+                setMembers={setMembers}
+              />
+            )}
 
-        {activeTab === 'settings' && isAdmin && (
-          <SettingsTab
-            pool={pool}
-            setPool={setPool}
-            members={members}
-          />
-        )}
+            {activeTab === 'settings' && isAdmin && (
+              <SettingsTab
+                pool={pool}
+                setPool={setPool}
+                members={members}
+              />
+            )}
       </main>
 
       {/* Navigation Warning Modal */}
