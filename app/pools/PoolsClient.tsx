@@ -354,17 +354,17 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       <AppHeader isSuperAdmin={user.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-surface dark:via-surface dark:to-surface dark:border-b dark:border-border-default">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-primary-900 dark:via-primary-800 dark:to-success-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-primary-600/20 backdrop-blur-sm flex items-center justify-center text-white dark:text-neutral-900 text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-primary-600/30 shadow-lg shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white dark:text-neutral-900 truncate">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
                 Pools
               </h2>
-              <p className="text-primary-100 dark:text-neutral-500 text-sm sm:text-base">
+              <p className="text-primary-100 dark:text-primary-200 text-sm sm:text-base">
                 Create, manage, and discover prediction pools
               </p>
             </div>
@@ -372,17 +372,17 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
           {/* Quick stats in hero */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.totalPools}</p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Pools</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPools}</p>
+              <p className="text-xs text-primary-200">Total Pools</p>
             </div>
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.activePools}</p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Active</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{stats.activePools}</p>
+              <p className="text-xs text-primary-200">Active</p>
             </div>
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.totalPoints}</p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Points</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPoints}</p>
+              <p className="text-xs text-primary-200">Total Points</p>
             </div>
           </div>
         </div>

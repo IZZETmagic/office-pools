@@ -199,18 +199,18 @@ export default function ProfilePage({
       <AppHeader isSuperAdmin={profile.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-surface dark:via-surface dark:to-surface dark:border-b dark:border-border-default">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-primary-900 dark:via-primary-800 dark:to-success-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-primary-600/20 backdrop-blur-sm flex items-center justify-center text-white dark:text-neutral-900 text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-primary-600/30 shadow-lg shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(profile.full_name, profile.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white dark:text-neutral-900 truncate">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
                 {profile.full_name || profile.username}
               </h2>
-              <p className="text-primary-100 dark:text-neutral-500 text-sm sm:text-base">@{profile.username}</p>
-              <p className="text-primary-200 dark:text-neutral-500 text-xs sm:text-sm mt-1">
+              <p className="text-primary-100 dark:text-primary-200 text-sm sm:text-base">@{profile.username}</p>
+              <p className="text-primary-200 text-xs sm:text-sm mt-1">
                 Member since {formatMemberSince(profile.created_at)}
               </p>
             </div>
@@ -218,24 +218,24 @@ export default function ProfilePage({
 
           {/* Quick stats in hero */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{poolMemberships.length}</p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Pools</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">{poolMemberships.length}</p>
+              <p className="text-xs text-primary-200">Pools</p>
             </div>
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">
                 {poolMemberships.reduce((sum, p) => {
                   const ps = playerScoresMap[p.member_id]
                   return sum + (ps ? ps.total_points : p.total_points)
                 }, 0)}
               </p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Points</p>
+              <p className="text-xs text-primary-200">Total Points</p>
             </div>
-            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+              <p className="text-xl sm:text-2xl font-bold text-white">
                 {poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0)}
               </p>
-              <p className="text-xs text-primary-200 dark:text-neutral-500">Predictions</p>
+              <p className="text-xs text-primary-200">Predictions</p>
             </div>
           </div>
         </div>
