@@ -304,7 +304,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh]">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 shrink-0">
           <h2 id="create-pool-title" className="text-lg font-bold text-neutral-900">Create a Pool</h2>
@@ -491,7 +491,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="date"
                           value={deadlineDate}
                           onChange={(e) => setDeadlineDate(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
                         />
                       </div>
                       <div>
@@ -500,7 +500,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="time"
                           value={deadlineTime}
                           onChange={(e) => setDeadlineTime(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
                         />
                       </div>
                     </div>

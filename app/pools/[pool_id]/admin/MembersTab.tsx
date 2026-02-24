@@ -285,7 +285,7 @@ export function MembersTab({
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="rank">Sort by Rank</option>
           <option value="points">Sort by Points</option>
@@ -301,7 +301,7 @@ export function MembersTab({
           return (
             <div
               key={member.member_id}
-              className={`rounded-lg border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-white border-neutral-200'}`}
+              className={`rounded-lg border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-neutral-200'}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -358,7 +358,7 @@ export function MembersTab({
                         break
                     }
                   }}
-                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-white text-neutral-700 cursor-pointer"
+                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
                 >
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
@@ -375,7 +375,7 @@ export function MembersTab({
       </div>
 
       {/* Members - Desktop table view */}
-      <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -493,7 +493,7 @@ export function MembersTab({
                                 break
                             }
                           }}
-                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-white text-neutral-700 cursor-pointer"
+                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
                         >
                           <option value="" disabled>
                             Actions
@@ -537,7 +537,7 @@ export function MembersTab({
       {/* Adjust Points Modal */}
       {modal.type === 'adjust_points' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-xl font-bold text-neutral-900 mb-4">
               Adjust Points - {modal.member.users.username}
             </h3>
@@ -628,7 +628,7 @@ export function MembersTab({
       {/* Promote Modal */}
       {modal.type === 'promote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Promote to Admin
             </h3>
@@ -665,7 +665,7 @@ export function MembersTab({
       {/* Demote Modal */}
       {modal.type === 'demote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Demote to Player
             </h3>
@@ -698,7 +698,7 @@ export function MembersTab({
       {/* Unlock Predictions Modal */}
       {modal.type === 'unlock_predictions' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Unlock Predictions
             </h3>
@@ -740,7 +740,7 @@ export function MembersTab({
       {/* Remove Modal */}
       {modal.type === 'remove' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-danger-600 mb-3">
               Remove Member
             </h3>
@@ -962,7 +962,7 @@ function ViewPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
           <h3 className="text-xl font-bold text-neutral-900">

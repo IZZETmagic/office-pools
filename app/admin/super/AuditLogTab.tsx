@@ -12,7 +12,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
     return (
       <div>
         <h2 className="text-2xl font-bold text-neutral-900 mb-6">Audit Log</h2>
-        <div className="bg-white rounded-lg shadow p-8 text-center text-neutral-600">
+        <div className="bg-surface rounded-lg shadow p-8 text-center text-neutral-600">
           No audit entries yet. Actions like match resets will be logged here.
         </div>
       </div>
@@ -28,7 +28,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
         </span>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">

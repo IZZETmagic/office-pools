@@ -633,7 +633,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -646,7 +646,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -659,7 +659,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -672,7 +672,7 @@ export function MatchesTab({
       </div>
 
       {/* Matches table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -839,7 +839,7 @@ export function MatchesTab({
       {/* Enter/Edit Result Modal */}
       {modal.type === 'enter_result' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 bg-danger-500 rounded-full" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -1073,7 +1073,7 @@ export function MatchesTab({
       {/* Update Live Score Modal */}
       {modal.type === 'update_live_score' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-3 h-3 bg-warning-500 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -1167,7 +1167,7 @@ export function MatchesTab({
       {/* Reset Match Modal */}
       {modal.type === 'reset_match' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">

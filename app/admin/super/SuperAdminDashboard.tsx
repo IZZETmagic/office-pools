@@ -50,7 +50,7 @@ export function SuperAdminDashboard({
   const activePools = pools.filter((p) => p.status === 'open' || p.status === 'active').length
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-surface-secondary">
       <AppHeader breadcrumbs={[{ label: 'Super Admin' }]} isSuperAdmin />
 
       {/* Sticky admin status bar + stats + tab navigation */}
@@ -86,7 +86,7 @@ export function SuperAdminDashboard({
       </div>
 
       {/* Tab navigation */}
-      <div className="bg-white border-b border-neutral-200 shadow-sm">
+      <div className="bg-surface border-b border-neutral-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex gap-0.5 sm:gap-1 overflow-x-auto">
             {TABS.map((tab) => (

@@ -174,12 +174,12 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Status</option>
           <option value="open">Open</option>
@@ -193,14 +193,14 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       {/* Pools cards */}
       <div className="grid gap-4">
         {filteredPools.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-neutral-600">
+          <div className="bg-surface rounded-lg shadow p-8 text-center text-neutral-600">
             No pools found.
           </div>
         ) : (
           filteredPools.map((pool) => (
             <div
               key={pool.pool_id}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-md transition"
+              className="bg-surface rounded-lg shadow p-6 hover:shadow-md transition"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -259,7 +259,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       {/* Delete Pool Modal */}
       {modal.type === 'delete_pool' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">Delete Pool</h3>

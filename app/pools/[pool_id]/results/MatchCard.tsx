@@ -58,7 +58,7 @@ function formatDate(dateStr: string): string {
 }
 
 function getCardBackground(result: PointsResult | null): string {
-  if (!result) return 'bg-white'
+  if (!result) return 'bg-surface'
   switch (result.type) {
     case 'exact':
       return 'bg-accent-50/60'

@@ -170,7 +170,7 @@ function BracketCell({
 
   return (
     <div
-      className="absolute border border-neutral-300 rounded bg-white shadow-sm overflow-hidden"
+      className="absolute border border-neutral-300 rounded bg-surface shadow-sm overflow-hidden"
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
     >
       {/* Home team row */}

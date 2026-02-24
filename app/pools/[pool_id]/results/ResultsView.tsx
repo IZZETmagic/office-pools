@@ -224,7 +224,7 @@ export function ResultsView({
   return (
     <div>
       {/* ── Points summary ── */}
-      <div className="mb-6 p-4 bg-white rounded-lg shadow border border-neutral-200 flex items-center justify-between">
+      <div className="mb-6 p-4 bg-surface rounded-lg shadow border border-neutral-200 flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-600">Your Total Points</p>
           <p className="text-3xl font-extrabold text-primary-600">{totalPoints}</p>
@@ -298,7 +298,7 @@ export function ResultsView({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-white text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
             <option value="all">All Groups</option>
             {GROUP_LETTERS.map((g) => (

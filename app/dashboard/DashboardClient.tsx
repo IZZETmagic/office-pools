@@ -299,39 +299,39 @@ export function DashboardClient({
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-surface-secondary">
       <AppHeader isSuperAdmin={user.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-surface dark:via-surface dark:to-surface dark:border-b dark:border-border-default">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 shadow-lg shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-primary-600/20 backdrop-blur-sm flex items-center justify-center text-white dark:text-neutral-900 text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-primary-600/30 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white dark:text-neutral-900 truncate">
                 Welcome, {user.full_name || user.username || 'Player'}!
               </h2>
-              <p className="text-primary-100 text-sm sm:text-base">@{user.username}</p>
+              <p className="text-primary-100 dark:text-neutral-500 text-sm sm:text-base">@{user.username}</p>
             </div>
           </div>
 
           {/* Quick stats in hero */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
-              <p className="text-xs text-primary-200">Active Pools</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{totalPools}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Active Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">
                 {bestRank ? `#${bestRank}` : '--'}
               </p>
-              <p className="text-xs text-primary-200">Best Rank</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Best Rank</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{totalPoints}</p>
-              <p className="text-xs text-primary-200">Total Points</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{totalPoints}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Points</p>
             </div>
           </div>
         </div>
@@ -495,7 +495,7 @@ export function DashboardClient({
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-lg shadow-sm border border-neutral-200">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-surface rounded-lg shadow-sm border border-neutral-200">
                         <span className="text-xl font-bold text-neutral-900">{match.home_score_ft ?? 0}</span>
                         <span className="text-neutral-400">-</span>
                         <span className="text-xl font-bold text-neutral-900">{match.away_score_ft ?? 0}</span>

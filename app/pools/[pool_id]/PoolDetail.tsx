@@ -258,7 +258,7 @@ export function PoolDetail({
   }, [activeTab, allTabKeys, handleTabSwitch])
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-surface-secondary">
       {/* Shared app header with breadcrumbs + pool badges */}
       <AppHeader
         breadcrumbs={[
@@ -274,7 +274,7 @@ export function PoolDetail({
       />
 
       {/* Tab navigation */}
-      <div className="sticky top-[57px] z-[9] bg-white">
+      <div className="sticky top-[57px] z-[9] bg-surface">
         <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
             <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
@@ -316,7 +316,7 @@ export function PoolDetail({
             </div>
           </div>
           {/* Scroll fade indicator for mobile */}
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none sm:hidden" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface to-transparent pointer-events-none sm:hidden" />
         </div>
       </div>
 
@@ -421,7 +421,7 @@ export function PoolDetail({
       {showNavWarning && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
-          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Unsaved Changes</h3>
             <p className="text-sm text-neutral-600 mb-5">
               You have unsaved predictions. What would you like to do?

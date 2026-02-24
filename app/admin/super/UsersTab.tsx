@@ -167,13 +167,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -182,7 +182,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       </div>
 
       {/* Users table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -319,7 +319,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       {/* Promote to Super Admin Modal */}
       {modal.type === 'promote_admin' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">

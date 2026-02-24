@@ -395,7 +395,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               type="date"
               value={deadlineDate}
               onChange={(e) => setDeadlineDate(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -406,7 +406,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               type="time"
               value={deadlineTime}
               onChange={(e) => setDeadlineTime(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -548,7 +548,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
             }
           }}
         >
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Delete Pool
             </h3>

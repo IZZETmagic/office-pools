@@ -776,7 +776,7 @@ export default function PredictionsFlow({
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Submit Final Predictions?
             </h3>
@@ -822,7 +822,7 @@ export default function PredictionsFlow({
       {showRecoveryModal && recoveryData && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-white sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Recover Unsaved Predictions?
             </h3>
@@ -865,7 +865,7 @@ export default function PredictionsFlow({
 
       {/* Sticky bottom progress bar on mobile */}
       {stageName !== 'summary' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 p-3 sm:hidden z-40">
+        <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-neutral-200 p-3 sm:hidden z-40">
           <div className="flex items-center gap-2">
             <div className="h-2 flex-1 bg-neutral-200 rounded-full overflow-hidden">
               <div
@@ -949,7 +949,7 @@ function ProgressBar({
   const percent = total > 0 ? Math.round((predicted / total) * 100) : 0
 
   return (
-    <div className="bg-white border border-neutral-200 rounded-lg p-3 sm:p-4">
+    <div className="bg-surface border border-neutral-200 rounded-lg p-3 sm:p-4">
       {/* Single row: label, status badge, progress bar, count, save status, details toggle */}
       <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
         {/* Label + status badge */}

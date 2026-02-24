@@ -35,6 +35,10 @@ export default function RootLayout({
             if (localStorage.getItem('sport-pool-theme') === 'classic') {
               document.documentElement.classList.add('theme-classic');
             }
+            var cm = localStorage.getItem('sport-pool-color-mode');
+            if (cm === 'dark' || (cm !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+              document.documentElement.classList.add('dark');
+            }
           } catch(e) {}
         `}} />
       </head>

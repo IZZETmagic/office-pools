@@ -213,7 +213,7 @@ function GroupComparisonCard({
   const actualBottom = actualStandings.slice(2)
 
   return (
-    <div className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+    <div className="border border-neutral-200 rounded-lg overflow-hidden bg-surface">
       {/* Group header with bonus badge */}
       <div className="flex items-center justify-between gap-2 px-3 py-2 bg-neutral-50 border-b border-neutral-200">
         <span className="text-sm font-bold text-neutral-900 shrink-0">Group {groupLetter}</span>
@@ -475,7 +475,7 @@ export function GroupStandingsComparison({
       {/* Header with collapse toggle */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow border border-neutral-200 hover:bg-neutral-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface rounded-lg shadow border border-neutral-200 hover:bg-neutral-50 transition-colors"
       >
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-neutral-900">
@@ -503,7 +503,7 @@ export function GroupStandingsComparison({
               <select
                 value={selectedMemberId}
                 onChange={(e) => setSelectedMemberId(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-neutral-300 rounded-md bg-white text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="px-3 py-1.5 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 {membersWithPredictions.map((m) => (
                   <option key={m.member_id} value={m.member_id}>

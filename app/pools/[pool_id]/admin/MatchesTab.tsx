@@ -136,7 +136,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -149,7 +149,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -162,7 +162,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white"
+            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -185,7 +185,7 @@ export function MatchesTab({
             const matchPredCount = predictions.filter((p) => p.match_id === match.match_id).length
             const matchDate = new Date(match.match_date)
             return (
-              <div key={match.match_id} className="bg-white border border-neutral-200 rounded-lg p-3">
+              <div key={match.match_id} className="bg-surface border border-neutral-200 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-mono bg-neutral-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
@@ -224,7 +224,7 @@ export function MatchesTab({
       </div>
 
       {/* Matches table - Desktop */}
-      <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -355,7 +355,7 @@ export function MatchesTab({
       {/* View Predictions Modal */}
       {modal.type === 'view_predictions' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-xl font-bold text-neutral-900 mb-1">
               Predictions for Match #{modal.match.match_number}
             </h3>

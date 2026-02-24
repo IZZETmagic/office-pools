@@ -3,7 +3,7 @@ import Link from 'next/link'
 export default function AccountDeletedPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-accent-100 flex items-center justify-center px-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center space-y-6">
+      <div className="bg-surface p-8 rounded-lg shadow-lg max-w-md w-full text-center space-y-6 dark:shadow-none dark:border dark:border-border-default">
 
         {/* Success icon */}
         <div className="mx-auto w-16 h-16 bg-success-100 rounded-full flex items-center justify-center">

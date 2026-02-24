@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
 import { AppHeader } from '@/components/ui/AppHeader'
+import { useTheme } from '@/components/ThemeProvider'
 import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // =====================
@@ -194,22 +195,22 @@ export default function ProfilePage({
   const supabase = createClient()
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-surface-secondary">
       <AppHeader isSuperAdmin={profile.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-surface dark:via-surface dark:to-surface dark:border-b dark:border-border-default">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 shadow-lg shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-primary-600/20 backdrop-blur-sm flex items-center justify-center text-white dark:text-neutral-900 text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-primary-600/30 shadow-lg shrink-0">
               {getInitials(profile.full_name, profile.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white dark:text-neutral-900 truncate">
                 {profile.full_name || profile.username}
               </h2>
-              <p className="text-primary-100 text-sm sm:text-base">@{profile.username}</p>
-              <p className="text-primary-200 text-xs sm:text-sm mt-1">
+              <p className="text-primary-100 dark:text-neutral-500 text-sm sm:text-base">@{profile.username}</p>
+              <p className="text-primary-200 dark:text-neutral-500 text-xs sm:text-sm mt-1">
                 Member since {formatMemberSince(profile.created_at)}
               </p>
             </div>
@@ -217,24 +218,24 @@ export default function ProfilePage({
 
           {/* Quick stats in hero */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{poolMemberships.length}</p>
-              <p className="text-xs text-primary-200">Pools</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{poolMemberships.length}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">
                 {poolMemberships.reduce((sum, p) => {
                   const ps = playerScoresMap[p.member_id]
                   return sum + (ps ? ps.total_points : p.total_points)
                 }, 0)}
               </p>
-              <p className="text-xs text-primary-200">Total Points</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Points</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">
                 {poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0)}
               </p>
-              <p className="text-xs text-primary-200">Predictions</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Predictions</p>
             </div>
           </div>
         </div>
@@ -953,7 +954,7 @@ function PredictionHistoryTab({
             <select
               value={poolFilter}
               onChange={e => handleFilterChange(setPoolFilter, e.target.value)}
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"
             >
               <option value="all">All Pools</option>
               {poolMemberships.map(pm => (
@@ -986,7 +987,7 @@ function PredictionHistoryTab({
             <select
               value={stageFilter}
               onChange={e => handleFilterChange(setStageFilter, e.target.value)}
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"
             >
               <option value="all">All Stages</option>
               {stages.map(stage => (
@@ -1109,7 +1110,7 @@ function AccountSettingsTab({
   supabase: any
   router: any
 }) {
-  const [darkMode, setDarkMode] = useState(false)
+  const { colorMode, setColorMode } = useTheme()
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -1221,37 +1222,30 @@ function AccountSettingsTab({
             </svg>
           </div>
           <h4 className="text-base font-semibold text-neutral-900">Appearance</h4>
-          <Badge variant="gray">Coming Soon</Badge>
         </div>
-        <div className="flex items-center justify-between bg-neutral-50 rounded-lg p-4 opacity-50">
+        <div className="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
           <div>
-            <p className="text-sm font-medium text-neutral-700">Dark Mode</p>
+            <p className="text-sm font-medium text-neutral-700">Color Mode</p>
             <p className="text-xs text-neutral-500 mt-0.5">
-              {darkMode ? 'Dark theme enabled' : 'Light theme enabled'}
+              {colorMode === 'system' ? 'Following system preference' :
+               colorMode === 'dark' ? 'Dark theme enabled' : 'Light theme enabled'}
             </p>
           </div>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`relative inline-flex h-8 w-16 items-center rounded-full border border-neutral-300 p-0.5 transition-colors shadow-sm ${
-              darkMode ? 'bg-primary-600 border-primary-600' : 'bg-neutral-200'
-            }`}
-          >
-            <span
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full bg-white shadow transition-transform duration-200 ${
-                darkMode ? 'translate-x-8' : 'translate-x-0'
-              }`}
-            >
-              {darkMode ? (
-                <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-warning-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-                </svg>
-              )}
-            </span>
-          </button>
+          <div className="flex gap-1">
+            {(['light', 'system', 'dark'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setColorMode(mode)}
+                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                  colorMode === mode
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+                }`}
+              >
+                {mode === 'light' ? 'Light' : mode === 'dark' ? 'Dark' : 'System'}
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -1296,7 +1290,7 @@ function AccountSettingsTab({
       {/* Password change modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100">
               <h3 className="text-lg font-bold text-neutral-900">Change Password</h3>
               <button
@@ -1367,7 +1361,7 @@ function AccountSettingsTab({
       {/* Delete account modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100">
               <h3 className="text-lg font-bold text-danger-600">Delete Account</h3>
               <button

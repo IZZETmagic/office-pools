@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTheme } from '@/components/ThemeProvider'
+
+type ColorMode = 'light' | 'dark' | 'system'
 
 type AppHeaderProps = {
   /** Optional breadcrumb items to display between brand and nav links */
@@ -16,6 +19,16 @@ type AppHeaderProps = {
 export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { colorMode, setColorMode } = useTheme()
+
+  const cycleColorMode = () => {
+    const next: Record<ColorMode, ColorMode> = {
+      system: 'light',
+      light: 'dark',
+      dark: 'system',
+    }
+    setColorMode(next[colorMode])
+  }
 
   // Close menu on route change
   useEffect(() => {
@@ -43,7 +56,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
   }
 
   return (
-    <nav className="sticky top-0 z-10 bg-white shadow-sm">
+    <nav className="sticky top-0 z-10 bg-surface shadow-sm dark:shadow-none dark:border-b dark:border-border-default">
       <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         {/* Left: Brand + breadcrumbs */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -89,6 +102,28 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
               {link.label}
             </Link>
           ))}
+          <button
+            onClick={cycleColorMode}
+            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition"
+            aria-label={`Color mode: ${colorMode}`}
+            title={`Theme: ${colorMode}`}
+          >
+            {colorMode === 'light' && (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+              </svg>
+            )}
+            {colorMode === 'dark' && (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+              </svg>
+            )}
+            {colorMode === 'system' && (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
+              </svg>
+            )}
+          </button>
           <form action="/auth/signout" method="post">
             <button
               type="submit"
@@ -126,7 +161,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
             onClick={() => setMenuOpen(false)}
           />
           {/* Menu */}
-          <div className="sm:hidden absolute left-3 right-3 mt-2 bg-white rounded-xl shadow-xl border border-neutral-200/60 z-20 overflow-hidden animate-[slideDown_200ms_ease-out]">
+          <div className="sm:hidden absolute left-3 right-3 mt-2 bg-surface rounded-xl shadow-xl dark:shadow-none border border-neutral-200/60 z-20 overflow-hidden animate-[slideDown_200ms_ease-out]">
             <div className="p-2 flex flex-col gap-0.5">
               {navLinks.map((link) => (
                 <Link
@@ -164,7 +199,28 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
                 </Link>
               ))}
             </div>
-            <div className="border-t border-neutral-100 p-2">
+            <div className="border-t border-neutral-100 p-2 flex flex-col gap-0.5">
+              <button
+                onClick={cycleColorMode}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 font-medium transition"
+              >
+                {colorMode === 'light' && (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                  </svg>
+                )}
+                {colorMode === 'dark' && (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                  </svg>
+                )}
+                {colorMode === 'system' && (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
+                  </svg>
+                )}
+                {colorMode === 'light' ? 'Light Mode' : colorMode === 'dark' ? 'Dark Mode' : 'System Mode'}
+              </button>
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"

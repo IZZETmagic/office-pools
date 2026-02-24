@@ -350,21 +350,21 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
   }, [pools])
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-surface-secondary">
       <AppHeader isSuperAdmin={user.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-surface dark:via-surface dark:to-surface dark:border-b dark:border-border-default">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 shadow-lg shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-primary-600/20 backdrop-blur-sm flex items-center justify-center text-white dark:text-neutral-900 text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-primary-600/30 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white dark:text-neutral-900 truncate">
                 Pools
               </h2>
-              <p className="text-primary-100 text-sm sm:text-base">
+              <p className="text-primary-100 dark:text-neutral-500 text-sm sm:text-base">
                 Create, manage, and discover prediction pools
               </p>
             </div>
@@ -372,17 +372,17 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
           {/* Quick stats in hero */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPools}</p>
-              <p className="text-xs text-primary-200">Total Pools</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.totalPools}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{stats.activePools}</p>
-              <p className="text-xs text-primary-200">Active</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.activePools}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Active</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPoints}</p>
-              <p className="text-xs text-primary-200">Total Points</p>
+            <div className="bg-white/10 dark:bg-surface-tertiary backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10 dark:border-border-default">
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-neutral-900">{stats.totalPoints}</p>
+              <p className="text-xs text-primary-200 dark:text-neutral-500">Total Points</p>
             </div>
           </div>
         </div>
@@ -396,7 +396,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               onClick={() => setActiveTab('my-pools')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'my-pools'
-                  ? 'bg-white text-neutral-900 shadow-sm'
+                  ? 'bg-surface text-neutral-900 shadow-sm'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
@@ -406,7 +406,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               onClick={() => setActiveTab('discover')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'discover'
-                  ? 'bg-white text-neutral-900 shadow-sm'
+                  ? 'bg-surface text-neutral-900 shadow-sm'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
@@ -456,7 +456,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="all">All Statuses</option>
                   {availableStatuses.map((s) => (
@@ -468,7 +468,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="newest">Newest Joined</option>
                   <option value="oldest">Oldest Joined</option>

@@ -55,7 +55,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/* Right side — form content */}
-      <div className="flex-1 flex flex-col bg-neutral-50">
+      <div className="flex-1 flex flex-col bg-surface-secondary">
 
         {/* Mobile-only brand header + tagline — pinned to top */}
         <div className="lg:hidden px-6 pt-6 pb-4 grid grid-cols-[auto_1fr] gap-x-2 items-start">
