@@ -147,11 +147,11 @@ function PoolCard({ pool }: { pool: PoolData }) {
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.total_points ?? 0}</p>
           <p className="text-xs text-neutral-500">Points</p>
         </div>
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
           <span className="text-lg font-bold text-neutral-900 inline-flex items-center gap-1">
             {pool.current_rank ? (
               <>#{pool.current_rank}</>
@@ -162,7 +162,7 @@ function PoolCard({ pool }: { pool: PoolData }) {
           </span>
           <p className="text-xs text-neutral-500">Rank</p>
         </div>
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.memberCount}</p>
           <p className="text-xs text-neutral-500">Members</p>
         </div>

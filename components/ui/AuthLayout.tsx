@@ -7,7 +7,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     <div className="min-h-screen flex flex-col lg:flex-row">
 
       {/* Left side — branding panel (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.15_0.05_265)] text-white flex-col justify-between p-12 relative overflow-hidden">
 
         {/* Decorative background shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -20,7 +20,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className="relative z-10 grid grid-cols-[auto_1fr] gap-x-3 items-start">
           <span className="text-4xl row-span-2">&#9917;</span>
           <h1 className="text-3xl font-bold tracking-tight">Sport Pool</h1>
-          <p className="text-primary-200 text-lg">FIFA World Cup 2026</p>
+          <p className="text-primary-200 dark:text-white/50 text-lg">FIFA World Cup 2026</p>
         </div>
 
         {/* Center — tagline and feature highlights */}
@@ -28,28 +28,28 @@ export function AuthLayout({ children }: AuthLayoutProps) {
           <h2 className="text-4xl font-bold leading-tight">
             Predict. Compete.<br />Win.
           </h2>
-          <p className="text-primary-200 text-lg max-w-md">
+          <p className="text-primary-200 dark:text-white/50 text-lg max-w-md">
             Join your friends and compete to see who knows the beautiful game best.
           </p>
 
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#127942;</span>
-              <span className="text-primary-100">Predict match scores &amp; climb the leaderboard</span>
+              <span className="text-primary-100 dark:text-white/60">Predict match scores &amp; climb the leaderboard</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#128202;</span>
-              <span className="text-primary-100">Track your stats and accuracy over time</span>
+              <span className="text-primary-100 dark:text-white/60">Track your stats and accuracy over time</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#128101;</span>
-              <span className="text-primary-100">Create or join pools with friends &amp; family</span>
+              <span className="text-primary-100 dark:text-white/60">Create or join pools with friends &amp; family</span>
             </div>
           </div>
         </div>
 
         {/* Bottom */}
-        <div className="relative z-10 text-primary-300 text-sm">
+        <div className="relative z-10 text-primary-300 dark:text-white/40 text-sm">
           &copy; 2026 Sport Pool
         </div>
       </div>

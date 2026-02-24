@@ -73,14 +73,14 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-success-600">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" aria-hidden="true" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-32 lg:py-40">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight">
               Create Your FIFA World Cup 2026 Prediction Pool
             </h1>
-            <p className="mt-6 text-lg sm:text-xl text-primary-100 max-w-2xl mx-auto">
+            <p className="mt-6 text-lg sm:text-xl text-primary-100 dark:text-white/60 max-w-2xl mx-auto">
               Compete with friends, predict match results, and climb the
               leaderboard. The ultimate way to experience the World Cup.
             </p>
@@ -139,7 +139,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
             {/* Connecting line (desktop only) */}
-            <div className="hidden md:block absolute top-12 left-[20%] right-[20%] h-0.5 bg-primary-200" />
+            <div className="hidden md:block absolute top-6 left-[calc(100%/6)] right-[calc(100%/6)] h-0.5 bg-primary-200" />
             {steps.map((step) => (
               <div key={step.number} className="relative text-center">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-600 text-white text-xl font-bold mb-4 relative z-10">
@@ -158,12 +158,12 @@ export default function Home() {
       </section>
 
       {/* Call to Action */}
-      <section className="py-16 sm:py-24 bg-gradient-to-r from-primary-600 to-success-600">
+      <section className="py-16 sm:py-24 bg-gradient-to-r from-primary-600 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             Ready to Start Your Pool?
           </h2>
-          <p className="text-lg text-primary-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg text-primary-100 dark:text-white/60 mb-8 max-w-2xl mx-auto">
             Join fans around the world predicting the FIFA World Cup 2026.
             Setting up your pool takes less than a minute.
           </p>

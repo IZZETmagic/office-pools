@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import type { PredictionMap, Team, MatchConductData, ScoreEntry } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -47,45 +46,58 @@ export default async function DashboardPage() {
     .eq('user_id', userData.user_id)
     .order('joined_at', { ascending: false })
 
-  // STEP 4a: Fetch live matches
-  const { data: liveMatches } = await supabase
-    .from('matches')
-    .select(`
-      match_id,
-      match_number,
-      stage,
-      match_date,
-      status,
-      home_score_ft,
-      away_score_ft,
-      home_team:teams!matches_home_team_id_fkey(country_name),
-      away_team:teams!matches_away_team_id_fkey(country_name),
-      home_team_placeholder,
-      away_team_placeholder
-    `)
-    .eq('status', 'live')
-    .order('match_date', { ascending: true })
+  // STEP 4a: Fetch live matches — only from tournaments the user has pools in
+  // Collect unique tournament IDs from user's pools
+  const userTournamentIds = [...new Set((userPools ?? []).map((m: any) => m.pools.tournament_id))]
 
-  // STEP 4b: Fetch upcoming matches (next 5 unplayed matches)
-  const { data: upcomingMatches } = await supabase
-    .from('matches')
-    .select(`
-      match_id,
-      match_number,
-      stage,
-      match_date,
-      status,
-      home_team:teams!matches_home_team_id_fkey(country_name),
-      away_team:teams!matches_away_team_id_fkey(country_name),
-      home_team_placeholder,
-      away_team_placeholder
-    `)
-    .in('status', ['scheduled', 'upcoming'])
-    .order('match_date', { ascending: true })
-    .limit(5)
+  let liveMatches: any[] | null = null
+  if (userTournamentIds.length > 0) {
+    const { data } = await supabase
+      .from('matches')
+      .select(`
+        match_id,
+        match_number,
+        stage,
+        match_date,
+        status,
+        home_score_ft,
+        away_score_ft,
+        home_team:teams!matches_home_team_id_fkey(country_name),
+        away_team:teams!matches_away_team_id_fkey(country_name),
+        home_team_placeholder,
+        away_team_placeholder
+      `)
+      .eq('status', 'live')
+      .in('tournament_id', userTournamentIds)
+      .order('match_date', { ascending: true })
+    liveMatches = data
+  }
+
+  // STEP 4b: Fetch upcoming matches — only from tournaments the user has pools in
+  let upcomingMatches: any[] | null = null
+  if (userTournamentIds.length > 0) {
+    const { data } = await supabase
+      .from('matches')
+      .select(`
+        match_id,
+        match_number,
+        stage,
+        match_date,
+        status,
+        home_team:teams!matches_home_team_id_fkey(country_name),
+        away_team:teams!matches_away_team_id_fkey(country_name),
+        home_team_placeholder,
+        away_team_placeholder
+      `)
+      .in('status', ['scheduled', 'upcoming'])
+      .in('tournament_id', userTournamentIds)
+      .order('match_date', { ascending: true })
+      .limit(5)
+    upcomingMatches = data
+  }
 
   // Normalize team data (Supabase may return arrays for FK joins)
-  const rawNormalizedLiveMatches = (liveMatches ?? []).map((m: any) => ({
+  const normalizedLiveMatches = (liveMatches ?? []).map((m: any) => ({
     ...m,
     home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
@@ -97,7 +109,7 @@ export default async function DashboardPage() {
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
   }))
 
-  // STEP 5: Fetch shared data needed for bonus calculation + bracket resolution (teams, conduct)
+  // STEP 4c: Fetch shared data needed for bonus calculation (teams, conduct)
   const [{ data: allTeams }, { data: conductRes }] = await Promise.all([
     supabase
       .from('teams')
@@ -117,100 +129,7 @@ export default async function DashboardPage() {
 
   const conductData: MatchConductData[] = (conductRes ?? []) as MatchConductData[]
 
-  // STEP 4c: Fetch user's predictions for live matches (including knockout fields)
-  const liveMatchIds = rawNormalizedLiveMatches.map((m: any) => m.match_id)
-  const memberIds = (userPools ?? []).map((m: any) => m.member_id)
-  const hasKnockoutLive = rawNormalizedLiveMatches.some((m: any) => m.stage !== 'group')
-
-  let livePredictionMap: Record<string, { predicted_home_score: number; predicted_away_score: number }> = {}
-  if (liveMatchIds.length > 0 && memberIds.length > 0) {
-    const { data: livePredictions } = await supabase
-      .from('predictions')
-      .select('match_id, predicted_home_score, predicted_away_score')
-      .in('member_id', memberIds)
-      .in('match_id', liveMatchIds)
-
-    // Use first prediction found per match (user may be in multiple pools)
-    for (const p of livePredictions ?? []) {
-      if (!livePredictionMap[p.match_id]) {
-        livePredictionMap[p.match_id] = {
-          predicted_home_score: p.predicted_home_score,
-          predicted_away_score: p.predicted_away_score,
-        }
-      }
-    }
-  }
-
-  // STEP 4d: Resolve predicted team names for knockout live matches via bracket resolver
-  let knockoutPredictedTeams: Record<string, { home: string | null; away: string | null }> = {}
-  if (hasKnockoutLive && (userPools ?? []).length > 0) {
-    const firstPool = (userPools as any[])[0]
-    const tournamentId = firstPool.pools.tournament_id
-
-    // Fetch all matches for bracket resolution
-    const { data: allTournamentMatches } = await supabase
-      .from('matches')
-      .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
-      .eq('tournament_id', tournamentId)
-      .order('match_number', { ascending: true })
-
-    // Fetch all user predictions for this pool
-    const { data: allUserPredictions } = await supabase
-      .from('predictions')
-      .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .eq('member_id', firstPool.member_id)
-
-    const bracketMatches = (allTournamentMatches ?? []).map((m: any) => ({
-      ...m,
-      home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
-      away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-    }))
-
-    const bracketPredictionMap = new Map<string, ScoreEntry>()
-    for (const p of allUserPredictions ?? []) {
-      bracketPredictionMap.set(p.match_id, {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        homePso: p.predicted_home_pso ?? null,
-        awayPso: p.predicted_away_pso ?? null,
-        winnerTeamId: p.predicted_winner_team_id ?? null,
-      })
-    }
-
-    // Build match_number → match_id lookup for live matches
-    const liveMatchNumberToId = new Map<number, string>()
-    for (const m of rawNormalizedLiveMatches) {
-      liveMatchNumberToId.set(m.match_number, m.match_id)
-    }
-
-    const bracket = resolveFullBracket({
-      matches: bracketMatches,
-      predictionMap: bracketPredictionMap,
-      teams,
-      conductData,
-    })
-
-    // Map predicted team names to live knockout matches
-    for (const [matchNumber, resolved] of bracket.knockoutTeamMap) {
-      const matchId = liveMatchNumberToId.get(matchNumber)
-      if (matchId) {
-        knockoutPredictedTeams[matchId] = {
-          home: resolved.home?.country_name ?? null,
-          away: resolved.away?.country_name ?? null,
-        }
-      }
-    }
-  }
-
-  // Attach predictions + knockout predicted teams to live matches
-  const normalizedLiveMatches = rawNormalizedLiveMatches.map((m: any) => ({
-    ...m,
-    prediction: livePredictionMap[m.match_id] ?? null,
-    predicted_home_team_name: knockoutPredictedTeams[m.match_id]?.home ?? null,
-    predicted_away_team_name: knockoutPredictedTeams[m.match_id]?.away ?? null,
-  }))
-
-  // STEP 6: Enrich each pool with calculated points (match + bonus), member count, match counts
+  // STEP 5: Enrich each pool with calculated points (match + bonus), member count, match counts
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
       const pool = m.pools

@@ -59,12 +59,6 @@ type UpcomingMatch = {
 type LiveMatch = UpcomingMatch & {
   home_score_ft: number | null
   away_score_ft: number | null
-  prediction: {
-    predicted_home_score: number
-    predicted_away_score: number
-  } | null
-  predicted_home_team_name: string | null
-  predicted_away_team_name: string | null
 }
 
 type DashboardClientProps = {
@@ -200,11 +194,11 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mb-5 text-center">
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.total_points ?? 0}</p>
           <p className="text-xs text-neutral-500">Total Points</p>
         </div>
-        <div className="bg-neutral-50 rounded-lg py-2 px-1 flex items-center justify-center">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1 flex items-center justify-center">
           <span className="text-lg font-bold text-neutral-900 inline-flex items-center gap-1 whitespace-nowrap">
             {pool.current_rank ? (
               <>
@@ -218,7 +212,7 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
             )}
           </span>
         </div>
-        <div className="bg-neutral-50 rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.completedMatches}/{pool.totalMatches}</p>
           <p className="text-xs text-neutral-500">Matches</p>
         </div>
@@ -453,7 +447,6 @@ export function DashboardClient({
               {liveMatches.map((match) => {
                 const homeTeam = (match.home_team as any)?.country_name ?? match.home_team_placeholder ?? 'TBD'
                 const awayTeam = (match.away_team as any)?.country_name ?? match.away_team_placeholder ?? 'TBD'
-                const isKnockout = match.stage !== 'group'
                 return (
                   <Card key={match.match_id} className="border-danger-200 bg-danger-50/30">
                     <div className="flex items-center justify-between mb-2">
@@ -473,27 +466,6 @@ export function DashboardClient({
                     <div className="flex items-center justify-between">
                       <div className="flex-1 text-right pr-3">
                         <p className="font-semibold text-neutral-900">{homeTeam}</p>
-                        {match.prediction && (
-                          <p className="text-xs text-neutral-500 mt-0.5">
-                            {isKnockout ? (
-                              <>
-                                {match.predicted_home_team_name && (
-                                  <span className="text-neutral-400">{match.predicted_home_team_name}{' '}</span>
-                                )}
-                                <span className="font-semibold text-neutral-600">
-                                  {match.prediction.predicted_home_score}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                Your prediction{' '}
-                                <span className="font-semibold text-neutral-600">
-                                  {match.prediction.predicted_home_score}
-                                </span>
-                              </>
-                            )}
-                          </p>
-                        )}
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1 bg-surface rounded-lg shadow-sm border border-neutral-200">
                         <span className="text-xl font-bold text-neutral-900">{match.home_score_ft ?? 0}</span>
@@ -502,27 +474,6 @@ export function DashboardClient({
                       </div>
                       <div className="flex-1 pl-3">
                         <p className="font-semibold text-neutral-900">{awayTeam}</p>
-                        {match.prediction && (
-                          <p className="text-xs text-neutral-500 mt-0.5">
-                            {isKnockout ? (
-                              <>
-                                <span className="font-semibold text-neutral-600">
-                                  {match.prediction.predicted_away_score}
-                                </span>
-                                {match.predicted_away_team_name && (
-                                  <span className="text-neutral-400">{' '}{match.predicted_away_team_name}</span>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                <span className="font-semibold text-neutral-600">
-                                  {match.prediction.predicted_away_score}
-                                </span>
-                                {' '}Your prediction
-                              </>
-                            )}
-                          </p>
-                        )}
                       </div>
                     </div>
                     {match.match_date && (
@@ -544,7 +495,11 @@ export function DashboardClient({
             <h3 className="text-xl font-bold text-neutral-900 mb-4">Upcoming Matches</h3>
             {upcomingMatches.length === 0 ? (
               <Card>
-                <p className="text-neutral-600">No upcoming matches scheduled.</p>
+                <p className="text-neutral-600">
+                  {pools.length === 0
+                    ? 'Join a pool to see upcoming matches.'
+                    : 'No upcoming matches scheduled.'}
+                </p>
               </Card>
             ) : (
               <div className="space-y-3">

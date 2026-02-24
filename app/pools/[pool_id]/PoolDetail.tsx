@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { AppHeader } from '@/components/ui/AppHeader'
@@ -138,6 +139,34 @@ export function PoolDetail({
 
   // Ref to check PredictionsFlow unsaved state
   const predictionsRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
+
+  // Leave pool state
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const adminCount = members.filter((m) => m.role === 'admin').length
+  const isSoleAdmin = isAdmin && adminCount <= 1
+
+  async function handleLeavePool() {
+    setLeaving(true)
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('pool_members')
+      .delete()
+      .eq('member_id', memberId)
+
+    if (error) {
+      setLeaving(false)
+      setShowLeaveModal(false)
+      return
+    }
+
+    await supabase.rpc('recalculate_pool_leaderboard', {
+      p_pool_id: pool.pool_id,
+    })
+
+    router.push('/pools')
+  }
 
   // Auto-refresh data on leaderboard, results, and standings tabs
   useEffect(() => {
@@ -313,6 +342,21 @@ export function PoolDetail({
                   ))}
                 </>
               )}
+
+              {/* Leave Pool button */}
+              {!isSoleAdmin && (
+                <>
+                  <div className="flex items-center px-1 sm:px-2">
+                    <div className="h-5 w-px bg-neutral-300" />
+                  </div>
+                  <button
+                    onClick={() => setShowLeaveModal(true)}
+                    className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
+                  >
+                    Leave Pool
+                  </button>
+                </>
+              )}
             </div>
           </div>
           {/* Scroll fade indicator for mobile */}
@@ -435,6 +479,50 @@ export function PoolDetail({
               </Button>
               <Button variant="gray" onClick={handleCancelNav} fullWidth>
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Pool Confirmation Modal */}
+      {showLeaveModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => { if (!leaving) setShowLeaveModal(false) }}
+          />
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">Leave Pool</h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Are you sure you want to leave <span className="font-semibold text-neutral-900">{pool.pool_name}</span>?
+            </p>
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-5">
+              <ul className="text-sm text-danger-800 space-y-1">
+                <li>&#8226; Your predictions will be permanently deleted</li>
+                <li>&#8226; Your scores and ranking will be removed</li>
+                <li>&#8226; You will need a pool code to rejoin</li>
+              </ul>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="gray"
+                onClick={() => setShowLeaveModal(false)}
+                disabled={leaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleLeavePool}
+                loading={leaving}
+                loadingText="Leaving..."
+              >
+                Leave Pool
               </Button>
             </div>
           </div>
