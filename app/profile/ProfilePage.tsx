@@ -209,8 +209,8 @@ export default function ProfilePage({
               <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
                 {profile.full_name || profile.username}
               </h2>
-              <p className="text-primary-100 dark:text-primary-200 text-sm sm:text-base">@{profile.username}</p>
-              <p className="text-primary-200 text-xs sm:text-sm mt-1">
+              <p className="text-primary-100 dark:text-white/60 text-sm sm:text-base">@{profile.username}</p>
+              <p className="text-primary-200 dark:text-white/50 text-xs sm:text-sm mt-1">
                 Member since {formatMemberSince(profile.created_at)}
               </p>
             </div>
@@ -220,7 +220,7 @@ export default function ProfilePage({
           <div className="grid grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{poolMemberships.length}</p>
-              <p className="text-xs text-primary-200">Pools</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Pools</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
@@ -229,13 +229,13 @@ export default function ProfilePage({
                   return sum + (ps ? ps.total_points : p.total_points)
                 }, 0)}
               </p>
-              <p className="text-xs text-primary-200">Total Points</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
                 {poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0)}
               </p>
-              <p className="text-xs text-primary-200">Predictions</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Predictions</p>
             </div>
           </div>
         </div>

@@ -364,7 +364,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
                 Pools
               </h2>
-              <p className="text-primary-100 dark:text-primary-200 text-sm sm:text-base">
+              <p className="text-primary-100 dark:text-white/60 text-sm sm:text-base">
                 Create, manage, and discover prediction pools
               </p>
             </div>
@@ -374,15 +374,15 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
           <div className="grid grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPools}</p>
-              <p className="text-xs text-primary-200">Total Pools</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Total Pools</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{stats.activePools}</p>
-              <p className="text-xs text-primary-200">Active</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Active</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPoints}</p>
-              <p className="text-xs text-primary-200">Total Points</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
         </div>

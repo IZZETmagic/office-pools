@@ -313,7 +313,7 @@ export function DashboardClient({
               <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
                 Welcome, {user.full_name || user.username || 'Player'}!
               </h2>
-              <p className="text-primary-100 dark:text-primary-200 text-sm sm:text-base">@{user.username}</p>
+              <p className="text-primary-100 dark:text-white/60 text-sm sm:text-base">@{user.username}</p>
             </div>
           </div>
 
@@ -321,17 +321,17 @@ export function DashboardClient({
           <div className="grid grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
-              <p className="text-xs text-primary-200">Active Pools</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Active Pools</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
                 {bestRank ? `#${bestRank}` : '--'}
               </p>
-              <p className="text-xs text-primary-200">Best Rank</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{totalPoints}</p>
-              <p className="text-xs text-primary-200">Total Points</p>
+              <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
         </div>
