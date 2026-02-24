@@ -354,7 +354,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       <AppHeader isSuperAdmin={user.is_super_admin} />
 
       {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-primary-900 dark:via-primary-800 dark:to-success-800">
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex items-center gap-5">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
