@@ -5,8 +5,8 @@ type AlertProps = {
 }
 
 const variantClasses = {
-  error: 'bg-danger-50 border border-danger-200 text-danger-600',
-  success: 'bg-success-50 border border-success-200 text-success-600',
+  error: 'bg-danger-50 border border-danger-200 text-danger-800',
+  success: 'bg-success-50 border border-success-200 text-success-800',
 }
 
 export function Alert({ variant, children, className = 'mb-4' }: AlertProps) {

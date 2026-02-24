@@ -2,15 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Alert } from '@/components/ui/Alert'
-import { Input } from '@/components/ui/Input'
-import { FormField } from '@/components/ui/FormField'
 import { AppHeader } from '@/components/ui/AppHeader'
+import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
+import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 
 // =====================
 // TYPES
@@ -294,173 +292,11 @@ export function DashboardClient({
   totalPoints,
   bestRank,
 }: DashboardClientProps) {
-  const supabase = createClient()
   const router = useRouter()
 
   // Modal state
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
-
-  // Join pool state
-  const [joinCode, setJoinCode] = useState('')
-  const [joinLoading, setJoinLoading] = useState(false)
-  const [joinError, setJoinError] = useState<string | null>(null)
-  const [joinSuccess, setJoinSuccess] = useState<string | null>(null)
-
-  // Create pool state
-  const [createLoading, setCreateLoading] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [createSuccess, setCreateSuccess] = useState<string | null>(null)
-  const [newPoolName, setNewPoolName] = useState('')
-  const [newPoolDescription, setNewPoolDescription] = useState('')
-  const [createdPoolCode, setCreatedPoolCode] = useState<string | null>(null)
-
-  // =====================
-  // JOIN POOL
-  // =====================
-  const handleJoinPool = async () => {
-    setJoinLoading(true)
-    setJoinError(null)
-    setJoinSuccess(null)
-
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('auth_user_id', authUser?.id)
-      .single()
-
-    if (!userData) {
-      setJoinError('Could not find your account.')
-      setJoinLoading(false)
-      return
-    }
-
-    const { data: pool, error: poolError } = await supabase
-      .from('pools')
-      .select('pool_id, pool_name, status')
-      .eq('pool_code', joinCode)
-      .single()
-
-    if (poolError || !pool) {
-      setJoinError('Pool not found. Check the code and try again.')
-      setJoinLoading(false)
-      return
-    }
-
-    if (pool.status !== 'open') {
-      setJoinError('This pool is no longer accepting new members.')
-      setJoinLoading(false)
-      return
-    }
-
-    const { error: insertError } = await supabase
-      .from('pool_members')
-      .insert({
-        pool_id: pool.pool_id,
-        user_id: userData.user_id,
-        role: 'player',
-      })
-
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setJoinError('You are already a member of this pool!')
-      } else {
-        setJoinError(insertError.message)
-      }
-      setJoinLoading(false)
-      return
-    }
-
-    setJoinSuccess(`Joined "${pool.pool_name}"!`)
-    setJoinCode('')
-    setJoinLoading(false)
-    setTimeout(() => {
-      setShowJoinModal(false)
-      setJoinSuccess(null)
-    }, 1500)
-    router.refresh()
-  }
-
-  // =====================
-  // CREATE POOL
-  // =====================
-  const handleCreatePool = async () => {
-    setCreateLoading(true)
-    setCreateError(null)
-    setCreateSuccess(null)
-
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('auth_user_id', authUser?.id)
-      .single()
-
-    if (!userData) {
-      setCreateError('Could not find your account.')
-      setCreateLoading(false)
-      return
-    }
-
-    const { data: tournament } = await supabase
-      .from('tournaments')
-      .select('tournament_id')
-      .limit(1)
-      .single()
-
-    if (!tournament) {
-      setCreateError('No tournament found. Contact support.')
-      setCreateLoading(false)
-      return
-    }
-
-    const { data: newPool, error: poolError } = await supabase
-      .from('pools')
-      .insert({
-        pool_name: newPoolName,
-        description: newPoolDescription || null,
-        tournament_id: tournament.tournament_id,
-        admin_user_id: userData.user_id,
-        prediction_deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'open',
-      })
-      .select()
-      .single()
-
-    if (poolError) {
-      if (poolError.code === '23505') {
-        setCreateError('Please try again.')
-      } else {
-        setCreateError(poolError.message)
-      }
-      setCreateLoading(false)
-      return
-    }
-
-    const { error: memberError } = await supabase
-      .from('pool_members')
-      .insert({
-        pool_id: newPool.pool_id,
-        user_id: userData.user_id,
-        role: 'admin',
-      })
-
-    if (memberError) {
-      setCreateError('Pool created but could not add you as admin: ' + memberError.message)
-      setCreateLoading(false)
-      return
-    }
-
-    setCreatedPoolCode(newPool.pool_code)
-    setCreateSuccess(`Pool "${newPoolName}" created!`)
-    setNewPoolName('')
-    setNewPoolDescription('')
-    setCreateLoading(false)
-    router.refresh()
-  }
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -485,7 +321,7 @@ export function DashboardClient({
           <div className="grid grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
-              <p className="text-xs text-primary-200">Total Pools</p>
+              <p className="text-xs text-primary-200">Active Pools</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
@@ -541,15 +377,18 @@ export function DashboardClient({
         {/* My Pools section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-neutral-900">My Pools</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold text-neutral-900">My Pools</h3>
+              <Link
+                href="/pools"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                View All &rarr;
+              </Link>
+            </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  setJoinError(null)
-                  setJoinSuccess(null)
-                  setJoinCode('')
-                  setShowJoinModal(true)
-                }}
+                onClick={() => setShowJoinModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -558,14 +397,7 @@ export function DashboardClient({
                 Join
               </button>
               <button
-                onClick={() => {
-                  setCreateError(null)
-                  setCreateSuccess(null)
-                  setCreatedPoolCode(null)
-                  setNewPoolName('')
-                  setNewPoolDescription('')
-                  setShowCreateModal(true)
-                }}
+                onClick={() => setShowCreateModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-success-600 bg-success-50 border border-success-200 rounded-lg hover:bg-success-100 hover:border-success-300 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -582,7 +414,7 @@ export function DashboardClient({
               <p className="text-neutral-500">Use the buttons above to join or create a pool.</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...pools].sort((a, b) => {
                 // Sort: incomplete drafts first, then not started, then submitted, then by deadline
                 const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
@@ -772,169 +604,18 @@ export function DashboardClient({
         </div>
       </main>
 
-      {/* Join Pool Modal */}
+      {/* Modals */}
       {showJoinModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !joinLoading) setShowJoinModal(false)
-          }}
-        >
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100">
-              <h2 className="text-lg font-bold text-neutral-900">Join a Pool</h2>
-              <button
-                onClick={() => !joinLoading && setShowJoinModal(false)}
-                className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="px-4 sm:px-6 py-4 sm:py-5">
-              <p className="text-sm text-neutral-600 mb-4">Enter the pool code shared with you to join.</p>
-
-              {joinError && <Alert variant="error" className="mb-3">{joinError}</Alert>}
-              {joinSuccess && <Alert variant="success" className="mb-3">{joinSuccess}</Alert>}
-
-              <FormField label="Pool Code">
-                <Input
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. HSBC2026"
-                />
-              </FormField>
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 px-4 sm:px-6 pb-4 sm:pb-5">
-              <Button
-                variant="gray"
-                onClick={() => setShowJoinModal(false)}
-                disabled={joinLoading}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleJoinPool}
-                disabled={joinLoading || !joinCode}
-                loading={joinLoading}
-                loadingText="Joining..."
-                className="flex-1"
-              >
-                Join Pool
-              </Button>
-            </div>
-          </div>
-        </div>
+        <JoinPoolModal
+          onClose={() => setShowJoinModal(false)}
+          onSuccess={() => { setShowJoinModal(false); router.refresh() }}
+        />
       )}
-
-      {/* Create Pool Modal */}
       {showCreateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !createLoading) setShowCreateModal(false)
-          }}
-        >
-          <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100">
-              <h2 className="text-lg font-bold text-neutral-900">Create a Pool</h2>
-              <button
-                onClick={() => !createLoading && setShowCreateModal(false)}
-                className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
-              <p className="text-sm text-neutral-600">Start your own pool and invite friends with a code.</p>
-
-              {createError && <Alert variant="error">{createError}</Alert>}
-              {createSuccess && (
-                <Alert variant="success">
-                  <p>{createSuccess}</p>
-                  {createdPoolCode && (
-                    <p className="mt-1">
-                      Pool code: <strong className="font-mono text-lg">{createdPoolCode}</strong>
-                    </p>
-                  )}
-                </Alert>
-              )}
-
-              {!createSuccess && (
-                <>
-                  <FormField label="Pool Name *">
-                    <Input
-                      type="text"
-                      value={newPoolName}
-                      onChange={(e) => setNewPoolName(e.target.value)}
-                      placeholder="e.g. Office World Cup 2026"
-                      focusColor="green"
-                    />
-                  </FormField>
-
-                  <FormField label="Description (optional)">
-                    <textarea
-                      value={newPoolDescription}
-                      onChange={(e) => setNewPoolDescription(e.target.value)}
-                      placeholder="Tell people about your pool..."
-                      rows={2}
-                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-success-500 focus:border-transparent text-neutral-900"
-                    />
-                  </FormField>
-                </>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 px-4 sm:px-6 pb-4 sm:pb-5">
-              {createSuccess ? (
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  Done
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    variant="gray"
-                    onClick={() => setShowCreateModal(false)}
-                    disabled={createLoading}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="green"
-                    onClick={handleCreatePool}
-                    disabled={createLoading || !newPoolName}
-                    loading={createLoading}
-                    loadingText="Creating..."
-                    className="flex-1"
-                  >
-                    Create Pool
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <CreatePoolModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => { setShowCreateModal(false); router.refresh() }}
+        />
       )}
     </div>
   )

@@ -21,7 +21,7 @@ export default function Footer() {
   if (HIDDEN_ROUTES.includes(pathname)) return null
 
   return (
-    <footer className="bg-neutral-900 text-neutral-400 py-8 sm:py-12">
+    <footer className="bg-neutral-900 text-neutral-300 py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6 sm:mb-8">
           <span className="text-white text-lg font-bold">&#9917; Sport Pool</span>

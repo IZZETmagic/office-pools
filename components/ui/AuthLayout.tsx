@@ -10,7 +10,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white flex-col justify-between p-12 relative overflow-hidden">
 
         {/* Decorative background shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
           <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/5 rounded-full" />
           <div className="absolute top-1/3 -right-16 w-56 h-56 bg-white/5 rounded-full" />
           <div className="absolute -bottom-12 left-1/4 w-40 h-40 bg-white/5 rounded-full" />

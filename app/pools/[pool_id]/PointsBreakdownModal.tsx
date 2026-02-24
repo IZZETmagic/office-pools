@@ -65,6 +65,9 @@ export function PointsBreakdownModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="points-breakdown-title"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -77,7 +80,7 @@ export function PointsBreakdownModal({
               <span className="text-2xl font-bold text-primary-600 flex-shrink-0 bg-primary-50 rounded-lg px-2.5 py-1">#{rank}</span>
             )}
             <div className="min-w-0">
-              <h2 className="text-lg font-bold text-neutral-900 truncate">{playerName}</h2>
+              <h2 id="points-breakdown-title" className="text-lg font-bold text-neutral-900 truncate">{playerName}</h2>
               {username && member.users?.full_name && (
                 <span className="text-sm text-neutral-500">@{username}</span>
               )}
@@ -88,7 +91,7 @@ export function PointsBreakdownModal({
             className="flex-shrink-0 p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
             aria-label="Close"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

@@ -387,7 +387,7 @@ export function GroupStandingsComparison({
   currentMemberId,
 }: GroupStandingsComparisonProps) {
   const [selectedMemberId, setSelectedMemberId] = useState<string>(currentMemberId)
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Build list of members who have predictions (for admin dropdown)
   // Uses allPredictions data instead of has_submitted_predictions flag which can be stale

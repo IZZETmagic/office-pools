@@ -13,7 +13,7 @@ export function FormField({ label, helperText, children, className }: FormFieldP
       </label>
       {children}
       {helperText && (
-        <p className="text-xs text-neutral-600 mt-1">{helperText}</p>
+        <p className="text-xs text-neutral-700 mt-1">{helperText}</p>
       )}
     </div>
   )

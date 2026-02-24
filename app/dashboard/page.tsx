@@ -341,17 +341,20 @@ export default async function DashboardPage() {
     })
   )
 
-  // Calculate stats
-  const totalPools = pools.length
-  const totalPoints = pools.reduce((sum: number, p: any) => sum + (p.total_points ?? 0), 0)
-  const bestRank = pools
+  // Filter to only active pools for dashboard display
+  const activePools = pools.filter((p: any) => p.status === 'open' || p.status === 'active')
+
+  // Calculate stats from active pools
+  const totalPools = activePools.length
+  const totalPoints = activePools.reduce((sum: number, p: any) => sum + (p.total_points ?? 0), 0)
+  const bestRank = activePools
     .filter((p: any) => p.current_rank != null)
     .reduce((best: number | null, p: any) => {
       if (best === null) return p.current_rank
       return p.current_rank < best ? p.current_rank : best
     }, null as number | null)
 
-  // Build activity feed
+  // Build activity feed (from all pools, not just active)
   const activities = pools
     .map((p: any) => ({
       type: 'joined' as const,
@@ -366,7 +369,7 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       user={userData}
-      pools={pools}
+      pools={activePools}
       liveMatches={normalizedLiveMatches}
       upcomingMatches={normalizedUpcomingMatches}
       activities={activities}
