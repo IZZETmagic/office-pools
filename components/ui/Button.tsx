@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 type ButtonBaseProps = {
-  variant?: 'primary' | 'green' | 'outline' | 'gray'
+  variant?: 'primary' | 'green' | 'outline' | 'gray' | 'danger' | 'warning'
   size?: 'sm' | 'md' | 'lg'
   fullWidth?: boolean
   loading?: boolean
@@ -27,6 +27,8 @@ const variantClasses = {
   green: 'bg-success-600 text-white hover:bg-success-700',
   outline: 'bg-white text-primary-700 border-2 border-primary-700 hover:bg-primary-50',
   gray: 'bg-neutral-200 text-neutral-800 hover:bg-neutral-300',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700',
+  warning: 'bg-warning-500 text-white hover:bg-warning-600',
 }
 
 const sizeClasses = {

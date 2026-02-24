@@ -132,12 +132,13 @@ function getMatchWinner(homeScore: number, awayScore: number): 'home' | 'away' |
 // TAB CONFIG
 // =====================
 
-const TAB_CONFIG: { key: Tab; label: string; icon: React.ReactNode }[] = [
+const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.ReactNode }[] = [
   {
     key: 'edit',
     label: 'Edit Profile',
+    mobileLabel: 'Edit Profile',
     icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
       </svg>
     ),
@@ -145,8 +146,9 @@ const TAB_CONFIG: { key: Tab; label: string; icon: React.ReactNode }[] = [
   {
     key: 'statistics',
     label: 'Statistics',
+    mobileLabel: 'Statistics',
     icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
       </svg>
     ),
@@ -154,8 +156,9 @@ const TAB_CONFIG: { key: Tab; label: string; icon: React.ReactNode }[] = [
   {
     key: 'predictions',
     label: 'Prediction History',
+    mobileLabel: 'History',
     icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
@@ -163,8 +166,9 @@ const TAB_CONFIG: { key: Tab; label: string; icon: React.ReactNode }[] = [
   {
     key: 'settings',
     label: 'Account Settings',
+    mobileLabel: 'Settings',
     icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
@@ -241,19 +245,20 @@ export default function ProfilePage({
           {/* Left sidebar - tab navigation */}
           <div className="w-full md:w-56 shrink-0">
             <Card padding="md" className="!p-2">
-              <div className="flex flex-row md:flex-col gap-1 overflow-x-auto">
+              <div className="flex flex-row md:flex-col gap-1">
                 {TAB_CONFIG.map(tab => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2.5 whitespace-nowrap ${
+                    className={`flex-1 md:flex-none md:w-full text-left px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center md:justify-start gap-1.5 sm:gap-2.5 ${
                       activeTab === tab.key
                         ? 'bg-primary-600 text-white shadow-sm'
                         : 'text-neutral-700 hover:bg-neutral-100'
                     }`}
                   >
                     {tab.icon}
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="md:hidden">{tab.mobileLabel}</span>
+                    <span className="hidden md:inline">{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -705,19 +710,7 @@ function StatisticsTab({
                       )}
                     </td>
                     <td className="text-center py-3 px-3 font-semibold text-neutral-900">
-                      {(() => {
-                        const ps = playerScoresMap[pool.member_id]
-                        const total = ps ? ps.total_points : pool.total_points
-                        const bonus = ps?.bonus_points ?? 0
-                        return (
-                          <span title={bonus > 0 ? `Match: ${ps!.match_points} + Bonus: ${bonus}` : undefined}>
-                            {total}
-                            {bonus > 0 && (
-                              <span className="text-xs text-success-600 ml-1">+{bonus}</span>
-                            )}
-                          </span>
-                        )
-                      })()}
+                      {playerScoresMap[pool.member_id]?.total_points ?? pool.total_points}
                     </td>
                     <td className="text-center py-3 px-3 text-neutral-700">
                       {pool.totalPredictions}/{totalMatchCount}

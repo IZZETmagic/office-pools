@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -321,9 +321,9 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
         {/* Step indicator */}
         {!success && (
-          <div className="flex items-center gap-1 px-4 sm:px-6 pt-3 pb-2 shrink-0">
+          <div className="flex items-center justify-center gap-3 px-4 sm:px-6 pt-3 pb-2 shrink-0">
             {STEPS.map((step, idx) => (
-              <div key={step.key} className="flex items-center gap-1 flex-1">
+              <React.Fragment key={step.key}>
                 <button
                   onClick={() => {
                     if (idx <= currentStepIndex) {
@@ -334,7 +334,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       setCurrentStep(step.key)
                     }
                   }}
-                  className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-2 text-xs font-medium transition-colors ${
                     step.key === currentStep
                       ? 'text-success-600'
                       : idx < currentStepIndex
@@ -343,7 +343,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   }`}
                 >
                   <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                       step.key === currentStep
                         ? 'bg-success-600 text-white'
                         : idx < currentStepIndex
@@ -359,12 +359,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       idx + 1
                     )}
                   </span>
-                  <span className="hidden sm:inline">{step.label}</span>
+                  <span>{step.label}</span>
                 </button>
                 {idx < STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 rounded ${idx < currentStepIndex ? 'bg-neutral-300' : 'bg-neutral-100'}`} />
+                  <div className={`w-6 sm:w-12 h-0.5 rounded ${idx < currentStepIndex ? 'bg-neutral-300' : 'bg-neutral-100'}`} />
                 )}
-              </div>
+              </React.Fragment>
             ))}
           </div>
         )}
@@ -569,12 +569,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
                   {/* Scoring info note */}
                   <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
-                    <svg className="w-5 h-5 text-primary-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                     </svg>
                     <div>
                       <p className="text-sm font-medium text-primary-800">Scoring & Bonus Points</p>
-                      <p className="text-xs text-primary-600 mt-0.5">
+                      <p className="text-xs text-primary-800 mt-0.5">
                         Your pool will be created with default scoring settings. You can customize all scoring rules, multipliers, and bonus points from the pool admin settings after creation.
                       </p>
                     </div>

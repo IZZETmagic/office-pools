@@ -501,70 +501,71 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       </Card>
 
       {/* Danger Zone */}
-      <div className="border-2 border-danger-300 rounded-lg p-4 sm:p-6 bg-danger-50">
-        <h3 className="text-lg font-semibold text-danger-600 mb-4">
+      <Card className="mb-6 border border-danger-200">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Danger Zone
         </h3>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Archive */}
           <div>
             <h4 className="text-sm font-semibold text-neutral-900 mb-1">
               Archive Pool
             </h4>
-            <p className="text-sm text-neutral-600 mb-3">
-              Archive this pool to preserve data but prevent new activity.
+            <p className="text-sm text-neutral-700 mb-3">
+              Preserve data but prevent new activity.
             </p>
-            <button
-              onClick={handleArchivePool}
-              className="px-4 py-2 text-sm rounded-lg font-semibold bg-warning-500 text-white hover:bg-warning-600 transition"
-            >
+            <Button variant="warning" size="sm" onClick={handleArchivePool}>
               Archive Pool
-            </button>
+            </Button>
           </div>
-
-          <hr className="border-danger-200" />
 
           {/* Delete */}
           <div>
             <h4 className="text-sm font-semibold text-neutral-900 mb-1">
               Delete Pool
             </h4>
-            <p className="text-sm text-neutral-600 mb-3">
-              Permanently delete this pool and all data. This action CANNOT be
-              undone.
+            <p className="text-sm text-neutral-700 mb-3">
+              Permanently delete this pool and all data.
             </p>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition"
-            >
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}>
               Delete Pool
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deleting) {
+              setShowDeleteModal(false)
+              setDeleteConfirmName('')
+            }
+          }}
+        >
           <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-danger-600 mb-3">
-              Delete Pool - PERMANENT ACTION
+            <h3 className="text-lg font-bold text-neutral-900 mb-3">
+              Delete Pool
             </h3>
 
-            <p className="text-sm text-neutral-600 mb-3">
-              You are about to PERMANENTLY DELETE:
+            <p className="text-sm text-neutral-700 mb-3">
+              You are about to permanently delete this pool:
             </p>
 
             <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-4">
-              <p className="text-sm font-bold text-danger-700 mb-2">
+              <p className="text-sm font-bold text-danger-800 mb-2">
                 {pool.pool_name}
               </p>
-              <ul className="text-sm text-danger-600 space-y-1">
-                <li>- {members.length} members will lose access</li>
-                <li>- All predictions will be deleted</li>
-                <li>- All member data will be deleted</li>
-                <li>- This action CANNOT be undone</li>
+              <ul className="text-sm text-danger-800 space-y-1">
+                <li>&#8226; {members.length} members will lose access</li>
+                <li>&#8226; All predictions will be deleted</li>
+                <li>&#8226; All member data will be deleted</li>
+                <li>&#8226; This action cannot be undone</li>
               </ul>
             </div>
 
@@ -577,11 +578,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               />
             </FormField>
 
-            <p className="text-sm text-danger-600 font-bold mt-3 mb-4">
-              THIS WILL DELETE EVERYTHING
-            </p>
-
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-3 justify-end mt-4">
               <Button
                 variant="gray"
                 onClick={() => {
@@ -592,15 +589,15 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               >
                 Cancel
               </Button>
-              <button
+              <Button
+                variant="danger"
                 onClick={handleDeletePool}
                 disabled={deleteConfirmName !== pool.pool_name || deleting}
-                className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={deleting}
+                loadingText="Deleting..."
               >
-                {deleting
-                  ? 'Deleting...'
-                  : 'I Understand, Delete Forever'}
-              </button>
+                I Understand, Delete Forever
+              </Button>
             </div>
           </div>
         </div>
