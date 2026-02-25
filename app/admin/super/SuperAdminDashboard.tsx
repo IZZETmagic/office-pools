@@ -12,6 +12,7 @@ import { MatchesTab } from './MatchesTab'
 import { UsersTab } from './UsersTab'
 import { PoolsTab } from './PoolsTab'
 import { AuditLogTab } from './AuditLogTab'
+import { formatNumber } from '@/lib/format'
 
 type Tab = 'matches' | 'users' | 'pools' | 'audit'
 
@@ -67,20 +68,20 @@ export function SuperAdminDashboard({
           <div className="text-neutral-300 whitespace-nowrap">
             Matches:{' '}
             <span className="text-white font-bold">
-              {completedMatches}/{totalMatches}
+              {formatNumber(completedMatches)}/{formatNumber(totalMatches)}
             </span>
           </div>
           <div className="text-neutral-300 whitespace-nowrap">
             Users:{' '}
-            <span className="text-white font-bold">{activeUsers}</span>
+            <span className="text-white font-bold">{formatNumber(activeUsers)}</span>
           </div>
           <div className="text-neutral-300 whitespace-nowrap">
             Pools:{' '}
-            <span className="text-white font-bold">{activePools}</span>
+            <span className="text-white font-bold">{formatNumber(activePools)}</span>
           </div>
           <div className="text-neutral-300 whitespace-nowrap">
             Audit:{' '}
-            <span className="text-white font-bold">{auditLogs.length}</span>
+            <span className="text-white font-bold">{formatNumber(auditLogs.length)}</span>
           </div>
         </div>
       </div>

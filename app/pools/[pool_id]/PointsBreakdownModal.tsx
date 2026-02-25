@@ -2,14 +2,15 @@
 
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
-import type { MemberData, PlayerScoreData, BonusScoreData } from './types'
+import type { LeaderboardEntry, PlayerScoreData, BonusScoreData } from './types'
+import { formatNumber } from '@/lib/format'
 
 // =============================================
 // TYPES & CONSTANTS
 // =============================================
 
 type PointsBreakdownModalProps = {
-  member: MemberData
+  entry: LeaderboardEntry
   playerScore: PlayerScoreData | null
   bonusScores: BonusScoreData[]
   onClose: () => void
@@ -29,14 +30,14 @@ const CATEGORY_CONFIG: Record<string, { label: string; bgClass: string; textClas
 // =============================================
 
 export function PointsBreakdownModal({
-  member,
+  entry,
   playerScore,
   bonusScores,
   onClose,
 }: PointsBreakdownModalProps) {
-  const matchPoints = playerScore?.match_points ?? member.total_points ?? 0
+  const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
-  const totalPoints = playerScore?.total_points ?? member.total_points ?? 0
+  const totalPoints = playerScore?.total_points ?? entry.total_points ?? 0
 
   // Group bonus scores by category
   const groupedBonuses = useMemo(() => {
@@ -58,9 +59,10 @@ export function PointsBreakdownModal({
     return subtotals
   }, [groupedBonuses])
 
-  const rank = member.current_rank
-  const playerName = member.users?.full_name || member.users?.username || 'Unknown Player'
-  const username = member.users?.username
+  const rank = entry.current_rank
+  const playerName = entry.users?.full_name || entry.users?.username || 'Unknown Player'
+  const username = entry.users?.username
+  const entryName = entry.entry_name
 
   return (
     <div
@@ -81,9 +83,14 @@ export function PointsBreakdownModal({
             )}
             <div className="min-w-0">
               <h2 id="points-breakdown-title" className="text-lg font-bold text-neutral-900 truncate">{playerName}</h2>
-              {username && member.users?.full_name && (
-                <span className="text-sm text-neutral-500">@{username}</span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {username && entry.users?.full_name && (
+                  <span className="text-sm text-neutral-500">@{username}</span>
+                )}
+                {entryName && entryName !== 'Entry 1' && (
+                  <span className="text-xs text-neutral-400">({entryName})</span>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -103,27 +110,27 @@ export function PointsBreakdownModal({
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <div className="bg-primary-50 rounded-lg p-3 text-center">
               <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">Match</div>
-              <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{matchPoints}</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{formatNumber(matchPoints)}</div>
             </div>
             <div className="bg-success-50 rounded-lg p-3 text-center">
               <div className="text-[11px] sm:text-xs font-medium text-success-600 uppercase tracking-wide">Bonus</div>
-              <div className="text-xl sm:text-2xl font-bold text-success-700 mt-1">{bonusPoints}</div>
+              <div className="text-xl sm:text-2xl font-bold text-success-700 mt-1">{formatNumber(bonusPoints)}</div>
             </div>
             <div className="bg-neutral-50 rounded-lg p-3 text-center border-2 border-neutral-200">
               <div className="text-[11px] sm:text-xs font-medium text-neutral-600 uppercase tracking-wide">Total</div>
-              <div className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1">{totalPoints}</div>
+              <div className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1">{formatNumber(totalPoints)}</div>
             </div>
           </div>
 
           {/* Formula display */}
           <div className="text-center text-sm text-neutral-500">
-            <span className="text-primary-600 font-medium">{matchPoints}</span>
+            <span className="text-primary-600 font-medium">{formatNumber(matchPoints)}</span>
             {' '}match pts
             {' + '}
-            <span className="text-success-600 font-medium">{bonusPoints}</span>
+            <span className="text-success-600 font-medium">{formatNumber(bonusPoints)}</span>
             {' '}bonus pts
             {' = '}
-            <span className="text-neutral-900 font-bold">{totalPoints}</span>
+            <span className="text-neutral-900 font-bold">{formatNumber(totalPoints)}</span>
             {' '}total
           </div>
 
@@ -160,7 +167,7 @@ export function PointsBreakdownModal({
                           {config.label}
                         </span>
                         <span className={`text-sm font-bold ${config.textClass}`}>
-                          {subtotal} pts
+                          {formatNumber(subtotal)} pts
                         </span>
                       </div>
 
@@ -175,7 +182,7 @@ export function PointsBreakdownModal({
                               {entry.description}
                             </span>
                             <span className="text-neutral-900 font-semibold flex-shrink-0">
-                              +{entry.points_earned}
+                              +{formatNumber(entry.points_earned)}
                             </span>
                           </div>
                         ))}

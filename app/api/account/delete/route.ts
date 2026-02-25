@@ -28,46 +28,65 @@ export async function DELETE() {
 
   const memberIds = members ? members.map((m: any) => m.member_id) : []
 
+  // Collect all entry_ids for this user's members
+  let entryIds: string[] = []
+  if (memberIds.length > 0) {
+    const { data: entries } = await supabase
+      .from('pool_entries')
+      .select('entry_id')
+      .in('member_id', memberIds)
+    entryIds = entries ? entries.map((e: any) => e.entry_id) : []
+  }
+
   // Use admin client for deletions (bypasses RLS, can delete auth users)
   const adminSupabase = createAdminClient()
 
-  // Delete in FK-safe order (same cascade pattern as PoolsTab.tsx)
-  if (memberIds.length > 0) {
+  // Delete in FK-safe order: entry-level data first, then entries, then members
+  if (entryIds.length > 0) {
     const { error: e1 } = await adminSupabase
       .from('match_scores')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e1) return NextResponse.json({ error: 'Failed to delete match scores' }, { status: 500 })
 
     const { error: e2 } = await adminSupabase
       .from('bonus_scores')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e2) return NextResponse.json({ error: 'Failed to delete bonus scores' }, { status: 500 })
 
     const { error: e3 } = await adminSupabase
       .from('predictions')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e3) return NextResponse.json({ error: 'Failed to delete predictions' }, { status: 500 })
 
     const { error: e4 } = await adminSupabase
       .from('group_predictions')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e4) return NextResponse.json({ error: 'Failed to delete group predictions' }, { status: 500 })
 
     const { error: e5 } = await adminSupabase
       .from('special_predictions')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e5) return NextResponse.json({ error: 'Failed to delete special predictions' }, { status: 500 })
 
     const { error: e6 } = await adminSupabase
       .from('player_scores')
       .delete()
-      .in('member_id', memberIds)
+      .in('entry_id', entryIds)
     if (e6) return NextResponse.json({ error: 'Failed to delete player scores' }, { status: 500 })
+  }
+
+  // Delete pool entries
+  if (memberIds.length > 0) {
+    const { error: eEntries } = await adminSupabase
+      .from('pool_entries')
+      .delete()
+      .in('member_id', memberIds)
+    if (eEntries) return NextResponse.json({ error: 'Failed to delete pool entries' }, { status: 500 })
   }
 
   // Delete pool memberships

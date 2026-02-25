@@ -4,6 +4,7 @@ import { PoolDetail } from './PoolDetail'
 import type {
   PoolData,
   MemberData,
+  EntryData,
   MatchData,
   SettingsData,
   PredictionData,
@@ -54,12 +55,11 @@ export default async function PoolPage({
     // Pool details
     supabase.from('pools').select('*').eq('pool_id', pool_id).single(),
 
-    // Members with user info
+    // Members with user info and their entries
     supabase
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email)')
-      .eq('pool_id', pool_id)
-      .order('current_rank', { ascending: true, nullsFirst: false }),
+      .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
+      .eq('pool_id', pool_id),
 
     // Pool settings
     supabase.from('pool_settings').select('*').eq('pool_id', pool_id).single(),
@@ -95,23 +95,46 @@ export default async function PoolPage({
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
   }))
 
-  const members = (membersRes.data || []) as MemberData[]
+  // Process members: attach entries array and sort entries by entry_number
+  const members = (membersRes.data || []).map((m: any) => {
+    const entries = (m.pool_entries || []) as EntryData[]
+    entries.sort((a: EntryData, b: EntryData) => a.entry_number - b.entry_number)
+    return {
+      ...m,
+      pool_entries: undefined,
+      entries,
+    } as MemberData
+  })
+
   const settings = settingsRes.data as SettingsData | null
   const teams = (teamsRes.data || []) as TeamData[]
 
-  // Fetch conduct data for group stage tiebreakers
+  // Collect all entry IDs across all members
+  const allEntries = members.flatMap((m) => m.entries || [])
+  const allEntryIds = allEntries.map((e) => e.entry_id)
+
+  // Get the current user's entries
+  const currentMember = members.find(m => m.member_id === membership.member_id)
+  const userEntries = currentMember?.entries || []
+  const userEntryIds = userEntries.map((e) => e.entry_id)
+
+  // Fetch conduct data, player scores, bonus scores (by entry_id now)
   const [{ data: conductRes }, { data: playerScoresRes }, { data: bonusScoresRes }] = await Promise.all([
     supabase
       .from('match_conduct')
       .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    supabase
-      .from('player_scores')
-      .select('member_id, match_points, bonus_points, total_points')
-      .in('member_id', members.map(m => m.member_id)),
-    supabase
-      .from('bonus_scores')
-      .select('bonus_score_id, member_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
-      .in('member_id', members.map(m => m.member_id)),
+    allEntryIds.length > 0
+      ? supabase
+          .from('player_scores')
+          .select('entry_id, match_points, bonus_points, total_points')
+          .in('entry_id', allEntryIds)
+      : Promise.resolve({ data: [] }),
+    allEntryIds.length > 0
+      ? supabase
+          .from('bonus_scores')
+          .select('bonus_score_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
+          .in('entry_id', allEntryIds)
+      : Promise.resolve({ data: [] }),
   ])
 
   const conductData = (conductRes || []) as {
@@ -123,29 +146,25 @@ export default async function PoolPage({
     yellow_direct_red_cards: number
   }[]
 
-  const playerScores = (playerScoresRes || []) as {
-    member_id: string
-    match_points: number
-    bonus_points: number
-    total_points: number
-  }[]
-
+  const playerScores = (playerScoresRes || []) as PlayerScoreData[]
   const bonusScores = (bonusScoresRes || []) as BonusScoreData[]
 
-  // Fetch user's predictions (for results + predictions tabs)
-  const { data: userPredictions } = await supabase
-    .from('predictions')
-    .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
-    .eq('member_id', membership.member_id)
+  // Fetch user's predictions for the first entry (default active entry)
+  const defaultEntry = userEntries[0]
+  const { data: userPredictions } = defaultEntry
+    ? await supabase
+        .from('predictions')
+        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
+        .eq('entry_id', defaultEntry.entry_id)
+    : { data: [] }
 
   // Fetch all predictions (needed for admin tabs + leaderboard bonus computation)
   let allPredictions: PredictionData[] = []
-  const memberIds = members.map((m) => m.member_id)
-  if (memberIds.length > 0) {
+  if (allEntryIds.length > 0) {
     const { data: predData } = await supabase
       .from('predictions')
       .select('*')
-      .in('member_id', memberIds)
+      .in('entry_id', allEntryIds)
 
     allPredictions = (predData || []) as PredictionData[]
   }
@@ -156,9 +175,6 @@ export default async function PoolPage({
     : false
 
   const psoEnabled = settings?.pso_enabled ?? true
-
-  // Get the current member's submission state
-  const currentMember = members.find(m => m.member_id === membership.member_id)
 
   return (
     <PoolDetail
@@ -177,10 +193,7 @@ export default async function PoolPage({
       isAdmin={isAdmin}
       isPastDeadline={isPastDeadline}
       psoEnabled={psoEnabled}
-      hasSubmitted={currentMember?.has_submitted_predictions ?? false}
-      submittedAt={currentMember?.predictions_submitted_at ?? null}
-      lastSavedAt={currentMember?.predictions_last_saved_at ?? null}
-      predictionsLocked={currentMember?.predictions_locked ?? false}
+      userEntries={userEntries}
       isSuperAdmin={userData.is_super_admin ?? false}
     />
   )

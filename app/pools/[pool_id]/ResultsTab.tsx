@@ -27,7 +27,7 @@ type ResultsTabProps = {
   isAdmin: boolean
   members: MemberData[]
   allPredictions: PredictionData[]
-  currentMemberId: string
+  currentEntryId: string
 }
 
 export function ResultsTab({
@@ -41,7 +41,7 @@ export function ResultsTab({
   isAdmin,
   members,
   allPredictions,
-  currentMemberId,
+  currentEntryId,
 }: ResultsTabProps) {
   // Build prediction lookup
   const predictionMap = new Map(
@@ -147,7 +147,7 @@ export function ResultsTab({
       isAdmin={isAdmin}
       members={members}
       allPredictions={allPredictions}
-      currentMemberId={currentMemberId}
+      currentEntryId={currentEntryId}
     />
   )
 }

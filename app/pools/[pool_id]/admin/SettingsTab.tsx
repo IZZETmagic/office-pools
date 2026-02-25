@@ -28,6 +28,9 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
   const [maxParticipants, setMaxParticipants] = useState(
     pool.max_participants?.toString() || '0'
   )
+  const [maxEntries, setMaxEntries] = useState(
+    pool.max_entries_per_user?.toString() || '1'
+  )
 
   // Deadline
   const [deadlineDate, setDeadlineDate] = useState(
@@ -45,6 +48,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
   const [saving, setSaving] = useState(false)
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [savingPrivacy, setSavingPrivacy] = useState(false)
+  const [savingEntries, setSavingEntries] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -164,6 +168,43 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
     setSavingPrivacy(false)
   }
 
+  async function handleSaveEntries() {
+    setSavingEntries(true)
+    setError(null)
+    setSuccess(null)
+
+    const maxE = parseInt(maxEntries) || 1
+    if (maxE < 1 || maxE > 10) {
+      setError('Max entries must be between 1 and 10.')
+      setSavingEntries(false)
+      return
+    }
+
+    // Check if any member currently has more entries than the new max
+    const currentMax = Math.max(...members.map(m => (m.entries || []).length), 0)
+    if (maxE < currentMax) {
+      setError(`Cannot reduce below ${currentMax} — some members already have that many entries.`)
+      setSavingEntries(false)
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('pools')
+      .update({
+        max_entries_per_user: maxE,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('pool_id', pool.pool_id)
+
+    if (updateError) {
+      setError(updateError.message)
+    } else {
+      setPool({ ...pool, max_entries_per_user: maxE })
+      setSuccess('Prediction entries setting updated.')
+    }
+    setSavingEntries(false)
+  }
+
   async function handleArchivePool() {
     if (!confirm('Are you sure you want to archive this pool? Members will still be able to view data but not make changes.'))
       return
@@ -188,17 +229,31 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
     setDeleting(true)
     setError(null)
 
-    // Delete in order: predictions -> pool_members -> pool_settings -> pools
+    // Delete in order: predictions -> entries -> pool_members -> pool_settings -> pools
     const memberIds = members.map((m) => m.member_id)
+    const entryIds = members.flatMap((m) => (m.entries || []).map(e => e.entry_id))
 
-    if (memberIds.length > 0) {
+    if (entryIds.length > 0) {
       const { error: predErr } = await supabase
         .from('predictions')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
 
       if (predErr) {
         setError('Failed to delete predictions: ' + predErr.message)
+        setDeleting(false)
+        return
+      }
+    }
+
+    if (memberIds.length > 0) {
+      const { error: entryErr } = await supabase
+        .from('pool_entries')
+        .delete()
+        .in('member_id', memberIds)
+
+      if (entryErr) {
+        setError('Failed to delete entries: ' + entryErr.message)
         setDeleting(false)
         return
       }
@@ -496,6 +551,52 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
             loadingText="Saving..."
           >
             Save Privacy Settings
+          </Button>
+        </div>
+      </Card>
+
+      {/* Prediction Entries */}
+      <Card className="mb-6">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+          Prediction Entries
+        </h3>
+
+        <p className="text-sm text-neutral-600 mb-4">
+          Allow members to submit multiple sets of predictions. Each entry is scored and ranked independently on the leaderboard.
+        </p>
+
+        <div className="space-y-4">
+          <FormField
+            label="Max Entries Per Member"
+            helperText="How many prediction sets each member can submit (1-10)"
+          >
+            <Input
+              type="number"
+              min="1"
+              max="10"
+              value={maxEntries}
+              onChange={(e) => setMaxEntries(e.target.value)}
+              className="max-w-[200px]"
+            />
+          </FormField>
+
+          {parseInt(maxEntries) > 1 && (
+            <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+              <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-primary-800">
+                Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
+              </p>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSaveEntries}
+            loading={savingEntries}
+            loadingText="Saving..."
+          >
+            Save Entries Setting
           </Button>
         </div>
       </Card>

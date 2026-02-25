@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/Alert'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { useTheme } from '@/components/ThemeProvider'
 import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
+import { formatNumber } from '@/lib/format'
 
 // =====================
 // TYPES
@@ -37,11 +38,12 @@ type PoolMembership = {
   has_submitted_predictions: boolean
   joined_at: string
   prediction_count: number
+  entry_id: string | null
 }
 
 type Prediction = {
   prediction_id: string
-  member_id: string
+  entry_id: string
   match_id: string
   predicted_home_score: number
   predicted_away_score: number
@@ -224,16 +226,16 @@ export default function ProfilePage({
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
-                {poolMemberships.reduce((sum, p) => {
-                  const ps = playerScoresMap[p.member_id]
+                {formatNumber(poolMemberships.reduce((sum, p) => {
+                  const ps = playerScoresMap[p.entry_id || p.member_id]
                   return sum + (ps ? ps.total_points : p.total_points)
-                }, 0)}
+                }, 0))}
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">
-                {poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0)}
+                {formatNumber(poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0))}
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Predictions</p>
             </div>
@@ -512,7 +514,7 @@ function StatisticsTab({
 }) {
   const totalPools = poolMemberships.length
   const totalPoints = poolMemberships.reduce((sum, p) => {
-    const ps = playerScoresMap[p.member_id]
+    const ps = playerScoresMap[p.entry_id || p.member_id]
     return sum + (ps ? ps.total_points : p.total_points)
   }, 0)
   const totalPredictions = poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0)
@@ -525,7 +527,7 @@ function StatisticsTab({
 
   const poolStats = useMemo(() => {
     return poolMemberships.map(pool => {
-      const poolPredictions = predictions.filter(p => p.member_id === pool.member_id)
+      const poolPredictions = predictions.filter(p => p.entry_id === pool.entry_id)
       const completedPredictions = poolPredictions.filter(
         p => p.matches?.status === 'completed'
       )
@@ -634,7 +636,7 @@ function StatisticsTab({
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-2xl font-bold text-success-600">{totalPoints}</p>
+              <p className="text-2xl font-bold text-success-600">{formatNumber(totalPoints)}</p>
               <p className="text-xs text-neutral-500">Total Points</p>
             </div>
           </div>
@@ -647,7 +649,7 @@ function StatisticsTab({
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-2xl font-bold text-accent-500">{totalPredictions}</p>
+              <p className="text-2xl font-bold text-accent-500">{formatNumber(totalPredictions)}</p>
               <p className="text-xs text-neutral-500">Predictions</p>
             </div>
           </div>
@@ -711,7 +713,7 @@ function StatisticsTab({
                       )}
                     </td>
                     <td className="text-center py-3 px-3 font-semibold text-neutral-900">
-                      {playerScoresMap[pool.member_id]?.total_points ?? pool.total_points}
+                      {formatNumber(playerScoresMap[pool.entry_id || pool.member_id]?.total_points ?? pool.total_points)}
                     </td>
                     <td className="text-center py-3 px-3 text-neutral-700">
                       {pool.totalPredictions}/{totalMatchCount}
@@ -813,21 +815,23 @@ function PredictionHistoryTab({
   const [currentPage, setCurrentPage] = useState(1)
   const perPage = 20
 
-  const memberToPool = useMemo(() => {
+  const entryToPool = useMemo(() => {
     const map: Record<string, PoolMembership> = {}
     for (const pm of poolMemberships) {
-      map[pm.member_id] = pm
+      if (pm.entry_id) map[pm.entry_id] = pm
     }
     return map
   }, [poolMemberships])
 
-  const memberToSettings = useMemo(() => {
+  const entryToSettings = useMemo(() => {
     const map: Record<string, PoolSettings> = {}
     for (const pm of poolMemberships) {
-      const raw = poolSettingsMap[pm.pool_id]
-      map[pm.member_id] = raw
-        ? { ...DEFAULT_POOL_SETTINGS, ...raw }
-        : DEFAULT_POOL_SETTINGS
+      if (pm.entry_id) {
+        const raw = poolSettingsMap[pm.pool_id]
+        map[pm.entry_id] = raw
+          ? { ...DEFAULT_POOL_SETTINGS, ...raw }
+          : DEFAULT_POOL_SETTINGS
+      }
     }
     return map
   }, [poolMemberships, poolSettingsMap])
@@ -847,7 +851,7 @@ function PredictionHistoryTab({
       let pointsDisplay = 'Pending'
 
       if ((m.status === 'completed' || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
-        const settings = memberToSettings[pred.member_id] ?? DEFAULT_POOL_SETTINGS
+        const settings = entryToSettings[pred.entry_id] ?? DEFAULT_POOL_SETTINGS
         const result = calculatePoints(
           pred.predicted_home_score,
           pred.predicted_away_score,
@@ -859,13 +863,13 @@ function PredictionHistoryTab({
 
         if (result.type === 'exact') {
           classification = 'exact'
-          pointsDisplay = `+${result.points}`
+          pointsDisplay = `+${formatNumber(result.points)}`
         } else if (result.type === 'winner_gd') {
           classification = 'winner_gd'
-          pointsDisplay = `+${result.points}`
+          pointsDisplay = `+${formatNumber(result.points)}`
         } else if (result.type === 'winner') {
           classification = 'winner'
-          pointsDisplay = `+${result.points}`
+          pointsDisplay = `+${formatNumber(result.points)}`
         } else {
           classification = 'incorrect'
           pointsDisplay = '+0'
@@ -874,16 +878,17 @@ function PredictionHistoryTab({
 
       return { ...pred, classification, pointsDisplay }
     })
-  }, [predictions, memberToSettings])
+  }, [predictions, entryToSettings])
 
   const filtered = useMemo(() => {
     let result = classified
 
     if (poolFilter !== 'all') {
-      const poolMemberIds = poolMemberships
+      const poolEntryIds = poolMemberships
         .filter(pm => pm.pool_id === poolFilter)
-        .map(pm => pm.member_id)
-      result = result.filter(p => poolMemberIds.includes(p.member_id))
+        .map(pm => pm.entry_id)
+        .filter(Boolean) as string[]
+      result = result.filter(p => poolEntryIds.includes(p.entry_id))
     }
 
     if (statusFilter !== 'all') {

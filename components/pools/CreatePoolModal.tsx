@@ -86,6 +86,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // Step 3: Pool Settings
   const [isPrivate, setIsPrivate] = useState(false)
   const [maxParticipants, setMaxParticipants] = useState('0')
+  const [maxEntries, setMaxEntries] = useState('1')
   const [deadlineDate, setDeadlineDate] = useState('2026-06-11')
   const [deadlineTime, setDeadlineTime] = useState('13:00')
 
@@ -189,6 +190,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     }
 
     const maxP = parseInt(maxParticipants) || 0
+    const maxE = Math.max(1, Math.min(10, parseInt(maxEntries) || 1))
     const deadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
 
     // 1. Create pool
@@ -203,6 +205,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         status: 'open',
         is_private: isPrivate,
         max_participants: maxP > 0 ? maxP : null,
+        max_entries_per_user: maxE,
       })
       .select()
       .single()
@@ -218,18 +221,33 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     }
 
     // 2. Add creator as admin
-    const { error: memberError } = await supabase
+    const { data: memberData, error: memberError } = await supabase
       .from('pool_members')
       .insert({
         pool_id: newPool.pool_id,
         user_id: userData.user_id,
         role: 'admin',
       })
+      .select('member_id')
+      .single()
 
     if (memberError) {
       setError('Pool created but could not add you as admin: ' + memberError.message)
       setLoading(false)
       return
+    }
+
+    // 2b. Auto-create first entry for the creator
+    const { error: entryError } = await supabase
+      .from('pool_entries')
+      .insert({
+        member_id: memberData.member_id,
+        entry_name: 'Entry 1',
+        entry_number: 1,
+      })
+
+    if (entryError) {
+      console.error('Failed to create first entry:', entryError.message)
     }
 
     // 3. Update pool_settings with default scoring values (trigger auto-creates the row)
@@ -563,6 +581,31 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         focusColor="green"
                       />
                     </FormField>
+                  </div>
+
+                  <hr className="border-neutral-100" />
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Prediction Entries</h3>
+                    <p className="text-sm text-neutral-600 mb-3">
+                      Allow members to submit multiple sets of predictions, each scored independently.
+                    </p>
+                    <FormField label="Max Entries Per Member" helperText="1-10 (default: 1)">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={maxEntries}
+                        onChange={(e) => setMaxEntries(e.target.value)}
+                        className="max-w-[200px]"
+                        focusColor="green"
+                      />
+                    </FormField>
+                    {parseInt(maxEntries) > 1 && (
+                      <p className="text-xs text-neutral-500 mt-2">
+                        Members can create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each appears as its own row on the leaderboard.
+                      </p>
+                    )}
                   </div>
 
                   <hr className="border-neutral-100" />

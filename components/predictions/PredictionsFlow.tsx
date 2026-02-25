@@ -27,7 +27,7 @@ import { useToast } from '@/components/ui/Toast'
 type Props = {
   matches: Match[]
   teams: Team[]
-  memberId: string
+  entryId: string
   poolId: string
   existingPredictions: Prediction[]
   isPastDeadline: boolean
@@ -54,7 +54,7 @@ const STAGE_MATCH_STAGES: Record<string, string[]> = {
 export default function PredictionsFlow({
   matches,
   teams,
-  memberId,
+  entryId,
   poolId,
   existingPredictions,
   isPastDeadline,
@@ -246,7 +246,7 @@ export default function PredictionsFlow({
 
   useEffect(() => {
     try {
-      const backup = localStorage.getItem(`predictions_backup_${poolId}`)
+      const backup = localStorage.getItem(`predictions_backup_${poolId}_${entryId}`)
       if (backup) {
         const parsed = JSON.parse(backup)
         // Check if it has a timestamp wrapper or is raw data
@@ -260,12 +260,12 @@ export default function PredictionsFlow({
           setShowRecoveryModal(true)
         } else {
           // Stale backup, discard
-          localStorage.removeItem(`predictions_backup_${poolId}`)
+          localStorage.removeItem(`predictions_backup_${poolId}_${entryId}`)
         }
       }
     } catch {
       // Corrupted backup, discard
-      localStorage.removeItem(`predictions_backup_${poolId}`)
+      localStorage.removeItem(`predictions_backup_${poolId}_${entryId}`)
     }
   }, [poolId])
 
@@ -277,7 +277,7 @@ export default function PredictionsFlow({
       }
       setPredictions(next)
       pendingChanges.current = true
-      localStorage.removeItem(`predictions_backup_${poolId}`)
+      localStorage.removeItem(`predictions_backup_${poolId}_${entryId}`)
       setShowRecoveryModal(false)
       setRecoveryData(null)
       showToast('Predictions recovered! Saving...', 'success')
@@ -287,7 +287,7 @@ export default function PredictionsFlow({
   }
 
   const handleDiscardBackup = () => {
-    localStorage.removeItem(`predictions_backup_${poolId}`)
+    localStorage.removeItem(`predictions_backup_${poolId}_${entryId}`)
     setShowRecoveryModal(false)
     setRecoveryData(null)
     showToast('Backup discarded', 'info')
@@ -351,7 +351,7 @@ export default function PredictionsFlow({
       try {
         const backup: Record<string, ScoreEntry> = {}
         for (const [k, v] of predictions) backup[k] = v
-        localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+        localStorage.setItem(`predictions_backup_${poolId}_${entryId}`, JSON.stringify({
           predictions: backup,
           timestamp: Date.now(),
         }))
@@ -402,7 +402,7 @@ export default function PredictionsFlow({
         const res = await fetch(`/api/pools/${poolId}/predictions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ predictions: predictionsPayload }),
+          body: JSON.stringify({ entryId, predictions: predictionsPayload }),
         })
 
         // Session expiry detection
@@ -414,7 +414,7 @@ export default function PredictionsFlow({
           try {
             const backup: Record<string, ScoreEntry> = {}
             for (const [k, v] of predictions) backup[k] = v
-            localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+            localStorage.setItem(`predictions_backup_${poolId}_${entryId}`, JSON.stringify({
               predictions: backup,
               timestamp: Date.now(),
             }))
@@ -443,7 +443,7 @@ export default function PredictionsFlow({
         lastSavedPredictions.current = new Map(predictions)
 
         // Clear any localStorage backup on successful save
-        try { localStorage.removeItem(`predictions_backup_${poolId}`) } catch {}
+        try { localStorage.removeItem(`predictions_backup_${poolId}_${entryId}`) } catch {}
 
         // Reset to idle after 3 seconds
         setTimeout(() => {
@@ -467,7 +467,7 @@ export default function PredictionsFlow({
     try {
       const backup: Record<string, ScoreEntry> = {}
       for (const [k, v] of predictions) backup[k] = v
-      localStorage.setItem(`predictions_backup_${poolId}`, JSON.stringify({
+      localStorage.setItem(`predictions_backup_${poolId}_${entryId}`, JSON.stringify({
         predictions: backup,
         timestamp: Date.now(),
       }))
@@ -493,6 +493,7 @@ export default function PredictionsFlow({
       const res = await fetch(`/api/pools/${poolId}/predictions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
       })
 
       const data = await res.json()

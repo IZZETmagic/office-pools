@@ -6,8 +6,9 @@ import { Card } from '@/components/ui/Card'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
 import { calculatePoints, type PoolSettings } from './results/points'
-import type { MemberData, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
 import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
+import { formatNumber } from '@/lib/format'
 
 type LeaderboardTabProps = {
   members: MemberData[]
@@ -89,48 +90,62 @@ export function LeaderboardTab({
   allPredictions,
   poolSettings,
 }: LeaderboardTabProps) {
-  const [selectedMember, setSelectedMember] = useState<MemberData | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
 
-  // Build lookup map for player scores
+  // Flatten members into leaderboard entries (each entry is a row)
+  const leaderboardEntries: LeaderboardEntry[] = useMemo(() => {
+    const entries: LeaderboardEntry[] = []
+    for (const member of members) {
+      for (const entry of member.entries || []) {
+        entries.push({
+          ...entry,
+          users: member.users,
+          role: member.role,
+        })
+      }
+    }
+    return entries
+  }, [members])
+
+  // Build lookup map for player scores (by entry_id)
   const scoreMap = new Map<string, PlayerScoreData>()
   for (const ps of playerScores) {
-    scoreMap.set(ps.member_id, ps)
+    scoreMap.set(ps.entry_id, ps)
   }
 
   // Pre-compute shared data for bonus calculation
   const matchesWithResult = useMemo(() => matches.map(toMatchWithResult), [matches])
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
-  // Compute bonus scores for ALL members client-side
-  // This replaces the database-dependent bonusScores with live computation
+  // Compute bonus scores for ALL entries client-side
   const computedBonusMap = useMemo(() => {
     const map = new Map<string, BonusScoreData[]>()
 
-    // Group predictions by member
-    const predsByMember = new Map<string, PredictionData[]>()
+    // Group predictions by entry_id
+    const predsByEntry = new Map<string, PredictionData[]>()
     for (const p of allPredictions) {
-      const existing = predsByMember.get(p.member_id) || []
+      const existing = predsByEntry.get(p.entry_id) || []
       existing.push(p)
-      predsByMember.set(p.member_id, existing)
+      predsByEntry.set(p.entry_id, existing)
     }
 
-    // Calculate bonus for each member with predictions
-    for (const [memberId, preds] of predsByMember) {
+    // Calculate bonus for each entry with predictions
+    for (const [entryId, preds] of predsByEntry) {
       const predictionMap = buildPredictionMap(preds)
-      const entries = calculateAllBonusPoints({
-        memberId,
+      const bonusEntries = calculateAllBonusPoints({
+        memberId: entryId,
         memberPredictions: predictionMap,
         matches: matchesWithResult,
         teams: tournamentTeams,
         conductData,
         settings: poolSettings,
-        tournamentAwards: null, // Tournament awards not available client-side yet
+        tournamentAwards: null,
       })
 
-      // Convert BonusScoreEntry[] to BonusScoreData[] (add bonus_score_id)
-      const bonusData: BonusScoreData[] = entries.map((e, i) => ({
-        bonus_score_id: `computed-${memberId}-${i}`,
-        member_id: e.member_id,
+      // Convert BonusScoreEntry[] to BonusScoreData[]
+      const bonusData: BonusScoreData[] = bonusEntries.map((e, i) => ({
+        bonus_score_id: `computed-${entryId}-${i}`,
+        entry_id: e.entry_id,
         bonus_type: e.bonus_type,
         bonus_category: e.bonus_category,
         related_group_letter: e.related_group_letter,
@@ -139,25 +154,25 @@ export function LeaderboardTab({
         description: e.description,
       }))
 
-      map.set(memberId, bonusData)
+      map.set(entryId, bonusData)
     }
 
     return map
   }, [allPredictions, matchesWithResult, tournamentTeams, conductData, poolSettings])
 
-  // Compute match points for each member client-side too
+  // Compute match points for each entry client-side too
   const computedMatchPointsMap = useMemo(() => {
     const map = new Map<string, number>()
 
-    // Group predictions by member
-    const predsByMember = new Map<string, PredictionData[]>()
+    // Group predictions by entry_id
+    const predsByEntry = new Map<string, PredictionData[]>()
     for (const p of allPredictions) {
-      const existing = predsByMember.get(p.member_id) || []
+      const existing = predsByEntry.get(p.entry_id) || []
       existing.push(p)
-      predsByMember.set(p.member_id, existing)
+      predsByEntry.set(p.entry_id, existing)
     }
 
-    for (const [memberId, preds] of predsByMember) {
+    for (const [entryId, preds] of predsByEntry) {
       const predMap = new Map(preds.map(p => [p.match_id, p]))
       let totalMatchPts = 0
 
@@ -187,18 +202,18 @@ export function LeaderboardTab({
         }
       }
 
-      map.set(memberId, totalMatchPts)
+      map.set(entryId, totalMatchPts)
     }
 
     return map
   }, [allPredictions, matches, poolSettings])
 
-  // Get bonus data for a member — prefer computed, fall back to DB
-  const getBonusForMember = (memberId: string): BonusScoreData[] => {
-    return computedBonusMap.get(memberId) || bonusScores.filter(bs => bs.member_id === memberId)
+  // Get bonus data for an entry — prefer computed, fall back to DB
+  const getBonusForEntry = (entryId: string): BonusScoreData[] => {
+    return computedBonusMap.get(entryId) || bonusScores.filter(bs => bs.entry_id === entryId)
   }
 
-  // Check if any member has computed bonus points
+  // Check if any entry has computed bonus points
   const hasAnyBonusPoints = useMemo(() => {
     for (const entries of computedBonusMap.values()) {
       if (entries.length > 0) return true
@@ -207,14 +222,14 @@ export function LeaderboardTab({
   }, [computedBonusMap, playerScores])
 
   // Build computed player score for modal
-  const getPlayerScore = (memberId: string): PlayerScoreData => {
-    const computedMatchPts = computedMatchPointsMap.get(memberId)
-    const computedBonus = computedBonusMap.get(memberId)
+  const getPlayerScore = (entryId: string): PlayerScoreData => {
+    const computedMatchPts = computedMatchPointsMap.get(entryId)
+    const computedBonus = computedBonusMap.get(entryId)
     const computedBonusPts = computedBonus ? computedBonus.reduce((sum, e) => sum + e.points_earned, 0) : 0
 
     if (computedMatchPts !== undefined) {
       return {
-        member_id: memberId,
+        entry_id: entryId,
         match_points: computedMatchPts,
         bonus_points: computedBonusPts,
         total_points: computedMatchPts + computedBonusPts,
@@ -222,23 +237,33 @@ export function LeaderboardTab({
     }
 
     // Fall back to DB
-    const dbScore = scoreMap.get(memberId)
+    const dbScore = scoreMap.get(entryId)
     if (dbScore) return dbScore
 
-    // Last resort: member's total_points
-    const member = members.find(m => m.member_id === memberId)
+    // Last resort: entry's total_points
+    const entry = leaderboardEntries.find(e => e.entry_id === entryId)
     return {
-      member_id: memberId,
-      match_points: member?.total_points ?? 0,
+      entry_id: entryId,
+      match_points: entry?.total_points ?? 0,
       bonus_points: 0,
-      total_points: member?.total_points ?? 0,
+      total_points: entry?.total_points ?? 0,
     }
   }
 
-  // Sort by rank
-  const sorted = [...members].sort(
-    (a, b) => (a.current_rank ?? 999) - (b.current_rank ?? 999)
-  )
+  // Sort entries by computed total points (descending), then by rank as tiebreaker
+  const sorted = useMemo(() => {
+    return [...leaderboardEntries].sort((a, b) => {
+      const aScore = getPlayerScore(a.entry_id).total_points
+      const bScore = getPlayerScore(b.entry_id).total_points
+      if (bScore !== aScore) return bScore - aScore
+      return (a.current_rank ?? 999) - (b.current_rank ?? 999)
+    })
+  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap])
+
+  // Check if any member has multiple entries (to show entry name)
+  const hasMultipleEntries = useMemo(() => {
+    return members.some(m => (m.entries?.length ?? 0) > 1)
+  }, [members])
 
   if (sorted.length === 0) {
     return (
@@ -255,15 +280,15 @@ export function LeaderboardTab({
 
       {/* Mobile card view */}
       <div className="sm:hidden space-y-2">
-        {sorted.map((member, index) => {
-          const rank = member.current_rank || index + 1
+        {sorted.map((entry, index) => {
+          const rank = index + 1
           const isTopThree = rank <= 3
-          const ps = getPlayerScore(member.member_id)
+          const ps = getPlayerScore(entry.entry_id)
 
           return (
             <div
-              key={member.member_id}
-              onClick={() => setSelectedMember(member)}
+              key={entry.entry_id}
+              onClick={() => setSelectedEntry(entry)}
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 isTopThree
                   ? 'bg-warning-50 border-warning-200 active:bg-warning-100'
@@ -281,13 +306,16 @@ export function LeaderboardTab({
               {/* Player info */}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-neutral-900 truncate">
-                  {member.users?.full_name || member.users?.username || 'Unknown Player'}
+                  {entry.users?.full_name || entry.users?.username || 'Unknown Player'}
+                  {hasMultipleEntries && (
+                    <span className="text-neutral-500 font-normal"> - {entry.entry_name}</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {member.users?.username && member.users?.full_name && (
-                    <span className="text-xs text-neutral-500">@{member.users.username}</span>
+                  {entry.users?.username && entry.users?.full_name && (
+                    <span className="text-xs text-neutral-500">@{entry.users.username}</span>
                   )}
-                  {member.role === 'admin' && (
+                  {entry.role === 'admin' && (
                     <Badge variant="blue">Admin</Badge>
                   )}
                 </div>
@@ -295,10 +323,10 @@ export function LeaderboardTab({
 
               {/* Points */}
               <div className="flex-shrink-0 text-right">
-                <div className="text-lg font-bold text-primary-600">{ps.total_points}</div>
+                <div className="text-lg font-bold text-primary-600">{formatNumber(ps.total_points)}</div>
                 {hasAnyBonusPoints && ps.bonus_points > 0 ? (
                   <div className="text-[10px] text-neutral-500">
-                    {ps.match_points} + {ps.bonus_points} bonus
+                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                   </div>
                 ) : (
                   <div className="text-[10px] text-neutral-500 uppercase">pts</div>
@@ -347,15 +375,15 @@ export function LeaderboardTab({
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-200">
-            {sorted.map((member, index) => {
-              const rank = member.current_rank || index + 1
+            {sorted.map((entry, index) => {
+              const rank = index + 1
               const isTopThree = rank <= 3
-              const ps = getPlayerScore(member.member_id)
+              const ps = getPlayerScore(entry.entry_id)
 
               return (
                 <tr
-                  key={member.member_id}
-                  onClick={() => setSelectedMember(member)}
+                  key={entry.entry_id}
+                  onClick={() => setSelectedEntry(entry)}
                   className={`cursor-pointer transition-colors ${
                     isTopThree ? 'bg-warning-50 hover:bg-warning-100' : 'hover:bg-primary-50'
                   }`}
@@ -372,10 +400,13 @@ export function LeaderboardTab({
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-neutral-900">
-                        {member.users?.full_name || member.users?.username || 'Unknown Player'}
+                        {entry.users?.full_name || entry.users?.username || 'Unknown Player'}
+                        {hasMultipleEntries && (
+                          <span className="text-neutral-500 font-normal"> - {entry.entry_name}</span>
+                        )}
                       </div>
-                      {member.users?.username && member.users?.full_name && (
-                        <div className="text-xs text-neutral-600">@{member.users.username}</div>
+                      {entry.users?.username && entry.users?.full_name && (
+                        <div className="text-xs text-neutral-600">@{entry.users.username}</div>
                       )}
                     </div>
                   </td>
@@ -383,23 +414,23 @@ export function LeaderboardTab({
                     <>
                       <td className="px-3 md:px-4 py-4 whitespace-nowrap text-right">
                         <span className="text-sm font-medium text-neutral-700">
-                          {ps.match_points}
+                          {formatNumber(ps.match_points)}
                         </span>
                       </td>
                       <td className="px-3 md:px-4 py-4 whitespace-nowrap text-right">
                         <span className="text-sm font-medium text-success-600">
-                          {ps.bonus_points}
+                          {formatNumber(ps.bonus_points)}
                         </span>
                       </td>
                     </>
                   )}
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                     <span className="text-xl font-bold text-primary-600">
-                      {ps.total_points}
+                      {formatNumber(ps.total_points)}
                     </span>
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
-                    {member.role === 'admin' && (
+                    {entry.role === 'admin' && (
                       <Badge variant="blue" className="py-1">Admin</Badge>
                     )}
                   </td>
@@ -416,12 +447,12 @@ export function LeaderboardTab({
       </div>
 
       {/* Points Breakdown Modal */}
-      {selectedMember && (
+      {selectedEntry && (
         <PointsBreakdownModal
-          member={selectedMember}
-          playerScore={getPlayerScore(selectedMember.member_id)}
-          bonusScores={getBonusForMember(selectedMember.member_id)}
-          onClose={() => setSelectedMember(null)}
+          entry={selectedEntry}
+          playerScore={getPlayerScore(selectedEntry.entry_id)}
+          bonusScores={getBonusForEntry(selectedEntry.entry_id)}
+          onClose={() => setSelectedEntry(null)}
         />
       )}
     </>

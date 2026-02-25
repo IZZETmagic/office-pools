@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
+import { formatNumber } from '@/lib/format'
 
 // =====================
 // TYPES
@@ -195,7 +196,7 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mb-5 text-center">
         <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
-          <p className="text-lg font-bold text-neutral-900">{pool.total_points ?? 0}</p>
+          <p className="text-lg font-bold text-neutral-900">{formatNumber(pool.total_points ?? 0)}</p>
           <p className="text-xs text-neutral-500">Total Points</p>
         </div>
         <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1 flex items-center justify-center">
@@ -324,7 +325,7 @@ export function DashboardClient({
               <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{totalPoints}</p>
+              <p className="text-xl sm:text-2xl font-bold text-white">{formatNumber(totalPoints)}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>

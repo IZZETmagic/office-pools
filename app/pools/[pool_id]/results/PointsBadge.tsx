@@ -1,6 +1,7 @@
 'use client'
 
 import { type PointsResult } from './points'
+import { formatNumber } from '@/lib/format'
 
 const badgeStyles: Record<PointsResult['type'], string> = {
   exact: 'bg-accent-100 text-accent-700 border border-accent-500',
@@ -41,16 +42,16 @@ export function PointsBadge({ result }: { result: PointsResult }) {
       >
         <span>{icons[result.type]}</span>
         <span>{typeLabels[result.type]}</span>
-        <span>+{ftPoints}</span>
+        <span>+{formatNumber(ftPoints)}</span>
       </span>
       {showMultiplier && (
         <span className="text-[10px] text-neutral-500">
-          {result.basePoints} x {result.multiplier}x
+          {formatNumber(result.basePoints)} x {result.multiplier}x
         </span>
       )}
       {result.pso && result.pso.psoPoints > 0 && (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-500">
-          +{result.pso.psoPoints} {psoTypeLabels[result.pso.psoType]}
+          +{formatNumber(result.pso.psoPoints)} {psoTypeLabels[result.pso.psoType]}
         </span>
       )}
     </div>

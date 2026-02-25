@@ -2,6 +2,7 @@
 
 import { GroupStanding } from '@/lib/tournament'
 import { Badge } from '@/components/ui/Badge'
+import { formatNumber } from '@/lib/format'
 
 type Props = {
   standings: GroupStanding[]
@@ -67,12 +68,12 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
                   <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.wins}</td>
                   <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.draws}</td>
                   <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">{team.losses}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{team.goalsFor}</td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{team.goalsAgainst}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{formatNumber(team.goalsFor)}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">{formatNumber(team.goalsAgainst)}</td>
                   <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600">
-                    {team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}
+                    {team.goalDifference > 0 ? `+${formatNumber(team.goalDifference)}` : formatNumber(team.goalDifference)}
                   </td>
-                  <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-neutral-900">{team.points}</td>
+                  <td className="text-center py-2 px-0.5 sm:px-1 font-bold text-neutral-900">{formatNumber(team.points)}</td>
                   {showConductScore && (
                     <td className="text-center py-2 px-0.5 sm:px-1 text-neutral-600 hidden sm:table-cell">
                       {team.conductScore ?? 0}

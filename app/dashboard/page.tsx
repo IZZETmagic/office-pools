@@ -21,17 +21,12 @@ export default async function DashboardPage() {
 
   if (!userData) redirect('/login')
 
-  // STEP 3: Fetch user's pools via pool_members
+  // STEP 3: Fetch user's pools via pool_members (with entries)
   const { data: userPools } = await supabase
     .from('pool_members')
     .select(`
       member_id,
       role,
-      total_points,
-      current_rank,
-      has_submitted_predictions,
-      predictions_submitted_at,
-      predictions_last_saved_at,
       joined_at,
       pools!inner(
         pool_id,
@@ -41,6 +36,16 @@ export default async function DashboardPage() {
         status,
         prediction_deadline,
         tournament_id
+      ),
+      pool_entries(
+        entry_id,
+        entry_name,
+        entry_number,
+        has_submitted_predictions,
+        predictions_submitted_at,
+        predictions_last_saved_at,
+        total_points,
+        current_rank
       )
     `)
     .eq('user_id', userData.user_id)
@@ -160,11 +165,22 @@ export default async function DashboardPage() {
         away_team: Array.isArray(match.away_team) ? match.away_team[0] ?? null : match.away_team,
       }))
 
+      // Get entries for this member
+      const entries = ((m as any).pool_entries || []) as any[]
+      const bestEntry = entries.length > 0
+        ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
+        : null
+      const anySubmitted = entries.some((e: any) => e.has_submitted_predictions)
+      const defaultEntry = bestEntry || entries[0]
+      const defaultEntryId = defaultEntry?.entry_id
+
       // Get user's predictions for this pool (with winner_team_id for bonus calc)
-      const { data: predictions } = await supabase
-        .from('predictions')
-        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-        .eq('member_id', m.member_id)
+      const { data: predictions } = defaultEntryId
+        ? await supabase
+            .from('predictions')
+            .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+            .eq('entry_id', defaultEntryId)
+        : { data: null }
 
       // Get pool settings
       const { data: rawPoolSettings } = await supabase
@@ -226,7 +242,7 @@ export default async function DashboardPage() {
         }
 
         const bonusEntries = calculateAllBonusPoints({
-          memberId: m.member_id,
+          memberId: defaultEntryId,
           memberPredictions: predictionMap,
           matches: normalizedMatches,
           teams,
@@ -247,10 +263,10 @@ export default async function DashboardPage() {
         match_points: matchPoints,
         bonus_points: bonusPoints,
         total_points: matchPoints + bonusPoints,
-        current_rank: m.current_rank,
-        has_submitted_predictions: m.has_submitted_predictions,
-        predictions_submitted_at: m.predictions_submitted_at,
-        predictions_last_saved_at: m.predictions_last_saved_at,
+        current_rank: bestEntry?.current_rank ?? null,
+        has_submitted_predictions: anySubmitted,
+        predictions_submitted_at: bestEntry?.predictions_submitted_at ?? null,
+        predictions_last_saved_at: bestEntry?.predictions_last_saved_at ?? null,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         totalMatches: totalMatchesCount ?? 0,

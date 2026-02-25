@@ -30,8 +30,8 @@ type GroupStandingsComparisonProps = {
   isAdmin: boolean
   members: MemberData[]
   allPredictions: PredictionData[]
-  // Current user's member ID (to default dropdown)
-  currentMemberId: string
+  // Current user's entry ID (to default dropdown)
+  currentEntryId: string
 }
 
 // =============================================
@@ -384,42 +384,54 @@ export function GroupStandingsComparison({
   isAdmin,
   members,
   allPredictions,
-  currentMemberId,
+  currentEntryId,
 }: GroupStandingsComparisonProps) {
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(currentMemberId)
+  const [selectedEntryId, setSelectedEntryId] = useState<string>(currentEntryId)
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Build list of members who have predictions (for admin dropdown)
+  // Build list of entries that have predictions (for admin dropdown)
   // Uses allPredictions data instead of has_submitted_predictions flag which can be stale
-  const membersWithPredictions = useMemo(() => {
-    // Build set of member IDs that have at least one prediction
-    const memberIdsWithPreds = new Set<string>()
-    // Always include current user
-    memberIdsWithPreds.add(currentMemberId)
+  const entriesWithPredictions = useMemo(() => {
+    // Build set of entry IDs that have at least one prediction
+    const entryIdsWithPreds = new Set<string>()
+    // Always include current user's entry
+    entryIdsWithPreds.add(currentEntryId)
     for (const p of allPredictions) {
-      memberIdsWithPreds.add(p.member_id)
+      entryIdsWithPreds.add(p.entry_id)
     }
-    // Also include members with the submitted flag (belt-and-suspenders)
+    // Also include entries with the submitted flag (belt-and-suspenders)
     for (const m of members) {
-      if (m.has_submitted_predictions) {
-        memberIdsWithPreds.add(m.member_id)
+      for (const e of m.entries || []) {
+        if (e.has_submitted_predictions) {
+          entryIdsWithPreds.add(e.entry_id)
+        }
       }
     }
-    return members.filter((m) => memberIdsWithPreds.has(m.member_id))
-  }, [members, allPredictions, currentMemberId])
+    // Build flat list of entries with user info for dropdown
+    type EntryWithUser = { entry_id: string; member_id: string; entry_name: string; username: string; full_name: string }
+    const result: EntryWithUser[] = []
+    for (const m of members) {
+      for (const e of m.entries || []) {
+        if (entryIdsWithPreds.has(e.entry_id)) {
+          result.push({ entry_id: e.entry_id, member_id: m.member_id, entry_name: e.entry_name, username: m.users.username, full_name: m.users.full_name })
+        }
+      }
+    }
+    return result
+  }, [members, allPredictions, currentEntryId])
 
   // Convert to tournament lib types (stable reference via useMemo)
   const tournamentMatches = useMemo(() => toTournamentMatches(matches), [matches])
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
-  // Get active member's predictions
+  // Get active entry's predictions
   const activePredictions = useMemo(() => {
-    if (selectedMemberId === currentMemberId) {
+    if (selectedEntryId === currentEntryId) {
       return userPredictions
     }
-    // Admin viewing another member
-    return allPredictions.filter((p) => p.member_id === selectedMemberId)
-  }, [selectedMemberId, currentMemberId, userPredictions, allPredictions])
+    // Admin viewing another entry
+    return allPredictions.filter((p) => p.entry_id === selectedEntryId)
+  }, [selectedEntryId, currentEntryId, userPredictions, allPredictions])
 
   // Build predicted standings via resolveFullBracket
   const predictedStandingsMap = useMemo(() => {
@@ -462,11 +474,11 @@ export function GroupStandingsComparison({
     })
   }, [actualStandingsMap])
 
-  // Get selected member's name for display
-  const selectedMember = members.find((m) => m.member_id === selectedMemberId)
-  const memberLabel = selectedMemberId === currentMemberId
+  // Get selected entry's owner name for display
+  const selectedEntry = entriesWithPredictions.find((e) => e.entry_id === selectedEntryId)
+  const memberLabel = selectedEntryId === currentEntryId
     ? 'Your'
-    : `${selectedMember?.users?.full_name || selectedMember?.users?.username || 'Unknown'}'s`
+    : `${selectedEntry?.full_name || selectedEntry?.username || 'Unknown'}'s`
 
   if (!hasAnyActualData && predictedStandingsMap.size === 0) return null
 
@@ -496,20 +508,20 @@ export function GroupStandingsComparison({
 
       {isExpanded && (
         <div className="mt-3 space-y-3">
-          {/* Admin member selector */}
-          {isAdmin && members.length > 1 && (
+          {/* Admin entry selector */}
+          {isAdmin && entriesWithPredictions.length > 1 && (
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-neutral-600">Viewing:</label>
               <select
-                value={selectedMemberId}
-                onChange={(e) => setSelectedMemberId(e.target.value)}
+                value={selectedEntryId}
+                onChange={(e) => setSelectedEntryId(e.target.value)}
                 className="px-3 py-1.5 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                {membersWithPredictions.map((m) => (
-                  <option key={m.member_id} value={m.member_id}>
-                    {m.member_id === currentMemberId
-                      ? `${m.users?.full_name || m.users?.username || 'You'} (You)`
-                      : m.users?.full_name || m.users?.username || 'Unknown'}
+                {entriesWithPredictions.map((e) => (
+                  <option key={e.entry_id} value={e.entry_id}>
+                    {e.entry_id === currentEntryId
+                      ? `${e.full_name || e.username || 'You'} (You)`
+                      : `${e.full_name || e.username || 'Unknown'}${e.entry_name !== 'Entry 1' ? ` - ${e.entry_name}` : ''}`}
                   </option>
                 ))}
               </select>

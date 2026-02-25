@@ -62,7 +62,7 @@ export async function POST(
     { data: conductData },
     { data: settingsRow },
     { data: tournamentAwardsRow },
-    { data: members },
+    { data: poolMembers },
   ] = await Promise.all([
     supabase
       .from('matches')
@@ -88,12 +88,23 @@ export async function POST(
       .single(),
     supabase
       .from('pool_members')
-      .select('member_id, has_submitted_predictions')
+      .select('member_id')
       .eq('pool_id', pool_id),
   ])
 
-  if (!matches || !teams || !members) {
+  if (!matches || !teams || !poolMembers) {
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+  }
+
+  // Fetch all entries for these members
+  const memberIds = poolMembers.map((m: any) => m.member_id)
+  const { data: entries } = await supabase
+    .from('pool_entries')
+    .select('entry_id, member_id, has_submitted_predictions')
+    .in('member_id', memberIds)
+
+  if (!entries) {
+    return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 })
   }
 
   // Normalize match join results
@@ -112,17 +123,17 @@ export async function POST(
     country_code: t.country_code?.trim() || '',
   }))
 
-  // 5. Process each member that has predictions
+  // 5. Process each entry that has predictions
   // Don't rely solely on has_submitted_predictions flag — check actual prediction data
   let totalBonusEntries = 0
   let totalBonusPoints = 0
 
-  for (const member of members) {
-    // Fetch this member's predictions
+  for (const entry of entries) {
+    // Fetch this entry's predictions
     const { data: predictions } = await supabase
       .from('predictions')
       .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .eq('member_id', member.member_id)
+      .eq('entry_id', entry.entry_id)
 
     if (!predictions || predictions.length === 0) continue
 
@@ -140,7 +151,7 @@ export async function POST(
 
     // Calculate bonus points
     const bonusEntries = calculateAllBonusPoints({
-      memberId: member.member_id,
+      memberId: entry.entry_id,
       memberPredictions: predictionMap,
       matches: normalizedMatches,
       teams: teamsData,
@@ -149,16 +160,16 @@ export async function POST(
       tournamentAwards,
     })
 
-    // Delete existing bonus_scores for this member
+    // Delete existing bonus_scores for this entry
     await supabase
       .from('bonus_scores')
       .delete()
-      .eq('member_id', member.member_id)
+      .eq('entry_id', entry.entry_id)
 
     // Insert new bonus_scores
     if (bonusEntries.length > 0) {
       const rows = bonusEntries.map(e => ({
-        member_id: e.member_id,
+        entry_id: e.entry_id,
         bonus_type: e.bonus_type,
         bonus_category: e.bonus_category,
         related_group_letter: e.related_group_letter,
@@ -172,15 +183,15 @@ export async function POST(
         .insert(rows)
 
       if (insertError) {
-        console.error(`Failed to insert bonus_scores for member ${member.member_id}:`, insertError)
+        console.error(`Failed to insert bonus_scores for entry ${entry.entry_id}:`, insertError)
       }
     }
 
-    // Auto-populate group_predictions for this member
-    await populateGroupPredictions(supabase, member.member_id, pool.tournament_id, normalizedMatches, predictionMap, teamsData)
+    // Auto-populate group_predictions for this entry
+    await populateGroupPredictions(supabase, entry.entry_id, pool.tournament_id, normalizedMatches, predictionMap, teamsData)
 
-    // Auto-populate special_predictions for this member
-    await populateSpecialPredictions(supabase, member.member_id, normalizedMatches, predictionMap, teamsData)
+    // Auto-populate special_predictions for this entry
+    await populateSpecialPredictions(supabase, entry.entry_id, normalizedMatches, predictionMap, teamsData)
 
     totalBonusEntries += bonusEntries.length
     totalBonusPoints += bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
@@ -197,7 +208,7 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    membersProcessed: members.length,
+    entriesProcessed: entries.length,
     totalBonusEntries,
     totalBonusPoints,
   })
@@ -209,7 +220,7 @@ export async function POST(
 
 async function populateGroupPredictions(
   supabase: any,
-  memberId: string,
+  entryId: string,
   tournamentId: string,
   matches: MatchWithResult[],
   predictionMap: PredictionMap,
@@ -222,7 +233,7 @@ async function populateGroupPredictions(
     if (!standings || standings.length < 4) continue
 
     const row = {
-      member_id: memberId,
+      entry_id: entryId,
       tournament_id: tournamentId,
       group_letter: letter,
       position_1_team_id: standings[0]?.team_id || null,
@@ -236,12 +247,12 @@ async function populateGroupPredictions(
     const { data: existing, error: lookupError } = await supabase
       .from('group_predictions')
       .select('group_prediction_id')
-      .eq('member_id', memberId)
+      .eq('entry_id', entryId)
       .eq('group_letter', letter)
       .single()
 
     if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error(`Error looking up group_predictions for member ${memberId}, group ${letter}:`, lookupError)
+      console.error(`Error looking up group_predictions for entry ${entryId}, group ${letter}:`, lookupError)
       continue
     }
 
@@ -264,7 +275,7 @@ async function populateGroupPredictions(
 
 async function populateSpecialPredictions(
   supabase: any,
-  memberId: string,
+  entryId: string,
   matches: MatchWithResult[],
   predictionMap: PredictionMap,
   teams: Team[]
@@ -272,7 +283,7 @@ async function populateSpecialPredictions(
   const bracket = resolveFullBracket({ matches, predictionMap, teams })
 
   const row = {
-    member_id: memberId,
+    entry_id: entryId,
     predicted_champion_team_id: bracket.champion?.team_id || null,
     predicted_runner_up_team_id: bracket.runnerUp?.team_id || null,
     predicted_third_place_team_id: bracket.thirdPlace?.team_id || null,
@@ -282,11 +293,11 @@ async function populateSpecialPredictions(
   const { data: existing, error: lookupError } = await supabase
     .from('special_predictions')
     .select('special_prediction_id')
-    .eq('member_id', memberId)
+    .eq('entry_id', entryId)
     .single()
 
   if (lookupError && lookupError.code !== 'PGRST116') {
-    console.error(`Error looking up special_predictions for member ${memberId}:`, lookupError)
+    console.error(`Error looking up special_predictions for entry ${entryId}:`, lookupError)
     return
   }
 

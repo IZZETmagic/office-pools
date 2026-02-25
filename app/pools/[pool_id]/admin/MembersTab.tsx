@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolData, MemberData, PredictionData, MatchData, TeamData } from '../types'
+import type { PoolData, MemberData, EntryData, PredictionData, MatchData, TeamData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -66,6 +66,13 @@ export function MembersTab({
 
   const adminCount = members.filter((m) => m.role === 'admin').length
 
+  // Helper: get best entry stats for a member
+  function getBestEntry(m: MemberData): EntryData | null {
+    const entries = m.entries || []
+    if (entries.length === 0) return null
+    return entries.reduce((best, e) => (e.total_points > best.total_points ? e : best), entries[0])
+  }
+
   // Sort and filter
   const filteredMembers = members
     .filter((m) => {
@@ -78,10 +85,16 @@ export function MembersTab({
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'rank':
-          return (a.current_rank ?? 999) - (b.current_rank ?? 999)
-        case 'points':
-          return (b.total_points ?? 0) - (a.total_points ?? 0)
+        case 'rank': {
+          const aRank = getBestEntry(a)?.current_rank ?? 999
+          const bRank = getBestEntry(b)?.current_rank ?? 999
+          return aRank - bRank
+        }
+        case 'points': {
+          const aPts = getBestEntry(a)?.total_points ?? 0
+          const bPts = getBestEntry(b)?.total_points ?? 0
+          return bPts - aPts
+        }
         case 'username':
           return a.users.username.localeCompare(b.users.username)
         case 'joined':
@@ -96,11 +109,18 @@ export function MembersTab({
   async function refreshMembers() {
     const { data } = await supabase
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email)')
+      .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
       .eq('pool_id', pool.pool_id)
-      .order('current_rank', { ascending: true, nullsFirst: false })
 
-    if (data) setMembers(data as MemberData[])
+    if (data) {
+      const processed = data.map((m: any) => {
+        const entries = ((m.pool_entries || []) as EntryData[]).sort(
+          (a: EntryData, b: EntryData) => a.entry_number - b.entry_number
+        )
+        return { ...m, pool_entries: undefined, entries } as MemberData
+      })
+      setMembers(processed)
+    }
   }
 
   async function handlePromote(member: MemberData) {
@@ -176,13 +196,19 @@ export function MembersTab({
       return
     }
 
+    const entry = getBestEntry(member)
+    if (!entry) {
+      setError('No entry found for this member.')
+      return
+    }
+
     setLoading(true)
-    const newTotal = (member.total_points ?? 0) + pointAdjustment
+    const newTotal = (entry.total_points ?? 0) + pointAdjustment
 
     const { error } = await supabase
-      .from('pool_members')
+      .from('pool_entries')
       .update({ total_points: newTotal })
-      .eq('member_id', member.member_id)
+      .eq('entry_id', entry.entry_id)
 
     if (error) {
       setError(error.message)
@@ -199,17 +225,27 @@ export function MembersTab({
   }
 
   async function handleUnlockPredictions(member: MemberData) {
+    // Unlock all submitted entries for this member
+    const submittedEntries = (member.entries || []).filter(e => e.has_submitted_predictions)
+    if (submittedEntries.length === 0) {
+      setError('No submitted entries found.')
+      setModal({ type: 'none' })
+      return
+    }
+
     setLoading(true)
     try {
-      const res = await fetch(`/api/pools/${pool.pool_id}/predictions/unlock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberId: member.member_id }),
-      })
+      for (const entry of submittedEntries) {
+        const res = await fetch(`/api/pools/${pool.pool_id}/predictions/unlock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entryId: entry.entry_id }),
+        })
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to unlock predictions')
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Failed to unlock predictions')
+        }
       }
 
       setSuccess(`Predictions unlocked for ${member.users.username}. They can now edit and resubmit.`)
@@ -306,7 +342,7 @@ export function MembersTab({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-neutral-500">#{member.current_rank || '-'}</span>
+                    <span className="text-sm font-bold text-neutral-500">#{getBestEntry(member)?.current_rank || '-'}</span>
                     <span className="text-sm font-medium text-neutral-900 truncate">
                       {member.users.username}
                       {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
@@ -314,14 +350,14 @@ export function MembersTab({
                   </div>
                   <p className="text-xs text-neutral-500 mt-0.5">{member.users.full_name}</p>
                 </div>
-                <span className="text-lg font-bold text-primary-600 shrink-0">{member.total_points ?? 0}</span>
+                <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member)?.total_points ?? 0}</span>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
                 <div className="flex items-center gap-1.5">
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
                   </Badge>
-                  {member.has_submitted_predictions ? (
+                  {(member.entries || []).some(e => e.has_submitted_predictions) ? (
                     <Badge variant="green">Submitted</Badge>
                   ) : (
                     <Badge variant="yellow">Pending</Badge>
@@ -363,7 +399,7 @@ export function MembersTab({
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
                   <option value="adjust_points">Adjust Points</option>
-                  {member.has_submitted_predictions && <option value="unlock_predictions">Unlock Predictions</option>}
+                  {(member.entries || []).some(e => e.has_submitted_predictions) && <option value="unlock_predictions">Unlock Predictions</option>}
                   {member.role === 'player' && <option value="promote">Promote</option>}
                   {member.role === 'admin' && adminCount > 1 && <option value="demote">Demote</option>}
                   {member.role === 'player' && <option value="remove">Remove</option>}
@@ -414,7 +450,7 @@ export function MembersTab({
                   >
                     <td className="px-4 py-3">
                       <span className="text-sm font-bold text-neutral-900">
-                        #{member.current_rank || '-'}
+                        #{getBestEntry(member)?.current_rank || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -434,11 +470,11 @@ export function MembersTab({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-lg font-bold text-primary-600">
-                        {member.total_points ?? 0}
+                        {getBestEntry(member)?.total_points ?? 0}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {member.has_submitted_predictions ? (
+                      {(member.entries || []).some(e => e.has_submitted_predictions) ? (
                         <Badge variant="green">Submitted</Badge>
                       ) : (
                         <Badge variant="yellow">Pending</Badge>
@@ -502,7 +538,7 @@ export function MembersTab({
                             View Predictions
                           </option>
                           <option value="adjust_points">Adjust Points</option>
-                          {member.has_submitted_predictions && <option value="unlock_predictions">Unlock Predictions</option>}
+                          {(member.entries || []).some(e => e.has_submitted_predictions) && <option value="unlock_predictions">Unlock Predictions</option>}
                           {member.role === 'player' && (
                             <option value="promote">Promote to Admin</option>
                           )}
@@ -548,7 +584,7 @@ export function MembersTab({
               <p className="text-sm text-neutral-600">
                 Current points:{' '}
                 <span className="font-bold">
-                  {modal.member.total_points ?? 0}
+                  {getBestEntry(modal.member)?.total_points ?? 0}
                 </span>
               </p>
             </div>
@@ -597,7 +633,7 @@ export function MembersTab({
             <p className="text-sm text-neutral-600 mb-4">
               New total:{' '}
               <span className="font-bold text-primary-600">
-                {(modal.member.total_points ?? 0) + pointAdjustment}
+                {(getBestEntry(modal.member)?.total_points ?? 0) + pointAdjustment}
               </span>
             </p>
 
@@ -711,11 +747,19 @@ export function MembersTab({
                 This will allow them to edit and resubmit their predictions. Only use this for special circumstances (e.g., technical issues).
               </p>
             </div>
-            {modal.member.predictions_submitted_at && (
-              <p className="text-xs text-neutral-500 mb-4">
-                Originally submitted: {new Date(modal.member.predictions_submitted_at).toLocaleString()}
-              </p>
-            )}
+            {(() => {
+              const submittedEntries = (modal.member.entries || []).filter(e => e.has_submitted_predictions)
+              if (submittedEntries.length === 0) return null
+              return (
+                <div className="text-xs text-neutral-500 mb-4 space-y-0.5">
+                  {submittedEntries.map(e => (
+                    <p key={e.entry_id}>
+                      {e.entry_name} submitted: {e.predictions_submitted_at ? new Date(e.predictions_submitted_at).toLocaleString() : 'N/A'}
+                    </p>
+                  ))}
+                </div>
+              )
+            })()}
             <div className="flex gap-3 justify-end">
               <Button
                 variant="gray"
@@ -807,8 +851,9 @@ function ViewPredictionsModal({
   teams: TeamData[]
   onClose: () => void
 }) {
+  const memberEntryIds = new Set((member.entries || []).map(e => e.entry_id))
   const memberPreds = predictions.filter(
-    (p) => p.member_id === member.member_id
+    (p) => memberEntryIds.has(p.entry_id)
   )
 
   // Convert matches to tournament Match type for resolution functions
@@ -969,7 +1014,7 @@ function ViewPredictionsModal({
             {member.users.full_name || member.users.username}&apos;s Predictions
           </h3>
           <p className="text-sm text-neutral-600 mt-1">
-            Total points: {member.total_points ?? 0}
+            Total points: {(member.entries || []).reduce((sum, e) => sum + e.total_points, 0)}
           </p>
         </div>
 

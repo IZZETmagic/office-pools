@@ -21,38 +21,52 @@ export default async function ProfileServerPage() {
 
   if (!profile) redirect('/login')
 
-  // Get user's pool memberships with pool details and prediction counts
+  // Get user's pool memberships with pool details and entries
   const { data: userPools } = await supabase
     .from('pool_members')
     .select(`
       member_id,
       pool_id,
       role,
-      total_points,
-      current_rank,
-      has_submitted_predictions,
       joined_at,
       pools!inner(
         pool_id,
         pool_name,
         tournament_id
       ),
-      predictions(prediction_id)
+      pool_entries(
+        entry_id,
+        entry_name,
+        entry_number,
+        has_submitted_predictions,
+        total_points,
+        current_rank
+      )
     `)
     .eq('user_id', profile.user_id)
 
-  const poolMemberships = (userPools ?? []).map((m: any) => ({
-    member_id: m.member_id,
-    pool_id: m.pool_id,
-    pool_name: m.pools.pool_name,
-    tournament_id: m.pools.tournament_id,
-    role: m.role,
-    total_points: m.total_points ?? 0,
-    current_rank: m.current_rank,
-    has_submitted_predictions: m.has_submitted_predictions,
-    joined_at: m.joined_at,
-    prediction_count: Array.isArray(m.predictions) ? m.predictions.length : 0,
-  }))
+  const poolMemberships = (userPools ?? []).map((m: any) => {
+    const entries = (m.pool_entries || []) as any[]
+    const bestEntry = entries.length > 0
+      ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
+      : null
+    const anySubmitted = entries.some((e: any) => e.has_submitted_predictions)
+    const defaultEntryId = bestEntry?.entry_id || entries[0]?.entry_id || null
+
+    return {
+      member_id: m.member_id,
+      pool_id: m.pool_id,
+      pool_name: m.pools.pool_name,
+      tournament_id: m.pools.tournament_id,
+      role: m.role,
+      total_points: bestEntry?.total_points ?? 0,
+      current_rank: bestEntry?.current_rank ?? null,
+      has_submitted_predictions: anySubmitted,
+      joined_at: m.joined_at,
+      prediction_count: 0, // Will be filled below
+      entry_id: defaultEntryId,
+    }
+  })
 
   // Get member counts for each pool (for rank display like #2/12)
   const memberCounts: Record<string, number> = {}
@@ -64,19 +78,19 @@ export default async function ProfileServerPage() {
     memberCounts[pool.pool_id] = count ?? 0
   }
 
-  // Get all predictions for the user's memberships (with match details)
-  const memberIds = poolMemberships.map((p: any) => p.member_id)
+  // Get all predictions for the user's entries (with match details)
+  const entryIds = poolMemberships.map((p: any) => p.entry_id).filter(Boolean)
   let predictions: any[] = []
 
-  if (memberIds.length > 0) {
-    // Fetch predictions per member separately to avoid join deduplication issues
+  if (entryIds.length > 0) {
+    // Fetch predictions per entry separately to avoid join deduplication issues
     const allPredictions: any[] = []
-    for (const memberId of memberIds) {
+    for (const entryId of entryIds) {
       const { data: predictionData } = await supabase
         .from('predictions')
         .select(`
           prediction_id,
-          member_id,
+          entry_id,
           match_id,
           predicted_home_score,
           predicted_away_score,
@@ -96,7 +110,7 @@ export default async function ProfileServerPage() {
             away_team:teams!matches_away_team_id_fkey(country_name)
           )
         `)
-        .eq('member_id', memberId)
+        .eq('entry_id', entryId)
 
       if (predictionData) {
         allPredictions.push(...predictionData)
@@ -115,6 +129,13 @@ export default async function ProfileServerPage() {
       const dateB = new Date(b.matches?.match_date ?? 0).getTime()
       return dateB - dateA
     })
+
+    // Update prediction counts per pool membership
+    for (const pm of poolMemberships) {
+      if (pm.entry_id) {
+        pm.prediction_count = predictions.filter((p: any) => p.entry_id === pm.entry_id).length
+      }
+    }
   }
 
   // Get pool settings for each pool (needed for accurate points display)
@@ -168,10 +189,12 @@ export default async function ProfileServerPage() {
     }))
 
     // Get user's predictions for this pool (with PSO + winner fields for bonus calc)
-    const { data: memberPredictions } = await supabase
-      .from('predictions')
-      .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .eq('member_id', pool.member_id)
+    const { data: memberPredictions } = pool.entry_id
+      ? await supabase
+          .from('predictions')
+          .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+          .eq('entry_id', pool.entry_id)
+      : { data: null }
 
     const poolSettings: PoolSettings = poolSettingsMap[pool.pool_id]
       ? { ...DEFAULT_POOL_SETTINGS, ...poolSettingsMap[pool.pool_id] }
@@ -226,7 +249,7 @@ export default async function ProfileServerPage() {
       }
 
       const bonusEntries = calculateAllBonusPoints({
-        memberId: pool.member_id,
+        memberId: pool.entry_id,
         memberPredictions: predictionMap,
         matches: normalizedMatches,
         teams,
@@ -238,7 +261,7 @@ export default async function ProfileServerPage() {
       bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
     }
 
-    playerScoresMap[pool.member_id] = {
+    playerScoresMap[pool.entry_id || pool.member_id] = {
       match_points: matchPoints,
       bonus_points: bonusPoints,
       total_points: matchPoints + bonusPoints,

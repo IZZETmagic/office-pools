@@ -30,7 +30,7 @@ export type TournamentAwards = {
 }
 
 export type BonusScoreEntry = {
-  member_id: string
+  entry_id: string
   bonus_type: string
   bonus_category: string
   related_group_letter: string | null
@@ -56,7 +56,7 @@ export function calculateAllBonusPoints(params: {
   settings: PoolSettings
   tournamentAwards: TournamentAwards | null
 }): BonusScoreEntry[] {
-  const { memberId, memberPredictions, matches, teams, conductData, settings, tournamentAwards } = params
+  const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards } = params
 
   const bonuses: BonusScoreEntry[] = []
 
@@ -80,27 +80,27 @@ export function calculateAllBonusPoints(params: {
 
   // A. Group Standings Bonus
   bonuses.push(...calculateGroupStandingsBonuses(
-    memberId, matches, predictedBracket, actualBracket, settings
+    entryId, matches, predictedBracket, actualBracket, settings
   ))
 
   // B. Overall Qualification Bonus
   bonuses.push(...calculateQualificationBonus(
-    memberId, matches, predictedBracket, actualBracket, settings
+    entryId, matches, predictedBracket, actualBracket, settings
   ))
 
   // C. Bracket Pairing Bonus (R32)
   bonuses.push(...calculateBracketPairingBonuses(
-    memberId, matches, predictedBracket, actualBracket, settings
+    entryId, matches, predictedBracket, actualBracket, settings
   ))
 
   // D. Match Winner Bonus (all knockout matches)
   bonuses.push(...calculateMatchWinnerBonuses(
-    memberId, matches, memberPredictions, actualResultsMap, predictedBracket, actualBracket, settings
+    entryId, matches, memberPredictions, actualResultsMap, predictedBracket, actualBracket, settings
   ))
 
   // E. Tournament Podium Bonus
   bonuses.push(...calculateTournamentPodiumBonuses(
-    memberId, predictedBracket, tournamentAwards, settings
+    entryId, predictedBracket, tournamentAwards, settings
   ))
 
   return bonuses
@@ -111,7 +111,7 @@ export function calculateAllBonusPoints(params: {
 // =============================================
 
 function calculateGroupStandingsBonuses(
-  memberId: string,
+  entryId: string,
   matches: MatchWithResult[],
   predictedBracket: BracketResult,
   actualBracket: BracketResult,
@@ -162,7 +162,7 @@ function calculateGroupStandingsBonuses(
 
     if (bonusType && points > 0) {
       bonuses.push({
-        member_id: memberId,
+        entry_id: entryId,
         bonus_type: bonusType,
         bonus_category: 'group_standings',
         related_group_letter: letter,
@@ -181,7 +181,7 @@ function calculateGroupStandingsBonuses(
 // =============================================
 
 function calculateQualificationBonus(
-  memberId: string,
+  entryId: string,
   matches: MatchWithResult[],
   predictedBracket: BracketResult,
   actualBracket: BracketResult,
@@ -225,7 +225,7 @@ function calculateQualificationBonus(
 
   if (bonusType && points > 0) {
     return [{
-      member_id: memberId,
+      entry_id: entryId,
       bonus_type: bonusType,
       bonus_category: 'qualification',
       related_group_letter: null,
@@ -243,7 +243,7 @@ function calculateQualificationBonus(
 // =============================================
 
 function calculateBracketPairingBonuses(
-  memberId: string,
+  entryId: string,
   matches: MatchWithResult[],
   predictedBracket: BracketResult,
   actualBracket: BracketResult,
@@ -271,7 +271,7 @@ function calculateBracketPairingBonuses(
       const match1 = [...actualPair].every(id => predictedPair.has(id))
       if (match1) {
         bonuses.push({
-          member_id: memberId,
+          entry_id: entryId,
           bonus_type: 'correct_bracket_pairing',
           bonus_category: 'bracket',
           related_group_letter: null,
@@ -291,7 +291,7 @@ function calculateBracketPairingBonuses(
 // =============================================
 
 function calculateMatchWinnerBonuses(
-  memberId: string,
+  entryId: string,
   matches: MatchWithResult[],
   memberPredictions: PredictionMap,
   actualResultsMap: PredictionMap,
@@ -325,7 +325,7 @@ function calculateMatchWinnerBonuses(
         match.stage === 'third_place' ? '3rd Place' : 'Final'
 
       bonuses.push({
-        member_id: memberId,
+        entry_id: entryId,
         bonus_type: 'match_winner_correct',
         bonus_category: 'bracket',
         related_group_letter: null,
@@ -344,7 +344,7 @@ function calculateMatchWinnerBonuses(
 // =============================================
 
 function calculateTournamentPodiumBonuses(
-  memberId: string,
+  entryId: string,
   predictedBracket: BracketResult,
   tournamentAwards: TournamentAwards | null,
   settings: PoolSettings
@@ -357,7 +357,7 @@ function calculateTournamentPodiumBonuses(
       const points = settings.bonus_champion_correct ?? 1000
       if (points > 0) {
         bonuses.push({
-          member_id: memberId,
+          entry_id: entryId,
           bonus_type: 'champion_correct',
           bonus_category: 'tournament',
           related_group_letter: null,
@@ -375,7 +375,7 @@ function calculateTournamentPodiumBonuses(
       const points = settings.bonus_second_place_correct ?? 25
       if (points > 0) {
         bonuses.push({
-          member_id: memberId,
+          entry_id: entryId,
           bonus_type: 'second_place_correct',
           bonus_category: 'tournament',
           related_group_letter: null,
@@ -393,7 +393,7 @@ function calculateTournamentPodiumBonuses(
       const points = settings.bonus_third_place_correct ?? 25
       if (points > 0) {
         bonuses.push({
-          member_id: memberId,
+          entry_id: entryId,
           bonus_type: 'third_place_correct',
           bonus_category: 'tournament',
           related_group_letter: null,

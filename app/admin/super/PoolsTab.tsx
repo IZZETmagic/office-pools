@@ -81,48 +81,69 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       memberIds.push(...members.map((m: any) => m.member_id))
     }
 
+    // Collect entry_ids
+    let entryIds: string[] = []
     if (memberIds.length > 0) {
-      // Delete match_scores for these members
+      const { data: entries } = await supabase
+        .from('pool_entries')
+        .select('entry_id')
+        .in('member_id', memberIds)
+      if (entries) {
+        entryIds = entries.map((e: any) => e.entry_id)
+      }
+    }
+
+    if (entryIds.length > 0) {
+      // Delete match_scores for these entries
       const { error: e1 } = await supabase
         .from('match_scores')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e1) { setError('Failed to delete match scores: ' + e1.message); setDeleting(false); return }
 
       // Delete bonus_scores
       const { error: e2 } = await supabase
         .from('bonus_scores')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e2) { setError('Failed to delete bonus scores: ' + e2.message); setDeleting(false); return }
 
       // Delete predictions
       const { error: e3 } = await supabase
         .from('predictions')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e3) { setError('Failed to delete predictions: ' + e3.message); setDeleting(false); return }
 
       // Delete group_predictions
       const { error: e4 } = await supabase
         .from('group_predictions')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e4) { setError('Failed to delete group predictions: ' + e4.message); setDeleting(false); return }
 
       // Delete special_predictions
       const { error: e5 } = await supabase
         .from('special_predictions')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e5) { setError('Failed to delete special predictions: ' + e5.message); setDeleting(false); return }
 
       // Delete player_scores
       const { error: e6 } = await supabase
         .from('player_scores')
         .delete()
-        .in('member_id', memberIds)
+        .in('entry_id', entryIds)
       if (e6) { setError('Failed to delete player scores: ' + e6.message); setDeleting(false); return }
+    }
+
+    // Delete pool_entries
+    if (memberIds.length > 0) {
+      const { error: eEntries } = await supabase
+        .from('pool_entries')
+        .delete()
+        .in('member_id', memberIds)
+      if (eEntries) { setError('Failed to delete pool entries: ' + eEntries.message); setDeleting(false); return }
     }
 
     // Delete pool_members

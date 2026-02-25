@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-// POST /api/pools/:poolId/predictions/unlock - Admin unlocks a member's predictions
+// POST /api/pools/:poolId/predictions/unlock - Admin unlocks an entry's predictions
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
@@ -33,20 +33,30 @@ export async function POST(
   }
 
   const body = await request.json()
-  const { memberId } = body as { memberId: string }
+  const { entryId } = body as { entryId: string }
 
-  if (!memberId) {
-    return NextResponse.json({ error: 'memberId is required' }, { status: 400 })
+  if (!entryId) {
+    return NextResponse.json({ error: 'entryId is required' }, { status: 400 })
+  }
+
+  // Verify the entry belongs to a member of this pool
+  const { data: entry } = await supabase
+    .from('pool_entries')
+    .select('entry_id, member_id, pool_members!inner(pool_id)')
+    .eq('entry_id', entryId)
+    .single()
+
+  if (!entry || (entry as any).pool_members?.pool_id !== pool_id) {
+    return NextResponse.json({ error: 'Entry not found in this pool' }, { status: 404 })
   }
 
   const { error: updateError } = await supabase
-    .from('pool_members')
+    .from('pool_entries')
     .update({
       has_submitted_predictions: false,
       predictions_submitted_at: null,
     })
-    .eq('member_id', memberId)
-    .eq('pool_id', pool_id)
+    .eq('entry_id', entryId)
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
@@ -58,9 +68,10 @@ export async function POST(
     .insert({
       pool_id: pool_id,
       admin_user_id: userData.user_id,
-      target_member_id: memberId,
+      target_member_id: entry.member_id,
       action: 'unlock_predictions',
       details: {
+        entry_id: entryId,
         reason: body.reason || null,
         timestamp: new Date().toISOString(),
       },

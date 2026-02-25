@@ -24,18 +24,44 @@ export async function GET(
 
   const { data: membership } = await supabase
     .from('pool_members')
-    .select('member_id, has_submitted_predictions, predictions_submitted_at, predictions_locked, predictions_last_saved_at')
+    .select('member_id')
     .eq('pool_id', pool_id)
     .eq('user_id', userData.user_id)
     .single()
 
   if (!membership) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
-  // Count predictions for this member
+  // Get entry_id from query param, or default to first entry
+  const { searchParams } = new URL(request.url)
+  const entryId = searchParams.get('entryId')
+
+  let entry: any
+  if (entryId) {
+    const { data } = await supabase
+      .from('pool_entries')
+      .select('*')
+      .eq('entry_id', entryId)
+      .eq('member_id', membership.member_id)
+      .single()
+    entry = data
+  } else {
+    const { data } = await supabase
+      .from('pool_entries')
+      .select('*')
+      .eq('member_id', membership.member_id)
+      .order('entry_number', { ascending: true })
+      .limit(1)
+      .single()
+    entry = data
+  }
+
+  if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+
+  // Count predictions for this entry
   const { count: predicted } = await supabase
     .from('predictions')
     .select('*', { count: 'exact', head: true })
-    .eq('member_id', membership.member_id)
+    .eq('entry_id', entry.entry_id)
 
   // Get pool details for deadline
   const { data: pool } = await supabase
@@ -54,17 +80,19 @@ export async function GET(
     ? new Date(pool.prediction_deadline) < new Date()
     : false
 
-  const canEdit = !membership.has_submitted_predictions && !membership.predictions_locked && !isPastDeadline
+  const canEdit = !entry.has_submitted_predictions && !entry.predictions_locked && !isPastDeadline
 
   return NextResponse.json({
-    status: membership.has_submitted_predictions ? 'submitted' : 'draft',
+    status: entry.has_submitted_predictions ? 'submitted' : 'draft',
     predicted: predicted ?? 0,
     total: total ?? 0,
-    lastSaved: membership.predictions_last_saved_at,
-    submittedAt: membership.predictions_submitted_at,
+    lastSaved: entry.predictions_last_saved_at,
+    submittedAt: entry.predictions_submitted_at,
     canEdit,
-    isLocked: membership.predictions_locked,
+    isLocked: entry.predictions_locked,
     isPastDeadline,
+    entryId: entry.entry_id,
+    entryName: entry.entry_name,
   })
 }
 
@@ -91,7 +119,7 @@ export async function POST(
 
   const { data: membership } = await supabase
     .from('pool_members')
-    .select('member_id, has_submitted_predictions, predictions_locked')
+    .select('member_id')
     .eq('pool_id', pool_id)
     .eq('user_id', userData.user_id)
     .single()
@@ -113,16 +141,9 @@ export async function POST(
     return NextResponse.json({ error: 'Prediction deadline has passed' }, { status: 403 })
   }
 
-  if (membership.has_submitted_predictions) {
-    return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
-  }
-
-  if (membership.predictions_locked) {
-    return NextResponse.json({ error: 'Predictions are locked' }, { status: 403 })
-  }
-
   const body = await request.json()
-  const { predictions } = body as {
+  const { predictions, entryId } = body as {
+    entryId: string
     predictions: {
       matchId: string
       predictionId?: string
@@ -132,6 +153,28 @@ export async function POST(
       awayPso?: number | null
       winnerTeamId?: string | null
     }[]
+  }
+
+  if (!entryId) {
+    return NextResponse.json({ error: 'entryId is required' }, { status: 400 })
+  }
+
+  // Verify entry belongs to this user
+  const { data: entry } = await supabase
+    .from('pool_entries')
+    .select('entry_id, has_submitted_predictions, predictions_locked')
+    .eq('entry_id', entryId)
+    .eq('member_id', membership.member_id)
+    .single()
+
+  if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+
+  if (entry.has_submitted_predictions) {
+    return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
+  }
+
+  if (entry.predictions_locked) {
+    return NextResponse.json({ error: 'Predictions are locked' }, { status: 403 })
   }
 
   if (!predictions || !Array.isArray(predictions)) {
@@ -153,7 +196,7 @@ export async function POST(
       })
     } else {
       toInsert.push({
-        member_id: membership.member_id,
+        entry_id: entryId,
         match_id: pred.matchId,
         predicted_home_score: pred.homeScore,
         predicted_away_score: pred.awayScore,
@@ -195,17 +238,17 @@ export async function POST(
     }
   }
 
-  // Update last saved timestamp
+  // Update last saved timestamp on pool_entries
   await supabase
-    .from('pool_members')
+    .from('pool_entries')
     .update({ predictions_last_saved_at: new Date().toISOString() })
-    .eq('member_id', membership.member_id)
+    .eq('entry_id', entryId)
 
   // Get updated prediction count
   const { count: predicted } = await supabase
     .from('predictions')
     .select('*', { count: 'exact', head: true })
-    .eq('member_id', membership.member_id)
+    .eq('entry_id', entryId)
 
   return NextResponse.json({
     saved: true,
@@ -238,14 +281,31 @@ export async function PUT(
 
   const { data: membership } = await supabase
     .from('pool_members')
-    .select('member_id, has_submitted_predictions, predictions_locked')
+    .select('member_id')
     .eq('pool_id', pool_id)
     .eq('user_id', userData.user_id)
     .single()
 
   if (!membership) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
-  if (membership.has_submitted_predictions) {
+  const body = await request.json()
+  const { entryId } = body as { entryId: string }
+
+  if (!entryId) {
+    return NextResponse.json({ error: 'entryId is required' }, { status: 400 })
+  }
+
+  // Verify entry belongs to this user
+  const { data: entry } = await supabase
+    .from('pool_entries')
+    .select('entry_id, has_submitted_predictions')
+    .eq('entry_id', entryId)
+    .eq('member_id', membership.member_id)
+    .single()
+
+  if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+
+  if (entry.has_submitted_predictions) {
     return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
   }
 
@@ -268,7 +328,7 @@ export async function PUT(
   const { count: predicted } = await supabase
     .from('predictions')
     .select('*', { count: 'exact', head: true })
-    .eq('member_id', membership.member_id)
+    .eq('entry_id', entryId)
 
   const { count: total } = await supabase
     .from('matches')
@@ -286,13 +346,13 @@ export async function PUT(
   // Mark as submitted
   const now = new Date().toISOString()
   const { error: updateError } = await supabase
-    .from('pool_members')
+    .from('pool_entries')
     .update({
       has_submitted_predictions: true,
       predictions_submitted_at: now,
       predictions_last_saved_at: now,
     })
-    .eq('member_id', membership.member_id)
+    .eq('entry_id', entryId)
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })

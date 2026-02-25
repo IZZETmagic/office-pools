@@ -68,13 +68,15 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       return
     }
 
-    const { error: insertError } = await supabase
+    const { data: memberData, error: insertError } = await supabase
       .from('pool_members')
       .insert({
         pool_id: pool.pool_id,
         user_id: userData.user_id,
         role: 'player',
       })
+      .select('member_id')
+      .single()
 
     if (insertError) {
       if (insertError.code === '23505') {
@@ -84,6 +86,19 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       }
       setLoading(false)
       return
+    }
+
+    // Auto-create first entry for the new member
+    const { error: entryError } = await supabase
+      .from('pool_entries')
+      .insert({
+        member_id: memberData.member_id,
+        entry_name: 'Entry 1',
+        entry_number: 1,
+      })
+
+    if (entryError) {
+      console.error('Failed to create first entry:', entryError.message)
     }
 
     setSuccess(`Joined "${pool.pool_name}"!`)

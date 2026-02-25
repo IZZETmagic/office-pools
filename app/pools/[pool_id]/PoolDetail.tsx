@@ -18,6 +18,7 @@ import { DEFAULT_POOL_SETTINGS, type PoolSettings } from './results/points'
 import type {
   PoolData,
   MemberData,
+  EntryData,
   MatchData,
   SettingsData,
   PredictionData,
@@ -74,10 +75,7 @@ type PoolDetailProps = {
   isAdmin: boolean
   isPastDeadline: boolean
   psoEnabled: boolean
-  hasSubmitted: boolean
-  submittedAt: string | null
-  lastSavedAt: string | null
-  predictionsLocked: boolean
+  userEntries: EntryData[]
   isSuperAdmin?: boolean
 }
 
@@ -100,10 +98,7 @@ export function PoolDetail({
   isAdmin,
   isPastDeadline,
   psoEnabled,
-  hasSubmitted,
-  submittedAt,
-  lastSavedAt,
-  predictionsLocked,
+  userEntries,
   isSuperAdmin,
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
@@ -129,6 +124,18 @@ export function PoolDetail({
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
   const [showNavWarning, setShowNavWarning] = useState(false)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
+
+  // Entry management
+  const [activeEntryId, setActiveEntryId] = useState<string>(
+    userEntries[0]?.entry_id || ''
+  )
+  const activeEntry = userEntries.find(e => e.entry_id === activeEntryId) || userEntries[0] || null
+
+  // Derive submission state from active entry
+  const hasSubmitted = activeEntry?.has_submitted_predictions ?? false
+  const submittedAt = activeEntry?.predictions_submitted_at ?? null
+  const lastSavedAt = activeEntry?.predictions_last_saved_at ?? null
+  const predictionsLocked = activeEntry?.predictions_locked ?? false
 
   // Sync server-refreshed props into local state
   useEffect(() => { setPool(initialPool) }, [initialPool])
@@ -383,11 +390,12 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'predictions' && (
+            {activeTab === 'predictions' && activeEntry && (
               <PredictionsFlow
+                key={activeEntryId}
                 matches={predictionsMatches}
                 teams={teams}
-                memberId={memberId}
+                entryId={activeEntry.entry_id}
                 poolId={pool.pool_id}
                 existingPredictions={userPredictions}
                 isPastDeadline={isPastDeadline}
@@ -412,7 +420,7 @@ export function PoolDetail({
                 isAdmin={isAdmin}
                 members={members}
                 allPredictions={allPredictions}
-                currentMemberId={memberId}
+                currentEntryId={activeEntry?.entry_id || ''}
               />
             )}
 

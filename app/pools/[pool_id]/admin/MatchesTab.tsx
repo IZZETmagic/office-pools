@@ -401,12 +401,14 @@ export function MatchesTab({
                   <div className="space-y-2 mb-4">
                     {matchPreds.map((pred) => {
                       const member = members.find(
-                        (m) => m.member_id === pred.member_id
+                        (m) => (m.entries || []).some(e => e.entry_id === pred.entry_id)
                       )
+                      const entry = member?.entries?.find(e => e.entry_id === pred.entry_id)
                       const name =
                         member?.users.full_name ||
                         member?.users.username ||
                         'Unknown'
+                      const entryLabel = entry && entry.entry_name !== 'Entry 1' ? ` (${entry.entry_name})` : ''
 
                       let pointsInfo = null
                       if (
@@ -448,7 +450,7 @@ export function MatchesTab({
                           key={pred.prediction_id}
                           className="flex items-center justify-between bg-neutral-50 rounded-lg px-4 py-2"
                         >
-                          <span className="text-sm text-neutral-700">{name}</span>
+                          <span className="text-sm text-neutral-700">{name}{entryLabel}</span>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
                               <span className="font-mono font-bold text-neutral-900">

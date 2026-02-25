@@ -8,6 +8,7 @@ export type PoolData = {
   status: string
   is_private: boolean
   max_participants: number | null
+  max_entries_per_user: number
   tournament_id: string
   prediction_deadline: string | null
   created_at: string
@@ -21,6 +22,20 @@ export type MemberData = {
   role: string
   joined_at: string
   entry_fee_paid: boolean
+  users: {
+    user_id: string
+    username: string
+    full_name: string
+    email: string
+  }
+  entries?: EntryData[]
+}
+
+export type EntryData = {
+  entry_id: string
+  member_id: string
+  entry_name: string
+  entry_number: number
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_locked: boolean
@@ -28,12 +43,18 @@ export type MemberData = {
   total_points: number
   current_rank: number | null
   last_rank_update: string | null
+  created_at: string
+}
+
+// Flattened entry with user info for leaderboard display
+export type LeaderboardEntry = EntryData & {
   users: {
     user_id: string
     username: string
     full_name: string
     email: string
   }
+  role: string
 }
 
 export type MatchData = {
@@ -104,7 +125,7 @@ export type SettingsData = {
 
 export type PredictionData = {
   prediction_id: string
-  member_id: string
+  entry_id: string
   match_id: string
   predicted_home_score: number
   predicted_away_score: number
@@ -123,7 +144,7 @@ export type TeamData = {
 }
 
 export type PlayerScoreData = {
-  member_id: string
+  entry_id: string
   match_points: number
   bonus_points: number
   total_points: number
@@ -131,7 +152,7 @@ export type PlayerScoreData = {
 
 export type BonusScoreData = {
   bonus_score_id: string
-  member_id: string
+  entry_id: string
   bonus_type: string
   bonus_category: string
   related_group_letter: string | null

@@ -55,7 +55,7 @@ export function ResultsView({
   isAdmin,
   members,
   allPredictions,
-  currentMemberId,
+  currentEntryId,
 }: {
   matches: ResultMatch[]
   poolSettings: PoolSettings
@@ -68,7 +68,7 @@ export function ResultsView({
   isAdmin: boolean
   members: MemberData[]
   allPredictions: PredictionData[]
-  currentMemberId: string
+  currentEntryId: string
 }) {
   const [stageTab, setStageTab] = useState<StageTab>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -200,7 +200,7 @@ export function ResultsView({
     }))
 
     const bonusEntries = calculateAllBonusPoints({
-      memberId: currentMemberId,
+      memberId: currentEntryId,
       memberPredictions: predictionMap,
       matches: matchesWithResult,
       teams: tournamentTeams,
@@ -210,7 +210,7 @@ export function ResultsView({
     })
 
     return bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
-  }, [userPredictions, rawMatches, teams, conductData, poolSettings, currentMemberId])
+  }, [userPredictions, rawMatches, teams, conductData, poolSettings, currentEntryId])
 
   const totalPoints = matchPoints + bonusPoints
 
@@ -322,7 +322,7 @@ export function ResultsView({
           isAdmin={isAdmin}
           members={members}
           allPredictions={allPredictions}
-          currentMemberId={currentMemberId}
+          currentEntryId={currentEntryId}
         />
       )}
 
