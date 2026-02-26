@@ -254,8 +254,30 @@ export default async function DashboardPage() {
         bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
       }
 
-      // Count predicted matches
+      // Count predicted matches (for default entry)
       const predictedMatches = predictions?.length ?? 0
+
+      // Build per-entry progress (prediction counts for each entry)
+      const entryIds = entries.map((e: any) => e.entry_id)
+      let entryPredCounts: Record<string, number> = {}
+      if (entryIds.length > 0) {
+        const { data: entryPreds } = await supabase
+          .from('predictions')
+          .select('entry_id')
+          .in('entry_id', entryIds)
+        if (entryPreds) {
+          for (const p of entryPreds) {
+            entryPredCounts[p.entry_id] = (entryPredCounts[p.entry_id] || 0) + 1
+          }
+        }
+      }
+
+      const entriesProgress = entries.map((e: any) => ({
+        entry_id: e.entry_id,
+        entry_name: e.entry_name,
+        predictedMatches: entryPredCounts[e.entry_id] || 0,
+        has_submitted: e.has_submitted_predictions || false,
+      }))
 
       return {
         ...pool,
@@ -272,6 +294,7 @@ export default async function DashboardPage() {
         totalMatches: totalMatchesCount ?? 0,
         completedMatches: completedMatchesList.length,
         predictedMatches,
+        entries: entriesProgress,
       }
     })
   )

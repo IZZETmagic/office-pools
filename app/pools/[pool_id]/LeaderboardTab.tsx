@@ -20,6 +20,7 @@ type LeaderboardTabProps = {
   conductData: MatchConductData[]
   allPredictions: PredictionData[]
   poolSettings: PoolSettings
+  maxEntriesPerUser: number
 }
 
 // =============================================
@@ -89,7 +90,9 @@ export function LeaderboardTab({
   conductData,
   allPredictions,
   poolSettings,
+  maxEntriesPerUser,
 }: LeaderboardTabProps) {
+  const isMultiEntry = maxEntriesPerUser > 1
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
 
   // Flatten members into leaderboard entries (each entry is a row)
@@ -260,11 +263,6 @@ export function LeaderboardTab({
     })
   }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap])
 
-  // Check if any member has multiple entries (to show entry name)
-  const hasMultipleEntries = useMemo(() => {
-    return members.some(m => (m.entries?.length ?? 0) > 1)
-  }, [members])
-
   if (sorted.length === 0) {
     return (
       <Card padding="lg" className="text-center">
@@ -305,20 +303,38 @@ export function LeaderboardTab({
 
               {/* Player info */}
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-neutral-900 truncate">
-                  {entry.users?.full_name || entry.users?.username || 'Unknown Player'}
-                  {hasMultipleEntries && (
-                    <span className="text-neutral-500 font-normal"> - {entry.entry_name}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {entry.users?.username && entry.users?.full_name && (
-                    <span className="text-xs text-neutral-500">@{entry.users.username}</span>
-                  )}
-                  {entry.role === 'admin' && (
-                    <Badge variant="blue">Admin</Badge>
-                  )}
-                </div>
+                {isMultiEntry ? (
+                  <>
+                    <div className="text-sm font-medium text-neutral-900 truncate">
+                      {entry.entry_name}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-neutral-500 truncate">
+                        {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                        {entry.users?.username && entry.users?.full_name && ` (@${entry.users.username})`}
+                      </span>
+                      {entry.role === 'admin' && (
+                        <Badge variant="blue">Admin</Badge>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium text-neutral-900 truncate">
+                      {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {entry.users?.username && (
+                        <span className="text-xs text-neutral-500 truncate">
+                          @{entry.users.username}
+                        </span>
+                      )}
+                      {entry.role === 'admin' && (
+                        <Badge variant="blue">Admin</Badge>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Points */}
@@ -353,7 +369,7 @@ export function LeaderboardTab({
                 Rank
               </th>
               <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
-                Player
+                {isMultiEntry ? 'Entry' : 'Player'}
               </th>
               {hasAnyBonusPoints && (
                 <>
@@ -398,17 +414,28 @@ export function LeaderboardTab({
                     </div>
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-neutral-900">
-                        {entry.users?.full_name || entry.users?.username || 'Unknown Player'}
-                        {hasMultipleEntries && (
-                          <span className="text-neutral-500 font-normal"> - {entry.entry_name}</span>
+                    {isMultiEntry ? (
+                      <div>
+                        <div className="text-sm font-medium text-neutral-900">
+                          {entry.entry_name}
+                        </div>
+                        <div className="text-xs text-neutral-500">
+                          {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                          {entry.users?.username && entry.users?.full_name && ` (@${entry.users.username})`}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-sm font-medium text-neutral-900">
+                          {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                        </div>
+                        {entry.users?.username && (
+                          <div className="text-xs text-neutral-500">
+                            @{entry.users.username}
+                          </div>
                         )}
                       </div>
-                      {entry.users?.username && entry.users?.full_name && (
-                        <div className="text-xs text-neutral-600">@{entry.users.username}</div>
-                      )}
-                    </div>
+                    )}
                   </td>
                   {hasAnyBonusPoints && (
                     <>
@@ -453,6 +480,10 @@ export function LeaderboardTab({
           playerScore={getPlayerScore(selectedEntry.entry_id)}
           bonusScores={getBonusForEntry(selectedEntry.entry_id)}
           onClose={() => setSelectedEntry(null)}
+          isMultiEntry={isMultiEntry}
+          poolSettings={poolSettings}
+          matches={matches}
+          entryPredictions={allPredictions.filter(p => p.entry_id === selectedEntry.entry_id)}
         />
       )}
     </>

@@ -10,7 +10,7 @@ import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
-import PredictionsFlow from '@/components/predictions/PredictionsFlow'
+import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
@@ -28,6 +28,21 @@ import type {
   BonusScoreData,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
+
+// =====================
+// HELPERS
+// =====================
+function formatTimeAgo(dateStr: string) {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  if (diffSec < 10) return 'just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 // =====================
 // TAB DEFINITIONS
@@ -126,16 +141,115 @@ export function PoolDetail({
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
 
   // Entry management
+  const [entries, setEntries] = useState<EntryData[]>(userEntries)
   const [activeEntryId, setActiveEntryId] = useState<string>(
     userEntries[0]?.entry_id || ''
   )
-  const activeEntry = userEntries.find(e => e.entry_id === activeEntryId) || userEntries[0] || null
+  const activeEntry = entries.find(e => e.entry_id === activeEntryId) || entries[0] || null
+
+  // Entry rename state
+  const [editingEntryName, setEditingEntryName] = useState(false)
+  const [entryNameDraft, setEntryNameDraft] = useState('')
+  const [savingEntryName, setSavingEntryName] = useState(false)
+  const [addingEntry, setAddingEntry] = useState(false)
+  const [showDeleteEntryModal, setShowDeleteEntryModal] = useState(false)
+  const [deletingEntry, setDeletingEntry] = useState(false)
+  const entryNameInputRef = useRef<HTMLInputElement>(null)
+  const [predictionStatus, setPredictionStatus] = useState<{ saveStatus: SaveStatus; lastSavedAt: string | null; predictedCount: number }>({ saveStatus: 'idle', lastSavedAt: null, predictedCount: 0 })
 
   // Derive submission state from active entry
   const hasSubmitted = activeEntry?.has_submitted_predictions ?? false
   const submittedAt = activeEntry?.predictions_submitted_at ?? null
   const lastSavedAt = activeEntry?.predictions_last_saved_at ?? null
   const predictionsLocked = activeEntry?.predictions_locked ?? false
+
+  const canAddEntry = pool.max_entries_per_user > entries.length && !isPastDeadline
+  const canDeleteEntry = entries.length > 1 && activeEntry && !activeEntry.has_submitted_predictions && !isPastDeadline
+
+  // Rename active entry
+  const handleRenameEntry = async () => {
+    if (!activeEntry || !entryNameDraft.trim() || savingEntryName) return
+    const trimmed = entryNameDraft.trim()
+    if (trimmed === activeEntry.entry_name) {
+      setEditingEntryName(false)
+      return
+    }
+    setSavingEntryName(true)
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/entries`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId: activeEntry.entry_id, entryName: trimmed }),
+      })
+      if (res.ok) {
+        setEntries(prev => prev.map(e =>
+          e.entry_id === activeEntry.entry_id ? { ...e, entry_name: trimmed } : e
+        ))
+        setEditingEntryName(false)
+      }
+    } finally {
+      setSavingEntryName(false)
+    }
+  }
+
+  // Add new entry
+  const handleAddEntry = async () => {
+    if (addingEntry || !canAddEntry) return
+    setAddingEntry(true)
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/entries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setEntries(prev => [...prev, data.entry as EntryData])
+        setActiveEntryId(data.entry.entry_id)
+        // Start editing the new entry name
+        setEntryNameDraft(data.entry.entry_name)
+        setEditingEntryName(true)
+      }
+    } finally {
+      setAddingEntry(false)
+    }
+  }
+
+  // Delete active entry
+  const handleDeleteEntry = async () => {
+    if (!activeEntry || deletingEntry || !canDeleteEntry) return
+    setDeletingEntry(true)
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/entries?entryId=${activeEntry.entry_id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        const remaining = entries.filter(e => e.entry_id !== activeEntry.entry_id)
+        setEntries(remaining)
+        setActiveEntryId(remaining[0]?.entry_id || '')
+        setShowDeleteEntryModal(false)
+        // Clear cached predictions for deleted entry
+        setLiveEntryPredictions(prev => {
+          const next = { ...prev }
+          delete next[activeEntry.entry_id]
+          return next
+        })
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to delete entry')
+      }
+    } finally {
+      setDeletingEntry(false)
+    }
+  }
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingEntryName && entryNameInputRef.current) {
+      entryNameInputRef.current.focus()
+      entryNameInputRef.current.select()
+    }
+  }, [editingEntryName])
 
   // Sync server-refreshed props into local state
   useEffect(() => { setPool(initialPool) }, [initialPool])
@@ -237,8 +351,64 @@ export function PoolDetail({
       }
     : DEFAULT_POOL_SETTINGS
 
+  // Live predictions fetched client-side (overrides server data when available)
+  const [liveEntryPredictions, setLiveEntryPredictions] = useState<Record<string, ExistingPrediction[]>>({})
+  const [loadingPredictions, setLoadingPredictions] = useState(false)
+
+  // Fetch predictions for the active entry from the database
+  const fetchEntryPredictions = useCallback(async (entryId: string) => {
+    setLoadingPredictions(true)
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('predictions')
+        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
+        .eq('entry_id', entryId)
+      if (data) {
+        setLiveEntryPredictions(prev => ({
+          ...prev,
+          [entryId]: data as ExistingPrediction[],
+        }))
+      }
+    } finally {
+      setLoadingPredictions(false)
+    }
+  }, [])
+
+  // Fetch predictions when switching to predictions tab or changing active entry
+  useEffect(() => {
+    if (activeTab === 'predictions' && activeEntry) {
+      fetchEntryPredictions(activeEntry.entry_id)
+    }
+  }, [activeTab, activeEntry?.entry_id, fetchEntryPredictions])
+
+  // Derive active entry's predictions: prefer live data, fall back to server data
+  const activeEntryPredictions: ExistingPrediction[] = useMemo(() => {
+    if (!activeEntry) return []
+    // Use live-fetched predictions if available
+    if (liveEntryPredictions[activeEntry.entry_id]) {
+      return liveEntryPredictions[activeEntry.entry_id]
+    }
+    // Fall back to server-fetched predictions for default entry
+    if (activeEntry.entry_id === userEntries[0]?.entry_id) {
+      return userPredictions
+    }
+    // Fall back to allPredictions for other entries
+    return allPredictions
+      .filter(p => p.entry_id === activeEntry.entry_id)
+      .map(p => ({
+        match_id: p.match_id,
+        predicted_home_score: p.predicted_home_score,
+        predicted_away_score: p.predicted_away_score,
+        predicted_home_pso: p.predicted_home_pso,
+        predicted_away_pso: p.predicted_away_pso,
+        predicted_winner_team_id: p.predicted_winner_team_id,
+        prediction_id: p.prediction_id,
+      }))
+  }, [activeEntry, userPredictions, allPredictions, userEntries, liveEntryPredictions])
+
   // Build user prediction list for results tab
-  const userPredictionsList = userPredictions.map((p) => ({
+  const userPredictionsList = activeEntryPredictions.map((p) => ({
     match_id: p.match_id,
     predicted_home_score: p.predicted_home_score,
     predicted_away_score: p.predicted_away_score,
@@ -387,25 +557,141 @@ export function PoolDetail({
                 conductData={conductData}
                 allPredictions={allPredictions}
                 poolSettings={poolSettings}
+                maxEntriesPerUser={pool.max_entries_per_user}
               />
             )}
 
             {activeTab === 'predictions' && activeEntry && (
-              <PredictionsFlow
-                key={activeEntryId}
-                matches={predictionsMatches}
-                teams={teams}
-                entryId={activeEntry.entry_id}
-                poolId={pool.pool_id}
-                existingPredictions={userPredictions}
-                isPastDeadline={isPastDeadline}
-                psoEnabled={psoEnabled}
-                hasSubmitted={hasSubmitted}
-                submittedAt={submittedAt}
-                lastSavedAt={lastSavedAt}
-                predictionsLocked={predictionsLocked}
-                onUnsavedChangesRef={predictionsRef}
-              />
+              <div>
+                {/* Entry selector + actions (single consolidated row) */}
+                <div className="mb-6">
+                  {editingEntryName ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={entryNameInputRef}
+                        type="text"
+                        value={entryNameDraft}
+                        onChange={e => setEntryNameDraft(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleRenameEntry()
+                          if (e.key === 'Escape') setEditingEntryName(false)
+                        }}
+                        className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+                        maxLength={40}
+                        placeholder="Entry name..."
+                      />
+                      <button
+                        onClick={handleRenameEntry}
+                        disabled={savingEntryName}
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {savingEntryName ? '...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setEditingEntryName(false)}
+                        className="px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {/* Entry pills (multi-entry) or entry name (single-entry) */}
+                      {pool.max_entries_per_user > 1 ? (
+                        <>
+                          {entries.map(e => (
+                            <button
+                              key={e.entry_id}
+                              onClick={() => setActiveEntryId(e.entry_id)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                                e.entry_id === activeEntryId
+                                  ? 'bg-primary-600 text-white shadow-sm'
+                                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                              }`}
+                            >
+                              {e.entry_name}
+                              {e.has_submitted_predictions && (
+                                <span className="ml-1 text-xs opacity-70">{'\u2713'}</span>
+                              )}
+                            </button>
+                          ))}
+                          {canAddEntry && (
+                            <button
+                              onClick={handleAddEntry}
+                              disabled={addingEntry}
+                              className="px-2.5 py-1.5 rounded-full text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 transition-colors whitespace-nowrap disabled:opacity-50"
+                            >
+                              {addingEntry ? '...' : '+ Add Entry'}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-sm font-semibold text-neutral-900">{activeEntry.entry_name}</span>
+                      )}
+
+                      {/* Edit / Delete icons (inline, after pills) */}
+                      {!isPastDeadline && !predictionsLocked && (
+                        <button
+                          onClick={() => {
+                            setEntryNameDraft(activeEntry.entry_name)
+                            setEditingEntryName(true)
+                          }}
+                          className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors shrink-0"
+                          title="Rename entry"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+                      {canDeleteEntry && (
+                        <button
+                          onClick={() => setShowDeleteEntryModal(true)}
+                          className="p-1 text-neutral-400 hover:text-danger-600 transition-colors shrink-0"
+                          title="Delete entry"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Status badge + save status (right-aligned) */}
+                      <div className="ml-auto flex items-center gap-1.5 shrink-0 text-xs">
+                        {hasSubmitted ? (
+                          <span className="px-1.5 py-0.5 rounded-full font-semibold bg-success-100 text-success-700">Submitted</span>
+                        ) : predictionStatus.predictedCount > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded-full font-semibold bg-warning-100 text-warning-700">Draft</span>
+                        ) : null}
+                        <span className="text-neutral-400 whitespace-nowrap" suppressHydrationWarning>
+                          {predictionStatus.saveStatus === 'saving' && 'Saving...'}
+                          {predictionStatus.saveStatus === 'saved' && '\u2713 Saved'}
+                          {predictionStatus.saveStatus === 'error' && <span className="text-danger-600">Failed</span>}
+                          {(predictionStatus.saveStatus === 'idle') && predictionStatus.lastSavedAt && !hasSubmitted && `Saved ${formatTimeAgo(predictionStatus.lastSavedAt)}`}
+                          {hasSubmitted && submittedAt && formatTimeAgo(submittedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <PredictionsFlow
+                  key={activeEntryId}
+                  matches={predictionsMatches}
+                  teams={teams}
+                  entryId={activeEntry.entry_id}
+                  poolId={pool.pool_id}
+                  existingPredictions={activeEntryPredictions}
+                  isPastDeadline={isPastDeadline}
+                  psoEnabled={psoEnabled}
+                  hasSubmitted={hasSubmitted}
+                  submittedAt={submittedAt}
+                  lastSavedAt={lastSavedAt}
+                  predictionsLocked={predictionsLocked}
+                  onUnsavedChangesRef={predictionsRef}
+                  onStatusChange={setPredictionStatus}
+                />
+              </div>
             )}
 
             {activeTab === 'results' && (
@@ -421,6 +707,7 @@ export function PoolDetail({
                 members={members}
                 allPredictions={allPredictions}
                 currentEntryId={activeEntry?.entry_id || ''}
+                userEntries={entries}
               />
             )}
 
@@ -487,6 +774,48 @@ export function PoolDetail({
               </Button>
               <Button variant="gray" onClick={handleCancelNav} fullWidth>
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Entry Confirmation Modal */}
+      {showDeleteEntryModal && activeEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => { if (!deletingEntry) setShowDeleteEntryModal(false) }}
+          />
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">Delete Entry</h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Are you sure you want to delete <span className="font-semibold text-neutral-900">{activeEntry.entry_name}</span>?
+            </p>
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-5">
+              <p className="text-sm text-danger-800">
+                All predictions for this entry will be permanently deleted. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="gray"
+                onClick={() => setShowDeleteEntryModal(false)}
+                disabled={deletingEntry}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeleteEntry}
+                loading={deletingEntry}
+                loadingText="Deleting..."
+              >
+                Delete Entry
               </Button>
             </div>
           </div>

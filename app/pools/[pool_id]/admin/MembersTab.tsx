@@ -29,12 +29,12 @@ type MembersTabProps = {
 
 type ModalState =
   | { type: 'none' }
-  | { type: 'view_predictions'; member: MemberData }
-  | { type: 'adjust_points'; member: MemberData }
+  | { type: 'view_predictions'; member: MemberData; entry?: EntryData }
+  | { type: 'adjust_points'; member: MemberData; entry?: EntryData }
   | { type: 'promote'; member: MemberData }
   | { type: 'demote'; member: MemberData }
   | { type: 'remove'; member: MemberData }
-  | { type: 'unlock_predictions'; member: MemberData }
+  | { type: 'unlock_predictions'; member: MemberData; entry?: EntryData }
 
 export function MembersTab({
   pool,
@@ -190,13 +190,13 @@ export function MembersTab({
     setRemoveConfirmed(false)
   }
 
-  async function handleAdjustPoints(member: MemberData) {
+  async function handleAdjustPoints(member: MemberData, targetEntry?: EntryData) {
     if (!adjustReason.trim()) {
       setError('Please provide a reason for the adjustment.')
       return
     }
 
-    const entry = getBestEntry(member)
+    const entry = targetEntry || getBestEntry(member)
     if (!entry) {
       setError('No entry found for this member.')
       return
@@ -214,7 +214,7 @@ export function MembersTab({
       setError(error.message)
     } else {
       setSuccess(
-        `Points adjusted for ${member.users.username}: ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`
+        `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`
       )
       await refreshMembers()
     }
@@ -224,10 +224,13 @@ export function MembersTab({
     setAdjustReason('')
   }
 
-  async function handleUnlockPredictions(member: MemberData) {
-    // Unlock all submitted entries for this member
-    const submittedEntries = (member.entries || []).filter(e => e.has_submitted_predictions)
-    if (submittedEntries.length === 0) {
+  async function handleUnlockPredictions(member: MemberData, specificEntry?: EntryData) {
+    // If a specific entry is provided, unlock only that one
+    const entriesToUnlock = specificEntry
+      ? [specificEntry]
+      : (member.entries || []).filter(e => e.has_submitted_predictions)
+
+    if (entriesToUnlock.length === 0) {
       setError('No submitted entries found.')
       setModal({ type: 'none' })
       return
@@ -235,7 +238,7 @@ export function MembersTab({
 
     setLoading(true)
     try {
-      for (const entry of submittedEntries) {
+      for (const entry of entriesToUnlock) {
         const res = await fetch(`/api/pools/${pool.pool_id}/predictions/unlock`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -248,7 +251,8 @@ export function MembersTab({
         }
       }
 
-      setSuccess(`Predictions unlocked for ${member.users.username}. They can now edit and resubmit.`)
+      const entryLabel = specificEntry ? specificEntry.entry_name : 'all entries'
+      setSuccess(`Predictions unlocked for ${member.users.username} (${entryLabel}). They can now edit and resubmit.`)
       await refreshMembers()
     } catch (err: any) {
       setError(err.message || 'Failed to unlock predictions')
@@ -352,13 +356,32 @@ export function MembersTab({
                 </div>
                 <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member)?.total_points ?? 0}</span>
               </div>
+              {/* Entries badges for multi-entry members */}
+              {(member.entries || []).length > 1 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {(member.entries || []).map(entry => (
+                    <span
+                      key={entry.entry_id}
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        entry.has_submitted_predictions
+                          ? 'bg-success-50 text-success-700'
+                          : 'bg-neutral-100 text-neutral-500'
+                      }`}
+                    >
+                      {entry.entry_name}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
                 <div className="flex items-center gap-1.5">
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
                   </Badge>
-                  {(member.entries || []).some(e => e.has_submitted_predictions) ? (
+                  {(member.entries || []).every(e => e.has_submitted_predictions) ? (
                     <Badge variant="green">Submitted</Badge>
+                  ) : (member.entries || []).some(e => e.has_submitted_predictions) ? (
+                    <Badge variant="yellow">Partial</Badge>
                   ) : (
                     <Badge variant="yellow">Pending</Badge>
                   )}
@@ -474,11 +497,18 @@ export function MembersTab({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {(member.entries || []).some(e => e.has_submitted_predictions) ? (
-                        <Badge variant="green">Submitted</Badge>
-                      ) : (
-                        <Badge variant="yellow">Pending</Badge>
-                      )}
+                      <div className="flex flex-col items-center gap-1">
+                        {(member.entries || []).every(e => e.has_submitted_predictions) ? (
+                          <Badge variant="green">Submitted</Badge>
+                        ) : (member.entries || []).some(e => e.has_submitted_predictions) ? (
+                          <Badge variant="yellow">Partial</Badge>
+                        ) : (
+                          <Badge variant="yellow">Pending</Badge>
+                        )}
+                        {(member.entries || []).length > 1 && (
+                          <span className="text-xs text-neutral-500">{(member.entries || []).length} entries</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <Badge
@@ -563,6 +593,7 @@ export function MembersTab({
       {modal.type === 'view_predictions' && (
         <ViewPredictionsModal
           member={modal.member}
+          initialEntry={modal.entry}
           predictions={predictions}
           matches={matches}
           teams={teams}
@@ -572,93 +603,21 @@ export function MembersTab({
 
       {/* Adjust Points Modal */}
       {modal.type === 'adjust_points' && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-xl font-bold text-neutral-900 mb-4">
-              Adjust Points - {modal.member.users.username}
-            </h3>
-
-            {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-
-            <div className="mb-4">
-              <p className="text-sm text-neutral-600">
-                Current points:{' '}
-                <span className="font-bold">
-                  {getBestEntry(modal.member)?.total_points ?? 0}
-                </span>
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Adjustment
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPointAdjustment((p) => p - 1)}
-                  className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  value={pointAdjustment}
-                  onChange={(e) =>
-                    setPointAdjustment(parseInt(e.target.value) || 0)
-                  }
-                  className="w-24 h-10 text-center border border-neutral-300 rounded-lg font-bold text-lg text-neutral-900"
-                />
-                <button
-                  onClick={() => setPointAdjustment((p) => p + 1)}
-                  className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Reason (required)
-              </label>
-              <textarea
-                value={adjustReason}
-                onChange={(e) => setAdjustReason(e.target.value)}
-                placeholder="Explain the reason for this adjustment..."
-                rows={3}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            <p className="text-sm text-neutral-600 mb-4">
-              New total:{' '}
-              <span className="font-bold text-primary-600">
-                {(getBestEntry(modal.member)?.total_points ?? 0) + pointAdjustment}
-              </span>
-            </p>
-
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="gray"
-                onClick={() => {
-                  setModal({ type: 'none' })
-                  setError(null)
-                }}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => handleAdjustPoints(modal.member)}
-                loading={loading}
-                loadingText="Saving..."
-              >
-                Confirm Adjustment
-              </Button>
-            </div>
-          </div>
-        </div>
+        <AdjustPointsModal
+          member={modal.member}
+          initialEntry={modal.entry}
+          pointAdjustment={pointAdjustment}
+          setPointAdjustment={setPointAdjustment}
+          adjustReason={adjustReason}
+          setAdjustReason={setAdjustReason}
+          error={error}
+          loading={loading}
+          onConfirm={(entry) => handleAdjustPoints(modal.member, entry)}
+          onClose={() => {
+            setModal({ type: 'none' })
+            setError(null)
+          }}
+        />
       )}
 
       {/* Promote Modal */}
@@ -733,52 +692,13 @@ export function MembersTab({
 
       {/* Unlock Predictions Modal */}
       {modal.type === 'unlock_predictions' && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
-              Unlock Predictions
-            </h3>
-            <p className="text-sm text-neutral-600 mb-2">
-              Unlock predictions for{' '}
-              <span className="font-bold">{modal.member.users.username}</span>?
-            </p>
-            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-warning-800">
-                This will allow them to edit and resubmit their predictions. Only use this for special circumstances (e.g., technical issues).
-              </p>
-            </div>
-            {(() => {
-              const submittedEntries = (modal.member.entries || []).filter(e => e.has_submitted_predictions)
-              if (submittedEntries.length === 0) return null
-              return (
-                <div className="text-xs text-neutral-500 mb-4 space-y-0.5">
-                  {submittedEntries.map(e => (
-                    <p key={e.entry_id}>
-                      {e.entry_name} submitted: {e.predictions_submitted_at ? new Date(e.predictions_submitted_at).toLocaleString() : 'N/A'}
-                    </p>
-                  ))}
-                </div>
-              )
-            })()}
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="gray"
-                onClick={() => setModal({ type: 'none' })}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => handleUnlockPredictions(modal.member)}
-                loading={loading}
-                loadingText="Unlocking..."
-              >
-                Unlock Predictions
-              </Button>
-            </div>
-          </div>
-        </div>
+        <UnlockPredictionsModal
+          member={modal.member}
+          initialEntry={modal.entry}
+          loading={loading}
+          onUnlock={(entry?: EntryData) => handleUnlockPredictions(modal.member, entry)}
+          onClose={() => setModal({ type: 'none' })}
+        />
       )}
 
       {/* Remove Modal */}
@@ -840,21 +760,31 @@ export function MembersTab({
 
 function ViewPredictionsModal({
   member,
+  initialEntry,
   predictions,
   matches,
   teams,
   onClose,
 }: {
   member: MemberData
+  initialEntry?: EntryData
   predictions: PredictionData[]
   matches: MatchData[]
   teams: TeamData[]
   onClose: () => void
 }) {
-  const memberEntryIds = new Set((member.entries || []).map(e => e.entry_id))
-  const memberPreds = predictions.filter(
-    (p) => memberEntryIds.has(p.entry_id)
+  const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
+  const hasMultipleEntries = entries.length > 1
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(
+    initialEntry?.entry_id || (entries.length > 0 ? entries[0].entry_id : null)
   )
+
+  // Filter predictions to selected entry only
+  const memberPreds = predictions.filter(
+    (p) => p.entry_id === selectedEntryId
+  )
+
+  const selectedEntry = entries.find(e => e.entry_id === selectedEntryId) || entries[0]
 
   // Convert matches to tournament Match type for resolution functions
   const tournamentMatches: Match[] = matches.map((m) => ({
@@ -1013,9 +943,30 @@ function ViewPredictionsModal({
           <h3 className="text-xl font-bold text-neutral-900">
             {member.users.full_name || member.users.username}&apos;s Predictions
           </h3>
-          <p className="text-sm text-neutral-600 mt-1">
-            Total points: {(member.entries || []).reduce((sum, e) => sum + e.total_points, 0)}
-          </p>
+          {selectedEntry && (
+            <p className="text-sm text-neutral-600 mt-1">
+              {selectedEntry.entry_name} &middot; {selectedEntry.total_points} pts
+              {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
+            </p>
+          )}
+          {/* Entry selector tabs */}
+          {hasMultipleEntries && (
+            <div className="flex gap-1.5 mt-3 overflow-x-auto">
+              {entries.map((entry) => (
+                <button
+                  key={entry.entry_id}
+                  onClick={() => setSelectedEntryId(entry.entry_id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                    selectedEntryId === entry.entry_id
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  {entry.entry_name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Scrollable content */}
@@ -1131,6 +1082,274 @@ function ViewPredictionsModal({
               Close
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================
+// UNLOCK PREDICTIONS MODAL
+// =============================================
+
+function UnlockPredictionsModal({
+  member,
+  initialEntry,
+  loading,
+  onUnlock,
+  onClose,
+}: {
+  member: MemberData
+  initialEntry?: EntryData
+  loading: boolean
+  onUnlock: (entry?: EntryData) => void
+  onClose: () => void
+}) {
+  const submittedEntries = (member.entries || []).filter(e => e.has_submitted_predictions)
+  const hasMultipleSubmitted = submittedEntries.length > 1
+  const [selectedEntryId, setSelectedEntryId] = useState<string | 'all'>(
+    initialEntry?.entry_id || (hasMultipleSubmitted ? 'all' : (submittedEntries[0]?.entry_id || 'all'))
+  )
+
+  const selectedEntry = selectedEntryId === 'all'
+    ? undefined
+    : submittedEntries.find(e => e.entry_id === selectedEntryId)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+        <h3 className="text-lg font-bold text-neutral-900 mb-3">
+          Unlock Predictions
+        </h3>
+        <p className="text-sm text-neutral-600 mb-2">
+          Unlock predictions for{' '}
+          <span className="font-bold">{member.users.username}</span>?
+        </p>
+
+        {/* Entry selector when multiple submitted entries */}
+        {hasMultipleSubmitted && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Select entry to unlock
+            </label>
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-lg hover:bg-neutral-50">
+                <input
+                  type="radio"
+                  name="unlock_entry"
+                  checked={selectedEntryId === 'all'}
+                  onChange={() => setSelectedEntryId('all')}
+                  className="text-primary-600"
+                />
+                <span className="font-medium">All entries</span>
+                <span className="text-xs text-neutral-500">({submittedEntries.length} submitted)</span>
+              </label>
+              {submittedEntries.map((entry) => (
+                <label
+                  key={entry.entry_id}
+                  className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-lg hover:bg-neutral-50"
+                >
+                  <input
+                    type="radio"
+                    name="unlock_entry"
+                    checked={selectedEntryId === entry.entry_id}
+                    onChange={() => setSelectedEntryId(entry.entry_id)}
+                    className="text-primary-600"
+                  />
+                  <span className="font-medium">{entry.entry_name}</span>
+                  <span className="text-xs text-neutral-500">
+                    {entry.predictions_submitted_at
+                      ? `submitted ${new Date(entry.predictions_submitted_at).toLocaleString()}`
+                      : ''}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+          <p className="text-sm text-warning-800">
+            This will allow them to edit and resubmit {selectedEntry ? selectedEntry.entry_name : 'their predictions'}. Only use this for special circumstances (e.g., technical issues).
+          </p>
+        </div>
+
+        {/* Show submitted entries info (only when single entry or no selector) */}
+        {!hasMultipleSubmitted && submittedEntries.length > 0 && (
+          <div className="text-xs text-neutral-500 mb-4 space-y-0.5">
+            {submittedEntries.map(e => (
+              <p key={e.entry_id}>
+                {e.entry_name} submitted: {e.predictions_submitted_at ? new Date(e.predictions_submitted_at).toLocaleString() : 'N/A'}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="gray"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => onUnlock(selectedEntry)}
+            loading={loading}
+            loadingText="Unlocking..."
+          >
+            {selectedEntry ? `Unlock ${selectedEntry.entry_name}` : 'Unlock All'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================
+// ADJUST POINTS MODAL
+// =============================================
+
+function AdjustPointsModal({
+  member,
+  initialEntry,
+  pointAdjustment,
+  setPointAdjustment,
+  adjustReason,
+  setAdjustReason,
+  error,
+  loading,
+  onConfirm,
+  onClose,
+}: {
+  member: MemberData
+  initialEntry?: EntryData
+  pointAdjustment: number
+  setPointAdjustment: (v: number | ((p: number) => number)) => void
+  adjustReason: string
+  setAdjustReason: (v: string) => void
+  error: string | null
+  loading: boolean
+  onConfirm: (entry: EntryData) => void
+  onClose: () => void
+}) {
+  const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
+  const hasMultipleEntries = entries.length > 1
+  const [selectedEntryId, setSelectedEntryId] = useState<string>(
+    initialEntry?.entry_id || entries[0]?.entry_id || ''
+  )
+
+  const selectedEntry = entries.find(e => e.entry_id === selectedEntryId) || entries[0]
+
+  if (!selectedEntry) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+        <h3 className="text-xl font-bold text-neutral-900 mb-4">
+          Adjust Points - {member.users.username}
+        </h3>
+
+        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+
+        {/* Entry selector when multiple entries */}
+        {hasMultipleEntries && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Select entry
+            </label>
+            <div className="flex gap-1.5 overflow-x-auto">
+              {entries.map((entry) => (
+                <button
+                  key={entry.entry_id}
+                  onClick={() => setSelectedEntryId(entry.entry_id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                    selectedEntryId === entry.entry_id
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  {entry.entry_name} ({entry.total_points} pts)
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <p className="text-sm text-neutral-600">
+            {selectedEntry.entry_name} current points:{' '}
+            <span className="font-bold">
+              {selectedEntry.total_points ?? 0}
+            </span>
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Adjustment
+          </label>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPointAdjustment((p: number) => p - 1)}
+              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              value={pointAdjustment}
+              onChange={(e) =>
+                setPointAdjustment(parseInt(e.target.value) || 0)
+              }
+              className="w-24 h-10 text-center border border-neutral-300 rounded-lg font-bold text-lg text-neutral-900"
+            />
+            <button
+              onClick={() => setPointAdjustment((p: number) => p + 1)}
+              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Reason (required)
+          </label>
+          <textarea
+            value={adjustReason}
+            onChange={(e) => setAdjustReason(e.target.value)}
+            placeholder="Explain the reason for this adjustment..."
+            rows={3}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <p className="text-sm text-neutral-600 mb-4">
+          New total:{' '}
+          <span className="font-bold text-primary-600">
+            {(selectedEntry.total_points ?? 0) + pointAdjustment}
+          </span>
+        </p>
+
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="gray"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => onConfirm(selectedEntry)}
+            loading={loading}
+            loadingText="Saving..."
+          >
+            Confirm Adjustment
+          </Button>
         </div>
       </div>
     </div>

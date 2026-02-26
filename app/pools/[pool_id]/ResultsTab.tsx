@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { ResultsView } from './results/ResultsView'
 import type { ResultMatch } from './results/MatchCard'
 import type { PoolSettings } from './results/points'
-import type { MatchData, TeamData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from './types'
+import type { MatchData, TeamData, ExistingPrediction, EntryData, MemberData, PredictionData, BonusScoreData } from './types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 
@@ -28,24 +28,70 @@ type ResultsTabProps = {
   members: MemberData[]
   allPredictions: PredictionData[]
   currentEntryId: string
+  userEntries: EntryData[]
 }
 
 export function ResultsTab({
   matches,
-  predictions,
+  predictions: initialPredictions,
   poolSettings,
   teams,
   conductData,
-  userPredictions,
+  userPredictions: initialUserPredictions,
   bonusScores,
   isAdmin,
   members,
   allPredictions,
   currentEntryId,
+  userEntries,
 }: ResultsTabProps) {
-  // Build prediction lookup
-  const predictionMap = new Map(
-    predictions.map((p) => [p.match_id, p])
+  const [selectedEntryId, setSelectedEntryId] = useState(currentEntryId)
+  const showEntrySelector = userEntries.length > 1
+
+  // Check if selected entry has been submitted
+  const selectedEntry = userEntries.find(e => e.entry_id === selectedEntryId)
+  const isEntrySubmitted = selectedEntry?.has_submitted_predictions ?? false
+
+  // Derive predictions for the selected entry (empty if not submitted)
+  const predictions = useMemo(() => {
+    if (!isEntrySubmitted) return []
+    if (selectedEntryId === currentEntryId) return initialPredictions
+    // Rebuild from allPredictions for a different entry
+    return allPredictions
+      .filter(p => p.entry_id === selectedEntryId)
+      .map(p => ({
+        match_id: p.match_id,
+        predicted_home_score: p.predicted_home_score,
+        predicted_away_score: p.predicted_away_score,
+        predicted_home_pso: p.predicted_home_pso,
+        predicted_away_pso: p.predicted_away_pso,
+        predicted_winner_team_id: p.predicted_winner_team_id,
+      }))
+  }, [selectedEntryId, currentEntryId, initialPredictions, allPredictions, isEntrySubmitted])
+
+  // Derive userPredictions (ExistingPrediction[]) for the selected entry (empty if not submitted)
+  const userPredictions = useMemo(() => {
+    if (!isEntrySubmitted) return []
+    if (selectedEntryId === currentEntryId) return initialUserPredictions
+    return allPredictions
+      .filter(p => p.entry_id === selectedEntryId)
+      .map(p => ({
+        match_id: p.match_id,
+        predicted_home_score: p.predicted_home_score,
+        predicted_away_score: p.predicted_away_score,
+        predicted_home_pso: p.predicted_home_pso,
+        predicted_away_pso: p.predicted_away_pso,
+        predicted_winner_team_id: p.predicted_winner_team_id,
+        prediction_id: p.prediction_id,
+      }))
+  }, [selectedEntryId, currentEntryId, initialUserPredictions, allPredictions, isEntrySubmitted])
+
+  const activeEntryId = selectedEntryId || currentEntryId
+
+  // Build prediction lookup (memoized so downstream useMemos react to entry changes)
+  const predictionMap = useMemo(
+    () => new Map(predictions.map((p) => [p.match_id, p])),
+    [predictions]
   )
 
   // Build PredictionMap (ScoreEntry format) for bracket resolver
@@ -91,8 +137,8 @@ export function ResultsTab({
     return bracket.knockoutTeamMap
   }, [matches, bracketPredictionMap, teams, conductData])
 
-  // Transform MatchData[] into ResultMatch[]
-  const resultMatches: ResultMatch[] = matches.map((m) => {
+  // Transform MatchData[] into ResultMatch[] (re-derives when predictions/entry changes)
+  const resultMatches: ResultMatch[] = useMemo(() => matches.map((m) => {
     const resolved = knockoutTeamMap.get(m.match_number)
     return {
       match_id: m.match_id,
@@ -124,7 +170,7 @@ export function ResultsTab({
       predicted_home_team_name: resolved?.home?.country_name ?? null,
       predicted_away_team_name: resolved?.away?.country_name ?? null,
     }
-  })
+  }), [matches, predictionMap, knockoutTeamMap])
 
   if (resultMatches.length === 0) {
     return (
@@ -147,7 +193,11 @@ export function ResultsTab({
       isAdmin={isAdmin}
       members={members}
       allPredictions={allPredictions}
-      currentEntryId={currentEntryId}
+      currentEntryId={activeEntryId}
+      // Entry selector
+      userEntries={showEntrySelector ? userEntries : undefined}
+      selectedEntryId={selectedEntryId}
+      onEntryChange={setSelectedEntryId}
     />
   )
 }

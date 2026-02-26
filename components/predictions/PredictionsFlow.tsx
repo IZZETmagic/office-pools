@@ -37,9 +37,10 @@ type Props = {
   lastSavedAt: string | null
   predictionsLocked: boolean
   onUnsavedChangesRef?: React.RefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>
+  onStatusChange?: (status: { saveStatus: SaveStatus; lastSavedAt: string | null; predictedCount: number }) => void
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 // Stage match count helpers
 const STAGE_MATCH_STAGES: Record<string, string[]> = {
@@ -64,6 +65,7 @@ export default function PredictionsFlow({
   lastSavedAt: initialLastSavedAt,
   predictionsLocked,
   onUnsavedChangesRef,
+  onStatusChange,
 }: Props) {
   // =============================================
   // STATE
@@ -110,7 +112,7 @@ export default function PredictionsFlow({
     if (onUnsavedChangesRef) {
       (onUnsavedChangesRef as React.MutableRefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>).current = {
         hasUnsaved: () => pendingChanges.current,
-        save: () => savePredictions(),
+        save: () => savePredictionsRef.current(),
       }
     }
   })
@@ -121,6 +123,9 @@ export default function PredictionsFlow({
   const periodicSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastSavedPredictions = useRef(new Map(predictions))
 
+  // Ref to always call the latest savePredictions (avoids stale closures)
+  const savePredictionsRef = useRef<() => Promise<void>>(() => Promise.resolve())
+
   // =============================================
   // COMPUTED: PROGRESS
   // =============================================
@@ -129,24 +134,14 @@ export default function PredictionsFlow({
   const predictedCount = Array.from(predictions.values()).filter(p => isPredictionComplete(p)).length
   const progressPercent = totalMatches > 0 ? Math.round((predictedCount / totalMatches) * 100) : 0
 
-  const stageProgress = useMemo(() => {
-    const progress: { stage: string; label: string; predicted: number; total: number }[] = []
-    for (const [stageKey, matchStages] of Object.entries(STAGE_MATCH_STAGES)) {
-      const stageMatches = matches.filter(m => matchStages.includes(m.stage))
-      const stagePredicted = stageMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
-      progress.push({
-        stage: stageKey,
-        label: STAGE_LABELS[stageKey] || stageKey,
-        predicted: stagePredicted,
-        total: stageMatches.length,
-      })
-    }
-    return progress
-  }, [matches, predictions])
-
   const hasUnsavedChanges = useMemo(() => {
     return pendingChanges.current
   }, [predictions, saveStatus])
+
+  // Report status to parent
+  useEffect(() => {
+    onStatusChange?.({ saveStatus, lastSavedAt, predictedCount })
+  }, [saveStatus, lastSavedAt, predictedCount, onStatusChange])
 
   // =============================================
   // PREDICTION UPDATE HANDLER
@@ -165,7 +160,7 @@ export default function PredictionsFlow({
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
       if (pendingChanges.current) {
-        savePredictions()
+        savePredictionsRef.current()
       }
     }, 500)
   }, [])
@@ -177,7 +172,7 @@ export default function PredictionsFlow({
   useEffect(() => {
     periodicSaveTimer.current = setInterval(() => {
       if (pendingChanges.current && !saving) {
-        savePredictions()
+        savePredictionsRef.current()
       }
     }, 60000)
 
@@ -195,7 +190,7 @@ export default function PredictionsFlow({
       if (pendingChanges.current) {
         e.preventDefault()
         // Trigger a save attempt
-        savePredictions()
+        savePredictionsRef.current()
       }
     }
 
@@ -223,7 +218,7 @@ export default function PredictionsFlow({
       showToast('Back online. Syncing...', 'info')
       // Sync any pending changes
       if (pendingChanges.current) {
-        savePredictions()
+        savePredictionsRef.current()
       }
     }
 
@@ -282,7 +277,7 @@ export default function PredictionsFlow({
       setRecoveryData(null)
       showToast('Predictions recovered! Saving...', 'success')
       // Trigger save of recovered data
-      setTimeout(() => savePredictions(), 500)
+      setTimeout(() => savePredictionsRef.current(), 500)
     }
   }
 
@@ -477,6 +472,9 @@ export default function PredictionsFlow({
     setSaving(false)
   }
 
+  // Keep ref in sync so stale closures always call the latest version
+  savePredictionsRef.current = savePredictions
+
   // =============================================
   // SUBMIT ALL PREDICTIONS (final)
   // =============================================
@@ -576,11 +574,6 @@ export default function PredictionsFlow({
           type="locked"
           message="The prediction deadline has passed. You can no longer submit or edit predictions."
         />
-        {predictedCount > 0 && (
-          <div className="mt-4">
-            <ProgressBar predicted={predictedCount} total={totalMatches} stageProgress={stageProgress} />
-          </div>
-        )}
       </div>
     )
   }
@@ -602,20 +595,9 @@ export default function PredictionsFlow({
         />
       )}
 
-      {/* Progress Indicator */}
-      <ProgressBar
-        predicted={predictedCount}
-        total={totalMatches}
-        stageProgress={stageProgress}
-        lastSavedAt={lastSavedAt}
-        saveStatus={saveStatus}
-        status={hasSubmitted ? 'submitted' : 'draft'}
-        submittedAt={submittedAt}
-      />
-
       {/* Error message */}
       {error && (
-        <Alert variant="error" className="mt-4">
+        <Alert variant="error" className="mt-4 mb-4">
           {error}
           {saveStatus === 'error' && (
             <button
@@ -628,8 +610,8 @@ export default function PredictionsFlow({
         </Alert>
       )}
 
-      {/* Stage navigation pills */}
-      <div className="mt-6 mb-6">
+      {/* Stage navigation pills + status */}
+      <div className="mt-2 mb-6">
         <div className="flex gap-1 overflow-x-auto pb-2">
           {STAGES.map((stage, idx) => {
             const isCurrent = idx === currentStage
@@ -925,113 +907,6 @@ function StatusBanner({ type, message }: { type: 'submitted' | 'locked'; message
   )
 }
 
-// =============================================
-// PROGRESS BAR COMPONENT
-// =============================================
-
-function ProgressBar({
-  predicted,
-  total,
-  stageProgress,
-  lastSavedAt,
-  saveStatus,
-  status,
-  submittedAt,
-}: {
-  predicted: number
-  total: number
-  stageProgress: { stage: string; label: string; predicted: number; total: number }[]
-  lastSavedAt?: string | null
-  saveStatus?: SaveStatus
-  status?: 'draft' | 'submitted'
-  submittedAt?: string | null
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const percent = total > 0 ? Math.round((predicted / total) * 100) : 0
-
-  return (
-    <div className="bg-surface border border-neutral-200 rounded-lg p-3 sm:p-4">
-      {/* Single row: label, status badge, progress bar, count, save status, details toggle */}
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
-        {/* Label + status badge */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <h4 className="text-xs sm:text-sm font-semibold text-neutral-700">Progress</h4>
-          {status === 'submitted' && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-success-100 text-success-700">
-              Submitted
-            </span>
-          )}
-          {status === 'draft' && predicted > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-warning-100 text-warning-700">
-              Draft
-            </span>
-          )}
-        </div>
-
-        {/* Progress bar */}
-        <div className="flex-1 min-w-[80px]">
-          <div className="h-2.5 bg-neutral-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                percent === 100 ? 'bg-success-500' : 'bg-primary-600'
-              }`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Count */}
-        <span className="text-xs font-medium text-neutral-600 whitespace-nowrap shrink-0">
-          {predicted}/{total}
-        </span>
-
-        {/* Save status */}
-        <span className="text-[10px] sm:text-xs text-neutral-500 whitespace-nowrap shrink-0">
-          {saveStatus === 'saving' && 'Saving...'}
-          {saveStatus === 'saved' && '\u2713 Saved'}
-          {saveStatus === 'error' && (
-            <span className="text-danger-600">Failed</span>
-          )}
-          {(!saveStatus || saveStatus === 'idle') && lastSavedAt && status !== 'submitted' && `Saved ${timeAgo(lastSavedAt)}`}
-          {(!saveStatus || saveStatus === 'idle') && !lastSavedAt && status !== 'submitted' && predicted > 0 && 'Unsaved'}
-          {status === 'submitted' && submittedAt && `${timeAgo(submittedAt)}`}
-        </span>
-
-        {/* Details toggle */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="text-[10px] sm:text-xs text-primary-600 hover:text-primary-800 font-medium shrink-0"
-        >
-          {expanded ? 'Hide' : 'Details'}
-        </button>
-      </div>
-
-      {/* Expanded: per-stage breakdown */}
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5">
-          {stageProgress.map(sp => {
-            const isComplete = sp.total > 0 && sp.predicted === sp.total
-            const isPartial = sp.predicted > 0 && sp.predicted < sp.total
-            return (
-              <div key={sp.stage} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className={isComplete ? 'text-success-600' : isPartial ? 'text-warning-600' : 'text-neutral-400'}>
-                    {isComplete ? '\u2705' : isPartial ? '\u231B' : '\u25CB'}
-                  </span>
-                  <span className="text-neutral-700">{sp.label}</span>
-                </div>
-                <span className={`font-medium ${isComplete ? 'text-success-600' : 'text-neutral-500'}`}>
-                  {sp.predicted} / {sp.total}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // =============================================
 // HELPERS

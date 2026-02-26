@@ -14,6 +14,13 @@ import { formatNumber } from '@/lib/format'
 // =====================
 // TYPES
 // =====================
+type EntryProgress = {
+  entry_id: string
+  entry_name: string
+  predictedMatches: number
+  has_submitted: boolean
+}
+
 type PoolCardData = {
   pool_id: string
   pool_name: string
@@ -35,6 +42,7 @@ type PoolCardData = {
   totalMatches: number
   completedMatches: number
   predictedMatches: number
+  entries: EntryProgress[]
 }
 
 type ActivityItem = {
@@ -219,32 +227,6 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
         </div>
       </div>
 
-      {/* Prediction progress bar */}
-      {pool.totalMatches > 0 && (
-        <div className="mb-5 flex items-center gap-2 text-xs">
-          <span className="text-neutral-600 shrink-0">Predictions:</span>
-          <div className="h-2 bg-neutral-200 rounded-full overflow-hidden flex-1">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                pool.has_submitted_predictions
-                  ? 'bg-success-500'
-                  : pool.predictedMatches === pool.totalMatches
-                  ? 'bg-primary-500'
-                  : 'bg-warning-500'
-              }`}
-              style={{ width: `${Math.round((pool.predictedMatches / pool.totalMatches) * 100)}%` }}
-            />
-          </div>
-          {pool.has_submitted_predictions ? (
-            <span className="text-success-600 font-semibold shrink-0">Submitted</span>
-          ) : pool.predictedMatches > 0 ? (
-            <span className="text-warning-600 font-semibold shrink-0">Draft</span>
-          ) : (
-            <span className="text-neutral-500 shrink-0">Not started</span>
-          )}
-        </div>
-      )}
-
       {/* Status indicators */}
       <div className="mb-5 text-xs">
         <span className="text-neutral-500">Pool closes: </span>
@@ -333,41 +315,6 @@ export function DashboardClient({
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-
-        {/* Resume Predictions Banner */}
-        {(() => {
-          const incompleteDrafts = pools.filter(
-            p => !p.has_submitted_predictions && p.predictedMatches > 0 && p.predictedMatches < p.totalMatches
-          )
-          if (incompleteDrafts.length === 0) return null
-          return (
-            <div className="mb-6 sm:mb-8 bg-warning-50 border border-warning-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-warning-600 text-xl shrink-0">&#9888;</span>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-warning-800 mb-1">You have incomplete predictions!</h4>
-                  <div className="space-y-1.5">
-                    {incompleteDrafts.map(pool => (
-                      <div key={pool.pool_id} className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-warning-700 truncate">
-                          {pool.pool_name}: <strong>{pool.predictedMatches}/{pool.totalMatches}</strong> ({Math.round((pool.predictedMatches / pool.totalMatches) * 100)}%)
-                        </span>
-                        <Button
-                          href={`/pools/${pool.pool_id}?tab=predictions`}
-                          variant="primary"
-                          size="sm"
-                          className="shrink-0"
-                        >
-                          Resume
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
 
         {/* My Pools section */}
         <div className="mb-8">

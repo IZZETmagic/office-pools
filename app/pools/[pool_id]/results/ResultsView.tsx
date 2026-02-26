@@ -6,7 +6,7 @@ import { calculatePoints, type PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import type { MatchData, TeamData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from '../types'
+import type { MatchData, TeamData, EntryData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from '../types'
 import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
 
 // =============================================
@@ -56,6 +56,10 @@ export function ResultsView({
   members,
   allPredictions,
   currentEntryId,
+  // Entry selector
+  userEntries,
+  selectedEntryId,
+  onEntryChange,
 }: {
   matches: ResultMatch[]
   poolSettings: PoolSettings
@@ -69,6 +73,10 @@ export function ResultsView({
   members: MemberData[]
   allPredictions: PredictionData[]
   currentEntryId: string
+  // Entry selector
+  userEntries?: EntryData[]
+  selectedEntryId?: string
+  onEntryChange?: (entryId: string) => void
 }) {
   const [stageTab, setStageTab] = useState<StageTab>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -226,7 +234,11 @@ export function ResultsView({
       {/* ── Points summary ── */}
       <div className="mb-6 p-4 bg-surface rounded-lg shadow border border-neutral-200 flex items-center justify-between">
         <div>
-          <p className="text-sm text-neutral-600">Your Total Points</p>
+          <p className="text-sm text-neutral-600">
+            {userEntries && userEntries.length > 1
+              ? `${userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'} Points`
+              : 'Your Total Points'}
+          </p>
           <p className="text-3xl font-extrabold text-primary-600">{totalPoints}</p>
           {bonusPoints > 0 && (
             <p className="text-xs text-neutral-500 mt-0.5">
@@ -263,7 +275,7 @@ export function ResultsView({
         ))}
       </div>
 
-      {/* ── Status filter + Group filter row ── */}
+      {/* ── Status filter + Group filter + Entry selector row ── */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         {/* Status buttons */}
         <div className="flex gap-1">
@@ -307,6 +319,23 @@ export function ResultsView({
               </option>
             ))}
           </select>
+        )}
+
+        {/* Entry selector (right-aligned, only for multi-entry users) */}
+        {userEntries && userEntries.length > 1 && onEntryChange && (
+          <div className="ml-auto">
+            <select
+              value={selectedEntryId || ''}
+              onChange={(e) => onEntryChange(e.target.value)}
+              className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              {userEntries.map((entry) => (
+                <option key={entry.entry_id} value={entry.entry_id}>
+                  {entry.entry_name}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 

@@ -519,9 +519,8 @@ export function GroupStandingsComparison({
               >
                 {entriesWithPredictions.map((e) => (
                   <option key={e.entry_id} value={e.entry_id}>
-                    {e.entry_id === currentEntryId
-                      ? `${e.full_name || e.username || 'You'} (You)`
-                      : `${e.full_name || e.username || 'Unknown'}${e.entry_name !== 'Entry 1' ? ` - ${e.entry_name}` : ''}`}
+                    {e.entry_name} - {e.full_name || e.username || 'Unknown'}
+                    {e.entry_id === currentEntryId ? ' (You)' : ''}
                   </option>
                 ))}
               </select>
