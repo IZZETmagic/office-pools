@@ -265,7 +265,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     setCreatedPoolCode(newPool.pool_code)
     setSuccess(`Pool "${poolName.trim()}" created!`)
     setLoading(false)
-    router.refresh()
+    // Navigate to the new pool's settings tab
+    router.push(`/pools/${newPool.pool_id}?tab=settings`)
   }
 
   const canProceedFromTournament = !!selectedTournamentId

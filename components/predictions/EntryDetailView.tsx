@@ -48,8 +48,9 @@ export function EntryDetailView({
   }, [onStatusChange])
 
   const hasSubmitted = entry.has_submitted_predictions
-  const statusVariant = hasSubmitted ? 'green' as const : predictionStatus.predictedCount > 0 ? 'yellow' as const : 'gray' as const
-  const statusLabel = hasSubmitted ? 'Submitted' : predictionStatus.predictedCount > 0 ? 'Draft' : 'Not Started'
+  const autoSubmitted = entry.auto_submitted
+  const statusVariant = autoSubmitted ? 'blue' as const : hasSubmitted ? 'green' as const : predictionStatus.predictedCount > 0 ? 'yellow' as const : 'gray' as const
+  const statusLabel = autoSubmitted ? 'Auto-Submitted' : hasSubmitted ? 'Submitted' : predictionStatus.predictedCount > 0 ? 'Draft' : 'Not Started'
 
   return (
     <div>
@@ -90,6 +91,7 @@ export function EntryDetailView({
         isPastDeadline={isPastDeadline}
         psoEnabled={psoEnabled}
         hasSubmitted={hasSubmitted}
+        autoSubmitted={autoSubmitted}
         submittedAt={entry.predictions_submitted_at}
         lastSavedAt={entry.predictions_last_saved_at}
         predictionsLocked={predictionsLocked}

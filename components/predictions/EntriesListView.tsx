@@ -20,7 +20,8 @@ type EntriesListViewProps = {
   onEditEntry: (entry: EntryData) => void
 }
 
-function getEntryStatus(entry: EntryData, predictedCount: number): { label: string; variant: 'green' | 'yellow' | 'gray' } {
+function getEntryStatus(entry: EntryData, predictedCount: number): { label: string; variant: 'green' | 'yellow' | 'gray' | 'blue' } {
+  if (entry.auto_submitted) return { label: 'Auto-Submitted', variant: 'blue' }
   if (entry.has_submitted_predictions) return { label: 'Submitted', variant: 'green' }
   if (predictedCount > 0) return { label: 'Draft', variant: 'yellow' }
   return { label: 'Not Started', variant: 'gray' }

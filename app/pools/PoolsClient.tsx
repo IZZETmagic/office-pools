@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -245,9 +245,13 @@ function PublicPoolCard({ pool, onJoin }: { pool: PublicPool; onJoin: (code: str
 // =====================
 export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'my-pools' | 'discover'>('my-pools')
+  // Tab state (support ?tab=discover from email links)
+  const [activeTab, setActiveTab] = useState<'my-pools' | 'discover'>(() => {
+    const tabParam = searchParams.get('tab')
+    return tabParam === 'discover' ? 'discover' : 'my-pools'
+  })
 
   // Filter state (My Pools)
   const [searchQuery, setSearchQuery] = useState('')

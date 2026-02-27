@@ -31,7 +31,8 @@ function baseTemplate(params: {
         <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
           <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
             <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
-            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Manage preferences</a>
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
           </p>
         </td></tr>
       </table>
@@ -60,7 +61,7 @@ export function poolJoinedTemplate(params: {
         <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Head over to the pool and start making your predictions before the deadline!</p>
       `,
       ctaText: 'Make Predictions',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=predictions`,
     }),
   }
 }
@@ -86,6 +87,36 @@ export function predictionsSubmittedTemplate(params: {
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
           <p style="color:#166534;margin:0;font-size:14px;"><strong>${matchCount}</strong> match predictions locked in</p>
         </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">Good luck!</p>
+      `,
+      ctaText: 'View Pool',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+export function predictionsAutoSubmittedTemplate(params: {
+  userName: string
+  poolName: string
+  entryName: string
+  matchCount: number
+  totalMatches: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, entryName, matchCount, totalMatches, poolUrl } = params
+  const isPartial = totalMatches > 0 && matchCount < totalMatches
+  return {
+    subject: `Your draft predictions were auto-submitted for ${poolName}`,
+    html: baseTemplate({
+      preheader: `The deadline passed and your draft for ${entryName} was automatically submitted`,
+      heading: 'Draft Auto-Submitted',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.</p>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#92400e;margin:0;font-size:14px;"><strong>${matchCount}</strong> of <strong>${totalMatches}</strong> match predictions submitted${isPartial ? ' (partial)' : ''}</p>
+        </div>
+        ${isPartial ? '<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Matches without predictions will not earn any points.</p>' : ''}
         <p style="color:#525252;line-height:1.6;margin:0;">Good luck!</p>
       `,
       ctaText: 'View Pool',
@@ -120,7 +151,7 @@ export function deadlineReminderTemplate(params: {
         <p style="color:#525252;line-height:1.6;margin:0;">Don't miss out - submit your predictions now!</p>
       `,
       ctaText: 'Submit Predictions',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=predictions`,
     }),
   }
 }
@@ -168,7 +199,7 @@ export function matchResultTemplate(params: {
         </table>
       `,
       ctaText: 'View Results',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=results`,
     }),
   }
 }
@@ -201,7 +232,7 @@ export function rankChangeTemplate(params: {
         </div>
       `,
       ctaText: 'View Leaderboard',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=leaderboard`,
     }),
   }
 }
@@ -247,7 +278,7 @@ export function weeklyRecapTemplate(params: {
         </table>
       `,
       ctaText: 'View Full Leaderboard',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=leaderboard`,
     }),
   }
 }
@@ -272,7 +303,7 @@ export function predictionsUnlockedTemplate(params: {
         <p style="color:#525252;line-height:1.6;margin:0;">You can now edit and resubmit your predictions.</p>
       `,
       ctaText: 'Edit Predictions',
-      ctaUrl: poolUrl,
+      ctaUrl: `${poolUrl}?tab=predictions`,
     }),
   }
 }
@@ -293,7 +324,7 @@ export function memberRemovedTemplate(params: {
         <p style="color:#525252;line-height:1.6;margin:0;">If you believe this was a mistake, please contact the pool administrator.</p>
       `,
       ctaText: 'Browse Pools',
-      ctaUrl: `${APP_URL}/pools`,
+      ctaUrl: `${APP_URL}/pools?tab=discover`,
     }),
   }
 }

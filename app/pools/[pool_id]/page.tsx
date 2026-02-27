@@ -174,6 +174,13 @@ export default async function PoolPage({
     ? new Date(pool.prediction_deadline) < new Date()
     : false
 
+  // Lazy fallback: auto-submit draft entries if deadline has passed
+  if (isPastDeadline) {
+    import('@/lib/auto-submit').then(({ autoSubmitDraftEntries }) => {
+      autoSubmitDraftEntries(pool_id).catch(() => {})
+    })
+  }
+
   const psoEnabled = settings?.pso_enabled ?? true
 
   return (

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -192,7 +192,12 @@ export default function ProfilePage({
   poolSettingsMap,
   playerScoresMap,
 }: ProfilePageProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('edit')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const tabParam = searchParams.get('tab') as Tab | null
+    const validTabs: Tab[] = ['edit', 'statistics', 'predictions', 'settings']
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'edit'
+  })
   const router = useRouter()
   const supabase = createClient()
 
