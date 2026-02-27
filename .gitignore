@@ -38,6 +38,8 @@ yarn-error.log*
 
 # claude code
 .claude/
+.mcp.json
+nul
 
 # typescript
 *.tsbuildinfo
