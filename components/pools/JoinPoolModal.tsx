@@ -101,6 +101,13 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       console.error('Failed to create first entry:', entryError.message)
     }
 
+    // Send welcome email (fire-and-forget)
+    fetch('/api/notifications/pool-joined', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pool_id: pool.pool_id }),
+    }).catch(() => {})
+
     setSuccess(`Joined "${pool.pool_name}"!`)
     setJoinCode('')
     setLoading(false)

@@ -135,6 +135,16 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
     } else {
       setPool({ ...pool, prediction_deadline: newDeadline.toISOString() })
       setSuccess('Prediction deadline updated.')
+
+      // Notify pool members about deadline change (fire-and-forget)
+      fetch('/api/notifications/deadline-changed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pool_id: pool.pool_id,
+          new_deadline: newDeadline.toISOString(),
+        }),
+      }).catch(() => {})
     }
     setSavingDeadline(false)
   }

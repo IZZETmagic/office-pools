@@ -183,6 +183,16 @@ export function MembersTab({
       p_pool_id: pool.pool_id,
     })
 
+    // Notify removed member (fire-and-forget)
+    fetch('/api/notifications/member-removed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pool_id: pool.pool_id,
+        removed_user_id: member.users.user_id,
+      }),
+    }).catch(() => {})
+
     setSuccess(`${member.users.username} removed from pool.`)
     await refreshMembers()
     setLoading(false)

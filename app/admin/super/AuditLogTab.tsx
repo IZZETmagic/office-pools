@@ -31,7 +31,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
       <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   Time
@@ -62,7 +62,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
                 const resetDate = new Date(log.reset_at)
 
                 return (
-                  <tr key={log.log_id} className="hover:bg-neutral-50">
+                  <tr key={log.log_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100">
                     <td className="px-4 py-3 text-sm text-neutral-600 whitespace-nowrap">
                       {resetDate.toLocaleDateString('en-US', {
                         month: 'short',
