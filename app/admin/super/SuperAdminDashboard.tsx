@@ -56,32 +56,32 @@ export function SuperAdminDashboard({
 
       {/* Sticky admin status bar + stats + tab navigation */}
       <div className="sticky top-[57px] z-[9]">
-      <div className="bg-neutral-900 px-4 sm:px-6 py-1.5 sm:py-2">
+      <div className="bg-neutral-900 dark:bg-[oklch(0.13_0.02_260)] px-4 sm:px-6 py-1.5 sm:py-2">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-[10px] sm:text-xs text-danger-400 font-medium">Full System Access</p>
         </div>
       </div>
 
       {/* Quick stats bar */}
-      <div className="bg-neutral-800 border-b border-neutral-700 px-4 sm:px-6 py-2 sm:py-3">
+      <div className="bg-neutral-800 dark:bg-[oklch(0.17_0.02_260)] border-b border-neutral-700 dark:border-[oklch(0.25_0.02_260)] px-4 sm:px-6 py-2 sm:py-3">
         <div className="max-w-7xl mx-auto flex gap-4 sm:gap-8 text-xs sm:text-sm overflow-x-auto">
-          <div className="text-neutral-300 whitespace-nowrap">
+          <div className="text-neutral-300 dark:text-neutral-500 whitespace-nowrap">
             Matches:{' '}
-            <span className="text-white font-bold">
+            <span className="text-white dark:text-neutral-900 font-bold">
               {formatNumber(completedMatches)}/{formatNumber(totalMatches)}
             </span>
           </div>
-          <div className="text-neutral-300 whitespace-nowrap">
+          <div className="text-neutral-300 dark:text-neutral-500 whitespace-nowrap">
             Users:{' '}
-            <span className="text-white font-bold">{formatNumber(activeUsers)}</span>
+            <span className="text-white dark:text-neutral-900 font-bold">{formatNumber(activeUsers)}</span>
           </div>
-          <div className="text-neutral-300 whitespace-nowrap">
+          <div className="text-neutral-300 dark:text-neutral-500 whitespace-nowrap">
             Pools:{' '}
-            <span className="text-white font-bold">{formatNumber(activePools)}</span>
+            <span className="text-white dark:text-neutral-900 font-bold">{formatNumber(activePools)}</span>
           </div>
-          <div className="text-neutral-300 whitespace-nowrap">
+          <div className="text-neutral-300 dark:text-neutral-500 whitespace-nowrap">
             Audit:{' '}
-            <span className="text-white font-bold">{formatNumber(auditLogs.length)}</span>
+            <span className="text-white dark:text-neutral-900 font-bold">{formatNumber(auditLogs.length)}</span>
           </div>
         </div>
       </div>

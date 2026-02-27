@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { MatchCard, type ResultMatch } from './MatchCard'
-import { calculatePoints, type PoolSettings } from './points'
+import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
@@ -33,11 +33,11 @@ const STAGE_TABS: { key: StageTab; label: string }[] = [
   { key: 'finals', label: 'Finals' },
 ]
 
-const STATUS_OPTIONS: { key: StatusFilter; label: string; color: string }[] = [
-  { key: 'all', label: 'All', color: 'bg-neutral-100 text-neutral-700' },
-  { key: 'completed', label: 'Completed', color: 'bg-success-100 text-success-700' },
-  { key: 'live', label: 'Live', color: 'bg-danger-100 text-danger-700' },
-  { key: 'upcoming', label: 'Upcoming', color: 'bg-neutral-100 text-neutral-600' },
+const STATUS_OPTIONS: { key: StatusFilter; label: string; activeColor: string }[] = [
+  { key: 'all', label: 'All', activeColor: 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900' },
+  { key: 'completed', label: 'Completed', activeColor: 'bg-success-600 text-white' },
+  { key: 'live', label: 'Live', activeColor: 'bg-danger-600 text-white' },
+  { key: 'upcoming', label: 'Upcoming', activeColor: 'bg-neutral-600 text-white dark:bg-neutral-300 dark:text-neutral-900' },
 ]
 
 // =============================================
@@ -137,6 +137,13 @@ export function ResultsView({
         m.away_score_ft !== null &&
         m.prediction
       ) {
+        const teamsMatch = checkKnockoutTeamsMatch(
+          m.stage,
+          m.home_team_id,
+          m.away_team_id,
+          m.predicted_home_team_id,
+          m.predicted_away_team_id,
+        )
         const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
         const res = calculatePoints(
           m.prediction.predicted_home_score,
@@ -152,7 +159,8 @@ export function ResultsView({
                 predictedHomePso: m.prediction.predicted_home_pso,
                 predictedAwayPso: m.prediction.predicted_away_pso,
               }
-            : undefined
+            : undefined,
+          teamsMatch,
         )
         sum += res.points
       }
@@ -285,14 +293,8 @@ export function ResultsView({
               onClick={() => setStatusFilter(opt.key)}
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
-                  ? opt.key === 'all'
-                    ? 'bg-neutral-800 text-white'
-                    : opt.key === 'completed'
-                      ? 'bg-success-600 text-white'
-                      : opt.key === 'live'
-                        ? 'bg-danger-600 text-white'
-                        : 'bg-neutral-600 text-white'
-                  : opt.color + ' hover:opacity-80'
+                  ? opt.activeColor
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
               }`}
             >
               {opt.label}

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -192,7 +192,12 @@ export default function ProfilePage({
   poolSettingsMap,
   playerScoresMap,
 }: ProfilePageProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('edit')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const tabParam = searchParams.get('tab') as Tab | null
+    const validTabs: Tab[] = ['edit', 'statistics', 'predictions', 'settings']
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'edit'
+  })
   const router = useRouter()
   const supabase = createClient()
 
@@ -680,7 +685,7 @@ function StatisticsTab({
           <div className="overflow-x-auto -mx-6">
             <table className="w-full text-sm min-w-[480px]">
               <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50">
+                <tr className="border-b border-neutral-200 bg-neutral-50 dark:bg-neutral-100">
                   <th className="text-left py-3 px-4 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Pool</th>
                   <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Rank</th>
                   <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Points</th>
@@ -690,7 +695,7 @@ function StatisticsTab({
               </thead>
               <tbody>
                 {poolStats.map(pool => (
-                  <tr key={pool.pool_id} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">
+                  <tr key={pool.pool_id} className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors">
                     <td className="py-3 px-4 sm:px-6">
                       <Link
                         href={`/pools/${pool.pool_id}`}
@@ -1020,7 +1025,7 @@ function PredictionHistoryTab({
             <div className="overflow-x-auto -mx-6">
               <table className="w-full text-sm min-w-[520px]">
                 <thead>
-                  <tr className="border-b border-neutral-200 bg-neutral-50">
+                  <tr className="border-b border-neutral-200 bg-neutral-50 dark:bg-neutral-100">
                     <th className="text-left py-3 px-4 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Match</th>
                     <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Prediction</th>
                     <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Result</th>
@@ -1038,7 +1043,7 @@ function PredictionHistoryTab({
                       : '-'
 
                     return (
-                      <tr key={pred.prediction_id} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">
+                      <tr key={pred.prediction_id} className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors">
                         <td className="py-3 px-4 sm:px-6">
                           <p className="font-medium text-neutral-900">{homeTeam} vs {awayTeam}</p>
                           <p className="text-xs text-neutral-500 mt-0.5">
@@ -1079,14 +1084,14 @@ function PredictionHistoryTab({
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-sm rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-sm rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Next
                   </button>
@@ -1128,6 +1133,54 @@ function AccountSettingsTab({
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Notification preferences
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
+    POOL_ACTIVITY: true,
+    PREDICTIONS: true,
+    MATCH_RESULTS: true,
+    LEADERBOARD: true,
+    ADMIN: true,
+  })
+  const [notifLoading, setNotifLoading] = useState(true)
+  const [notifUpdating, setNotifUpdating] = useState<string | null>(null)
+
+  const NOTIF_OPTIONS = [
+    { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave pool, invitations' },
+    { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, submission confirmations' },
+    { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Match results and points earned' },
+    { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings' },
+    { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed, predictions unlocked' },
+  ]
+
+  useEffect(() => {
+    fetch('/api/notifications/preferences')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.preferences) setNotifPrefs(data.preferences)
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false))
+  }, [])
+
+  const handleToggleNotif = useCallback(async (key: string) => {
+    const newValue = !notifPrefs[key]
+    setNotifUpdating(key)
+    setNotifPrefs((prev) => ({ ...prev, [key]: newValue }))
+
+    try {
+      await fetch('/api/notifications/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicKey: key, enabled: newValue }),
+      })
+    } catch {
+      // Revert on failure
+      setNotifPrefs((prev) => ({ ...prev, [key]: !newValue }))
+    } finally {
+      setNotifUpdating(null)
+    }
+  }, [notifPrefs])
 
   async function handlePasswordChange() {
     setPasswordError(null)
@@ -1207,7 +1260,7 @@ function AccountSettingsTab({
           </div>
           <h4 className="text-base font-semibold text-neutral-900">Security</h4>
         </div>
-        <div className="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
+        <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-100 rounded-lg p-4">
           <div>
             <p className="text-sm font-medium text-neutral-700">Password</p>
             <p className="text-xs text-neutral-500 mt-0.5">Change your account password</p>
@@ -1228,7 +1281,7 @@ function AccountSettingsTab({
           </div>
           <h4 className="text-base font-semibold text-neutral-900">Appearance</h4>
         </div>
-        <div className="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
+        <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-100 rounded-lg p-4">
           <div>
             <p className="text-sm font-medium text-neutral-700">Color Mode</p>
             <p className="text-xs text-neutral-500 mt-0.5">
@@ -1262,22 +1315,43 @@ function AccountSettingsTab({
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
             </svg>
           </div>
-          <h4 className="text-base font-semibold text-neutral-900">Notifications</h4>
-          <Badge variant="gray">Coming Soon</Badge>
+          <h4 className="text-base font-semibold text-neutral-900">Email Notifications</h4>
         </div>
-        <div className="space-y-3 opacity-50 bg-neutral-50 rounded-lg p-4">
-          <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-neutral-300" />
-            <span className="text-sm text-neutral-700">Match result notifications</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-neutral-300" />
-            <span className="text-sm text-neutral-700">Deadline reminders</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-not-allowed">
-            <input type="checkbox" disabled className="rounded border-neutral-300" />
-            <span className="text-sm text-neutral-700">Rank change alerts</span>
-          </label>
+        <p className="text-sm text-neutral-600 mb-4">Choose which email notifications you&apos;d like to receive.</p>
+        <div className="space-y-3">
+          {notifLoading ? (
+            <div className="bg-neutral-50 dark:bg-neutral-100 rounded-lg p-4 text-center">
+              <p className="text-sm text-neutral-500">Loading preferences...</p>
+            </div>
+          ) : (
+            NOTIF_OPTIONS.map((opt) => (
+              <label
+                key={opt.key}
+                className="flex items-center justify-between gap-3 p-3 bg-neutral-50 dark:bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-200 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
+                  <p className="text-xs text-neutral-500">{opt.desc}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={notifPrefs[opt.key]}
+                  disabled={notifUpdating === opt.key}
+                  onClick={() => handleToggleNotif(opt.key)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                    notifPrefs[opt.key] ? 'bg-primary-600' : 'bg-neutral-300'
+                  } ${notifUpdating === opt.key ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition duration-200 ease-in-out ${
+                      notifPrefs[opt.key] ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </label>
+            ))
+          )}
         </div>
       </Card>
 

@@ -179,7 +179,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('user_id')
+      .select('user_id, username')
       .eq('auth_user_id', authUser?.id)
       .single()
 
@@ -237,12 +237,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       return
     }
 
-    // 2b. Auto-create first entry for the creator
+    // 2b. Auto-create first entry for the creator (default name = username)
     const { error: entryError } = await supabase
       .from('pool_entries')
       .insert({
         member_id: memberData.member_id,
-        entry_name: 'Entry 1',
+        entry_name: userData.username || 'Entry 1',
         entry_number: 1,
       })
 
@@ -265,7 +265,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     setCreatedPoolCode(newPool.pool_code)
     setSuccess(`Pool "${poolName.trim()}" created!`)
     setLoading(false)
-    router.refresh()
+    // Navigate to the new pool's settings tab
+    router.push(`/pools/${newPool.pool_id}?tab=settings`)
   }
 
   const canProceedFromTournament = !!selectedTournamentId

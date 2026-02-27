@@ -11,6 +11,8 @@ import { ResultsTab } from './ResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
+import { EntriesListView } from '@/components/predictions/EntriesListView'
+import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
@@ -28,21 +30,7 @@ import type {
   BonusScoreData,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
-
-// =====================
-// HELPERS
-// =====================
-function formatTimeAgo(dateStr: string) {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const diffSec = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  if (diffSec < 10) return 'just now'
-  if (diffSec < 60) return `${diffSec}s ago`
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+import { formatTimeAgo } from '@/lib/format'
 
 // =====================
 // TAB DEFINITIONS
@@ -157,6 +145,10 @@ export function PoolDetail({
   const entryNameInputRef = useRef<HTMLInputElement>(null)
   const [predictionStatus, setPredictionStatus] = useState<{ saveStatus: SaveStatus; lastSavedAt: string | null; predictedCount: number }>({ saveStatus: 'idle', lastSavedAt: null, predictedCount: 0 })
 
+  // Multi-entry view state (list vs detail)
+  const [predictionsView, setPredictionsView] = useState<{ mode: 'list' } | { mode: 'detail'; entryId: string }>({ mode: 'list' })
+  const [pendingBackToList, setPendingBackToList] = useState(false)
+
   // Derive submission state from active entry
   const hasSubmitted = activeEntry?.has_submitted_predictions ?? false
   const submittedAt = activeEntry?.predictions_submitted_at ?? null
@@ -228,6 +220,7 @@ export function PoolDetail({
         setEntries(remaining)
         setActiveEntryId(remaining[0]?.entry_id || '')
         setShowDeleteEntryModal(false)
+        setPredictionsView({ mode: 'list' })
         // Clear cached predictions for deleted entry
         setLiveEntryPredictions(prev => {
           const next = { ...prev }
@@ -242,6 +235,108 @@ export function PoolDetail({
       setDeletingEntry(false)
     }
   }
+
+  // Live predictions fetched client-side (overrides server data when available)
+  const [liveEntryPredictions, setLiveEntryPredictions] = useState<Record<string, ExistingPrediction[]>>({})
+  const [loadingPredictions, setLoadingPredictions] = useState(false)
+
+  // Fetch predictions for the active entry from the database
+  const fetchEntryPredictions = useCallback(async (entryId: string) => {
+    setLoadingPredictions(true)
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('predictions')
+        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
+        .eq('entry_id', entryId)
+      if (data) {
+        setLiveEntryPredictions(prev => ({
+          ...prev,
+          [entryId]: data as ExistingPrediction[],
+        }))
+      }
+    } finally {
+      setLoadingPredictions(false)
+    }
+  }, [])
+
+  // Navigate into an entry's detail view (multi-entry)
+  const handleOpenEntryDetail = useCallback((entry: EntryData) => {
+    setActiveEntryId(entry.entry_id)
+    // Clear stale cached predictions so EntryDetailView doesn't mount with old data
+    setLiveEntryPredictions(prev => {
+      const next = { ...prev }
+      delete next[entry.entry_id]
+      return next
+    })
+    setPredictionsView({ mode: 'detail', entryId: entry.entry_id })
+    // Fetch fresh predictions — EntryDetailView is gated on loadingPredictions
+    fetchEntryPredictions(entry.entry_id)
+  }, [fetchEntryPredictions])
+
+  // Navigate back to entries list (silently save any pending changes, refresh list data)
+  const handleBackToList = useCallback(async () => {
+    if (predictionsRef.current?.hasUnsaved()) {
+      await predictionsRef.current.save()
+    }
+
+    // Refresh predictions + entry metadata so list view shows up-to-date progress/timestamps
+    const entryId = activeEntryId
+    if (entryId) {
+      const supabase = createClient()
+      const [predsResult, entryResult] = await Promise.all([
+        supabase
+          .from('predictions')
+          .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+          .eq('entry_id', entryId),
+        supabase
+          .from('pool_entries')
+          .select('has_submitted_predictions, predictions_submitted_at, predictions_last_saved_at')
+          .eq('entry_id', entryId)
+          .single(),
+      ])
+      if (predsResult.data) {
+        setAllPredictions(prev => [
+          ...prev.filter(p => p.entry_id !== entryId),
+          ...(predsResult.data as PredictionData[]),
+        ])
+      }
+      if (entryResult.data) {
+        setEntries(prev => prev.map(e =>
+          e.entry_id === entryId
+            ? {
+                ...e,
+                predictions_last_saved_at: entryResult.data.predictions_last_saved_at,
+                has_submitted_predictions: entryResult.data.has_submitted_predictions,
+                predictions_submitted_at: entryResult.data.predictions_submitted_at,
+              }
+            : e
+        ))
+      }
+    }
+
+    setPredictionsView({ mode: 'list' })
+  }, [activeEntryId])
+
+  // Delete entry from list view (needs to set active first for handleDeleteEntry)
+  const handleDeleteEntryFromList = useCallback((entry: EntryData) => {
+    setActiveEntryId(entry.entry_id)
+    setShowDeleteEntryModal(true)
+  }, [])
+
+  // Rename entry from list view
+  const handleRenameEntryFromList = useCallback(async (entry: EntryData, newName: string) => {
+    const res = await fetch(`/api/pools/${pool.pool_id}/entries`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entryId: entry.entry_id, entryName: newName }),
+    })
+    if (res.ok) {
+      setEntries(prev => prev.map(e =>
+        e.entry_id === entry.entry_id ? { ...e, entry_name: newName } : e
+      ))
+    }
+  }, [pool.pool_id])
 
   // Focus input when editing starts
   useEffect(() => {
@@ -324,13 +419,23 @@ export function PoolDetail({
     if (predictionsRef.current) {
       await predictionsRef.current.save()
     }
-    if (pendingTab) switchTab(pendingTab)
+    if (pendingBackToList) {
+      setPredictionsView({ mode: 'list' })
+      setPendingBackToList(false)
+    } else if (pendingTab) {
+      switchTab(pendingTab)
+    }
     setShowNavWarning(false)
     setPendingTab(null)
   }
 
   const handleLeaveWithoutSaving = () => {
-    if (pendingTab) switchTab(pendingTab)
+    if (pendingBackToList) {
+      setPredictionsView({ mode: 'list' })
+      setPendingBackToList(false)
+    } else if (pendingTab) {
+      switchTab(pendingTab)
+    }
     setShowNavWarning(false)
     setPendingTab(null)
   }
@@ -338,6 +443,7 @@ export function PoolDetail({
   const handleCancelNav = () => {
     setShowNavWarning(false)
     setPendingTab(null)
+    setPendingBackToList(false)
   }
 
   // Build pool settings for points calculation
@@ -350,30 +456,6 @@ export function PoolDetail({
         pso_correct_result: settings.pso_correct_result ?? 0,
       }
     : DEFAULT_POOL_SETTINGS
-
-  // Live predictions fetched client-side (overrides server data when available)
-  const [liveEntryPredictions, setLiveEntryPredictions] = useState<Record<string, ExistingPrediction[]>>({})
-  const [loadingPredictions, setLoadingPredictions] = useState(false)
-
-  // Fetch predictions for the active entry from the database
-  const fetchEntryPredictions = useCallback(async (entryId: string) => {
-    setLoadingPredictions(true)
-    try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('predictions')
-        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
-        .eq('entry_id', entryId)
-      if (data) {
-        setLiveEntryPredictions(prev => ({
-          ...prev,
-          [entryId]: data as ExistingPrediction[],
-        }))
-      }
-    } finally {
-      setLoadingPredictions(false)
-    }
-  }, [])
 
   // Fetch predictions when switching to predictions tab or changing active entry
   useEffect(() => {
@@ -562,136 +644,130 @@ export function PoolDetail({
             )}
 
             {activeTab === 'predictions' && activeEntry && (
-              <div>
-                {/* Entry selector + actions (single consolidated row) */}
-                <div className="mb-6">
-                  {editingEntryName ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={entryNameInputRef}
-                        type="text"
-                        value={entryNameDraft}
-                        onChange={e => setEntryNameDraft(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleRenameEntry()
-                          if (e.key === 'Escape') setEditingEntryName(false)
-                        }}
-                        className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
-                        maxLength={40}
-                        placeholder="Entry name..."
-                      />
-                      <button
-                        onClick={handleRenameEntry}
-                        disabled={savingEntryName}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        {savingEntryName ? '...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => setEditingEntryName(false)}
-                        className="px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                      {/* Entry pills (multi-entry) or entry name (single-entry) */}
-                      {pool.max_entries_per_user > 1 ? (
-                        <>
-                          {entries.map(e => (
-                            <button
-                              key={e.entry_id}
-                              onClick={() => setActiveEntryId(e.entry_id)}
-                              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                                e.entry_id === activeEntryId
-                                  ? 'bg-primary-600 text-white shadow-sm'
-                                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                              }`}
-                            >
-                              {e.entry_name}
-                              {e.has_submitted_predictions && (
-                                <span className="ml-1 text-xs opacity-70">{'\u2713'}</span>
-                              )}
-                            </button>
-                          ))}
-                          {canAddEntry && (
-                            <button
-                              onClick={handleAddEntry}
-                              disabled={addingEntry}
-                              className="px-2.5 py-1.5 rounded-full text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 transition-colors whitespace-nowrap disabled:opacity-50"
-                            >
-                              {addingEntry ? '...' : '+ Add Entry'}
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-sm font-semibold text-neutral-900">{activeEntry.entry_name}</span>
-                      )}
-
-                      {/* Edit / Delete icons (inline, after pills) */}
-                      {!isPastDeadline && !predictionsLocked && (
-                        <button
-                          onClick={() => {
-                            setEntryNameDraft(activeEntry.entry_name)
-                            setEditingEntryName(true)
+              pool.max_entries_per_user > 1 ? (
+                // Multi-entry: list view or detail view
+                predictionsView.mode === 'list' ? (
+                  <EntriesListView
+                    entries={entries}
+                    poolId={pool.pool_id}
+                    totalMatches={matches.length}
+                    isPastDeadline={isPastDeadline}
+                    allPredictions={allPredictions}
+                    canAddEntry={canAddEntry}
+                    addingEntry={addingEntry}
+                    onAddEntry={handleAddEntry}
+                    onDeleteEntry={handleDeleteEntryFromList}
+                    onRenameEntry={handleRenameEntryFromList}
+                    onEditEntry={handleOpenEntryDetail}
+                  />
+                ) : loadingPredictions ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                  </div>
+                ) : (
+                  <EntryDetailView
+                    entry={entries.find(e => e.entry_id === predictionsView.entryId) || activeEntry}
+                    onBack={handleBackToList}
+                    matches={predictionsMatches}
+                    teams={teams}
+                    poolId={pool.pool_id}
+                    existingPredictions={activeEntryPredictions}
+                    isPastDeadline={isPastDeadline}
+                    psoEnabled={psoEnabled}
+                    predictionsLocked={predictionsLocked}
+                    onUnsavedChangesRef={predictionsRef}
+                    onStatusChange={setPredictionStatus}
+                  />
+                )
+              ) : (
+                // Single-entry: render PredictionsFlow directly
+                <div>
+                  <div className="mb-6">
+                    {editingEntryName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={entryNameInputRef}
+                          type="text"
+                          value={entryNameDraft}
+                          onChange={e => setEntryNameDraft(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleRenameEntry()
+                            if (e.key === 'Escape') setEditingEntryName(false)
                           }}
-                          className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors shrink-0"
-                          title="Rename entry"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                      )}
-                      {canDeleteEntry && (
+                          className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+                          maxLength={40}
+                          placeholder="Entry name..."
+                        />
                         <button
-                          onClick={() => setShowDeleteEntryModal(true)}
-                          className="p-1 text-neutral-400 hover:text-danger-600 transition-colors shrink-0"
-                          title="Delete entry"
+                          onClick={handleRenameEntry}
+                          disabled={savingEntryName}
+                          className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          {savingEntryName ? '...' : 'Save'}
                         </button>
-                      )}
-
-                      {/* Status badge + save status (right-aligned) */}
-                      <div className="ml-auto flex items-center gap-1.5 shrink-0 text-xs">
-                        {hasSubmitted ? (
-                          <span className="px-1.5 py-0.5 rounded-full font-semibold bg-success-100 text-success-700">Submitted</span>
-                        ) : predictionStatus.predictedCount > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded-full font-semibold bg-warning-100 text-warning-700">Draft</span>
-                        ) : null}
-                        <span className="text-neutral-400 whitespace-nowrap" suppressHydrationWarning>
-                          {predictionStatus.saveStatus === 'saving' && 'Saving...'}
-                          {predictionStatus.saveStatus === 'saved' && '\u2713 Saved'}
-                          {predictionStatus.saveStatus === 'error' && <span className="text-danger-600">Failed</span>}
-                          {(predictionStatus.saveStatus === 'idle') && predictionStatus.lastSavedAt && !hasSubmitted && `Saved ${formatTimeAgo(predictionStatus.lastSavedAt)}`}
-                          {hasSubmitted && submittedAt && formatTimeAgo(submittedAt)}
-                        </span>
+                        <button
+                          onClick={() => setEditingEntryName(false)}
+                          className="px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-700"
+                        >
+                          Cancel
+                        </button>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                        <span className="text-sm font-semibold text-neutral-900">{activeEntry.entry_name}</span>
 
-                <PredictionsFlow
-                  key={activeEntryId}
-                  matches={predictionsMatches}
-                  teams={teams}
-                  entryId={activeEntry.entry_id}
-                  poolId={pool.pool_id}
-                  existingPredictions={activeEntryPredictions}
-                  isPastDeadline={isPastDeadline}
-                  psoEnabled={psoEnabled}
-                  hasSubmitted={hasSubmitted}
-                  submittedAt={submittedAt}
-                  lastSavedAt={lastSavedAt}
-                  predictionsLocked={predictionsLocked}
-                  onUnsavedChangesRef={predictionsRef}
-                  onStatusChange={setPredictionStatus}
-                />
-              </div>
+                        {!isPastDeadline && !predictionsLocked && (
+                          <button
+                            onClick={() => {
+                              setEntryNameDraft(activeEntry.entry_name)
+                              setEditingEntryName(true)
+                            }}
+                            className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors shrink-0"
+                            title="Rename entry"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        )}
+
+                        {/* Status badge + save status (right-aligned) */}
+                        <div className="ml-auto flex items-center gap-1.5 shrink-0 text-xs">
+                          {hasSubmitted ? (
+                            <span className="px-1.5 py-0.5 rounded-full font-semibold bg-success-100 text-success-700">Submitted</span>
+                          ) : predictionStatus.predictedCount > 0 ? (
+                            <span className="px-1.5 py-0.5 rounded-full font-semibold bg-warning-100 text-warning-700">Draft</span>
+                          ) : null}
+                          <span className="text-neutral-400 whitespace-nowrap" suppressHydrationWarning>
+                            {predictionStatus.saveStatus === 'saving' && 'Saving...'}
+                            {predictionStatus.saveStatus === 'saved' && '\u2713 Saved'}
+                            {predictionStatus.saveStatus === 'error' && <span className="text-danger-600">Failed</span>}
+                            {(predictionStatus.saveStatus === 'idle') && predictionStatus.lastSavedAt && !hasSubmitted && `Saved ${formatTimeAgo(predictionStatus.lastSavedAt)}`}
+                            {hasSubmitted && submittedAt && formatTimeAgo(submittedAt)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <PredictionsFlow
+                    key={activeEntryId}
+                    matches={predictionsMatches}
+                    teams={teams}
+                    entryId={activeEntry.entry_id}
+                    poolId={pool.pool_id}
+                    existingPredictions={activeEntryPredictions}
+                    isPastDeadline={isPastDeadline}
+                    psoEnabled={psoEnabled}
+                    hasSubmitted={hasSubmitted}
+                    submittedAt={submittedAt}
+                    lastSavedAt={lastSavedAt}
+                    predictionsLocked={predictionsLocked}
+                    onUnsavedChangesRef={predictionsRef}
+                    onStatusChange={setPredictionStatus}
+                  />
+                </div>
+              )
             )}
 
             {activeTab === 'results' && (

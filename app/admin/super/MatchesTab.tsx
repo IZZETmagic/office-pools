@@ -675,7 +675,7 @@ export function MatchesTab({
       <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   #
@@ -720,7 +720,7 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-neutral-50">
+                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100">
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
@@ -959,7 +959,7 @@ export function MatchesTab({
 
                 {/* PSO score inputs */}
                 {resultType === 'pso' && (
-                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 rounded-lg">
+                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 dark:bg-neutral-100 rounded-lg">
                     <div className="text-center">
                       <p className="text-xs text-neutral-600 mb-1">PSO</p>
                       <input
@@ -1009,7 +1009,7 @@ export function MatchesTab({
                 </button>
 
                 {showConductFields && (
-                  <div className="mt-3 bg-neutral-50 rounded-lg p-4">
+                  <div className="mt-3 bg-neutral-50 dark:bg-neutral-100 rounded-lg p-4">
                     <p className="text-xs text-neutral-500 mb-4">
                       Enter card counts per team. Each count represents distinct player incidents.
                       Used as FIFA tiebreaker in group standings.

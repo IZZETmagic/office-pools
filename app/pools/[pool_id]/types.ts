@@ -39,6 +39,7 @@ export type EntryData = {
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_locked: boolean
+  auto_submitted: boolean
   predictions_last_saved_at: string | null
   total_points: number
   current_rank: number | null

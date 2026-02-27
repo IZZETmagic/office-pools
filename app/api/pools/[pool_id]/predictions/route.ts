@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email/send'
+import { predictionsSubmittedTemplate } from '@/lib/email/templates'
+import { TOPICS } from '@/lib/email/topics'
 
 // =============================================================
 // GET /api/pools/:poolId/predictions - Get prediction status
@@ -273,7 +276,7 @@ export async function PUT(
 
   const { data: userData } = await supabase
     .from('users')
-    .select('user_id')
+    .select('user_id, email, username, full_name')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -298,7 +301,7 @@ export async function PUT(
   // Verify entry belongs to this user
   const { data: entry } = await supabase
     .from('pool_entries')
-    .select('entry_id, has_submitted_predictions')
+    .select('entry_id, entry_name, has_submitted_predictions')
     .eq('entry_id', entryId)
     .eq('member_id', membership.member_id)
     .single()
@@ -312,7 +315,7 @@ export async function PUT(
   // Check pool deadline
   const { data: pool } = await supabase
     .from('pools')
-    .select('prediction_deadline, tournament_id')
+    .select('prediction_deadline, tournament_id, pool_name')
     .eq('pool_id', pool_id)
     .single()
 
@@ -357,6 +360,23 @@ export async function PUT(
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
+
+  // Send confirmation email (fire-and-forget)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+  const { subject, html } = predictionsSubmittedTemplate({
+    userName: userData.full_name || userData.username,
+    poolName: pool?.pool_name || 'your pool',
+    entryName: entry.entry_name || 'Entry',
+    matchCount: predicted ?? 0,
+    poolUrl: `${appUrl}/pools/${pool_id}`,
+  })
+  sendEmail({
+    to: userData.email,
+    subject,
+    html,
+    topicId: TOPICS.PREDICTIONS,
+    tags: [{ name: 'category', value: 'predictions' }],
+  }).catch(console.error)
 
   return NextResponse.json({
     submitted: true,

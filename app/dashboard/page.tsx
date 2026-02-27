@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
-import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
+import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
+import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 
 export default async function DashboardPage() {
@@ -193,11 +194,31 @@ export default async function DashboardPage() {
         ? { ...DEFAULT_POOL_SETTINGS, ...rawPoolSettings }
         : DEFAULT_POOL_SETTINGS
 
-      // Build prediction lookup and calculate MATCH points
+      // Build prediction maps
       const predictionLookup = new Map(
         (predictions ?? []).map((p: any) => [p.match_id, p])
       )
 
+      const predictionMap: PredictionMap = new Map()
+      for (const p of (predictions ?? [])) {
+        predictionMap.set(p.match_id, {
+          home: p.predicted_home_score,
+          away: p.predicted_away_score,
+          homePso: p.predicted_home_pso ?? null,
+          awayPso: p.predicted_away_pso ?? null,
+          winnerTeamId: p.predicted_winner_team_id ?? null,
+        })
+      }
+
+      // Resolve bracket for knockout team matching
+      const bracket = resolveFullBracket({
+        matches: normalizedMatches,
+        predictionMap,
+        teams,
+        conductData,
+      })
+
+      // Calculate MATCH points
       let matchPoints = 0
       const completedMatchesList = normalizedMatches.filter(
         (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
@@ -206,6 +227,14 @@ export default async function DashboardPage() {
       for (const match of completedMatchesList) {
         const pred = predictionLookup.get(match.match_id)
         if (pred && match.home_score_ft !== null && match.away_score_ft !== null) {
+          const resolved = bracket.knockoutTeamMap.get(match.match_number)
+          const teamsMatch = checkKnockoutTeamsMatch(
+            match.stage,
+            match.home_team_id,
+            match.away_team_id,
+            resolved?.home?.team_id ?? null,
+            resolved?.away?.team_id ?? null,
+          )
           const hasPso = match.home_score_pso !== null && match.away_score_pso !== null
           const result = calculatePoints(
             pred.predicted_home_score,
@@ -221,7 +250,8 @@ export default async function DashboardPage() {
                   predictedHomePso: pred.predicted_home_pso ?? null,
                   predictedAwayPso: pred.predicted_away_pso ?? null,
                 }
-              : undefined
+              : undefined,
+            teamsMatch,
           )
           matchPoints += result.points
         }
@@ -230,17 +260,6 @@ export default async function DashboardPage() {
       // Calculate BONUS points
       let bonusPoints = 0
       if (predictions && predictions.length > 0) {
-        const predictionMap: PredictionMap = new Map()
-        for (const p of predictions) {
-          predictionMap.set(p.match_id, {
-            home: p.predicted_home_score,
-            away: p.predicted_away_score,
-            homePso: p.predicted_home_pso ?? null,
-            awayPso: p.predicted_away_pso ?? null,
-            winnerTeamId: p.predicted_winner_team_id ?? null,
-          })
-        }
-
         const bonusEntries = calculateAllBonusPoints({
           memberId: defaultEntryId,
           memberPredictions: predictionMap,

@@ -185,7 +185,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       <div className="bg-surface rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
                   User
@@ -223,7 +223,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                   return (
                     <tr
                       key={user.user_id}
-                      className={`hover:bg-neutral-50 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
+                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-100 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
                     >
                       <td className="px-4 py-3">
                         <div>

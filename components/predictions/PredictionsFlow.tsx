@@ -33,6 +33,7 @@ type Props = {
   isPastDeadline: boolean
   psoEnabled: boolean
   hasSubmitted: boolean
+  autoSubmitted?: boolean
   submittedAt: string | null
   lastSavedAt: string | null
   predictionsLocked: boolean
@@ -61,6 +62,7 @@ export default function PredictionsFlow({
   isPastDeadline,
   psoEnabled,
   hasSubmitted: initialHasSubmitted,
+  autoSubmitted = false,
   submittedAt: initialSubmittedAt,
   lastSavedAt: initialLastSavedAt,
   predictionsLocked,
@@ -581,7 +583,13 @@ export default function PredictionsFlow({
   return (
     <div>
       {/* Status Banner */}
-      {hasSubmitted && (
+      {hasSubmitted && autoSubmitted && (
+        <StatusBanner
+          type="auto-submitted"
+          message={`Your predictions were auto-submitted when the deadline passed${submittedAt ? ` on ${formatDate(submittedAt)}` : ''}. Any missing predictions will earn 0 points.`}
+        />
+      )}
+      {hasSubmitted && !autoSubmitted && (
         <StatusBanner
           type="submitted"
           message={`Your predictions were submitted${submittedAt ? ` on ${formatDate(submittedAt)}` : ''}. Good luck!`}
@@ -881,10 +889,11 @@ export default function PredictionsFlow({
 // STATUS BANNER COMPONENT
 // =============================================
 
-function StatusBanner({ type, message }: { type: 'submitted' | 'locked'; message: string }) {
+function StatusBanner({ type, message }: { type: 'submitted' | 'locked' | 'auto-submitted'; message: string }) {
   const styles = {
     submitted: 'bg-success-50 border-success-200 text-success-800',
     locked: 'bg-neutral-50 border-neutral-200 text-neutral-800',
+    'auto-submitted': 'bg-primary-50 border-primary-200 text-primary-800',
   }
   const icons = {
     submitted: (
@@ -895,6 +904,11 @@ function StatusBanner({ type, message }: { type: 'submitted' | 'locked'; message
     locked: (
       <svg className="w-5 h-5 text-neutral-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
+    'auto-submitted': (
+      <svg className="w-5 h-5 text-primary-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   }

@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email/send'
+import { predictionsUnlockedTemplate } from '@/lib/email/templates'
+import { TOPICS } from '@/lib/email/topics'
 
 // POST /api/pools/:poolId/predictions/unlock - Admin unlocks an entry's predictions
 export async function POST(
@@ -42,7 +45,7 @@ export async function POST(
   // Verify the entry belongs to a member of this pool
   const { data: entry } = await supabase
     .from('pool_entries')
-    .select('entry_id, member_id, pool_members!inner(pool_id)')
+    .select('entry_id, entry_name, member_id, pool_members!inner(pool_id, user_id)')
     .eq('entry_id', entryId)
     .single()
 
@@ -76,6 +79,40 @@ export async function POST(
         timestamp: new Date().toISOString(),
       },
     })
+
+  // Send notification email to the entry owner (fire-and-forget)
+  const entryOwnerUserId = (entry as any).pool_members?.user_id
+  if (entryOwnerUserId) {
+    const { data: ownerData } = await supabase
+      .from('users')
+      .select('email, username, full_name')
+      .eq('user_id', entryOwnerUserId)
+      .single()
+
+    if (ownerData) {
+      const { data: pool } = await supabase
+        .from('pools')
+        .select('pool_name')
+        .eq('pool_id', pool_id)
+        .single()
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+      const { subject, html } = predictionsUnlockedTemplate({
+        userName: ownerData.full_name || ownerData.username,
+        poolName: pool?.pool_name || 'your pool',
+        entryName: entry.entry_name || 'Entry',
+        poolUrl: `${appUrl}/pools/${pool_id}`,
+      })
+
+      sendEmail({
+        to: ownerData.email,
+        subject,
+        html,
+        topicId: TOPICS.ADMIN,
+        tags: [{ name: 'category', value: 'admin' }],
+      }).catch(console.error)
+    }
+  }
 
   return NextResponse.json({ unlocked: true })
 }

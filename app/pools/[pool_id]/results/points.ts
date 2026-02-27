@@ -165,6 +165,27 @@ function calculatePsoPoints(
 }
 
 /**
+ * Check whether the user's predicted teams for a knockout match slot
+ * match the actual teams. Returns true for group stage (always eligible).
+ * For knockout, compares predicted team IDs (from bracket resolution)
+ * against the actual home/away team IDs as a set (order-independent).
+ */
+export function checkKnockoutTeamsMatch(
+  stage: string,
+  actualHomeTeamId: string | null,
+  actualAwayTeamId: string | null,
+  predictedHomeTeamId: string | null,
+  predictedAwayTeamId: string | null,
+): boolean {
+  if (stage === 'group') return true
+  if (!actualHomeTeamId || !actualAwayTeamId) return true // match teams not yet set
+  if (!predictedHomeTeamId || !predictedAwayTeamId) return false // user didn't resolve teams
+
+  const actualSet = new Set([actualHomeTeamId, actualAwayTeamId])
+  return actualSet.has(predictedHomeTeamId) && actualSet.has(predictedAwayTeamId)
+}
+
+/**
  * Calculate points earned for a single prediction using pool settings.
  *
  * Group stage uses group_* settings with no multiplier.
@@ -173,6 +194,9 @@ function calculatePsoPoints(
  *
  * When PSO is enabled and the match went to penalties, bonus PSO points
  * are added on top of the FT points.
+ *
+ * For knockout rounds, if knockoutTeamsMatch is false (the predicted teams
+ * for this match slot don't match the actual teams), 0 points are awarded.
  */
 export function calculatePoints(
   predictedHome: number,
@@ -186,9 +210,21 @@ export function calculatePoints(
     actualAwayPso: number
     predictedHomePso: number | null
     predictedAwayPso: number | null
-  }
+  },
+  knockoutTeamsMatch?: boolean,
 ): PointsResult {
   const isGroupStage = stage === 'group'
+
+  // For knockout rounds, if predicted teams don't match actual teams, no points
+  if (!isGroupStage && knockoutTeamsMatch === false) {
+    return {
+      points: 0,
+      basePoints: 0,
+      multiplier: isGroupStage ? 1 : getStageMultiplier(stage, settings),
+      label: 'Wrong teams +0',
+      type: 'miss',
+    }
+  }
 
   // Determine base points for each tier
   const exactBase = isGroupStage
