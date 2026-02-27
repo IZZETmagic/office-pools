@@ -40,7 +40,7 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
 
     const { data: userData } = await supabase
       .from('users')
-      .select('user_id')
+      .select('user_id, username')
       .eq('auth_user_id', authUser?.id)
       .single()
 
@@ -88,12 +88,12 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       return
     }
 
-    // Auto-create first entry for the new member
+    // Auto-create first entry for the new member (default name = username)
     const { error: entryError } = await supabase
       .from('pool_entries')
       .insert({
         member_id: memberData.member_id,
-        entry_name: 'Entry 1',
+        entry_name: userData.username || 'Entry 1',
         entry_number: 1,
       })
 

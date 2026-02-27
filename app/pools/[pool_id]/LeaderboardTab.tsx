@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import { calculatePoints, type PoolSettings } from './results/points'
+import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
+import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
 import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
 import { formatNumber } from '@/lib/format'
@@ -179,10 +180,29 @@ export function LeaderboardTab({
       const predMap = new Map(preds.map(p => [p.match_id, p]))
       let totalMatchPts = 0
 
+      // Resolve bracket for this entry to check knockout team matches
+      const predictionMap = buildPredictionMap(preds)
+      const bracket = resolveFullBracket({
+        matches: matchesWithResult,
+        predictionMap,
+        teams: tournamentTeams,
+        conductData,
+      })
+
       for (const m of matches) {
         if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
           const pred = predMap.get(m.match_id)
           if (!pred) continue
+
+          // For knockout: check if predicted teams match actual teams
+          const resolved = bracket.knockoutTeamMap.get(m.match_number)
+          const teamsMatch = checkKnockoutTeamsMatch(
+            m.stage,
+            m.home_team_id,
+            m.away_team_id,
+            resolved?.home?.team_id ?? null,
+            resolved?.away?.team_id ?? null,
+          )
 
           const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
           const result = calculatePoints(
@@ -199,7 +219,8 @@ export function LeaderboardTab({
                   predictedHomePso: pred.predicted_home_pso,
                   predictedAwayPso: pred.predicted_away_pso,
                 }
-              : undefined
+              : undefined,
+            teamsMatch,
           )
           totalMatchPts += result.points
         }
@@ -484,6 +505,8 @@ export function LeaderboardTab({
           poolSettings={poolSettings}
           matches={matches}
           entryPredictions={allPredictions.filter(p => p.entry_id === selectedEntry.entry_id)}
+          teams={teams}
+          conductData={conductData}
         />
       )}
     </>

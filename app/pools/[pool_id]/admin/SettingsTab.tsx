@@ -46,9 +46,6 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
 
   // UI state
   const [saving, setSaving] = useState(false)
-  const [savingDeadline, setSavingDeadline] = useState(false)
-  const [savingPrivacy, setSavingPrivacy] = useState(false)
-  const [savingEntries, setSavingEntries] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -72,147 +69,94 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
       )
     : null
 
-  async function handleSaveDetails() {
+  async function handleSaveAll() {
+    // Validate pool name
     if (!poolName.trim()) {
       setError('Pool name is required.')
       return
     }
 
+    // Validate deadline if set
+    let newDeadline: Date | null = null
+    if (deadlineDate) {
+      newDeadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
+      if (newDeadline <= new Date()) {
+        setError('Deadline must be in the future.')
+        return
+      }
+    }
+
+    // Validate max entries
+    const maxE = parseInt(maxEntries) || 1
+    if (maxE < 1 || maxE > 10) {
+      setError('Max entries must be between 1 and 10.')
+      return
+    }
+
+    const currentMax = Math.max(...members.map(m => (m.entries || []).length), 0)
+    if (maxE < currentMax) {
+      setError(`Cannot reduce below ${currentMax} — some members already have that many entries.`)
+      return
+    }
+
+    const maxP = parseInt(maxParticipants) || 0
+
     setSaving(true)
     setError(null)
     setSuccess(null)
 
+    const updatePayload: Record<string, any> = {
+      pool_name: poolName.trim(),
+      description: description.trim() || null,
+      status,
+      is_private: isPrivate,
+      max_participants: maxP > 0 ? maxP : null,
+      max_entries_per_user: maxE,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (newDeadline) {
+      updatePayload.prediction_deadline = newDeadline.toISOString()
+    }
+
     const { error: updateError } = await supabase
       .from('pools')
-      .update({
-        pool_name: poolName.trim(),
-        description: description.trim() || null,
-        status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('pool_id', pool.pool_id)
 
     if (updateError) {
       setError(updateError.message)
-    } else {
-      setPool({
-        ...pool,
-        pool_name: poolName.trim(),
-        description: description.trim() || null,
-        status,
-      })
-      setSuccess('Pool details updated.')
-    }
-    setSaving(false)
-  }
-
-  async function handleSaveDeadline() {
-    if (!deadlineDate) {
-      setError('Please select a date.')
+      setSaving(false)
       return
     }
 
-    const newDeadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
-    if (newDeadline <= new Date()) {
-      setError('Deadline must be in the future.')
-      return
-    }
+    // Check if deadline changed — notify members if so
+    const deadlineChanged = newDeadline &&
+      (!pool.prediction_deadline || newDeadline.toISOString() !== new Date(pool.prediction_deadline).toISOString())
 
-    setSavingDeadline(true)
-    setError(null)
-    setSuccess(null)
-
-    const { error: updateError } = await supabase
-      .from('pools')
-      .update({
-        prediction_deadline: newDeadline.toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('pool_id', pool.pool_id)
-
-    if (updateError) {
-      setError(updateError.message)
-    } else {
-      setPool({ ...pool, prediction_deadline: newDeadline.toISOString() })
-      setSuccess('Prediction deadline updated.')
-
-      // Notify pool members about deadline change (fire-and-forget)
+    if (deadlineChanged) {
       fetch('/api/notifications/deadline-changed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pool_id: pool.pool_id,
-          new_deadline: newDeadline.toISOString(),
+          new_deadline: newDeadline!.toISOString(),
         }),
       }).catch(() => {})
     }
-    setSavingDeadline(false)
-  }
 
-  async function handleSavePrivacy() {
-    setSavingPrivacy(true)
-    setError(null)
-    setSuccess(null)
-
-    const maxP = parseInt(maxParticipants) || 0
-
-    const { error: updateError } = await supabase
-      .from('pools')
-      .update({
-        is_private: isPrivate,
-        max_participants: maxP > 0 ? maxP : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('pool_id', pool.pool_id)
-
-    if (updateError) {
-      setError(updateError.message)
-    } else {
-      setPool({
-        ...pool,
-        is_private: isPrivate,
-        max_participants: maxP > 0 ? maxP : null,
-      })
-      setSuccess('Privacy settings updated.')
-    }
-    setSavingPrivacy(false)
-  }
-
-  async function handleSaveEntries() {
-    setSavingEntries(true)
-    setError(null)
-    setSuccess(null)
-
-    const maxE = parseInt(maxEntries) || 1
-    if (maxE < 1 || maxE > 10) {
-      setError('Max entries must be between 1 and 10.')
-      setSavingEntries(false)
-      return
-    }
-
-    // Check if any member currently has more entries than the new max
-    const currentMax = Math.max(...members.map(m => (m.entries || []).length), 0)
-    if (maxE < currentMax) {
-      setError(`Cannot reduce below ${currentMax} — some members already have that many entries.`)
-      setSavingEntries(false)
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('pools')
-      .update({
-        max_entries_per_user: maxE,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('pool_id', pool.pool_id)
-
-    if (updateError) {
-      setError(updateError.message)
-    } else {
-      setPool({ ...pool, max_entries_per_user: maxE })
-      setSuccess('Prediction entries setting updated.')
-    }
-    setSavingEntries(false)
+    setPool({
+      ...pool,
+      pool_name: poolName.trim(),
+      description: description.trim() || null,
+      status,
+      is_private: isPrivate,
+      max_participants: maxP > 0 ? maxP : null,
+      max_entries_per_user: maxE,
+      ...(newDeadline ? { prediction_deadline: newDeadline.toISOString() } : {}),
+    })
+    setSuccess('Settings saved.')
+    setSaving(false)
   }
 
   async function handleArchivePool() {
@@ -347,8 +291,8 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
         </Alert>
       )}
 
-      {/* Pool Information */}
       <Card className="mb-6">
+        {/* Pool Information */}
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Pool Information
         </h3>
@@ -405,19 +349,12 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               ))}
             </div>
           </FormField>
-
-          <Button
-            onClick={handleSaveDetails}
-            loading={saving}
-            loadingText="Saving..."
-          >
-            Save Changes
-          </Button>
         </div>
-      </Card>
 
-      {/* Prediction Deadline */}
-      <Card className="mb-6">
+        {/* Divider */}
+        <hr className="my-6 border-neutral-200" />
+
+        {/* Prediction Deadline */}
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Prediction Deadline
         </h3>
@@ -476,7 +413,7 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setQuickDeadline('tournament_start')}
             className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
@@ -497,17 +434,10 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
           </button>
         </div>
 
-        <Button
-          onClick={handleSaveDeadline}
-          loading={savingDeadline}
-          loadingText="Updating..."
-        >
-          Update Deadline
-        </Button>
-      </Card>
+        {/* Divider */}
+        <hr className="my-6 border-neutral-200" />
 
-      {/* Privacy Settings */}
-      <Card className="mb-6">
+        {/* Privacy Settings */}
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Privacy Settings
         </h3>
@@ -554,19 +484,12 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
               className="max-w-[200px]"
             />
           </FormField>
-
-          <Button
-            onClick={handleSavePrivacy}
-            loading={savingPrivacy}
-            loadingText="Saving..."
-          >
-            Save Privacy Settings
-          </Button>
         </div>
-      </Card>
 
-      {/* Prediction Entries */}
-      <Card className="mb-6">
+        {/* Divider */}
+        <hr className="my-6 border-neutral-200" />
+
+        {/* Prediction Entries */}
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Prediction Entries
         </h3>
@@ -591,22 +514,25 @@ export function SettingsTab({ pool, setPool, members }: SettingsTabProps) {
           </FormField>
 
           {parseInt(maxEntries) > 1 && (
-            <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
-              <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+              <svg className="w-5 h-5 text-primary-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
-              <p className="text-xs text-primary-800">
+              <p className="text-xs text-primary-800 leading-5">
                 Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
               </p>
             </div>
           )}
+        </div>
 
+        {/* Save button */}
+        <div className="mt-8 pt-6 border-t border-neutral-200">
           <Button
-            onClick={handleSaveEntries}
-            loading={savingEntries}
+            onClick={handleSaveAll}
+            loading={saving}
             loadingText="Saving..."
           >
-            Save Entries Setting
+            Save Changes
           </Button>
         </div>
       </Card>

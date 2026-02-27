@@ -1,6 +1,6 @@
 'use client'
 
-import { calculatePoints, type PointsResult, type PoolSettings } from './points'
+import { calculatePoints, checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
 
@@ -35,6 +35,8 @@ export type ResultMatch = {
   // Predicted teams for knockout matches (resolved from user's bracket)
   predicted_home_team_name: string | null
   predicted_away_team_name: string | null
+  predicted_home_team_id: string | null
+  predicted_away_team_id: string | null
 }
 
 // =============================================
@@ -61,10 +63,10 @@ function getCardBackground(result: PointsResult | null): string {
   if (!result) return 'bg-surface'
   switch (result.type) {
     case 'exact':
-      return 'bg-accent-50/60'
+      return 'bg-success-50/60'
     case 'winner_gd':
     case 'winner':
-      return 'bg-success-50/60'
+      return 'bg-warning-50/60'
     case 'miss':
       return 'bg-danger-50/40'
   }
@@ -92,6 +94,13 @@ export function MatchCard({
   // Calculate points for completed and live matches with actual scores and a prediction
   let pointsResult: PointsResult | null = null
   if ((isCompleted || isLive) && hasActualScores && hasPrediction) {
+    const teamsMatch = checkKnockoutTeamsMatch(
+      match.stage,
+      match.home_team_id,
+      match.away_team_id,
+      match.predicted_home_team_id,
+      match.predicted_away_team_id,
+    )
     pointsResult = calculatePoints(
       match.prediction!.predicted_home_score,
       match.prediction!.predicted_away_score,
@@ -106,7 +115,8 @@ export function MatchCard({
             predictedHomePso: match.prediction!.predicted_home_pso,
             predictedAwayPso: match.prediction!.predicted_away_pso,
           }
-        : undefined
+        : undefined,
+      teamsMatch,
     )
   }
 

@@ -169,6 +169,8 @@ export function ResultsTab({
         : null,
       predicted_home_team_name: resolved?.home?.country_name ?? null,
       predicted_away_team_name: resolved?.away?.country_name ?? null,
+      predicted_home_team_id: resolved?.home?.team_id ?? null,
+      predicted_away_team_id: resolved?.away?.team_id ?? null,
     }
   }), [matches, predictionMap, knockoutTeamMap])
 

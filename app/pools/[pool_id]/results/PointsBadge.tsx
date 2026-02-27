@@ -4,9 +4,9 @@ import { type PointsResult } from './points'
 import { formatNumber } from '@/lib/format'
 
 const badgeStyles: Record<PointsResult['type'], string> = {
-  exact: 'bg-accent-100 text-accent-700 border border-accent-500',
-  winner_gd: 'bg-success-100 text-success-800 border border-success-500',
-  winner: 'bg-primary-100 text-primary-800 border border-primary-500',
+  exact: 'bg-success-100 text-success-800 border border-success-500',
+  winner_gd: 'bg-warning-100 text-warning-800 border border-warning-400',
+  winner: 'bg-warning-100 text-warning-800 border border-warning-400',
   miss: 'bg-neutral-50 text-neutral-500 border border-neutral-200',
 }
 

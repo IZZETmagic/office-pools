@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { MatchCard, type ResultMatch } from './MatchCard'
-import { calculatePoints, type PoolSettings } from './points'
+import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
@@ -137,6 +137,13 @@ export function ResultsView({
         m.away_score_ft !== null &&
         m.prediction
       ) {
+        const teamsMatch = checkKnockoutTeamsMatch(
+          m.stage,
+          m.home_team_id,
+          m.away_team_id,
+          m.predicted_home_team_id,
+          m.predicted_away_team_id,
+        )
         const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
         const res = calculatePoints(
           m.prediction.predicted_home_score,
@@ -152,7 +159,8 @@ export function ResultsView({
                 predictedHomePso: m.prediction.predicted_home_pso,
                 predictedAwayPso: m.prediction.predicted_away_pso,
               }
-            : undefined
+            : undefined,
+          teamsMatch,
         )
         sum += res.points
       }

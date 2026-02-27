@@ -1,8 +1,10 @@
 'use client'
 
 import { useMemo, useCallback } from 'react'
-import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, PredictionData } from './types'
-import { calculatePoints, type PoolSettings } from './results/points'
+import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
+import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
+import { resolveFullBracket } from '@/lib/bracketResolver'
+import type { MatchConductData } from '@/lib/tournament'
 import { formatNumber } from '@/lib/format'
 
 // =============================================
@@ -18,6 +20,8 @@ type PointsBreakdownModalProps = {
   poolSettings: PoolSettings
   matches: MatchData[]
   entryPredictions: PredictionData[]
+  teams: TeamData[]
+  conductData: MatchConductData[]
 }
 
 type MatchPointDetail = {
@@ -95,6 +99,8 @@ export function PointsBreakdownModal({
   poolSettings,
   matches,
   entryPredictions,
+  teams,
+  conductData,
 }: PointsBreakdownModalProps) {
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
@@ -109,6 +115,56 @@ export function PointsBreakdownModal({
     return map
   }, [entryPredictions])
 
+  // Resolve bracket for knockout team matching
+  const knockoutTeamMap = useMemo(() => {
+    const bracketMatches = matches.map(m => ({
+      match_id: m.match_id,
+      match_number: m.match_number,
+      stage: m.stage,
+      group_letter: m.group_letter,
+      match_date: m.match_date,
+      venue: m.venue,
+      status: m.status,
+      home_team_id: m.home_team_id,
+      away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder,
+      away_team_placeholder: m.away_team_placeholder,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      is_completed: m.is_completed,
+      home_score_ft: m.home_score_ft,
+      away_score_ft: m.away_score_ft,
+      home_score_pso: m.home_score_pso,
+      away_score_pso: m.away_score_pso,
+      winner_team_id: m.winner_team_id,
+      tournament_id: m.tournament_id,
+    }))
+    const bracketPredMap = new Map(
+      entryPredictions.map(p => [p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null,
+        awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      }])
+    )
+    const tournamentTeams = teams.map(t => ({
+      team_id: t.team_id,
+      country_name: t.country_name,
+      country_code: t.country_code,
+      group_letter: t.group_letter,
+      fifa_ranking_points: t.fifa_ranking_points,
+      flag_url: t.flag_url,
+    }))
+    const bracket = resolveFullBracket({
+      matches: bracketMatches,
+      predictionMap: bracketPredMap,
+      teams: tournamentTeams,
+      conductData,
+    })
+    return bracket.knockoutTeamMap
+  }, [matches, entryPredictions, teams, conductData])
+
   // Compute per-match point details
   const matchDetails = useMemo(() => {
     const details: MatchPointDetail[] = []
@@ -118,6 +174,15 @@ export function PointsBreakdownModal({
 
       const pred = predictionMap.get(m.match_id)
       if (!pred) continue
+
+      const resolved = knockoutTeamMap.get(m.match_number)
+      const teamsMatch = checkKnockoutTeamsMatch(
+        m.stage,
+        m.home_team_id,
+        m.away_team_id,
+        resolved?.home?.team_id ?? null,
+        resolved?.away?.team_id ?? null,
+      )
 
       const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
       const result = calculatePoints(
@@ -134,7 +199,8 @@ export function PointsBreakdownModal({
               predictedHomePso: pred.predicted_home_pso,
               predictedAwayPso: pred.predicted_away_pso,
             }
-          : undefined
+          : undefined,
+        teamsMatch,
       )
 
       details.push({
