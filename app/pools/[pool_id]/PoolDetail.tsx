@@ -640,6 +640,7 @@ export function PoolDetail({
                 allPredictions={allPredictions}
                 poolSettings={poolSettings}
                 maxEntriesPerUser={pool.max_entries_per_user}
+                currentUserId={currentUserId}
               />
             )}
 

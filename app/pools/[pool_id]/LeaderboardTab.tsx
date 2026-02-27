@@ -22,6 +22,7 @@ type LeaderboardTabProps = {
   allPredictions: PredictionData[]
   poolSettings: PoolSettings
   maxEntriesPerUser: number
+  currentUserId: string
 }
 
 // =============================================
@@ -92,6 +93,7 @@ export function LeaderboardTab({
   allPredictions,
   poolSettings,
   maxEntriesPerUser,
+  currentUserId,
 }: LeaderboardTabProps) {
   const isMultiEntry = maxEntriesPerUser > 1
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
@@ -303,6 +305,7 @@ export function LeaderboardTab({
           const rank = index + 1
           const isTopThree = rank <= 3
           const ps = getPlayerScore(entry.entry_id)
+          const isCurrentUser = entry.users?.user_id === currentUserId
 
           return (
             <div
@@ -334,6 +337,9 @@ export function LeaderboardTab({
                         {entry.users?.full_name || entry.users?.username || 'Unknown'}
                         {entry.users?.username && entry.users?.full_name && ` (@${entry.users.username})`}
                       </span>
+                      {isCurrentUser && (
+                        <Badge variant="green">You</Badge>
+                      )}
                       {entry.role === 'admin' && (
                         <Badge variant="blue">Admin</Badge>
                       )}
@@ -349,6 +355,9 @@ export function LeaderboardTab({
                         <span className="text-xs text-neutral-500 truncate">
                           @{entry.users.username}
                         </span>
+                      )}
+                      {isCurrentUser && (
+                        <Badge variant="green">You</Badge>
                       )}
                       {entry.role === 'admin' && (
                         <Badge variant="blue">Admin</Badge>
@@ -416,6 +425,7 @@ export function LeaderboardTab({
               const rank = index + 1
               const isTopThree = rank <= 3
               const ps = getPlayerScore(entry.entry_id)
+              const isCurrentUser = entry.users?.user_id === currentUserId
 
               return (
                 <tr
@@ -437,8 +447,11 @@ export function LeaderboardTab({
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                     {isMultiEntry ? (
                       <div>
-                        <div className="text-sm font-medium text-neutral-900">
-                          {entry.entry_name}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium text-neutral-900">
+                            {entry.entry_name}
+                          </span>
+                          {isCurrentUser && <Badge variant="green">You</Badge>}
                         </div>
                         <div className="text-xs text-neutral-500">
                           {entry.users?.full_name || entry.users?.username || 'Unknown'}
@@ -447,8 +460,11 @@ export function LeaderboardTab({
                       </div>
                     ) : (
                       <div>
-                        <div className="text-sm font-medium text-neutral-900">
-                          {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium text-neutral-900">
+                            {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                          </span>
+                          {isCurrentUser && <Badge variant="green">You</Badge>}
                         </div>
                         {entry.users?.username && (
                           <div className="text-xs text-neutral-500">
