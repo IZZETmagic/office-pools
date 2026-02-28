@@ -278,7 +278,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                             <>
                               <Button
                                 size="sm"
-                                variant={user.is_super_admin ? 'gray' : 'danger'}
+                                variant={user.is_super_admin ? 'gray' : 'warning'}
                                 onClick={() =>
                                   handleToggleSuperAdmin(
                                     user,

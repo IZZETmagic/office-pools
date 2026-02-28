@@ -367,7 +367,7 @@ export function EntriesListView({
 
         {/* Add Entry button (desktop, below table) */}
         {canAddEntry && (
-          <div className="px-4 md:px-6 py-3 border-t border-neutral-200 bg-neutral-50">
+          <div className="px-4 md:px-6 py-3 border-t border-neutral-200 bg-neutral-50 flex justify-end">
             <Button
               variant="outline"
               size="sm"

@@ -16,11 +16,11 @@ import { formatNumber } from '@/lib/format'
 
 type Tab = 'matches' | 'users' | 'pools' | 'audit'
 
-const TABS: { key: Tab; label: string; icon: string }[] = [
-  { key: 'matches', label: 'Matches', icon: '⚽' },
-  { key: 'users', label: 'Users', icon: '👥' },
-  { key: 'pools', label: 'Pools', icon: '🏆' },
-  { key: 'audit', label: 'Audit Log', icon: '📋' },
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'matches', label: 'Matches' },
+  { key: 'users', label: 'Users' },
+  { key: 'pools', label: 'Pools' },
+  { key: 'audit', label: 'Audit Log' },
 ]
 
 type SuperAdminDashboardProps = {
@@ -96,11 +96,11 @@ export function SuperAdminDashboard({
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === tab.key
-                    ? 'bg-danger-600 text-white shadow-sm'
+                    ? 'bg-primary-600 text-white shadow-sm'
                     : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                 }`}
               >
-                {tab.icon} {tab.label}
+                {tab.label}
               </button>
             ))}
           </div>

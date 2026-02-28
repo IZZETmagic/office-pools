@@ -45,6 +45,8 @@ export default async function DashboardPage() {
         has_submitted_predictions,
         predictions_submitted_at,
         predictions_last_saved_at,
+        auto_submitted,
+        created_at,
         total_points,
         current_rank
       )
@@ -331,17 +333,76 @@ export default async function DashboardPage() {
       return p.current_rank < best ? p.current_rank : best
     }, null as number | null)
 
-  // Build activity feed (from all pools, not just active)
-  const activities = pools
-    .map((p: any) => ({
+  // Build activity feed from multiple sources (from all pools, not just active)
+  const allActivities: any[] = []
+  for (const m of (userPools ?? [])) {
+    const pool = (m as any).pools
+    const poolName = pool.pool_name
+    const poolId = pool.pool_id
+    const entries = ((m as any).pool_entries || []) as any[]
+
+    // 1. JOINED event
+    allActivities.push({
       type: 'joined' as const,
-      poolName: p.pool_name,
-      poolId: p.pool_id,
-      date: p.joined_at,
-      hasPredictions: p.has_submitted_predictions,
-    }))
-    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5)
+      poolName,
+      poolId,
+      date: m.joined_at,
+      hasPredictions: entries.some((e: any) => e.has_submitted_predictions),
+    })
+
+    // 2. SUBMITTED / AUTO_SUBMITTED events (per entry)
+    for (const entry of entries) {
+      if (entry.predictions_submitted_at) {
+        if (entry.auto_submitted) {
+          allActivities.push({
+            type: 'auto_submitted' as const,
+            poolName,
+            poolId,
+            date: entry.predictions_submitted_at,
+            entryName: entry.entry_name,
+          })
+        } else {
+          allActivities.push({
+            type: 'submitted' as const,
+            poolName,
+            poolId,
+            date: entry.predictions_submitted_at,
+            entryName: entry.entry_name,
+          })
+        }
+      }
+    }
+
+    // 3. ENTRY_CREATED events (only additional entries, not the auto-created first one)
+    for (const entry of entries) {
+      if (entry.entry_number > 1 && entry.created_at) {
+        allActivities.push({
+          type: 'entry_created' as const,
+          poolName,
+          poolId,
+          date: entry.created_at,
+          entryName: entry.entry_name,
+        })
+      }
+    }
+
+    // 4. DEADLINE_PASSED event (only if deadline is in the past)
+    if (pool.prediction_deadline) {
+      const deadlineDate = new Date(pool.prediction_deadline)
+      if (deadlineDate < new Date()) {
+        allActivities.push({
+          type: 'deadline_passed' as const,
+          poolName,
+          poolId,
+          date: pool.prediction_deadline,
+        })
+      }
+    }
+  }
+
+  const activities = allActivities
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10)
 
   return (
     <DashboardClient

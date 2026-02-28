@@ -24,7 +24,7 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-neutral-200 text-neutral-700 text-[10px] sm:text-xs">
-              <th className="text-left py-2 pr-1 sm:pr-2 w-5 sm:w-6">#</th>
+              <th className="text-left py-2 pl-2 sm:pl-3 pr-1 sm:pr-2 w-5 sm:w-6">#</th>
               <th className="text-left py-2 pr-1 sm:pr-2">Team</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8">P</th>
               <th className="text-center py-2 px-0.5 sm:px-1 w-6 sm:w-8">W</th>
@@ -60,7 +60,7 @@ export function StandingsTable({ standings, groupLetter, showConductScore }: Pro
 
               return (
                 <tr key={team.team_id} className={`border-b border-neutral-100 text-xs sm:text-sm ${rowClass}`}>
-                  <td className="py-2 pr-1 sm:pr-2 text-neutral-600 font-medium">{pos}</td>
+                  <td className="py-2 pl-2 sm:pl-3 pr-1 sm:pr-2 text-neutral-600 font-medium">{pos}</td>
                   <td className="py-2 pr-1 sm:pr-2 font-medium text-neutral-900 whitespace-nowrap text-xs sm:text-sm">
                     {team.country_name}
                   </td>

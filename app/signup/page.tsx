@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -17,14 +17,64 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
 
   const router = useRouter()
   const supabase = createClient()
+
+  const checkUsername = useCallback(async (value: string) => {
+    if (value.length < 3) {
+      setUsernameStatus('idle')
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+      setUsernameStatus('idle')
+      return
+    }
+    setUsernameStatus('checking')
+    const { data } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('username', value)
+      .single()
+    setUsernameStatus(data ? 'taken' : 'available')
+  }, [supabase])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    // Validate username format
+    if (!username || username.length < 3 || username.length > 20) {
+      setError('Username must be 3-20 characters.')
+      setLoading(false)
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, and underscores.')
+      setLoading(false)
+      return
+    }
+    if (usernameStatus === 'taken') {
+      setError('That username is already taken.')
+      setLoading(false)
+      return
+    }
+
+    // Double-check availability before creating auth user
+    const { data: existing } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('username', username)
+      .single()
+
+    if (existing) {
+      setUsernameStatus('taken')
+      setError('That username is already taken.')
+      setLoading(false)
+      return
+    }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -47,12 +97,25 @@ export default function SignupPage() {
         .eq('auth_user_id', authData.user.id)
 
       if (profileError) {
+        // Check if it's a unique constraint violation
+        if (profileError.code === '23505' && profileError.message?.includes('username')) {
+          setError('That username was just taken. Please choose another.')
+          setUsernameStatus('taken')
+          setLoading(false)
+          return
+        }
         console.error('Profile update error:', profileError)
       }
 
       router.push('/dashboard')
     }
   }
+
+  const usernameError = username.length > 0 && username.length < 3
+    ? 'Username must be at least 3 characters'
+    : username.length > 0 && !/^[a-zA-Z0-9_]*$/.test(username)
+    ? 'Only letters, numbers, and underscores'
+    : undefined
 
   return (
     <AuthLayout>
@@ -72,14 +135,35 @@ export default function SignupPage() {
           />
         </FormField>
 
-        <FormField label="Username">
-          <Input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            placeholder="johnsmith"
-          />
+        <FormField
+          label="Username"
+          helperText="3-20 characters, letters, numbers, and underscores only"
+          error={usernameError}
+        >
+          <div className="relative">
+            <Input
+              type="text"
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value)
+                setUsernameStatus('idle')
+              }}
+              onBlur={() => checkUsername(username)}
+              required
+              maxLength={20}
+              placeholder="johnsmith"
+              className={usernameStatus === 'taken' ? '!border-danger-500 !focus:ring-danger-500' : ''}
+            />
+            {usernameStatus === 'checking' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500">Checking...</span>
+            )}
+            {usernameStatus === 'available' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-success-600 font-medium">Available ✓</span>
+            )}
+            {usernameStatus === 'taken' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-danger-600 font-medium">Taken</span>
+            )}
+          </div>
         </FormField>
 
         <FormField label="Email">
@@ -103,7 +187,14 @@ export default function SignupPage() {
           />
         </FormField>
 
-        <Button type="submit" fullWidth size="lg" loading={loading} loadingText="Creating account...">
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          loading={loading}
+          loadingText="Creating account..."
+          disabled={usernameStatus === 'taken' || usernameStatus === 'checking'}
+        >
           Sign Up
         </Button>
       </form>

@@ -57,18 +57,41 @@ export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdat
 
       {/* Matches */}
       <div className="space-y-3">
-        {resolvedMatches.map(({ match, homeTeam, awayTeam }) => (
-          <KnockoutMatchCard
-            key={match.match_id}
-            match={match}
-            homeTeam={homeTeam}
-            awayTeam={awayTeam}
-            prediction={predictions.get(match.match_id)}
-            onUpdate={onUpdatePrediction}
-            psoEnabled={psoEnabled}
-            readOnly={readOnly}
-          />
-        ))}
+        {resolvedMatches.map(({ match, homeTeam, awayTeam }, index) => {
+          // Show section headers when third_place and final are grouped together
+          const showSectionHeader = stage === 'finals' && (
+            index === 0 ||
+            resolvedMatches[index - 1].match.stage !== match.stage
+          )
+
+          return (
+            <div key={match.match_id}>
+              {showSectionHeader && (
+                <div className={`flex items-center gap-3 ${index > 0 ? 'mt-6' : ''} mb-2`}>
+                  <div className="h-px flex-1 bg-neutral-200" />
+                  <span className={`text-xs font-bold uppercase tracking-wider ${
+                    match.stage === 'final'
+                      ? 'text-warning-600'
+                      : 'text-neutral-500'
+                  }`}>
+                    {match.stage === 'final' ? 'Final' : 'Third Place Match'}
+                  </span>
+                  <div className="h-px flex-1 bg-neutral-200" />
+                </div>
+              )}
+              <KnockoutMatchCard
+                match={match}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+                prediction={predictions.get(match.match_id)}
+                onUpdate={onUpdatePrediction}
+                psoEnabled={psoEnabled}
+                readOnly={readOnly}
+                highlight={match.stage === 'final'}
+              />
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -86,6 +109,7 @@ function KnockoutMatchCard({
   onUpdate,
   psoEnabled,
   readOnly,
+  highlight,
 }: {
   match: Match
   homeTeam: GroupStanding | null
@@ -94,6 +118,7 @@ function KnockoutMatchCard({
   onUpdate?: (matchId: string, score: ScoreEntry) => void
   psoEnabled: boolean
   readOnly?: boolean
+  highlight?: boolean
 }) {
   const homeName = homeTeam?.country_name || match.home_team_placeholder || 'TBD'
   const awayName = awayTeam?.country_name || match.away_team_placeholder || 'TBD'
@@ -179,7 +204,7 @@ function KnockoutMatchCard({
   const city = venueParts.slice(1).join(', ') || ''
 
   return (
-    <Card padding="md">
+    <Card padding="md" className={highlight ? 'ring-1 ring-warning-400' : undefined}>
       {/* Single row: Match#, Date/Time, Home, Score, Away, City/Stadium */}
       <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap">
         <span className="text-[10px] sm:text-xs text-neutral-400 shrink-0 mr-0.5 sm:mr-2">#{match.match_number}</span>

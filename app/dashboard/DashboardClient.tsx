@@ -45,13 +45,18 @@ type PoolCardData = {
   entries: EntryProgress[]
 }
 
-type ActivityItem = {
-  type: 'joined'
+type ActivityItemBase = {
   poolName: string
   poolId: string
   date: string
-  hasPredictions: boolean
 }
+
+type ActivityItem =
+  | (ActivityItemBase & { type: 'joined'; hasPredictions: boolean })
+  | (ActivityItemBase & { type: 'submitted'; entryName: string })
+  | (ActivityItemBase & { type: 'auto_submitted'; entryName: string })
+  | (ActivityItemBase & { type: 'entry_created'; entryName: string })
+  | (ActivityItemBase & { type: 'deadline_passed' })
 
 type UpcomingMatch = {
   match_id: string
@@ -157,6 +162,31 @@ function timeAgo(dateStr: string) {
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 30) return `${diffDays}d ago`
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function activityIcon(type: ActivityItem['type']): string {
+  switch (type) {
+    case 'joined': return '👋'
+    case 'submitted': return '✅'
+    case 'auto_submitted': return '⏰'
+    case 'entry_created': return '📝'
+    case 'deadline_passed': return '🔒'
+  }
+}
+
+function activityDescription(activity: ActivityItem, poolLink: React.ReactNode): React.ReactNode {
+  switch (activity.type) {
+    case 'joined':
+      return <>Joined {poolLink}</>
+    case 'submitted':
+      return <>Submitted <span className="font-medium">{activity.entryName}</span> for {poolLink}</>
+    case 'auto_submitted':
+      return <><span className="font-medium">{activity.entryName}</span> auto-submitted for {poolLink}</>
+    case 'entry_created':
+      return <>Added entry <span className="font-medium">{activity.entryName}</span> in {poolLink}</>
+    case 'deadline_passed':
+      return <>Predictions locked for {poolLink}</>
+  }
 }
 
 // =====================
@@ -353,7 +383,16 @@ export function DashboardClient({
           {pools.length === 0 ? (
             <Card padding="lg" className="text-center">
               <p className="text-neutral-600 text-lg mb-2">You haven&apos;t joined any pools yet.</p>
-              <p className="text-neutral-500">Use the buttons above to join or create a pool.</p>
+              <p className="text-neutral-500 mb-4">Use the buttons above to join or create a pool.</p>
+              <Link
+                href="/pools?tab=discover"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                Discover Pools
+              </Link>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -487,19 +526,36 @@ export function DashboardClient({
             ) : (
               <Card>
                 <ul className="divide-y divide-neutral-100">
-                  {activities.map((activity, idx) => (
-                    <li key={idx} className="py-3 first:pt-0 last:pb-0">
-                      <p className="text-sm text-neutral-900">
-                        Joined <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">{activity.poolName}</Link>
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
-                        {!activity.hasPredictions && (
-                          <Badge variant="yellow">Needs predictions</Badge>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                  {activities.map((activity, idx) => {
+                    const poolLink = (
+                      <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
+                        {activity.poolName}
+                      </Link>
+                    )
+                    return (
+                      <li key={idx} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-start gap-2">
+                          <span className="text-sm leading-5 shrink-0" aria-hidden="true">
+                            {activityIcon(activity.type)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm text-neutral-900">
+                              {activityDescription(activity, poolLink)}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
+                              {activity.type === 'joined' && !activity.hasPredictions && (
+                                <Badge variant="yellow">Needs predictions</Badge>
+                              )}
+                              {activity.type === 'auto_submitted' && (
+                                <Badge variant="blue">Auto</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               </Card>
             )}

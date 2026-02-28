@@ -65,16 +65,16 @@ const RIGHT_SF = [102]
 // =============================================
 
 // Cell dimensions
-const CELL_W = 100
-const CELL_H = 40
+const CELL_W = 110
+const CELL_H = 42
 // Vertical gap between two matches that feed into the same next-round match
-const PAIR_GAP = 4
+const PAIR_GAP = 6
 // Horizontal gap between rounds (for connector lines)
-const COL_GAP = 14
+const COL_GAP = 16
 // Round column width = cell + gap
 const ROUND_W = CELL_W + COL_GAP
 // Header height above the bracket
-const HEADER_H = 16
+const HEADER_H = 18
 
 // Total bracket height: 8 R32 matches with gaps
 // R32: 8 slots, grouped as 4 pairs. Within each pair gap is PAIR_GAP, between pairs we need space.
@@ -175,12 +175,12 @@ function BracketCell({
     >
       {/* Home team row */}
       <div
-        className={`flex items-center justify-between px-1 border-b border-neutral-100 ${
+        className={`flex items-center justify-between px-1.5 border-b border-neutral-100 ${
           match.winnerSide === 'home'
             ? 'bg-success-50 font-semibold text-success-800'
             : 'text-neutral-700'
         }`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 10, lineHeight: '12px' }}
+        style={{ height: CELL_H / 2 - 0.5, fontSize: 11, lineHeight: '14px' }}
       >
         <span className="truncate flex-1 mr-0.5">
           {shortName(match.homeName)}
@@ -199,12 +199,12 @@ function BracketCell({
 
       {/* Away team row */}
       <div
-        className={`flex items-center justify-between px-1 ${
+        className={`flex items-center justify-between px-1.5 ${
           match.winnerSide === 'away'
             ? 'bg-success-50 font-semibold text-success-800'
             : 'text-neutral-700'
         }`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 10, lineHeight: '12px' }}
+        style={{ height: CELL_H / 2 - 0.5, fontSize: 11, lineHeight: '14px' }}
       >
         <span className="truncate flex-1 mr-0.5">
           {shortName(match.awayName)}
@@ -385,8 +385,8 @@ function KnockoutBracket({
               key={i}
               className={`absolute text-center font-bold uppercase tracking-wider ${
                 h.label === 'Final'
-                  ? 'text-[9px] text-warning-600'
-                  : 'text-[9px] text-neutral-400'
+                  ? 'text-[10px] text-warning-600'
+                  : 'text-[10px] text-neutral-400'
               }`}
               style={{ left: h.x, top: 0, width: CELL_W }}
             >

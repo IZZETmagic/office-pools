@@ -795,7 +795,7 @@ export function MatchesTab({
                             </>
                           )}
                           {match.status !== 'cancelled' && (
-                            <Button size="sm" variant="danger" onClick={() => openResultModal(match)}>
+                            <Button size="sm" variant="primary" onClick={() => openResultModal(match)}>
                               {match.is_completed
                                 ? 'Edit Result'
                                 : 'Enter Result'}
