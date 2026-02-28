@@ -108,8 +108,11 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
           <PointsRow label="Correct Winner + Goal Difference" value={s.group_correct_difference} />
           <PointsRow label="Correct Result Only (Win/Draw/Loss)" value={s.group_correct_result} />
         </div>
-        <div className="mt-4 bg-primary-50 rounded-lg px-4 py-3">
-          <p className="text-xs text-primary-800">
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
+          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+          </svg>
+          <p className="text-xs text-primary-800 leading-5">
             <strong>How it works:</strong> If the actual score is 2-1, predicting 2-1 earns {s.group_exact_score} pts (exact). Predicting 3-2 earns {s.group_correct_difference} pts (correct winner + goal difference of 1). Predicting 2-0 earns {s.group_correct_result} pts (correct winner only). Only the highest tier applies.
           </p>
         </div>
@@ -137,8 +140,11 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
           <MultiplierRow label="Third Place Match" value={s.third_place_multiplier} />
           <MultiplierRow label="Final" value={s.final_multiplier} />
         </div>
-        <div className="mt-4 bg-primary-50 rounded-lg px-4 py-3">
-          <p className="text-xs text-primary-800">
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
+          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+          </svg>
+          <p className="text-xs text-primary-800 leading-5">
             <strong>Example:</strong> An exact score prediction in the Final earns {s.knockout_exact_score} x {s.final_multiplier} = <strong>{finalExactExample} pts</strong>.
           </p>
         </div>
