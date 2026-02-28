@@ -180,7 +180,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">Pool Management</h2>
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Pool Management</h2>
         <span className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full font-medium text-sm">
           {pools.length} Total Pools
         </span>
@@ -195,12 +195,12 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
         >
           <option value="all">All Status</option>
           <option value="open">Open</option>
@@ -214,19 +214,19 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       {/* Pools cards */}
       <div className="grid gap-4">
         {filteredPools.length === 0 ? (
-          <div className="bg-surface rounded-lg shadow p-8 text-center text-neutral-600">
+          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
             No pools found.
           </div>
         ) : (
           filteredPools.map((pool) => (
             <div
               key={pool.pool_id}
-              className="bg-surface rounded-lg shadow p-6 hover:shadow-md transition"
+              className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-6 hover:shadow-md dark:hover:border-neutral-600 transition"
             >
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-bold text-neutral-900">
+                    <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
                       {pool.pool_name}
                     </h3>
                     <Badge variant={getStatusVariant(pool.status)}>
@@ -234,11 +234,11 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                     </Badge>
                   </div>
                   {pool.description && (
-                    <p className="text-sm text-neutral-600 mb-2">
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
                       {pool.description}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-4 text-sm text-neutral-600">
+                  <div className="flex flex-wrap gap-4 text-sm text-neutral-600 dark:text-neutral-400">
                     <span>
                       Code: <strong className="font-mono">{pool.pool_code}</strong>
                     </span>
@@ -265,12 +265,14 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                     </span>
                   </div>
                 </div>
-                <button
+                <Button
+                  size="sm"
+                  variant="danger"
                   onClick={() => openDeleteModal(pool)}
-                  className="text-xs px-3 py-1.5 rounded bg-danger-600 text-white hover:bg-danger-700 font-medium transition flex-shrink-0"
+                  className="flex-shrink-0"
                 >
                   Delete Pool
-                </button>
+                </Button>
               </div>
             </div>
           ))
@@ -330,13 +332,15 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
               >
                 Cancel
               </Button>
-              <button
+              <Button
+                variant="danger"
                 onClick={handleDeletePool}
-                disabled={deleting || deleteConfirm !== modal.pool.pool_name}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-danger-600 hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={deleteConfirm !== modal.pool.pool_name}
+                loading={deleting}
+                loadingText="Deleting..."
               >
-                {deleting ? 'Deleting...' : 'Permanently Delete Pool'}
-              </button>
+                Permanently Delete Pool
+              </Button>
             </div>
           </div>
         </div>

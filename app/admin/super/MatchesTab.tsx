@@ -599,7 +599,7 @@ export function MatchesTab({
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">Match Results</h2>
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Match Results</h2>
         <div className="flex gap-3 items-center text-sm">
           <span className="px-3 py-1 bg-success-100 text-success-700 rounded-full font-medium">
             {completedCount} Completed
@@ -612,13 +612,9 @@ export function MatchesTab({
           <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">
             {scheduledCount} Scheduled
           </span>
-          <button
-            onClick={handleManualAdvance}
-            disabled={advancing}
-            className="px-4 py-1.5 bg-accent-500 text-white rounded-full font-medium text-sm hover:bg-accent-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {advancing ? 'Advancing...' : 'Advance Teams'}
-          </button>
+          <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
+            Advance Teams
+          </Button>
         </div>
       </div>
 
@@ -633,7 +629,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -646,7 +642,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -659,7 +655,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -672,35 +668,35 @@ export function MatchesTab({
       </div>
 
       {/* Matches table */}
-      <div className="bg-surface rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Stage
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Score
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200">
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
               {filteredMatches.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
@@ -720,7 +716,7 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100">
+                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
@@ -784,46 +780,31 @@ export function MatchesTab({
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-2 justify-end">
                           {match.status === 'scheduled' && (
-                            <button
-                              onClick={() => handleSetMatchStatus(match, 'live')}
-                              className="text-xs px-3 py-1.5 rounded bg-warning-500 text-white hover:bg-warning-600 font-medium transition"
-                            >
+                            <Button size="sm" variant="warning" onClick={() => handleSetMatchStatus(match, 'live')}>
                               Set Live
-                            </button>
+                            </Button>
                           )}
                           {match.status === 'live' && (
                             <>
-                              <button
-                                onClick={() => openLiveScoreModal(match)}
-                                className="text-xs px-3 py-1.5 rounded bg-warning-500 text-white hover:bg-warning-600 font-medium transition"
-                              >
+                              <Button size="sm" variant="warning" onClick={() => openLiveScoreModal(match)}>
                                 Update Score
-                              </button>
-                              <button
-                                onClick={() => handleSetMatchStatus(match, 'scheduled')}
-                                className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-medium transition"
-                              >
+                              </Button>
+                              <Button size="sm" variant="gray" onClick={() => handleSetMatchStatus(match, 'scheduled')}>
                                 Set Scheduled
-                              </button>
+                              </Button>
                             </>
                           )}
                           {match.status !== 'cancelled' && (
-                            <button
-                              onClick={() => openResultModal(match)}
-                              className="text-xs px-3 py-1.5 rounded bg-danger-600 text-white hover:bg-danger-700 font-medium transition"
-                            >
+                            <Button size="sm" variant="danger" onClick={() => openResultModal(match)}>
                               {match.is_completed
                                 ? 'Edit Result'
                                 : 'Enter Result'}
-                            </button>
+                            </Button>
                           )}
                           {match.is_completed && (
-                            <button
-                              onClick={() => openResetModal(match)}
-                              className="text-xs px-3 py-1.5 rounded bg-neutral-800 text-white hover:bg-neutral-900 font-medium transition"
-                            >
+                            <Button size="sm" variant="primary" className="!bg-neutral-800 hover:!bg-neutral-900" onClick={() => openResetModal(match)}>
                               Reset
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -964,7 +945,7 @@ export function MatchesTab({
 
                 {/* PSO score inputs */}
                 {resultType === 'pso' && (
-                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 dark:bg-neutral-100 rounded-lg">
+                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
                     <div className="text-center">
                       <p className="text-xs text-neutral-600 mb-1">PSO</p>
                       <input
@@ -1014,7 +995,7 @@ export function MatchesTab({
                 </button>
 
                 {showConductFields && (
-                  <div className="mt-3 bg-neutral-50 dark:bg-neutral-100 rounded-lg p-4">
+                  <div className="mt-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg p-4">
                     <p className="text-xs text-neutral-500 mb-4">
                       Enter card counts per team. Each count represents distinct player incidents.
                       Used as FIFA tiebreaker in group standings.
@@ -1162,13 +1143,14 @@ export function MatchesTab({
               >
                 Cancel
               </Button>
-              <button
+              <Button
+                variant="warning"
                 onClick={handleUpdateLiveScore}
-                disabled={saving}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-warning-500 hover:bg-warning-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={saving}
+                loadingText="Updating..."
               >
-                {saving ? 'Updating...' : 'Update Score & Recalculate'}
-              </button>
+                Update Score &amp; Recalculate
+              </Button>
             </div>
           </div>
         </div>
@@ -1241,13 +1223,15 @@ export function MatchesTab({
               >
                 Cancel
               </Button>
-              <button
+              <Button
+                variant="danger"
                 onClick={handleResetMatch}
-                disabled={resetting || resetConfirmText !== 'RESET'}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-danger-600 hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={resetConfirmText !== 'RESET'}
+                loading={resetting}
+                loadingText="Resetting..."
               >
-                {resetting ? 'Resetting...' : 'Reset Match'}
-              </button>
+                Reset Match
+              </Button>
             </div>
           </div>
         </div>

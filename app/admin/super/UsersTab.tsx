@@ -147,7 +147,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">User Management</h2>
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">User Management</h2>
         <div className="flex gap-3 text-sm">
           <span className="px-3 py-1 bg-danger-100 text-danger-700 rounded-full font-medium">
             {superAdminCount} Super Admin{superAdminCount !== 1 ? 's' : ''}
@@ -167,13 +167,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface w-64 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -182,35 +182,35 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       </div>
 
       {/* Users table */}
-      <div className="bg-surface rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Email
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Role
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Last Login
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200">
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
@@ -223,11 +223,11 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                   return (
                     <tr
                       key={user.user_id}
-                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-100 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
+                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
                     >
                       <td className="px-4 py-3">
                         <div>
-                          <span className="font-medium text-neutral-900">
+                          <span className="font-medium text-neutral-900 dark:text-white">
                             {user.username}
                           </span>
                           {isCurrentUser && (
@@ -242,7 +242,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
                         {user.email}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -257,14 +257,14 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                           {user.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
                         {new Date(user.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
                         })}
                       </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600">
+                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
                         {user.last_login
                           ? new Date(user.last_login).toLocaleDateString(
                               'en-US',
@@ -276,33 +276,27 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                         <div className="flex gap-2 justify-end">
                           {!isCurrentUser && (
                             <>
-                              <button
+                              <Button
+                                size="sm"
+                                variant={user.is_super_admin ? 'gray' : 'danger'}
                                 onClick={() =>
                                   handleToggleSuperAdmin(
                                     user,
                                     !user.is_super_admin
                                   )
                                 }
-                                className={`text-xs px-3 py-1.5 rounded font-medium transition ${
-                                  user.is_super_admin
-                                    ? 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                                    : 'bg-danger-600 text-white hover:bg-danger-700'
-                                }`}
                               >
                                 {user.is_super_admin
                                   ? 'Remove Admin'
                                   : 'Make Admin'}
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={user.is_active ? 'danger' : 'green'}
                                 onClick={() => handleToggleActive(user)}
-                                className={`text-xs px-3 py-1.5 rounded font-medium transition ${
-                                  user.is_active
-                                    ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
-                                    : 'bg-success-50 text-success-600 hover:bg-success-100'
-                                }`}
                               >
                                 {user.is_active ? 'Deactivate' : 'Reactivate'}
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>
@@ -366,13 +360,15 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
               >
                 Cancel
               </Button>
-              <button
+              <Button
+                variant="danger"
                 onClick={handleConfirmPromote}
-                disabled={saving || promoteConfirm !== 'PROMOTE'}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-danger-600 hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={promoteConfirm !== 'PROMOTE'}
+                loading={saving}
+                loadingText="Promoting..."
               >
-                {saving ? 'Promoting...' : 'Promote to Super Admin'}
-              </button>
+                Promote to Super Admin
+              </Button>
             </div>
           </div>
         </div>

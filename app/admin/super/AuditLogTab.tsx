@@ -11,8 +11,8 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
   if (auditLogs.length === 0) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900 mb-6">Audit Log</h2>
-        <div className="bg-surface rounded-lg shadow p-8 text-center text-neutral-600">
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Audit Log</h2>
+        <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
           No audit entries yet. Actions like match resets will be logged here.
         </div>
       </div>
@@ -22,38 +22,38 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">Audit Log</h2>
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Audit Log</h2>
         <span className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full font-medium text-sm">
           {auditLogs.length} Entries
         </span>
       </div>
 
-      <div className="bg-surface rounded-lg shadow overflow-hidden">
+      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-100 border-b border-neutral-200">
+            <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Time
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Action
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Previous Score
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Performed By
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   Reason
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200">
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
               {auditLogs.map((log) => {
                 const home =
                   log.matches?.home_team?.country_name || 'Unknown'
@@ -62,8 +62,8 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
                 const resetDate = new Date(log.reset_at)
 
                 return (
-                  <tr key={log.log_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100">
-                    <td className="px-4 py-3 text-sm text-neutral-600 whitespace-nowrap">
+                  <tr key={log.log_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                       {resetDate.toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -89,7 +89,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
                     <td className="px-4 py-3 text-sm">
                       {log.matches ? (
                         <>
-                          <span className="font-medium text-neutral-900">
+                          <span className="font-medium text-neutral-900 dark:text-white">
                             #{log.matches.match_number}
                           </span>
                           <span className="text-neutral-600 ml-2">
@@ -100,7 +100,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
                         <span className="text-neutral-500">Unknown match</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600">
+                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
                       {log.previous_home_score !== null ? (
                         <>
                           <span className="font-mono font-bold">
@@ -122,10 +122,10 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
                         <span className="text-neutral-500">N/A</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600">
+                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
                       {log.users?.username || 'Unknown'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 max-w-xs truncate">
+                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 max-w-xs truncate">
                       {log.reason || '-'}
                     </td>
                   </tr>
