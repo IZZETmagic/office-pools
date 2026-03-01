@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
 import FeedbackButton from "@/components/ui/FeedbackButton";
 import Footer from "@/components/ui/Footer";
@@ -42,6 +43,9 @@ export default function RootLayout({
           } catch(e) {}
         `}} />
       </head>
+      {process.env.NEXT_PUBLIC_GTM_ID && (
+        <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+      )}
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
