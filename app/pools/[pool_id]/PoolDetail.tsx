@@ -10,6 +10,7 @@ import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
+import { HowToPlayTab } from './HowToPlayTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import { EntriesListView } from '@/components/predictions/EntriesListView'
 import { EntryDetailView } from '@/components/predictions/EntryDetailView'
@@ -44,11 +45,13 @@ type Tab =
   | 'results'
   | 'standings'
   | 'scoring_rules'
+  | 'how_to_play'
   | 'members'
   | 'scoring_config'
   | 'settings'
 
 const USER_TABS: { key: Tab; label: string }[] = [
+  { key: 'how_to_play', label: 'How to Play' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
@@ -83,6 +86,7 @@ type PoolDetailProps = {
   psoEnabled: boolean
   userEntries: EntryData[]
   isSuperAdmin?: boolean
+  hasSeenHowToPlay: boolean
 }
 
 // =====================
@@ -106,11 +110,27 @@ export function PoolDetail({
   psoEnabled,
   userEntries,
   isSuperAdmin,
+  hasSeenHowToPlay,
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const initialTab = (searchParams.get('tab') as Tab) || 'leaderboard'
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const urlTab = searchParams.get('tab') as Tab
+    if (urlTab) return urlTab
+    return hasSeenHowToPlay ? 'leaderboard' : 'how_to_play'
+  })
+
+  // Mark how-to-play as seen on first visit (non-blocking)
+  useEffect(() => {
+    if (!hasSeenHowToPlay) {
+      const supabase = createClient()
+      supabase
+        .from('pool_members')
+        .update({ has_seen_how_to_play: true })
+        .eq('member_id', memberId)
+        .then()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync tab state on browser back/forward (popstate)
   useEffect(() => {
@@ -942,6 +962,14 @@ export function PoolDetail({
 
             {activeTab === 'scoring_rules' && (
               <ScoringRulesTab settings={settings} />
+            )}
+
+            {activeTab === 'how_to_play' && (
+              <HowToPlayTab
+                poolName={pool.pool_name}
+                maxEntries={pool.max_entries_per_user}
+                isPastDeadline={isPastDeadline}
+              />
             )}
 
             {/* Admin tabs */}

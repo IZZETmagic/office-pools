@@ -41,7 +41,7 @@ export default async function PoolPage({
   // STEP 3: Check membership
   const { data: membership } = await supabase
     .from('pool_members')
-    .select('member_id, role')
+    .select('member_id, role, has_seen_how_to_play')
     .eq('pool_id', pool_id)
     .eq('user_id', userData.user_id)
     .single()
@@ -202,6 +202,7 @@ export default async function PoolPage({
       psoEnabled={psoEnabled}
       userEntries={userEntries}
       isSuperAdmin={userData.is_super_admin ?? false}
+      hasSeenHowToPlay={membership.has_seen_how_to_play ?? false}
     />
   )
 }
