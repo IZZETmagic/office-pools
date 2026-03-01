@@ -75,6 +75,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>('tournament')
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'back'>('forward')
+  const [slideKey, setSlideKey] = useState(0)
 
   // Step 1: Tournament
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -120,12 +122,16 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   function goNext() {
     if (currentStepIndex < STEPS.length - 1) {
+      setSlideDirection('forward')
+      setSlideKey((k) => k + 1)
       setCurrentStep(STEPS[currentStepIndex + 1].key)
     }
   }
 
   function goBack() {
     if (currentStepIndex > 0) {
+      setSlideDirection('back')
+      setSlideKey((k) => k + 1)
       setCurrentStep(STEPS[currentStepIndex - 1].key)
     }
   }
@@ -315,7 +321,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-pool-title"
@@ -323,7 +329,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 shrink-0">
           <h2 id="create-pool-title" className="text-lg font-bold text-neutral-900">Create a Pool</h2>
@@ -344,11 +350,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
               <React.Fragment key={step.key}>
                 <button
                   onClick={() => {
-                    if (idx <= currentStepIndex) {
-                      setCurrentStep(step.key)
-                    } else if (idx === 1 && canProceedFromTournament) {
-                      setCurrentStep(step.key)
-                    } else if (idx === 2 && canProceedFromTournament && canProceedFromDetails) {
+                    let canGo = false
+                    if (idx <= currentStepIndex) canGo = true
+                    else if (idx === 1 && canProceedFromTournament) canGo = true
+                    else if (idx === 2 && canProceedFromTournament && canProceedFromDetails) canGo = true
+                    if (canGo && idx !== currentStepIndex) {
+                      setSlideDirection(idx > currentStepIndex ? 'forward' : 'back')
+                      setSlideKey((k) => k + 1)
                       setCurrentStep(step.key)
                     }
                   }}
@@ -387,9 +395,10 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           </div>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-4 sm:px-6 py-4">
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
+          <div key={slideKey} className={slideDirection === 'forward' ? 'step-slide-forward' : 'step-slide-back'}>
               {/* STEP 1: Tournament */}
               {currentStep === 'tournament' && (
                 <div className="space-y-4">
@@ -541,7 +550,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         <div className="inline-grid grid-cols-2 gap-2">
                           {([
                             { value: false, label: 'Public', desc: 'Anyone with code can join' },
-                            { value: true, label: 'Private', desc: 'Requires admin approval' },
+                            { value: true, label: 'Private', desc: 'Requires pool code to join' },
                           ] as const).map((opt) => (
                             <button
                               key={String(opt.value)}
@@ -619,6 +628,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   </div>
                 </div>
               )}
+          </div>
         </div>
 
         {/* Footer */}

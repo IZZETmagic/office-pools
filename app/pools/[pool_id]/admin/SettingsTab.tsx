@@ -495,7 +495,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             <div className="inline-grid grid-cols-2 gap-2">
               {([
                 { value: false, label: 'Public', desc: 'Anyone with code can join' },
-                { value: true, label: 'Private', desc: 'Requires admin approval' },
+                { value: true, label: 'Private', desc: 'Requires pool code to join' },
               ] as const).map((opt) => (
                 <button
                   key={String(opt.value)}

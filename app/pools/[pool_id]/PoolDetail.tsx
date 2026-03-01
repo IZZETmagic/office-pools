@@ -793,6 +793,7 @@ export function PoolDetail({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        <div key={activeTab} className="tab-transition">
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
                 members={members}
@@ -1005,6 +1006,7 @@ export function PoolDetail({
                 onDirtyChange={(dirty) => { settingsDirtyRef.current = dirty }}
               />
             )}
+        </div>
       </main>
 
       {/* Navigation Warning Modal */}
