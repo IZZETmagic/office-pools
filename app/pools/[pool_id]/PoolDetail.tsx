@@ -12,11 +12,13 @@ import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import { HowToPlayTab } from './HowToPlayTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
+import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
 import { EntriesListView } from '@/components/predictions/EntriesListView'
 import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
+import { RoundsTab } from './admin/RoundsTab'
 import { DEFAULT_POOL_SETTINGS, calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
 import { resolveFullBracket } from '@/lib/bracketResolver'
@@ -32,6 +34,8 @@ import type {
   ExistingPrediction,
   PlayerScoreData,
   BonusScoreData,
+  PoolRoundState,
+  EntryRoundSubmission,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 import { formatTimeAgo } from '@/lib/format'
@@ -49,6 +53,7 @@ type Tab =
   | 'members'
   | 'scoring_config'
   | 'settings'
+  | 'rounds'
 
 const USER_TABS: { key: Tab; label: string }[] = [
   { key: 'how_to_play', label: 'How to Play' },
@@ -87,6 +92,8 @@ type PoolDetailProps = {
   userEntries: EntryData[]
   isSuperAdmin?: boolean
   hasSeenHowToPlay: boolean
+  roundStates?: PoolRoundState[]
+  roundSubmissions?: EntryRoundSubmission[]
 }
 
 // =====================
@@ -111,6 +118,8 @@ export function PoolDetail({
   userEntries,
   isSuperAdmin,
   hasSeenHowToPlay,
+  roundStates = [],
+  roundSubmissions = [],
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -262,6 +271,7 @@ export function PoolDetail({
 
   // Live predictions fetched client-side (overrides server data when available)
   const [liveEntryPredictions, setLiveEntryPredictions] = useState<Record<string, ExistingPrediction[]>>({})
+  const [liveRoundSubmissions, setLiveRoundSubmissions] = useState<Record<string, EntryRoundSubmission[]>>({})
   const [loadingPredictions, setLoadingPredictions] = useState(false)
 
   // Fetch predictions for the active entry from the database
@@ -284,6 +294,19 @@ export function PoolDetail({
     }
   }, [])
 
+  // Fetch round submissions for an entry (progressive pools)
+  const fetchEntryRoundSubmissions = useCallback(async (entryId: string) => {
+    if (pool.prediction_mode !== 'progressive') return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('entry_round_submissions')
+      .select('*')
+      .eq('entry_id', entryId)
+    if (data) {
+      setLiveRoundSubmissions(prev => ({ ...prev, [entryId]: data as EntryRoundSubmission[] }))
+    }
+  }, [pool.prediction_mode])
+
   // Navigate into an entry's detail view (multi-entry)
   const handleOpenEntryDetail = useCallback((entry: EntryData) => {
     setActiveEntryId(entry.entry_id)
@@ -296,7 +319,8 @@ export function PoolDetail({
     setPredictionsView({ mode: 'detail', entryId: entry.entry_id })
     // Fetch fresh predictions — EntryDetailView is gated on loadingPredictions
     fetchEntryPredictions(entry.entry_id)
-  }, [fetchEntryPredictions])
+    fetchEntryRoundSubmissions(entry.entry_id)
+  }, [fetchEntryPredictions, fetchEntryRoundSubmissions])
 
   // Navigate back to entries list (silently save any pending changes, refresh list data)
   const handleBackToList = useCallback(async () => {
@@ -611,6 +635,7 @@ export function PoolDetail({
         conductData,
         settings: poolSettings,
         tournamentAwards: null,
+        predictionMode: pool.prediction_mode as 'full_tournament' | 'progressive',
       })
       const bonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
       const adjustment = adjustmentMap.get(entryId) ?? 0
@@ -653,6 +678,19 @@ export function PoolDetail({
       }))
   }, [activeEntry, userPredictions, allPredictions, userEntries, liveEntryPredictions])
 
+  // Derive active entry's round submissions: prefer live data, fall back to server props
+  const activeRoundSubmissions: EntryRoundSubmission[] = useMemo(() => {
+    if (!activeEntry) return []
+    if (liveRoundSubmissions[activeEntry.entry_id]) {
+      return liveRoundSubmissions[activeEntry.entry_id]
+    }
+    // Server props are for the default entry
+    if (activeEntry.entry_id === userEntries[0]?.entry_id) {
+      return roundSubmissions
+    }
+    return []
+  }, [activeEntry, roundSubmissions, userEntries, liveRoundSubmissions])
+
   // Build user prediction list for results tab
   const userPredictionsList = activeEntryPredictions.map((p) => ({
     match_id: p.match_id,
@@ -670,7 +708,11 @@ export function PoolDetail({
     away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
   }))
 
-  const tabs = isAdmin ? [...USER_TABS, ...ADMIN_TABS] : USER_TABS
+  const isProgressive = pool.prediction_mode === 'progressive'
+  const adminTabs = isProgressive
+    ? [{ key: 'rounds' as Tab, label: 'Rounds' }, ...ADMIN_TABS]
+    : ADMIN_TABS
+  const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
   // Swipe navigation for mobile
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -806,10 +848,82 @@ export function PoolDetail({
                 poolSettings={poolSettings}
                 maxEntriesPerUser={pool.max_entries_per_user}
                 currentUserId={currentUserId}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive'}
               />
             )}
 
-            {activeTab === 'predictions' && activeEntry && (
+            {activeTab === 'predictions' && activeEntry && isProgressive && (
+              pool.max_entries_per_user > 1 ? (
+                // Multi-entry progressive: list view or detail view
+                predictionsView.mode === 'list' ? (
+                  <EntriesListView
+                    entries={entries}
+                    poolId={pool.pool_id}
+                    totalMatches={matches.length}
+                    isPastDeadline={isPastDeadline}
+                    allPredictions={allPredictions}
+                    canAddEntry={canAddEntry}
+                    addingEntry={addingEntry}
+                    onAddEntry={handleAddEntry}
+                    onDeleteEntry={handleDeleteEntryFromList}
+                    onRenameEntry={handleRenameEntryFromList}
+                    onEditEntry={handleOpenEntryDetail}
+                  />
+                ) : loadingPredictions ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Back navigation */}
+                    <button
+                      onClick={handleBackToList}
+                      className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium mb-4 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to Entries
+                    </button>
+                    <div className="flex items-center gap-2 mb-4">
+                      <h3 className="text-lg font-semibold text-neutral-900">{activeEntry.entry_name}</h3>
+                    </div>
+                    <ProgressivePredictionsFlow
+                      key={activeEntryId}
+                      matches={predictionsMatches}
+                      teams={teams}
+                      entryId={activeEntry.entry_id}
+                      poolId={pool.pool_id}
+                      existingPredictions={activeEntryPredictions}
+                      psoEnabled={psoEnabled}
+                      predictionsLocked={predictionsLocked}
+                      onUnsavedChangesRef={predictionsRef}
+                      onStatusChange={setPredictionStatus}
+                      roundStates={roundStates}
+                      roundSubmissions={activeRoundSubmissions}
+                    />
+                  </div>
+                )
+              ) : (
+                // Single-entry progressive: render directly
+                <ProgressivePredictionsFlow
+                  key={activeEntryId}
+                  matches={predictionsMatches}
+                  teams={teams}
+                  entryId={activeEntry.entry_id}
+                  poolId={pool.pool_id}
+                  existingPredictions={activeEntryPredictions}
+                  psoEnabled={psoEnabled}
+                  predictionsLocked={predictionsLocked}
+                  onUnsavedChangesRef={predictionsRef}
+                  onStatusChange={setPredictionStatus}
+                  roundStates={roundStates}
+                  roundSubmissions={activeRoundSubmissions}
+                />
+              )
+            )}
+
+            {activeTab === 'predictions' && activeEntry && !isProgressive && (
               pool.max_entries_per_user > 1 ? (
                 // Multi-entry: list view or detail view
                 predictionsView.mode === 'list' ? (
@@ -970,6 +1084,7 @@ export function PoolDetail({
                 poolName={pool.pool_name}
                 maxEntries={pool.max_entries_per_user}
                 isPastDeadline={isPastDeadline}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive'}
               />
             )}
 
@@ -1004,6 +1119,13 @@ export function PoolDetail({
                 setPool={setPool}
                 members={members}
                 onDirtyChange={(dirty) => { settingsDirtyRef.current = dirty }}
+              />
+            )}
+
+            {activeTab === 'rounds' && isAdmin && isProgressive && (
+              <RoundsTab
+                poolId={pool.pool_id}
+                roundStates={roundStates}
               />
             )}
         </div>

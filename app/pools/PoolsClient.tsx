@@ -23,6 +23,7 @@ type PoolData = {
   status: string
   is_private: boolean
   prediction_deadline: string | null
+  prediction_mode: 'full_tournament' | 'progressive'
   tournament_id: string
   created_at: string
   role: string
@@ -40,6 +41,7 @@ type PublicPool = {
   description: string | null
   status: string
   prediction_deadline: string | null
+  prediction_mode: 'full_tournament' | 'progressive'
   created_at: string
   memberCount: number
 }
@@ -125,7 +127,7 @@ function PoolRow({ pool }: { pool: PoolData }) {
       className="block bg-surface border border-neutral-200 dark:border-border-default rounded-lg px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 dark:hover:bg-surface-secondary transition-colors"
     >
       {/* Desktop layout – grid ensures columns align across rows */}
-      <div className="hidden sm:grid sm:grid-cols-[1fr_4.5rem_5.5rem_4.5rem_6rem_1.25rem] items-center gap-x-3">
+      <div className="hidden sm:grid sm:grid-cols-[1fr_4.5rem_5.5rem_4.5rem_5.5rem_6rem_1.25rem] items-center gap-x-3">
         {/* Name + code + badges */}
         <div className={`min-w-0 flex flex-col ${pool.role === 'admin' ? '' : 'justify-center min-h-[2.75rem]'}`}>
           <div className="flex items-center gap-2">
@@ -177,6 +179,12 @@ function PoolRow({ pool }: { pool: PoolData }) {
           <p className="text-[10px] text-neutral-500">Members</p>
         </div>
 
+        {/* Type */}
+        <div className="text-center text-sm">
+          <p className="font-bold text-neutral-900">{pool.prediction_mode === 'progressive' ? 'Prog' : 'Full'}</p>
+          <p className="text-[10px] text-neutral-500">Type</p>
+        </div>
+
         {/* Deadline */}
         <div className="text-right">
           <span className={`text-xs ${deadline.className}`}>{deadline.text}</span>
@@ -222,7 +230,7 @@ function PoolRow({ pool }: { pool: PoolData }) {
             <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
           </div>
         </div>
-        <div className="grid grid-cols-[3.5rem_4rem_1fr_auto] items-center gap-x-3 text-xs">
+        <div className="grid grid-cols-[3.5rem_4rem_auto_1fr_auto] items-center gap-x-3 text-xs">
           <span className="text-neutral-900">
             <span className="font-bold">{formatNumber(pool.total_points ?? 0)}</span>
             <span className="text-neutral-500 ml-0.5">pts</span>
@@ -232,6 +240,7 @@ function PoolRow({ pool }: { pool: PoolData }) {
             <span className="text-neutral-400">/{pool.memberCount}</span>
           </span>
           <span className="text-neutral-500">{pool.memberCount} members</span>
+          <span className="text-neutral-500">{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
           <span className="flex items-center gap-1.5">
             <span className={deadline.className}>{deadline.text}</span>
             <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -271,6 +280,7 @@ function PublicPoolRow({ pool, onJoin }: { pool: PublicPool; onJoin: (code: stri
             </svg>
             {pool.memberCount} members
           </span>
+          <span>{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
           <span className={deadline.className}>{deadline.text}</span>
         </div>
 
@@ -298,6 +308,7 @@ function PublicPoolRow({ pool, onJoin }: { pool: PublicPool; onJoin: (code: stri
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-xs text-neutral-500">
             <span>{pool.memberCount} members</span>
+            <span>{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
             <span className={deadline.className}>{deadline.text}</span>
           </div>
           <Button

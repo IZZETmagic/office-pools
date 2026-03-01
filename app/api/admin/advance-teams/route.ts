@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveFullBracket, buildActualResultsMap } from '@/lib/bracketResolver'
-import { resolveAllR32Matches, GROUP_LETTERS, calculateGroupStandings } from '@/lib/tournament'
-import type { Team, MatchConductData } from '@/lib/tournament'
+import { resolveAllR32Matches, GROUP_LETTERS, calculateGroupStandings, ROUND_MATCH_STAGES, ROUND_ORDER, ROUND_LABELS } from '@/lib/tournament'
+import type { Team, MatchConductData, RoundKey } from '@/lib/tournament'
 import {
   parsePlaceholder,
   determineWinnerId,
@@ -10,6 +10,9 @@ import {
   type AdvancementResult,
   type ClearResult,
 } from '@/lib/advancement'
+import { sendBatchEmails } from '@/lib/email/send'
+import { roundOpenTemplate } from '@/lib/email/templates'
+import { TOPICS } from '@/lib/email/topics'
 
 // =============================================================
 // POST /api/admin/advance-teams
@@ -80,6 +83,11 @@ export async function POST(request: NextRequest) {
       const koResults = await advanceKnockoutWinner(supabase, km, matches, teams)
       advanced.push(...koResults)
     }
+  }
+
+  // 5. Check progressive pools for round auto-completion (fire-and-forget)
+  if (trigger !== 'match_reset') {
+    checkProgressiveRoundCompletion(supabase, matches, userData.user_id).catch(console.error)
   }
 
   return NextResponse.json({
@@ -323,4 +331,139 @@ async function clearDownstreamTeams(
   }
 
   return cleared
+}
+
+// =============================================================
+// Progressive round auto-completion
+// After match results/advancement, check if any round is fully
+// completed for progressive pools and auto-transition states.
+// =============================================================
+async function checkProgressiveRoundCompletion(
+  supabase: any,
+  matches: any[],
+  userId: string
+) {
+  // Find all progressive pools
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('pool_id, pool_name, tournament_id')
+    .eq('prediction_mode', 'progressive')
+
+  if (!pools || pools.length === 0) return
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+
+  for (const pool of pools) {
+    // Get rounds in 'in_progress' or 'open' state
+    const { data: activeRounds } = await supabase
+      .from('pool_round_states')
+      .select('*')
+      .eq('pool_id', pool.pool_id)
+      .in('state', ['open', 'in_progress'])
+
+    if (!activeRounds || activeRounds.length === 0) continue
+
+    for (const round of activeRounds) {
+      const roundKey = round.round_key as RoundKey
+      const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+      const roundMatches = matches.filter((m: any) =>
+        stages.includes(m.stage) && m.tournament_id === pool.tournament_id
+      )
+
+      if (roundMatches.length === 0) continue
+
+      const allCompleted = roundMatches.every((m: any) => m.is_completed)
+      if (!allCompleted) continue
+
+      // All matches in this round are completed — transition to 'completed'
+      const now = new Date().toISOString()
+      await supabase
+        .from('pool_round_states')
+        .update({
+          state: 'completed',
+          completed_at: now,
+          updated_at: now,
+        })
+        .eq('id', round.id)
+
+      // Auto-open next round if teams are assigned
+      const nextRound = ROUND_ORDER[roundKey]
+      if (!nextRound) continue
+
+      // Check if next round is still locked
+      const { data: nextRoundState } = await supabase
+        .from('pool_round_states')
+        .select('*')
+        .eq('pool_id', pool.pool_id)
+        .eq('round_key', nextRound)
+        .single()
+
+      if (!nextRoundState || nextRoundState.state !== 'locked') continue
+
+      // Check if next round's matches have teams assigned
+      const nextStages = ROUND_MATCH_STAGES[nextRound] ?? []
+      const nextMatches = matches.filter((m: any) =>
+        nextStages.includes(m.stage) && m.tournament_id === pool.tournament_id
+      )
+
+      const allTeamsAssigned = nextMatches.length > 0 && nextMatches.every(
+        (m: any) => m.home_team_id && m.away_team_id
+      )
+
+      if (!allTeamsAssigned) continue
+
+      // Set default deadline: 2 hours before first match of next round
+      const sortedNext = [...nextMatches].sort(
+        (a: any, b: any) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
+      )
+      const firstMatchDate = new Date(sortedNext[0].match_date)
+      const defaultDeadline = new Date(firstMatchDate.getTime() - 2 * 60 * 60 * 1000).toISOString()
+
+      await supabase
+        .from('pool_round_states')
+        .update({
+          state: 'open',
+          deadline: defaultDeadline,
+          opened_at: now,
+          opened_by: userId,
+          updated_at: now,
+        })
+        .eq('id', nextRoundState.id)
+
+      // Send notification emails to pool members
+      const { data: members } = await supabase
+        .from('pool_members')
+        .select('users(email, full_name, username)')
+        .eq('pool_id', pool.pool_id)
+
+      if (members && members.length > 0) {
+        const roundName = ROUND_LABELS[nextRound]
+        const poolUrl = `${appUrl}/pools/${pool.pool_id}?tab=predictions`
+
+        const emails = members
+          .filter((m: any) => m.users?.email)
+          .map((m: any) => {
+            const { subject, html } = roundOpenTemplate({
+              userName: m.users.full_name || m.users.username || 'there',
+              poolName: pool.pool_name,
+              roundName,
+              deadline: defaultDeadline,
+              matchCount: nextMatches.length,
+              poolUrl,
+            })
+            return {
+              to: m.users.email,
+              subject,
+              html,
+              topicId: TOPICS.POOL_ACTIVITY,
+              tags: [{ name: 'category', value: 'round_open' }],
+            }
+          })
+
+        if (emails.length > 0) {
+          sendBatchEmails(emails).catch(console.error)
+        }
+      }
+    }
+  }
 }

@@ -402,10 +402,28 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
         {/* Divider */}
         <hr className="my-6 border-neutral-200" />
 
+        {/* Prediction Mode badge */}
+        {pool.prediction_mode === 'progressive' && (
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm font-medium text-neutral-700">Prediction Mode:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+              Progressive
+            </span>
+          </div>
+        )}
+
         {/* Prediction Deadline */}
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Prediction Deadline
+          {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
         </h3>
+
+        {pool.prediction_mode === 'progressive' && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800">
+              This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
+            </p>
+          </div>
+        )}
 
         {currentDeadline && (
           <div className="mb-4">

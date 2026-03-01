@@ -129,6 +129,61 @@ export const STAGE_LABELS: Record<string, string> = {
 export const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
 // =============================================
+// PROGRESSIVE PREDICTIONS MODE CONSTANTS
+// =============================================
+
+/** Round keys for progressive mode (each is a separate prediction session) */
+export const ROUND_KEYS = [
+  'group',
+  'round_32',
+  'round_16',
+  'quarter_final',
+  'semi_final',
+  'third_place',
+  'final',
+] as const
+
+export type RoundKey = typeof ROUND_KEYS[number]
+
+export const ROUND_LABELS: Record<RoundKey, string> = {
+  group: 'Group Stage',
+  round_32: 'Round of 32',
+  round_16: 'Round of 16',
+  quarter_final: 'Quarter Finals',
+  semi_final: 'Semi Finals',
+  third_place: 'Third Place',
+  final: 'Final',
+}
+
+/** Ordered sequence for state machine: which round follows which */
+export const ROUND_ORDER: Record<RoundKey, RoundKey | null> = {
+  group: 'round_32',
+  round_32: 'round_16',
+  round_16: 'quarter_final',
+  quarter_final: 'semi_final',
+  semi_final: 'third_place',
+  third_place: 'final',
+  final: null,
+}
+
+/** Maps each round_key to the match.stage values it contains */
+export const ROUND_MATCH_STAGES: Record<RoundKey, string[]> = {
+  group: ['group'],
+  round_32: ['round_32'],
+  round_16: ['round_16'],
+  quarter_final: ['quarter_final'],
+  semi_final: ['semi_final'],
+  third_place: ['third_place'],
+  final: ['final'],
+}
+
+/** Get matches for a given round key */
+export function getMatchesForRound(matches: Match[], roundKey: RoundKey): Match[] {
+  const stages = ROUND_MATCH_STAGES[roundKey]
+  return matches.filter(m => stages.includes(m.stage))
+}
+
+// =============================================
 // ROUND OF 32 MATCHUP MAPPING
 // Each entry maps a match_number to the home/away resolution logic
 // =============================================

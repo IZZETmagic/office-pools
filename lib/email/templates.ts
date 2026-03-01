@@ -355,3 +355,130 @@ export function deadlineChangedTemplate(params: {
     }),
   }
 }
+
+// --- Progressive Predictions Templates ---
+
+export function roundOpenTemplate(params: {
+  userName: string
+  poolName: string
+  roundName: string
+  deadline: string
+  matchCount: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, roundName, deadline, matchCount, poolUrl } = params
+  const deadlineFormatted = new Date(deadline).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+  return {
+    subject: `${roundName} predictions now open - ${poolName}`,
+    html: baseTemplate({
+      preheader: `${roundName} is ready! Make your predictions for ${matchCount} matches.`,
+      heading: `${roundName} Predictions Open!`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The <strong>${roundName}</strong> is now open for predictions in <strong>${poolName}</strong>!</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#166534;margin:0 0 8px;font-size:14px;font-weight:600;">${matchCount} matches to predict</p>
+          <p style="color:#166534;margin:0;font-size:13px;">Deadline: ${deadlineFormatted}</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">Head over to the pool and make your predictions before the deadline!</p>
+      `,
+      ctaText: 'Make Predictions',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+export function roundSubmittedTemplate(params: {
+  userName: string
+  poolName: string
+  roundName: string
+  entryName: string
+  matchCount: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, roundName, entryName, matchCount, poolUrl } = params
+  return {
+    subject: `${roundName} predictions submitted - ${poolName}`,
+    html: baseTemplate({
+      preheader: `Your ${roundName} predictions for ${entryName} in ${poolName} are locked in!`,
+      heading: `${roundName} Predictions Submitted!`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Your <strong>${roundName}</strong> predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong> have been submitted.</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#166534;margin:0;font-size:14px;"><strong>${matchCount}</strong> match predictions locked in</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">Good luck! Points will be awarded as matches complete.</p>
+      `,
+      ctaText: 'View Pool',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+export function roundAutoSubmittedTemplate(params: {
+  userName: string
+  poolName: string
+  roundName: string
+  entryName: string
+  matchCount: number
+  totalRoundMatches: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, roundName, entryName, matchCount, totalRoundMatches, poolUrl } = params
+  return {
+    subject: `${roundName} predictions auto-submitted - ${poolName}`,
+    html: baseTemplate({
+      preheader: `Your draft ${roundName} predictions for ${entryName} were auto-submitted.`,
+      heading: `${roundName} Auto-Submitted`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The deadline for <strong>${roundName}</strong> in <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.</p>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#92400e;margin:0;font-size:14px;"><strong>${matchCount}</strong> of <strong>${totalRoundMatches}</strong> matches had predictions saved</p>
+          ${matchCount < totalRoundMatches ? `<p style="color:#92400e;margin:4px 0 0;font-size:13px;">Matches without predictions will score 0 points.</p>` : ''}
+        </div>
+      `,
+      ctaText: 'View Pool',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+export function roundDeadlineReminderTemplate(params: {
+  userName: string
+  poolName: string
+  roundName: string
+  deadline: string
+  unsubmittedEntries: string[]
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, roundName, deadline, unsubmittedEntries, poolUrl } = params
+  const deadlineFormatted = new Date(deadline).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+  const entriesList = unsubmittedEntries.map(e => `<li style="color:#92400e;font-size:13px;">${e}</li>`).join('')
+  return {
+    subject: `Reminder: ${roundName} predictions closing soon - ${poolName}`,
+    html: baseTemplate({
+      preheader: `Don't miss out! ${roundName} predictions close soon.`,
+      heading: `${roundName} Deadline Approaching`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The <strong>${roundName}</strong> deadline for <strong>${poolName}</strong> is approaching.</p>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#92400e;margin:0 0 8px;font-weight:600;">Deadline: ${deadlineFormatted}</p>
+          ${unsubmittedEntries.length > 0 ? `
+          <p style="color:#92400e;margin:0 0 4px;font-size:13px;">Unsubmitted entries:</p>
+          <ul style="margin:0;padding-left:20px;">${entriesList}</ul>
+          ` : ''}
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">Submit your predictions before time runs out!</p>
+      `,
+      ctaText: 'Submit Predictions',
+      ctaUrl: poolUrl,
+    }),
+  }
+}

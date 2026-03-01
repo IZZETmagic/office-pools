@@ -11,6 +11,7 @@ export type PoolData = {
   max_entries_per_user: number
   tournament_id: string
   prediction_deadline: string | null
+  prediction_mode: 'full_tournament' | 'progressive'
   created_at: string
   updated_at: string
 }
@@ -173,4 +174,38 @@ export type ExistingPrediction = {
   predicted_away_pso: number | null
   predicted_winner_team_id: string | null
   prediction_id: string
+}
+
+// =====================
+// PROGRESSIVE MODE TYPES
+// =====================
+
+export type RoundKey = 'group' | 'round_32' | 'round_16' | 'quarter_final' | 'semi_final' | 'third_place' | 'final'
+
+export type RoundStateValue = 'locked' | 'open' | 'in_progress' | 'completed'
+
+export type PoolRoundState = {
+  id: string
+  pool_id: string
+  round_key: RoundKey
+  state: RoundStateValue
+  deadline: string | null
+  opened_at: string | null
+  closed_at: string | null
+  completed_at: string | null
+  opened_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EntryRoundSubmission = {
+  id: string
+  entry_id: string
+  round_key: RoundKey
+  has_submitted: boolean
+  submitted_at: string | null
+  auto_submitted: boolean
+  prediction_count: number
+  created_at: string
+  updated_at: string
 }

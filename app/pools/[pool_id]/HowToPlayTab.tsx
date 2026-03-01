@@ -6,6 +6,7 @@ type HowToPlayTabProps = {
   poolName: string
   maxEntries: number
   isPastDeadline: boolean
+  predictionMode?: 'full_tournament' | 'progressive'
 }
 
 function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
@@ -17,7 +18,8 @@ function Step({ number, title, children }: { number: number; title: string; chil
   )
 }
 
-export function HowToPlayTab({ poolName, maxEntries, isPastDeadline }: HowToPlayTabProps) {
+export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionMode = 'full_tournament' }: HowToPlayTabProps) {
+  const isProgressive = predictionMode === 'progressive'
   return (
     <div>
       {/* Welcome */}
@@ -60,46 +62,82 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline }: HowToPlay
       <Card className="mb-6">
         <h4 className="text-lg font-semibold text-neutral-900 mb-1">Making Predictions</h4>
         <p className="text-xs text-neutral-500 mb-4">
-          {isPastDeadline
+          {isPastDeadline && !isProgressive
             ? 'The prediction deadline has passed. You can still view your predictions.'
-            : 'Head to the Predictions tab to start filling in your predictions.'}
+            : isProgressive
+              ? 'This pool uses progressive predictions. You predict round by round as the tournament unfolds.'
+              : 'Head to the Predictions tab to start filling in your predictions.'}
         </p>
-        <div className="space-y-3">
-          <Step number={1} title="Go to Predictions">
-            Click the <strong>Predictions</strong> tab to see all your prediction entries.
-          </Step>
-          <Step number={2} title="Select an entry">
-            {maxEntries > 1
-              ? <>This pool allows up to <strong>{maxEntries} entries</strong> per player. Select an entry to edit, or create a new one.</>
-              : <>Select your entry to start making predictions.</>}
-          </Step>
-          <Step number={3} title="Predict match scores">
-            For each match, enter your predicted score for both teams. Your predictions auto-save as you type.
-          </Step>
-          <Step number={4} title="Submit your predictions">
-            When you&apos;re ready, submit your entry. Once submitted, your predictions are locked and cannot be edited. In special circumstances, the pool administrator can unlock your entry to allow changes.
-          </Step>
-        </div>
+        {isProgressive ? (
+          <div className="space-y-3">
+            <Step number={1} title="Go to Predictions">
+              Click the <strong>Predictions</strong> tab. You&apos;ll see a round selector showing all tournament rounds.
+            </Step>
+            <Step number={2} title="Predict the current round">
+              Select the currently open round and enter your score predictions. For knockout rounds, you&apos;ll see the <strong>actual qualified teams</strong> &mdash; no guessing needed.
+            </Step>
+            <Step number={3} title="Submit before the deadline">
+              Each round has its own deadline. Submit your predictions before the deadline. Predictions auto-save as drafts, and drafts are auto-submitted when the deadline passes.
+            </Step>
+            <Step number={4} title="Repeat for each round">
+              After a round completes and the next round&apos;s teams are confirmed, the new round will open. You&apos;ll be notified by email when each round opens.
+            </Step>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Step number={1} title="Go to Predictions">
+              Click the <strong>Predictions</strong> tab to see all your prediction entries.
+            </Step>
+            <Step number={2} title="Select an entry">
+              {maxEntries > 1
+                ? <>This pool allows up to <strong>{maxEntries} entries</strong> per player. Select an entry to edit, or create a new one.</>
+                : <>Select your entry to start making predictions.</>}
+            </Step>
+            <Step number={3} title="Predict match scores">
+              For each match, enter your predicted score for both teams. Your predictions auto-save as you type.
+            </Step>
+            <Step number={4} title="Submit your predictions">
+              When you&apos;re ready, submit your entry. Once submitted, your predictions are locked and cannot be edited. In special circumstances, the pool administrator can unlock your entry to allow changes.
+            </Step>
+          </div>
+        )}
       </Card>
 
       {/* Deadlines & Locking */}
       <Card className="mb-6">
         <h4 className="text-lg font-semibold text-neutral-900 mb-1">Deadlines & Locking</h4>
         <p className="text-xs text-neutral-500 mb-4">Important timing information for your predictions.</p>
-        <div className="space-y-3 text-sm text-neutral-700">
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 text-warning-600 mt-0.5">&#9888;</span>
-            <p>The pool administrator sets a <strong>prediction deadline</strong>. Once the deadline passes, all predictions are locked and no further changes can be made.</p>
+        {isProgressive ? (
+          <div className="space-y-3 text-sm text-neutral-700">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-warning-600 mt-0.5">&#9888;</span>
+              <p>Each round has its own <strong>deadline</strong> set by the pool administrator. Deadlines are typically before the first match of each round.</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-success-600 mt-0.5">&#10003;</span>
+              <p>You can edit predictions for the current open round until the deadline. Once submitted or past deadline, that round&apos;s predictions are locked.</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-primary-600 mt-0.5">&#128274;</span>
+              <p>If you miss a round&apos;s deadline without submitting, you&apos;ll score <strong>0 points</strong> for that round. You can still predict future rounds.</p>
+            </div>
           </div>
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 text-success-600 mt-0.5">&#10003;</span>
-            <p>You can edit and re-submit your predictions as many times as you like <strong>before the deadline</strong>.</p>
+        ) : (
+          <div className="space-y-3 text-sm text-neutral-700">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-warning-600 mt-0.5">&#9888;</span>
+              <p>The pool administrator sets a <strong>prediction deadline</strong>. Once the deadline passes, all predictions are locked and no further changes can be made.</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-success-600 mt-0.5">&#10003;</span>
+              <p>You can edit and re-submit your predictions as many times as you like <strong>before the deadline</strong>.</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-primary-600 mt-0.5">&#128274;</span>
+              <p>After the deadline, predictions become visible to all pool members and scoring begins as matches are played.</p>
+            </div>
           </div>
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 text-primary-600 mt-0.5">&#128274;</span>
-            <p>After the deadline, predictions become visible to all pool members and scoring begins as matches are played.</p>
-          </div>
-        </div>
+        )}
       </Card>
 
       {/* How Scoring Works */}
@@ -122,7 +160,12 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline }: HowToPlay
           </div>
           <div>
             <p className="font-semibold text-neutral-900 mb-1">Bonus Points</p>
-            <p>Extra points are available for correctly predicting group standings, knockout bracket pairings, and tournament outcomes (champion, runner-up, third place).</p>
+            <p>
+              Extra points are available for correctly predicting group standings
+              {isProgressive
+                ? ' and tournament outcomes (champion, runner-up, third place).'
+                : ', knockout bracket pairings, and tournament outcomes (champion, runner-up, third place).'}
+            </p>
           </div>
         </div>
         <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">

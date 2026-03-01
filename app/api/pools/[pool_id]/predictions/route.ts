@@ -69,7 +69,7 @@ export async function GET(
   // Get pool details for deadline
   const { data: pool } = await supabase
     .from('pools')
-    .select('prediction_deadline, tournament_id')
+    .select('prediction_deadline, tournament_id, prediction_mode')
     .eq('pool_id', pool_id)
     .single()
 
@@ -83,7 +83,37 @@ export async function GET(
     ? new Date(pool.prediction_deadline) < new Date()
     : false
 
-  const canEdit = !entry.has_submitted_predictions && !entry.predictions_locked && !isPastDeadline
+  // For progressive mode, include round-level status
+  let roundStatus = null
+  if (pool?.prediction_mode === 'progressive') {
+    const { data: roundStates } = await supabase
+      .from('pool_round_states')
+      .select('*')
+      .eq('pool_id', pool_id)
+      .order('created_at', { ascending: true })
+
+    const { data: roundSubmissions } = await supabase
+      .from('entry_round_submissions')
+      .select('*')
+      .eq('entry_id', entry.entry_id)
+
+    const currentRound = (roundStates ?? []).find(rs => rs.state === 'open') ?? null
+    const currentRoundDeadline = currentRound?.deadline ?? null
+    const isPastRoundDeadline = currentRoundDeadline
+      ? new Date(currentRoundDeadline) < new Date()
+      : false
+
+    roundStatus = {
+      roundStates: roundStates ?? [],
+      roundSubmissions: roundSubmissions ?? [],
+      currentRound,
+      isPastRoundDeadline,
+    }
+  }
+
+  const canEdit = pool?.prediction_mode === 'progressive'
+    ? !entry.predictions_locked // Progressive: per-round edit checks done separately
+    : !entry.has_submitted_predictions && !entry.predictions_locked && !isPastDeadline
 
   return NextResponse.json({
     status: entry.has_submitted_predictions ? 'submitted' : 'draft',
@@ -96,6 +126,8 @@ export async function GET(
     isPastDeadline,
     entryId: entry.entry_id,
     entryName: entry.entry_name,
+    predictionMode: pool?.prediction_mode ?? 'full_tournament',
+    ...(roundStatus ? { roundStatus } : {}),
   })
 }
 
@@ -132,21 +164,28 @@ export async function POST(
   // Check pool deadline
   const { data: pool } = await supabase
     .from('pools')
-    .select('prediction_deadline')
+    .select('prediction_deadline, prediction_mode')
     .eq('pool_id', pool_id)
     .single()
 
-  const isPastDeadline = pool?.prediction_deadline
-    ? new Date(pool.prediction_deadline) < new Date()
-    : false
+  if (pool?.prediction_mode === 'progressive') {
+    // For progressive mode, check round-specific deadline
+    // The roundKey is sent in the body, but we read it after parsing
+    // For now, we validate after parsing the body below
+  } else {
+    const isPastDeadline = pool?.prediction_deadline
+      ? new Date(pool.prediction_deadline) < new Date()
+      : false
 
-  if (isPastDeadline) {
-    return NextResponse.json({ error: 'Prediction deadline has passed' }, { status: 403 })
+    if (isPastDeadline) {
+      return NextResponse.json({ error: 'Prediction deadline has passed' }, { status: 403 })
+    }
   }
 
   const body = await request.json()
-  const { predictions, entryId } = body as {
+  const { predictions, entryId, roundKey } = body as {
     entryId: string
+    roundKey?: string
     predictions: {
       matchId: string
       predictionId?: string
@@ -162,6 +201,37 @@ export async function POST(
     return NextResponse.json({ error: 'entryId is required' }, { status: 400 })
   }
 
+  // For progressive mode, validate round-specific deadline
+  if (pool?.prediction_mode === 'progressive' && roundKey) {
+    const { data: roundState } = await supabase
+      .from('pool_round_states')
+      .select('state, deadline')
+      .eq('pool_id', pool_id)
+      .eq('round_key', roundKey)
+      .single()
+
+    if (roundState) {
+      if (roundState.state !== 'open') {
+        return NextResponse.json({ error: `Round is not open for predictions` }, { status: 403 })
+      }
+      if (roundState.deadline && new Date(roundState.deadline) < new Date()) {
+        return NextResponse.json({ error: 'Round deadline has passed' }, { status: 403 })
+      }
+    }
+
+    // Check if already submitted for this round
+    const { data: roundSubmission } = await supabase
+      .from('entry_round_submissions')
+      .select('has_submitted')
+      .eq('entry_id', entryId)
+      .eq('round_key', roundKey)
+      .single()
+
+    if (roundSubmission?.has_submitted) {
+      return NextResponse.json({ error: 'Predictions already submitted for this round' }, { status: 403 })
+    }
+  }
+
   // Verify entry belongs to this user
   const { data: entry } = await supabase
     .from('pool_entries')
@@ -172,7 +242,8 @@ export async function POST(
 
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
 
-  if (entry.has_submitted_predictions) {
+  // For full tournament mode, check global submission status
+  if (pool?.prediction_mode !== 'progressive' && entry.has_submitted_predictions) {
     return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
   }
 

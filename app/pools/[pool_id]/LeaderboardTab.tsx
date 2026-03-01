@@ -23,6 +23,7 @@ type LeaderboardTabProps = {
   poolSettings: PoolSettings
   maxEntriesPerUser: number
   currentUserId: string
+  predictionMode?: 'full_tournament' | 'progressive'
 }
 
 // =============================================
@@ -94,6 +95,7 @@ export function LeaderboardTab({
   poolSettings,
   maxEntriesPerUser,
   currentUserId,
+  predictionMode = 'full_tournament',
 }: LeaderboardTabProps) {
   const isMultiEntry = maxEntriesPerUser > 1
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
@@ -146,6 +148,7 @@ export function LeaderboardTab({
         conductData,
         settings: poolSettings,
         tournamentAwards: null,
+        predictionMode,
       })
 
       // Convert BonusScoreEntry[] to BonusScoreData[]

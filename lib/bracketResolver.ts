@@ -11,6 +11,8 @@ import {
   getKnockoutLoser,
   getBest8ThirdPlaceTeams,
   rankThirdPlaceTeams,
+  type RoundKey,
+  ROUND_MATCH_STAGES,
 } from './tournament'
 
 export type BracketResult = {
@@ -140,6 +142,55 @@ export function resolveFullBracket(params: {
     runnerUp,
     thirdPlace: thirdPlaceWinner,
     qualifiedTeamIds,
+  }
+}
+
+/**
+ * For progressive mode: resolve knockout matches using actual team assignments
+ * from the matches table (set by advance-teams flow) rather than user predictions.
+ * Returns a map of match_number → { home, away } with team info as GroupStanding-like objects.
+ */
+export function resolveMatchesFromActual(
+  matches: Match[],
+  teams: Team[],
+  roundKey: RoundKey
+): Map<number, { home: GroupStanding | null; away: GroupStanding | null }> {
+  const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+  const stageMatches = matches.filter(m => stages.includes(m.stage))
+  const teamMap = new Map(teams.map(t => [t.team_id, t]))
+
+  const result = new Map<number, { home: GroupStanding | null; away: GroupStanding | null }>()
+
+  for (const match of stageMatches) {
+    const homeTeam = match.home_team_id ? teamMap.get(match.home_team_id) : null
+    const awayTeam = match.away_team_id ? teamMap.get(match.away_team_id) : null
+
+    result.set(match.match_number, {
+      home: homeTeam ? teamToStanding(homeTeam) : null,
+      away: awayTeam ? teamToStanding(awayTeam) : null,
+    })
+  }
+
+  return result
+}
+
+/** Convert a Team to a GroupStanding-like object for use in knockout forms */
+function teamToStanding(team: Team): GroupStanding {
+  return {
+    team_id: team.team_id,
+    country_name: team.country_name,
+    country_code: team.country_code,
+    flag_url: team.flag_url,
+    group_letter: team.group_letter,
+    fifa_ranking_points: team.fifa_ranking_points,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDifference: 0,
+    points: 0,
   }
 }
 

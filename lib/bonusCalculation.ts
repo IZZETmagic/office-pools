@@ -55,8 +55,9 @@ export function calculateAllBonusPoints(params: {
   conductData: MatchConductData[]
   settings: PoolSettings
   tournamentAwards: TournamentAwards | null
+  predictionMode?: 'full_tournament' | 'progressive'
 }): BonusScoreEntry[] {
-  const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards } = params
+  const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards, predictionMode = 'full_tournament' } = params
 
   const bonuses: BonusScoreEntry[] = []
 
@@ -78,6 +79,12 @@ export function calculateAllBonusPoints(params: {
     conductData,
   })
 
+  // For progressive mode, build knockout team map from actual match data
+  // (users see real teams, so match winner bonus should use actual pairings)
+  const effectivePredictedBracket = predictionMode === 'progressive'
+    ? { ...predictedBracket, knockoutTeamMap: actualBracket.knockoutTeamMap }
+    : predictedBracket
+
   // A. Group Standings Bonus
   bonuses.push(...calculateGroupStandingsBonuses(
     entryId, matches, predictedBracket, actualBracket, settings
@@ -88,19 +95,19 @@ export function calculateAllBonusPoints(params: {
     entryId, matches, predictedBracket, actualBracket, settings
   ))
 
-  // C. Bracket Pairing Bonus (R32)
+  // C. Bracket Pairing Bonus (R32) - skipped for progressive (points = 0 via settings)
   bonuses.push(...calculateBracketPairingBonuses(
     entryId, matches, predictedBracket, actualBracket, settings
   ))
 
   // D. Match Winner Bonus (all knockout matches)
   bonuses.push(...calculateMatchWinnerBonuses(
-    entryId, matches, memberPredictions, actualResultsMap, predictedBracket, actualBracket, settings
+    entryId, matches, memberPredictions, actualResultsMap, effectivePredictedBracket, actualBracket, settings
   ))
 
   // E. Tournament Podium Bonus
   bonuses.push(...calculateTournamentPodiumBonuses(
-    entryId, predictedBracket, tournamentAwards, settings
+    entryId, matches, memberPredictions, effectivePredictedBracket, tournamentAwards, settings
   ))
 
   return bonuses
@@ -345,15 +352,50 @@ function calculateMatchWinnerBonuses(
 
 function calculateTournamentPodiumBonuses(
   entryId: string,
+  matches: MatchWithResult[],
+  memberPredictions: PredictionMap,
   predictedBracket: BracketResult,
   tournamentAwards: TournamentAwards | null,
   settings: PoolSettings
 ): BonusScoreEntry[] {
   const bonuses: BonusScoreEntry[] = []
 
+  // Derive predicted podium: use bracket resolution for champion/runner-up/third-place.
+  // For progressive mode, the bracket's knockoutTeamMap uses actual teams,
+  // so getKnockoutWinner on the final/third-place matches gives the correct predictions.
+  let predictedChampion = predictedBracket.champion
+  let predictedRunnerUp = predictedBracket.runnerUp
+  let predictedThirdPlace = predictedBracket.thirdPlace
+
+  // If bracket resolution didn't resolve podium (progressive mode edge case),
+  // try deriving directly from user's final/third-place predictions
+  if (!predictedChampion || !predictedRunnerUp) {
+    const finalMatch = matches.find(m => m.stage === 'final')
+    if (finalMatch) {
+      const finalTeams = predictedBracket.knockoutTeamMap.get(finalMatch.match_number)
+      if (finalTeams?.home && finalTeams?.away) {
+        const winner = getKnockoutWinner(finalMatch.match_id, memberPredictions, finalTeams.home, finalTeams.away)
+        const loser = winner?.team_id === finalTeams.home.team_id ? finalTeams.away : finalTeams.home
+        if (winner) predictedChampion = winner
+        if (loser) predictedRunnerUp = loser
+      }
+    }
+  }
+
+  if (!predictedThirdPlace) {
+    const thirdPlaceMatch = matches.find(m => m.stage === 'third_place')
+    if (thirdPlaceMatch) {
+      const thirdTeams = predictedBracket.knockoutTeamMap.get(thirdPlaceMatch.match_number)
+      if (thirdTeams?.home && thirdTeams?.away) {
+        const winner = getKnockoutWinner(thirdPlaceMatch.match_id, memberPredictions, thirdTeams.home, thirdTeams.away)
+        if (winner) predictedThirdPlace = winner
+      }
+    }
+  }
+
   // Champion
-  if (tournamentAwards?.champion_team_id && predictedBracket.champion) {
-    if (predictedBracket.champion.team_id === tournamentAwards.champion_team_id) {
+  if (tournamentAwards?.champion_team_id && predictedChampion) {
+    if (predictedChampion.team_id === tournamentAwards.champion_team_id) {
       const points = settings.bonus_champion_correct ?? 1000
       if (points > 0) {
         bonuses.push({
@@ -363,15 +405,15 @@ function calculateTournamentPodiumBonuses(
           related_group_letter: null,
           related_match_id: null,
           points_earned: points,
-          description: `Champion correct: ${predictedBracket.champion.country_name}`,
+          description: `Champion correct: ${predictedChampion.country_name}`,
         })
       }
     }
   }
 
   // Runner-up
-  if (tournamentAwards?.runner_up_team_id && predictedBracket.runnerUp) {
-    if (predictedBracket.runnerUp.team_id === tournamentAwards.runner_up_team_id) {
+  if (tournamentAwards?.runner_up_team_id && predictedRunnerUp) {
+    if (predictedRunnerUp.team_id === tournamentAwards.runner_up_team_id) {
       const points = settings.bonus_second_place_correct ?? 25
       if (points > 0) {
         bonuses.push({
@@ -381,15 +423,15 @@ function calculateTournamentPodiumBonuses(
           related_group_letter: null,
           related_match_id: null,
           points_earned: points,
-          description: `Runner-up correct: ${predictedBracket.runnerUp.country_name}`,
+          description: `Runner-up correct: ${predictedRunnerUp.country_name}`,
         })
       }
     }
   }
 
   // Third place
-  if (tournamentAwards?.third_place_team_id && predictedBracket.thirdPlace) {
-    if (predictedBracket.thirdPlace.team_id === tournamentAwards.third_place_team_id) {
+  if (tournamentAwards?.third_place_team_id && predictedThirdPlace) {
+    if (predictedThirdPlace.team_id === tournamentAwards.third_place_team_id) {
       const points = settings.bonus_third_place_correct ?? 25
       if (points > 0) {
         bonuses.push({
@@ -399,7 +441,7 @@ function calculateTournamentPodiumBonuses(
           related_group_letter: null,
           related_match_id: null,
           points_earned: points,
-          description: `Third place correct: ${predictedBracket.thirdPlace.country_name}`,
+          description: `Third place correct: ${predictedThirdPlace.country_name}`,
         })
       }
     }

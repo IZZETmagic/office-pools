@@ -36,6 +36,7 @@ export default async function PoolsPage() {
         status,
         is_private,
         prediction_deadline,
+        prediction_mode,
         tournament_id,
         created_at
       ),

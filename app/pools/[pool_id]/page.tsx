@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PoolDetail } from './PoolDetail'
 import type {
@@ -12,6 +12,8 @@ import type {
   ExistingPrediction,
   PlayerScoreData,
   BonusScoreData,
+  PoolRoundState,
+  EntryRoundSubmission,
 } from './types'
 
 export default async function PoolPage({
@@ -158,6 +160,48 @@ export default async function PoolPage({
         .eq('entry_id', defaultEntry.entry_id)
     : { data: [] }
 
+  // For progressive pools: fetch round states and submissions
+  let roundStates: PoolRoundState[] = []
+  let roundSubmissions: EntryRoundSubmission[] = []
+  if (pool.prediction_mode === 'progressive') {
+    const [roundStatesRes, roundSubsRes] = await Promise.all([
+      supabase
+        .from('pool_round_states')
+        .select('*')
+        .eq('pool_id', pool_id)
+        .order('created_at', { ascending: true }),
+      defaultEntry
+        ? supabase
+            .from('entry_round_submissions')
+            .select('*')
+            .eq('entry_id', defaultEntry.entry_id)
+        : Promise.resolve({ data: [] }),
+    ])
+    roundStates = (roundStatesRes.data || []) as PoolRoundState[]
+    roundSubmissions = (roundSubsRes.data || []) as EntryRoundSubmission[]
+
+    // Auto-seed missing round states (handles pools created before feature deploy or RLS insert failures)
+    if (roundStates.length === 0) {
+      const adminClient = createAdminClient()
+      const roundKeys = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+      const now = new Date().toISOString()
+      const seedRows = roundKeys.map(key => ({
+        pool_id: pool_id,
+        round_key: key,
+        state: key === 'group' ? 'open' : 'locked',
+        deadline: key === 'group' && pool.prediction_deadline ? pool.prediction_deadline : null,
+        opened_at: key === 'group' ? now : null,
+      }))
+      const { data: seeded } = await adminClient
+        .from('pool_round_states')
+        .insert(seedRows)
+        .select('*')
+      if (seeded) {
+        roundStates = seeded as PoolRoundState[]
+      }
+    }
+  }
+
   // Fetch all predictions (needed for admin tabs + leaderboard bonus computation)
   let allPredictions: PredictionData[] = []
   if (allEntryIds.length > 0) {
@@ -203,6 +247,8 @@ export default async function PoolPage({
       userEntries={userEntries}
       isSuperAdmin={userData.is_super_admin ?? false}
       hasSeenHowToPlay={membership.has_seen_how_to_play ?? false}
+      roundStates={roundStates}
+      roundSubmissions={roundSubmissions}
     />
   )
 }

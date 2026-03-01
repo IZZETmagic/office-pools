@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   // Build query for public pools
   let query = supabase
     .from('pools')
-    .select('pool_id, pool_name, pool_code, description, status, prediction_deadline, created_at')
+    .select('pool_id, pool_name, pool_code, description, status, prediction_deadline, prediction_mode, created_at')
     .eq('is_private', false)
 
   if (q.trim()) {

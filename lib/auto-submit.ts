@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
-import { predictionsAutoSubmittedTemplate } from '@/lib/email/templates'
+import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { ROUND_LABELS, ROUND_MATCH_STAGES, type RoundKey } from '@/lib/tournament'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
@@ -165,6 +166,167 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
 
   if (result.submitted > 0) {
     console.log(`[AutoSubmit] Auto-submitted ${result.submitted} entries across ${result.poolsChecked} pools`)
+  }
+
+  return result
+}
+
+/**
+ * Auto-submit progressive round predictions for rounds whose deadline has passed.
+ * For each progressive pool: find rounds in 'open' state with past deadline,
+ * auto-submit entries that have predictions, transition round to 'in_progress'.
+ */
+export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
+  const supabase = createAdminClient()
+  const result: AutoSubmitResult = { poolsChecked: 0, submitted: 0, errors: [] }
+
+  try {
+    // 1. Find open rounds with past deadlines
+    const { data: openRounds, error: roundsError } = await supabase
+      .from('pool_round_states')
+      .select('id, pool_id, round_key, deadline')
+      .eq('state', 'open')
+      .lt('deadline', new Date().toISOString())
+      .not('deadline', 'is', null)
+
+    if (roundsError) {
+      result.errors.push(`Failed to fetch open rounds: ${roundsError.message}`)
+      return result
+    }
+
+    if (!openRounds || openRounds.length === 0) return result
+
+    // Group by pool
+    const poolRounds = new Map<string, typeof openRounds>()
+    for (const round of openRounds) {
+      const existing = poolRounds.get(round.pool_id) ?? []
+      existing.push(round)
+      poolRounds.set(round.pool_id, existing)
+    }
+
+    result.poolsChecked = poolRounds.size
+
+    for (const [poolId, rounds] of poolRounds) {
+      // Get pool info
+      const { data: pool } = await supabase
+        .from('pools')
+        .select('pool_id, pool_name, tournament_id')
+        .eq('pool_id', poolId)
+        .single()
+
+      if (!pool) continue
+
+      // Get all entries for this pool
+      const { data: members } = await supabase
+        .from('pool_members')
+        .select('member_id, users(email, full_name, username)')
+        .eq('pool_id', poolId)
+
+      const { data: entries } = await supabase
+        .from('pool_entries')
+        .select('entry_id, entry_name, member_id')
+        .in('member_id', (members ?? []).map(m => m.member_id))
+
+      if (!entries || entries.length === 0) continue
+
+      const memberMap = new Map((members ?? []).map((m: any) => [m.member_id, m]))
+
+      for (const round of rounds) {
+        const roundKey = round.round_key as RoundKey
+        const roundName = ROUND_LABELS[roundKey] ?? roundKey
+        const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+
+        // Get match count for this round
+        const { count: roundMatchCount } = await supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .eq('tournament_id', pool.tournament_id)
+          .in('stage', stages)
+
+        // Find entries without submission for this round that have predictions
+        for (const entry of entries) {
+          // Check if already submitted
+          const { data: existingSub } = await supabase
+            .from('entry_round_submissions')
+            .select('id, has_submitted')
+            .eq('entry_id', entry.entry_id)
+            .eq('round_key', roundKey)
+            .maybeSingle()
+
+          if (existingSub?.has_submitted) continue
+
+          // Count predictions for this round's matches
+          const { data: matchIds } = await supabase
+            .from('matches')
+            .select('match_id')
+            .eq('tournament_id', pool.tournament_id)
+            .in('stage', stages)
+
+          if (!matchIds || matchIds.length === 0) continue
+
+          const { count: predCount } = await supabase
+            .from('predictions')
+            .select('*', { count: 'exact', head: true })
+            .eq('entry_id', entry.entry_id)
+            .in('match_id', matchIds.map(m => m.match_id))
+
+          if (!predCount || predCount === 0) continue
+
+          // Auto-submit: upsert entry_round_submissions
+          const now = new Date().toISOString()
+          await supabase
+            .from('entry_round_submissions')
+            .upsert({
+              ...(existingSub?.id ? { id: existingSub.id } : {}),
+              entry_id: entry.entry_id,
+              round_key: roundKey,
+              has_submitted: true,
+              submitted_at: now,
+              auto_submitted: true,
+              prediction_count: predCount,
+              updated_at: now,
+            }, { onConflict: 'entry_id,round_key' })
+
+          result.submitted++
+
+          // Send notification email
+          const member = memberMap.get(entry.member_id) as any
+          if (member?.users?.email) {
+            const { subject, html } = roundAutoSubmittedTemplate({
+              userName: member.users.full_name || member.users.username || 'there',
+              poolName: pool.pool_name,
+              entryName: entry.entry_name,
+              roundName,
+              matchCount: predCount,
+              totalRoundMatches: roundMatchCount ?? 0,
+              poolUrl: `${APP_URL}/pools/${poolId}?tab=predictions`,
+            })
+
+            sendBatchEmails([{
+              to: member.users.email,
+              subject,
+              html,
+              topicId: TOPICS.PREDICTIONS,
+            }]).catch(console.error)
+          }
+        }
+
+        // Transition round to in_progress
+        await supabase
+          .from('pool_round_states')
+          .update({
+            state: 'in_progress',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', round.id)
+      }
+    }
+  } catch (err) {
+    result.errors.push(`Unexpected error: ${err}`)
+  }
+
+  if (result.submitted > 0) {
+    console.log(`[AutoSubmit] Progressive: auto-submitted ${result.submitted} round entries`)
   }
 
   return result

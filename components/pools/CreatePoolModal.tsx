@@ -62,6 +62,7 @@ const SCORING_DEFAULTS = {
 
 const STEPS = [
   { key: 'tournament', label: 'Tournament' },
+  { key: 'pool_type', label: 'Pool Type' },
   { key: 'details', label: 'Details' },
   { key: 'settings', label: 'Settings' },
 ] as const
@@ -88,6 +89,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const [description, setDescription] = useState('')
 
   // Step 3: Pool Settings
+  const [predictionMode, setPredictionMode] = useState<'full_tournament' | 'progressive'>('full_tournament')
   const [isPrivate, setIsPrivate] = useState(false)
   const [maxParticipants, setMaxParticipants] = useState('0')
   const [maxEntries, setMaxEntries] = useState('1')
@@ -207,6 +209,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         tournament_id: selectedTournamentId,
         admin_user_id: userData.user_id,
         prediction_deadline: deadline.toISOString(),
+        prediction_mode: predictionMode,
         status: 'open',
         is_private: isPrivate,
         max_participants: maxP > 0 ? maxP : null,
@@ -267,6 +270,32 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       return
     }
 
+    // 4. For progressive pools: seed round states and disable bracket pairing bonus
+    if (predictionMode === 'progressive') {
+      const roundKeys = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+      const roundStates = roundKeys.map(key => ({
+        pool_id: newPool.pool_id,
+        round_key: key,
+        state: key === 'group' ? 'open' : 'locked',
+        deadline: key === 'group' ? deadline.toISOString() : null,
+        opened_at: key === 'group' ? new Date().toISOString() : null,
+      }))
+
+      const { error: roundError } = await supabase
+        .from('pool_round_states')
+        .insert(roundStates)
+
+      if (roundError) {
+        console.error('Failed to create round states:', roundError.message)
+      }
+
+      // Disable bracket pairing bonus for progressive pools (users already know pairings)
+      await supabase
+        .from('pool_settings')
+        .update({ bonus_correct_bracket_pairing: 0 })
+        .eq('pool_id', newPool.pool_id)
+    }
+
     setLoading(false)
     showToast(`Pool "${poolName.trim()}" created! Code: ${newPool.pool_code}`, 'success')
     onSuccess?.()
@@ -280,6 +309,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   function canProceed() {
     if (currentStep === 'tournament') return canProceedFromTournament
+    if (currentStep === 'pool_type') return true // always has a default selection
     if (currentStep === 'details') return canProceedFromDetails
     return true
   }
@@ -353,7 +383,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                     let canGo = false
                     if (idx <= currentStepIndex) canGo = true
                     else if (idx === 1 && canProceedFromTournament) canGo = true
-                    else if (idx === 2 && canProceedFromTournament && canProceedFromDetails) canGo = true
+                    else if (idx === 2 && canProceedFromTournament) canGo = true
+                    else if (idx === 3 && canProceedFromTournament && canProceedFromDetails) canGo = true
                     if (canGo && idx !== currentStepIndex) {
                       setSlideDirection(idx > currentStepIndex ? 'forward' : 'back')
                       setSlideKey((k) => k + 1)
@@ -467,7 +498,65 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 </div>
               )}
 
-              {/* STEP 2: Details */}
+              {/* STEP 2: Pool Type */}
+              {currentStep === 'pool_type' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-neutral-600">How will members make their predictions?</p>
+
+                  <div className="space-y-3">
+                    {([
+                      {
+                        value: 'full_tournament' as const,
+                        label: 'Full Tournament',
+                        desc: 'Members predict all matches upfront before the tournament starts. They must predict which teams qualify for the knockout rounds based on their group stage predictions.',
+                        icon: (
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        value: 'progressive' as const,
+                        label: 'Progressive',
+                        desc: 'Members predict round-by-round as teams advance. After each round completes, the next round opens with actual qualified teams and matchups.',
+                        icon: (
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.69z" />
+                          </svg>
+                        ),
+                      },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setPredictionMode(opt.value)}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                          predictionMode === opt.value
+                            ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
+                            : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={predictionMode === opt.value ? 'text-success-600' : 'text-neutral-400'}>{opt.icon}</span>
+                          <h3 className="text-sm font-semibold text-neutral-900">{opt.label}</h3>
+                        </div>
+                        <p className="text-xs text-neutral-500 mt-1.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <p className="text-xs text-amber-800">
+                      This cannot be changed after your pool is created.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Details */}
               {currentStep === 'details' && (
                 <div className="space-y-4">
                   <p className="text-sm text-neutral-600">Give your pool a name and optional description.</p>
@@ -494,11 +583,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 </div>
               )}
 
-              {/* STEP 3: Settings */}
+              {/* STEP 4: Settings */}
               {currentStep === 'settings' && (
                 <div className="space-y-5">
                   <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Prediction Deadline</h3>
+                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">
+                      {predictionMode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
+                    </h3>
                     <div className="flex gap-3 mb-3 flex-wrap">
                       <div>
                         <label className="block text-xs font-medium text-neutral-600 mb-1">Date</label>
