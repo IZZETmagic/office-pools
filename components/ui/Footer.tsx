@@ -51,14 +51,14 @@ export default function Footer() {
             <h4 className="text-white dark:text-neutral-900 font-semibold mb-2 sm:mb-3">Support</h4>
             <ul className="space-y-1.5 sm:space-y-2 text-sm">
               <li>
-                <a href="#faq" className="hover:text-white dark:hover:text-neutral-900 transition">
+                <Link href="/faq" className="hover:text-white dark:hover:text-neutral-900 transition">
                   FAQ
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white dark:hover:text-neutral-900 transition">
+                <Link href="/contact" className="hover:text-white dark:hover:text-neutral-900 transition">
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -66,14 +66,14 @@ export default function Footer() {
             <h4 className="text-white dark:text-neutral-900 font-semibold mb-2 sm:mb-3">Legal</h4>
             <ul className="space-y-1.5 sm:space-y-2 text-sm">
               <li>
-                <a href="#" className="hover:text-white dark:hover:text-neutral-900 transition">
+                <Link href="/privacy" className="hover:text-white dark:hover:text-neutral-900 transition">
                   Privacy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white dark:hover:text-neutral-900 transition">
+                <Link href="/terms" className="hover:text-white dark:hover:text-neutral-900 transition">
                   Terms
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

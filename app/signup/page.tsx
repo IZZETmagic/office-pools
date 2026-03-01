@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
@@ -107,6 +108,17 @@ export default function SignupPage() {
         console.error('Profile update error:', profileError)
       }
 
+      // Log terms agreement (non-blocking — don't prevent signup if this fails)
+      try {
+        await fetch('/api/terms-agreement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ terms_version: '2026-03-01' }),
+        })
+      } catch (err) {
+        console.error('Failed to log terms agreement:', err)
+      }
+
       router.push('/dashboard')
     }
   }
@@ -187,13 +199,32 @@ export default function SignupPage() {
           />
         </FormField>
 
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreedToTerms}
+            onChange={(e) => setAgreedToTerms(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+          />
+          <span className="text-sm text-neutral-600">
+            I agree to the{' '}
+            <Link href="/terms" target="_blank" className="text-primary-600 hover:underline font-medium">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="text-primary-600 hover:underline font-medium">
+              Privacy Policy
+            </Link>
+          </span>
+        </label>
+
         <Button
           type="submit"
           fullWidth
           size="lg"
           loading={loading}
           loadingText="Creating account..."
-          disabled={usernameStatus === 'taken' || usernameStatus === 'checking'}
+          disabled={!agreedToTerms || usernameStatus === 'taken' || usernameStatus === 'checking'}
         >
           Sign Up
         </Button>

@@ -535,65 +535,72 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   <hr className="border-neutral-100" />
 
                   <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Privacy</h3>
-                    <div className="space-y-2 mb-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="privacy"
-                          checked={!isPrivate}
-                          onChange={() => setIsPrivate(false)}
-                          className="text-success-600"
-                        />
-                        <span className="text-sm text-neutral-700">Public (anyone with code can join)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="privacy"
-                          checked={isPrivate}
-                          onChange={() => setIsPrivate(true)}
-                          className="text-success-600"
-                        />
-                        <span className="text-sm text-neutral-700">Private (requires admin approval)</span>
-                      </label>
-                    </div>
+                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Privacy Settings</h3>
+                    <div className="space-y-4">
+                      <FormField label="Pool Visibility">
+                        <div className="inline-grid grid-cols-2 gap-2">
+                          {([
+                            { value: false, label: 'Public', desc: 'Anyone with code can join' },
+                            { value: true, label: 'Private', desc: 'Requires admin approval' },
+                          ] as const).map((opt) => (
+                            <button
+                              key={String(opt.value)}
+                              type="button"
+                              onClick={() => setIsPrivate(opt.value)}
+                              className={`p-3 rounded-lg border cursor-pointer transition text-left ${
+                                isPrivate === opt.value
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
+                              <p className="text-xs text-neutral-500">{opt.desc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </FormField>
 
-                    <FormField label="Maximum Members" helperText="Set to 0 for unlimited">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={maxParticipants}
-                        onChange={(e) => setMaxParticipants(e.target.value)}
-                        className="max-w-[200px]"
-                        focusColor="green"
-                      />
-                    </FormField>
+                      <FormField label="Maximum Members" helperText="Set to 0 for unlimited">
+                        <div className="w-[10.3125rem]">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={maxParticipants}
+                            onChange={(e) => setMaxParticipants(e.target.value)}
+                          />
+                        </div>
+                      </FormField>
+                    </div>
                   </div>
 
                   <hr className="border-neutral-100" />
 
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-900 mb-3">Prediction Entries</h3>
-                    <p className="text-sm text-neutral-600 mb-3">
-                      Allow members to submit multiple sets of predictions, each scored independently.
+                    <p className="text-sm text-neutral-600 mb-4">
+                      Allow members to submit multiple sets of predictions. Each entry is scored and ranked independently on the leaderboard.
                     </p>
-                    <FormField label="Max Entries Per Member" helperText="1-10 (default: 1)">
-                      <Input
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={maxEntries}
-                        onChange={(e) => setMaxEntries(e.target.value)}
-                        className="max-w-[200px]"
-                        focusColor="green"
-                      />
-                    </FormField>
-                    {parseInt(maxEntries) > 1 && (
-                      <p className="text-xs text-neutral-500 mt-2">
-                        Members can create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each appears as its own row on the leaderboard.
-                      </p>
-                    )}
+                    <div className="space-y-4">
+                      <FormField label="Max Entries Per Member">
+                        <div className="flex">
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setMaxEntries(String(n))}
+                              className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-lg last:rounded-r-lg transition ${
+                                parseInt(maxEntries) === n
+                                  ? 'bg-primary-500 text-white border-primary-500 z-10'
+                                  : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </FormField>
+
+                    </div>
                   </div>
 
                   <hr className="border-neutral-100" />

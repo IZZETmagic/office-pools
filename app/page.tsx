@@ -182,6 +182,14 @@ export default function Home() {
             </h2>
           </div>
           <FAQAccordion />
+          <div className="text-center mt-8">
+            <Link
+              href="/faq"
+              className="text-primary-600 hover:text-primary-700 font-medium transition"
+            >
+              View all FAQs &rarr;
+            </Link>
+          </div>
         </div>
       </section>
 
