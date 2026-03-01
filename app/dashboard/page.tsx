@@ -48,7 +48,8 @@ export default async function DashboardPage() {
         auto_submitted,
         created_at,
         total_points,
-        current_rank
+        current_rank,
+        point_adjustment
       )
     `)
     .eq('user_id', userData.user_id)
@@ -300,12 +301,14 @@ export default async function DashboardPage() {
         has_submitted: e.has_submitted_predictions || false,
       }))
 
+      const adjustment = bestEntry?.point_adjustment ?? 0
+
       return {
         ...pool,
         role: m.role,
         match_points: matchPoints,
         bonus_points: bonusPoints,
-        total_points: matchPoints + bonusPoints,
+        total_points: matchPoints + bonusPoints + adjustment,
         current_rank: bestEntry?.current_rank ?? null,
         has_submitted_predictions: anySubmitted,
         predictions_submitted_at: bestEntry?.predictions_submitted_at ?? null,

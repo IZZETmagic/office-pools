@@ -212,21 +212,32 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
       <div className="flex justify-between items-start mb-5">
         <div className="min-w-0 flex-1 mr-3">
           <h4 className="text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-neutral-500">
-              Code: <span className="font-mono font-bold text-neutral-700">{pool.pool_code}</span>
+          {pool.role === 'admin' ? (
+            <span className="inline-flex items-center gap-1 text-xs text-neutral-500 mt-0.5">
+              Code:
+              <button
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1 font-mono text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
+                title="Copy pool code"
+              >
+                {pool.pool_code}
+                {copied ? (
+                  <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                  </svg>
+                )}
+              </button>
             </span>
-            <button
-              onClick={handleCopy}
-              className="text-primary-600 hover:text-primary-800 text-xs"
-              title="Copy pool code"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
+          ) : (
+            <span className="text-xs invisible mt-0.5">&#8203;</span>
+          )}
         </div>
         <div className="flex gap-1 shrink-0">
-          {pool.role === 'admin' && <Badge variant="blue">Admin</Badge>}
+          {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
           <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
         </div>
       </div>
@@ -440,15 +451,13 @@ export function DashboardClient({
                       <p className="text-xs text-neutral-500">
                         {formatStage(match.stage)} &middot; Match #{match.match_number}
                       </p>
-                      <Badge variant="yellow">
-                        <span className="flex items-center gap-1">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
-                          </span>
-                          LIVE
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-700 bg-danger-100 px-2 py-0.5 rounded-full">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
                         </span>
-                      </Badge>
+                        LIVE
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex-1 text-right pr-3">
@@ -507,7 +516,7 @@ export function DashboardClient({
                         <p className="text-sm font-medium text-neutral-700">
                           {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                         </p>
-                        <Badge variant="gray">{match.status}</Badge>
+                        <Badge variant="outline-gray">{match.status}</Badge>
                       </div>
                     </Card>
                   )

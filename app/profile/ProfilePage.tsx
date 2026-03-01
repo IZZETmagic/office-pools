@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { useTheme } from '@/components/ThemeProvider'
 import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -139,7 +140,7 @@ const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.Re
   {
     key: 'edit',
     label: 'Edit Profile',
-    mobileLabel: 'Edit Profile',
+    mobileLabel: 'Edit',
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -322,12 +323,12 @@ function EditProfileTab({
   supabase: any
   router: any
 }) {
+  const { showToast } = useToast()
   const [username, setUsername] = useState(profile.username)
   const [fullName, setFullName] = useState(profile.full_name ?? '')
   const [email, setEmail] = useState(profile.email)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
 
   const usernameChanged = username !== profile.username
@@ -354,7 +355,6 @@ function EditProfileTab({
 
   async function handleSave() {
     setError(null)
-    setSuccess(null)
 
     if (!username || username.length < 3 || username.length > 20) {
       setError('Username must be 3-20 characters.')
@@ -392,9 +392,9 @@ function EditProfileTab({
           email,
         })
         if (emailError) throw emailError
-        setSuccess('Profile updated! A verification email has been sent to your new address.')
+        showToast('Profile updated! A verification email has been sent to your new address.', 'success')
       } else {
-        setSuccess('Profile updated successfully!')
+        showToast('Profile updated successfully!', 'success')
       }
 
       router.refresh()
@@ -420,7 +420,6 @@ function EditProfileTab({
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
-      {success && <Alert variant="success">{success}</Alert>}
 
       <div className="space-y-5">
         <FormField label="Username *" helperText="Letters, numbers, and underscores only (3-20 characters)">
@@ -479,7 +478,6 @@ function EditProfileTab({
               setFullName(profile.full_name ?? '')
               setEmail(profile.email)
               setError(null)
-              setSuccess(null)
               setUsernameStatus('idle')
             }}
             disabled={!hasChanges}
@@ -1121,13 +1119,13 @@ function AccountSettingsTab({
   router: any
 }) {
   const { colorMode, setColorMode } = useTheme()
+  const { showToast } = useToast()
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
@@ -1184,7 +1182,6 @@ function AccountSettingsTab({
 
   async function handlePasswordChange() {
     setPasswordError(null)
-    setPasswordSuccess(null)
 
     if (newPassword.length < 8) {
       setPasswordError('Password must be at least 8 characters.')
@@ -1202,7 +1199,7 @@ function AccountSettingsTab({
       })
       if (error) throw error
 
-      setPasswordSuccess('Password updated successfully!')
+      showToast('Password updated successfully!', 'success')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setShowPasswordModal(false), 1500)
@@ -1378,8 +1375,7 @@ function AccountSettingsTab({
                   setNewPassword('')
                   setConfirmPassword('')
                   setPasswordError(null)
-                  setPasswordSuccess(null)
-                }}
+                              }}
                 className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg p-1.5 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -1389,7 +1385,6 @@ function AccountSettingsTab({
             </div>
             <div className="p-4 sm:p-6">
               {passwordError && <Alert variant="error">{passwordError}</Alert>}
-              {passwordSuccess && <Alert variant="success">{passwordSuccess}</Alert>}
 
               <div className="space-y-4">
                 <FormField label="New Password *" helperText="Must be at least 8 characters">
@@ -1418,8 +1413,7 @@ function AccountSettingsTab({
                     setNewPassword('')
                     setConfirmPassword('')
                     setPasswordError(null)
-                    setPasswordSuccess(null)
-                  }}
+                                  }}
                 >
                   Cancel
                 </Button>

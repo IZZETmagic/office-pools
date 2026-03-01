@@ -6,6 +6,7 @@ import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 
 type ScoringTabProps = {
   pool: PoolData
@@ -23,6 +24,7 @@ const DEFAULTS = {
   knockout_exact_score: 5,
   knockout_correct_difference: 3,
   knockout_correct_result: 1,
+  round_32_multiplier: 1,
   round_16_multiplier: 1,
   quarter_final_multiplier: 1.5,
   semi_final_multiplier: 2,
@@ -61,6 +63,9 @@ export function ScoringTab({
   setMembers,
 }: ScoringTabProps) {
   const supabase = createClient()
+  const { showToast } = useToast()
+
+  const [copied, setCopied] = useState(false)
 
   // Form state
   const [groupExact, setGroupExact] = useState(
@@ -80,6 +85,9 @@ export function ScoringTab({
   )
   const [koResult, setKoResult] = useState(
     settings?.knockout_correct_result ?? DEFAULTS.knockout_correct_result
+  )
+  const [r32Mult, setR32Mult] = useState(
+    settings?.round_32_multiplier ?? DEFAULTS.round_32_multiplier
   )
   const [r16Mult, setR16Mult] = useState(
     settings?.round_16_multiplier ?? DEFAULTS.round_16_multiplier
@@ -161,7 +169,6 @@ export function ScoringTab({
   const [recalculating, setRecalculating] = useState(false)
   const [recalculatingBonus, setRecalculatingBonus] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [expandGroup, setExpandGroup] = useState(true)
   const [expandKnockout, setExpandKnockout] = useState(true)
@@ -199,6 +206,7 @@ export function ScoringTab({
     setKoExact(DEFAULTS.knockout_exact_score)
     setKoDiff(DEFAULTS.knockout_correct_difference)
     setKoResult(DEFAULTS.knockout_correct_result)
+    setR32Mult(DEFAULTS.round_32_multiplier)
     setR16Mult(DEFAULTS.round_16_multiplier)
     setQfMult(DEFAULTS.quarter_final_multiplier)
     setSfMult(DEFAULTS.semi_final_multiplier)
@@ -227,7 +235,6 @@ export function ScoringTab({
   async function handleSave() {
     setSaving(true)
     setError(null)
-    setSuccess(null)
 
     const updateData = {
       group_exact_score: groupExact,
@@ -236,6 +243,7 @@ export function ScoringTab({
       knockout_exact_score: koExact,
       knockout_correct_difference: koDiff,
       knockout_correct_result: koResult,
+      round_32_multiplier: r32Mult,
       round_16_multiplier: r16Mult,
       quarter_final_multiplier: qfMult,
       semi_final_multiplier: sfMult,
@@ -305,7 +313,7 @@ export function ScoringTab({
 
     if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
-    setSuccess('Scoring updated. Points recalculated for all members.')
+    showToast('Scoring updated. Points recalculated for all members.', 'success')
     setSaving(false)
     setShowConfirm(false)
   }
@@ -313,7 +321,6 @@ export function ScoringTab({
   async function handleManualRecalculate() {
     setRecalculating(true)
     setError(null)
-    setSuccess(null)
 
     const { error: rpcError } = await supabase.rpc(
       'recalculate_all_pool_points',
@@ -335,14 +342,13 @@ export function ScoringTab({
 
     if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
-    setSuccess('Points recalculated successfully.')
+    showToast('Points recalculated successfully.', 'success')
     setRecalculating(false)
   }
 
   async function handleRecalculateBonus() {
     setRecalculatingBonus(true)
     setError(null)
-    setSuccess(null)
 
     try {
       const res = await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, {
@@ -367,8 +373,9 @@ export function ScoringTab({
 
       if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
-      setSuccess(
-        `Bonus points recalculated: ${data.membersProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`
+      showToast(
+        `Bonus points recalculated: ${data.membersProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`,
+        'success'
       )
     } catch (err: any) {
       setError('Bonus recalculation failed: ' + (err.message || 'Network error'))
@@ -431,12 +438,32 @@ export function ScoringTab({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-neutral-900 mb-6">
-        Scoring Configuration
-      </h2>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-neutral-900">
+          Scoring Configuration
+        </h2>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="text-sm text-neutral-500">Code:</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(pool.pool_code)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            title="Copy pool code"
+          >
+            {pool.pool_code}
+            {copied ? (
+              <svg className="w-3.5 h-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+            )}
+          </button>
+        </div>
+      </div>
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Current scoring display */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -479,6 +506,10 @@ export function ScoringTab({
             </div>
             <hr className="my-2" />
             <p className="text-xs text-neutral-600 font-medium mb-1">Stage Multipliers:</p>
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Round of 32</span>
+              <span className="font-bold text-neutral-900">{r32Mult}x</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-neutral-600">Round of 16</span>
               <span className="font-bold text-neutral-900">{r16Mult}x</span>
@@ -628,6 +659,15 @@ export function ScoringTab({
           </button>
           {expandMultipliers && (
             <div className="space-y-4 pl-4">
+              <SliderInput
+                label="Round of 32:"
+                value={r32Mult}
+                onChange={setR32Mult}
+                min={0.5}
+                max={5}
+                step={0.5}
+                suffix="x"
+              />
               <SliderInput
                 label="Round of 16:"
                 value={r16Mult}

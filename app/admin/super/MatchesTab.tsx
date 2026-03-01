@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 
 type MatchesTabProps = {
   matches: SuperMatchData[]
@@ -89,6 +90,7 @@ export function MatchesTab({
   setAuditLogs,
 }: MatchesTabProps) {
   const supabase = createClient()
+  const { showToast } = useToast()
 
   // Filters
   const [stageFilter, setStageFilter] = useState('all')
@@ -106,7 +108,6 @@ export function MatchesTab({
   const [psoAway, setPsoAway] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Reset form
   const [resetConfirmText, setResetConfirmText] = useState('')
@@ -115,7 +116,6 @@ export function MatchesTab({
 
   // Manual advancement
   const [advancing, setAdvancing] = useState(false)
-  const [advanceResult, setAdvanceResult] = useState<string | null>(null)
 
   // Conduct / Fair Play card entry (group stage only)
   const [showConductFields, setShowConductFields] = useState(false)
@@ -159,7 +159,6 @@ export function MatchesTab({
     setPsoAway(match.away_score_pso?.toString() ?? '')
     setResultType(match.home_score_pso !== null ? 'pso' : 'ft')
     setError(null)
-    setSuccess(null)
 
     // Reset conduct fields
     setHomeYellowCards('0')
@@ -204,7 +203,6 @@ export function MatchesTab({
     setResetConfirmText('')
     setResetReason('')
     setError(null)
-    setSuccess(null)
     setModal({ type: 'reset_match', match })
   }
 
@@ -230,15 +228,13 @@ export function MatchesTab({
         m.match_id === match.match_id ? { ...m, status: newStatus } : m
       )
     )
-    setSuccess(`Match #${match.match_number} set to "${label}".`)
-    setTimeout(() => setSuccess(null), 3000)
+    showToast(`Match #${match.match_number} set to "${label}".`, 'success')
   }
 
   function openLiveScoreModal(match: SuperMatchData) {
     setHomeScore(match.home_score_ft?.toString() ?? '0')
     setAwayScore(match.away_score_ft?.toString() ?? '0')
     setError(null)
-    setSuccess(null)
     setModal({ type: 'update_live_score', match })
   }
 
@@ -294,15 +290,12 @@ export function MatchesTab({
 
     await refreshMatches()
 
-    setSuccess(
-      `Live score updated to ${hScore}-${aScore}. Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`
-    )
     setSaving(false)
-
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
+    setModal({ type: 'none' })
+    showToast(
+      `Live score updated to ${hScore}-${aScore}. Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
+      'success'
+    )
   }
 
   async function refreshMatches() {
@@ -486,15 +479,12 @@ export function MatchesTab({
 
     const result = rpcResult as { predictions_processed?: number } | null
     const processed = result?.predictions_processed ?? 0
-    setSuccess(
-      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}${advanceInfo}`
-    )
     setSaving(false)
-
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
+    setModal({ type: 'none' })
+    showToast(
+      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}${advanceInfo}`,
+      'success'
+    )
   }
 
   async function handleResetMatch() {
@@ -560,19 +550,14 @@ export function MatchesTab({
       console.error('Failed to clear advanced teams:', e)
     }
 
-    setSuccess(`Match has been reset. All affected pool points recalculated.${clearInfo}`)
     setResetting(false)
-
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
+    setModal({ type: 'none' })
+    showToast(`Match has been reset. All affected pool points recalculated.${clearInfo}`, 'success')
   }
 
   async function handleManualAdvance() {
     if (!confirm('Run team advancement for all completed matches?')) return
     setAdvancing(true)
-    setAdvanceResult(null)
     try {
       const res = await fetch('/api/admin/advance-teams', {
         method: 'POST',
@@ -581,19 +566,18 @@ export function MatchesTab({
       })
       if (res.ok) {
         const data = await res.json()
-        setAdvanceResult(data.message)
+        showToast(data.message, 'success')
         if (data.advanced.length > 0) {
           await refreshMatches()
         }
       } else {
         const err = await res.json()
-        setAdvanceResult(`Error: ${err.error}`)
+        showToast(`Error: ${err.error}`, 'error')
       }
     } catch (e) {
-      setAdvanceResult('Failed to advance teams.')
+      showToast('Failed to advance teams.', 'error')
     }
     setAdvancing(false)
-    setTimeout(() => setAdvanceResult(null), 5000)
   }
 
   return (
@@ -618,8 +602,6 @@ export function MatchesTab({
         </div>
       </div>
 
-      {advanceResult && <Alert variant="success" className="mb-4">{advanceResult}</Alert>}
-      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
@@ -860,7 +842,6 @@ export function MatchesTab({
             </div>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             {/* Score inputs */}
             <div className="flex items-center justify-center gap-4 mb-6">
@@ -1100,7 +1081,6 @@ export function MatchesTab({
             </div>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             {/* Score inputs */}
             <div className="flex items-center justify-center gap-4 mb-6">
@@ -1187,7 +1167,6 @@ export function MatchesTab({
             </div>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-neutral-700 mb-1">

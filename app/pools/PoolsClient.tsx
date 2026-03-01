@@ -107,136 +107,209 @@ function formatDeadline(deadline: string | null) {
 // =====================
 // POOL CARD (for My Pools)
 // =====================
-function PoolCard({ pool }: { pool: PoolData }) {
+function PoolRow({ pool }: { pool: PoolData }) {
   const deadline = formatDeadline(pool.prediction_deadline)
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(pool.pool_code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // fallback - ignore
-    }
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    navigator.clipboard.writeText(pool.pool_code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
-    <Card>
-      {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div className="min-w-0 flex-1 mr-3">
-          <h4 className="text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-neutral-500">
-              Code: <span className="font-mono font-bold text-neutral-700">{pool.pool_code}</span>
+    <Link
+      href={`/pools/${pool.pool_id}`}
+      className="block bg-surface border border-neutral-200 dark:border-border-default rounded-lg px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 dark:hover:bg-surface-secondary transition-colors"
+    >
+      {/* Desktop layout – grid ensures columns align across rows */}
+      <div className="hidden sm:grid sm:grid-cols-[1fr_4.5rem_5.5rem_4.5rem_6rem_1.25rem] items-center gap-x-3">
+        {/* Name + code + badges */}
+        <div className={`min-w-0 flex flex-col ${pool.role === 'admin' ? '' : 'justify-center min-h-[2.75rem]'}`}>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+            {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
+            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+          </div>
+          {pool.role === 'admin' && (
+            <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
+              Code:
+              <button
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1 font-mono text-xs text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
+                title="Copy pool code"
+              >
+                {pool.pool_code}
+                {copied ? (
+                  <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                  </svg>
+                )}
+              </button>
             </span>
-            <button
-              onClick={handleCopy}
-              className="text-primary-600 hover:text-primary-800 text-xs"
-              title="Copy pool code"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+          )}
+        </div>
+
+        {/* Points */}
+        <div className="text-center text-sm">
+          <p className="font-bold text-neutral-900">{formatNumber(pool.total_points ?? 0)}</p>
+          <p className="text-[10px] text-neutral-500">Points</p>
+        </div>
+
+        {/* Rank */}
+        <div className="text-center text-sm">
+          <p className="font-bold text-neutral-900">
+            {pool.current_rank ? `#${pool.current_rank}` : '--'}
+            <span className="text-neutral-400 font-normal text-xs"> / {pool.memberCount}</span>
+          </p>
+          <p className="text-[10px] text-neutral-500">Rank</p>
+        </div>
+
+        {/* Members */}
+        <div className="text-center text-sm">
+          <p className="font-bold text-neutral-900">{pool.memberCount}</p>
+          <p className="text-[10px] text-neutral-500">Members</p>
+        </div>
+
+        {/* Deadline */}
+        <div className="text-right">
+          <span className={`text-xs ${deadline.className}`}>{deadline.text}</span>
+        </div>
+
+        {/* Chevron */}
+        <div className="flex justify-end">
+          <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Mobile layout – fixed-width stat columns for alignment */}
+      <div className="sm:hidden">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+            {pool.role === 'admin' && (
+              <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
+                Code:
+                <button
+                  onClick={handleCopy}
+                  className="inline-flex items-center gap-1 font-mono text-xs text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
+                  title="Copy pool code"
+                >
+                  {pool.pool_code}
+                  {copied ? (
+                    <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                    </svg>
+                  )}
+                </button>
+              </span>
+            )}
+          </div>
+          <div className="flex gap-1 shrink-0">
+            {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
+            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
           </div>
         </div>
-        <div className="flex gap-1 shrink-0">
-          {pool.role === 'admin' && <Badge variant="blue">Admin</Badge>}
-          <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
-          <p className="text-lg font-bold text-neutral-900">{formatNumber(pool.total_points ?? 0)}</p>
-          <p className="text-xs text-neutral-500">Points</p>
-        </div>
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
-          <span className="text-lg font-bold text-neutral-900 inline-flex items-center gap-1">
-            {pool.current_rank ? (
-              <>#{pool.current_rank}</>
-            ) : (
-              '--'
-            )}
-            <span className="text-neutral-400 font-normal text-sm">/ {pool.memberCount}</span>
+        <div className="grid grid-cols-[3.5rem_4rem_1fr_auto] items-center gap-x-3 text-xs">
+          <span className="text-neutral-900">
+            <span className="font-bold">{formatNumber(pool.total_points ?? 0)}</span>
+            <span className="text-neutral-500 ml-0.5">pts</span>
           </span>
-          <p className="text-xs text-neutral-500">Rank</p>
+          <span className="text-neutral-900">
+            <span className="font-bold">{pool.current_rank ? `#${pool.current_rank}` : '--'}</span>
+            <span className="text-neutral-400">/{pool.memberCount}</span>
+          </span>
+          <span className="text-neutral-500">{pool.memberCount} members</span>
+          <span className="flex items-center gap-1.5">
+            <span className={deadline.className}>{deadline.text}</span>
+            <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
         </div>
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
-          <p className="text-lg font-bold text-neutral-900">{pool.memberCount}</p>
-          <p className="text-xs text-neutral-500">Members</p>
-        </div>
       </div>
-
-      {/* Status row */}
-      <div className="flex items-center justify-between mb-4 text-xs">
-        <span className="text-neutral-500">
-          Joined {formatDate(pool.joined_at)}
-        </span>
-        <span className={deadline.className}>{deadline.text}</span>
-      </div>
-
-      {/* CTA */}
-      <div className="flex gap-2">
-        <Button
-          href={`/pools/${pool.pool_id}`}
-          variant="primary"
-          size="sm"
-          fullWidth
-        >
-          View Pool
-        </Button>
-        <Button
-          href={`/pools/${pool.pool_id}?tab=predictions`}
-          variant="outline"
-          size="sm"
-          fullWidth
-        >
-          Predictions
-        </Button>
-      </div>
-    </Card>
+    </Link>
   )
 }
 
 // =====================
-// PUBLIC POOL CARD (for Discover)
+// PUBLIC POOL ROW (for Discover)
 // =====================
-function PublicPoolCard({ pool, onJoin }: { pool: PublicPool; onJoin: (code: string) => void }) {
+function PublicPoolRow({ pool, onJoin }: { pool: PublicPool; onJoin: (code: string, name: string) => void }) {
   const deadline = formatDeadline(pool.prediction_deadline)
 
   return (
-    <Card>
-      <div className="flex justify-between items-start mb-3">
-        <div className="min-w-0 flex-1 mr-3">
-          <h4 className="text-base font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+    <div className="bg-surface border border-neutral-200 dark:border-border-default rounded-lg px-4 py-3">
+      {/* Desktop layout */}
+      <div className="hidden sm:flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+          </div>
           {pool.description && (
-            <p className="text-sm text-neutral-500 mt-0.5 line-clamp-2">{pool.description}</p>
+            <p className="text-xs text-neutral-500 truncate mt-0.5">{pool.description}</p>
           )}
         </div>
-        <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+
+        <div className="flex items-center gap-6 shrink-0 text-xs text-neutral-500">
+          <span className="inline-flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+            </svg>
+            {pool.memberCount} members
+          </span>
+          <span className={deadline.className}>{deadline.text}</span>
+        </div>
+
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => onJoin(pool.pool_code, pool.pool_name)}
+          className="shrink-0"
+        >
+          Join Pool
+        </Button>
       </div>
 
-      <div className="flex items-center gap-4 mb-4 text-xs text-neutral-500">
-        <span className="inline-flex items-center gap-1">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-          </svg>
-          {pool.memberCount} members
-        </span>
-        <span className={deadline.className}>{deadline.text}</span>
+      {/* Mobile layout */}
+      <div className="sm:hidden">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+            {pool.description && (
+              <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">{pool.description}</p>
+            )}
+          </div>
+          <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-neutral-500">
+            <span>{pool.memberCount} members</span>
+            <span className={deadline.className}>{deadline.text}</span>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => onJoin(pool.pool_code, pool.pool_name)}
+          >
+            Join
+          </Button>
+        </div>
       </div>
-
-      <Button
-        variant="primary"
-        size="sm"
-        fullWidth
-        onClick={() => onJoin(pool.pool_code)}
-      >
-        Join Pool
-      </Button>
-    </Card>
+    </div>
   )
 }
 
@@ -268,6 +341,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [joinInitialCode, setJoinInitialCode] = useState('')
+  const [joinPoolName, setJoinPoolName] = useState('')
 
   // Client-side filtering for My Pools
   const filteredPools = useMemo(() => {
@@ -332,8 +406,9 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     return () => clearTimeout(timeout)
   }, [discoverQuery, activeTab, searchPublicPools])
 
-  const handleJoinFromDiscover = (code: string) => {
+  const handleJoinFromDiscover = (code: string, name: string) => {
     setJoinInitialCode(code)
+    setJoinPoolName(name)
     setShowJoinModal(true)
   }
 
@@ -523,9 +598,9 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   {filteredPools.length} pool{filteredPools.length !== 1 ? 's' : ''}
                   {searchQuery || statusFilter !== 'all' ? ' found' : ''}
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
                   {filteredPools.map((pool) => (
-                    <PoolCard key={pool.pool_id} pool={pool} />
+                    <PoolRow key={pool.pool_id} pool={pool} />
                   ))}
                 </div>
               </>
@@ -558,9 +633,9 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <p className="text-sm text-neutral-500 mb-3">
                   {discoverResults.length} public pool{discoverResults.length !== 1 ? 's' : ''} found
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
                   {discoverResults.map((pool) => (
-                    <PublicPoolCard
+                    <PublicPoolRow
                       key={pool.pool_id}
                       pool={pool}
                       onJoin={handleJoinFromDiscover}
@@ -585,9 +660,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       {/* Modals */}
       {showJoinModal && (
         <JoinPoolModal
-          onClose={() => { setShowJoinModal(false); setJoinInitialCode('') }}
+          onClose={() => { setShowJoinModal(false); setJoinInitialCode(''); setJoinPoolName('') }}
           onSuccess={handleModalSuccess}
           initialCode={joinInitialCode}
+          initialPoolName={joinPoolName}
         />
       )}
       {showCreateModal && (

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 
@@ -13,11 +14,14 @@ type JoinPoolModalProps = {
   onSuccess?: () => void
   /** Optional pre-filled pool code (e.g. from Discover tab) */
   initialCode?: string
+  /** Optional pool name for confirmation mode (from Discover tab) */
+  initialPoolName?: string
 }
 
-export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPoolModalProps) {
+export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoolName = '' }: JoinPoolModalProps) {
   const supabase = createClient()
   const router = useRouter()
+  const { showToast } = useToast()
 
   const placeholderCode = useMemo(() => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -29,12 +33,10 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
   const [joinCode, setJoinCode] = useState(initialCode)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const handleJoinPool = async () => {
     setLoading(true)
     setError(null)
-    setSuccess(null)
 
     const { data: { user: authUser } } = await supabase.auth.getUser()
 
@@ -108,13 +110,12 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       body: JSON.stringify({ pool_id: pool.pool_id }),
     }).catch(() => {})
 
-    setSuccess(`Joined "${pool.pool_name}"!`)
-    setJoinCode('')
     setLoading(false)
-    setTimeout(() => {
-      onSuccess?.()
-      router.refresh()
-    }, 1500)
+    showToast(`Joined "${pool.pool_name}"!`, 'success')
+    setJoinCode('')
+    onSuccess?.()
+    onClose()
+    router.refresh()
   }
 
   return (
@@ -130,7 +131,9 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
       <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100">
-          <h2 id="join-pool-title" className="text-lg font-bold text-neutral-900">Join a Pool</h2>
+          <h2 id="join-pool-title" className="text-lg font-bold text-neutral-900">
+            {initialPoolName ? 'Join Pool' : 'Join a Pool'}
+          </h2>
           <button
             onClick={() => !loading && onClose()}
             className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
@@ -144,19 +147,27 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '' }: JoinPool
 
         {/* Content */}
         <div className="px-4 sm:px-6 py-4 sm:py-5">
-          <p className="text-sm text-neutral-600 mb-4">Enter the pool code shared with you to join.</p>
+          {initialPoolName ? (
+            <>
+              <p className="text-sm text-neutral-600 mb-1">Would you like to join</p>
+              <p className="text-base font-semibold text-neutral-900">{initialPoolName}?</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-600 mb-4">Enter the pool code shared with you to join.</p>
 
-          {error && <Alert variant="error" className="mb-3">{error}</Alert>}
-          {success && <Alert variant="success" className="mb-3">{success}</Alert>}
+              <FormField label="Pool Code">
+                <Input
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder={`e.g. ${placeholderCode}`}
+                />
+              </FormField>
+            </>
+          )}
 
-          <FormField label="Pool Code">
-            <Input
-              type="text"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder={`e.g. ${placeholderCode}`}
-            />
-          </FormField>
+          {error && <Alert variant="error" className="mt-3">{error}</Alert>}
         </div>
 
         {/* Footer */}

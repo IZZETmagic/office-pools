@@ -42,6 +42,8 @@ export type EntryData = {
   auto_submitted: boolean
   predictions_last_saved_at: string | null
   total_points: number
+  point_adjustment: number
+  adjustment_reason: string | null
   current_rank: number | null
   last_rank_update: string | null
   created_at: string
@@ -91,6 +93,7 @@ export type SettingsData = {
   knockout_exact_score: number
   knockout_correct_difference: number
   knockout_correct_result: number
+  round_32_multiplier: number
   round_16_multiplier: number
   quarter_final_multiplier: number
   semi_final_multiplier: number

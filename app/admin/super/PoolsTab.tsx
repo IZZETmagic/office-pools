@@ -6,6 +6,7 @@ import type { SuperPoolData } from './page'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 
 type PoolsTabProps = {
   pools: SuperPoolData[]
@@ -18,6 +19,7 @@ type ModalState =
 
 export function PoolsTab({ pools, setPools }: PoolsTabProps) {
   const supabase = createClient()
+  const { showToast } = useToast()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -25,7 +27,6 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const filteredPools = pools.filter((p) => {
     if (statusFilter !== 'all' && p.status !== statusFilter) return false
@@ -47,7 +48,6 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
   function openDeleteModal(pool: SuperPoolData) {
     setDeleteConfirm('')
     setError(null)
-    setSuccess(null)
     setModal({ type: 'delete_pool', pool })
   }
 
@@ -168,13 +168,9 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
     if (e9) { setError('Failed to delete pool: ' + e9.message); setDeleting(false); return }
 
     setPools(pools.filter((p) => p.pool_id !== pool.pool_id))
-    setSuccess(`Pool "${pool.pool_name}" has been permanently deleted.`)
     setDeleting(false)
-
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
+    setModal({ type: 'none' })
+    showToast(`Pool "${pool.pool_name}" has been permanently deleted.`, 'success')
   }
 
   return (
@@ -185,8 +181,6 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           {pools.length} Total Pools
         </span>
       </div>
-
-      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
@@ -305,7 +299,6 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
             </div>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-neutral-700 mb-1">

@@ -249,6 +249,8 @@ export function LeaderboardTab({
 
   // Build computed player score for modal
   const getPlayerScore = (entryId: string): PlayerScoreData => {
+    const entry = leaderboardEntries.find(e => e.entry_id === entryId)
+    const adjustment = entry?.point_adjustment ?? 0
     const computedMatchPts = computedMatchPointsMap.get(entryId)
     const computedBonus = computedBonusMap.get(entryId)
     const computedBonusPts = computedBonus ? computedBonus.reduce((sum, e) => sum + e.points_earned, 0) : 0
@@ -258,21 +260,25 @@ export function LeaderboardTab({
         entry_id: entryId,
         match_points: computedMatchPts,
         bonus_points: computedBonusPts,
-        total_points: computedMatchPts + computedBonusPts,
+        total_points: computedMatchPts + computedBonusPts + adjustment,
       }
     }
 
     // Fall back to DB
     const dbScore = scoreMap.get(entryId)
-    if (dbScore) return dbScore
+    if (dbScore) {
+      return {
+        ...dbScore,
+        total_points: dbScore.total_points + adjustment,
+      }
+    }
 
     // Last resort: entry's total_points
-    const entry = leaderboardEntries.find(e => e.entry_id === entryId)
     return {
       entry_id: entryId,
       match_points: entry?.total_points ?? 0,
       bonus_points: 0,
-      total_points: entry?.total_points ?? 0,
+      total_points: (entry?.total_points ?? 0) + adjustment,
     }
   }
 
@@ -329,40 +335,39 @@ export function LeaderboardTab({
               <div className="flex-1 min-w-0">
                 {isMultiEntry ? (
                   <>
-                    <div className="text-sm font-medium text-neutral-900 truncate">
-                      {entry.entry_name}
-                    </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-neutral-500 truncate">
-                        {entry.users?.full_name || entry.users?.username || 'Unknown'}
-                        {entry.users?.username && entry.users?.full_name && ` (@${entry.users.username})`}
+                      <span className="text-sm font-medium text-neutral-900 truncate">
+                        {entry.entry_name}
                       </span>
                       {isCurrentUser && (
-                        <Badge variant="green">You</Badge>
+                        <span className="text-xs text-primary-500 ml-1">(you)</span>
                       )}
                       {entry.role === 'admin' && (
-                        <Badge variant="blue">Admin</Badge>
+                        <Badge variant="outline">Admin</Badge>
                       )}
+                    </div>
+                    <div className="text-xs text-neutral-500 truncate">
+                      @{entry.users?.username || 'Unknown'}
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="text-sm font-medium text-neutral-900 truncate">
-                      {entry.users?.full_name || entry.users?.username || 'Unknown'}
-                    </div>
                     <div className="flex items-center gap-1.5">
-                      {entry.users?.username && (
-                        <span className="text-xs text-neutral-500 truncate">
-                          @{entry.users.username}
-                        </span>
-                      )}
+                      <span className="text-sm font-medium text-neutral-900 truncate">
+                        {entry.users?.full_name || entry.users?.username || 'Unknown'}
+                      </span>
                       {isCurrentUser && (
-                        <Badge variant="green">You</Badge>
+                        <span className="text-xs text-primary-500 ml-1">(you)</span>
                       )}
                       {entry.role === 'admin' && (
-                        <Badge variant="blue">Admin</Badge>
+                        <Badge variant="outline">Admin</Badge>
                       )}
                     </div>
+                    {entry.users?.username && (
+                      <div className="text-xs text-neutral-500 truncate">
+                        @{entry.users.username}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -451,11 +456,10 @@ export function LeaderboardTab({
                           <span className="text-sm font-medium text-neutral-900">
                             {entry.entry_name}
                           </span>
-                          {isCurrentUser && <Badge variant="green">You</Badge>}
+                          {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                         </div>
                         <div className="text-xs text-neutral-500">
-                          {entry.users?.full_name || entry.users?.username || 'Unknown'}
-                          {entry.users?.username && entry.users?.full_name && ` (@${entry.users.username})`}
+                          @{entry.users?.username || 'Unknown'}
                         </div>
                       </div>
                     ) : (
@@ -464,7 +468,7 @@ export function LeaderboardTab({
                           <span className="text-sm font-medium text-neutral-900">
                             {entry.users?.full_name || entry.users?.username || 'Unknown'}
                           </span>
-                          {isCurrentUser && <Badge variant="green">You</Badge>}
+                          {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                         </div>
                         {entry.users?.username && (
                           <div className="text-xs text-neutral-500">
@@ -495,7 +499,7 @@ export function LeaderboardTab({
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
                     {entry.role === 'admin' && (
-                      <Badge variant="blue" className="py-1">Admin</Badge>
+                      <Badge variant="outline" className="py-1">Admin</Badge>
                     )}
                   </td>
                   <td className="pr-3 py-4 whitespace-nowrap text-neutral-300">

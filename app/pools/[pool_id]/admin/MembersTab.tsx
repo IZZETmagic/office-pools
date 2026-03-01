@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import {
   getKnockoutWinner,
@@ -25,6 +26,7 @@ type MembersTabProps = {
   matches: MatchData[]
   teams: TeamData[]
   currentUserId: string
+  computedEntryTotals: Map<string, number>
 }
 
 type ModalState =
@@ -44,14 +46,15 @@ export function MembersTab({
   matches,
   teams,
   currentUserId,
+  computedEntryTotals,
 }: MembersTabProps) {
   const supabase = createClient()
+  const { showToast } = useToast()
 
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'rank' | 'points' | 'username' | 'joined'>('rank')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   // Adjust points state
@@ -66,11 +69,17 @@ export function MembersTab({
 
   const adminCount = members.filter((m) => m.role === 'admin').length
 
-  // Helper: get best entry stats for a member
+  // Get the true total points for an entry (client-side computed match + bonus, falling back to pool_entries)
+  function getEntryTotalPoints(entry: EntryData): number {
+    return computedEntryTotals.get(entry.entry_id) ?? entry.total_points
+  }
+
+  // Helper: get best entry stats for a member (using true total including bonus)
   function getBestEntry(m: MemberData): EntryData | null {
     const entries = m.entries || []
     if (entries.length === 0) return null
-    return entries.reduce((best, e) => (e.total_points > best.total_points ? e : best), entries[0])
+    return entries.reduce((best, e) =>
+      getEntryTotalPoints(e) > getEntryTotalPoints(best) ? e : best, entries[0])
   }
 
   // Sort and filter
@@ -91,8 +100,10 @@ export function MembersTab({
           return aRank - bRank
         }
         case 'points': {
-          const aPts = getBestEntry(a)?.total_points ?? 0
-          const bPts = getBestEntry(b)?.total_points ?? 0
+          const aBest = getBestEntry(a)
+          const bBest = getBestEntry(b)
+          const aPts = aBest ? getEntryTotalPoints(aBest) : 0
+          const bPts = bBest ? getEntryTotalPoints(bBest) : 0
           return bPts - aPts
         }
         case 'username':
@@ -133,7 +144,7 @@ export function MembersTab({
     if (error) {
       setError(error.message)
     } else {
-      setSuccess(`${member.users.username} promoted to admin.`)
+      showToast(`${member.users.username} promoted to admin.`, 'success')
       await refreshMembers()
     }
     setLoading(false)
@@ -156,7 +167,7 @@ export function MembersTab({
     if (error) {
       setError(error.message)
     } else {
-      setSuccess(`${member.users.username} demoted to player.`)
+      showToast(`${member.users.username} demoted to player.`, 'success')
       await refreshMembers()
     }
     setLoading(false)
@@ -193,7 +204,7 @@ export function MembersTab({
       }),
     }).catch(() => {})
 
-    setSuccess(`${member.users.username} removed from pool.`)
+    showToast(`${member.users.username} removed from pool.`, 'success')
     await refreshMembers()
     setLoading(false)
     setModal({ type: 'none' })
@@ -213,18 +224,20 @@ export function MembersTab({
     }
 
     setLoading(true)
-    const newTotal = (entry.total_points ?? 0) + pointAdjustment
+    const newAdjustment = (entry.point_adjustment ?? 0) + pointAdjustment
+    const newTotal = getEntryTotalPoints(entry) + pointAdjustment
 
     const { error } = await supabase
       .from('pool_entries')
-      .update({ total_points: newTotal })
+      .update({ point_adjustment: newAdjustment, adjustment_reason: adjustReason.trim() })
       .eq('entry_id', entry.entry_id)
 
     if (error) {
       setError(error.message)
     } else {
-      setSuccess(
-        `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`
+      showToast(
+        `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`,
+        'success'
       )
       await refreshMembers()
     }
@@ -262,7 +275,7 @@ export function MembersTab({
       }
 
       const entryLabel = specificEntry ? specificEntry.entry_name : 'all entries'
-      setSuccess(`Predictions unlocked for ${member.users.username} (${entryLabel}). They can now edit and resubmit.`)
+      showToast(`Predictions unlocked for ${member.users.username} (${entryLabel}). They can now edit and resubmit.`, 'success')
       await refreshMembers()
     } catch (err: any) {
       setError(err.message || 'Failed to unlock predictions')
@@ -279,7 +292,24 @@ export function MembersTab({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-neutral-900 mb-6">Pool Members</h2>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-neutral-900">Pool Members</h2>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="text-sm text-neutral-500">Code:</span>
+          <button
+            onClick={copyPoolCode}
+            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            title="Copy pool code"
+          >
+            {pool.pool_code}
+            {copied ? (
+              <svg className="w-3.5 h-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+            )}
+          </button>
+        </div>
+      </div>
 
       {error && (
         <Alert variant="error" className="mb-4">
@@ -292,36 +322,6 @@ export function MembersTab({
           </button>
         </Alert>
       )}
-      {success && (
-        <Alert variant="success" className="mb-4">
-          {success}
-          <button
-            onClick={() => setSuccess(null)}
-            className="ml-2 text-success-800 font-bold"
-          >
-            x
-          </button>
-        </Alert>
-      )}
-
-      {/* Invite Section */}
-      <Card className="mb-6">
-        <h3 className="font-semibold text-neutral-900 mb-3">Invite Members</h3>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-neutral-600">Pool Code:</span>
-            <span className="font-mono font-bold text-lg text-neutral-900 bg-neutral-100 px-3 py-1 rounded">
-              {pool.pool_code}
-            </span>
-            <button
-              onClick={copyPoolCode}
-              className="text-xs px-3 py-1.5 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 font-medium transition"
-            >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-        </div>
-      </Card>
 
       {/* Search and Sort */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -364,7 +364,7 @@ export function MembersTab({
                   </div>
                   <p className="text-xs text-neutral-500 mt-0.5">{member.users.full_name}</p>
                 </div>
-                <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member)?.total_points ?? 0}</span>
+                <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}</span>
               </div>
               {/* Entries badges for multi-entry members */}
               {(member.entries || []).length > 1 && (
@@ -402,7 +402,6 @@ export function MembersTab({
                     const action = e.target.value
                     e.target.value = ''
                     setError(null)
-                    setSuccess(null)
                     switch (action) {
                       case 'view_predictions':
                         setModal({ type: 'view_predictions', member })
@@ -490,11 +489,7 @@ export function MembersTab({
                       <div>
                         <p className="text-sm font-medium text-neutral-900">
                           {member.users.username}
-                          {isCurrentUser && (
-                            <span className="text-xs text-primary-500 ml-1">
-                              (you)
-                            </span>
-                          )}
+                          {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                         </p>
                         <p className="text-xs text-neutral-600">
                           {member.users.full_name}
@@ -503,7 +498,7 @@ export function MembersTab({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-lg font-bold text-primary-600">
-                        {getBestEntry(member)?.total_points ?? 0}
+                        {getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -541,8 +536,7 @@ export function MembersTab({
                             const action = e.target.value
                             e.target.value = ''
                             setError(null)
-                            setSuccess(null)
-                            switch (action) {
+                                    switch (action) {
                               case 'view_predictions':
                                 setModal({
                                   type: 'view_predictions',
@@ -608,6 +602,7 @@ export function MembersTab({
           matches={matches}
           teams={teams}
           onClose={() => setModal({ type: 'none' })}
+          getEntryTotalPoints={getEntryTotalPoints}
         />
       )}
 
@@ -627,6 +622,7 @@ export function MembersTab({
             setModal({ type: 'none' })
             setError(null)
           }}
+          getEntryTotalPoints={getEntryTotalPoints}
         />
       )}
 
@@ -775,6 +771,7 @@ function ViewPredictionsModal({
   matches,
   teams,
   onClose,
+  getEntryTotalPoints,
 }: {
   member: MemberData
   initialEntry?: EntryData
@@ -782,6 +779,7 @@ function ViewPredictionsModal({
   matches: MatchData[]
   teams: TeamData[]
   onClose: () => void
+  getEntryTotalPoints: (entry: EntryData) => number
 }) {
   const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
   const hasMultipleEntries = entries.length > 1
@@ -955,7 +953,7 @@ function ViewPredictionsModal({
           </h3>
           {selectedEntry && (
             <p className="text-sm text-neutral-600 mt-1">
-              {selectedEntry.entry_name} &middot; {selectedEntry.total_points} pts
+              {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
               {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
             </p>
           )}
@@ -1235,6 +1233,7 @@ function AdjustPointsModal({
   loading,
   onConfirm,
   onClose,
+  getEntryTotalPoints,
 }: {
   member: MemberData
   initialEntry?: EntryData
@@ -1246,6 +1245,7 @@ function AdjustPointsModal({
   loading: boolean
   onConfirm: (entry: EntryData) => void
   onClose: () => void
+  getEntryTotalPoints: (entry: EntryData) => number
 }) {
   const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
   const hasMultipleEntries = entries.length > 1
@@ -1283,7 +1283,7 @@ function AdjustPointsModal({
                       : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                   }`}
                 >
-                  {entry.entry_name} ({entry.total_points} pts)
+                  {entry.entry_name} ({getEntryTotalPoints(entry)} pts)
                 </button>
               ))}
             </div>
@@ -1294,7 +1294,7 @@ function AdjustPointsModal({
           <p className="text-sm text-neutral-600">
             {selectedEntry.entry_name} current points:{' '}
             <span className="font-bold">
-              {selectedEntry.total_points ?? 0}
+              {getEntryTotalPoints(selectedEntry)}
             </span>
           </p>
         </div>
@@ -1343,7 +1343,7 @@ function AdjustPointsModal({
         <p className="text-sm text-neutral-600 mb-4">
           New total:{' '}
           <span className="font-bold text-primary-600">
-            {(selectedEntry.total_points ?? 0) + pointAdjustment}
+            {getEntryTotalPoints(selectedEntry) + pointAdjustment}
           </span>
         </p>
 

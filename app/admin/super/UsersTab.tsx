@@ -6,6 +6,7 @@ import type { SuperUserData } from './page'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 
 type UsersTabProps = {
   users: SuperUserData[]
@@ -20,13 +21,13 @@ type ModalState =
 
 export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
   const supabase = createClient()
+  const { showToast } = useToast()
 
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'super' | 'regular'>('all')
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [promoteConfirm, setPromoteConfirm] = useState('')
 
   const superAdminCount = users.filter((u) => u.is_super_admin).length
@@ -49,7 +50,6 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
     if (makeSuperAdmin) {
       setPromoteConfirm('')
       setError(null)
-      setSuccess(null)
       setModal({ type: 'promote_admin', user })
       return
     }
@@ -107,13 +107,9 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       )
     )
 
-    setSuccess(`${modal.user.username} promoted to super admin.`)
     setSaving(false)
-
-    setTimeout(() => {
-      setModal({ type: 'none' })
-      setSuccess(null)
-    }, 2000)
+    setModal({ type: 'none' })
+    showToast(`${modal.user.username} promoted to super admin.`, 'success')
   }
 
   async function handleToggleActive(user: SuperUserData) {
@@ -157,8 +153,6 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           </span>
         </div>
       </div>
-
-      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
@@ -230,11 +224,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                           <span className="font-medium text-neutral-900 dark:text-white">
                             {user.username}
                           </span>
-                          {isCurrentUser && (
-                            <span className="ml-2 text-xs text-danger-500 font-medium">
-                              (You)
-                            </span>
-                          )}
+                          {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                           {user.full_name && (
                             <p className="text-xs text-neutral-600">
                               {user.full_name}
@@ -337,7 +327,6 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
             </div>
 
             {error && <Alert variant="error" className="mb-4">{error}</Alert>}
-            {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-neutral-700 mb-1">

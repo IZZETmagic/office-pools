@@ -367,16 +367,35 @@ body {
   display: none;
 }
 
-/* Toast slide-in animation */
-@keyframes toast-slide-in {
+/* Toast animations — slide down from top */
+@keyframes toast-enter {
   from {
-    transform: translateX(100%);
+    transform: translateY(-100%);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
+}
+
+@keyframes toast-exit {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 0.3s ease-out forwards;
+}
+
+.toast-exit {
+  animation: toast-exit 0.3s ease-in forwards;
 }
 
 /* Mobile menu animations */

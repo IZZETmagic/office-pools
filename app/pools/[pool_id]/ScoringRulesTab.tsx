@@ -9,6 +9,7 @@ type PoolSettings = {
   knockout_exact_score: number
   knockout_correct_difference: number
   knockout_correct_result: number
+  round_32_multiplier: number
   round_16_multiplier: number
   quarter_final_multiplier: number
   semi_final_multiplier: number
@@ -42,6 +43,7 @@ const DEFAULTS: PoolSettings = {
   knockout_exact_score: 200,
   knockout_correct_difference: 150,
   knockout_correct_result: 100,
+  round_32_multiplier: 1,
   round_16_multiplier: 1,
   quarter_final_multiplier: 2,
   semi_final_multiplier: 4,
@@ -134,6 +136,7 @@ export function ScoringRulesTab({ settings }: ScoringRulesTabProps) {
         <h4 className="text-lg font-semibold text-neutral-900 mb-1">Round Multipliers</h4>
         <p className="text-xs text-neutral-500 mb-4">Knockout base points are multiplied by these values depending on the round.</p>
         <div className="divide-y divide-neutral-100">
+          <MultiplierRow label="Round of 32" value={s.round_32_multiplier} />
           <MultiplierRow label="Round of 16" value={s.round_16_multiplier} />
           <MultiplierRow label="Quarter Finals" value={s.quarter_final_multiplier} />
           <MultiplierRow label="Semi Finals" value={s.semi_final_multiplier} />

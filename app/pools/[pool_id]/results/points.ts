@@ -14,6 +14,7 @@ export type PoolSettings = {
   knockout_correct_difference: number
   knockout_correct_result: number
   // Stage multipliers
+  round_32_multiplier: number
   round_16_multiplier: number
   quarter_final_multiplier: number
   semi_final_multiplier: number
@@ -55,6 +56,7 @@ export const DEFAULT_POOL_SETTINGS: PoolSettings = {
   knockout_exact_score: 5,
   knockout_correct_difference: 3,
   knockout_correct_result: 1,
+  round_32_multiplier: 1,
   round_16_multiplier: 1,
   quarter_final_multiplier: 1,
   semi_final_multiplier: 1,
@@ -115,6 +117,8 @@ function getWinner(homeScore: number, awayScore: number): 'home' | 'away' | 'dra
  */
 function getStageMultiplier(stage: string, settings: PoolSettings): number {
   switch (stage) {
+    case 'round_32':
+      return settings.round_32_multiplier || 1
     case 'round_16':
       return settings.round_16_multiplier || 1
     case 'quarter_final':

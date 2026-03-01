@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 
@@ -70,6 +71,7 @@ type Step = typeof STEPS[number]['key']
 export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const supabase = createClient()
   const router = useRouter()
+  const { showToast } = useToast()
 
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>('tournament')
@@ -93,8 +95,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // UI state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [createdPoolCode, setCreatedPoolCode] = useState<string | null>(null)
 
   // Fetch tournaments on mount
   useEffect(() => {
@@ -167,7 +167,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const handleCreatePool = async () => {
     setLoading(true)
     setError(null)
-    setSuccess(null)
 
     if (!selectedTournamentId) {
       setError('Please select a tournament.')
@@ -262,9 +261,10 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       return
     }
 
-    setCreatedPoolCode(newPool.pool_code)
-    setSuccess(`Pool "${poolName.trim()}" created!`)
     setLoading(false)
+    showToast(`Pool "${poolName.trim()}" created! Code: ${newPool.pool_code}`, 'success')
+    onSuccess?.()
+    onClose()
     // Navigate to the new pool's settings tab
     router.push(`/pools/${newPool.pool_id}?tab=settings`)
   }
@@ -339,8 +339,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         </div>
 
         {/* Step indicator */}
-        {!success && (
-          <div className="flex items-center justify-center gap-3 px-4 sm:px-6 pt-3 pb-2 shrink-0">
+        <div className="flex items-center justify-center gap-3 px-4 sm:px-6 pt-3 pb-2 shrink-0">
             {STEPS.map((step, idx) => (
               <React.Fragment key={step.key}>
                 <button
@@ -386,23 +385,11 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
               </React.Fragment>
             ))}
           </div>
-        )}
 
         {/* Scrollable content */}
         <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4">
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
-          {success ? (
-            <Alert variant="success">
-              <p>{success}</p>
-              {createdPoolCode && (
-                <p className="mt-1">
-                  Pool code: <strong className="font-mono text-lg">{createdPoolCode}</strong>
-                </p>
-              )}
-            </Alert>
-          ) : (
-            <>
               {/* STEP 1: Tournament */}
               {currentStep === 'tournament' && (
                 <div className="space-y-4">
@@ -625,22 +612,10 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   </div>
                 </div>
               )}
-            </>
-          )}
         </div>
 
         {/* Footer */}
         <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-neutral-100 shrink-0">
-          {success ? (
-            <Button
-              variant="green"
-              fullWidth
-              onClick={() => { onSuccess?.(); onClose() }}
-            >
-              Done
-            </Button>
-          ) : (
-            <>
               {currentStepIndex > 0 ? (
                 <Button variant="gray" onClick={goBack} disabled={loading} className="flex-1">
                   Back
@@ -672,8 +647,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   Create Pool
                 </Button>
               )}
-            </>
-          )}
         </div>
       </div>
     </div>

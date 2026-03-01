@@ -16,7 +16,10 @@ import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
-import { DEFAULT_POOL_SETTINGS, type PoolSettings } from './results/points'
+import { DEFAULT_POOL_SETTINGS, calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
+import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
+import { resolveFullBracket } from '@/lib/bracketResolver'
+import type { PredictionMap, Team } from '@/lib/tournament'
 import type {
   PoolData,
   MemberData,
@@ -127,6 +130,7 @@ export function PoolDetail({
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
   const [showNavWarning, setShowNavWarning] = useState(false)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
+  const settingsDirtyRef = useRef(false)
 
   // Entry management
   const [entries, setEntries] = useState<EntryData[]>(userEntries)
@@ -412,6 +416,12 @@ export function PoolDetail({
       setShowNavWarning(true)
       return
     }
+    // If leaving settings tab with unsaved changes, show warning
+    if (activeTab === 'settings' && tab !== 'settings' && settingsDirtyRef.current) {
+      setPendingTab(tab)
+      setShowNavWarning(true)
+      return
+    }
     switchTab(tab)
   }, [activeTab, switchTab])
 
@@ -456,6 +466,140 @@ export function PoolDetail({
         pso_correct_result: settings.pso_correct_result ?? 0,
       }
     : DEFAULT_POOL_SETTINGS
+
+  // =============================================
+  // Compute true total points (match + bonus) for each entry — same logic as LeaderboardTab
+  // =============================================
+  const computedEntryTotals = useMemo(() => {
+    const map = new Map<string, number>()
+
+    // Convert data to types needed by scoring functions
+    const matchesWithResult: MatchWithResult[] = matches.map((m) => ({
+      match_id: m.match_id,
+      match_number: m.match_number,
+      stage: m.stage,
+      group_letter: m.group_letter,
+      match_date: m.match_date,
+      venue: m.venue,
+      status: m.status,
+      home_team_id: m.home_team_id,
+      away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder,
+      away_team_placeholder: m.away_team_placeholder,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      is_completed: m.is_completed,
+      home_score_ft: m.home_score_ft,
+      away_score_ft: m.away_score_ft,
+      home_score_pso: m.home_score_pso,
+      away_score_pso: m.away_score_pso,
+      winner_team_id: m.winner_team_id,
+      tournament_id: m.tournament_id,
+    }))
+
+    const tournamentTeams: Team[] = teams.map((t) => ({
+      team_id: t.team_id,
+      country_name: t.country_name,
+      country_code: t.country_code,
+      group_letter: t.group_letter,
+      fifa_ranking_points: t.fifa_ranking_points,
+      flag_url: t.flag_url,
+    }))
+
+    // Build lookup for point adjustments from member entries
+    const adjustmentMap = new Map<string, number>()
+    for (const member of members) {
+      for (const entry of member.entries || []) {
+        adjustmentMap.set(entry.entry_id, entry.point_adjustment ?? 0)
+      }
+    }
+
+    // Group predictions by entry_id
+    const predsByEntry = new Map<string, PredictionData[]>()
+    for (const p of allPredictions) {
+      const existing = predsByEntry.get(p.entry_id) || []
+      existing.push(p)
+      predsByEntry.set(p.entry_id, existing)
+    }
+
+    for (const [entryId, preds] of predsByEntry) {
+      // Build prediction map for this entry
+      const predictionMap: PredictionMap = new Map()
+      const predMap = new Map(preds.map(p => [p.match_id, p]))
+      for (const p of preds) {
+        predictionMap.set(p.match_id, {
+          home: p.predicted_home_score,
+          away: p.predicted_away_score,
+          homePso: p.predicted_home_pso ?? null,
+          awayPso: p.predicted_away_pso ?? null,
+          winnerTeamId: p.predicted_winner_team_id ?? null,
+        })
+      }
+
+      // Resolve bracket for knockout team matching
+      const bracket = resolveFullBracket({
+        matches: matchesWithResult,
+        predictionMap,
+        teams: tournamentTeams,
+        conductData,
+      })
+
+      // Compute match points
+      let matchPts = 0
+      for (const m of matches) {
+        if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
+          const pred = predMap.get(m.match_id)
+          if (!pred) continue
+
+          const resolved = bracket.knockoutTeamMap.get(m.match_number)
+          const teamsMatch = checkKnockoutTeamsMatch(
+            m.stage,
+            m.home_team_id,
+            m.away_team_id,
+            resolved?.home?.team_id ?? null,
+            resolved?.away?.team_id ?? null,
+          )
+
+          const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
+          const result = calculatePoints(
+            pred.predicted_home_score,
+            pred.predicted_away_score,
+            m.home_score_ft,
+            m.away_score_ft,
+            m.stage,
+            poolSettings,
+            hasPso
+              ? {
+                  actualHomePso: m.home_score_pso!,
+                  actualAwayPso: m.away_score_pso!,
+                  predictedHomePso: pred.predicted_home_pso,
+                  predictedAwayPso: pred.predicted_away_pso,
+                }
+              : undefined,
+            teamsMatch,
+          )
+          matchPts += result.points
+        }
+      }
+
+      // Compute bonus points
+      const bonusEntries = calculateAllBonusPoints({
+        memberId: entryId,
+        memberPredictions: predictionMap,
+        matches: matchesWithResult,
+        teams: tournamentTeams,
+        conductData,
+        settings: poolSettings,
+        tournamentAwards: null,
+      })
+      const bonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+      const adjustment = adjustmentMap.get(entryId) ?? 0
+
+      map.set(entryId, matchPts + bonusPts + adjustment)
+    }
+
+    return map
+  }, [allPredictions, matches, teams, conductData, poolSettings, members])
 
   // Fetch predictions when switching to predictions tab or changing active entry
   useEffect(() => {
@@ -555,7 +699,7 @@ export function PoolDetail({
         badges={
           <>
             <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-            {isAdmin && <Badge variant="blue">Admin</Badge>}
+            {isAdmin && <Badge variant="outline">Admin</Badge>}
           </>
         }
         isSuperAdmin={isSuperAdmin}
@@ -810,6 +954,7 @@ export function PoolDetail({
                 matches={matches}
                 teams={teams}
                 currentUserId={currentUserId}
+                computedEntryTotals={computedEntryTotals}
               />
             )}
 
@@ -829,6 +974,7 @@ export function PoolDetail({
                 pool={pool}
                 setPool={setPool}
                 members={members}
+                onDirtyChange={(dirty) => { settingsDirtyRef.current = dirty }}
               />
             )}
       </main>
@@ -840,12 +986,14 @@ export function PoolDetail({
           <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Unsaved Changes</h3>
             <p className="text-sm text-neutral-600 mb-5">
-              You have unsaved predictions. What would you like to do?
+              You have unsaved changes. What would you like to do?
             </p>
             <div className="flex flex-col gap-2">
-              <Button variant="primary" onClick={handleSaveAndLeave} fullWidth>
-                Save &amp; Leave
-              </Button>
+              {activeTab === 'predictions' && (
+                <Button variant="primary" onClick={handleSaveAndLeave} fullWidth>
+                  Save &amp; Leave
+                </Button>
+              )}
               <Button variant="outline" onClick={handleLeaveWithoutSaving} fullWidth>
                 Leave Without Saving
               </Button>

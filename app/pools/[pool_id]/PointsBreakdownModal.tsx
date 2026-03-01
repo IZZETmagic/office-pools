@@ -302,6 +302,10 @@ export function PointsBreakdownModal({
     if (rank) lines.push(`Rank,${rank}`)
     lines.push(`Match Points,${matchPoints}`)
     lines.push(`Bonus Points,${bonusPoints}`)
+    if ((entry.point_adjustment ?? 0) !== 0) {
+      lines.push(`Point Adjustment,${entry.point_adjustment}`)
+      if (entry.adjustment_reason) lines.push(`Adjustment Reason,${esc(entry.adjustment_reason)}`)
+    }
     lines.push(`Total Points,${totalPoints}`)
     lines.push('')
 
@@ -439,7 +443,7 @@ export function PointsBreakdownModal({
         {/* Scrollable content */}
         <div className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {/* Total summary */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className={`grid gap-2 sm:gap-3 ${(entry.point_adjustment ?? 0) !== 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="bg-primary-50 rounded-lg p-3 text-center">
               <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">Match</div>
               <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{formatNumber(matchPoints)}</div>
@@ -448,11 +452,43 @@ export function PointsBreakdownModal({
               <div className="text-[11px] sm:text-xs font-medium text-success-600 uppercase tracking-wide">Bonus</div>
               <div className="text-xl sm:text-2xl font-bold text-success-700 mt-1">{formatNumber(bonusPoints)}</div>
             </div>
+            {(entry.point_adjustment ?? 0) !== 0 && (
+              <div className="bg-warning-50 rounded-lg p-3 text-center">
+                <div className="text-[11px] sm:text-xs font-medium text-warning-600 uppercase tracking-wide">Adj</div>
+                <div className={`text-xl sm:text-2xl font-bold mt-1 ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-700' : 'text-error-700'}`}>
+                  {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)}
+                </div>
+              </div>
+            )}
             <div className="bg-neutral-50 rounded-lg p-3 text-center border-2 border-neutral-200">
               <div className="text-[11px] sm:text-xs font-medium text-neutral-600 uppercase tracking-wide">Total</div>
               <div className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1">{formatNumber(totalPoints)}</div>
             </div>
           </div>
+
+          {/* ========================================== */}
+          {/* POINT ADJUSTMENT (only if non-zero)        */}
+          {/* ========================================== */}
+          {(entry.point_adjustment ?? 0) !== 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                Point Adjustment
+              </h3>
+              <div className="border border-warning-200 dark:border-warning-700 rounded-lg overflow-hidden bg-warning-50/50">
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <span className="text-xs font-medium text-warning-800">Manual Adjustment</span>
+                  <span className={`text-xs font-bold ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-error-600'}`}>
+                    {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)} pts
+                  </span>
+                </div>
+                {entry.adjustment_reason && (
+                  <div className="px-3 pb-2.5 -mt-1">
+                    <span className="text-xs text-warning-700 italic">{entry.adjustment_reason}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ========================================== */}
           {/* MATCH POINTS BREAKDOWN                     */}
@@ -582,6 +618,7 @@ export function PointsBreakdownModal({
                   <span className="text-xs font-semibold text-neutral-900">Round Multipliers</span>
                 </div>
                 <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                  <PointsRow label="Round of 32" value={`${poolSettings.round_32_multiplier}x`} suffix="" />
                   <PointsRow label="Round of 16" value={`${poolSettings.round_16_multiplier}x`} suffix="" />
                   <PointsRow label="Quarter Finals" value={`${poolSettings.quarter_final_multiplier}x`} suffix="" />
                   <PointsRow label="Semi Finals" value={`${poolSettings.semi_final_multiplier}x`} suffix="" />

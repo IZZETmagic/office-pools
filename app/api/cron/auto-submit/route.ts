@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { autoSubmitDraftEntries } from '@/lib/auto-submit'
+import { autoArchivePools } from '@/lib/auto-archive'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,14 +14,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await autoSubmitDraftEntries()
+    // Run both tasks in parallel
+    const [submitResult, archiveResult] = await Promise.all([
+      autoSubmitDraftEntries(),
+      autoArchivePools(),
+    ])
 
     return NextResponse.json({
       ok: true,
-      ...result,
+      autoSubmit: submitResult,
+      autoArchive: archiveResult,
     })
   } catch (err) {
-    console.error('[Cron] auto-submit error:', err)
+    console.error('[Cron] error:', err)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

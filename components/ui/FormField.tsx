@@ -9,7 +9,7 @@ type FormFieldProps = {
 export function FormField({ label, helperText, error, children, className }: FormFieldProps) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-neutral-700 mb-1">
+      <label className="block text-sm font-medium text-neutral-700 mb-2">
         {label}
       </label>
       {children}
