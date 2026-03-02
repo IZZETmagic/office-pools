@@ -18,6 +18,8 @@ type EntriesListViewProps = {
   onDeleteEntry: (entry: EntryData) => void
   onRenameEntry: (entry: EntryData, newName: string) => Promise<void>
   onEditEntry: (entry: EntryData) => void
+  /** Override predicted counts per entry (used for bracket picker where predictions table isn't used) */
+  entryProgressOverride?: Record<string, number>
 }
 
 function getEntryStatus(entry: EntryData, predictedCount: number): { label: string; variant: 'green' | 'yellow' | 'gray' | 'blue' } {
@@ -51,6 +53,7 @@ export function EntriesListView({
   onDeleteEntry,
   onRenameEntry,
   onEditEntry,
+  entryProgressOverride,
 }: EntriesListViewProps) {
   // Inline rename state (local to list view)
   const [renamingEntryId, setRenamingEntryId] = useState<string | null>(null)
@@ -59,7 +62,7 @@ export function EntriesListView({
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const getPredictedCount = (entryId: string) =>
-    allPredictions.filter(p => p.entry_id === entryId).length
+    entryProgressOverride?.[entryId] ?? allPredictions.filter(p => p.entry_id === entryId).length
 
   const startRename = (entry: EntryData) => {
     setRenamingEntryId(entry.entry_id)

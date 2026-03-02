@@ -14,6 +14,9 @@ import type {
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
+  BPGroupRanking,
+  BPThirdPlaceRanking,
+  BPKnockoutPick,
 } from './types'
 
 export default async function PoolPage({
@@ -202,6 +205,35 @@ export default async function PoolPage({
     }
   }
 
+  // For bracket_picker pools: fetch bracket picker data for the default entry
+  let bpGroupRankings: BPGroupRanking[] = []
+  let bpThirdPlaceRankings: BPThirdPlaceRanking[] = []
+  let bpKnockoutPicks: BPKnockoutPick[] = []
+  let bpEntryProgressMap: Record<string, number> = {}
+
+  if (pool.prediction_mode === 'bracket_picker' && defaultEntry) {
+    const [grRes, tpRes, kpRes] = await Promise.all([
+      supabase.from('bracket_picker_group_rankings').select('*').eq('entry_id', defaultEntry.entry_id),
+      supabase.from('bracket_picker_third_place_rankings').select('*').eq('entry_id', defaultEntry.entry_id),
+      supabase.from('bracket_picker_knockout_picks').select('*').eq('entry_id', defaultEntry.entry_id),
+    ])
+    bpGroupRankings = (grRes.data ?? []) as BPGroupRanking[]
+    bpThirdPlaceRankings = (tpRes.data ?? []) as BPThirdPlaceRanking[]
+    bpKnockoutPicks = (kpRes.data ?? []) as BPKnockoutPick[]
+  }
+
+  // For bracket_picker multi-entry: fetch progress counts for all user entries
+  if (pool.prediction_mode === 'bracket_picker' && userEntryIds.length > 0) {
+    const [grCountRes, tpCountRes, kpCountRes] = await Promise.all([
+      supabase.from('bracket_picker_group_rankings').select('entry_id').in('entry_id', userEntryIds),
+      supabase.from('bracket_picker_third_place_rankings').select('entry_id').in('entry_id', userEntryIds),
+      supabase.from('bracket_picker_knockout_picks').select('entry_id').in('entry_id', userEntryIds),
+    ])
+    for (const row of [...(grCountRes.data ?? []), ...(tpCountRes.data ?? []), ...(kpCountRes.data ?? [])]) {
+      bpEntryProgressMap[row.entry_id] = (bpEntryProgressMap[row.entry_id] || 0) + 1
+    }
+  }
+
   // Fetch all predictions (needed for admin tabs + leaderboard bonus computation)
   let allPredictions: PredictionData[] = []
   if (allEntryIds.length > 0) {
@@ -249,6 +281,10 @@ export default async function PoolPage({
       hasSeenHowToPlay={membership.has_seen_how_to_play ?? false}
       roundStates={roundStates}
       roundSubmissions={roundSubmissions}
+      bpGroupRankings={bpGroupRankings}
+      bpThirdPlaceRankings={bpThirdPlaceRankings}
+      bpKnockoutPicks={bpKnockoutPicks}
+      bpEntryProgressMap={bpEntryProgressMap}
     />
   )
 }

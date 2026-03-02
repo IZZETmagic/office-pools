@@ -23,7 +23,7 @@ type LeaderboardTabProps = {
   poolSettings: PoolSettings
   maxEntriesPerUser: number
   currentUserId: string
-  predictionMode?: 'full_tournament' | 'progressive'
+  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
 }
 
 // =============================================
@@ -247,13 +247,34 @@ export function LeaderboardTab({
     for (const entries of computedBonusMap.values()) {
       if (entries.length > 0) return true
     }
+    // For bracket picker, check DB bonus_scores directly
+    if (bonusScores.length > 0) return true
     return playerScores.some(ps => ps.bonus_points > 0)
-  }, [computedBonusMap, playerScores])
+  }, [computedBonusMap, playerScores, bonusScores])
 
   // Build computed player score for modal
   const getPlayerScore = (entryId: string): PlayerScoreData => {
     const entry = leaderboardEntries.find(e => e.entry_id === entryId)
     const adjustment = entry?.point_adjustment ?? 0
+
+    // For bracket picker pools, derive scores from DB bonus_scores
+    // (no match predictions exist, so client-side computation is empty)
+    if (predictionMode === 'bracket_picker') {
+      const dbBonusEntries = bonusScores.filter(bs => bs.entry_id === entryId)
+      const dbBonusPts = dbBonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+
+      // Also check player_scores for any previously computed totals
+      const dbScore = scoreMap.get(entryId)
+      const totalFromDb = dbScore ? dbScore.total_points : dbBonusPts
+
+      return {
+        entry_id: entryId,
+        match_points: 0,
+        bonus_points: dbBonusPts || (dbScore?.bonus_points ?? 0),
+        total_points: Math.max(dbBonusPts, totalFromDb) + adjustment,
+      }
+    }
+
     const computedMatchPts = computedMatchPointsMap.get(entryId)
     const computedBonus = computedBonusMap.get(entryId)
     const computedBonusPts = computedBonus ? computedBonus.reduce((sum, e) => sum + e.points_earned, 0) : 0
@@ -293,7 +314,7 @@ export function LeaderboardTab({
       if (bScore !== aScore) return bScore - aScore
       return (a.current_rank ?? 999) - (b.current_rank ?? 999)
     })
-  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap])
+  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap, bonusScores, predictionMode])
 
   if (sorted.length === 0) {
     return (
@@ -378,7 +399,9 @@ export function LeaderboardTab({
               {/* Points */}
               <div className="flex-shrink-0 text-right">
                 <div className="text-lg font-bold text-primary-600">{formatNumber(ps.total_points)}</div>
-                {hasAnyBonusPoints && ps.bonus_points > 0 ? (
+                {predictionMode === 'bracket_picker' ? (
+                  <div className="text-[10px] text-neutral-500 uppercase">pts</div>
+                ) : hasAnyBonusPoints && ps.bonus_points > 0 ? (
                   <div className="text-[10px] text-neutral-500">
                     {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                   </div>
@@ -409,7 +432,7 @@ export function LeaderboardTab({
               <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
                 {isMultiEntry ? 'Entry' : 'Player'}
               </th>
-              {hasAnyBonusPoints && (
+              {hasAnyBonusPoints && predictionMode !== 'bracket_picker' && (
                 <>
                   <th className="px-3 md:px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase tracking-wider">
                     Match
@@ -481,7 +504,7 @@ export function LeaderboardTab({
                       </div>
                     )}
                   </td>
-                  {hasAnyBonusPoints && (
+                  {hasAnyBonusPoints && predictionMode !== 'bracket_picker' && (
                     <>
                       <td className="px-3 md:px-4 py-4 whitespace-nowrap text-right">
                         <span className="text-sm font-medium text-neutral-700">
@@ -530,6 +553,7 @@ export function LeaderboardTab({
           entryPredictions={allPredictions.filter(p => p.entry_id === selectedEntry.entry_id)}
           teams={teams}
           conductData={conductData}
+          predictionMode={predictionMode}
         />
       )}
     </>

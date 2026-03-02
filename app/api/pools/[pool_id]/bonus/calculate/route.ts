@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
 import { resolveFullBracket } from '@/lib/bracketResolver'
@@ -18,6 +18,7 @@ export async function POST(
 ) {
   const { pool_id } = await params
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
   // 1. Authenticate
   const { data: { user } } = await supabase.auth.getUser()
@@ -160,13 +161,13 @@ export async function POST(
       tournamentAwards,
     })
 
-    // Delete existing bonus_scores for this entry
-    await supabase
+    // Delete existing bonus_scores for this entry (use admin client to bypass RLS)
+    await adminClient
       .from('bonus_scores')
       .delete()
       .eq('entry_id', entry.entry_id)
 
-    // Insert new bonus_scores
+    // Insert new bonus_scores (use admin client to bypass RLS)
     if (bonusEntries.length > 0) {
       const rows = bonusEntries.map(e => ({
         entry_id: e.entry_id,
@@ -178,7 +179,7 @@ export async function POST(
         description: e.description,
       }))
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await adminClient
         .from('bonus_scores')
         .insert(rows)
 
@@ -188,17 +189,17 @@ export async function POST(
     }
 
     // Auto-populate group_predictions for this entry
-    await populateGroupPredictions(supabase, entry.entry_id, pool.tournament_id, normalizedMatches, predictionMap, teamsData)
+    await populateGroupPredictions(adminClient, entry.entry_id, pool.tournament_id, normalizedMatches, predictionMap, teamsData)
 
     // Auto-populate special_predictions for this entry
-    await populateSpecialPredictions(supabase, entry.entry_id, normalizedMatches, predictionMap, teamsData)
+    await populateSpecialPredictions(adminClient, entry.entry_id, normalizedMatches, predictionMap, teamsData)
 
     totalBonusEntries += bonusEntries.length
     totalBonusPoints += bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
   }
 
-  // 6. Recalculate leaderboard
-  const { error: leaderboardError } = await supabase.rpc('recalculate_pool_leaderboard', {
+  // 6. Recalculate leaderboard (use admin client to bypass RLS)
+  const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
     p_pool_id: pool_id,
   })
 

@@ -6,7 +6,7 @@ type HowToPlayTabProps = {
   poolName: string
   maxEntries: number
   isPastDeadline: boolean
-  predictionMode?: 'full_tournament' | 'progressive'
+  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
 }
 
 function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {

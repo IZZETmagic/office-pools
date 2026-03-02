@@ -271,19 +271,28 @@ export function MatchesTab({
     // Step 2: Recalculate points for all pools (now supports live matches with scores)
     const { data: pools } = await supabase
       .from('pools')
-      .select('pool_id')
+      .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
     if (pools) {
       for (const pool of pools) {
-        await supabase.rpc('recalculate_all_pool_points', {
-          pool_id_param: pool.pool_id,
-        })
-        // Also recalculate bonus points
-        try {
-          await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
-        } catch (e) {
-          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+        if (pool.prediction_mode === 'bracket_picker') {
+          // Bracket picker pools use the BP calculate endpoint
+          try {
+            await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+          } catch (e) {
+            console.error('Failed to recalculate bracket picker points for pool', pool.pool_id, e)
+          }
+        } else {
+          await supabase.rpc('recalculate_all_pool_points', {
+            pool_id_param: pool.pool_id,
+          })
+          // Also recalculate bonus points
+          try {
+            await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+          } catch (e) {
+            console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+          }
         }
       }
     }
@@ -430,23 +439,27 @@ export function MatchesTab({
       }
     }
 
-    // Recalculate bonus points for all pools linked to this tournament
+    // Recalculate bonus/bracket points for all pools linked to this tournament
     const { data: pools } = await supabase
       .from('pools')
-      .select('pool_id')
+      .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
     let bonusInfo = ''
     if (pools && pools.length > 0) {
       for (const pool of pools) {
         try {
-          const res = await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+          // Use the appropriate calculation endpoint based on pool type
+          const endpoint = pool.prediction_mode === 'bracket_picker'
+            ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
+            : `/api/pools/${pool.pool_id}/bonus/calculate`
+          const res = await fetch(endpoint, { method: 'POST' })
           if (res.ok) {
             const data = await res.json()
             bonusInfo = ` Bonus: ${data.totalBonusEntries} entries (${data.totalBonusPoints} pts).`
           }
         } catch (e) {
-          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+          console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
       }
     }
@@ -510,18 +523,21 @@ export function MatchesTab({
       return
     }
 
-    // Recalculate bonus points for all pools after reset
-    const { data: pools } = await supabase
+    // Recalculate bonus/bracket points for all pools after reset
+    const { data: resetPools } = await supabase
       .from('pools')
-      .select('pool_id')
+      .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
-    if (pools) {
-      for (const pool of pools) {
+    if (resetPools) {
+      for (const pool of resetPools) {
         try {
-          await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+          const endpoint = pool.prediction_mode === 'bracket_picker'
+            ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
+            : `/api/pools/${pool.pool_id}/bonus/calculate`
+          await fetch(endpoint, { method: 'POST' })
         } catch (e) {
-          console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+          console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
       }
     }

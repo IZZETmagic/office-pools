@@ -13,6 +13,7 @@ import { ScoringRulesTab } from './ScoringRulesTab'
 import { HowToPlayTab } from './HowToPlayTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
+import BracketPickerFlow from '@/components/predictions/BracketPickerFlow'
 import { EntriesListView } from '@/components/predictions/EntriesListView'
 import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { MembersTab } from './admin/MembersTab'
@@ -36,6 +37,9 @@ import type {
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
+  BPGroupRanking,
+  BPThirdPlaceRanking,
+  BPKnockoutPick,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 import { formatTimeAgo } from '@/lib/format'
@@ -94,6 +98,10 @@ type PoolDetailProps = {
   hasSeenHowToPlay: boolean
   roundStates?: PoolRoundState[]
   roundSubmissions?: EntryRoundSubmission[]
+  bpGroupRankings?: BPGroupRanking[]
+  bpThirdPlaceRankings?: BPThirdPlaceRanking[]
+  bpKnockoutPicks?: BPKnockoutPick[]
+  bpEntryProgressMap?: Record<string, number>
 }
 
 // =====================
@@ -120,6 +128,10 @@ export function PoolDetail({
   hasSeenHowToPlay,
   roundStates = [],
   roundSubmissions = [],
+  bpGroupRankings = [],
+  bpThirdPlaceRankings = [],
+  bpKnockoutPicks = [],
+  bpEntryProgressMap: initialBPEntryProgressMap = {},
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -158,6 +170,10 @@ export function PoolDetail({
   const [settings, setSettings] = useState(initialSettings)
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
   const [showNavWarning, setShowNavWarning] = useState(false)
+
+  // Prediction mode flags (defined early so hooks can reference them)
+  const isProgressive = pool.prediction_mode === 'progressive'
+  const isBracketPicker = pool.prediction_mode === 'bracket_picker'
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
   const settingsDirtyRef = useRef(false)
 
@@ -254,8 +270,18 @@ export function PoolDetail({
         setActiveEntryId(remaining[0]?.entry_id || '')
         setShowDeleteEntryModal(false)
         setPredictionsView({ mode: 'list' })
-        // Clear cached predictions for deleted entry
+        // Clear cached data for deleted entry
         setLiveEntryPredictions(prev => {
+          const next = { ...prev }
+          delete next[activeEntry.entry_id]
+          return next
+        })
+        setLiveBPData(prev => {
+          const next = { ...prev }
+          delete next[activeEntry.entry_id]
+          return next
+        })
+        setBPEntryProgressMap(prev => {
           const next = { ...prev }
           delete next[activeEntry.entry_id]
           return next
@@ -273,6 +299,14 @@ export function PoolDetail({
   const [liveEntryPredictions, setLiveEntryPredictions] = useState<Record<string, ExistingPrediction[]>>({})
   const [liveRoundSubmissions, setLiveRoundSubmissions] = useState<Record<string, EntryRoundSubmission[]>>({})
   const [loadingPredictions, setLoadingPredictions] = useState(false)
+
+  // Live bracket picker data fetched client-side (overrides server data when available)
+  const [liveBPData, setLiveBPData] = useState<Record<string, {
+    groupRankings: BPGroupRanking[]
+    thirdPlaceRankings: BPThirdPlaceRanking[]
+    knockoutPicks: BPKnockoutPick[]
+  }>>({})
+  const [bpEntryProgressMap, setBPEntryProgressMap] = useState<Record<string, number>>(initialBPEntryProgressMap)
 
   // Fetch predictions for the active entry from the database
   const fetchEntryPredictions = useCallback(async (entryId: string) => {
@@ -307,20 +341,56 @@ export function PoolDetail({
     }
   }, [pool.prediction_mode])
 
+  // Fetch bracket picker data for an entry
+  const fetchEntryBPData = useCallback(async (entryId: string) => {
+    setLoadingPredictions(true)
+    try {
+      const supabase = createClient()
+      const [grRes, tpRes, kpRes] = await Promise.all([
+        supabase.from('bracket_picker_group_rankings').select('*').eq('entry_id', entryId),
+        supabase.from('bracket_picker_third_place_rankings').select('*').eq('entry_id', entryId),
+        supabase.from('bracket_picker_knockout_picks').select('*').eq('entry_id', entryId),
+      ])
+      const groupRankings = (grRes.data ?? []) as BPGroupRanking[]
+      const thirdPlaceRankings = (tpRes.data ?? []) as BPThirdPlaceRanking[]
+      const knockoutPicks = (kpRes.data ?? []) as BPKnockoutPick[]
+      setLiveBPData(prev => ({
+        ...prev,
+        [entryId]: { groupRankings, thirdPlaceRankings, knockoutPicks },
+      }))
+      // Update progress map
+      setBPEntryProgressMap(prev => ({
+        ...prev,
+        [entryId]: groupRankings.length + thirdPlaceRankings.length + knockoutPicks.length,
+      }))
+    } finally {
+      setLoadingPredictions(false)
+    }
+  }, [])
+
   // Navigate into an entry's detail view (multi-entry)
   const handleOpenEntryDetail = useCallback((entry: EntryData) => {
     setActiveEntryId(entry.entry_id)
-    // Clear stale cached predictions so EntryDetailView doesn't mount with old data
+    // Clear stale cached data so detail view doesn't mount with old data
     setLiveEntryPredictions(prev => {
       const next = { ...prev }
       delete next[entry.entry_id]
       return next
     })
+    setLiveBPData(prev => {
+      const next = { ...prev }
+      delete next[entry.entry_id]
+      return next
+    })
     setPredictionsView({ mode: 'detail', entryId: entry.entry_id })
-    // Fetch fresh predictions — EntryDetailView is gated on loadingPredictions
-    fetchEntryPredictions(entry.entry_id)
-    fetchEntryRoundSubmissions(entry.entry_id)
-  }, [fetchEntryPredictions, fetchEntryRoundSubmissions])
+    // Fetch fresh data — detail view is gated on loadingPredictions
+    if (isBracketPicker) {
+      fetchEntryBPData(entry.entry_id)
+    } else {
+      fetchEntryPredictions(entry.entry_id)
+      fetchEntryRoundSubmissions(entry.entry_id)
+    }
+  }, [fetchEntryPredictions, fetchEntryRoundSubmissions, fetchEntryBPData, isBracketPicker])
 
   // Navigate back to entries list (silently save any pending changes, refresh list data)
   const handleBackToList = useCallback(async () => {
@@ -332,39 +402,69 @@ export function PoolDetail({
     const entryId = activeEntryId
     if (entryId) {
       const supabase = createClient()
-      const [predsResult, entryResult] = await Promise.all([
-        supabase
-          .from('predictions')
-          .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-          .eq('entry_id', entryId),
-        supabase
-          .from('pool_entries')
-          .select('has_submitted_predictions, predictions_submitted_at, predictions_last_saved_at')
-          .eq('entry_id', entryId)
-          .single(),
-      ])
-      if (predsResult.data) {
-        setAllPredictions(prev => [
-          ...prev.filter(p => p.entry_id !== entryId),
-          ...(predsResult.data as PredictionData[]),
+
+      if (isBracketPicker) {
+        // Refresh BP progress counts + entry metadata
+        const [grRes, tpRes, kpRes, entryResult] = await Promise.all([
+          supabase.from('bracket_picker_group_rankings').select('entry_id').eq('entry_id', entryId),
+          supabase.from('bracket_picker_third_place_rankings').select('entry_id').eq('entry_id', entryId),
+          supabase.from('bracket_picker_knockout_picks').select('entry_id').eq('entry_id', entryId),
+          supabase
+            .from('pool_entries')
+            .select('has_submitted_predictions, predictions_submitted_at, predictions_last_saved_at')
+            .eq('entry_id', entryId)
+            .single(),
         ])
-      }
-      if (entryResult.data) {
-        setEntries(prev => prev.map(e =>
-          e.entry_id === entryId
-            ? {
-                ...e,
-                predictions_last_saved_at: entryResult.data.predictions_last_saved_at,
-                has_submitted_predictions: entryResult.data.has_submitted_predictions,
-                predictions_submitted_at: entryResult.data.predictions_submitted_at,
-              }
-            : e
-        ))
+        const count = (grRes.data?.length ?? 0) + (tpRes.data?.length ?? 0) + (kpRes.data?.length ?? 0)
+        setBPEntryProgressMap(prev => ({ ...prev, [entryId]: count }))
+        if (entryResult.data) {
+          setEntries(prev => prev.map(e =>
+            e.entry_id === entryId
+              ? {
+                  ...e,
+                  predictions_last_saved_at: entryResult.data.predictions_last_saved_at,
+                  has_submitted_predictions: entryResult.data.has_submitted_predictions,
+                  predictions_submitted_at: entryResult.data.predictions_submitted_at,
+                }
+              : e
+          ))
+        }
+      } else {
+        // Refresh predictions + entry metadata for non-BP modes
+        const [predsResult, entryResult] = await Promise.all([
+          supabase
+            .from('predictions')
+            .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+            .eq('entry_id', entryId),
+          supabase
+            .from('pool_entries')
+            .select('has_submitted_predictions, predictions_submitted_at, predictions_last_saved_at')
+            .eq('entry_id', entryId)
+            .single(),
+        ])
+        if (predsResult.data) {
+          setAllPredictions(prev => [
+            ...prev.filter(p => p.entry_id !== entryId),
+            ...(predsResult.data as PredictionData[]),
+          ])
+        }
+        if (entryResult.data) {
+          setEntries(prev => prev.map(e =>
+            e.entry_id === entryId
+              ? {
+                  ...e,
+                  predictions_last_saved_at: entryResult.data.predictions_last_saved_at,
+                  has_submitted_predictions: entryResult.data.has_submitted_predictions,
+                  predictions_submitted_at: entryResult.data.predictions_submitted_at,
+                }
+              : e
+          ))
+        }
       }
     }
 
     setPredictionsView({ mode: 'list' })
-  }, [activeEntryId])
+  }, [activeEntryId, isBracketPicker])
 
   // Delete entry from list view (needs to set active first for handleDeleteEntry)
   const handleDeleteEntryFromList = useCallback((entry: EntryData) => {
@@ -635,7 +735,7 @@ export function PoolDetail({
         conductData,
         settings: poolSettings,
         tournamentAwards: null,
-        predictionMode: pool.prediction_mode as 'full_tournament' | 'progressive',
+        predictionMode: pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker',
       })
       const bonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
       const adjustment = adjustmentMap.get(entryId) ?? 0
@@ -646,12 +746,16 @@ export function PoolDetail({
     return map
   }, [allPredictions, matches, teams, conductData, poolSettings, members])
 
-  // Fetch predictions when switching to predictions tab or changing active entry
+  // Fetch predictions/BP data when switching to predictions tab or changing active entry
   useEffect(() => {
     if (activeTab === 'predictions' && activeEntry) {
-      fetchEntryPredictions(activeEntry.entry_id)
+      if (isBracketPicker) {
+        fetchEntryBPData(activeEntry.entry_id)
+      } else {
+        fetchEntryPredictions(activeEntry.entry_id)
+      }
     }
-  }, [activeTab, activeEntry?.entry_id, fetchEntryPredictions])
+  }, [activeTab, activeEntry?.entry_id, fetchEntryPredictions, fetchEntryBPData, isBracketPicker])
 
   // Derive active entry's predictions: prefer live data, fall back to server data
   const activeEntryPredictions: ExistingPrediction[] = useMemo(() => {
@@ -691,6 +795,31 @@ export function PoolDetail({
     return []
   }, [activeEntry, roundSubmissions, userEntries, liveRoundSubmissions])
 
+  // Derive active entry's bracket picker data: prefer live data, fall back to server props
+  const activeBPGroupRankings: BPGroupRanking[] = useMemo(() => {
+    if (!activeEntry) return []
+    if (liveBPData[activeEntry.entry_id]) return liveBPData[activeEntry.entry_id].groupRankings
+    if (activeEntry.entry_id === userEntries[0]?.entry_id) return bpGroupRankings
+    return []
+  }, [activeEntry, liveBPData, userEntries, bpGroupRankings])
+
+  const activeBPThirdPlaceRankings: BPThirdPlaceRanking[] = useMemo(() => {
+    if (!activeEntry) return []
+    if (liveBPData[activeEntry.entry_id]) return liveBPData[activeEntry.entry_id].thirdPlaceRankings
+    if (activeEntry.entry_id === userEntries[0]?.entry_id) return bpThirdPlaceRankings
+    return []
+  }, [activeEntry, liveBPData, userEntries, bpThirdPlaceRankings])
+
+  const activeBPKnockoutPicks: BPKnockoutPick[] = useMemo(() => {
+    if (!activeEntry) return []
+    if (liveBPData[activeEntry.entry_id]) return liveBPData[activeEntry.entry_id].knockoutPicks
+    if (activeEntry.entry_id === userEntries[0]?.entry_id) return bpKnockoutPicks
+    return []
+  }, [activeEntry, liveBPData, userEntries, bpKnockoutPicks])
+
+  // Total expected bracket picker picks for progress display (12 groups × 4 + 12 third place + 32 knockout)
+  const bpTotalExpectedPicks = 92
+
   // Build user prediction list for results tab
   const userPredictionsList = activeEntryPredictions.map((p) => ({
     match_id: p.match_id,
@@ -708,7 +837,6 @@ export function PoolDetail({
     away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
   }))
 
-  const isProgressive = pool.prediction_mode === 'progressive'
   const adminTabs = isProgressive
     ? [{ key: 'rounds' as Tab, label: 'Rounds' }, ...ADMIN_TABS]
     : ADMIN_TABS
@@ -848,7 +976,7 @@ export function PoolDetail({
                 poolSettings={poolSettings}
                 maxEntriesPerUser={pool.max_entries_per_user}
                 currentUserId={currentUserId}
-                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive'}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
               />
             )}
 
@@ -923,7 +1051,83 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'predictions' && activeEntry && !isProgressive && (
+            {activeTab === 'predictions' && activeEntry && isBracketPicker && (
+              pool.max_entries_per_user > 1 ? (
+                // Multi-entry bracket picker: list view or detail view
+                predictionsView.mode === 'list' ? (
+                  <EntriesListView
+                    entries={entries}
+                    poolId={pool.pool_id}
+                    totalMatches={bpTotalExpectedPicks}
+                    isPastDeadline={isPastDeadline}
+                    allPredictions={allPredictions}
+                    canAddEntry={canAddEntry}
+                    addingEntry={addingEntry}
+                    onAddEntry={handleAddEntry}
+                    onDeleteEntry={handleDeleteEntryFromList}
+                    onRenameEntry={handleRenameEntryFromList}
+                    onEditEntry={handleOpenEntryDetail}
+                    entryProgressOverride={bpEntryProgressMap}
+                  />
+                ) : loadingPredictions ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Back navigation */}
+                    <button
+                      onClick={handleBackToList}
+                      className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium mb-4 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to Entries
+                    </button>
+                    <div className="flex items-center gap-2 mb-4">
+                      <h3 className="text-lg font-semibold text-neutral-900">{activeEntry.entry_name}</h3>
+                    </div>
+                    <BracketPickerFlow
+                      key={activeEntryId}
+                      poolId={pool.pool_id}
+                      entryId={activeEntry.entry_id}
+                      teams={teams}
+                      matches={predictionsMatches}
+                      settings={settings!}
+                      predictionDeadline={pool.prediction_deadline}
+                      isSubmitted={activeEntry.has_submitted_predictions}
+                      isLocked={activeEntry.predictions_locked}
+                      existingGroupRankings={activeBPGroupRankings}
+                      existingThirdPlaceRankings={activeBPThirdPlaceRankings}
+                      existingKnockoutPicks={activeBPKnockoutPicks}
+                      onSaveStatusChange={(status) => setPredictionStatus(prev => ({ ...prev, saveStatus: status }))}
+                      onSubmit={() => { router.refresh() }}
+                    />
+                  </div>
+                )
+              ) : (
+                // Single-entry bracket picker: render directly
+                <BracketPickerFlow
+                  key={activeEntryId}
+                  poolId={pool.pool_id}
+                  entryId={activeEntry.entry_id}
+                  teams={teams}
+                  matches={predictionsMatches}
+                  settings={settings!}
+                  predictionDeadline={pool.prediction_deadline}
+                  isSubmitted={activeEntry.has_submitted_predictions}
+                  isLocked={activeEntry.predictions_locked}
+                  existingGroupRankings={activeBPGroupRankings}
+                  existingThirdPlaceRankings={activeBPThirdPlaceRankings}
+                  existingKnockoutPicks={activeBPKnockoutPicks}
+                  onSaveStatusChange={(status) => setPredictionStatus(prev => ({ ...prev, saveStatus: status }))}
+                  onSubmit={() => { router.refresh() }}
+                />
+              )
+            )}
+
+            {activeTab === 'predictions' && activeEntry && !isProgressive && !isBracketPicker && (
               pool.max_entries_per_user > 1 ? (
                 // Multi-entry: list view or detail view
                 predictionsView.mode === 'list' ? (
@@ -1076,7 +1280,7 @@ export function PoolDetail({
             )}
 
             {activeTab === 'scoring_rules' && (
-              <ScoringRulesTab settings={settings} />
+              <ScoringRulesTab settings={settings} predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'} />
             )}
 
             {activeTab === 'how_to_play' && (
@@ -1084,7 +1288,7 @@ export function PoolDetail({
                 poolName={pool.pool_name}
                 maxEntries={pool.max_entries_per_user}
                 isPastDeadline={isPastDeadline}
-                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive'}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
               />
             )}
 

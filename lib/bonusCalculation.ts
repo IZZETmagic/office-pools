@@ -55,7 +55,7 @@ export function calculateAllBonusPoints(params: {
   conductData: MatchConductData[]
   settings: PoolSettings
   tournamentAwards: TournamentAwards | null
-  predictionMode?: 'full_tournament' | 'progressive'
+  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
 }): BonusScoreEntry[] {
   const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards, predictionMode = 'full_tournament' } = params
 

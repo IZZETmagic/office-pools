@@ -22,6 +22,7 @@ type PointsBreakdownModalProps = {
   entryPredictions: PredictionData[]
   teams: TeamData[]
   conductData: MatchConductData[]
+  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
 }
 
 type MatchPointDetail = {
@@ -73,6 +74,20 @@ const BONUS_CATEGORY_CONFIG: Record<string, { label: string }> = {
   tournament: { label: 'Tournament Podium' },
 }
 
+// Bracket Picker category ordering and labels
+const BP_CATEGORY_ORDER = ['bp_group', 'bp_third_place', 'bp_knockout', 'bp_bonus', 'group_standings', 'qualification', 'bracket', 'tournament'] as const
+
+const BP_CATEGORY_CONFIG: Record<string, { label: string }> = {
+  bp_group: { label: 'Group Rankings' },
+  bp_third_place: { label: 'Third-Place Rankings' },
+  bp_knockout: { label: 'Knockout Bracket' },
+  bp_bonus: { label: 'Bracket Picker Bonus' },
+  group_standings: { label: 'Group Standings Bonus' },
+  qualification: { label: 'Overall Qualification Bonus' },
+  bracket: { label: 'Knockout & Bracket Bonus' },
+  tournament: { label: 'Tournament Podium' },
+}
+
 // =============================================
 // SUB-COMPONENTS
 // =============================================
@@ -101,6 +116,7 @@ export function PointsBreakdownModal({
   entryPredictions,
   teams,
   conductData,
+  predictionMode = 'full_tournament',
 }: PointsBreakdownModalProps) {
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
@@ -445,7 +461,9 @@ export function PointsBreakdownModal({
           {/* Total summary */}
           <div className={`grid gap-2 sm:gap-3 ${(entry.point_adjustment ?? 0) !== 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="bg-primary-50 rounded-lg p-3 text-center">
-              <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">Match</div>
+              <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">
+                {predictionMode === 'bracket_picker' ? 'Picks' : 'Match'}
+              </div>
               <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{formatNumber(matchPoints)}</div>
             </div>
             <div className="bg-success-50 rounded-lg p-3 text-center">
@@ -490,177 +508,300 @@ export function PointsBreakdownModal({
             </div>
           )}
 
-          {/* ========================================== */}
-          {/* MATCH POINTS BREAKDOWN                     */}
-          {/* ========================================== */}
-          <div>
-            <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
-              Match Points Breakdown
-            </h3>
+          {predictionMode === 'bracket_picker' ? (
+            <>
+              {/* ========================================== */}
+              {/* BRACKET PICKER POINTS BREAKDOWN            */}
+              {/* ========================================== */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                  Points Breakdown
+                </h3>
 
-            {matchDetails.length === 0 ? (
-              <div className="text-center py-6 bg-neutral-50 rounded-lg">
-                <div className="text-neutral-400 text-sm">No completed matches with predictions yet</div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {renderMatchStageSection('group')}
-                {renderMatchStageSection('round_32')}
-                {renderMatchStageSection('round_16')}
-                {renderMatchStageSection('quarter_final')}
-                {renderMatchStageSection('semi_final')}
-                {renderMatchStageSection('third_place')}
-                {renderMatchStageSection('final')}
-
-                {totalPsoPoints > 0 && (
-                  <div className="bg-accent-50 rounded-lg px-3 py-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-medium text-accent-700">Penalty Shootout Bonus (included above)</span>
-                      <span className="text-xs font-bold text-accent-700">+{formatNumber(totalPsoPoints)} pts</span>
+                {bonusScores.length === 0 && matchPoints === 0 ? (
+                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-400 text-sm">No points calculated yet</div>
+                    <div className="text-neutral-400 text-xs mt-1">
+                      Points are calculated as tournament stages complete
                     </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {BP_CATEGORY_ORDER.map((category) => {
+                      const catEntries = groupedBonuses.get(category)
+                      if (!catEntries || catEntries.length === 0) return null
+                      const subtotal = categorySubtotals.get(category) ?? 0
+                      const config = BP_CATEGORY_CONFIG[category]
+
+                      return (
+                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
+                            <span className="text-xs font-semibold text-neutral-900">
+                              {config.label}
+                            </span>
+                            <span className="text-xs font-bold text-neutral-900 flex-shrink-0">
+                              {formatNumber(subtotal)} pts
+                            </span>
+                          </div>
+                          <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                            {catEntries.map((bs, i) => (
+                              <div
+                                key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
+                                className="flex items-start justify-between px-3 py-2 text-xs"
+                              >
+                                <span className="text-neutral-700 pr-3 leading-snug">
+                                  {bs.description}
+                                </span>
+                                <span className="text-success-600 font-semibold flex-shrink-0">
+                                  +{formatNumber(bs.points_earned)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* ========================================== */}
-          {/* BONUS POINTS BREAKDOWN                     */}
-          {/* ========================================== */}
-          <div>
-            <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
-              Bonus Points Breakdown
-            </h3>
+              {/* ========================================== */}
+              {/* BRACKET PICKER SCORING RULES REFERENCE     */}
+              {/* ========================================== */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                  Scoring Rules Reference
+                </h3>
 
-            {bonusScores.length === 0 ? (
-              <div className="text-center py-6 bg-neutral-50 rounded-lg">
-                <div className="text-neutral-400 text-sm">No bonus points earned yet</div>
-                <div className="text-neutral-400 text-xs mt-1">
-                  Bonus points are calculated as tournament stages complete
+                <div className="space-y-3">
+                  {/* Group Rankings Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Group Stage Rankings</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Correct 1st Place" value={poolSettings.bp_group_correct_1st ?? 4} />
+                      <PointsRow label="Correct 2nd Place" value={poolSettings.bp_group_correct_2nd ?? 3} />
+                      <PointsRow label="Correct 3rd Place" value={poolSettings.bp_group_correct_3rd ?? 2} />
+                      <PointsRow label="Correct 4th Place" value={poolSettings.bp_group_correct_4th ?? 1} />
+                    </div>
+                  </div>
+
+                  {/* Third-Place Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Third-Place Rankings</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Correct qualifier" value={poolSettings.bp_third_correct_qualifier ?? 2} />
+                      <PointsRow label="Correct eliminated" value={poolSettings.bp_third_correct_eliminated ?? 1} />
+                      <PointsRow label="All 8 qualifiers correct bonus" value={poolSettings.bp_third_all_correct_bonus ?? 10} />
+                    </div>
+                  </div>
+
+                  {/* Knockout Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Knockout Stage</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Round of 32" value={poolSettings.bp_r32_correct ?? 1} />
+                      <PointsRow label="Round of 16" value={poolSettings.bp_r16_correct ?? 2} />
+                      <PointsRow label="Quarter Finals" value={poolSettings.bp_qf_correct ?? 4} />
+                      <PointsRow label="Semi Finals" value={poolSettings.bp_sf_correct ?? 8} />
+                      <PointsRow label="3rd Place Match" value={poolSettings.bp_third_place_match_correct ?? 10} />
+                      <PointsRow label="Final" value={poolSettings.bp_final_correct ?? 20} />
+                    </div>
+                  </div>
+
+                  {/* Bonus Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Bonus Points</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Champion correct" value={poolSettings.bp_champion_bonus ?? 50} />
+                      <PointsRow label="Penalty prediction" value={poolSettings.bp_penalty_correct ?? 1} />
+                    </div>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {BONUS_CATEGORY_ORDER.map((category) => {
-                  const entries = groupedBonuses.get(category)
-                  if (!entries || entries.length === 0) return null
-                  const subtotal = categorySubtotals.get(category) ?? 0
-                  const config = BONUS_CATEGORY_CONFIG[category]
+            </>
+          ) : (
+            <>
+              {/* ========================================== */}
+              {/* MATCH POINTS BREAKDOWN                     */}
+              {/* ========================================== */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                  Match Points Breakdown
+                </h3>
 
-                  return (
-                    <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
-                        <span className="text-xs font-semibold text-neutral-900">
-                          {config.label}
-                        </span>
-                        <span className="text-xs font-bold text-neutral-900 flex-shrink-0">
-                          {formatNumber(subtotal)} pts
-                        </span>
+                {matchDetails.length === 0 ? (
+                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-400 text-sm">No completed matches with predictions yet</div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {renderMatchStageSection('group')}
+                    {renderMatchStageSection('round_32')}
+                    {renderMatchStageSection('round_16')}
+                    {renderMatchStageSection('quarter_final')}
+                    {renderMatchStageSection('semi_final')}
+                    {renderMatchStageSection('third_place')}
+                    {renderMatchStageSection('final')}
+
+                    {totalPsoPoints > 0 && (
+                      <div className="bg-accent-50 rounded-lg px-3 py-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-accent-700">Penalty Shootout Bonus (included above)</span>
+                          <span className="text-xs font-bold text-accent-700">+{formatNumber(totalPsoPoints)} pts</span>
+                        </div>
                       </div>
-                      <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                        {entries.map((bs, i) => (
-                          <div
-                            key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
-                            className="flex items-start justify-between px-3 py-2 text-xs"
-                          >
-                            <span className="text-neutral-700 pr-3 leading-snug">
-                              {bs.description}
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ========================================== */}
+              {/* BONUS POINTS BREAKDOWN                     */}
+              {/* ========================================== */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                  Bonus Points Breakdown
+                </h3>
+
+                {bonusScores.length === 0 ? (
+                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-400 text-sm">No bonus points earned yet</div>
+                    <div className="text-neutral-400 text-xs mt-1">
+                      Bonus points are calculated as tournament stages complete
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {BONUS_CATEGORY_ORDER.map((category) => {
+                      const catEntries = groupedBonuses.get(category)
+                      if (!catEntries || catEntries.length === 0) return null
+                      const subtotal = categorySubtotals.get(category) ?? 0
+                      const config = BONUS_CATEGORY_CONFIG[category]
+
+                      return (
+                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
+                            <span className="text-xs font-semibold text-neutral-900">
+                              {config.label}
                             </span>
-                            <span className="text-success-600 font-semibold flex-shrink-0">
-                              +{formatNumber(bs.points_earned)}
+                            <span className="text-xs font-bold text-neutral-900 flex-shrink-0">
+                              {formatNumber(subtotal)} pts
                             </span>
                           </div>
-                        ))}
+                          <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                            {catEntries.map((bs, i) => (
+                              <div
+                                key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
+                                className="flex items-start justify-between px-3 py-2 text-xs"
+                              >
+                                <span className="text-neutral-700 pr-3 leading-snug">
+                                  {bs.description}
+                                </span>
+                                <span className="text-success-600 font-semibold flex-shrink-0">
+                                  +{formatNumber(bs.points_earned)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ========================================== */}
+              {/* SCORING RULES REFERENCE                    */}
+              {/* ========================================== */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                  Scoring Rules Reference
+                </h3>
+
+                <div className="space-y-3">
+                  {/* Group Stage Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Group Stage</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Exact Score" value={poolSettings.group_exact_score} />
+                      <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.group_correct_difference} />
+                      <PointsRow label="Correct Result Only" value={poolSettings.group_correct_result} />
+                    </div>
+                  </div>
+
+                  {/* Knockout Stage Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Knockout Stage (Base)</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Exact Score" value={poolSettings.knockout_exact_score} />
+                      <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.knockout_correct_difference} />
+                      <PointsRow label="Correct Result Only" value={poolSettings.knockout_correct_result} />
+                    </div>
+                  </div>
+
+                  {/* Multipliers */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Round Multipliers</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Round of 32" value={`${poolSettings.round_32_multiplier}x`} suffix="" />
+                      <PointsRow label="Round of 16" value={`${poolSettings.round_16_multiplier}x`} suffix="" />
+                      <PointsRow label="Quarter Finals" value={`${poolSettings.quarter_final_multiplier}x`} suffix="" />
+                      <PointsRow label="Semi Finals" value={`${poolSettings.semi_final_multiplier}x`} suffix="" />
+                      <PointsRow label="Third Place" value={`${poolSettings.third_place_multiplier}x`} suffix="" />
+                      <PointsRow label="Final" value={`${poolSettings.final_multiplier}x`} suffix="" />
+                    </div>
+                  </div>
+
+                  {/* PSO Rules */}
+                  {poolSettings.pso_enabled && (
+                    <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                      <div className="px-3 py-2 bg-neutral-50">
+                        <span className="text-xs font-semibold text-neutral-900">Penalty Shootout (Bonus)</span>
+                      </div>
+                      <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                        <PointsRow label="Exact PSO Score" value={poolSettings.pso_exact_score} />
+                        <PointsRow label="Correct PSO Winner + GD" value={poolSettings.pso_correct_difference} />
+                        <PointsRow label="Correct PSO Winner Only" value={poolSettings.pso_correct_result} />
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+                  )}
 
-          {/* ========================================== */}
-          {/* SCORING RULES REFERENCE                    */}
-          {/* ========================================== */}
-          <div>
-            <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
-              Scoring Rules Reference
-            </h3>
-
-            <div className="space-y-3">
-              {/* Group Stage Rules */}
-              <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-neutral-50">
-                  <span className="text-xs font-semibold text-neutral-900">Group Stage</span>
-                </div>
-                <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                  <PointsRow label="Exact Score" value={poolSettings.group_exact_score} />
-                  <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.group_correct_difference} />
-                  <PointsRow label="Correct Result Only" value={poolSettings.group_correct_result} />
-                </div>
-              </div>
-
-              {/* Knockout Stage Rules */}
-              <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-neutral-50">
-                  <span className="text-xs font-semibold text-neutral-900">Knockout Stage (Base)</span>
-                </div>
-                <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                  <PointsRow label="Exact Score" value={poolSettings.knockout_exact_score} />
-                  <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.knockout_correct_difference} />
-                  <PointsRow label="Correct Result Only" value={poolSettings.knockout_correct_result} />
-                </div>
-              </div>
-
-              {/* Multipliers */}
-              <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-neutral-50">
-                  <span className="text-xs font-semibold text-neutral-900">Round Multipliers</span>
-                </div>
-                <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                  <PointsRow label="Round of 32" value={`${poolSettings.round_32_multiplier}x`} suffix="" />
-                  <PointsRow label="Round of 16" value={`${poolSettings.round_16_multiplier}x`} suffix="" />
-                  <PointsRow label="Quarter Finals" value={`${poolSettings.quarter_final_multiplier}x`} suffix="" />
-                  <PointsRow label="Semi Finals" value={`${poolSettings.semi_final_multiplier}x`} suffix="" />
-                  <PointsRow label="Third Place" value={`${poolSettings.third_place_multiplier}x`} suffix="" />
-                  <PointsRow label="Final" value={`${poolSettings.final_multiplier}x`} suffix="" />
-                </div>
-              </div>
-
-              {/* PSO Rules */}
-              {poolSettings.pso_enabled && (
-                <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-neutral-50">
-                    <span className="text-xs font-semibold text-neutral-900">Penalty Shootout (Bonus)</span>
-                  </div>
-                  <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                    <PointsRow label="Exact PSO Score" value={poolSettings.pso_exact_score} />
-                    <PointsRow label="Correct PSO Winner + GD" value={poolSettings.pso_correct_difference} />
-                    <PointsRow label="Correct PSO Winner Only" value={poolSettings.pso_correct_result} />
+                  {/* Bonus Rules */}
+                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-900">Bonus Points (per group / per match)</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <PointsRow label="Winner AND Runner-up correct" value={poolSettings.bonus_group_winner_and_runnerup ?? 0} />
+                      <PointsRow label="Winner only correct" value={poolSettings.bonus_group_winner_only ?? 0} />
+                      <PointsRow label="Runner-up only correct" value={poolSettings.bonus_group_runnerup_only ?? 0} />
+                      <PointsRow label="Both qualify, positions swapped" value={poolSettings.bonus_both_qualify_swapped ?? 0} />
+                      <PointsRow label="One qualifies, wrong position" value={poolSettings.bonus_one_qualifies_wrong_position ?? 0} />
+                      <PointsRow label="Correct bracket pairing" value={poolSettings.bonus_correct_bracket_pairing ?? 0} />
+                      <PointsRow label="Correct match winner" value={poolSettings.bonus_match_winner_correct ?? 0} />
+                      <PointsRow label="Champion correct" value={poolSettings.bonus_champion_correct ?? 0} />
+                      <PointsRow label="Runner-up correct" value={poolSettings.bonus_second_place_correct ?? 0} />
+                      <PointsRow label="Third place correct" value={poolSettings.bonus_third_place_correct ?? 0} />
+                    </div>
                   </div>
                 </div>
-              )}
-
-              {/* Bonus Rules */}
-              <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-neutral-50">
-                  <span className="text-xs font-semibold text-neutral-900">Bonus Points (per group / per match)</span>
-                </div>
-                <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                  <PointsRow label="Winner AND Runner-up correct" value={poolSettings.bonus_group_winner_and_runnerup ?? 0} />
-                  <PointsRow label="Winner only correct" value={poolSettings.bonus_group_winner_only ?? 0} />
-                  <PointsRow label="Runner-up only correct" value={poolSettings.bonus_group_runnerup_only ?? 0} />
-                  <PointsRow label="Both qualify, positions swapped" value={poolSettings.bonus_both_qualify_swapped ?? 0} />
-                  <PointsRow label="One qualifies, wrong position" value={poolSettings.bonus_one_qualifies_wrong_position ?? 0} />
-                  <PointsRow label="Correct bracket pairing" value={poolSettings.bonus_correct_bracket_pairing ?? 0} />
-                  <PointsRow label="Correct match winner" value={poolSettings.bonus_match_winner_correct ?? 0} />
-                  <PointsRow label="Champion correct" value={poolSettings.bonus_champion_correct ?? 0} />
-                  <PointsRow label="Runner-up correct" value={poolSettings.bonus_second_place_correct ?? 0} />
-                  <PointsRow label="Third place correct" value={poolSettings.bonus_third_place_correct ?? 0} />
-                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -11,7 +11,7 @@ export type PoolData = {
   max_entries_per_user: number
   tournament_id: string
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive'
+  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string
   updated_at: string
 }
@@ -124,6 +124,22 @@ export type SettingsData = {
   bonus_top_scorer_correct: number | null
   // Bracket pairing mode
   bracket_pairing_mode: string | null
+  // Bracket Picker scoring
+  bp_group_correct_1st: number | null
+  bp_group_correct_2nd: number | null
+  bp_group_correct_3rd: number | null
+  bp_group_correct_4th: number | null
+  bp_third_correct_qualifier: number | null
+  bp_third_correct_eliminated: number | null
+  bp_third_all_correct_bonus: number | null
+  bp_r32_correct: number | null
+  bp_r16_correct: number | null
+  bp_qf_correct: number | null
+  bp_sf_correct: number | null
+  bp_third_place_match_correct: number | null
+  bp_final_correct: number | null
+  bp_champion_bonus: number | null
+  bp_penalty_correct: number | null
   created_at: string
   updated_at: string
 }
@@ -208,4 +224,33 @@ export type EntryRoundSubmission = {
   prediction_count: number
   created_at: string
   updated_at: string
+}
+
+// ========================
+// BRACKET PICKER MODE TYPES
+// ========================
+
+export type BPGroupRanking = {
+  id: string
+  entry_id: string
+  team_id: string
+  group_letter: string
+  predicted_position: number
+}
+
+export type BPThirdPlaceRanking = {
+  id: string
+  entry_id: string
+  team_id: string
+  group_letter: string
+  rank: number
+}
+
+export type BPKnockoutPick = {
+  id: string
+  entry_id: string
+  match_id: string
+  match_number: number
+  winner_team_id: string
+  predicted_penalty: boolean
 }

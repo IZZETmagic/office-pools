@@ -33,7 +33,8 @@ export default async function ProfileServerPage() {
       pools!inner(
         pool_id,
         pool_name,
-        tournament_id
+        tournament_id,
+        prediction_mode
       ),
       pool_entries(
         entry_id,
@@ -59,6 +60,7 @@ export default async function ProfileServerPage() {
       pool_id: m.pool_id,
       pool_name: m.pools.pool_name,
       tournament_id: m.pools.tournament_id,
+      prediction_mode: m.pools.prediction_mode ?? 'full_tournament',
       role: m.role,
       total_points: bestEntry?.total_points ?? 0,
       current_rank: bestEntry?.current_rank ?? null,
@@ -225,60 +227,71 @@ export default async function ProfileServerPage() {
       conductData,
     })
 
-    // Calculate MATCH points
+    // Calculate points — bracket picker uses DB bonus_scores, other modes compute client-side
     let matchPoints = 0
+    let bonusPoints = 0
     const completedMatchesList = normalizedMatches.filter(
       (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
     )
 
-    for (const match of completedMatchesList) {
-      const pred = predictionLookup.get(match.match_id)
-      if (pred && match.home_score_ft !== null && match.away_score_ft !== null) {
-        const resolved = bracket.knockoutTeamMap.get(match.match_number)
-        const teamsMatch = checkKnockoutTeamsMatch(
-          match.stage,
-          match.home_team_id,
-          match.away_team_id,
-          resolved?.home?.team_id ?? null,
-          resolved?.away?.team_id ?? null,
-        )
-        const hasPso = match.home_score_pso !== null && match.away_score_pso !== null
-        const result = calculatePoints(
-          pred.predicted_home_score,
-          pred.predicted_away_score,
-          match.home_score_ft,
-          match.away_score_ft,
-          match.stage,
-          poolSettings,
-          hasPso
-            ? {
-                actualHomePso: match.home_score_pso!,
-                actualAwayPso: match.away_score_pso!,
-                predictedHomePso: pred.predicted_home_pso ?? null,
-                predictedAwayPso: pred.predicted_away_pso ?? null,
-              }
-            : undefined,
-          teamsMatch,
-        )
-        matchPoints += result.points
+    if (pool.prediction_mode === 'bracket_picker') {
+      // For bracket picker pools, read pre-computed scores from bonus_scores table
+      if (pool.entry_id) {
+        const { data: bpBonusScores } = await supabase
+          .from('bonus_scores')
+          .select('points_earned')
+          .eq('entry_id', pool.entry_id)
+
+        bonusPoints = (bpBonusScores ?? []).reduce((sum: number, e: any) => sum + e.points_earned, 0)
       }
-    }
+    } else {
+      for (const match of completedMatchesList) {
+        const pred = predictionLookup.get(match.match_id)
+        if (pred && match.home_score_ft !== null && match.away_score_ft !== null) {
+          const resolved = bracket.knockoutTeamMap.get(match.match_number)
+          const teamsMatch = checkKnockoutTeamsMatch(
+            match.stage,
+            match.home_team_id,
+            match.away_team_id,
+            resolved?.home?.team_id ?? null,
+            resolved?.away?.team_id ?? null,
+          )
+          const hasPso = match.home_score_pso !== null && match.away_score_pso !== null
+          const result = calculatePoints(
+            pred.predicted_home_score,
+            pred.predicted_away_score,
+            match.home_score_ft,
+            match.away_score_ft,
+            match.stage,
+            poolSettings,
+            hasPso
+              ? {
+                  actualHomePso: match.home_score_pso!,
+                  actualAwayPso: match.away_score_pso!,
+                  predictedHomePso: pred.predicted_home_pso ?? null,
+                  predictedAwayPso: pred.predicted_away_pso ?? null,
+                }
+              : undefined,
+            teamsMatch,
+          )
+          matchPoints += result.points
+        }
+      }
 
-    // Calculate BONUS points
-    let bonusPoints = 0
-    if (memberPredictions && memberPredictions.length > 0) {
+      // Calculate BONUS points for non-BP modes
+      if (memberPredictions && memberPredictions.length > 0) {
+        const bonusEntries = calculateAllBonusPoints({
+          memberId: pool.entry_id,
+          memberPredictions: predictionMap,
+          matches: normalizedMatches,
+          teams,
+          conductData,
+          settings: poolSettings,
+          tournamentAwards: null,
+        })
 
-      const bonusEntries = calculateAllBonusPoints({
-        memberId: pool.entry_id,
-        memberPredictions: predictionMap,
-        matches: normalizedMatches,
-        teams,
-        conductData,
-        settings: poolSettings,
-        tournamentAwards: null,
-      })
-
-      bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+        bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+      }
     }
 
     playerScoresMap[pool.entry_id || pool.member_id] = {

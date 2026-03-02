@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolData, MemberData, EntryData, PredictionData, MatchData, TeamData } from '../types'
+import type { PoolData, MemberData, EntryData, PredictionData, MatchData, TeamData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -15,8 +15,10 @@ import {
   type PredictionMap,
   type Match,
   type Team,
+  GROUP_LETTERS,
 } from '@/lib/tournament'
 import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolveFullBracketFromPicks } from '@/lib/bracketPickerResolver'
 
 type MembersTabProps = {
   pool: PoolData
@@ -595,15 +597,26 @@ export function MembersTab({
 
       {/* View Predictions Modal */}
       {modal.type === 'view_predictions' && (
-        <ViewPredictionsModal
-          member={modal.member}
-          initialEntry={modal.entry}
-          predictions={predictions}
-          matches={matches}
-          teams={teams}
-          onClose={() => setModal({ type: 'none' })}
-          getEntryTotalPoints={getEntryTotalPoints}
-        />
+        pool.prediction_mode === 'bracket_picker' ? (
+          <ViewBracketPickerPredictionsModal
+            member={modal.member}
+            initialEntry={modal.entry}
+            matches={matches}
+            teams={teams}
+            onClose={() => setModal({ type: 'none' })}
+            getEntryTotalPoints={getEntryTotalPoints}
+          />
+        ) : (
+          <ViewPredictionsModal
+            member={modal.member}
+            initialEntry={modal.entry}
+            predictions={predictions}
+            matches={matches}
+            teams={teams}
+            onClose={() => setModal({ type: 'none' })}
+            getEntryTotalPoints={getEntryTotalPoints}
+          />
+        )
       )}
 
       {/* Adjust Points Modal */}
@@ -1086,6 +1099,328 @@ function ViewPredictionsModal({
             ) : (
               <div />
             )}
+            <Button variant="gray" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================
+// VIEW BRACKET PICKER PREDICTIONS MODAL
+// =============================================
+
+function ViewBracketPickerPredictionsModal({
+  member,
+  initialEntry,
+  matches,
+  teams,
+  onClose,
+  getEntryTotalPoints,
+}: {
+  member: MemberData
+  initialEntry?: EntryData
+  matches: MatchData[]
+  teams: TeamData[]
+  onClose: () => void
+  getEntryTotalPoints: (entry: EntryData) => number
+}) {
+  const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
+  const hasMultipleEntries = entries.length > 1
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(
+    initialEntry?.entry_id || (entries.length > 0 ? entries[0].entry_id : null)
+  )
+  const selectedEntry = entries.find(e => e.entry_id === selectedEntryId) || entries[0]
+
+  // Fetch bracket picker data client-side for the selected entry
+  const [bpData, setBpData] = useState<{
+    groupRankings: BPGroupRanking[]
+    thirdPlaceRankings: BPThirdPlaceRanking[]
+    knockoutPicks: BPKnockoutPick[]
+  } | null>(null)
+  const [loadingBp, setLoadingBp] = useState(false)
+
+  useEffect(() => {
+    if (!selectedEntryId) return
+    setLoadingBp(true)
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('bracket_picker_group_rankings').select('*').eq('entry_id', selectedEntryId),
+      supabase.from('bracket_picker_third_place_rankings').select('*').eq('entry_id', selectedEntryId),
+      supabase.from('bracket_picker_knockout_picks').select('*').eq('entry_id', selectedEntryId),
+    ]).then(([grRes, tpRes, kpRes]) => {
+      setBpData({
+        groupRankings: (grRes.data ?? []) as BPGroupRanking[],
+        thirdPlaceRankings: (tpRes.data ?? []) as BPThirdPlaceRanking[],
+        knockoutPicks: (kpRes.data ?? []) as BPKnockoutPick[],
+      })
+      setLoadingBp(false)
+    })
+  }, [selectedEntryId])
+
+  // Convert teams to tournament Team type
+  const tournamentTeams: Team[] = useMemo(() =>
+    teams.map((t) => ({
+      team_id: t.team_id,
+      country_name: t.country_name,
+      country_code: t.country_code,
+      group_letter: t.group_letter,
+      fifa_ranking_points: t.fifa_ranking_points,
+      flag_url: t.flag_url,
+    })),
+  [teams])
+
+  const tournamentMatches = useMemo(() =>
+    matches.map((m) => ({
+      match_id: m.match_id,
+      match_number: m.match_number,
+      stage: m.stage,
+      group_letter: m.group_letter,
+      match_date: m.match_date,
+      venue: m.venue,
+      status: m.status,
+      home_team_id: m.home_team_id,
+      away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder,
+      away_team_placeholder: m.away_team_placeholder,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+    })),
+  [matches])
+
+  // Resolve bracket from bracket picker data
+  const bracket = useMemo(() => {
+    if (!bpData || bpData.groupRankings.length === 0) return null
+    return resolveFullBracketFromPicks({
+      groupRankings: bpData.groupRankings,
+      thirdPlaceRankings: bpData.thirdPlaceRankings,
+      knockoutPicks: bpData.knockoutPicks,
+      teams: tournamentTeams,
+      matches: tournamentMatches,
+    })
+  }, [bpData, tournamentTeams, tournamentMatches])
+
+  // Team lookup
+  const teamMap = useMemo(() => new Map(teams.map(t => [t.team_id, t])), [teams])
+
+  // Stage labels for knockout
+  const knockoutStageOrder = ['round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+  const stageNames: Record<string, string> = {
+    round_32: 'Round of 32',
+    round_16: 'Round of 16',
+    quarter_final: 'Quarter Finals',
+    semi_final: 'Semi Finals',
+    third_place: 'Third Place',
+    final: 'Final',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+        {/* Header */}
+        <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
+          <h3 className="text-xl font-bold text-neutral-900">
+            {member.users.full_name || member.users.username}&apos;s Bracket Picks
+          </h3>
+          {selectedEntry && (
+            <p className="text-sm text-neutral-600 mt-1">
+              {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
+              {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
+            </p>
+          )}
+          {hasMultipleEntries && (
+            <div className="flex gap-1.5 mt-3 overflow-x-auto">
+              {entries.map((entry) => (
+                <button
+                  key={entry.entry_id}
+                  onClick={() => setSelectedEntryId(entry.entry_id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                    selectedEntryId === entry.entry_id
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  {entry.entry_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 p-4 sm:px-6">
+          {loadingBp ? (
+            <div className="text-center py-8">
+              <div className="text-neutral-400 text-sm">Loading bracket picks...</div>
+            </div>
+          ) : !bpData || bpData.groupRankings.length === 0 ? (
+            <p className="text-neutral-600 text-sm py-4">No bracket picks submitted.</p>
+          ) : (
+            <>
+              {/* Champion highlight */}
+              {bracket?.champion && (
+                <div className="mb-5 text-center p-4 rounded-xl bg-gradient-to-br from-warning-50 to-warning-100 border-2 border-warning-300">
+                  <div className="text-3xl mb-1">&#127942;</div>
+                  <p className="text-xs font-semibold text-warning-600 uppercase tracking-wide mb-1">Predicted Champion</p>
+                  <div className="flex items-center justify-center gap-2">
+                    {bracket.champion.flag_url && (
+                      <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-sm object-cover" />
+                    )}
+                    <span className="text-lg font-bold text-neutral-900">{bracket.champion.country_name}</span>
+                  </div>
+                  {(bracket.runnerUp || bracket.thirdPlace) && (
+                    <div className="flex justify-center gap-6 mt-2 text-xs text-neutral-600">
+                      {bracket.runnerUp && (
+                        <span>
+                          <span className="text-neutral-400">2nd:</span>{' '}
+                          <span className="font-semibold">{bracket.runnerUp.country_name}</span>
+                        </span>
+                      )}
+                      {bracket.thirdPlace && (
+                        <span>
+                          <span className="text-neutral-400">3rd:</span>{' '}
+                          <span className="font-semibold">{bracket.thirdPlace.country_name}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Group Rankings */}
+              <div className="mb-5">
+                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Group Rankings</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {GROUP_LETTERS.map((letter) => {
+                    const groupRanks = bpData.groupRankings
+                      .filter(r => r.group_letter === letter)
+                      .sort((a, b) => a.predicted_position - b.predicted_position)
+                    if (groupRanks.length === 0) return null
+                    return (
+                      <div key={letter} className="bg-neutral-50 rounded-lg p-2.5">
+                        <div className="text-xs font-bold text-neutral-700 mb-1.5">Group {letter}</div>
+                        <div className="space-y-1">
+                          {groupRanks.map((rank, i) => {
+                            const team = teamMap.get(rank.team_id)
+                            return (
+                              <div key={rank.team_id} className="flex items-center gap-1.5">
+                                <span className={`text-[10px] font-bold w-4 text-center ${
+                                  i === 0 ? 'text-success-600' : i === 1 ? 'text-primary-600' : 'text-neutral-400'
+                                }`}>{i + 1}</span>
+                                {team?.flag_url && (
+                                  <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                                )}
+                                <span className="text-xs text-neutral-800 truncate">{team?.country_name || 'Unknown'}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Third-Place Rankings */}
+              <div className="mb-5">
+                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Third-Place Rankings</h4>
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <div className="space-y-1">
+                    {[...bpData.thirdPlaceRankings]
+                      .sort((a, b) => a.rank - b.rank)
+                      .map((ranking, i) => {
+                        const team = teamMap.get(ranking.team_id)
+                        const qualifies = i < 8
+                        return (
+                          <div key={ranking.team_id} className={`flex items-center gap-2 py-0.5 ${!qualifies ? 'opacity-40' : ''}`}>
+                            <span className={`text-[10px] font-bold w-5 text-center ${qualifies ? 'text-success-600' : 'text-neutral-400'}`}>
+                              {i + 1}
+                            </span>
+                            {team?.flag_url && (
+                              <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                            )}
+                            <span className="text-xs text-neutral-800 flex-1 truncate">{team?.country_name || 'Unknown'}</span>
+                            <span className="text-xs text-neutral-400">Grp {ranking.group_letter}</span>
+                            {qualifies ? (
+                              <span className="text-[10px] font-medium text-success-600 bg-success-50 px-1.5 py-0.5 rounded">Q</span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">E</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Knockout Bracket */}
+              <div className="mb-3">
+                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Knockout Bracket</h4>
+                {knockoutStageOrder.map((stage) => {
+                  const stageMatches = matches
+                    .filter(m => m.stage === stage)
+                    .sort((a, b) => a.match_number - b.match_number)
+                  if (stageMatches.length === 0) return null
+
+                  const stagePicks = stageMatches.map(m => {
+                    const pick = bpData.knockoutPicks.find(kp => kp.match_id === m.match_id)
+                    const winnerTeam = pick ? teamMap.get(pick.winner_team_id) : null
+                    const resolved = bracket?.knockoutTeamMap.get(m.match_number)
+                    return { match: m, pick, winnerTeam, resolved }
+                  })
+
+                  return (
+                    <div key={stage} className="mb-3">
+                      <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wide mb-1">
+                        {stageNames[stage]}
+                      </div>
+                      <div className="space-y-1">
+                        {stagePicks.map(({ match, pick, winnerTeam, resolved }) => (
+                          <div key={match.match_id} className="bg-neutral-50 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-neutral-400 shrink-0 w-7 text-right">
+                                #{match.match_number}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                {resolved ? (
+                                  <span className="text-xs text-neutral-500">
+                                    {resolved.home?.country_name || 'TBD'} vs {resolved.away?.country_name || 'TBD'}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-neutral-400">TBD vs TBD</span>
+                                )}
+                              </div>
+                              {winnerTeam ? (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {winnerTeam.flag_url && (
+                                    <img src={winnerTeam.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                                  )}
+                                  <span className="text-xs font-semibold text-success-700">{winnerTeam.country_name}</span>
+                                  {pick?.predicted_penalty && (
+                                    <span className="text-[9px] text-primary-600 font-medium">(PSO)</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-neutral-400">No pick</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 sm:px-6 pt-3 border-t border-neutral-100 shrink-0">
+          <div className="flex justify-end">
             <Button variant="gray" onClick={onClose}>
               Close
             </Button>

@@ -54,6 +54,24 @@ const DEFAULTS = {
   bonus_top_scorer_correct: 100,
 }
 
+const BP_DEFAULTS = {
+  bp_group_correct_1st: 4,
+  bp_group_correct_2nd: 3,
+  bp_group_correct_3rd: 2,
+  bp_group_correct_4th: 1,
+  bp_third_correct_qualifier: 2,
+  bp_third_correct_eliminated: 1,
+  bp_third_all_correct_bonus: 10,
+  bp_r32_correct: 1,
+  bp_r16_correct: 2,
+  bp_qf_correct: 4,
+  bp_sf_correct: 8,
+  bp_third_place_match_correct: 10,
+  bp_final_correct: 20,
+  bp_champion_bonus: 50,
+  bp_penalty_correct: 1,
+}
+
 export function ScoringTab({
   pool,
   settings,
@@ -164,6 +182,61 @@ export function ScoringTab({
     settings?.bonus_third_place_correct ?? DEFAULTS.bonus_third_place_correct
   )
 
+  // Bracket Picker state
+  const isBracketPicker = pool.prediction_mode === 'bracket_picker'
+
+  const [bpGroup1st, setBpGroup1st] = useState(
+    settings?.bp_group_correct_1st ?? BP_DEFAULTS.bp_group_correct_1st
+  )
+  const [bpGroup2nd, setBpGroup2nd] = useState(
+    settings?.bp_group_correct_2nd ?? BP_DEFAULTS.bp_group_correct_2nd
+  )
+  const [bpGroup3rd, setBpGroup3rd] = useState(
+    settings?.bp_group_correct_3rd ?? BP_DEFAULTS.bp_group_correct_3rd
+  )
+  const [bpGroup4th, setBpGroup4th] = useState(
+    settings?.bp_group_correct_4th ?? BP_DEFAULTS.bp_group_correct_4th
+  )
+  const [bpThirdQualifier, setBpThirdQualifier] = useState(
+    settings?.bp_third_correct_qualifier ?? BP_DEFAULTS.bp_third_correct_qualifier
+  )
+  const [bpThirdEliminated, setBpThirdEliminated] = useState(
+    settings?.bp_third_correct_eliminated ?? BP_DEFAULTS.bp_third_correct_eliminated
+  )
+  const [bpThirdAllBonus, setBpThirdAllBonus] = useState(
+    settings?.bp_third_all_correct_bonus ?? BP_DEFAULTS.bp_third_all_correct_bonus
+  )
+  const [bpR32, setBpR32] = useState(
+    settings?.bp_r32_correct ?? BP_DEFAULTS.bp_r32_correct
+  )
+  const [bpR16, setBpR16] = useState(
+    settings?.bp_r16_correct ?? BP_DEFAULTS.bp_r16_correct
+  )
+  const [bpQf, setBpQf] = useState(
+    settings?.bp_qf_correct ?? BP_DEFAULTS.bp_qf_correct
+  )
+  const [bpSf, setBpSf] = useState(
+    settings?.bp_sf_correct ?? BP_DEFAULTS.bp_sf_correct
+  )
+  const [bpThirdPlaceMatch, setBpThirdPlaceMatch] = useState(
+    settings?.bp_third_place_match_correct ?? BP_DEFAULTS.bp_third_place_match_correct
+  )
+  const [bpFinal, setBpFinal] = useState(
+    settings?.bp_final_correct ?? BP_DEFAULTS.bp_final_correct
+  )
+  const [bpChampionBonus, setBpChampionBonus] = useState(
+    settings?.bp_champion_bonus ?? BP_DEFAULTS.bp_champion_bonus
+  )
+  const [bpPenaltyCorrect, setBpPenaltyCorrect] = useState(
+    settings?.bp_penalty_correct ?? BP_DEFAULTS.bp_penalty_correct
+  )
+
+  // Bracket Picker expand states
+  const [expandBpGroup, setExpandBpGroup] = useState(true)
+  const [expandBpThird, setExpandBpThird] = useState(true)
+  const [expandBpKnockout, setExpandBpKnockout] = useState(true)
+  const [expandBpBonus, setExpandBpBonus] = useState(true)
+
   // UI state
   const [saving, setSaving] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
@@ -200,75 +273,112 @@ export function ScoringTab({
       : null
 
   function resetDefaults() {
-    setGroupExact(DEFAULTS.group_exact_score)
-    setGroupDiff(DEFAULTS.group_correct_difference)
-    setGroupResult(DEFAULTS.group_correct_result)
-    setKoExact(DEFAULTS.knockout_exact_score)
-    setKoDiff(DEFAULTS.knockout_correct_difference)
-    setKoResult(DEFAULTS.knockout_correct_result)
-    setR32Mult(DEFAULTS.round_32_multiplier)
-    setR16Mult(DEFAULTS.round_16_multiplier)
-    setQfMult(DEFAULTS.quarter_final_multiplier)
-    setSfMult(DEFAULTS.semi_final_multiplier)
-    setTpMult(DEFAULTS.third_place_multiplier)
-    setFinalMult(DEFAULTS.final_multiplier)
-    setPsoEnabled(DEFAULTS.pso_enabled)
-    setPsoExact(DEFAULTS.pso_exact_score)
-    setPsoDiff(DEFAULTS.pso_correct_difference)
-    setPsoResult(DEFAULTS.pso_correct_result)
-    // Bonus
-    setBonusGroupWinnerAndRunnerup(DEFAULTS.bonus_group_winner_and_runnerup)
-    setBonusGroupWinnerOnly(DEFAULTS.bonus_group_winner_only)
-    setBonusGroupRunnerupOnly(DEFAULTS.bonus_group_runnerup_only)
-    setBonusBothQualifySwapped(DEFAULTS.bonus_both_qualify_swapped)
-    setBonusOneQualifiesWrongPos(DEFAULTS.bonus_one_qualifies_wrong_position)
-    setBonusAllQualified(DEFAULTS.bonus_all_16_qualified)
-    setBonus75PctQualified(DEFAULTS.bonus_12_15_qualified)
-    setBonus50PctQualified(DEFAULTS.bonus_8_11_qualified)
-    setBonusBracketPairing(DEFAULTS.bonus_correct_bracket_pairing)
-    setBonusMatchWinner(DEFAULTS.bonus_match_winner_correct)
-    setBonusChampion(DEFAULTS.bonus_champion_correct)
-    setBonusSecondPlace(DEFAULTS.bonus_second_place_correct)
-    setBonusThirdPlace(DEFAULTS.bonus_third_place_correct)
+    if (isBracketPicker) {
+      setBpGroup1st(BP_DEFAULTS.bp_group_correct_1st)
+      setBpGroup2nd(BP_DEFAULTS.bp_group_correct_2nd)
+      setBpGroup3rd(BP_DEFAULTS.bp_group_correct_3rd)
+      setBpGroup4th(BP_DEFAULTS.bp_group_correct_4th)
+      setBpThirdQualifier(BP_DEFAULTS.bp_third_correct_qualifier)
+      setBpThirdEliminated(BP_DEFAULTS.bp_third_correct_eliminated)
+      setBpThirdAllBonus(BP_DEFAULTS.bp_third_all_correct_bonus)
+      setBpR32(BP_DEFAULTS.bp_r32_correct)
+      setBpR16(BP_DEFAULTS.bp_r16_correct)
+      setBpQf(BP_DEFAULTS.bp_qf_correct)
+      setBpSf(BP_DEFAULTS.bp_sf_correct)
+      setBpThirdPlaceMatch(BP_DEFAULTS.bp_third_place_match_correct)
+      setBpFinal(BP_DEFAULTS.bp_final_correct)
+      setBpChampionBonus(BP_DEFAULTS.bp_champion_bonus)
+      setBpPenaltyCorrect(BP_DEFAULTS.bp_penalty_correct)
+    } else {
+      setGroupExact(DEFAULTS.group_exact_score)
+      setGroupDiff(DEFAULTS.group_correct_difference)
+      setGroupResult(DEFAULTS.group_correct_result)
+      setKoExact(DEFAULTS.knockout_exact_score)
+      setKoDiff(DEFAULTS.knockout_correct_difference)
+      setKoResult(DEFAULTS.knockout_correct_result)
+      setR32Mult(DEFAULTS.round_32_multiplier)
+      setR16Mult(DEFAULTS.round_16_multiplier)
+      setQfMult(DEFAULTS.quarter_final_multiplier)
+      setSfMult(DEFAULTS.semi_final_multiplier)
+      setTpMult(DEFAULTS.third_place_multiplier)
+      setFinalMult(DEFAULTS.final_multiplier)
+      setPsoEnabled(DEFAULTS.pso_enabled)
+      setPsoExact(DEFAULTS.pso_exact_score)
+      setPsoDiff(DEFAULTS.pso_correct_difference)
+      setPsoResult(DEFAULTS.pso_correct_result)
+      // Bonus
+      setBonusGroupWinnerAndRunnerup(DEFAULTS.bonus_group_winner_and_runnerup)
+      setBonusGroupWinnerOnly(DEFAULTS.bonus_group_winner_only)
+      setBonusGroupRunnerupOnly(DEFAULTS.bonus_group_runnerup_only)
+      setBonusBothQualifySwapped(DEFAULTS.bonus_both_qualify_swapped)
+      setBonusOneQualifiesWrongPos(DEFAULTS.bonus_one_qualifies_wrong_position)
+      setBonusAllQualified(DEFAULTS.bonus_all_16_qualified)
+      setBonus75PctQualified(DEFAULTS.bonus_12_15_qualified)
+      setBonus50PctQualified(DEFAULTS.bonus_8_11_qualified)
+      setBonusBracketPairing(DEFAULTS.bonus_correct_bracket_pairing)
+      setBonusMatchWinner(DEFAULTS.bonus_match_winner_correct)
+      setBonusChampion(DEFAULTS.bonus_champion_correct)
+      setBonusSecondPlace(DEFAULTS.bonus_second_place_correct)
+      setBonusThirdPlace(DEFAULTS.bonus_third_place_correct)
+    }
   }
 
   async function handleSave() {
     setSaving(true)
     setError(null)
 
-    const updateData = {
-      group_exact_score: groupExact,
-      group_correct_difference: groupDiff,
-      group_correct_result: groupResult,
-      knockout_exact_score: koExact,
-      knockout_correct_difference: koDiff,
-      knockout_correct_result: koResult,
-      round_32_multiplier: r32Mult,
-      round_16_multiplier: r16Mult,
-      quarter_final_multiplier: qfMult,
-      semi_final_multiplier: sfMult,
-      third_place_multiplier: tpMult,
-      final_multiplier: finalMult,
-      pso_enabled: psoEnabled,
-      pso_exact_score: psoExact,
-      pso_correct_difference: psoDiff,
-      pso_correct_result: psoResult,
-      // Bonus fields
-      bonus_group_winner_and_runnerup: bonusGroupWinnerAndRunnerup,
-      bonus_group_winner_only: bonusGroupWinnerOnly,
-      bonus_group_runnerup_only: bonusGroupRunnerupOnly,
-      bonus_both_qualify_swapped: bonusBothQualifySwapped,
-      bonus_one_qualifies_wrong_position: bonusOneQualifiesWrongPos,
-      bonus_all_16_qualified: bonusAllQualified,
-      bonus_12_15_qualified: bonus75PctQualified,
-      bonus_8_11_qualified: bonus50PctQualified,
-      bonus_correct_bracket_pairing: bonusBracketPairing,
-      bonus_match_winner_correct: bonusMatchWinner,
-      bonus_champion_correct: bonusChampion,
-      bonus_second_place_correct: bonusSecondPlace,
-      bonus_third_place_correct: bonusThirdPlace,
-      updated_at: new Date().toISOString(),
-    }
+    const updateData = isBracketPicker
+      ? {
+          bp_group_correct_1st: bpGroup1st,
+          bp_group_correct_2nd: bpGroup2nd,
+          bp_group_correct_3rd: bpGroup3rd,
+          bp_group_correct_4th: bpGroup4th,
+          bp_third_correct_qualifier: bpThirdQualifier,
+          bp_third_correct_eliminated: bpThirdEliminated,
+          bp_third_all_correct_bonus: bpThirdAllBonus,
+          bp_r32_correct: bpR32,
+          bp_r16_correct: bpR16,
+          bp_qf_correct: bpQf,
+          bp_sf_correct: bpSf,
+          bp_third_place_match_correct: bpThirdPlaceMatch,
+          bp_final_correct: bpFinal,
+          bp_champion_bonus: bpChampionBonus,
+          bp_penalty_correct: bpPenaltyCorrect,
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          group_exact_score: groupExact,
+          group_correct_difference: groupDiff,
+          group_correct_result: groupResult,
+          knockout_exact_score: koExact,
+          knockout_correct_difference: koDiff,
+          knockout_correct_result: koResult,
+          round_32_multiplier: r32Mult,
+          round_16_multiplier: r16Mult,
+          quarter_final_multiplier: qfMult,
+          semi_final_multiplier: sfMult,
+          third_place_multiplier: tpMult,
+          final_multiplier: finalMult,
+          pso_enabled: psoEnabled,
+          pso_exact_score: psoExact,
+          pso_correct_difference: psoDiff,
+          pso_correct_result: psoResult,
+          // Bonus fields
+          bonus_group_winner_and_runnerup: bonusGroupWinnerAndRunnerup,
+          bonus_group_winner_only: bonusGroupWinnerOnly,
+          bonus_group_runnerup_only: bonusGroupRunnerupOnly,
+          bonus_both_qualify_swapped: bonusBothQualifySwapped,
+          bonus_one_qualifies_wrong_position: bonusOneQualifiesWrongPos,
+          bonus_all_16_qualified: bonusAllQualified,
+          bonus_12_15_qualified: bonus75PctQualified,
+          bonus_8_11_qualified: bonus50PctQualified,
+          bonus_correct_bracket_pairing: bonusBracketPairing,
+          bonus_match_winner_correct: bonusMatchWinner,
+          bonus_champion_correct: bonusChampion,
+          bonus_second_place_correct: bonusSecondPlace,
+          bonus_third_place_correct: bonusThirdPlace,
+          updated_at: new Date().toISOString(),
+        }
 
     const { error: updateError } = await supabase
       .from('pool_settings')
@@ -282,17 +392,37 @@ export function ScoringTab({
       return
     }
 
-    // Call recalculate function
-    const { error: rpcError } = await supabase.rpc(
-      'recalculate_all_pool_points',
-      { pool_id_param: pool.pool_id }
-    )
+    // Recalculate points
+    if (isBracketPicker) {
+      // For bracket picker pools, call the BP calculate endpoint
+      try {
+        const res = await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json()
+          setError('Settings saved but recalculation failed: ' + (data.error || res.statusText))
+          setSaving(false)
+          setShowConfirm(false)
+          return
+        }
+      } catch (err: any) {
+        setError('Settings saved but recalculation failed: ' + (err.message || 'Network error'))
+        setSaving(false)
+        setShowConfirm(false)
+        return
+      }
+    } else {
+      // For other modes, call the match points RPC
+      const { error: rpcError } = await supabase.rpc(
+        'recalculate_all_pool_points',
+        { pool_id_param: pool.pool_id }
+      )
 
-    if (rpcError) {
-      setError('Settings saved but recalculation failed: ' + rpcError.message)
-      setSaving(false)
-      setShowConfirm(false)
-      return
+      if (rpcError) {
+        setError('Settings saved but recalculation failed: ' + rpcError.message)
+        setSaving(false)
+        setShowConfirm(false)
+        return
+      }
     }
 
     // Refresh settings
@@ -322,15 +452,38 @@ export function ScoringTab({
     setRecalculating(true)
     setError(null)
 
-    const { error: rpcError } = await supabase.rpc(
-      'recalculate_all_pool_points',
-      { pool_id_param: pool.pool_id }
-    )
+    if (isBracketPicker) {
+      // For bracket picker pools, call the BP calculate endpoint
+      try {
+        const res = await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json()
+          setError('Recalculation failed: ' + (data.error || res.statusText))
+          setRecalculating(false)
+          return
+        }
+        const data = await res.json()
+        showToast(
+          `Bracket picker points recalculated: ${data.entriesProcessed} entries, ${data.totalBonusEntries} score items (${data.totalBonusPoints} total pts).`,
+          'success'
+        )
+      } catch (err: any) {
+        setError('Recalculation failed: ' + (err.message || 'Network error'))
+        setRecalculating(false)
+        return
+      }
+    } else {
+      const { error: rpcError } = await supabase.rpc(
+        'recalculate_all_pool_points',
+        { pool_id_param: pool.pool_id }
+      )
 
-    if (rpcError) {
-      setError('Recalculation failed: ' + rpcError.message)
-      setRecalculating(false)
-      return
+      if (rpcError) {
+        setError('Recalculation failed: ' + rpcError.message)
+        setRecalculating(false)
+        return
+      }
+      showToast('Points recalculated successfully.', 'success')
     }
 
     // Refresh members
@@ -342,7 +495,6 @@ export function ScoringTab({
 
     if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
-    showToast('Points recalculated successfully.', 'success')
     setRecalculating(false)
   }
 
@@ -350,10 +502,12 @@ export function ScoringTab({
     setRecalculatingBonus(true)
     setError(null)
 
+    const endpoint = isBracketPicker
+      ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
+      : `/api/pools/${pool.pool_id}/bonus/calculate`
+
     try {
-      const res = await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, {
-        method: 'POST',
-      })
+      const res = await fetch(endpoint, { method: 'POST' })
 
       if (!res.ok) {
         const data = await res.json()
@@ -373,10 +527,17 @@ export function ScoringTab({
 
       if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
-      showToast(
-        `Bonus points recalculated: ${data.membersProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`,
-        'success'
-      )
+      if (isBracketPicker) {
+        showToast(
+          `Bracket picker points recalculated: ${data.entriesProcessed} entries, ${data.totalBonusEntries} score items (${data.totalBonusPoints} total pts).`,
+          'success'
+        )
+      } else {
+        showToast(
+          `Bonus points recalculated: ${data.membersProcessed ?? data.entriesProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`,
+          'success'
+        )
+      }
     } catch (err: any) {
       setError('Bonus recalculation failed: ' + (err.message || 'Network error'))
     }
@@ -465,518 +626,809 @@ export function ScoringTab({
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
-      {/* Current scoring display */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <h3 className="font-semibold text-neutral-900 mb-3">
-            Group Stage Scoring
-          </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-neutral-600">🎯 Exact Score</span>
-              <span className="font-bold text-neutral-900">{groupExact} points</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">✓ Correct Winner + GD</span>
-              <span className="font-bold text-neutral-900">{groupDiff} points</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">✓ Correct Winner Only</span>
-              <span className="font-bold text-neutral-900">{groupResult} point{groupResult !== 1 ? 's' : ''}</span>
-            </div>
+      {isBracketPicker ? (
+        <>
+          {/* Bracket Picker current scoring display */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Group Stage Points
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Correct 1st Place</span>
+                  <span className="font-bold text-neutral-900">{bpGroup1st} point{bpGroup1st !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Correct 2nd Place</span>
+                  <span className="font-bold text-neutral-900">{bpGroup2nd} point{bpGroup2nd !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Correct 3rd Place</span>
+                  <span className="font-bold text-neutral-900">{bpGroup3rd} point{bpGroup3rd !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Correct 4th Place</span>
+                  <span className="font-bold text-neutral-900">{bpGroup4th} point{bpGroup4th !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Knockout Points
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Round of 32</span>
+                  <span className="font-bold text-neutral-900">{bpR32} point{bpR32 !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Round of 16</span>
+                  <span className="font-bold text-neutral-900">{bpR16} point{bpR16 !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Quarter Finals</span>
+                  <span className="font-bold text-neutral-900">{bpQf} point{bpQf !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Semi Finals</span>
+                  <span className="font-bold text-neutral-900">{bpSf} point{bpSf !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">3rd Place Match</span>
+                  <span className="font-bold text-neutral-900">{bpThirdPlaceMatch} point{bpThirdPlaceMatch !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Final</span>
+                  <span className="font-bold text-neutral-900">{bpFinal} point{bpFinal !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Bonus Points
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Champion Bonus</span>
+                  <span className="font-bold text-neutral-900">{bpChampionBonus} point{bpChampionBonus !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">All 8 3rd-Place Correct</span>
+                  <span className="font-bold text-neutral-900">{bpThirdAllBonus} point{bpThirdAllBonus !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Penalty Prediction</span>
+                  <span className="font-bold text-neutral-900">{bpPenaltyCorrect} point{bpPenaltyCorrect !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
 
-        <Card>
-          <h3 className="font-semibold text-neutral-900 mb-3">
-            Knockout Stage Scoring
-          </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-neutral-600">🎯 Exact Score</span>
-              <span className="font-bold text-neutral-900">{koExact} points</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">✓ Correct Winner + GD</span>
-              <span className="font-bold text-neutral-900">{koDiff} points</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">✓ Correct Winner Only</span>
-              <span className="font-bold text-neutral-900">{koResult} point{koResult !== 1 ? 's' : ''}</span>
-            </div>
-            <hr className="my-2" />
-            <p className="text-xs text-neutral-600 font-medium mb-1">Stage Multipliers:</p>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Round of 32</span>
-              <span className="font-bold text-neutral-900">{r32Mult}x</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Round of 16</span>
-              <span className="font-bold text-neutral-900">{r16Mult}x</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Quarter Final</span>
-              <span className="font-bold text-neutral-900">{qfMult}x</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Semi Final</span>
-              <span className="font-bold text-neutral-900">{sfMult}x</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Third Place</span>
-              <span className="font-bold text-neutral-900">{tpMult}x</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-600">Final</span>
-              <span className="font-bold text-neutral-900">{finalMult}x</span>
-            </div>
-          </div>
-        </Card>
+          {/* Bracket Picker Edit Form */}
+          <Card className="mb-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+              Edit Scoring Rules
+            </h3>
 
-        <Card>
-          <h3 className="font-semibold text-neutral-900 mb-3">
-            Penalty Shootout
-          </h3>
-          {psoEnabled ? (
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-neutral-600">🎯 Exact PSO Score</span>
-                <span className="font-bold text-neutral-900">{psoExact} points</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-600">✓ Correct Winner + GD</span>
-                <span className="font-bold text-neutral-900">{psoDiff} points</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-600">✓ Correct Winner Only</span>
-                <span className="font-bold text-neutral-900">{psoResult} point{psoResult !== 1 ? 's' : ''}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-neutral-500 italic">Disabled</p>
-          )}
-        </Card>
-      </div>
-
-      {/* Edit Scoring Form */}
-      <Card className="mb-6">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Edit Scoring Rules
-        </h3>
-
-        {/* Group Stage */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandGroup(!expandGroup)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandGroup ? '▼' : '▶'}</span>
-            Group Stage Points
-          </button>
-          {expandGroup && (
-            <div className="space-y-4 pl-4">
-              <SliderInput
-                label="Exact Score Match:"
-                value={groupExact}
-                onChange={setGroupExact}
-                min={5}
-                max={100}
-                step={5}
-              />
-              <SliderInput
-                label="Correct Winner + Goal Difference:"
-                value={groupDiff}
-                onChange={setGroupDiff}
-                min={5}
-                max={100}
-                step={5}
-              />
-              <SliderInput
-                label="Correct Winner Only:"
-                value={groupResult}
-                onChange={setGroupResult}
-                min={5}
-                max={100}
-                step={5}
-              />
-              {groupWarning && (
-                <p className="text-sm text-warning-500">{groupWarning}</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Knockout Stage */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandKnockout(!expandKnockout)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandKnockout ? '▼' : '▶'}</span>
-            Knockout Stage Points (Base Values)
-          </button>
-          {expandKnockout && (
-            <div className="space-y-4 pl-4">
-              <SliderInput
-                label="Exact Score Match:"
-                value={koExact}
-                onChange={setKoExact}
-                min={5}
-                max={200}
-                step={5}
-              />
-              <SliderInput
-                label="Correct Winner + Goal Difference:"
-                value={koDiff}
-                onChange={setKoDiff}
-                min={5}
-                max={200}
-                step={5}
-              />
-              <SliderInput
-                label="Correct Winner Only:"
-                value={koResult}
-                onChange={setKoResult}
-                min={5}
-                max={200}
-                step={5}
-              />
-              {koWarning && (
-                <p className="text-sm text-warning-500">{koWarning}</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Multipliers */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandMultipliers(!expandMultipliers)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandMultipliers ? '▼' : '▶'}</span>
-            Knockout Stage Multipliers
-          </button>
-          {expandMultipliers && (
-            <div className="space-y-4 pl-4">
-              <SliderInput
-                label="Round of 32:"
-                value={r32Mult}
-                onChange={setR32Mult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <SliderInput
-                label="Round of 16:"
-                value={r16Mult}
-                onChange={setR16Mult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <SliderInput
-                label="Quarter Final:"
-                value={qfMult}
-                onChange={setQfMult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <SliderInput
-                label="Semi Final:"
-                value={sfMult}
-                onChange={setSfMult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <SliderInput
-                label="Third Place:"
-                value={tpMult}
-                onChange={setTpMult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <SliderInput
-                label="Final:"
-                value={finalMult}
-                onChange={setFinalMult}
-                min={0.5}
-                max={5}
-                step={0.5}
-                suffix="x"
-              />
-              <p className="text-xs text-neutral-600">
-                Example: {koExact} points (exact) x {finalMult} (final) ={' '}
-                {koExact * finalMult} points
-              </p>
-              {multiplierWarning && (
-                <p className="text-sm text-danger-500">{multiplierWarning}</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Penalty Shootout Scoring */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandPso(!expandPso)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandPso ? '▼' : '▶'}</span>
-            Penalty Shootout Scoring
-          </button>
-          {expandPso && (
-            <div className="space-y-4 pl-4">
-              <div className="flex items-center gap-3">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={psoEnabled}
-                    onChange={(e) => setPsoEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
-                <span className="text-sm text-neutral-700">
-                  Enable penalty shootout scoring
-                </span>
-              </div>
-              <p className="text-xs text-neutral-600">
-                When enabled, bonus points are awarded for predicting the penalty shootout score in knockout matches that go to penalties.
-              </p>
-              <div className={psoEnabled ? '' : 'opacity-40 pointer-events-none'}>
-                <SliderInput
-                  label="Exact PSO Score:"
-                  value={psoExact}
-                  onChange={setPsoExact}
-                  min={5}
-                  max={200}
-                  step={5}
-                />
-                <div className="mt-4">
+            {/* Group Stage Points */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBpGroup(!expandBpGroup)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBpGroup ? '▼' : '▶'}</span>
+                Group Stage Points
+              </button>
+              {expandBpGroup && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Points awarded for correctly predicting a team's finishing position within their group.
+                  </p>
                   <SliderInput
-                    label="Correct Winner + GD:"
-                    value={psoDiff}
-                    onChange={setPsoDiff}
-                    min={5}
+                    label="Correct 1st Place:"
+                    value={bpGroup1st}
+                    onChange={setBpGroup1st}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Correct 2nd Place:"
+                    value={bpGroup2nd}
+                    onChange={setBpGroup2nd}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Correct 3rd Place:"
+                    value={bpGroup3rd}
+                    onChange={setBpGroup3rd}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Correct 4th Place:"
+                    value={bpGroup4th}
+                    onChange={setBpGroup4th}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Third-Place Points */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBpThird(!expandBpThird)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBpThird ? '▼' : '▶'}</span>
+                Third-Place Points
+              </button>
+              {expandBpThird && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Points for correctly predicting which 3rd-place teams qualify for the knockout stage and which are eliminated.
+                  </p>
+                  <SliderInput
+                    label="Correct Qualifier:"
+                    value={bpThirdQualifier}
+                    onChange={setBpThirdQualifier}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Correct Eliminated:"
+                    value={bpThirdEliminated}
+                    onChange={setBpThirdEliminated}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="All 8 Correct Bonus:"
+                    value={bpThirdAllBonus}
+                    onChange={setBpThirdAllBonus}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Knockout Points */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBpKnockout(!expandBpKnockout)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBpKnockout ? '▼' : '▶'}</span>
+                Knockout Points
+              </button>
+              {expandBpKnockout && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Points for correctly predicting the winner of each knockout match. Higher rounds are worth more.
+                  </p>
+                  <SliderInput
+                    label="Round of 32:"
+                    value={bpR32}
+                    onChange={setBpR32}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Round of 16:"
+                    value={bpR16}
+                    onChange={setBpR16}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Quarter Finals:"
+                    value={bpQf}
+                    onChange={setBpQf}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Semi Finals:"
+                    value={bpSf}
+                    onChange={setBpSf}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="3rd Place Match:"
+                    value={bpThirdPlaceMatch}
+                    onChange={setBpThirdPlaceMatch}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Final:"
+                    value={bpFinal}
+                    onChange={setBpFinal}
+                    min={0}
+                    max={100}
+                    step={1}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Bonus Points */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBpBonus(!expandBpBonus)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBpBonus ? '▼' : '▶'}</span>
+                Bonus Points
+              </button>
+              {expandBpBonus && (
+                <div className="space-y-4 pl-4">
+                  <SliderInput
+                    label="Champion Bonus:"
+                    value={bpChampionBonus}
+                    onChange={setBpChampionBonus}
+                    min={0}
                     max={200}
                     step={5}
                   />
+                  <SliderInput
+                    label="Correct Penalty Prediction:"
+                    value={bpPenaltyCorrect}
+                    onChange={setBpPenaltyCorrect}
+                    min={0}
+                    max={10}
+                    step={1}
+                  />
                 </div>
-                <div className="mt-4">
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <Button variant="gray" onClick={resetDefaults}>
+                Reset to Defaults
+              </Button>
+              <Button variant="green" onClick={() => setShowConfirm(true)}>
+                Save Changes
+              </Button>
+            </div>
+          </Card>
+        </>
+      ) : (
+        <>
+          {/* Current scoring display */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Group Stage Scoring
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">🎯 Exact Score</span>
+                  <span className="font-bold text-neutral-900">{groupExact} points</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">✓ Correct Winner + GD</span>
+                  <span className="font-bold text-neutral-900">{groupDiff} points</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">✓ Correct Winner Only</span>
+                  <span className="font-bold text-neutral-900">{groupResult} point{groupResult !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Knockout Stage Scoring
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">🎯 Exact Score</span>
+                  <span className="font-bold text-neutral-900">{koExact} points</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">✓ Correct Winner + GD</span>
+                  <span className="font-bold text-neutral-900">{koDiff} points</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">✓ Correct Winner Only</span>
+                  <span className="font-bold text-neutral-900">{koResult} point{koResult !== 1 ? 's' : ''}</span>
+                </div>
+                <hr className="my-2" />
+                <p className="text-xs text-neutral-600 font-medium mb-1">Stage Multipliers:</p>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Round of 32</span>
+                  <span className="font-bold text-neutral-900">{r32Mult}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Round of 16</span>
+                  <span className="font-bold text-neutral-900">{r16Mult}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Quarter Final</span>
+                  <span className="font-bold text-neutral-900">{qfMult}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Semi Final</span>
+                  <span className="font-bold text-neutral-900">{sfMult}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Third Place</span>
+                  <span className="font-bold text-neutral-900">{tpMult}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Final</span>
+                  <span className="font-bold text-neutral-900">{finalMult}x</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <h3 className="font-semibold text-neutral-900 mb-3">
+                Penalty Shootout
+              </h3>
+              {psoEnabled ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">🎯 Exact PSO Score</span>
+                    <span className="font-bold text-neutral-900">{psoExact} points</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">✓ Correct Winner + GD</span>
+                    <span className="font-bold text-neutral-900">{psoDiff} points</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">✓ Correct Winner Only</span>
+                    <span className="font-bold text-neutral-900">{psoResult} point{psoResult !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500 italic">Disabled</p>
+              )}
+            </Card>
+          </div>
+
+          {/* Edit Scoring Form */}
+          <Card className="mb-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+              Edit Scoring Rules
+            </h3>
+
+            {/* Group Stage */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandGroup(!expandGroup)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandGroup ? '▼' : '▶'}</span>
+                Group Stage Points
+              </button>
+              {expandGroup && (
+                <div className="space-y-4 pl-4">
+                  <SliderInput
+                    label="Exact Score Match:"
+                    value={groupExact}
+                    onChange={setGroupExact}
+                    min={5}
+                    max={100}
+                    step={5}
+                  />
+                  <SliderInput
+                    label="Correct Winner + Goal Difference:"
+                    value={groupDiff}
+                    onChange={setGroupDiff}
+                    min={5}
+                    max={100}
+                    step={5}
+                  />
                   <SliderInput
                     label="Correct Winner Only:"
-                    value={psoResult}
-                    onChange={setPsoResult}
+                    value={groupResult}
+                    onChange={setGroupResult}
+                    min={5}
+                    max={100}
+                    step={5}
+                  />
+                  {groupWarning && (
+                    <p className="text-sm text-warning-500">{groupWarning}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Knockout Stage */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandKnockout(!expandKnockout)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandKnockout ? '▼' : '▶'}</span>
+                Knockout Stage Points (Base Values)
+              </button>
+              {expandKnockout && (
+                <div className="space-y-4 pl-4">
+                  <SliderInput
+                    label="Exact Score Match:"
+                    value={koExact}
+                    onChange={setKoExact}
                     min={5}
                     max={200}
                     step={5}
                   />
+                  <SliderInput
+                    label="Correct Winner + Goal Difference:"
+                    value={koDiff}
+                    onChange={setKoDiff}
+                    min={5}
+                    max={200}
+                    step={5}
+                  />
+                  <SliderInput
+                    label="Correct Winner Only:"
+                    value={koResult}
+                    onChange={setKoResult}
+                    min={5}
+                    max={200}
+                    step={5}
+                  />
+                  {koWarning && (
+                    <p className="text-sm text-warning-500">{koWarning}</p>
+                  )}
                 </div>
-              </div>
-              {psoWarning && (
-                <p className="text-sm text-warning-500">{psoWarning}</p>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Bonus: Group Standings */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandBonusGroup(!expandBonusGroup)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandBonusGroup ? '▼' : '▶'}</span>
-            Bonus: Group Standings
-          </button>
-          {expandBonusGroup && (
-            <div className="space-y-4 pl-4">
-              <p className="text-xs text-neutral-600">
-                Awarded per group when all group matches are completed. Compares predicted group standings (derived from match predictions) against actual results.
+            {/* Multipliers */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandMultipliers(!expandMultipliers)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandMultipliers ? '▼' : '▶'}</span>
+                Knockout Stage Multipliers
+              </button>
+              {expandMultipliers && (
+                <div className="space-y-4 pl-4">
+                  <SliderInput
+                    label="Round of 32:"
+                    value={r32Mult}
+                    onChange={setR32Mult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <SliderInput
+                    label="Round of 16:"
+                    value={r16Mult}
+                    onChange={setR16Mult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <SliderInput
+                    label="Quarter Final:"
+                    value={qfMult}
+                    onChange={setQfMult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <SliderInput
+                    label="Semi Final:"
+                    value={sfMult}
+                    onChange={setSfMult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <SliderInput
+                    label="Third Place:"
+                    value={tpMult}
+                    onChange={setTpMult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <SliderInput
+                    label="Final:"
+                    value={finalMult}
+                    onChange={setFinalMult}
+                    min={0.5}
+                    max={5}
+                    step={0.5}
+                    suffix="x"
+                  />
+                  <p className="text-xs text-neutral-600">
+                    Example: {koExact} points (exact) x {finalMult} (final) ={' '}
+                    {koExact * finalMult} points
+                  </p>
+                  {multiplierWarning && (
+                    <p className="text-sm text-danger-500">{multiplierWarning}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Penalty Shootout Scoring */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandPso(!expandPso)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandPso ? '▼' : '▶'}</span>
+                Penalty Shootout Scoring
+              </button>
+              {expandPso && (
+                <div className="space-y-4 pl-4">
+                  <div className="flex items-center gap-3">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={psoEnabled}
+                        onChange={(e) => setPsoEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                    </label>
+                    <span className="text-sm text-neutral-700">
+                      Enable penalty shootout scoring
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-600">
+                    When enabled, bonus points are awarded for predicting the penalty shootout score in knockout matches that go to penalties.
+                  </p>
+                  <div className={psoEnabled ? '' : 'opacity-40 pointer-events-none'}>
+                    <SliderInput
+                      label="Exact PSO Score:"
+                      value={psoExact}
+                      onChange={setPsoExact}
+                      min={5}
+                      max={200}
+                      step={5}
+                    />
+                    <div className="mt-4">
+                      <SliderInput
+                        label="Correct Winner + GD:"
+                        value={psoDiff}
+                        onChange={setPsoDiff}
+                        min={5}
+                        max={200}
+                        step={5}
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <SliderInput
+                        label="Correct Winner Only:"
+                        value={psoResult}
+                        onChange={setPsoResult}
+                        min={5}
+                        max={200}
+                        step={5}
+                      />
+                    </div>
+                  </div>
+                  {psoWarning && (
+                    <p className="text-sm text-warning-500">{psoWarning}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Bonus: Group Standings */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBonusGroup(!expandBonusGroup)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBonusGroup ? '▼' : '▶'}</span>
+                Bonus: Group Standings
+              </button>
+              {expandBonusGroup && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Awarded per group when all group matches are completed. Compares predicted group standings (derived from match predictions) against actual results.
+                  </p>
+                  <SliderInput
+                    label="Winner AND Runner-up correct:"
+                    value={bonusGroupWinnerAndRunnerup}
+                    onChange={setBonusGroupWinnerAndRunnerup}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Winner only correct:"
+                    value={bonusGroupWinnerOnly}
+                    onChange={setBonusGroupWinnerOnly}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Both qualify, positions swapped:"
+                    value={bonusBothQualifySwapped}
+                    onChange={setBonusBothQualifySwapped}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Runner-up only correct:"
+                    value={bonusGroupRunnerupOnly}
+                    onChange={setBonusGroupRunnerupOnly}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="One qualifies, wrong position:"
+                    value={bonusOneQualifiesWrongPos}
+                    onChange={setBonusOneQualifiesWrongPos}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Bonus: Overall Qualification */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBonusQualification(!expandBonusQualification)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBonusQualification ? '▼' : '▶'}</span>
+                Bonus: Overall Qualification
+              </button>
+              {expandBonusQualification && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Awarded once when all 48 group matches are completed. Based on how many of the 32 qualifying teams were predicted correctly.
+                  </p>
+                  <SliderInput
+                    label="All qualified teams correct:"
+                    value={bonusAllQualified}
+                    onChange={setBonusAllQualified}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="75%+ qualified correct:"
+                    value={bonus75PctQualified}
+                    onChange={setBonus75PctQualified}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="50%+ qualified correct:"
+                    value={bonus50PctQualified}
+                    onChange={setBonus50PctQualified}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Bonus: Knockout & Tournament */}
+            <div className="mb-6">
+              <button
+                onClick={() => setExpandBonusKnockout(!expandBonusKnockout)}
+                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
+              >
+                <span>{expandBonusKnockout ? '▼' : '▶'}</span>
+                Bonus: Knockout &amp; Tournament
+              </button>
+              {expandBonusKnockout && (
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Bracket pairing and match winner bonuses are awarded as knockout matches are played. Podium bonuses are awarded when the tournament champion, runner-up, and third place are confirmed.
+                  </p>
+                  <SliderInput
+                    label="Correct R32 bracket pairing:"
+                    value={bonusBracketPairing}
+                    onChange={setBonusBracketPairing}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Correct knockout match winner:"
+                    value={bonusMatchWinner}
+                    onChange={setBonusMatchWinner}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Champion correct:"
+                    value={bonusChampion}
+                    onChange={setBonusChampion}
+                    min={0}
+                    max={2000}
+                    step={50}
+                  />
+                  <SliderInput
+                    label="Runner-up correct:"
+                    value={bonusSecondPlace}
+                    onChange={setBonusSecondPlace}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                  <SliderInput
+                    label="Third place correct:"
+                    value={bonusThirdPlace}
+                    onChange={setBonusThirdPlace}
+                    min={0}
+                    max={500}
+                    step={25}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Coming Soon — Best Player & Top Scorer */}
+            <div className="mb-6 border border-neutral-200 rounded-lg px-4 py-3 bg-neutral-50">
+              <p className="text-sm font-semibold text-neutral-400">
+                Bonus: Best Player &amp; Top Scorer
+                <span className="ml-2 inline-block px-2 py-0.5 text-xs bg-neutral-200 text-neutral-500 rounded-full">
+                  Coming Soon
+                </span>
               </p>
-              <SliderInput
-                label="Winner AND Runner-up correct:"
-                value={bonusGroupWinnerAndRunnerup}
-                onChange={setBonusGroupWinnerAndRunnerup}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Winner only correct:"
-                value={bonusGroupWinnerOnly}
-                onChange={setBonusGroupWinnerOnly}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Both qualify, positions swapped:"
-                value={bonusBothQualifySwapped}
-                onChange={setBonusBothQualifySwapped}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Runner-up only correct:"
-                value={bonusGroupRunnerupOnly}
-                onChange={setBonusGroupRunnerupOnly}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="One qualifies, wrong position:"
-                value={bonusOneQualifiesWrongPos}
-                onChange={setBonusOneQualifiesWrongPos}
-                min={0}
-                max={500}
-                step={25}
-              />
+              <div className="mt-2 space-y-2 opacity-40 pointer-events-none">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-neutral-500 w-52 shrink-0">Best Player correct:</span>
+                  <span className="text-sm font-bold text-neutral-400">100 points</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-neutral-500 w-52 shrink-0">Top Scorer correct:</span>
+                  <span className="text-sm font-bold text-neutral-400">100 points</span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Bonus: Overall Qualification */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandBonusQualification(!expandBonusQualification)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandBonusQualification ? '▼' : '▶'}</span>
-            Bonus: Overall Qualification
-          </button>
-          {expandBonusQualification && (
-            <div className="space-y-4 pl-4">
-              <p className="text-xs text-neutral-600">
-                Awarded once when all 48 group matches are completed. Based on how many of the 32 qualifying teams were predicted correctly.
-              </p>
-              <SliderInput
-                label="All qualified teams correct:"
-                value={bonusAllQualified}
-                onChange={setBonusAllQualified}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="75%+ qualified correct:"
-                value={bonus75PctQualified}
-                onChange={setBonus75PctQualified}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="50%+ qualified correct:"
-                value={bonus50PctQualified}
-                onChange={setBonus50PctQualified}
-                min={0}
-                max={500}
-                step={25}
-              />
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <Button variant="gray" onClick={resetDefaults}>
+                Reset to Defaults
+              </Button>
+              <Button variant="green" onClick={() => setShowConfirm(true)}>
+                Save Changes
+              </Button>
             </div>
-          )}
-        </div>
-
-        {/* Bonus: Knockout & Tournament */}
-        <div className="mb-6">
-          <button
-            onClick={() => setExpandBonusKnockout(!expandBonusKnockout)}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-          >
-            <span>{expandBonusKnockout ? '▼' : '▶'}</span>
-            Bonus: Knockout &amp; Tournament
-          </button>
-          {expandBonusKnockout && (
-            <div className="space-y-4 pl-4">
-              <p className="text-xs text-neutral-600">
-                Bracket pairing and match winner bonuses are awarded as knockout matches are played. Podium bonuses are awarded when the tournament champion, runner-up, and third place are confirmed.
-              </p>
-              <SliderInput
-                label="Correct R32 bracket pairing:"
-                value={bonusBracketPairing}
-                onChange={setBonusBracketPairing}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Correct knockout match winner:"
-                value={bonusMatchWinner}
-                onChange={setBonusMatchWinner}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Champion correct:"
-                value={bonusChampion}
-                onChange={setBonusChampion}
-                min={0}
-                max={2000}
-                step={50}
-              />
-              <SliderInput
-                label="Runner-up correct:"
-                value={bonusSecondPlace}
-                onChange={setBonusSecondPlace}
-                min={0}
-                max={500}
-                step={25}
-              />
-              <SliderInput
-                label="Third place correct:"
-                value={bonusThirdPlace}
-                onChange={setBonusThirdPlace}
-                min={0}
-                max={500}
-                step={25}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Coming Soon — Best Player & Top Scorer */}
-        <div className="mb-6 border border-neutral-200 rounded-lg px-4 py-3 bg-neutral-50">
-          <p className="text-sm font-semibold text-neutral-400">
-            Bonus: Best Player &amp; Top Scorer
-            <span className="ml-2 inline-block px-2 py-0.5 text-xs bg-neutral-200 text-neutral-500 rounded-full">
-              Coming Soon
-            </span>
-          </p>
-          <div className="mt-2 space-y-2 opacity-40 pointer-events-none">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-500 w-52 shrink-0">Best Player correct:</span>
-              <span className="text-sm font-bold text-neutral-400">100 points</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-500 w-52 shrink-0">Top Scorer correct:</span>
-              <span className="text-sm font-bold text-neutral-400">100 points</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-          <Button variant="gray" onClick={resetDefaults}>
-            Reset to Defaults
-          </Button>
-          <Button variant="green" onClick={() => setShowConfirm(true)}>
-            Save Changes
-          </Button>
-        </div>
-      </Card>
+          </Card>
+        </>
+      )}
 
       {/* Manual Recalculation */}
       <Card>
@@ -988,22 +1440,35 @@ export function ScoringTab({
           using current rules.
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            variant="outline"
-            onClick={handleManualRecalculate}
-            loading={recalculating}
-            loadingText="Recalculating..."
-          >
-            Recalculate Match Points
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleRecalculateBonus}
-            loading={recalculatingBonus}
-            loadingText="Recalculating Bonus..."
-          >
-            Recalculate Bonus Points
-          </Button>
+          {isBracketPicker ? (
+            <Button
+              variant="outline"
+              onClick={handleManualRecalculate}
+              loading={recalculating}
+              loadingText="Recalculating..."
+            >
+              Recalculate Bracket Picker Points
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleManualRecalculate}
+                loading={recalculating}
+                loadingText="Recalculating..."
+              >
+                Recalculate Match Points
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRecalculateBonus}
+                loading={recalculatingBonus}
+                loadingText="Recalculating Bonus..."
+              >
+                Recalculate Bonus Points
+              </Button>
+            </>
+          )}
         </div>
       </Card>
 

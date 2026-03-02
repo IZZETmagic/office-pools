@@ -488,16 +488,10 @@ body {
   animation: step-slide-right 0.25s ease-out forwards;
 }
 
-/* Tab content transition — subtle fade + rise */
+/* Tab content transition — subtle fade in (no transform to avoid breaking fixed modals) */
 @keyframes tab-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .tab-transition {
