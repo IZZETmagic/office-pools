@@ -8,6 +8,9 @@ import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/l
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, SettingsData } from '@/app/pools/[pool_id]/types'
 
+// Allow up to 60s on Vercel Hobby plan (default is 10s, too short for this route)
+export const maxDuration = 60
+
 // =============================================================
 // POST /api/pools/:poolId/bracket-picks/calculate
 // Recalculates bracket picker points for all members in the pool.
@@ -285,8 +288,26 @@ export async function POST(
     // CALCULATE SCORES FOR EACH ENTRY
     // =========================================================================
 
-    let totalBonusEntries = 0
+    // Bulk delete all existing bonus_scores for these entries in one DB call
+    const { error: deleteErr } = await adminClient
+      .from('bonus_scores')
+      .delete()
+      .in('entry_id', entryIds)
+
+    if (deleteErr) {
+      console.error('Failed to bulk delete bonus_scores:', deleteErr)
+    }
+
     let totalBonusPoints = 0
+    const allBonusRows: {
+      entry_id: string
+      bonus_type: string
+      bonus_category: string
+      related_group_letter: string | null
+      related_match_id: string | null
+      points_earned: number
+      description: string
+    }[] = []
 
     for (const entry of submittedEntries) {
       const entryId = entry.entry_id
@@ -310,28 +331,11 @@ export async function POST(
         settings,
       })
 
-      // Delete existing bonus_scores for this entry (use admin client to bypass RLS)
-      await adminClient
-        .from('bonus_scores')
-        .delete()
-        .eq('entry_id', entryId)
-
-      // Build bonus_scores rows from the breakdown
-      const bonusRows: {
-        entry_id: string
-        bonus_type: string
-        bonus_category: string
-        related_group_letter: string | null
-        related_match_id: string | null
-        points_earned: number
-        description: string
-      }[] = []
-
       // Group ranking details
       for (const d of breakdown.groupDetails) {
         if (d.points > 0) {
           const team = teamsData.find(t => t.team_id === d.team_id)
-          bonusRows.push({
+          allBonusRows.push({
             entry_id: entryId,
             bonus_type: `bp_group_position_${d.position}`,
             bonus_category: 'bp_group',
@@ -348,7 +352,7 @@ export async function POST(
         if (d.points > 0) {
           const team = teamsData.find(t => t.team_id === d.team_id)
           const label = d.predicted_qualifies ? 'qualifies' : 'eliminated'
-          bonusRows.push({
+          allBonusRows.push({
             entry_id: entryId,
             bonus_type: `bp_third_${label}`,
             bonus_category: 'bp_third_place',
@@ -362,7 +366,7 @@ export async function POST(
 
       // Third-place all correct bonus
       if (breakdown.thirdPlaceAllCorrectBonus > 0) {
-        bonusRows.push({
+        allBonusRows.push({
           entry_id: entryId,
           bonus_type: 'bp_third_all_correct',
           bonus_category: 'bp_third_place',
@@ -378,7 +382,7 @@ export async function POST(
         if (d.points > 0) {
           const stageLabel = formatStage(d.stage)
           const team = teamsData.find(t => t.team_id === d.predicted_winner)
-          bonusRows.push({
+          allBonusRows.push({
             entry_id: entryId,
             bonus_type: `bp_knockout_${d.stage}`,
             bonus_category: 'bp_knockout',
@@ -392,7 +396,7 @@ export async function POST(
 
       // Penalty prediction points
       if (breakdown.penaltyPoints > 0) {
-        bonusRows.push({
+        allBonusRows.push({
           entry_id: entryId,
           bonus_type: 'bp_penalty_predictions',
           bonus_category: 'bp_bonus',
@@ -405,7 +409,7 @@ export async function POST(
 
       // Champion bonus
       if (breakdown.championBonus > 0) {
-        bonusRows.push({
+        allBonusRows.push({
           entry_id: entryId,
           bonus_type: 'bp_champion',
           bonus_category: 'bp_bonus',
@@ -416,19 +420,18 @@ export async function POST(
         })
       }
 
-      // Insert bonus_scores (use admin client to bypass RLS)
-      if (bonusRows.length > 0) {
-        const { error: insertError } = await adminClient
-          .from('bonus_scores')
-          .insert(bonusRows)
-
-        if (insertError) {
-          console.error(`Failed to insert bonus_scores for entry ${entryId}:`, insertError)
-        }
-      }
-
-      totalBonusEntries += bonusRows.length
       totalBonusPoints += breakdown.total
+    }
+
+    // Bulk insert all bonus_scores in one DB call
+    if (allBonusRows.length > 0) {
+      const { error: insertError } = await adminClient
+        .from('bonus_scores')
+        .insert(allBonusRows)
+
+      if (insertError) {
+        console.error('Failed to bulk insert bonus_scores:', insertError)
+      }
     }
 
     // =========================================================================
@@ -446,7 +449,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       entriesProcessed: submittedEntries.length,
-      totalBonusEntries,
+      totalBonusEntries: allBonusRows.length,
       totalBonusPoints,
     })
   } catch (err: any) {
