@@ -14,15 +14,22 @@ type ThemeContextType = {
   resolvedColorMode: 'light' | 'dark'
 }
 
-const ThemeContext = createContext<ThemeContextType | null>(null)
+const defaultThemeContext: ThemeContextType = {
+  theme: 'new',
+  setTheme: () => {},
+  toggleTheme: () => {},
+  colorMode: 'system',
+  setColorMode: () => {},
+  resolvedColorMode: 'light',
+}
+
+const ThemeContext = createContext<ThemeContextType>(defaultThemeContext)
 
 const PALETTE_KEY = 'sport-pool-theme'
 const COLOR_MODE_KEY = 'sport-pool-color-mode'
 
 export function useTheme() {
-  const ctx = useContext(ThemeContext)
-  if (!ctx) throw new Error('useTheme must be used within a ThemeProvider')
-  return ctx
+  return useContext(ThemeContext)
 }
 
 function getSystemPreference(): 'light' | 'dark' {
