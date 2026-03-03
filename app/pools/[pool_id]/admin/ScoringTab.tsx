@@ -398,8 +398,9 @@ export function ScoringTab({
       try {
         const res = await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
         if (!res.ok) {
-          const data = await res.json()
-          setError('Settings saved but recalculation failed: ' + (data.error || res.statusText))
+          let errMsg = res.statusText
+          try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
+          setError('Settings saved but recalculation failed: ' + errMsg)
           setSaving(false)
           setShowConfirm(false)
           return
@@ -457,8 +458,9 @@ export function ScoringTab({
       try {
         const res = await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
         if (!res.ok) {
-          const data = await res.json()
-          setError('Recalculation failed: ' + (data.error || res.statusText))
+          let errMsg = res.statusText
+          try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
+          setError('Recalculation failed: ' + errMsg)
           setRecalculating(false)
           return
         }
@@ -510,8 +512,9 @@ export function ScoringTab({
       const res = await fetch(endpoint, { method: 'POST' })
 
       if (!res.ok) {
-        const data = await res.json()
-        setError('Bonus recalculation failed: ' + (data.error || res.statusText))
+        let errMsg = res.statusText
+        try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
+        setError('Bonus recalculation failed: ' + errMsg)
         setRecalculatingBonus(false)
         return
       }

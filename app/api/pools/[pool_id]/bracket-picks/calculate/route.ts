@@ -18,432 +18,444 @@ export async function POST(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  // 1. Authenticate
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createClient()
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
+    // 1. Authenticate
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-  // 2. Check authorization (pool admin or super admin)
-  const isSuperAdmin = userData.is_super_admin === true
-  if (!isSuperAdmin) {
-    const { data: membership } = await supabase
-      .from('pool_members')
-      .select('role')
-      .eq('pool_id', pool_id)
-      .eq('user_id', userData.user_id)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('user_id, is_super_admin')
+      .eq('auth_user_id', user.id)
       .single()
 
-    if (!membership || membership.role !== 'admin') {
-      return NextResponse.json({ error: 'Must be pool admin or super admin' }, { status: 403 })
-    }
-  }
+    if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  // Create admin client for writing to RLS-protected tables (bonus_scores, player_scores)
-  const adminClient = createAdminClient()
+    // 2. Check authorization (pool admin or super admin)
+    const isSuperAdmin = userData.is_super_admin === true
+    if (!isSuperAdmin) {
+      const { data: membership } = await supabase
+        .from('pool_members')
+        .select('role')
+        .eq('pool_id', pool_id)
+        .eq('user_id', userData.user_id)
+        .single()
 
-  // 3. Fetch pool info
-  const { data: pool } = await supabase
-    .from('pools')
-    .select('pool_id, tournament_id, prediction_mode')
-    .eq('pool_id', pool_id)
-    .single()
-
-  if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
-
-  if (pool.prediction_mode !== 'bracket_picker') {
-    return NextResponse.json({ error: 'Pool is not in bracket picker mode' }, { status: 400 })
-  }
-
-  // 4. Fetch all needed data in parallel
-  const [
-    { data: matches },
-    { data: teams },
-    { data: conductData },
-    { data: settingsRow },
-    { data: poolMembers },
-  ] = await Promise.all([
-    supabase
-      .from('matches')
-      .select('*')
-      .eq('tournament_id', pool.tournament_id)
-      .order('match_number', { ascending: true }),
-    supabase
-      .from('teams')
-      .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
-      .eq('tournament_id', pool.tournament_id),
-    supabase
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    supabase
-      .from('pool_settings')
-      .select('*')
-      .eq('pool_id', pool_id)
-      .single(),
-    supabase
-      .from('pool_members')
-      .select('member_id')
-      .eq('pool_id', pool_id),
-  ])
-
-  if (!matches || !teams || !poolMembers) {
-    return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
-  }
-
-  // Build settings (merge with defaults via the scoring function)
-  const settings: SettingsData = (settingsRow || {}) as SettingsData
-
-  // Build team data
-  const teamsData: Team[] = (teams as any[]).map(t => ({
-    ...t,
-    group_letter: t.group_letter?.trim() || '',
-    country_code: t.country_code?.trim() || '',
-  }))
-
-  // Cast matches to BPMatchWithResult (the scoring function needs is_completed, scores, etc.)
-  const completedMatches: BPMatchWithResult[] = (matches as any[]).map(m => ({
-    match_id: m.match_id,
-    match_number: m.match_number,
-    stage: m.stage,
-    group_letter: m.group_letter,
-    match_date: m.match_date,
-    venue: m.venue,
-    status: m.status,
-    home_team_id: m.home_team_id,
-    away_team_id: m.away_team_id,
-    home_team_placeholder: m.home_team_placeholder,
-    away_team_placeholder: m.away_team_placeholder,
-    home_team: null,
-    away_team: null,
-    is_completed: m.is_completed ?? false,
-    home_score_ft: m.home_score_ft,
-    away_score_ft: m.away_score_ft,
-    home_score_pso: m.home_score_pso,
-    away_score_pso: m.away_score_pso,
-    winner_team_id: m.winner_team_id,
-  }))
-
-  // =========================================================================
-  // COMPUTE ACTUAL GROUP STANDINGS
-  // =========================================================================
-  // We need actual group standings from real match results to compare against
-  // the user's predicted group rankings.
-
-  const conduct: MatchConductData[] = conductData || []
-
-  // Build a "prediction map" from actual results so we can reuse calculateGroupStandings
-  const actualResultsMap: PredictionMap = new Map()
-  for (const m of completedMatches) {
-    if (m.is_completed && m.home_score_ft != null && m.away_score_ft != null) {
-      const entry: ScoreEntry = {
-        home: m.home_score_ft,
-        away: m.away_score_ft,
-        homePso: m.home_score_pso ?? null,
-        awayPso: m.away_score_pso ?? null,
-        winnerTeamId: m.winner_team_id ?? null,
+      if (!membership || membership.role !== 'admin') {
+        return NextResponse.json({ error: 'Must be pool admin or super admin' }, { status: 403 })
       }
-      actualResultsMap.set(m.match_id, entry)
     }
-  }
 
-  const actualGroupStandings = new Map<string, GroupStanding[]>()
-  for (const letter of GROUP_LETTERS) {
-    const groupMatches = completedMatches.filter(m => m.stage === 'group' && m.group_letter === letter)
-    if (groupMatches.length === 0) continue
+    // Create admin client for reading all entries (bypasses RLS) and writing scores
+    const adminClient = createAdminClient()
 
-    const standings = calculateGroupStandings(
-      letter,
-      groupMatches,
-      actualResultsMap,
-      teamsData,
-      conduct,
-    )
-    actualGroupStandings.set(letter, standings)
-  }
+    // 3. Fetch pool info
+    const { data: pool } = await supabase
+      .from('pools')
+      .select('pool_id, tournament_id, prediction_mode')
+      .eq('pool_id', pool_id)
+      .single()
 
-  // =========================================================================
-  // COMPUTE ACTUAL THIRD-PLACE QUALIFIERS
-  // =========================================================================
-  // Rank all third-place teams across groups, take the best 8 as qualifiers
+    if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
 
-  const actualThirdPlaceQualifierTeamIds = new Set<string>()
-
-  // Only do this if enough groups have completed
-  const completedGroupLetters = new Set<string>()
-  for (const [letter, standings] of actualGroupStandings) {
-    // A group is "complete" if all 6 group matches for it are completed
-    const groupMatches = completedMatches.filter(
-      m => m.stage === 'group' && m.group_letter === letter && m.is_completed
-    )
-    if (groupMatches.length >= 6) {
-      completedGroupLetters.add(letter)
+    if (pool.prediction_mode !== 'bracket_picker') {
+      return NextResponse.json({ error: 'Pool is not in bracket picker mode' }, { status: 400 })
     }
-  }
 
-  // Build standings map with only completed groups for third-place ranking
-  const completedStandingsMap = new Map<string, GroupStanding[]>()
-  for (const letter of completedGroupLetters) {
-    const standings = actualGroupStandings.get(letter)
-    if (standings) completedStandingsMap.set(letter, standings)
-  }
+    // 4. Fetch all needed data in parallel (use adminClient to bypass RLS for cross-user reads)
+    const [
+      { data: matches, error: matchesErr },
+      { data: teams, error: teamsErr },
+      { data: conductData },
+      { data: settingsRow },
+      { data: poolMembers, error: membersErr },
+    ] = await Promise.all([
+      adminClient
+        .from('matches')
+        .select('*')
+        .eq('tournament_id', pool.tournament_id)
+        .order('match_number', { ascending: true }),
+      adminClient
+        .from('teams')
+        .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url'),
+      adminClient
+        .from('match_conduct')
+        .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+      adminClient
+        .from('pool_settings')
+        .select('*')
+        .eq('pool_id', pool_id)
+        .single(),
+      adminClient
+        .from('pool_members')
+        .select('member_id')
+        .eq('pool_id', pool_id),
+    ])
 
-  if (completedStandingsMap.size === 12) {
-    // All groups complete — rank all third-place teams
-    const rankedThird = rankThirdPlaceTeams(completedStandingsMap)
-    const best8 = rankedThird.slice(0, 8)
-    for (const t of best8) {
-      actualThirdPlaceQualifierTeamIds.add(t.team_id)
+    if (!matches || !teams || !poolMembers) {
+      const errMsg = matchesErr?.message || teamsErr?.message || membersErr?.message || 'Unknown'
+      return NextResponse.json({ error: `Failed to fetch data: ${errMsg}` }, { status: 500 })
     }
-  }
 
-  // =========================================================================
-  // FETCH ALL ENTRIES AND THEIR BP PREDICTIONS
-  // =========================================================================
+    // Build settings (merge with defaults via the scoring function)
+    const settings: SettingsData = (settingsRow || {}) as SettingsData
 
-  const memberIds = poolMembers.map((m: any) => m.member_id)
-  const { data: entries } = await supabase
-    .from('pool_entries')
-    .select('entry_id, member_id, has_submitted_predictions')
-    .in('member_id', memberIds)
+    // Build team data
+    const teamsData: Team[] = (teams as any[]).map(t => ({
+      ...t,
+      group_letter: t.group_letter?.trim() || '',
+      country_code: t.country_code?.trim() || '',
+    }))
 
-  if (!entries) {
-    return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 })
-  }
+    // Cast matches to BPMatchWithResult (the scoring function needs is_completed, scores, etc.)
+    const allMatches: BPMatchWithResult[] = (matches as any[]).map(m => ({
+      match_id: m.match_id,
+      match_number: m.match_number,
+      stage: m.stage,
+      group_letter: m.group_letter,
+      match_date: m.match_date,
+      venue: m.venue,
+      status: m.status,
+      home_team_id: m.home_team_id,
+      away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder,
+      away_team_placeholder: m.away_team_placeholder,
+      home_team: null,
+      away_team: null,
+      is_completed: m.is_completed ?? false,
+      home_score_ft: m.home_score_ft,
+      away_score_ft: m.away_score_ft,
+      home_score_pso: m.home_score_pso,
+      away_score_pso: m.away_score_pso,
+      winner_team_id: m.winner_team_id,
+    }))
 
-  // Only process entries that have submitted predictions
-  const submittedEntries = entries.filter((e: any) => e.has_submitted_predictions)
+    // =========================================================================
+    // COMPUTE ACTUAL GROUP STANDINGS
+    // =========================================================================
+    // We need actual group standings from real match results to compare against
+    // the user's predicted group rankings.
 
-  if (submittedEntries.length === 0) {
+    const conduct: MatchConductData[] = conductData || []
+
+    // Build a "prediction map" from actual results so we can reuse calculateGroupStandings
+    const actualResultsMap: PredictionMap = new Map()
+    for (const m of allMatches) {
+      if (m.is_completed && m.home_score_ft != null && m.away_score_ft != null) {
+        const entry: ScoreEntry = {
+          home: m.home_score_ft,
+          away: m.away_score_ft,
+          homePso: m.home_score_pso ?? null,
+          awayPso: m.away_score_pso ?? null,
+          winnerTeamId: m.winner_team_id ?? null,
+        }
+        actualResultsMap.set(m.match_id, entry)
+      }
+    }
+
+    const actualGroupStandings = new Map<string, GroupStanding[]>()
+    for (const letter of GROUP_LETTERS) {
+      const groupMatches = allMatches.filter(m => m.stage === 'group' && m.group_letter === letter)
+      if (groupMatches.length === 0) continue
+
+      const standings = calculateGroupStandings(
+        letter,
+        groupMatches,
+        actualResultsMap,
+        teamsData,
+        conduct,
+      )
+      actualGroupStandings.set(letter, standings)
+    }
+
+    // =========================================================================
+    // COMPUTE ACTUAL THIRD-PLACE QUALIFIERS
+    // =========================================================================
+    // Rank all third-place teams across groups, take the best 8 as qualifiers
+
+    const actualThirdPlaceQualifierTeamIds = new Set<string>()
+
+    // Only do this if enough groups have completed
+    const completedGroupLetters = new Set<string>()
+    for (const [letter] of actualGroupStandings) {
+      // A group is "complete" if all 6 group matches for it are completed
+      const groupMatches = allMatches.filter(
+        m => m.stage === 'group' && m.group_letter === letter && m.is_completed
+      )
+      if (groupMatches.length >= 6) {
+        completedGroupLetters.add(letter)
+      }
+    }
+
+    // Build standings map with only completed groups for third-place ranking
+    const completedStandingsMap = new Map<string, GroupStanding[]>()
+    for (const letter of completedGroupLetters) {
+      const standings = actualGroupStandings.get(letter)
+      if (standings) completedStandingsMap.set(letter, standings)
+    }
+
+    if (completedStandingsMap.size === 12) {
+      // All groups complete — rank all third-place teams
+      const rankedThird = rankThirdPlaceTeams(completedStandingsMap)
+      const best8 = rankedThird.slice(0, 8)
+      for (const t of best8) {
+        actualThirdPlaceQualifierTeamIds.add(t.team_id)
+      }
+    }
+
+    // =========================================================================
+    // FETCH ALL ENTRIES AND THEIR BP PREDICTIONS
+    // =========================================================================
+
+    const memberIds = poolMembers.map((m: any) => m.member_id)
+    const { data: entries, error: entriesErr } = await adminClient
+      .from('pool_entries')
+      .select('entry_id, member_id, has_submitted_predictions')
+      .in('member_id', memberIds)
+
+    if (!entries) {
+      return NextResponse.json({ error: `Failed to fetch entries: ${entriesErr?.message || 'Unknown'}` }, { status: 500 })
+    }
+
+    // Only process entries that have submitted predictions
+    const submittedEntries = entries.filter((e: any) => e.has_submitted_predictions)
+
+    if (submittedEntries.length === 0) {
+      // Still recalculate leaderboard to clear any stale scores
+      await adminClient.rpc('recalculate_pool_leaderboard', { p_pool_id: pool_id })
+
+      return NextResponse.json({
+        success: true,
+        entriesProcessed: 0,
+        totalBonusEntries: 0,
+        totalBonusPoints: 0,
+        message: 'No submitted entries found',
+      })
+    }
+
+    const entryIds = submittedEntries.map((e: any) => e.entry_id)
+
+    // Fetch all bracket picker data for all entries in parallel (use adminClient to bypass RLS)
+    const [
+      { data: allGroupRankings },
+      { data: allThirdPlaceRankings },
+      { data: allKnockoutPicks },
+    ] = await Promise.all([
+      adminClient
+        .from('bracket_picker_group_rankings')
+        .select('*')
+        .in('entry_id', entryIds),
+      adminClient
+        .from('bracket_picker_third_place_rankings')
+        .select('*')
+        .in('entry_id', entryIds),
+      adminClient
+        .from('bracket_picker_knockout_picks')
+        .select('*')
+        .in('entry_id', entryIds),
+    ])
+
+    // Group BP data by entry_id
+    const groupRankingsByEntry = new Map<string, BPGroupRanking[]>()
+    const thirdPlaceByEntry = new Map<string, BPThirdPlaceRanking[]>()
+    const knockoutPicksByEntry = new Map<string, BPKnockoutPick[]>()
+
+    for (const r of (allGroupRankings || []) as any[]) {
+      const list = groupRankingsByEntry.get(r.entry_id) || []
+      list.push(r as BPGroupRanking)
+      groupRankingsByEntry.set(r.entry_id, list)
+    }
+
+    for (const r of (allThirdPlaceRankings || []) as any[]) {
+      const list = thirdPlaceByEntry.get(r.entry_id) || []
+      list.push(r as BPThirdPlaceRanking)
+      thirdPlaceByEntry.set(r.entry_id, list)
+    }
+
+    for (const p of (allKnockoutPicks || []) as any[]) {
+      const list = knockoutPicksByEntry.get(p.entry_id) || []
+      list.push(p as BPKnockoutPick)
+      knockoutPicksByEntry.set(p.entry_id, list)
+    }
+
+    // =========================================================================
+    // CALCULATE SCORES FOR EACH ENTRY
+    // =========================================================================
+
+    let totalBonusEntries = 0
+    let totalBonusPoints = 0
+
+    for (const entry of submittedEntries) {
+      const entryId = entry.entry_id
+      const groupRankings = groupRankingsByEntry.get(entryId) || []
+      const thirdPlaceRankings = thirdPlaceByEntry.get(entryId) || []
+      const knockoutPicks = knockoutPicksByEntry.get(entryId) || []
+
+      // Skip entries without any picks
+      if (groupRankings.length === 0 && thirdPlaceRankings.length === 0 && knockoutPicks.length === 0) {
+        continue
+      }
+
+      // Calculate bracket picker points
+      const breakdown = calculateBracketPickerPoints({
+        groupRankings,
+        thirdPlaceRankings,
+        knockoutPicks,
+        actualGroupStandings,
+        actualThirdPlaceQualifierTeamIds,
+        completedMatches: allMatches,
+        settings,
+      })
+
+      // Delete existing bonus_scores for this entry (use admin client to bypass RLS)
+      await adminClient
+        .from('bonus_scores')
+        .delete()
+        .eq('entry_id', entryId)
+
+      // Build bonus_scores rows from the breakdown
+      const bonusRows: {
+        entry_id: string
+        bonus_type: string
+        bonus_category: string
+        related_group_letter: string | null
+        related_match_id: string | null
+        points_earned: number
+        description: string
+      }[] = []
+
+      // Group ranking details
+      for (const d of breakdown.groupDetails) {
+        if (d.points > 0) {
+          const team = teamsData.find(t => t.team_id === d.team_id)
+          bonusRows.push({
+            entry_id: entryId,
+            bonus_type: `bp_group_position_${d.position}`,
+            bonus_category: 'bp_group',
+            related_group_letter: d.group_letter,
+            related_match_id: null,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.team_id} at position ${d.position} in Group ${d.group_letter}`,
+          })
+        }
+      }
+
+      // Third-place ranking details
+      for (const d of breakdown.thirdPlaceDetails) {
+        if (d.points > 0) {
+          const team = teamsData.find(t => t.team_id === d.team_id)
+          const label = d.predicted_qualifies ? 'qualifies' : 'eliminated'
+          bonusRows.push({
+            entry_id: entryId,
+            bonus_type: `bp_third_${label}`,
+            bonus_category: 'bp_third_place',
+            related_group_letter: d.group_letter,
+            related_match_id: null,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.team_id} (Group ${d.group_letter}) ${label}`,
+          })
+        }
+      }
+
+      // Third-place all correct bonus
+      if (breakdown.thirdPlaceAllCorrectBonus > 0) {
+        bonusRows.push({
+          entry_id: entryId,
+          bonus_type: 'bp_third_all_correct',
+          bonus_category: 'bp_third_place',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.thirdPlaceAllCorrectBonus,
+          description: 'Correctly predicted all 8 qualifying third-place teams',
+        })
+      }
+
+      // Knockout details
+      for (const d of breakdown.knockoutDetails) {
+        if (d.points > 0) {
+          const stageLabel = formatStage(d.stage)
+          const team = teamsData.find(t => t.team_id === d.predicted_winner)
+          bonusRows.push({
+            entry_id: entryId,
+            bonus_type: `bp_knockout_${d.stage}`,
+            bonus_category: 'bp_knockout',
+            related_group_letter: null,
+            related_match_id: d.match_id,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.predicted_winner} to win Match ${d.match_number} (${stageLabel})`,
+          })
+        }
+      }
+
+      // Penalty prediction points
+      if (breakdown.penaltyPoints > 0) {
+        bonusRows.push({
+          entry_id: entryId,
+          bonus_type: 'bp_penalty_predictions',
+          bonus_category: 'bp_bonus',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.penaltyPoints,
+          description: `Penalty prediction points (${breakdown.penaltyPoints} pts)`,
+        })
+      }
+
+      // Champion bonus
+      if (breakdown.championBonus > 0) {
+        bonusRows.push({
+          entry_id: entryId,
+          bonus_type: 'bp_champion',
+          bonus_category: 'bp_bonus',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.championBonus,
+          description: 'Correctly predicted the tournament champion',
+        })
+      }
+
+      // Insert bonus_scores (use admin client to bypass RLS)
+      if (bonusRows.length > 0) {
+        const { error: insertError } = await adminClient
+          .from('bonus_scores')
+          .insert(bonusRows)
+
+        if (insertError) {
+          console.error(`Failed to insert bonus_scores for entry ${entryId}:`, insertError)
+        }
+      }
+
+      totalBonusEntries += bonusRows.length
+      totalBonusPoints += breakdown.total
+    }
+
+    // =========================================================================
+    // RECALCULATE LEADERBOARD
+    // =========================================================================
+
+    const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
+      p_pool_id: pool_id,
+    })
+
+    if (leaderboardError) {
+      console.error('Leaderboard recalculation error:', leaderboardError)
+    }
+
     return NextResponse.json({
       success: true,
-      entriesProcessed: 0,
-      totalBonusEntries: 0,
-      totalBonusPoints: 0,
-      message: 'No submitted entries found',
+      entriesProcessed: submittedEntries.length,
+      totalBonusEntries,
+      totalBonusPoints,
     })
+  } catch (err: any) {
+    console.error('Bracket picker calculate error:', err)
+    return NextResponse.json(
+      { error: err?.message || 'Internal server error during bracket picker calculation' },
+      { status: 500 }
+    )
   }
-
-  const entryIds = submittedEntries.map((e: any) => e.entry_id)
-
-  // Fetch all bracket picker data for all entries in parallel
-  const [
-    { data: allGroupRankings },
-    { data: allThirdPlaceRankings },
-    { data: allKnockoutPicks },
-  ] = await Promise.all([
-    supabase
-      .from('bracket_picker_group_rankings')
-      .select('*')
-      .in('entry_id', entryIds),
-    supabase
-      .from('bracket_picker_third_place_rankings')
-      .select('*')
-      .in('entry_id', entryIds),
-    supabase
-      .from('bracket_picker_knockout_picks')
-      .select('*')
-      .in('entry_id', entryIds),
-  ])
-
-  // Group BP data by entry_id
-  const groupRankingsByEntry = new Map<string, BPGroupRanking[]>()
-  const thirdPlaceByEntry = new Map<string, BPThirdPlaceRanking[]>()
-  const knockoutPicksByEntry = new Map<string, BPKnockoutPick[]>()
-
-  for (const r of (allGroupRankings || []) as any[]) {
-    const list = groupRankingsByEntry.get(r.entry_id) || []
-    list.push(r as BPGroupRanking)
-    groupRankingsByEntry.set(r.entry_id, list)
-  }
-
-  for (const r of (allThirdPlaceRankings || []) as any[]) {
-    const list = thirdPlaceByEntry.get(r.entry_id) || []
-    list.push(r as BPThirdPlaceRanking)
-    thirdPlaceByEntry.set(r.entry_id, list)
-  }
-
-  for (const p of (allKnockoutPicks || []) as any[]) {
-    const list = knockoutPicksByEntry.get(p.entry_id) || []
-    list.push(p as BPKnockoutPick)
-    knockoutPicksByEntry.set(p.entry_id, list)
-  }
-
-  // =========================================================================
-  // CALCULATE SCORES FOR EACH ENTRY
-  // =========================================================================
-
-  let totalBonusEntries = 0
-  let totalBonusPoints = 0
-
-  for (const entry of submittedEntries) {
-    const entryId = entry.entry_id
-    const groupRankings = groupRankingsByEntry.get(entryId) || []
-    const thirdPlaceRankings = thirdPlaceByEntry.get(entryId) || []
-    const knockoutPicks = knockoutPicksByEntry.get(entryId) || []
-
-    // Skip entries without any picks
-    if (groupRankings.length === 0 && thirdPlaceRankings.length === 0 && knockoutPicks.length === 0) {
-      continue
-    }
-
-    // Calculate bracket picker points
-    const breakdown = calculateBracketPickerPoints({
-      groupRankings,
-      thirdPlaceRankings,
-      knockoutPicks,
-      actualGroupStandings,
-      actualThirdPlaceQualifierTeamIds,
-      completedMatches,
-      settings,
-    })
-
-    // Delete existing bonus_scores for this entry (use admin client to bypass RLS)
-    await adminClient
-      .from('bonus_scores')
-      .delete()
-      .eq('entry_id', entryId)
-
-    // Build bonus_scores rows from the breakdown
-    const bonusRows: {
-      entry_id: string
-      bonus_type: string
-      bonus_category: string
-      related_group_letter: string | null
-      related_match_id: string | null
-      points_earned: number
-      description: string
-    }[] = []
-
-    // Group ranking details
-    for (const d of breakdown.groupDetails) {
-      if (d.points > 0) {
-        const team = teamsData.find(t => t.team_id === d.team_id)
-        bonusRows.push({
-          entry_id: entryId,
-          bonus_type: `bp_group_position_${d.position}`,
-          bonus_category: 'bp_group',
-          related_group_letter: d.group_letter,
-          related_match_id: null,
-          points_earned: d.points,
-          description: `Correctly predicted ${team?.country_name || d.team_id} at position ${d.position} in Group ${d.group_letter}`,
-        })
-      }
-    }
-
-    // Third-place ranking details
-    for (const d of breakdown.thirdPlaceDetails) {
-      if (d.points > 0) {
-        const team = teamsData.find(t => t.team_id === d.team_id)
-        const label = d.predicted_qualifies ? 'qualifies' : 'eliminated'
-        bonusRows.push({
-          entry_id: entryId,
-          bonus_type: `bp_third_${label}`,
-          bonus_category: 'bp_third_place',
-          related_group_letter: d.group_letter,
-          related_match_id: null,
-          points_earned: d.points,
-          description: `Correctly predicted ${team?.country_name || d.team_id} (Group ${d.group_letter}) ${label}`,
-        })
-      }
-    }
-
-    // Third-place all correct bonus
-    if (breakdown.thirdPlaceAllCorrectBonus > 0) {
-      bonusRows.push({
-        entry_id: entryId,
-        bonus_type: 'bp_third_all_correct',
-        bonus_category: 'bp_third_place',
-        related_group_letter: null,
-        related_match_id: null,
-        points_earned: breakdown.thirdPlaceAllCorrectBonus,
-        description: 'Correctly predicted all 8 qualifying third-place teams',
-      })
-    }
-
-    // Knockout details
-    for (const d of breakdown.knockoutDetails) {
-      if (d.points > 0) {
-        const stageLabel = formatStage(d.stage)
-        const team = teamsData.find(t => t.team_id === d.predicted_winner)
-        bonusRows.push({
-          entry_id: entryId,
-          bonus_type: `bp_knockout_${d.stage}`,
-          bonus_category: 'bp_knockout',
-          related_group_letter: null,
-          related_match_id: d.match_id,
-          points_earned: d.points,
-          description: `Correctly predicted ${team?.country_name || d.predicted_winner} to win Match ${d.match_number} (${stageLabel})`,
-        })
-      }
-    }
-
-    // Penalty prediction points
-    if (breakdown.penaltyPoints > 0) {
-      bonusRows.push({
-        entry_id: entryId,
-        bonus_type: 'bp_penalty_predictions',
-        bonus_category: 'bp_bonus',
-        related_group_letter: null,
-        related_match_id: null,
-        points_earned: breakdown.penaltyPoints,
-        description: `Penalty prediction points (${breakdown.penaltyPoints} pts)`,
-      })
-    }
-
-    // Champion bonus
-    if (breakdown.championBonus > 0) {
-      bonusRows.push({
-        entry_id: entryId,
-        bonus_type: 'bp_champion',
-        bonus_category: 'bp_bonus',
-        related_group_letter: null,
-        related_match_id: null,
-        points_earned: breakdown.championBonus,
-        description: 'Correctly predicted the tournament champion',
-      })
-    }
-
-    // Insert bonus_scores (use admin client to bypass RLS)
-    if (bonusRows.length > 0) {
-      const { error: insertError } = await adminClient
-        .from('bonus_scores')
-        .insert(bonusRows)
-
-      if (insertError) {
-        console.error(`Failed to insert bonus_scores for entry ${entryId}:`, insertError)
-      }
-    }
-
-    totalBonusEntries += bonusRows.length
-    totalBonusPoints += breakdown.total
-  }
-
-  // =========================================================================
-  // RECALCULATE LEADERBOARD
-  // =========================================================================
-
-  const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
-    p_pool_id: pool_id,
-  })
-
-  if (leaderboardError) {
-    console.error('Leaderboard recalculation error:', leaderboardError)
-  }
-
-  return NextResponse.json({
-    success: true,
-    entriesProcessed: submittedEntries.length,
-    totalBonusEntries,
-    totalBonusPoints,
-  })
 }
 
 // =============================================
