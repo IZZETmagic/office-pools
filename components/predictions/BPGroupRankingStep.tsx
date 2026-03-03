@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -105,7 +106,7 @@ function SortableTeamItem({ team, position }: SortableTeamItemProps) {
 
       <button
         type="button"
-        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-manipulation"
+        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-none"
         aria-label={`Reorder ${team.country_name}`}
         {...attributes}
         {...listeners}
@@ -135,6 +136,9 @@ function GroupCard({ groupLetter, teamIds, teamsMap, onReorder }: GroupCardProps
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 4 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -258,7 +262,7 @@ export function BPGroupRankingStep({
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         {GROUP_LETTERS.map((letter) => (
           <GroupCard
             key={letter}
