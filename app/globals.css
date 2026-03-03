@@ -495,7 +495,7 @@ body {
 }
 
 .tab-transition {
-  animation: tab-fade-in 0.2s ease-out forwards;
+  animation: tab-fade-in 0.2s ease-out;
 }
 
 /* Prevent iOS zoom on input focus (inputs < 16px trigger zoom) */
