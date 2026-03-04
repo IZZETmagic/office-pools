@@ -7,8 +7,10 @@ import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
 import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
 import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
-import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
+import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
+import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import { formatNumber } from '@/lib/format'
 
 type LeaderboardTabProps = {
@@ -24,6 +26,10 @@ type LeaderboardTabProps = {
   maxEntriesPerUser: number
   currentUserId: string
   predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
+  // All entries' bracket picker data for client-side scoring
+  allBPGroupRankings?: BPGroupRanking[]
+  allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
+  allBPKnockoutPicks?: BPKnockoutPick[]
 }
 
 // =============================================
@@ -96,6 +102,9 @@ export function LeaderboardTab({
   maxEntriesPerUser,
   currentUserId,
   predictionMode = 'full_tournament',
+  allBPGroupRankings = [],
+  allBPThirdPlaceRankings = [],
+  allBPKnockoutPicks = [],
 }: LeaderboardTabProps) {
   const isMultiEntry = maxEntriesPerUser > 1
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
@@ -237,8 +246,244 @@ export function LeaderboardTab({
     return map
   }, [allPredictions, matches, poolSettings])
 
+  // Compute bracket picker scores client-side (mirrors computedBonusMap for full_tournament)
+  const computedBPBonusMap = useMemo(() => {
+    const map = new Map<string, BonusScoreData[]>()
+    if (predictionMode !== 'bracket_picker' || allBPGroupRankings.length === 0) return map
+
+    // Build actual group standings from real match results
+    const conduct = conductData
+    const actualResultsMap: PredictionMap = new Map()
+    for (const m of matches) {
+      if ((m.is_completed || m.status === 'completed') && m.home_score_ft != null && m.away_score_ft != null) {
+        const entry: ScoreEntry = {
+          home: m.home_score_ft,
+          away: m.away_score_ft,
+          homePso: m.home_score_pso ?? null,
+          awayPso: m.away_score_pso ?? null,
+          winnerTeamId: m.winner_team_id ?? null,
+        }
+        actualResultsMap.set(m.match_id, entry)
+      }
+    }
+
+    const actualGroupStandings = new Map<string, GroupStanding[]>()
+    for (const letter of GROUP_LETTERS) {
+      const groupMatches = matches.filter(m => m.stage === 'group' && m.group_letter === letter)
+      if (groupMatches.length === 0) continue
+      const standings = calculateGroupStandings(
+        letter,
+        groupMatches as any,
+        actualResultsMap,
+        tournamentTeams,
+        conduct,
+      )
+      actualGroupStandings.set(letter, standings)
+    }
+
+    // Determine actual third-place qualifiers
+    const actualThirdPlaceQualifierTeamIds = new Set<string>()
+    const completedGroupLetters = new Set<string>()
+    for (const [letter] of actualGroupStandings) {
+      const completedGroupMatches = matches.filter(
+        m => m.stage === 'group' && m.group_letter === letter && m.is_completed
+      )
+      if (completedGroupMatches.length >= 6) completedGroupLetters.add(letter)
+    }
+
+    if (completedGroupLetters.size === 12) {
+      const completedStandingsMap = new Map<string, GroupStanding[]>()
+      for (const letter of completedGroupLetters) {
+        const standings = actualGroupStandings.get(letter)
+        if (standings) completedStandingsMap.set(letter, standings)
+      }
+      const rankedThird = rankThirdPlaceTeams(completedStandingsMap)
+      for (const t of rankedThird.slice(0, 8)) {
+        actualThirdPlaceQualifierTeamIds.add(t.team_id)
+      }
+    }
+
+    // Build BP match data
+    const bpMatches: BPMatchWithResult[] = matches.map(m => ({
+      match_id: m.match_id,
+      match_number: m.match_number,
+      stage: m.stage,
+      group_letter: m.group_letter,
+      match_date: m.match_date,
+      venue: m.venue,
+      status: m.status,
+      home_team_id: m.home_team_id,
+      away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder,
+      away_team_placeholder: m.away_team_placeholder,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      is_completed: m.is_completed ?? false,
+      home_score_ft: m.home_score_ft,
+      away_score_ft: m.away_score_ft,
+      home_score_pso: m.home_score_pso,
+      away_score_pso: m.away_score_pso,
+      winner_team_id: m.winner_team_id,
+    }))
+
+    // Group BP data by entry_id
+    const grByEntry = new Map<string, BPGroupRanking[]>()
+    const tpByEntry = new Map<string, BPThirdPlaceRanking[]>()
+    const kpByEntry = new Map<string, BPKnockoutPick[]>()
+
+    for (const r of allBPGroupRankings) {
+      const list = grByEntry.get(r.entry_id) || []
+      list.push(r)
+      grByEntry.set(r.entry_id, list)
+    }
+    for (const r of allBPThirdPlaceRankings) {
+      const list = tpByEntry.get(r.entry_id) || []
+      list.push(r)
+      tpByEntry.set(r.entry_id, list)
+    }
+    for (const p of allBPKnockoutPicks) {
+      const list = kpByEntry.get(p.entry_id) || []
+      list.push(p)
+      kpByEntry.set(p.entry_id, list)
+    }
+
+    // Compute scores for each entry that has BP data
+    const allEntryIds = new Set([...grByEntry.keys(), ...tpByEntry.keys(), ...kpByEntry.keys()])
+
+    const formatStage = (stage: string): string => {
+      switch (stage) {
+        case 'round_32': return 'Round of 32'
+        case 'round_16': return 'Round of 16'
+        case 'quarter_final': return 'Quarter-Final'
+        case 'semi_final': return 'Semi-Final'
+        case 'third_place': return 'Third-Place Match'
+        case 'final': return 'Final'
+        default: return stage
+      }
+    }
+
+    for (const entryId of allEntryIds) {
+      const groupRankings = grByEntry.get(entryId) || []
+      const thirdPlaceRankings = tpByEntry.get(entryId) || []
+      const knockoutPicks = kpByEntry.get(entryId) || []
+
+      if (groupRankings.length === 0 && thirdPlaceRankings.length === 0 && knockoutPicks.length === 0) continue
+
+      const breakdown = calculateBracketPickerPoints({
+        groupRankings,
+        thirdPlaceRankings,
+        knockoutPicks,
+        actualGroupStandings,
+        actualThirdPlaceQualifierTeamIds,
+        completedMatches: bpMatches,
+        settings: poolSettings as any,
+      })
+
+      // Convert breakdown to BonusScoreData[] (same format the API stores)
+      const bonusData: BonusScoreData[] = []
+      let idx = 0
+
+      for (const d of breakdown.groupDetails) {
+        if (d.points > 0) {
+          const team = tournamentTeams.find(t => t.team_id === d.team_id)
+          bonusData.push({
+            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+            entry_id: entryId,
+            bonus_type: `bp_group_position_${d.position}`,
+            bonus_category: 'bp_group',
+            related_group_letter: d.group_letter,
+            related_match_id: null,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.team_id} at position ${d.position} in Group ${d.group_letter}`,
+          })
+        }
+      }
+
+      for (const d of breakdown.thirdPlaceDetails) {
+        if (d.points > 0) {
+          const team = tournamentTeams.find(t => t.team_id === d.team_id)
+          const label = d.predicted_qualifies ? 'qualifies' : 'eliminated'
+          bonusData.push({
+            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+            entry_id: entryId,
+            bonus_type: `bp_third_${label}`,
+            bonus_category: 'bp_third_place',
+            related_group_letter: d.group_letter,
+            related_match_id: null,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.team_id} (Group ${d.group_letter}) ${label}`,
+          })
+        }
+      }
+
+      if (breakdown.thirdPlaceAllCorrectBonus > 0) {
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: 'bp_third_all_correct',
+          bonus_category: 'bp_third_place',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.thirdPlaceAllCorrectBonus,
+          description: 'Correctly predicted all 8 qualifying third-place teams',
+        })
+      }
+
+      for (const d of breakdown.knockoutDetails) {
+        if (d.points > 0) {
+          const stageLabel = formatStage(d.stage)
+          const team = tournamentTeams.find(t => t.team_id === d.predicted_winner)
+          bonusData.push({
+            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+            entry_id: entryId,
+            bonus_type: `bp_knockout_${d.stage}`,
+            bonus_category: 'bp_knockout',
+            related_group_letter: null,
+            related_match_id: d.match_id,
+            points_earned: d.points,
+            description: `Correctly predicted ${team?.country_name || d.predicted_winner} to win Match ${d.match_number} (${stageLabel})`,
+          })
+        }
+      }
+
+      if (breakdown.penaltyPoints > 0) {
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: 'bp_penalty_predictions',
+          bonus_category: 'bp_bonus',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.penaltyPoints,
+          description: `Penalty prediction points (${breakdown.penaltyPoints} pts)`,
+        })
+      }
+
+      if (breakdown.championBonus > 0) {
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: 'bp_champion',
+          bonus_category: 'bp_bonus',
+          related_group_letter: null,
+          related_match_id: null,
+          points_earned: breakdown.championBonus,
+          description: 'Correctly predicted the tournament champion',
+        })
+      }
+
+      map.set(entryId, bonusData)
+    }
+
+    return map
+  }, [predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, matches, tournamentTeams, conductData, poolSettings])
+
   // Get bonus data for an entry — prefer computed, fall back to DB
   const getBonusForEntry = (entryId: string): BonusScoreData[] => {
+    // For bracket picker, prefer computed BP scores
+    if (predictionMode === 'bracket_picker') {
+      return computedBPBonusMap.get(entryId) || bonusScores.filter(bs => bs.entry_id === entryId)
+    }
     return computedBonusMap.get(entryId) || bonusScores.filter(bs => bs.entry_id === entryId)
   }
 
@@ -247,31 +492,47 @@ export function LeaderboardTab({
     for (const entries of computedBonusMap.values()) {
       if (entries.length > 0) return true
     }
-    // For bracket picker, check DB bonus_scores directly
+    // For bracket picker, check computed BP scores
+    for (const entries of computedBPBonusMap.values()) {
+      if (entries.length > 0) return true
+    }
     if (bonusScores.length > 0) return true
     return playerScores.some(ps => ps.bonus_points > 0)
-  }, [computedBonusMap, playerScores, bonusScores])
+  }, [computedBonusMap, computedBPBonusMap, playerScores, bonusScores])
 
   // Build computed player score for modal
   const getPlayerScore = (entryId: string): PlayerScoreData => {
     const entry = leaderboardEntries.find(e => e.entry_id === entryId)
     const adjustment = entry?.point_adjustment ?? 0
 
-    // For bracket picker pools, derive scores from DB bonus_scores
-    // (no match predictions exist, so client-side computation is empty)
+    // For bracket picker pools, use client-side computed BP scores
+    // Base "picks" = bp_group, bp_third_place, bp_knockout
+    // True bonus = bp_bonus (champion, penalty, all-correct)
     if (predictionMode === 'bracket_picker') {
-      const dbBonusEntries = bonusScores.filter(bs => bs.entry_id === entryId)
-      const dbBonusPts = dbBonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+      const computedBP = computedBPBonusMap.get(entryId)
+      if (computedBP) {
+        const baseCats = new Set(['bp_group', 'bp_third_place', 'bp_knockout'])
+        const picksPts = computedBP.filter(e => baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
+        const bonusPts = computedBP.filter(e => !baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
+        return {
+          entry_id: entryId,
+          match_points: picksPts,
+          bonus_points: bonusPts,
+          total_points: picksPts + bonusPts + adjustment,
+        }
+      }
 
-      // Also check player_scores for any previously computed totals
-      const dbScore = scoreMap.get(entryId)
-      const totalFromDb = dbScore ? dbScore.total_points : dbBonusPts
+      // Fall back to DB data if no BP data available
+      const dbBonusEntries = bonusScores.filter(bs => bs.entry_id === entryId)
+      const baseCats = new Set(['bp_group', 'bp_third_place', 'bp_knockout'])
+      const dbPicksPts = dbBonusEntries.filter(e => baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
+      const dbBonusPts = dbBonusEntries.filter(e => !baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
 
       return {
         entry_id: entryId,
-        match_points: 0,
-        bonus_points: dbBonusPts || (dbScore?.bonus_points ?? 0),
-        total_points: Math.max(dbBonusPts, totalFromDb) + adjustment,
+        match_points: dbPicksPts,
+        bonus_points: dbBonusPts,
+        total_points: dbPicksPts + dbBonusPts + adjustment,
       }
     }
 
@@ -314,7 +575,7 @@ export function LeaderboardTab({
       if (bScore !== aScore) return bScore - aScore
       return (a.current_rank ?? 999) - (b.current_rank ?? 999)
     })
-  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap, bonusScores, predictionMode])
+  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap, computedBPBonusMap, bonusScores, predictionMode])
 
   if (sorted.length === 0) {
     return (

@@ -20,13 +20,16 @@ function Step({ number, title, children }: { number: number; title: string; chil
 
 export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionMode = 'full_tournament' }: HowToPlayTabProps) {
   const isProgressive = predictionMode === 'progressive'
+  const isBracketPicker = predictionMode === 'bracket_picker'
   return (
     <div>
       {/* Welcome */}
       <Card className="mb-6">
         <h4 className="text-lg font-semibold text-neutral-900 mb-1">Welcome to {poolName}!</h4>
         <p className="text-sm text-neutral-700 leading-relaxed">
-          This is your FIFA World Cup 2026 prediction pool. Predict match scores, earn points for accuracy, and compete on the leaderboard against other pool members. Here&apos;s everything you need to know to get started.
+          {isBracketPicker
+            ? 'This is your FIFA World Cup 2026 bracket pool. Rank group standings, pick knockout bracket winners, earn points for accuracy, and compete on the leaderboard against other pool members. Here\'s everything you need to know to get started.'
+            : 'This is your FIFA World Cup 2026 prediction pool. Predict match scores, earn points for accuracy, and compete on the leaderboard against other pool members. Here\'s everything you need to know to get started.'}
         </p>
       </Card>
 
@@ -66,7 +69,9 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             ? 'The prediction deadline has passed. You can still view your predictions.'
             : isProgressive
               ? 'This pool uses progressive predictions. You predict round by round as the tournament unfolds.'
-              : 'Head to the Predictions tab to start filling in your predictions.'}
+              : isBracketPicker
+                ? 'This pool uses bracket-style predictions. Rank groups, pick winners, and build your bracket before the deadline.'
+                : 'Head to the Predictions tab to start filling in your predictions.'}
         </p>
         {isProgressive ? (
           <div className="space-y-3">
@@ -81,6 +86,29 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             </Step>
             <Step number={4} title="Repeat for each round">
               After a round completes and the next round&apos;s teams are confirmed, the new round will open. You&apos;ll be notified by email when each round opens.
+            </Step>
+          </div>
+        ) : isBracketPicker ? (
+          <div className="space-y-3">
+            <Step number={1} title="Go to Predictions">
+              Click the <strong>Predictions</strong> tab to see your bracket entries.
+            </Step>
+            <Step number={2} title="Select an entry">
+              {maxEntries > 1
+                ? <>This pool allows up to <strong>{maxEntries} entries</strong> per player. Select an entry to edit, or create a new one.</>
+                : <>Select your entry to start building your bracket.</>}
+            </Step>
+            <Step number={3} title="Rank teams in each group">
+              For each of the 12 groups, drag and drop the 4 teams into your predicted finishing order (1st through 4th). The top 2 from each group plus the 8 best 3rd-place teams advance.
+            </Step>
+            <Step number={4} title="Rank third-place teams">
+              Rank all 12 third-place teams to predict which <strong>8 will qualify</strong> for the Round of 32 and which 4 will be eliminated.
+            </Step>
+            <Step number={5} title="Pick knockout bracket winners">
+              Based on your group and third-place rankings, the knockout bracket is built. Select the <strong>winner of each match</strong> from the Round of 32 through the Final. Changing an earlier pick will automatically update later rounds.
+            </Step>
+            <Step number={6} title="Submit your bracket">
+              When you&apos;re ready, submit your entry. Once submitted, your bracket is locked and cannot be edited. In special circumstances, the pool administrator can unlock your entry to allow changes.
             </Step>
           </div>
         ) : (
@@ -143,39 +171,72 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
       {/* How Scoring Works */}
       <Card className="mb-6">
         <h4 className="text-lg font-semibold text-neutral-900 mb-1">How Scoring Works</h4>
-        <div className="space-y-4 text-sm text-neutral-700 mt-4">
-          <div>
-            <p className="font-semibold text-neutral-900 mb-1">Match Predictions</p>
-            <p>Points are awarded based on how close your predicted score is to the actual result. There are three tiers:</p>
-            <ul className="list-disc pl-5 mt-2 space-y-1 text-neutral-600">
-              <li><strong>Exact Score</strong> &mdash; You predicted the exact final score (highest points)</li>
-              <li><strong>Correct Difference</strong> &mdash; Right winner and correct goal difference</li>
-              <li><strong>Correct Result</strong> &mdash; Right winner (or draw) but wrong score</li>
-            </ul>
-            <p className="mt-2 text-neutral-500 text-xs">Only the highest matching tier applies per match.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-neutral-900 mb-1">Knockout Multipliers</p>
-            <p>Knockout stage matches have <strong>multipliers</strong> that increase with each round. The Final is worth the most points.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-neutral-900 mb-1">Bonus Points</p>
-            <p>
-              Extra points are available for correctly predicting group standings
-              {isProgressive
-                ? ' and tournament outcomes (champion, runner-up, third place).'
-                : ', knockout bracket pairings, and tournament outcomes (champion, runner-up, third place).'}
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-          </svg>
-          <p className="text-xs text-primary-800 leading-5">
-            <strong>Tip:</strong> Check the <strong>Scoring Rules</strong> tab for the exact point values and multipliers configured for this pool.
-          </p>
-        </div>
+        {isBracketPicker ? (
+          <>
+            <div className="space-y-4 text-sm text-neutral-700 mt-4">
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Group Rankings</p>
+                <p>Points are awarded for each team you place in the correct finishing position within their group. Predicting the 1st-place team correctly earns the most points, with decreasing points for 2nd, 3rd, and 4th.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Third-Place Picks</p>
+                <p>Earn points for correctly identifying which 3rd-place teams qualify for the Round of 32 and which are eliminated. A bonus is available if you get all 8 qualifiers correct.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Knockout Picks</p>
+                <p>Points are awarded for correctly predicting the <strong>winner</strong> of each knockout match. Later rounds are worth more &mdash; the Final earns the most points.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Bonus Points</p>
+                <p>Extra points are available for correctly predicting the tournament champion and penalty shootout outcomes.</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
+              <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-primary-800 leading-5">
+                <strong>Tip:</strong> Check the <strong>Scoring Rules</strong> tab for the exact point values configured for this pool.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-4 text-sm text-neutral-700 mt-4">
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Match Predictions</p>
+                <p>Points are awarded based on how close your predicted score is to the actual result. There are three tiers:</p>
+                <ul className="list-disc pl-5 mt-2 space-y-1 text-neutral-600">
+                  <li><strong>Exact Score</strong> &mdash; You predicted the exact final score (highest points)</li>
+                  <li><strong>Correct Difference</strong> &mdash; Right winner and correct goal difference</li>
+                  <li><strong>Correct Result</strong> &mdash; Right winner (or draw) but wrong score</li>
+                </ul>
+                <p className="mt-2 text-neutral-500 text-xs">Only the highest matching tier applies per match.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Knockout Multipliers</p>
+                <p>Knockout stage matches have <strong>multipliers</strong> that increase with each round. The Final is worth the most points.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Bonus Points</p>
+                <p>
+                  Extra points are available for correctly predicting group standings
+                  {isProgressive
+                    ? ' and tournament outcomes (champion, runner-up, third place).'
+                    : ', knockout bracket pairings, and tournament outcomes (champion, runner-up, third place).'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
+              <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-primary-800 leading-5">
+                <strong>Tip:</strong> Check the <strong>Scoring Rules</strong> tab for the exact point values and multipliers configured for this pool.
+              </p>
+            </div>
+          </>
+        )}
       </Card>
 
       {/* Where to Find Things */}
@@ -189,7 +250,11 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
           </div>
           <div className="py-3">
             <p className="text-sm font-semibold text-neutral-900">Predictions</p>
-            <p className="text-xs text-neutral-600 mt-0.5">View and edit your prediction entries. This is where you fill in your match scores.</p>
+            <p className="text-xs text-neutral-600 mt-0.5">
+              {isBracketPicker
+                ? 'View and edit your bracket entries. This is where you rank groups and pick knockout winners.'
+                : 'View and edit your prediction entries. This is where you fill in your match scores.'}
+            </p>
           </div>
           <div className="py-3">
             <p className="text-sm font-semibold text-neutral-900">Results</p>

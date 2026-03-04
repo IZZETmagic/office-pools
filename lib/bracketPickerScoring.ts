@@ -155,6 +155,17 @@ export function calculateBracketPickerPoints(params: {
   // THIRD PLACE SCORING
   // =========================================================================
 
+  // Build set of ALL actual 3rd-place team IDs (one per completed group).
+  // A player only gets third-place credit if the team they predicted as 3rd
+  // actually finished 3rd in that group.
+  const actualThirdPlaceTeamIds = new Set<string>()
+  for (const letter of completedGroups) {
+    const standings = actualGroupStandings.get(letter)
+    if (standings && standings.length >= 3) {
+      actualThirdPlaceTeamIds.add(standings[2].team_id)
+    }
+  }
+
   // Sort user's third-place rankings by rank (ascending) to determine their
   // predicted top 8 qualifiers vs bottom 4 eliminated
   const sortedThirdPlace = [...thirdPlaceRankings].sort((a, b) => a.rank - b.rank)
@@ -167,17 +178,24 @@ export function calculateBracketPickerPoints(params: {
     const predicted_qualifies = predictedQualifierIds.has(team_id)
     const actually_qualifies = actualThirdPlaceQualifierTeamIds.has(team_id)
 
+    // Check if this team actually finished 3rd in their group.
+    // If the player predicted Team A as 3rd but Team B actually finished 3rd,
+    // no third-place points are awarded (the group prediction was wrong).
+    const isActualThirdPlace = actualThirdPlaceTeamIds.has(team_id)
+
     let correct = false
     let points = 0
 
-    if (predicted_qualifies && actually_qualifies) {
-      // Correctly predicted as qualifier
-      correct = true
-      points = settings.bp_third_correct_qualifier ?? DEFAULTS.bp_third_correct_qualifier
-    } else if (!predicted_qualifies && !actually_qualifies) {
-      // Correctly predicted as eliminated
-      correct = true
-      points = settings.bp_third_correct_eliminated ?? DEFAULTS.bp_third_correct_eliminated
+    if (isActualThirdPlace) {
+      if (predicted_qualifies && actually_qualifies) {
+        // Correctly predicted as qualifier
+        correct = true
+        points = settings.bp_third_correct_qualifier ?? DEFAULTS.bp_third_correct_qualifier
+      } else if (!predicted_qualifies && !actually_qualifies) {
+        // Correctly predicted as eliminated
+        correct = true
+        points = settings.bp_third_correct_eliminated ?? DEFAULTS.bp_third_correct_eliminated
+      }
     }
 
     thirdPlaceDetails.push({

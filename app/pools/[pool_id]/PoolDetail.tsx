@@ -8,6 +8,7 @@ import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
+import { BracketResultsTab } from './BracketResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import { HowToPlayTab } from './HowToPlayTab'
@@ -51,6 +52,7 @@ type Tab =
   | 'leaderboard'
   | 'predictions'
   | 'results'
+  | 'my_bracket'
   | 'standings'
   | 'scoring_rules'
   | 'how_to_play'
@@ -59,12 +61,20 @@ type Tab =
   | 'settings'
   | 'rounds'
 
-const USER_TABS: { key: Tab; label: string }[] = [
+const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'how_to_play', label: 'How to Play' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
   { key: 'standings', label: 'Standings' },
+  { key: 'scoring_rules', label: 'Scoring Rules' },
+]
+
+const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
+  { key: 'how_to_play', label: 'How to Play' },
+  { key: 'leaderboard', label: 'Leaderboard' },
+  { key: 'predictions', label: 'Predictions' },
+  { key: 'my_bracket', label: 'My Bracket' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -102,6 +112,10 @@ type PoolDetailProps = {
   bpThirdPlaceRankings?: BPThirdPlaceRanking[]
   bpKnockoutPicks?: BPKnockoutPick[]
   bpEntryProgressMap?: Record<string, number>
+  // All entries' BP data for leaderboard scoring
+  allBPGroupRankings?: BPGroupRanking[]
+  allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
+  allBPKnockoutPicks?: BPKnockoutPick[]
 }
 
 // =====================
@@ -132,6 +146,9 @@ export function PoolDetail({
   bpThirdPlaceRankings = [],
   bpKnockoutPicks = [],
   bpEntryProgressMap: initialBPEntryProgressMap = {},
+  allBPGroupRankings = [],
+  allBPThirdPlaceRankings = [],
+  allBPKnockoutPicks = [],
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -534,7 +551,7 @@ export function PoolDetail({
 
   // Auto-refresh data on leaderboard, results, and standings tabs
   useEffect(() => {
-    const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'standings']
+    const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'my_bracket', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
 
     const interval = setInterval(() => router.refresh(), 30000)
@@ -746,9 +763,9 @@ export function PoolDetail({
     return map
   }, [allPredictions, matches, teams, conductData, poolSettings, members])
 
-  // Fetch predictions/BP data when switching to predictions tab or changing active entry
+  // Fetch predictions/BP data when switching to predictions/my_bracket tab or changing active entry
   useEffect(() => {
-    if (activeTab === 'predictions' && activeEntry) {
+    if ((activeTab === 'predictions' || activeTab === 'my_bracket') && activeEntry) {
       if (isBracketPicker) {
         fetchEntryBPData(activeEntry.entry_id)
       } else {
@@ -840,6 +857,7 @@ export function PoolDetail({
   const adminTabs = isProgressive
     ? [{ key: 'rounds' as Tab, label: 'Rounds' }, ...ADMIN_TABS]
     : ADMIN_TABS
+  const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
   const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
   // Swipe navigation for mobile
@@ -977,6 +995,9 @@ export function PoolDetail({
                 maxEntriesPerUser={pool.max_entries_per_user}
                 currentUserId={currentUserId}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+                allBPGroupRankings={allBPGroupRankings}
+                allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+                allBPKnockoutPicks={allBPKnockoutPicks}
               />
             )}
 
@@ -1254,7 +1275,7 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'results' && (
+            {activeTab === 'results' && !isBracketPicker && (
               <ResultsTab
                 matches={matches}
                 predictions={userPredictionsList}
@@ -1268,6 +1289,23 @@ export function PoolDetail({
                 allPredictions={allPredictions}
                 currentEntryId={activeEntry?.entry_id || ''}
                 userEntries={entries}
+              />
+            )}
+
+            {activeTab === 'my_bracket' && isBracketPicker && settings && (
+              <BracketResultsTab
+                matches={matches}
+                teams={teams}
+                conductData={conductData}
+                settings={settings}
+                bpGroupRankings={activeBPGroupRankings}
+                bpThirdPlaceRankings={activeBPThirdPlaceRankings}
+                bpKnockoutPicks={activeBPKnockoutPicks}
+                userEntries={entries}
+                currentEntryId={activeEntry?.entry_id || ''}
+                allBPGroupRankings={allBPGroupRankings}
+                allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+                allBPKnockoutPicks={allBPKnockoutPicks}
               />
             )}
 

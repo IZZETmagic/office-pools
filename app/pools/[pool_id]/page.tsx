@@ -210,6 +210,10 @@ export default async function PoolPage({
   let bpThirdPlaceRankings: BPThirdPlaceRanking[] = []
   let bpKnockoutPicks: BPKnockoutPick[] = []
   let bpEntryProgressMap: Record<string, number> = {}
+  // All entries' BP data (for leaderboard client-side scoring)
+  let allBPGroupRankings: BPGroupRanking[] = []
+  let allBPThirdPlaceRankings: BPThirdPlaceRanking[] = []
+  let allBPKnockoutPicks: BPKnockoutPick[] = []
 
   if (pool.prediction_mode === 'bracket_picker' && defaultEntry) {
     const [grRes, tpRes, kpRes] = await Promise.all([
@@ -222,15 +226,22 @@ export default async function PoolPage({
     bpKnockoutPicks = (kpRes.data ?? []) as BPKnockoutPick[]
   }
 
-  // For bracket_picker multi-entry: fetch progress counts for all user entries
-  if (pool.prediction_mode === 'bracket_picker' && userEntryIds.length > 0) {
-    const [grCountRes, tpCountRes, kpCountRes] = await Promise.all([
-      supabase.from('bracket_picker_group_rankings').select('entry_id').in('entry_id', userEntryIds),
-      supabase.from('bracket_picker_third_place_rankings').select('entry_id').in('entry_id', userEntryIds),
-      supabase.from('bracket_picker_knockout_picks').select('entry_id').in('entry_id', userEntryIds),
+  // For bracket_picker pools: fetch ALL entries' BP data for leaderboard scoring
+  if (pool.prediction_mode === 'bracket_picker' && allEntryIds.length > 0) {
+    const [grAllRes, tpAllRes, kpAllRes] = await Promise.all([
+      supabase.from('bracket_picker_group_rankings').select('*').in('entry_id', allEntryIds),
+      supabase.from('bracket_picker_third_place_rankings').select('*').in('entry_id', allEntryIds),
+      supabase.from('bracket_picker_knockout_picks').select('*').in('entry_id', allEntryIds),
     ])
-    for (const row of [...(grCountRes.data ?? []), ...(tpCountRes.data ?? []), ...(kpCountRes.data ?? [])]) {
-      bpEntryProgressMap[row.entry_id] = (bpEntryProgressMap[row.entry_id] || 0) + 1
+    allBPGroupRankings = (grAllRes.data ?? []) as BPGroupRanking[]
+    allBPThirdPlaceRankings = (tpAllRes.data ?? []) as BPThirdPlaceRanking[]
+    allBPKnockoutPicks = (kpAllRes.data ?? []) as BPKnockoutPick[]
+
+    // Also derive progress counts from the all-entries data
+    for (const row of [...allBPGroupRankings, ...allBPThirdPlaceRankings, ...allBPKnockoutPicks]) {
+      if (userEntryIds.includes(row.entry_id)) {
+        bpEntryProgressMap[row.entry_id] = (bpEntryProgressMap[row.entry_id] || 0) + 1
+      }
     }
   }
 
@@ -285,6 +296,9 @@ export default async function PoolPage({
       bpThirdPlaceRankings={bpThirdPlaceRankings}
       bpKnockoutPicks={bpKnockoutPicks}
       bpEntryProgressMap={bpEntryProgressMap}
+      allBPGroupRankings={allBPGroupRankings}
+      allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+      allBPKnockoutPicks={allBPKnockoutPicks}
     />
   )
 }
