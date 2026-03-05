@@ -805,12 +805,9 @@ export function PoolDetail({
     if (liveRoundSubmissions[activeEntry.entry_id]) {
       return liveRoundSubmissions[activeEntry.entry_id]
     }
-    // Server props are for the default entry
-    if (activeEntry.entry_id === userEntries[0]?.entry_id) {
-      return roundSubmissions
-    }
-    return []
-  }, [activeEntry, roundSubmissions, userEntries, liveRoundSubmissions])
+    // Server props now contain all user entries' submissions
+    return roundSubmissions.filter(s => s.entry_id === activeEntry.entry_id)
+  }, [activeEntry, roundSubmissions, liveRoundSubmissions])
 
   // Derive active entry's bracket picker data: prefer live data, fall back to server props
   const activeBPGroupRankings: BPGroupRanking[] = useMemo(() => {
@@ -1017,6 +1014,9 @@ export function PoolDetail({
                     onDeleteEntry={handleDeleteEntryFromList}
                     onRenameEntry={handleRenameEntryFromList}
                     onEditEntry={handleOpenEntryDetail}
+                    roundStates={roundStates}
+                    allRoundSubmissions={roundSubmissions}
+                    liveRoundSubmissions={liveRoundSubmissions}
                   />
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">

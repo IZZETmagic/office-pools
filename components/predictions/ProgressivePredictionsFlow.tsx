@@ -84,6 +84,8 @@ export default function ProgressivePredictionsFlow({
   const [selectedRound, setSelectedRound] = useState<RoundKey>(initialRound)
 
   // Prediction state
+  const pendingChanges = useRef(false)
+
   const [predictions, setPredictions] = useState<PredictionMap>(() => {
     const map = new Map<string, ScoreEntry>()
     for (const p of existingPredictions) {
@@ -97,6 +99,22 @@ export default function ProgressivePredictionsFlow({
     }
     return map
   })
+
+  // Sync predictions state when existingPredictions prop changes (e.g., after async re-fetch on tab return)
+  useEffect(() => {
+    if (pendingChanges.current) return // Don't overwrite unsaved local edits
+    const map = new Map<string, ScoreEntry>()
+    for (const p of existingPredictions) {
+      map.set(p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso,
+        awayPso: p.predicted_away_pso,
+        winnerTeamId: p.predicted_winner_team_id,
+      })
+    }
+    setPredictions(map)
+  }, [existingPredictions])
 
   // Track existing prediction IDs for upsert
   const existingPredictionIds = useRef(new Map<string, string>())
@@ -115,8 +133,6 @@ export default function ProgressivePredictionsFlow({
   const [submitting, setSubmitting] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const saving = saveStatus === 'saving'
-
-  const pendingChanges = useRef(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const periodicSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const savePredictionsRef = useRef<() => Promise<void>>(() => Promise.resolve())

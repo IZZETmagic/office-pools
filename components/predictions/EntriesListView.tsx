@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatTimeAgo } from '@/lib/format'
 import type { EntryData, PredictionData } from '@/app/pools/[pool_id]/types'
+import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
 
 type EntriesListViewProps = {
   entries: EntryData[]
@@ -20,10 +21,27 @@ type EntriesListViewProps = {
   onEditEntry: (entry: EntryData) => void
   /** Override predicted counts per entry (used for bracket picker where predictions table isn't used) */
   entryProgressOverride?: Record<string, number>
+  /** Progressive mode: round states for the pool */
+  roundStates?: PoolRoundState[]
+  /** Progressive mode: server-loaded round submissions for all user entries */
+  allRoundSubmissions?: EntryRoundSubmission[]
+  /** Progressive mode: live (client-fetched) round submissions keyed by entry_id */
+  liveRoundSubmissions?: Record<string, EntryRoundSubmission[]>
 }
 
-function getEntryStatus(entry: EntryData, predictedCount: number): { label: string; variant: 'green' | 'yellow' | 'gray' | 'blue' } {
+function getEntryStatus(
+  entry: EntryData,
+  predictedCount: number,
+  progressiveStatus?: 'submitted' | 'draft' | null,
+): { label: string; variant: 'green' | 'yellow' | 'gray' | 'blue' } {
   if (entry.auto_submitted) return { label: 'Auto-Submitted', variant: 'blue' }
+  // Progressive mode: use round-level submission status
+  if (progressiveStatus === 'submitted') return { label: 'Submitted', variant: 'green' }
+  if (progressiveStatus === 'draft') {
+    if (predictedCount > 0) return { label: 'Draft', variant: 'yellow' }
+    return { label: 'Not Started', variant: 'gray' }
+  }
+  // Full tournament mode
   if (entry.has_submitted_predictions) return { label: 'Submitted', variant: 'green' }
   if (predictedCount > 0) return { label: 'Draft', variant: 'yellow' }
   return { label: 'Not Started', variant: 'gray' }
@@ -54,6 +72,9 @@ export function EntriesListView({
   onRenameEntry,
   onEditEntry,
   entryProgressOverride,
+  roundStates,
+  allRoundSubmissions,
+  liveRoundSubmissions,
 }: EntriesListViewProps) {
   // Inline rename state (local to list view)
   const [renamingEntryId, setRenamingEntryId] = useState<string | null>(null)
@@ -63,6 +84,26 @@ export function EntriesListView({
 
   const getPredictedCount = (entryId: string) =>
     entryProgressOverride?.[entryId] ?? allPredictions.filter(p => p.entry_id === entryId).length
+
+  // Progressive mode: compute per-entry submission status
+  // "submitted" = no open round is unsubmitted, "draft" = open round exists without submission
+  const progressiveStatusMap = useMemo(() => {
+    if (!roundStates?.length) return null
+    const openRound = roundStates.find(rs => rs.state === 'open')
+    const map = new Map<string, 'submitted' | 'draft'>()
+    for (const entry of entries) {
+      const subs = liveRoundSubmissions?.[entry.entry_id] ?? allRoundSubmissions?.filter(s => s.entry_id === entry.entry_id) ?? []
+      if (!openRound) {
+        // No open round: submitted if they have any round submissions
+        map.set(entry.entry_id, subs.some(s => s.has_submitted) ? 'submitted' : 'draft')
+      } else {
+        // Open round exists: submitted only if they've submitted for that round
+        const roundSub = subs.find(s => s.round_key === openRound.round_key)
+        map.set(entry.entry_id, roundSub?.has_submitted ? 'submitted' : 'draft')
+      }
+    }
+    return map
+  }, [roundStates, entries, allRoundSubmissions, liveRoundSubmissions])
 
   const startRename = (entry: EntryData) => {
     setRenamingEntryId(entry.entry_id)
@@ -97,7 +138,7 @@ export function EntriesListView({
       <div className="sm:hidden space-y-2">
         {entries.map(entry => {
           const predictedCount = getPredictedCount(entry.entry_id)
-          const status = getEntryStatus(entry, predictedCount)
+          const status = getEntryStatus(entry, predictedCount, progressiveStatusMap?.get(entry.entry_id))
           const timestamp = getTimestamp(entry)
           const isRenaming = renamingEntryId === entry.entry_id
 
@@ -193,7 +234,7 @@ export function EntriesListView({
                 <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      entry.has_submitted_predictions
+                      status.variant === 'green' || status.variant === 'blue'
                         ? 'bg-success-500'
                         : predictedCount > 0
                           ? 'bg-warning-500'
@@ -248,7 +289,7 @@ export function EntriesListView({
           <tbody className="divide-y divide-neutral-200">
             {entries.map(entry => {
               const predictedCount = getPredictedCount(entry.entry_id)
-              const status = getEntryStatus(entry, predictedCount)
+              const status = getEntryStatus(entry, predictedCount, progressiveStatusMap?.get(entry.entry_id))
               const timestamp = getTimestamp(entry)
               const isRenaming = renamingEntryId === entry.entry_id
               const progressPct = totalMatches > 0 ? (predictedCount / totalMatches) * 100 : 0
@@ -333,7 +374,7 @@ export function EntriesListView({
                       <div className="w-20 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            entry.has_submitted_predictions
+                            status.variant === 'green' || status.variant === 'blue'
                               ? 'bg-success-500'
                               : predictedCount > 0
                                 ? 'bg-warning-500'

@@ -188,7 +188,22 @@ export default function BracketPickerFlow({
   // STATE
   // =============================================
 
-  const [currentStep, setCurrentStep] = useState(initialIsSubmitted ? REVIEW_STEP : 0)
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (initialIsSubmitted) return REVIEW_STEP
+    // Resume at the furthest step the user has reached based on existing data
+    const hasKnockoutStage = (stages: string[]) =>
+      existingKnockoutPicks.some(p => {
+        const m = matches.find(match => match.match_id === p.match_id)
+        return m && stages.includes(m.stage)
+      })
+    if (hasKnockoutStage(['third_place', 'final'])) return 6
+    if (hasKnockoutStage(['semi_final'])) return 5
+    if (hasKnockoutStage(['quarter_final'])) return 4
+    if (hasKnockoutStage(['round_16'])) return 3
+    if (hasKnockoutStage(['round_32'])) return 2
+    if (existingThirdPlaceRankings.length > 0) return 1
+    return 0
+  })
   const [isSubmitted, setIsSubmitted] = useState(initialIsSubmitted)
   const [submitting, setSubmitting] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)

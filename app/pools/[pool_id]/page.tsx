@@ -173,11 +173,11 @@ export default async function PoolPage({
         .select('*')
         .eq('pool_id', pool_id)
         .order('created_at', { ascending: true }),
-      defaultEntry
+      userEntryIds.length > 0
         ? supabase
             .from('entry_round_submissions')
             .select('*')
-            .eq('entry_id', defaultEntry.entry_id)
+            .in('entry_id', userEntryIds)
         : Promise.resolve({ data: [] }),
     ])
     roundStates = (roundStatesRes.data || []) as PoolRoundState[]
