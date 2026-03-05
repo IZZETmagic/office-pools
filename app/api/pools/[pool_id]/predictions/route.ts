@@ -255,61 +255,32 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid predictions data' }, { status: 400 })
   }
 
-  const toInsert: any[] = []
-  const toUpdate: any[] = []
+  const toUpsert: any[] = []
 
   for (const pred of predictions) {
-    if (pred.predictionId) {
-      toUpdate.push({
-        prediction_id: pred.predictionId,
-        predicted_home_score: pred.homeScore,
-        predicted_away_score: pred.awayScore,
-        predicted_home_pso: pred.homePso ?? null,
-        predicted_away_pso: pred.awayPso ?? null,
-        predicted_winner_team_id: pred.winnerTeamId ?? null,
-      })
-    } else {
-      toInsert.push({
-        entry_id: entryId,
-        match_id: pred.matchId,
-        predicted_home_score: pred.homeScore,
-        predicted_away_score: pred.awayScore,
-        predicted_home_pso: pred.homePso ?? null,
-        predicted_away_pso: pred.awayPso ?? null,
-        predicted_winner_team_id: pred.winnerTeamId ?? null,
-      })
-    }
+    toUpsert.push({
+      entry_id: entryId,
+      match_id: pred.matchId,
+      predicted_home_score: pred.homeScore,
+      predicted_away_score: pred.awayScore,
+      predicted_home_pso: pred.homePso ?? null,
+      predicted_away_pso: pred.awayPso ?? null,
+      predicted_winner_team_id: pred.winnerTeamId ?? null,
+    })
   }
 
   const insertedIds: { match_id: string; prediction_id: string }[] = []
 
-  if (toInsert.length > 0) {
-    const { data: inserted, error: insertError } = await supabase
+  if (toUpsert.length > 0) {
+    const { data: upserted, error: upsertError } = await supabase
       .from('predictions')
-      .insert(toInsert)
+      .upsert(toUpsert, { onConflict: 'entry_id,match_id' })
       .select('match_id, prediction_id')
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
-    if (inserted) insertedIds.push(...inserted)
-  }
-
-  for (const pred of toUpdate) {
-    const { error: updateError } = await supabase
-      .from('predictions')
-      .update({
-        predicted_home_score: pred.predicted_home_score,
-        predicted_away_score: pred.predicted_away_score,
-        predicted_home_pso: pred.predicted_home_pso,
-        predicted_away_pso: pred.predicted_away_pso,
-        predicted_winner_team_id: pred.predicted_winner_team_id,
-      })
-      .eq('prediction_id', pred.prediction_id)
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
+    if (upserted) insertedIds.push(...upserted)
   }
 
   // Update last saved timestamp on pool_entries
