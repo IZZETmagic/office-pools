@@ -70,6 +70,15 @@ export function MembersTab({
   const [copied, setCopied] = useState(false)
 
   const adminCount = members.filter((m) => m.role === 'admin').length
+  const isProgressive = pool.prediction_mode === 'progressive'
+
+  // For progressive mode, an entry is "unlockable" if it has any predictions (round submissions exist per-round)
+  // For other modes, check has_submitted_predictions
+  const hasUnlockableEntries = (member: MemberData) =>
+    (member.entries || []).some(e =>
+      e.has_submitted_predictions ||
+      (isProgressive && predictions.some(p => p.entry_id === e.entry_id))
+    )
 
   // Get the true total points for an entry (client-side computed match + bonus, falling back to pool_entries)
   function getEntryTotalPoints(entry: EntryData): number {
@@ -253,7 +262,10 @@ export function MembersTab({
     // If a specific entry is provided, unlock only that one
     const entriesToUnlock = specificEntry
       ? [specificEntry]
-      : (member.entries || []).filter(e => e.has_submitted_predictions)
+      : (member.entries || []).filter(e =>
+          e.has_submitted_predictions ||
+          (isProgressive && predictions.some(p => p.entry_id === e.entry_id))
+        )
 
     if (entriesToUnlock.length === 0) {
       setError('No submitted entries found.')
@@ -433,7 +445,7 @@ export function MembersTab({
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
                   <option value="adjust_points">Adjust Points</option>
-                  {(member.entries || []).some(e => e.has_submitted_predictions) && <option value="unlock_predictions">Unlock Predictions</option>}
+                  {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
                   {member.role === 'player' && <option value="promote">Promote</option>}
                   {member.role === 'admin' && adminCount > 1 && <option value="demote">Demote</option>}
                   {member.role === 'player' && <option value="remove">Remove</option>}
@@ -574,7 +586,7 @@ export function MembersTab({
                             View Predictions
                           </option>
                           <option value="adjust_points">Adjust Points</option>
-                          {(member.entries || []).some(e => e.has_submitted_predictions) && <option value="unlock_predictions">Unlock Predictions</option>}
+                          {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
                           {member.role === 'player' && (
                             <option value="promote">Promote to Admin</option>
                           )}
@@ -717,6 +729,8 @@ export function MembersTab({
           loading={loading}
           onUnlock={(entry?: EntryData) => handleUnlockPredictions(modal.member, entry)}
           onClose={() => setModal({ type: 'none' })}
+          isProgressive={isProgressive}
+          predictions={predictions}
         />
       )}
 
@@ -1441,14 +1455,22 @@ function UnlockPredictionsModal({
   loading,
   onUnlock,
   onClose,
+  isProgressive,
+  predictions,
 }: {
   member: MemberData
   initialEntry?: EntryData
   loading: boolean
   onUnlock: (entry?: EntryData) => void
   onClose: () => void
+  isProgressive?: boolean
+  predictions?: PredictionData[]
 }) {
-  const submittedEntries = (member.entries || []).filter(e => e.has_submitted_predictions)
+  // For progressive mode, an entry is "submitted" if it has any predictions (round submissions are per-round)
+  const submittedEntries = (member.entries || []).filter(e =>
+    e.has_submitted_predictions ||
+    (isProgressive && (predictions ?? []).some(p => p.entry_id === e.entry_id))
+  )
   const hasMultipleSubmitted = submittedEntries.length > 1
   const [selectedEntryId, setSelectedEntryId] = useState<string | 'all'>(
     initialEntry?.entry_id || (hasMultipleSubmitted ? 'all' : (submittedEntries[0]?.entry_id || 'all'))

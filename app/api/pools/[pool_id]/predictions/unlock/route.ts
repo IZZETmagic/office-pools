@@ -65,6 +65,36 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
+  // For progressive mode, also reset round-level submissions so the user can re-edit and re-submit
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('prediction_mode')
+    .eq('pool_id', pool_id)
+    .single()
+
+  if (pool?.prediction_mode === 'progressive') {
+    // Reset all submitted rounds for this entry that are still in an open round
+    const { data: openRounds } = await supabase
+      .from('pool_round_states')
+      .select('round_key')
+      .eq('pool_id', pool_id)
+      .eq('state', 'open')
+
+    const openRoundKeys = (openRounds ?? []).map(r => r.round_key)
+
+    if (openRoundKeys.length > 0) {
+      await supabase
+        .from('entry_round_submissions')
+        .update({
+          has_submitted: false,
+          submitted_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('entry_id', entryId)
+        .in('round_key', openRoundKeys)
+    }
+  }
+
   // Log the unlock action for audit trail
   await supabase
     .from('admin_audit_log')
