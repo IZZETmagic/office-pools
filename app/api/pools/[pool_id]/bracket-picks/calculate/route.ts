@@ -331,20 +331,22 @@ export async function POST(
         settings,
       })
 
-      // Group ranking details
+      // Group ranking details — include all positions (correct and incorrect)
+      const positionLabels = ['1st', '2nd', '3rd', '4th'] as const
       for (const d of breakdown.groupDetails) {
-        if (d.points > 0) {
-          const team = teamsData.find(t => t.team_id === d.team_id)
-          allBonusRows.push({
-            entry_id: entryId,
-            bonus_type: `bp_group_position_${d.position}`,
-            bonus_category: 'bp_group',
-            related_group_letter: d.group_letter,
-            related_match_id: null,
-            points_earned: d.points,
-            description: `Correctly predicted ${team?.country_name || d.team_id} at position ${d.position} in Group ${d.group_letter}`,
-          })
-        }
+        const team = teamsData.find(t => t.team_id === d.team_id)
+        const teamName = team?.country_name || d.team_id
+        const posLabel = positionLabels[d.position - 1] ?? `${d.position}th`
+        const correctness = d.correct ? 'Correctly' : 'Incorrectly'
+        allBonusRows.push({
+          entry_id: entryId,
+          bonus_type: `bp_group_position_${d.position}`,
+          bonus_category: 'bp_group',
+          related_group_letter: d.group_letter,
+          related_match_id: null,
+          points_earned: d.points,
+          description: `Group ${d.group_letter} ${posLabel} position: ${correctness} predicted ${teamName}`,
+        })
       }
 
       // Third-place ranking details

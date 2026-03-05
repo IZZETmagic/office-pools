@@ -627,7 +627,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -640,7 +640,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -653,7 +653,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -665,8 +665,86 @@ export function MatchesTab({
         )}
       </div>
 
-      {/* Matches table */}
-      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      {/* Matches — mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {filteredMatches.length === 0 ? (
+          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+            No matches found with current filters.
+          </div>
+        ) : (
+          filteredMatches.map((match) => {
+            const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
+            const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+            const matchDate = new Date(match.match_date)
+            return (
+              <div key={match.match_id} className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4">
+                {/* Top row: match #, stage, status */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-mono font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
+                    #{match.match_number}
+                  </span>
+                  <Badge variant="blue">
+                    {getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}
+                  </Badge>
+                  <Badge variant={getStatusBadgeVariant(match.status)}>
+                    {match.status}
+                  </Badge>
+                  <span className="ml-auto text-xs text-neutral-500 dark:text-neutral-400">
+                    {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+                    {matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                </div>
+                {/* Teams + score */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-medium text-neutral-900 dark:text-white">
+                    {home} <span className="text-neutral-400 mx-1">vs</span> {away}
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-3">
+                    {match.is_completed ? (
+                      <span className="font-bold text-neutral-900 dark:text-white">
+                        {match.home_score_ft} - {match.away_score_ft}
+                        {match.home_score_pso !== null && (
+                          <span className="text-xs text-neutral-500 block">PSO: {match.home_score_pso}-{match.away_score_pso}</span>
+                        )}
+                      </span>
+                    ) : match.status === 'live' && match.home_score_ft !== null ? (
+                      <span className="font-bold text-warning-700">
+                        {match.home_score_ft} - {match.away_score_ft}
+                        <span className="text-xs text-warning-500 block">provisional</span>
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
+                  </div>
+                </div>
+                {/* Actions */}
+                <div className="flex flex-wrap gap-2">
+                  {match.status === 'scheduled' && (
+                    <Button size="sm" variant="warning" onClick={() => handleSetMatchStatus(match, 'live')}>Set Live</Button>
+                  )}
+                  {match.status === 'live' && (
+                    <>
+                      <Button size="sm" variant="warning" onClick={() => openLiveScoreModal(match)}>Update Score</Button>
+                      <Button size="sm" variant="gray" onClick={() => handleSetMatchStatus(match, 'scheduled')}>Set Scheduled</Button>
+                    </>
+                  )}
+                  {match.status !== 'cancelled' && (
+                    <Button size="sm" variant="primary" onClick={() => openResultModal(match)}>
+                      {match.is_completed ? 'Edit Result' : 'Enter Result'}
+                    </Button>
+                  )}
+                  {match.is_completed && (
+                    <Button size="sm" variant="primary" className="!bg-neutral-800 hover:!bg-neutral-900" onClick={() => openResetModal(match)}>Reset</Button>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Matches — desktop table */}
+      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

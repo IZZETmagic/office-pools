@@ -98,13 +98,14 @@ type PoolDetailProps = {
   conductData: MatchConductData[]
   playerScores: PlayerScoreData[]
   bonusScores: BonusScoreData[]
-  memberId: string
+  memberId: string | null
   currentUserId: string
   isAdmin: boolean
   isPastDeadline: boolean
   psoEnabled: boolean
   userEntries: EntryData[]
   isSuperAdmin?: boolean
+  isSuperAdminViewing?: boolean
   hasSeenHowToPlay: boolean
   roundStates?: PoolRoundState[]
   roundSubmissions?: EntryRoundSubmission[]
@@ -139,6 +140,7 @@ export function PoolDetail({
   psoEnabled,
   userEntries,
   isSuperAdmin,
+  isSuperAdminViewing,
   hasSeenHowToPlay,
   roundStates = [],
   roundSubmissions = [],
@@ -158,9 +160,9 @@ export function PoolDetail({
     return hasSeenHowToPlay ? 'leaderboard' : 'how_to_play'
   })
 
-  // Mark how-to-play as seen on first visit (non-blocking)
+  // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
   useEffect(() => {
-    if (!hasSeenHowToPlay) {
+    if (!hasSeenHowToPlay && memberId) {
       const supabase = createClient()
       supabase
         .from('pool_members')
@@ -221,8 +223,8 @@ export function PoolDetail({
   const lastSavedAt = activeEntry?.predictions_last_saved_at ?? null
   const predictionsLocked = activeEntry?.predictions_locked ?? false
 
-  const canAddEntry = pool.max_entries_per_user > entries.length && !isPastDeadline
-  const canDeleteEntry = entries.length > 1 && activeEntry && !activeEntry.has_submitted_predictions && !isPastDeadline
+  const canAddEntry = !isSuperAdminViewing && pool.max_entries_per_user > entries.length && !isPastDeadline
+  const canDeleteEntry = !isSuperAdminViewing && entries.length > 1 && activeEntry && !activeEntry.has_submitted_predictions && !isPastDeadline
 
   // Rename active entry
   const handleRenameEntry = async () => {
@@ -910,6 +912,20 @@ export function PoolDetail({
         isSuperAdmin={isSuperAdmin}
       />
 
+      {/* Super Admin viewing banner */}
+      {isSuperAdminViewing && (
+        <div className="bg-warning-100 dark:bg-warning-900/30 border-b border-warning-300 dark:border-warning-700">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
+            <svg className="w-4 h-4 text-warning-700 dark:text-warning-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-xs sm:text-sm font-medium text-warning-800 dark:text-warning-300">
+              Viewing as Super Admin — You are not a member of this pool
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Tab navigation */}
       <div className="sticky top-[57px] z-[9] bg-surface">
         <div className="relative">
@@ -951,8 +967,8 @@ export function PoolDetail({
                 </>
               )}
 
-              {/* Leave Pool button */}
-              {!isSoleAdmin && (
+              {/* Leave Pool button (hidden for super admin non-members) */}
+              {!isSoleAdmin && !isSuperAdminViewing && (
                 <>
                   <div className="flex items-center px-1 sm:px-2">
                     <div className="h-5 w-px bg-neutral-300" />

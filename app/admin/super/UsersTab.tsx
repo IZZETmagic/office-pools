@@ -161,13 +161,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -175,8 +175,71 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
         </select>
       </div>
 
-      {/* Users table */}
-      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      {/* Users — mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {filteredUsers.length === 0 ? (
+          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+            No users found.
+          </div>
+        ) : (
+          filteredUsers.map((user) => {
+            const isCurrentUser = user.user_id === currentUserId
+            return (
+              <div
+                key={user.user_id}
+                className={`bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 ${isCurrentUser ? 'ring-1 ring-danger-300 dark:ring-danger-700' : ''}`}
+              >
+                {/* Top row: name, badges */}
+                <div className="flex items-center flex-wrap gap-2 mb-2">
+                  <span className="font-medium text-neutral-900 dark:text-white">
+                    {user.username}
+                  </span>
+                  {isCurrentUser && <span className="text-xs text-primary-500">(you)</span>}
+                  {user.is_super_admin ? (
+                    <Badge variant="yellow">Super Admin</Badge>
+                  ) : (
+                    <Badge variant="gray">User</Badge>
+                  )}
+                  <Badge variant={user.is_active ? 'green' : 'gray'}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+                {/* Details */}
+                <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                  {user.full_name && <p className="text-xs">{user.full_name}</p>}
+                  <p className="truncate">{user.email}</p>
+                  <div className="flex gap-4 text-xs text-neutral-500 dark:text-neutral-500">
+                    <span>Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span>Login: {user.last_login ? new Date(user.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</span>
+                  </div>
+                </div>
+                {/* Actions */}
+                {!isCurrentUser && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={user.is_super_admin ? 'gray' : 'warning'}
+                      onClick={() => handleToggleSuperAdmin(user, !user.is_super_admin)}
+                    >
+                      {user.is_super_admin ? 'Remove Admin' : 'Make Admin'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={user.is_active ? 'danger' : 'green'}
+                      onClick={() => handleToggleActive(user)}
+                    >
+                      {user.is_active ? 'Deactivate' : 'Reactivate'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Users — desktop table */}
+      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

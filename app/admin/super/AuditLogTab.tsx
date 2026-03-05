@@ -28,7 +28,63 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
         </span>
       </div>
 
-      <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      {/* Audit — mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {auditLogs.map((log) => {
+          const home = log.matches?.home_team?.country_name || 'Unknown'
+          const away = log.matches?.away_team?.country_name || 'Unknown'
+          const resetDate = new Date(log.reset_at)
+          return (
+            <div key={log.log_id} className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4">
+              {/* Top row: action badge + time */}
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant={log.action_type === 'reset' ? 'yellow' : 'blue'}>
+                  {log.action_type || 'unknown'}
+                </Badge>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-auto">
+                  {resetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
+                  {resetDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+              {/* Match info */}
+              <div className="text-sm mb-2">
+                {log.matches ? (
+                  <span>
+                    <span className="font-medium text-neutral-900 dark:text-white">#{log.matches.match_number}</span>
+                    <span className="text-neutral-600 dark:text-neutral-400 ml-2">{home} vs {away}</span>
+                  </span>
+                ) : (
+                  <span className="text-neutral-500">Unknown match</span>
+                )}
+              </div>
+              {/* Previous score + performed by */}
+              <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+                <span>
+                  Prev:{' '}
+                  {log.previous_home_score !== null ? (
+                    <>
+                      <span className="font-mono font-bold text-neutral-700 dark:text-neutral-300">{log.previous_home_score}-{log.previous_away_score}</span>
+                      {log.previous_home_pso !== null && (
+                        <span className="ml-1">(PSO: {log.previous_home_pso}-{log.previous_away_pso})</span>
+                      )}
+                    </>
+                  ) : 'N/A'}
+                </span>
+                <span>By: {log.users?.username || 'Unknown'}</span>
+              </div>
+              {/* Reason */}
+              {log.reason && (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2 truncate">
+                  {log.reason}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Audit — desktop table */}
+      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

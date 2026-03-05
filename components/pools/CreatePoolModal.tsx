@@ -61,10 +61,10 @@ const SCORING_DEFAULTS = {
 }
 
 const STEPS = [
-  { key: 'tournament', label: 'Tournament' },
-  { key: 'pool_type', label: 'Pool Type' },
-  { key: 'details', label: 'Details' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'tournament', label: 'Tournament', mobileLabel: 'Tournament' },
+  { key: 'pool_type', label: 'Pool Type', mobileLabel: 'Type' },
+  { key: 'details', label: 'Details', mobileLabel: 'Details' },
+  { key: 'settings', label: 'Settings', mobileLabel: 'Settings' },
 ] as const
 
 type Step = typeof STEPS[number]['key']
@@ -416,7 +416,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       idx + 1
                     )}
                   </span>
-                  <span>{step.label}</span>
+                  <span className="hidden sm:inline">{step.label}</span>
+                  <span className="sm:hidden">{step.mobileLabel}</span>
                 </button>
                 {idx < STEPS.length - 1 && (
                   <div className={`w-6 sm:w-12 h-0.5 rounded ${idx < currentStepIndex ? 'bg-neutral-300' : 'bg-neutral-100'}`} />

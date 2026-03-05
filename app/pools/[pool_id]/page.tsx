@@ -43,7 +43,7 @@ export default async function PoolPage({
 
   if (!userData) redirect('/dashboard')
 
-  // STEP 3: Check membership
+  // STEP 3: Check membership (super admins can bypass)
   const { data: membership } = await supabase
     .from('pool_members')
     .select('member_id, role, has_seen_how_to_play')
@@ -51,9 +51,11 @@ export default async function PoolPage({
     .eq('user_id', userData.user_id)
     .single()
 
-  if (!membership) redirect('/dashboard')
+  const isSuperAdminViewing = !membership && userData.is_super_admin === true
 
-  const isAdmin = membership.role === 'admin'
+  if (!membership && !isSuperAdminViewing) redirect('/dashboard')
+
+  const isAdmin = isSuperAdminViewing ? true : membership!.role === 'admin'
 
   // STEP 4: Fetch all data in parallel
   const [poolRes, membersRes, settingsRes, teamsRes] = await Promise.all([
@@ -118,8 +120,10 @@ export default async function PoolPage({
   const allEntries = members.flatMap((m) => m.entries || [])
   const allEntryIds = allEntries.map((e) => e.entry_id)
 
-  // Get the current user's entries
-  const currentMember = members.find(m => m.member_id === membership.member_id)
+  // Get the current user's entries (super admin non-member has none)
+  const currentMember = membership
+    ? members.find(m => m.member_id === membership.member_id)
+    : undefined
   const userEntries = currentMember?.entries || []
   const userEntryIds = userEntries.map((e) => e.entry_id)
 
@@ -282,14 +286,15 @@ export default async function PoolPage({
       conductData={conductData}
       playerScores={playerScores}
       bonusScores={bonusScores}
-      memberId={membership.member_id}
+      memberId={membership?.member_id ?? null}
       currentUserId={userData.user_id}
       isAdmin={isAdmin}
       isPastDeadline={isPastDeadline}
       psoEnabled={psoEnabled}
       userEntries={userEntries}
       isSuperAdmin={userData.is_super_admin ?? false}
-      hasSeenHowToPlay={membership.has_seen_how_to_play ?? false}
+      isSuperAdminViewing={isSuperAdminViewing}
+      hasSeenHowToPlay={membership?.has_seen_how_to_play ?? true}
       roundStates={roundStates}
       roundSubmissions={roundSubmissions}
       bpGroupRankings={bpGroupRankings}

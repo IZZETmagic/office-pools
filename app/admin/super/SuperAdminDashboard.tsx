@@ -56,15 +56,26 @@ export function SuperAdminDashboard({
 
       {/* Sticky admin status bar + stats + tab navigation */}
       <div className="sticky top-[57px] z-[9]">
-      <div className="bg-neutral-900 dark:bg-neutral-950 px-4 sm:px-6 py-1.5 sm:py-2">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-[10px] sm:text-xs text-danger-400 font-medium">Full System Access</p>
+      {/* Mobile: compact single-row status + stats */}
+      <div className="sm:hidden bg-neutral-900 dark:bg-neutral-950 px-4 py-1.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <p className="text-[10px] text-danger-400 font-medium">Full System Access</p>
+          <div className="flex gap-3 text-[10px] text-neutral-400">
+            <span><span className="text-white font-bold">{formatNumber(completedMatches)}/{formatNumber(totalMatches)}</span> Matches</span>
+            <span><span className="text-white font-bold">{formatNumber(activeUsers)}</span> Users</span>
+            <span><span className="text-white font-bold">{formatNumber(activePools)}</span> Pools</span>
+          </div>
         </div>
       </div>
 
-      {/* Quick stats bar */}
-      <div className="bg-neutral-800 dark:bg-neutral-900 border-b border-neutral-700 dark:border-neutral-700 px-4 sm:px-6 py-2 sm:py-3">
-        <div className="max-w-7xl mx-auto flex gap-4 sm:gap-8 text-xs sm:text-sm overflow-x-auto">
+      {/* Desktop: separate status + stats bars */}
+      <div className="hidden sm:block bg-neutral-900 dark:bg-neutral-950 px-6 py-2">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-xs text-danger-400 font-medium">Full System Access</p>
+        </div>
+      </div>
+      <div className="hidden sm:block bg-neutral-800 dark:bg-neutral-900 border-b border-neutral-700 dark:border-neutral-700 px-6 py-3">
+        <div className="max-w-7xl mx-auto flex gap-8 text-sm overflow-x-auto">
           <div className="text-neutral-300 dark:text-neutral-400 whitespace-nowrap">
             Matches:{' '}
             <span className="text-white font-bold">
@@ -87,7 +98,7 @@ export function SuperAdminDashboard({
       </div>
 
       {/* Tab navigation */}
-      <div className="bg-surface">
+      <div className="bg-surface border-b border-neutral-200 dark:border-neutral-700 sm:border-b-0">
         <div className="max-w-7xl mx-auto px-2 sm:px-6">
           <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
             {TABS.map((tab) => (

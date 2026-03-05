@@ -189,12 +189,12 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-surface"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Status</option>
           <option value="open">Open</option>
@@ -215,12 +215,12 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           filteredPools.map((pool) => (
             <div
               key={pool.pool_id}
-              className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-6 hover:shadow-md dark:hover:border-neutral-600 transition"
+              className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 sm:p-6 hover:shadow-md dark:hover:border-neutral-600 transition"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1">
+                    <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white truncate">
                       {pool.pool_name}
                     </h3>
                     <Badge variant={getStatusVariant(pool.status)}>
@@ -232,7 +232,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                       {pool.description}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-4 text-sm text-neutral-600 dark:text-neutral-400">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
                     <span>
                       Code: <strong className="font-mono">{pool.pool_code}</strong>
                     </span>
@@ -259,14 +259,22 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                     </span>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => openDeleteModal(pool)}
-                  className="flex-shrink-0"
-                >
-                  Delete Pool
-                </Button>
+                <div className="flex gap-2 flex-shrink-0 self-start">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    href={`/pools/${pool.pool_id}`}
+                  >
+                    View Pool
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => openDeleteModal(pool)}
+                  >
+                    Delete Pool
+                  </Button>
+                </div>
               </div>
             </div>
           ))

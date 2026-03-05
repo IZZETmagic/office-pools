@@ -549,11 +549,11 @@ export function PointsBreakdownModal({
                                 key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
                                 className="flex items-start justify-between px-3 py-2 text-xs"
                               >
-                                <span className="text-neutral-700 pr-3 leading-snug">
+                                <span className={`pr-3 leading-snug ${bs.points_earned > 0 ? 'text-neutral-700' : 'text-neutral-400'}`}>
                                   {bs.description}
                                 </span>
-                                <span className="text-success-600 font-semibold flex-shrink-0">
-                                  +{formatNumber(bs.points_earned)}
+                                <span className={`font-semibold flex-shrink-0 ${bs.points_earned > 0 ? 'text-success-600' : 'text-neutral-400'}`}>
+                                  {bs.points_earned > 0 ? `+${formatNumber(bs.points_earned)}` : '0'}
                                 </span>
                               </div>
                             ))}
