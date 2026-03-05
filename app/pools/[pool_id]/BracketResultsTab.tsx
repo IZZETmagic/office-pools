@@ -371,7 +371,6 @@ function ThirdPlaceComparison({
                       <span className="font-mono text-[10px] text-neutral-400 w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
                       <span className="text-[10px] text-neutral-400">{team.group_letter}</span>
-                      <span className="text-[10px] text-neutral-400 tabular-nums">{team.points}pts</span>
                     </div>
                   </Fragment>
                 )

@@ -135,7 +135,7 @@ function TeamButton({
       disabled={isDisabled}
       onClick={onClick}
       className={`
-        flex-1 flex items-center gap-2 px-3 py-3 rounded-lg border-2 transition-all duration-150
+        flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-lg border-2 transition-all duration-150
         ${isSelected
           ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
           : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50'
