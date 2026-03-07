@@ -171,7 +171,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
                   className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${
                     isActive(link.href)
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-400'
-                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700'
+                      : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700'
                   }`}
                 >
                   {link.href === '/dashboard' && (
@@ -202,7 +202,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
             <div className="border-t border-neutral-100 p-2 flex flex-col gap-0.5">
               <button
                 onClick={cycleColorMode}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700 font-medium transition"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
               >
                 {colorMode === 'light' && (
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
@@ -224,7 +224,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700 font-medium transition"
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />

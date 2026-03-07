@@ -384,36 +384,52 @@ export function LeaderboardTab({
       let idx = 0
 
       for (const d of breakdown.groupDetails) {
-        if (d.points > 0) {
-          const team = tournamentTeams.find(t => t.team_id === d.team_id)
-          bonusData.push({
-            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
-            entry_id: entryId,
-            bonus_type: `bp_group_position_${d.position}`,
-            bonus_category: 'bp_group',
-            related_group_letter: d.group_letter,
-            related_match_id: null,
-            points_earned: d.points,
-            description: `Correctly predicted ${team?.country_name || d.team_id} at position ${d.position} in Group ${d.group_letter}`,
-          })
+        const team = tournamentTeams.find(t => t.team_id === d.team_id)
+        const teamName = team?.country_name || d.team_id
+        let description: string
+        if (d.correct) {
+          description = `Correctly predicted ${teamName} at position ${d.position} in Group ${d.group_letter}`
+        } else {
+          const standings = actualGroupStandings.get(d.group_letter)
+          const actualIdx = standings?.findIndex(s => s.team_id === d.team_id) ?? -1
+          const actualPos = actualIdx >= 0 ? actualIdx + 1 : null
+          description = actualPos
+            ? `Predicted ${teamName} at position ${d.position} in Group ${d.group_letter} (actual: ${actualPos})`
+            : `Predicted ${teamName} at position ${d.position} in Group ${d.group_letter}`
         }
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: `bp_group_position_${d.position}${d.correct ? '' : '_miss'}`,
+          bonus_category: 'bp_group',
+          related_group_letter: d.group_letter,
+          related_match_id: null,
+          points_earned: d.points,
+          description,
+        })
       }
 
       for (const d of breakdown.thirdPlaceDetails) {
-        if (d.points > 0) {
-          const team = tournamentTeams.find(t => t.team_id === d.team_id)
-          const label = d.predicted_qualifies ? 'qualifies' : 'eliminated'
-          bonusData.push({
-            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
-            entry_id: entryId,
-            bonus_type: `bp_third_${label}`,
-            bonus_category: 'bp_third_place',
-            related_group_letter: d.group_letter,
-            related_match_id: null,
-            points_earned: d.points,
-            description: `Correctly predicted ${team?.country_name || d.team_id} (Group ${d.group_letter}) ${label}`,
-          })
+        const team = tournamentTeams.find(t => t.team_id === d.team_id)
+        const teamName = team?.country_name || d.team_id
+        const predictedLabel = d.predicted_qualifies ? 'qualifies' : 'eliminated'
+        let description: string
+        if (d.correct) {
+          description = `Correctly predicted ${teamName} (Group ${d.group_letter}) ${predictedLabel}`
+        } else {
+          const actualLabel = d.actually_qualifies ? 'qualified' : 'was eliminated'
+          description = `Predicted ${teamName} (Group ${d.group_letter}) ${predictedLabel} (actually ${actualLabel})`
         }
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: `bp_third_${predictedLabel}${d.correct ? '' : '_miss'}`,
+          bonus_category: 'bp_third_place',
+          related_group_letter: d.group_letter,
+          related_match_id: null,
+          points_earned: d.points,
+          description,
+        })
       }
 
       if (breakdown.thirdPlaceAllCorrectBonus > 0) {
@@ -430,20 +446,32 @@ export function LeaderboardTab({
       }
 
       for (const d of breakdown.knockoutDetails) {
-        if (d.points > 0) {
-          const stageLabel = formatStage(d.stage)
-          const team = tournamentTeams.find(t => t.team_id === d.predicted_winner)
-          bonusData.push({
-            bonus_score_id: `bp-computed-${entryId}-${idx++}`,
-            entry_id: entryId,
-            bonus_type: `bp_knockout_${d.stage}`,
-            bonus_category: 'bp_knockout',
-            related_group_letter: null,
-            related_match_id: d.match_id,
-            points_earned: d.points,
-            description: `Correctly predicted ${team?.country_name || d.predicted_winner} to win Match ${d.match_number} (${stageLabel})`,
-          })
+        const stageLabel = formatStage(d.stage)
+        const predictedTeam = tournamentTeams.find(t => t.team_id === d.predicted_winner)
+        const predictedName = predictedTeam?.country_name || d.predicted_winner
+        let description: string
+        let typeSuffix = ''
+        if (d.correct) {
+          description = `Correctly predicted ${predictedName} to win Match ${d.match_number} (${stageLabel})`
+        } else if (d.actual_winner === null) {
+          description = `Predicted ${predictedName} to win Match ${d.match_number} (${stageLabel})`
+          typeSuffix = '_pending'
+        } else {
+          const actualTeam = tournamentTeams.find(t => t.team_id === d.actual_winner)
+          const actualName = actualTeam?.country_name || d.actual_winner
+          description = `Predicted ${predictedName} to win Match ${d.match_number} (${stageLabel}) (actual: ${actualName})`
+          typeSuffix = '_miss'
         }
+        bonusData.push({
+          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          entry_id: entryId,
+          bonus_type: `bp_knockout_${d.stage}${typeSuffix}`,
+          bonus_category: 'bp_knockout',
+          related_group_letter: null,
+          related_match_id: d.match_id,
+          points_earned: d.points,
+          description,
+        })
       }
 
       if (breakdown.penaltyPoints > 0) {

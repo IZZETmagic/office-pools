@@ -74,6 +74,25 @@ const BONUS_CATEGORY_CONFIG: Record<string, { label: string }> = {
   tournament: { label: 'Tournament Podium' },
 }
 
+// Bracket Picker prediction status colors and labels
+const BP_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  correct: { bg: 'bg-success-100', text: 'text-success-700' },
+  miss: { bg: 'bg-neutral-100', text: 'text-neutral-500' },
+  pending: { bg: 'bg-warning-100', text: 'text-warning-700' },
+}
+
+const BP_TYPE_LABELS: Record<string, string> = {
+  correct: 'Correct',
+  miss: 'Miss',
+  pending: 'Pending',
+}
+
+function getBpPredictionStatus(bs: BonusScoreData): 'correct' | 'miss' | 'pending' {
+  if (bs.points_earned > 0) return 'correct'
+  if (bs.bonus_type.endsWith('_pending')) return 'pending'
+  return 'miss'
+}
+
 // Bracket Picker category ordering and labels
 const BP_CATEGORY_ORDER = ['bp_group', 'bp_third_place', 'bp_knockout', 'bp_bonus', 'group_standings', 'qualification', 'bracket', 'tournament'] as const
 
@@ -289,6 +308,20 @@ export function PointsBreakdownModal({
     return subtotals
   }, [groupedBonuses])
 
+  // Per-category correct/miss/pending counts for bracket picker
+  const bpCategoryStats = useMemo(() => {
+    if (predictionMode !== 'bracket_picker') return new Map<string, { correct: number; miss: number; pending: number }>()
+    const stats = new Map<string, { correct: number; miss: number; pending: number }>()
+    for (const [category, entries] of groupedBonuses) {
+      const s = { correct: 0, miss: 0, pending: 0 }
+      for (const bs of entries) {
+        s[getBpPredictionStatus(bs)]++
+      }
+      stats.set(category, s)
+    }
+    return stats
+  }, [predictionMode, groupedBonuses])
+
   const rank = entry.current_rank
   const playerName = entry.users?.full_name || entry.users?.username || 'Unknown Player'
   const username = entry.users?.username
@@ -367,21 +400,51 @@ export function PointsBreakdownModal({
 
     // Bonus Points
     if (bonusScores.length > 0) {
-      lines.push('BONUS POINTS BREAKDOWN')
-      lines.push('Category,Description,Points')
-      for (const category of BONUS_CATEGORY_ORDER) {
-        const entries = groupedBonuses.get(category)
-        if (!entries || entries.length === 0) continue
-        const config = BONUS_CATEGORY_CONFIG[category]
-        for (const bs of entries) {
-          lines.push([
-            esc(config.label),
-            esc(bs.description),
-            bs.points_earned,
-          ].join(','))
+      if (predictionMode === 'bracket_picker') {
+        // Bracket picker: full detail with status per prediction
+        for (const category of BP_CATEGORY_ORDER) {
+          const entries = groupedBonuses.get(category)
+          if (!entries || entries.length === 0) continue
+          const config = BP_CATEGORY_CONFIG[category]
+          const stats = bpCategoryStats.get(category)
+          const subtotal = categorySubtotals.get(category) ?? 0
+
+          lines.push(config.label.toUpperCase())
+          if (stats) {
+            const parts: string[] = []
+            if (stats.correct > 0) parts.push(`${stats.correct} Correct`)
+            if (stats.miss > 0) parts.push(`${stats.miss} Miss`)
+            if (stats.pending > 0) parts.push(`${stats.pending} Pending`)
+            lines.push(`Summary,${parts.join(' / ')},${subtotal} pts`)
+          }
+          lines.push('Status,Description,Points')
+          for (const bs of entries) {
+            const status = getBpPredictionStatus(bs)
+            lines.push([
+              esc(BP_TYPE_LABELS[status]),
+              esc(bs.description),
+              bs.points_earned,
+            ].join(','))
+          }
+          lines.push('')
         }
+      } else {
+        lines.push('BONUS POINTS BREAKDOWN')
+        lines.push('Category,Description,Points')
+        for (const category of BONUS_CATEGORY_ORDER) {
+          const entries = groupedBonuses.get(category)
+          if (!entries || entries.length === 0) continue
+          const config = BONUS_CATEGORY_CONFIG[category]
+          for (const bs of entries) {
+            lines.push([
+              esc(config.label),
+              esc(bs.description),
+              bs.points_earned,
+            ].join(','))
+          }
+        }
+        lines.push('')
       }
-      lines.push('')
     }
 
     const csv = lines.join('\n')
@@ -393,7 +456,7 @@ export function PointsBreakdownModal({
     a.download = `points_breakdown_${safeName}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [playerName, entryName, isMultiEntry, rank, matchPoints, bonusPoints, totalPoints, matchDetails, stageStats, bonusScores, groupedBonuses])
+  }, [playerName, entryName, isMultiEntry, rank, matchPoints, bonusPoints, totalPoints, matchDetails, stageStats, bonusScores, groupedBonuses, predictionMode, bpCategoryStats, categorySubtotals, entry])
 
   return (
     <div
@@ -532,10 +595,11 @@ export function PointsBreakdownModal({
                       if (!catEntries || catEntries.length === 0) return null
                       const subtotal = categorySubtotals.get(category) ?? 0
                       const config = BP_CATEGORY_CONFIG[category]
+                      const stats = bpCategoryStats.get(category)
 
                       return (
                         <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
+                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
                             <span className="text-xs font-semibold text-neutral-900">
                               {config.label}
                             </span>
@@ -543,20 +607,51 @@ export function PointsBreakdownModal({
                               {formatNumber(subtotal)} pts
                             </span>
                           </div>
+
+                          {/* Summary bar */}
+                          {stats && (stats.correct > 0 || stats.miss > 0 || stats.pending > 0) && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-100 dark:border-border-default">
+                              {stats.correct > 0 && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.correct.bg} ${BP_TYPE_COLORS.correct.text}`}>
+                                  {stats.correct} Correct
+                                </span>
+                              )}
+                              {stats.miss > 0 && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.miss.bg} ${BP_TYPE_COLORS.miss.text}`}>
+                                  {stats.miss} Miss
+                                </span>
+                              )}
+                              {stats.pending > 0 && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.pending.bg} ${BP_TYPE_COLORS.pending.text}`}>
+                                  {stats.pending} Pending
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Individual prediction rows */}
                           <div className="divide-y divide-neutral-100 dark:divide-border-default">
-                            {catEntries.map((bs, i) => (
-                              <div
-                                key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
-                                className="flex items-start justify-between px-3 py-2 text-xs"
-                              >
-                                <span className={`pr-3 leading-snug ${bs.points_earned > 0 ? 'text-neutral-700' : 'text-neutral-400'}`}>
-                                  {bs.description}
-                                </span>
-                                <span className={`font-semibold flex-shrink-0 ${bs.points_earned > 0 ? 'text-success-600' : 'text-neutral-400'}`}>
-                                  {bs.points_earned > 0 ? `+${formatNumber(bs.points_earned)}` : '0'}
-                                </span>
-                              </div>
-                            ))}
+                            {catEntries.map((bs, i) => {
+                              const status = getBpPredictionStatus(bs)
+                              return (
+                                <div
+                                  key={`${bs.bonus_type}-${bs.related_group_letter}-${bs.related_match_id}-${i}`}
+                                  className="flex items-center justify-between px-3 py-2 text-xs"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className={`flex-shrink-0 text-[10px] font-medium w-14 text-center py-0.5 rounded ${BP_TYPE_COLORS[status].bg} ${BP_TYPE_COLORS[status].text}`}>
+                                      {BP_TYPE_LABELS[status]}
+                                    </span>
+                                    <span className={`leading-snug truncate ${status === 'correct' ? 'text-neutral-700' : status === 'pending' ? 'text-warning-600' : 'text-neutral-400'}`}>
+                                      {bs.description}
+                                    </span>
+                                  </div>
+                                  <span className={`font-semibold flex-shrink-0 ml-2 ${bs.points_earned > 0 ? 'text-success-600' : 'text-neutral-400'}`}>
+                                    {bs.points_earned > 0 ? `+${formatNumber(bs.points_earned)}` : '0'}
+                                  </span>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )
@@ -576,7 +671,7 @@ export function PointsBreakdownModal({
                 <div className="space-y-3">
                   {/* Group Rankings Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Group Stage Rankings</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -589,7 +684,7 @@ export function PointsBreakdownModal({
 
                   {/* Third-Place Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Third-Place Rankings</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -601,7 +696,7 @@ export function PointsBreakdownModal({
 
                   {/* Knockout Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Knockout Stage</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -616,7 +711,7 @@ export function PointsBreakdownModal({
 
                   {/* Bonus Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Bonus Points</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -688,7 +783,7 @@ export function PointsBreakdownModal({
 
                       return (
                         <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
+                          <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
                             <span className="text-xs font-semibold text-neutral-900">
                               {config.label}
                             </span>
@@ -729,7 +824,7 @@ export function PointsBreakdownModal({
                 <div className="space-y-3">
                   {/* Group Stage Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Group Stage</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -741,7 +836,7 @@ export function PointsBreakdownModal({
 
                   {/* Knockout Stage Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Knockout Stage (Base)</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -753,7 +848,7 @@ export function PointsBreakdownModal({
 
                   {/* Multipliers */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Round Multipliers</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -769,7 +864,7 @@ export function PointsBreakdownModal({
                   {/* PSO Rules */}
                   {poolSettings.pso_enabled && (
                     <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                      <div className="px-3 py-2 bg-neutral-50">
+                      <div className="px-3 py-2 bg-neutral-100">
                         <span className="text-xs font-semibold text-neutral-900">Penalty Shootout (Bonus)</span>
                       </div>
                       <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -782,7 +877,7 @@ export function PointsBreakdownModal({
 
                   {/* Bonus Rules */}
                   <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-neutral-50">
+                    <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Bonus Points (per group / per match)</span>
                     </div>
                     <div className="divide-y divide-neutral-100 dark:divide-border-default">
@@ -821,7 +916,7 @@ export function PointsBreakdownModal({
     return (
       <div key={stage} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
         {/* Stage header */}
-        <div className="flex items-center justify-between px-3 py-2 bg-neutral-50">
+        <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-neutral-900">{label}</span>
             {isKnockout && (

@@ -226,6 +226,72 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 }
 
 // =====================
+// MOBILE POOL CARD
+// =====================
+function MobilePoolCard({ pool }: { pool: PoolCardData }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(pool.pool_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback - ignore
+    }
+  }
+
+  return (
+    <Link
+      href={`/pools/${pool.pool_id}`}
+      className="shrink-0 w-48 bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 flex flex-col gap-2 hover:shadow-md transition-shadow"
+    >
+      <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
+      <div className="flex gap-1 flex-wrap text-[10px] [&>span]:text-[10px] [&>span]:px-1.5 [&>span]:py-0">
+        {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
+        <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+      </div>
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-1 text-center">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-md py-1.5">
+          <p className="text-lg font-bold text-neutral-900 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
+          <p className="text-[10px] text-neutral-500">Points</p>
+        </div>
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-md py-1.5">
+          <p className="text-lg font-bold text-neutral-900 leading-tight">
+            {pool.current_rank ? `#${pool.current_rank}` : '--'}<span className="text-neutral-400 font-normal">/{pool.memberCount}</span>
+          </p>
+          <p className="text-[10px] text-neutral-500">Rank</p>
+        </div>
+      </div>
+      {pool.role === 'admin' && (
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-[10px] text-neutral-500 font-mono bg-neutral-100 dark:bg-surface-tertiary hover:bg-neutral-200 dark:hover:bg-neutral-700 px-2 py-1 rounded transition-colors w-full justify-center"
+        >
+          {copied ? (
+            <>
+              <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+              </svg>
+              {pool.pool_code}
+            </>
+          )}
+        </button>
+      )}
+    </Link>
+  )
+}
+
+// =====================
 // POOL CARD
 // =====================
 function PoolCard({ pool }: { pool: PoolCardData }) {
@@ -442,28 +508,39 @@ export function DashboardClient({
               </Link>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...pools].sort((a, b) => {
-                // Sort: incomplete drafts first, then not started, then submitted, then by deadline
-                const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
-                  ? 0  // incomplete draft
-                  : !a.has_submitted_predictions && a.predictedMatches === 0
-                  ? 1  // not started
-                  : 2  // submitted
-                const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
-                  ? 0
-                  : !b.has_submitted_predictions && b.predictedMatches === 0
-                  ? 1
-                  : 2
-                if (aScore !== bScore) return aScore - bScore
-                // Secondary: by deadline (soonest first)
-                const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
-                const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
-                return aDeadline - bDeadline
-              }).map((pool) => (
-                <PoolCard key={pool.pool_id} pool={pool} />
-              ))}
-            </div>
+            <>
+              {/* Mobile: compact horizontal scroll strip */}
+              <div className="md:hidden flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {[...pools].sort((a, b) => {
+                  const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
+                    ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
+                  const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
+                    ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
+                  if (aScore !== bScore) return aScore - bScore
+                  const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
+                  const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
+                  return aDeadline - bDeadline
+                }).map((pool) => (
+                  <MobilePoolCard key={pool.pool_id} pool={pool} />
+                ))}
+              </div>
+
+              {/* Desktop: full card grid */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...pools].sort((a, b) => {
+                  const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
+                    ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
+                  const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
+                    ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
+                  if (aScore !== bScore) return aScore - bScore
+                  const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
+                  const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
+                  return aDeadline - bDeadline
+                }).map((pool) => (
+                  <PoolCard key={pool.pool_id} pool={pool} />
+                ))}
+              </div>
+            </>
           )}
         </div>
 
