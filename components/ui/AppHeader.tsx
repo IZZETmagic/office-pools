@@ -56,7 +56,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
   }
 
   return (
-    <nav className="sticky top-0 z-10 bg-surface shadow-sm dark:shadow-none dark:border-b dark:border-border-default">
+    <nav className="sticky top-0 z-40 bg-surface shadow-sm dark:shadow-none dark:border-b dark:border-border-default">
       <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         {/* Left: Brand + breadcrumbs */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -104,7 +104,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
           ))}
           <button
             onClick={cycleColorMode}
-            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition"
+            className="p-2 rounded-xl text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition"
             aria-label={`Color mode: ${colorMode}`}
             title={`Theme: ${colorMode}`}
           >
@@ -137,7 +137,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
         {/* Hamburger button (mobile only) */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="sm:hidden p-1.5 -mr-1.5 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-700 transition"
+          className="sm:hidden p-1.5 -mr-1.5 rounded-xl text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-700 transition"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           {menuOpen ? (
@@ -157,18 +157,18 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
         <>
           {/* Backdrop */}
           <div
-            className="sm:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-10 animate-[fadeIn_150ms_ease-out]"
+            className="sm:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 animate-[fadeIn_150ms_ease-out]"
             onClick={() => setMenuOpen(false)}
           />
           {/* Menu */}
-          <div className="sm:hidden absolute left-3 right-3 mt-2 bg-surface rounded-xl shadow-xl dark:shadow-none border border-neutral-200/60 z-20 overflow-hidden animate-[slideDown_200ms_ease-out]">
+          <div className="sm:hidden absolute left-3 right-3 mt-2 bg-surface rounded-2xl shadow-xl dark:shadow-none border border-neutral-200/60 z-50 overflow-hidden animate-[slideDown_200ms_ease-out]">
             <div className="p-2 flex flex-col gap-0.5">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${
+                  className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition ${
                     isActive(link.href)
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-400'
                       : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700'
@@ -202,7 +202,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
             <div className="border-t border-neutral-100 p-2 flex flex-col gap-0.5">
               <button
                 onClick={cycleColorMode}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
               >
                 {colorMode === 'light' && (
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
@@ -224,7 +224,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700 font-medium transition"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -232,6 +232,15 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin }: AppHeaderProps)
                   Sign Out
                 </button>
               </form>
+            </div>
+            <div className="border-t border-neutral-100 px-5 py-2.5 flex items-center gap-2">
+              <Link href="/faq" onClick={() => setMenuOpen(false)} className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition">FAQ</Link>
+              <span className="text-neutral-300 dark:text-neutral-600">&middot;</span>
+              <Link href="/contact" onClick={() => setMenuOpen(false)} className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition">Contact</Link>
+              <span className="text-neutral-300 dark:text-neutral-600">&middot;</span>
+              <Link href="/privacy" onClick={() => setMenuOpen(false)} className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition">Privacy</Link>
+              <span className="text-neutral-300 dark:text-neutral-600">&middot;</span>
+              <Link href="/terms" onClick={() => setMenuOpen(false)} className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition">Terms</Link>
             </div>
           </div>
         </>

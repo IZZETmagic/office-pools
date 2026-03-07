@@ -18,13 +18,13 @@ export default function GlobalError({
           <div className="flex gap-3 justify-center">
             <button
               onClick={reset}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition"
             >
               Try again
             </button>
             <a
               href="/dashboard"
-              className="px-4 py-2 bg-neutral-200 text-neutral-700 rounded-lg font-medium hover:bg-neutral-300 transition"
+              className="px-4 py-2 bg-neutral-200 text-neutral-700 rounded-xl font-medium hover:bg-neutral-300 transition"
             >
               Go to Dashboard
             </a>

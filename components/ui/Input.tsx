@@ -11,7 +11,7 @@ export function Input({ focusColor = 'blue', className, ...props }: InputProps) 
   return (
     <input
       {...props}
-      className={`w-full px-4 py-2 border border-neutral-300 rounded-lg bg-surface focus:ring-2 ${focusClasses[focusColor]} focus:border-transparent text-neutral-900 ${className ?? ''}`}
+      className={`w-full px-4 py-2 border border-neutral-300 rounded-xl bg-surface focus:ring-2 ${focusClasses[focusColor]} focus:border-transparent text-neutral-900 ${className ?? ''}`}
     />
   )
 }

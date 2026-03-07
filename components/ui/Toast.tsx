@@ -73,7 +73,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
   return (
     <div
       ref={itemRef}
-      className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium w-full max-w-sm ${variantStyles[toast.variant]} ${isExiting ? 'toast-exit' : 'toast-enter'}`}
+      className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium w-full max-w-sm ${variantStyles[toast.variant]} ${isExiting ? 'toast-exit' : 'toast-enter'}`}
       style={{
         transform: swipeX !== 0 ? `translateX(${swipeX}px)` : undefined,
         opacity: swipeX !== 0 ? Math.max(0, 1 - Math.abs(swipeX) / 150) : undefined,
@@ -88,7 +88,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       <span className="flex-1 leading-snug">{toast.message}</span>
       <button
         onClick={handleDismiss}
-        className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none p-1 -mr-1 rounded-md transition-opacity"
+        className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none p-1 -mr-1 rounded-lg transition-opacity"
         aria-label="Dismiss"
       >
         &times;

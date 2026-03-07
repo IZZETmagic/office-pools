@@ -90,7 +90,7 @@ export default function Home() {
               </Button>
               <a
                 href="#features"
-                className="inline-flex items-center justify-center rounded-lg px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 hover:bg-white/10 transition"
+                className="inline-flex items-center justify-center rounded-xl px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 hover:bg-white/10 transition"
               >
                 Learn More ↓
               </a>
@@ -114,7 +114,7 @@ export default function Home() {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="bg-surface rounded-xl p-6 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow"
+                className="bg-surface rounded-2xl p-6 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow"
               >
                 <div className="text-4xl mb-4">{feature.icon}</div>
                 <h3 className="text-lg font-semibold text-neutral-900 mb-2">

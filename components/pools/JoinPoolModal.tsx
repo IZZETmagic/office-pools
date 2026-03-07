@@ -128,7 +128,7 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col dark:shadow-none dark:border dark:border-border-default modal-panel">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col dark:shadow-none dark:border dark:border-border-default modal-panel">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100">
           <h2 id="join-pool-title" className="text-lg font-bold text-neutral-900">
@@ -136,7 +136,7 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
           </h2>
           <button
             onClick={() => !loading && onClose()}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">

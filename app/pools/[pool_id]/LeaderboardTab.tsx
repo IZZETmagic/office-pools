@@ -630,7 +630,7 @@ export function LeaderboardTab({
             <div
               key={entry.entry_id}
               onClick={() => setSelectedEntry(entry)}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                 isTopThree
                   ? 'bg-warning-50 border-warning-200 active:bg-warning-100'
                   : 'bg-surface border-neutral-200 active:bg-neutral-50'
@@ -711,7 +711,7 @@ export function LeaderboardTab({
       </div>
 
       {/* Desktop table view */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-xl shadow overflow-hidden">
         <table className="w-full">
           <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>

@@ -78,7 +78,7 @@ function CollapsibleSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-surface rounded-xl border border-neutral-200 overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-neutral-200 overflow-hidden">
       <div className="px-4 py-3 flex items-center justify-between">
         <button
           type="button"
@@ -122,7 +122,7 @@ function CollapsibleSection({
 function TeamFlag({ team, size = 'sm' }: { team: TeamData | GroupStanding | null; size?: 'sm' | 'md' | 'lg' }) {
   if (!team) {
     return (
-      <div className={`rounded-sm bg-neutral-200 flex items-center justify-center ${
+      <div className={`rounded-md bg-neutral-200 flex items-center justify-center ${
         size === 'lg' ? 'w-10 h-7' : size === 'md' ? 'w-7 h-5' : 'w-5 h-3.5'
       }`}>
         <span className="text-[6px] text-neutral-400">?</span>
@@ -266,7 +266,7 @@ export function BPBracketReview({
 
       {/* Section 4: Champion (prominent, always visible) */}
       {champion ? (
-        <div className="bg-success-50 border border-success-200 rounded-xl p-5 text-center">
+        <div className="bg-success-50 border border-success-200 rounded-2xl p-5 text-center">
           <div className="text-3xl mb-1">&#127942;</div>
           <p className="text-[10px] font-semibold text-success-600 uppercase tracking-wider mb-1">
             Your Predicted Champion
@@ -295,7 +295,7 @@ export function BPBracketReview({
           </div>
         </div>
       ) : (
-        <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 text-center">
+        <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 text-center">
           <div className="text-2xl mb-1 opacity-30">&#127942;</div>
           <p className="text-sm text-neutral-400">No champion predicted yet</p>
           {!readOnly && (
@@ -328,7 +328,7 @@ export function BPBracketReview({
             const teamIds = groupRankings.get(letter)
             if (!teamIds || teamIds.length === 0) {
               return (
-                <div key={letter} className="rounded-lg border border-dashed border-neutral-200 p-2.5">
+                <div key={letter} className="rounded-xl border border-dashed border-neutral-200 p-2.5">
                   <p className="text-xs font-bold text-neutral-400 mb-1">Group {letter}</p>
                   <p className="text-[10px] text-neutral-300">Not ranked</p>
                 </div>
@@ -336,7 +336,7 @@ export function BPBracketReview({
             }
 
             return (
-              <div key={letter} className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-2.5">
+              <div key={letter} className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-2.5">
                 <p className="text-xs font-bold text-neutral-700 mb-1.5">Group {letter}</p>
                 <div className="space-y-1">
                   {teamIds.map((teamId, idx) => {
@@ -414,7 +414,7 @@ export function BPBracketReview({
       </CollapsibleSection>
 
       {/* Section 3: Knockout Bracket (always expanded) */}
-      <div className="bg-surface rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-neutral-200 overflow-hidden">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-neutral-900">Knockout Bracket</span>
@@ -491,7 +491,7 @@ export function BPBracketReview({
                     return (
                       <div
                         key={match.match_id}
-                        className={`rounded-lg border px-2.5 py-2 ${
+                        className={`rounded-xl border px-2.5 py-2 ${
                           isChampionPath
                             ? 'border-success-300 bg-success-50/60'
                             : winner
@@ -528,7 +528,7 @@ export function BPBracketReview({
       </div>
 
       {/* Statistics summary */}
-      <div className="bg-surface rounded-xl border border-neutral-200 p-4">
+      <div className="bg-surface rounded-2xl border border-neutral-200 p-4">
         <h3 className="text-sm font-semibold text-neutral-900 mb-3">Prediction Summary</h3>
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>

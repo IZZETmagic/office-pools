@@ -767,16 +767,16 @@ export default function PredictionsFlow({
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Submit Final Predictions?
             </h3>
-            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
               <p className="text-sm text-warning-800">
                 Once submitted, you <strong>cannot</strong> make changes to your predictions.
               </p>
             </div>
-            <div className="bg-neutral-50 rounded-lg p-3 mb-4">
+            <div className="bg-neutral-50 rounded-xl p-3 mb-4">
               <p className="text-sm text-neutral-700">
                 Progress: <strong>{predictedCount} / {totalMatches}</strong> matches ({progressPercent}%)
               </p>
@@ -813,7 +813,7 @@ export default function PredictionsFlow({
       {showRecoveryModal && recoveryData && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Recover Unsaved Predictions?
             </h3>
@@ -822,7 +822,7 @@ export default function PredictionsFlow({
               <strong>{recoveryTimestamp ? timeAgo(new Date(recoveryTimestamp).toISOString()) : 'earlier'}</strong>
               {' '}that weren&apos;t saved to the server. Would you like to recover them?
             </p>
-            <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 mb-4">
+            <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 mb-4">
               <p className="text-sm text-primary-800">
                 <strong>{Object.keys(recoveryData).length}</strong> predictions found in local backup.
               </p>
@@ -914,7 +914,7 @@ function StatusBanner({ type, message }: { type: 'submitted' | 'locked' | 'auto-
   }
 
   return (
-    <div className={`flex items-center gap-3 p-4 rounded-lg border ${styles[type]} mb-4`}>
+    <div className={`flex items-center gap-3 p-4 rounded-xl border ${styles[type]} mb-4`}>
       {icons[type]}
       <p className="text-sm font-medium">{message}</p>
     </div>

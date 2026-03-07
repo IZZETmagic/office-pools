@@ -161,13 +161,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -178,7 +178,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       {/* Users — mobile cards */}
       <div className="sm:hidden space-y-3">
         {filteredUsers.length === 0 ? (
-          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+          <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
             No users found.
           </div>
         ) : (
@@ -187,7 +187,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
             return (
               <div
                 key={user.user_id}
-                className={`bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 ${isCurrentUser ? 'ring-1 ring-danger-300 dark:ring-danger-700' : ''}`}
+                className={`bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 ${isCurrentUser ? 'ring-1 ring-danger-300 dark:ring-danger-700' : ''}`}
               >
                 {/* Top row: name, badges */}
                 <div className="flex items-center flex-wrap gap-2 mb-2">
@@ -239,7 +239,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       </div>
 
       {/* Users — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
@@ -367,7 +367,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       {modal.type === 'promote_admin' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">
@@ -375,7 +375,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
               </h3>
             </div>
 
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 mb-4">
               <p className="text-sm text-danger-700 font-medium mb-2">
                 WARNING: This grants full system access!
               </p>
@@ -401,7 +401,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                 value={promoteConfirm}
                 onChange={(e) => setPromoteConfirm(e.target.value)}
                 placeholder="PROMOTE"
-                className="w-full px-3 py-2 border border-danger-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-danger-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 

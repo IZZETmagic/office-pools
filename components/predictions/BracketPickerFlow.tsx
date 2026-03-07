@@ -684,7 +684,7 @@ export default function BracketPickerFlow({
     <div>
       {/* Submitted banner */}
       {isSubmitted && (
-        <div className="flex items-center gap-3 p-4 rounded-lg border bg-success-50 border-success-200 text-success-800 mb-4">
+        <div className="flex items-center gap-3 p-4 rounded-xl border bg-success-50 border-success-200 text-success-800 mb-4">
           <svg className="w-5 h-5 text-success-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -694,7 +694,7 @@ export default function BracketPickerFlow({
 
       {/* Locked banner */}
       {isLocked && !isSubmitted && (
-        <div className="flex items-center gap-3 p-4 rounded-lg border bg-neutral-50 border-neutral-200 text-neutral-800 mb-4">
+        <div className="flex items-center gap-3 p-4 rounded-xl border bg-neutral-50 border-neutral-200 text-neutral-800 mb-4">
           <svg className="w-5 h-5 text-neutral-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
@@ -704,7 +704,7 @@ export default function BracketPickerFlow({
 
       {/* Deadline info */}
       {deadlineInfo && !isSubmitted && (
-        <div className={`flex items-center gap-3 p-4 rounded-lg border mb-4 ${
+        <div className={`flex items-center gap-3 p-4 rounded-xl border mb-4 ${
           deadlineInfo.isPast
             ? 'bg-danger-50 border-danger-200 text-danger-800'
             : 'bg-primary-50 border-primary-200 text-primary-800'
@@ -937,14 +937,14 @@ export default function BracketPickerFlow({
 
           {/* Champion Highlight */}
           {bracket.champion ? (
-            <div className="bg-gradient-to-r from-warning-50 to-warning-100 border-2 border-warning-300 rounded-xl p-5 text-center">
+            <div className="bg-gradient-to-r from-warning-50 to-warning-100 border-2 border-warning-300 rounded-2xl p-5 text-center">
               <div className="text-3xl mb-1">&#127942;</div>
               <p className="text-[10px] font-semibold text-warning-600 uppercase tracking-wider mb-1">
                 Your Predicted Champion
               </p>
               <div className="flex items-center justify-center gap-2.5 mb-3">
                 {bracket.champion.flag_url && (
-                  <img src={bracket.champion.flag_url} alt={bracket.champion.country_name} className="w-10 h-7 rounded-sm object-cover" />
+                  <img src={bracket.champion.flag_url} alt={bracket.champion.country_name} className="w-10 h-7 rounded-md object-cover" />
                 )}
                 <span className="text-xl font-bold text-neutral-900">{bracket.champion.country_name}</span>
               </div>
@@ -970,7 +970,7 @@ export default function BracketPickerFlow({
               </div>
             </div>
           ) : (
-            <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 text-center">
+            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 text-center">
               <div className="text-2xl mb-1 opacity-30">&#127942;</div>
               <p className="text-sm text-neutral-400">No champion predicted yet</p>
               {!isReadOnly && (
@@ -986,7 +986,7 @@ export default function BracketPickerFlow({
           )}
 
           {/* Group Rankings Summary */}
-          <div className="bg-surface rounded-xl border border-neutral-200 overflow-hidden">
+          <div className="bg-surface rounded-2xl border border-neutral-200 overflow-hidden">
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-neutral-900">Group Rankings</span>
@@ -1004,14 +1004,14 @@ export default function BracketPickerFlow({
                   const ranking = groupRankings.get(letter) ?? []
                   if (ranking.length === 0) {
                     return (
-                      <div key={letter} className="rounded-lg border border-dashed border-neutral-200 p-2.5">
+                      <div key={letter} className="rounded-xl border border-dashed border-neutral-200 p-2.5">
                         <p className="text-xs font-bold text-neutral-400 mb-1">Group {letter}</p>
                         <p className="text-[10px] text-neutral-300">Not ranked</p>
                       </div>
                     )
                   }
                   return (
-                    <div key={letter} className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-2.5">
+                    <div key={letter} className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-2.5">
                       <p className="text-xs font-bold text-neutral-700 mb-1.5">Group {letter}</p>
                       <div className="space-y-1">
                         {ranking.map((teamId, idx) => {
@@ -1044,7 +1044,7 @@ export default function BracketPickerFlow({
           </div>
 
           {/* Third Place Summary */}
-          <div className="bg-surface rounded-xl border border-neutral-200 overflow-hidden">
+          <div className="bg-surface rounded-2xl border border-neutral-200 overflow-hidden">
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-neutral-900">Third-Place Rankings</span>
@@ -1102,7 +1102,7 @@ export default function BracketPickerFlow({
           </div>
 
           {/* Knockout Bracket - Round by Round */}
-          <div className="bg-surface rounded-xl border border-neutral-200 overflow-hidden">
+          <div className="bg-surface rounded-2xl border border-neutral-200 overflow-hidden">
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-neutral-900">Knockout Bracket</span>
@@ -1160,7 +1160,7 @@ export default function BracketPickerFlow({
                         return (
                           <div
                             key={match.match_id}
-                            className={`rounded-lg border px-2.5 py-2 ${
+                            className={`rounded-xl border px-2.5 py-2 ${
                               isChampionPath
                                 ? 'border-success-300 bg-success-50/60'
                                 : winnerTeam
@@ -1253,18 +1253,18 @@ export default function BracketPickerFlow({
           ============================================= */}
       {showSubmitModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay sm:p-4" onClick={() => setShowSubmitModal(false)}>
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Submit Bracket Predictions?
             </h3>
-            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
               <p className="text-sm text-warning-800">
                 Once submitted, you <strong>cannot</strong> make changes to your bracket predictions.
               </p>
             </div>
 
             {bracket.champion && (
-              <div className="bg-neutral-50 rounded-lg p-3 mb-4 flex items-center gap-2">
+              <div className="bg-neutral-50 rounded-xl p-3 mb-4 flex items-center gap-2">
                 <span className="text-sm text-neutral-700">Your champion:</span>
                 {bracket.champion.flag_url && (
                   <img src={bracket.champion.flag_url} alt={bracket.champion.country_name} className="w-6 h-4 rounded-[2px] object-cover" />
@@ -1273,7 +1273,7 @@ export default function BracketPickerFlow({
               </div>
             )}
 
-            <div className="bg-neutral-50 rounded-lg p-3 mb-4 space-y-1">
+            <div className="bg-neutral-50 rounded-xl p-3 mb-4 space-y-1">
               <p className="text-sm text-neutral-700">
                 Groups ranked: <strong>{groupRankings.size} / {GROUP_LETTERS.length}</strong>
               </p>

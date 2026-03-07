@@ -22,7 +22,7 @@ export default function ResetSuccessPage() {
 
         <Link
           href="/login"
-          className="inline-block px-8 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold"
+          className="inline-block px-8 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-semibold"
         >
           Go to Login
         </Link>

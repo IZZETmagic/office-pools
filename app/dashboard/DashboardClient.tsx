@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -10,6 +10,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
+import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
 // =====================
 // TYPES
@@ -149,6 +150,19 @@ function formatStage(stage: string) {
   return map[stage] ?? stage
 }
 
+function formatStageShort(stage: string) {
+  const map: Record<string, string> = {
+    group: 'GS',
+    round_32: 'R32',
+    round_16: 'R16',
+    quarter_final: 'QF',
+    semi_final: 'SF',
+    third_place: '3rd',
+    finals: 'F',
+  }
+  return map[stage] ?? stage
+}
+
 function timeAgo(dateStr: string) {
   const now = new Date()
   const then = new Date(dateStr)
@@ -271,47 +285,25 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className="shrink-0 w-48 bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 flex flex-col gap-2 hover:shadow-md transition-shadow"
+      className="shrink-0 w-48 min-h-[10rem] bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default p-4 flex flex-col hover:shadow-md transition-shadow"
     >
-      <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-      <div className="flex gap-1 flex-wrap text-[10px] [&>span]:text-[10px] [&>span]:px-1.5 [&>span]:py-0">
+      <h4 className="text-sm font-bold text-neutral-900 line-clamp-2">{pool.pool_name}</h4>
+      <div className="flex gap-1.5 flex-wrap mt-2 text-[10px] [&>span]:text-[10px] [&>span]:px-1.5 [&>span]:py-0">
         {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
         <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
       </div>
-      <div className="mt-auto grid grid-cols-2 gap-2 pt-1 text-center">
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-md py-1.5">
-          <p className="text-lg font-bold text-neutral-900 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
-          <p className="text-[10px] text-neutral-500">Points</p>
+      <div className="mt-auto pt-3 flex items-end justify-between">
+        <div>
+          <p className="text-xs text-neutral-500">Points</p>
+          <p className="text-2xl font-bold text-neutral-900 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
         </div>
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-md py-1.5">
-          <p className="text-lg font-bold text-neutral-900 leading-tight">
-            {pool.current_rank ? `#${pool.current_rank}` : '--'}<span className="text-neutral-400 font-normal">/{pool.memberCount}</span>
+        <div className="text-right">
+          <p className="text-xs text-neutral-500">Rank</p>
+          <p className="text-2xl font-bold text-neutral-900 leading-tight">
+            #{pool.current_rank ?? '--'}
           </p>
-          <p className="text-[10px] text-neutral-500">Rank</p>
         </div>
       </div>
-      {pool.role === 'admin' && (
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 text-[10px] text-neutral-500 font-mono bg-neutral-100 dark:bg-surface-tertiary hover:bg-neutral-200 dark:hover:bg-neutral-700 px-2 py-1 rounded transition-colors w-full justify-center"
-        >
-          {copied ? (
-            <>
-              <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              Copied!
-            </>
-          ) : (
-            <>
-              <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-              </svg>
-              {pool.pool_code}
-            </>
-          )}
-        </button>
-      )}
     </Link>
   )
 }
@@ -371,11 +363,11 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mb-5 text-center">
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-xl py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{formatNumber(pool.total_points ?? 0)}</p>
           <p className="text-xs text-neutral-500">Total Points</p>
         </div>
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1 flex items-center justify-center">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-xl py-2 px-1 flex items-center justify-center">
           <span className="text-lg font-bold text-neutral-900 inline-flex items-center gap-1 whitespace-nowrap">
             {pool.current_rank ? (
               <>
@@ -389,7 +381,7 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
             )}
           </span>
         </div>
-        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-lg py-2 px-1">
+        <div className="bg-neutral-50 dark:bg-surface-tertiary dark:border dark:border-border-default rounded-xl py-2 px-1">
           <p className="text-lg font-bold text-neutral-900">{pool.completedMatches}/{pool.totalMatches}</p>
           <p className="text-xs text-neutral-500">Matches</p>
         </div>
@@ -425,6 +417,88 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
 }
 
 // =====================
+// ACTIVITY LIST WITH EXPAND/COLLAPSE ANIMATION
+// =====================
+function ActivityList({
+  activities,
+  showAll,
+  onToggle,
+}: {
+  activities: ActivityItem[]
+  showAll: boolean
+  onToggle: () => void
+}) {
+  const firstThree = activities.slice(0, 3)
+  const rest = activities.slice(3)
+  let dayCounter = ''
+
+  function renderItem(activity: ActivityItem, idx: number, list: ActivityItem[], startIdx: number) {
+    const dayHeader = formatDayHeader(activity.date)
+    const globalIdx = startIdx + idx
+    const showHeader = dayHeader !== dayCounter
+    dayCounter = dayHeader
+    const poolLink = (
+      <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
+        {activity.poolName}
+      </Link>
+    )
+    return (
+      <li key={globalIdx}>
+        {showHeader && (
+          <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${globalIdx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
+            {dayHeader}
+          </p>
+        )}
+        <div className={`flex items-start gap-3 ${!showHeader && globalIdx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < list.length - 1 || (startIdx === 0 && rest.length > 0) ? 'pb-3' : ''}`}>
+          <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
+            <ActivityIcon type={activity.type} />
+          </span>
+          <div className="min-w-0 pt-0.5">
+            <p className="text-sm text-neutral-900">
+              {activityDescription(activity, poolLink)}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
+              {activity.type === 'joined' && !activity.hasPredictions && (
+                <Badge variant="yellow">Needs predictions</Badge>
+              )}
+              {activity.type === 'auto_submitted' && (
+                <Badge variant="blue">Auto</Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </li>
+    )
+  }
+
+  return (
+    <Card>
+      <ul>
+        {firstThree.map((a, i) => renderItem(a, i, firstThree, 0))}
+      </ul>
+      {rest.length > 0 && (
+        <>
+          <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showAll ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+            <div className="overflow-hidden">
+              <ul>
+                {rest.map((a, i) => renderItem(a, i, rest, 3))}
+              </ul>
+            </div>
+          </div>
+          <button
+            onClick={onToggle}
+            className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+          >
+            {showAll ? 'Show less' : `Show ${rest.length} more`}
+          </button>
+        </>
+      )}
+    </Card>
+  )
+}
+
+// =====================
 // MAIN COMPONENT
 // =====================
 export function DashboardClient({
@@ -444,6 +518,14 @@ export function DashboardClient({
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [matchTab, setMatchTab] = useState<'live' | 'upcoming'>(liveMatches.length > 0 ? 'live' : 'upcoming')
+  const [matchTabDir, setMatchTabDir] = useState<'left' | 'right'>('right')
+  const { containerRef: matchTabRef, indicatorStyle: matchIndicator, ready: matchTabReady } = useSlideIndicator(matchTab)
+
+  const switchMatchTab = useCallback((tab: 'live' | 'upcoming') => {
+    if (tab === matchTab) return
+    setMatchTabDir(tab === 'upcoming' ? 'right' : 'left')
+    setMatchTab(tab)
+  }, [matchTab])
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -451,29 +533,54 @@ export function DashboardClient({
 
       {/* Hero header */}
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
+        <div className="max-w-6xl mx-auto px-6 sm:px-6 py-5 sm:py-10">
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+              <h2 className="text-lg sm:text-3xl font-bold text-white truncate">
                 Welcome, {user.full_name || user.username || 'Player'}!
               </h2>
-              <p className="text-primary-100 dark:text-white/60 text-sm sm:text-base">@{user.username}</p>
+              <p className="text-primary-100 dark:text-white/60 text-xs sm:text-base">@{user.username}</p>
             </div>
           </div>
 
-          {/* Quick stats in hero */}
-          <div className="grid grid-cols-3 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
+          {/* Quick stats in hero — compact on mobile, glass cards on desktop */}
+          {/* Mobile: inline row with dividers */}
+          <div className="flex items-center justify-around mt-3 sm:hidden">
+            <div className="text-center">
+              <p className="text-lg font-bold text-white">{totalPools}</p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Active Pools</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-white flex items-center justify-center gap-1">
+                {bestRank === 1 && (
+                  <svg className="w-4 h-4 text-accent-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 3h14l-1.5 6.5a1 1 0 01-.97.75H7.47a1 1 0 01-.97-.75L5 3zm2.5 0L9 8h6l1.5-5h-9zM12 12a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 110 2 1 1 0 010-2zM8 20h8a1 1 0 110 2H8a1 1 0 110-2z"/>
+                  </svg>
+                )}
+                {bestRank ? `#${bestRank}` : '--'}
+              </p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Best Rank</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-white">{formatNumber(totalPoints)}</p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Total Points</p>
+            </div>
+          </div>
+          {/* Desktop: glass stat cards */}
+          <div className="hidden sm:grid grid-cols-3 gap-4 mt-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border border-white/10">
+              <p className="text-2xl font-bold text-white">{totalPools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Active Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
-              <p className={`font-bold text-white flex items-center justify-center gap-1.5 ${bestRank === 1 ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
+              <p className={`font-bold text-white flex items-center justify-center gap-1.5 ${bestRank === 1 ? 'text-3xl' : 'text-2xl'}`}>
                 {bestRank === 1 && (
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-accent-500" viewBox="0 0 24 24" fill="currentColor">
+                  <svg className="w-6 h-6 text-accent-500" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M5 3h14l-1.5 6.5a1 1 0 01-.97.75H7.47a1 1 0 01-.97-.75L5 3zm2.5 0L9 8h6l1.5-5h-9zM12 12a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 110 2 1 1 0 010-2zM8 20h8a1 1 0 110 2H8a1 1 0 110-2z"/>
                   </svg>
                 )}
@@ -481,15 +588,15 @@ export function DashboardClient({
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{formatNumber(totalPoints)}</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
+              <p className="text-2xl font-bold text-white">{formatNumber(totalPoints)}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-6xl mx-auto px-6 sm:px-6 py-6 sm:py-8">
 
         {/* My Pools section */}
         <div className="mb-8">
@@ -506,7 +613,7 @@ export function DashboardClient({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
@@ -515,7 +622,7 @@ export function DashboardClient({
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -531,7 +638,7 @@ export function DashboardClient({
               <p className="text-neutral-500 mb-4">Use the buttons above to join or create a pool.</p>
               <Link
                 href="/pools?tab=discover"
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 hover:border-primary-300 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -598,22 +705,28 @@ export function DashboardClient({
             </div>
 
             {/* Tab toggle */}
-            <div className="bg-neutral-100 dark:bg-surface-tertiary rounded-lg p-1 flex mb-4">
+            <div ref={matchTabRef} className="relative bg-neutral-100 dark:bg-surface-tertiary rounded-xl p-1 flex mb-4">
+              <div
+                className={`absolute top-1 bottom-1 bg-surface rounded-lg shadow-sm pointer-events-none ${matchTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                style={{ left: matchIndicator.left, width: matchIndicator.width }}
+              />
               <button
-                onClick={() => setMatchTab('live')}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                data-tab-key="live"
+                onClick={() => switchMatchTab('live')}
+                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                   matchTab === 'live'
-                    ? 'bg-surface text-neutral-900 shadow-sm'
+                    ? 'text-neutral-900'
                     : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
                 Live Now
               </button>
               <button
-                onClick={() => setMatchTab('upcoming')}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                data-tab-key="upcoming"
+                onClick={() => switchMatchTab('upcoming')}
+                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                   matchTab === 'upcoming'
-                    ? 'bg-surface text-neutral-900 shadow-sm'
+                    ? 'text-neutral-900'
                     : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
@@ -621,7 +734,12 @@ export function DashboardClient({
               </button>
             </div>
 
-            {/* Tab content */}
+            {/* Tab content with slide animation */}
+            <div className="overflow-hidden">
+            <div
+              key={matchTab}
+              className={matchTabDir === 'right' ? 'animate-[slideInRight_250ms_ease-out]' : 'animate-[slideInLeft_250ms_ease-out]'}
+            >
             {matchTab === 'live' ? (
               liveMatches.length === 0 ? (
                 <Card>
@@ -661,7 +779,7 @@ export function DashboardClient({
                             {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
                             <p className="font-semibold text-neutral-900 text-sm">{homeTeam}</p>
                           </div>
-                          <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-lg border border-neutral-200 dark:border-border-default">
+                          <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-xl border border-neutral-200 dark:border-border-default">
                             <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
                             <span className="text-neutral-400 text-lg">-</span>
                             <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
@@ -725,8 +843,9 @@ export function DashboardClient({
                             const awayLabel = match.away_team_placeholder ?? 'TBD'
                             return (
                               <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-xs text-neutral-400 shrink-0">#{match.match_number}</span>
+                                <div className="flex items-center min-w-0">
+                                  <span className="text-xs text-neutral-400 w-8 shrink-0 tabular-nums">#{match.match_number}</span>
+                                  <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
                                   <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
                                 </div>
                                 <span className="text-xs text-neutral-400 shrink-0 ml-3">
@@ -742,12 +861,14 @@ export function DashboardClient({
                 )
               })()
             )}
+            </div>
+            </div>
           </div>
         )}
 
         {/* ===== DESKTOP: Live Matches — only shown when there are live matches ===== */}
         {liveMatches.length > 0 && (
-          <div className="hidden md:block mb-8 bg-danger-50/40 dark:bg-danger-950/20 border border-danger-200/50 dark:border-danger-800/30 rounded-xl p-4 sm:p-5">
+          <div className="hidden md:block mb-8 bg-danger-50/40 dark:bg-danger-950/20 border border-danger-200/50 dark:border-danger-800/30 rounded-2xl p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
@@ -778,19 +899,17 @@ export function DashboardClient({
                         LIVE
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 flex items-center justify-end gap-2 pr-3">
-                        {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
-                        <p className="font-semibold text-neutral-900">{homeTeam}</p>
+                    <div className="flex items-center justify-between overflow-hidden">
+                      <div className="flex-1 min-w-0 flex items-center justify-end pr-3">
+                        <p className="font-semibold text-neutral-900 text-sm truncate">{homeTeam}</p>
                       </div>
-                      <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-lg shadow-sm border border-neutral-200 dark:border-border-default">
+                      <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-xl shadow-sm border border-neutral-200 dark:border-border-default">
                         <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
                         <span className="text-neutral-400 text-lg">-</span>
                         <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
                       </div>
-                      <div className="flex-1 flex items-center gap-2 pl-3">
-                        <p className="font-semibold text-neutral-900">{awayTeam}</p>
-                        {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
+                      <div className="flex-1 min-w-0 flex items-center pl-3">
+                        <p className="font-semibold text-neutral-900 text-sm truncate">{awayTeam}</p>
                       </div>
                     </div>
                     {elapsed && (
@@ -866,8 +985,9 @@ export function DashboardClient({
                           const awayLabel = match.away_team_placeholder ?? 'TBD'
                           return (
                             <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs text-neutral-400 shrink-0">#{match.match_number}</span>
+                              <div className="flex items-center min-w-0">
+                                <span className="text-xs text-neutral-400 w-8 shrink-0 tabular-nums">#{match.match_number}</span>
+                                <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
                                 <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
                               </div>
                               <span className="text-xs text-neutral-400 shrink-0 ml-3">
@@ -891,62 +1011,13 @@ export function DashboardClient({
               <Card>
                 <p className="text-neutral-600">No recent activity.</p>
               </Card>
-            ) : (() => {
-              const visibleActivities = showAllActivity ? activities : activities.slice(0, 5)
-              let lastDayHeader = ''
-              return (
-                <Card>
-                  <ul>
-                    {visibleActivities.map((activity, idx) => {
-                      const dayHeader = formatDayHeader(activity.date)
-                      const showHeader = dayHeader !== lastDayHeader
-                      lastDayHeader = dayHeader
-                      const poolLink = (
-                        <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
-                          {activity.poolName}
-                        </Link>
-                      )
-                      return (
-                        <li key={idx}>
-                          {showHeader && (
-                            <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${idx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
-                              {dayHeader}
-                            </p>
-                          )}
-                          <div className={`flex items-start gap-3 ${!showHeader && idx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < visibleActivities.length - 1 ? 'pb-3' : ''}`}>
-                            <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
-                              <ActivityIcon type={activity.type} />
-                            </span>
-                            <div className="min-w-0 pt-0.5">
-                              <p className="text-sm text-neutral-900">
-                                {activityDescription(activity, poolLink)}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
-                                {activity.type === 'joined' && !activity.hasPredictions && (
-                                  <Badge variant="yellow">Needs predictions</Badge>
-                                )}
-                                {activity.type === 'auto_submitted' && (
-                                  <Badge variant="blue">Auto</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  {activities.length > 5 && (
-                    <button
-                      onClick={() => setShowAllActivity(!showAllActivity)}
-                      className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-                    >
-                      {showAllActivity ? 'Show less' : `Show ${activities.length - 5} more`}
-                    </button>
-                  )}
-                </Card>
-              )
-            })()}
+            ) : (
+              <ActivityList
+                activities={activities}
+                showAll={showAllActivity}
+                onToggle={() => setShowAllActivity(!showAllActivity)}
+              />
+            )}
           </div>
         </div>
 
@@ -957,62 +1028,13 @@ export function DashboardClient({
             <Card>
               <p className="text-neutral-600">No recent activity.</p>
             </Card>
-          ) : (() => {
-            const visibleActivities = showAllActivity ? activities : activities.slice(0, 5)
-            let lastDayHeader = ''
-            return (
-              <Card>
-                <ul>
-                  {visibleActivities.map((activity, idx) => {
-                    const dayHeader = formatDayHeader(activity.date)
-                    const showHeader = dayHeader !== lastDayHeader
-                    lastDayHeader = dayHeader
-                    const poolLink = (
-                      <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
-                        {activity.poolName}
-                      </Link>
-                    )
-                    return (
-                      <li key={idx}>
-                        {showHeader && (
-                          <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${idx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
-                            {dayHeader}
-                          </p>
-                        )}
-                        <div className={`flex items-start gap-3 ${!showHeader && idx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < visibleActivities.length - 1 ? 'pb-3' : ''}`}>
-                          <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
-                            <ActivityIcon type={activity.type} />
-                          </span>
-                          <div className="min-w-0 pt-0.5">
-                            <p className="text-sm text-neutral-900">
-                              {activityDescription(activity, poolLink)}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
-                              {activity.type === 'joined' && !activity.hasPredictions && (
-                                <Badge variant="yellow">Needs predictions</Badge>
-                              )}
-                              {activity.type === 'auto_submitted' && (
-                                <Badge variant="blue">Auto</Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-                {activities.length > 5 && (
-                  <button
-                    onClick={() => setShowAllActivity(!showAllActivity)}
-                    className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-                  >
-                    {showAllActivity ? 'Show less' : `Show ${activities.length - 5} more`}
-                  </button>
-                )}
-              </Card>
-            )
-          })()}
+          ) : (
+            <ActivityList
+              activities={activities}
+              showAll={showAllActivity}
+              onToggle={() => setShowAllActivity(!showAllActivity)}
+            />
+          )}
         </div>
       </main>
 

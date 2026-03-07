@@ -12,7 +12,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
     return (
       <div>
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Audit Log</h2>
-        <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
           No audit entries yet. Actions like match resets will be logged here.
         </div>
       </div>
@@ -35,7 +35,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
           const away = log.matches?.away_team?.country_name || 'Unknown'
           const resetDate = new Date(log.reset_at)
           return (
-            <div key={log.log_id} className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4">
+            <div key={log.log_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4">
               {/* Top row: action badge + time */}
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant={log.action_type === 'reset' ? 'yellow' : 'blue'}>
@@ -84,7 +84,7 @@ export function AuditLogTab({ auditLogs }: AuditLogTabProps) {
       </div>
 
       {/* Audit — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

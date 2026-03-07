@@ -468,12 +468,12 @@ export function PointsBreakdownModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {rank && (
-              <span className="text-2xl font-bold text-primary-600 flex-shrink-0 bg-primary-50 rounded-lg px-2.5 py-1">#{rank}</span>
+              <span className="text-2xl font-bold text-primary-600 flex-shrink-0 bg-primary-50 rounded-xl px-2.5 py-1">#{rank}</span>
             )}
             <div className="min-w-0">
               {isMultiEntry ? (
@@ -499,7 +499,7 @@ export function PointsBreakdownModal({
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={exportCsv}
-              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
               aria-label="Export CSV"
               title="Export as CSV"
             >
@@ -509,7 +509,7 @@ export function PointsBreakdownModal({
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
               aria-label="Close"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -523,25 +523,25 @@ export function PointsBreakdownModal({
         <div className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {/* Total summary */}
           <div className={`grid gap-2 sm:gap-3 ${(entry.point_adjustment ?? 0) !== 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            <div className="bg-primary-50 rounded-lg p-3 text-center">
+            <div className="bg-primary-50 rounded-xl p-3 text-center">
               <div className="text-[11px] sm:text-xs font-medium text-primary-600 uppercase tracking-wide">
                 {predictionMode === 'bracket_picker' ? 'Picks' : 'Match'}
               </div>
               <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">{formatNumber(matchPoints)}</div>
             </div>
-            <div className="bg-success-50 rounded-lg p-3 text-center">
+            <div className="bg-success-50 rounded-xl p-3 text-center">
               <div className="text-[11px] sm:text-xs font-medium text-success-600 uppercase tracking-wide">Bonus</div>
               <div className="text-xl sm:text-2xl font-bold text-success-700 mt-1">{formatNumber(bonusPoints)}</div>
             </div>
             {(entry.point_adjustment ?? 0) !== 0 && (
-              <div className="bg-warning-50 rounded-lg p-3 text-center">
+              <div className="bg-warning-50 rounded-xl p-3 text-center">
                 <div className="text-[11px] sm:text-xs font-medium text-warning-600 uppercase tracking-wide">Adj</div>
                 <div className={`text-xl sm:text-2xl font-bold mt-1 ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-700' : 'text-error-700'}`}>
                   {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)}
                 </div>
               </div>
             )}
-            <div className="bg-neutral-50 rounded-lg p-3 text-center border-2 border-neutral-200">
+            <div className="bg-neutral-50 rounded-xl p-3 text-center border-2 border-neutral-200">
               <div className="text-[11px] sm:text-xs font-medium text-neutral-600 uppercase tracking-wide">Total</div>
               <div className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1">{formatNumber(totalPoints)}</div>
             </div>
@@ -555,7 +555,7 @@ export function PointsBreakdownModal({
               <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
                 Point Adjustment
               </h3>
-              <div className="border border-warning-200 dark:border-warning-700 rounded-lg overflow-hidden bg-warning-50/50">
+              <div className="border border-warning-200 dark:border-warning-700 rounded-xl overflow-hidden bg-warning-50/50">
                 <div className="flex items-center justify-between px-3 py-2.5">
                   <span className="text-xs font-medium text-warning-800">Manual Adjustment</span>
                   <span className={`text-xs font-bold ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-error-600'}`}>
@@ -582,7 +582,7 @@ export function PointsBreakdownModal({
                 </h3>
 
                 {bonusScores.length === 0 && matchPoints === 0 ? (
-                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                  <div className="text-center py-6 bg-neutral-50 rounded-xl">
                     <div className="text-neutral-400 text-sm">No points calculated yet</div>
                     <div className="text-neutral-400 text-xs mt-1">
                       Points are calculated as tournament stages complete
@@ -598,7 +598,7 @@ export function PointsBreakdownModal({
                       const stats = bpCategoryStats.get(category)
 
                       return (
-                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                           <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
                             <span className="text-xs font-semibold text-neutral-900">
                               {config.label}
@@ -670,7 +670,7 @@ export function PointsBreakdownModal({
 
                 <div className="space-y-3">
                   {/* Group Rankings Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Group Stage Rankings</span>
                     </div>
@@ -683,7 +683,7 @@ export function PointsBreakdownModal({
                   </div>
 
                   {/* Third-Place Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Third-Place Rankings</span>
                     </div>
@@ -695,7 +695,7 @@ export function PointsBreakdownModal({
                   </div>
 
                   {/* Knockout Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Knockout Stage</span>
                     </div>
@@ -710,7 +710,7 @@ export function PointsBreakdownModal({
                   </div>
 
                   {/* Bonus Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Bonus Points</span>
                     </div>
@@ -733,7 +733,7 @@ export function PointsBreakdownModal({
                 </h3>
 
                 {matchDetails.length === 0 ? (
-                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                  <div className="text-center py-6 bg-neutral-50 rounded-xl">
                     <div className="text-neutral-400 text-sm">No completed matches with predictions yet</div>
                   </div>
                 ) : (
@@ -747,7 +747,7 @@ export function PointsBreakdownModal({
                     {renderMatchStageSection('final')}
 
                     {totalPsoPoints > 0 && (
-                      <div className="bg-accent-50 rounded-lg px-3 py-2">
+                      <div className="bg-accent-50 rounded-xl px-3 py-2">
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-medium text-accent-700">Penalty Shootout Bonus (included above)</span>
                           <span className="text-xs font-bold text-accent-700">+{formatNumber(totalPsoPoints)} pts</span>
@@ -767,7 +767,7 @@ export function PointsBreakdownModal({
                 </h3>
 
                 {bonusScores.length === 0 ? (
-                  <div className="text-center py-6 bg-neutral-50 rounded-lg">
+                  <div className="text-center py-6 bg-neutral-50 rounded-xl">
                     <div className="text-neutral-400 text-sm">No bonus points earned yet</div>
                     <div className="text-neutral-400 text-xs mt-1">
                       Bonus points are calculated as tournament stages complete
@@ -782,7 +782,7 @@ export function PointsBreakdownModal({
                       const config = BONUS_CATEGORY_CONFIG[category]
 
                       return (
-                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                        <div key={category} className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                           <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
                             <span className="text-xs font-semibold text-neutral-900">
                               {config.label}
@@ -823,7 +823,7 @@ export function PointsBreakdownModal({
 
                 <div className="space-y-3">
                   {/* Group Stage Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Group Stage</span>
                     </div>
@@ -835,7 +835,7 @@ export function PointsBreakdownModal({
                   </div>
 
                   {/* Knockout Stage Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Knockout Stage (Base)</span>
                     </div>
@@ -847,7 +847,7 @@ export function PointsBreakdownModal({
                   </div>
 
                   {/* Multipliers */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Round Multipliers</span>
                     </div>
@@ -863,7 +863,7 @@ export function PointsBreakdownModal({
 
                   {/* PSO Rules */}
                   {poolSettings.pso_enabled && (
-                    <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                    <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                       <div className="px-3 py-2 bg-neutral-100">
                         <span className="text-xs font-semibold text-neutral-900">Penalty Shootout (Bonus)</span>
                       </div>
@@ -876,7 +876,7 @@ export function PointsBreakdownModal({
                   )}
 
                   {/* Bonus Rules */}
-                  <div className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-neutral-100">
                       <span className="text-xs font-semibold text-neutral-900">Bonus Points (per group / per match)</span>
                     </div>
@@ -914,7 +914,7 @@ export function PointsBreakdownModal({
     const isKnockout = stage !== 'group'
 
     return (
-      <div key={stage} className="border border-neutral-200 dark:border-border-default rounded-lg overflow-hidden">
+      <div key={stage} className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
         {/* Stage header */}
         <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
           <div className="flex items-center gap-2">

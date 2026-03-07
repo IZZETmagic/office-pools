@@ -145,7 +145,7 @@ export function EntriesListView({
           return (
             <div
               key={entry.entry_id}
-              className="rounded-lg border border-neutral-200 bg-surface p-3 cursor-pointer hover:bg-primary-50 active:bg-primary-100 transition-colors group"
+              className="rounded-xl border border-neutral-200 bg-surface p-3 cursor-pointer hover:bg-primary-50 active:bg-primary-100 transition-colors group"
               onClick={() => !isRenaming && onEditEntry(entry)}
               role="button"
               tabIndex={0}
@@ -164,13 +164,13 @@ export function EntriesListView({
                         if (e.key === 'Enter') handleRename(entry)
                         if (e.key === 'Escape') setRenamingEntryId(null)
                       }}
-                      className="px-2 py-1 border border-primary-300 rounded-md text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full min-w-0"
+                      className="px-2 py-1 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full min-w-0"
                       maxLength={40}
                     />
                     <button
                       onClick={() => handleRename(entry)}
                       disabled={savingRename}
-                      className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 shrink-0"
+                      className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 shrink-0"
                     >
                       {savingRename ? '...' : 'Save'}
                     </button>
@@ -265,7 +265,7 @@ export function EntriesListView({
       </div>
 
       {/* Desktop table view */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow overflow-hidden dark:shadow-none dark:border dark:border-border-default">
+      <div className="hidden sm:block bg-surface rounded-xl shadow overflow-hidden dark:shadow-none dark:border dark:border-border-default">
         <table className="w-full">
           <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
@@ -316,13 +316,13 @@ export function EntriesListView({
                             if (e.key === 'Enter') handleRename(entry)
                             if (e.key === 'Escape') setRenamingEntryId(null)
                           }}
-                          className="px-2 py-1 border border-primary-300 rounded-md text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+                          className="px-2 py-1 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
                           maxLength={40}
                         />
                         <button
                           onClick={() => handleRename(entry)}
                           disabled={savingRename}
-                          className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                          className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                         >
                           {savingRename ? '...' : 'Save'}
                         </button>

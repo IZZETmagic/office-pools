@@ -34,15 +34,15 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#127942;</span>
+              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#127942;</span>
               <span className="text-primary-100 dark:text-white/60">Predict match scores &amp; climb the leaderboard</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#128202;</span>
+              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#128202;</span>
               <span className="text-primary-100 dark:text-white/60">Track your stats and accuracy over time</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-xl">&#128101;</span>
+              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#128101;</span>
               <span className="text-primary-100 dark:text-white/60">Create or join pools with friends &amp; family</span>
             </div>
           </div>

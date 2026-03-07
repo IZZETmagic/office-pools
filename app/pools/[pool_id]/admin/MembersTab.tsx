@@ -349,7 +349,7 @@ export function MembersTab({
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface"
         >
           <option value="rank">Sort by Rank</option>
           <option value="points">Sort by Points</option>
@@ -365,7 +365,7 @@ export function MembersTab({
           return (
             <div
               key={member.member_id}
-              className={`rounded-lg border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-neutral-200'}`}
+              className={`rounded-xl border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-neutral-200'}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -457,7 +457,7 @@ export function MembersTab({
       </div>
 
       {/* Members - Desktop table view */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-xl shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -654,7 +654,7 @@ export function MembersTab({
       {/* Promote Modal */}
       {modal.type === 'promote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Promote to Admin
             </h3>
@@ -691,7 +691,7 @@ export function MembersTab({
       {/* Demote Modal */}
       {modal.type === 'demote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Demote to Player
             </h3>
@@ -737,7 +737,7 @@ export function MembersTab({
       {/* Remove Modal */}
       {modal.type === 'remove' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-danger-600 mb-3">
               Remove Member
             </h3>
@@ -746,7 +746,7 @@ export function MembersTab({
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               from this pool?
             </p>
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-4">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-4">
               <p className="text-sm text-danger-600">
                 This will delete all their predictions. This action cannot be
                 undone.
@@ -775,7 +775,7 @@ export function MembersTab({
               <button
                 onClick={() => handleRemove(modal.member)}
                 disabled={!removeConfirmed || loading}
-                className="px-4 py-2 text-sm rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm rounded-xl font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Removing...' : 'Remove Member'}
               </button>
@@ -972,7 +972,7 @@ function ViewPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
           <h3 className="text-xl font-bold text-neutral-900">
@@ -1043,7 +1043,7 @@ function ViewPredictionsModal({
                         return (
                           <div
                             key={pred.prediction_id}
-                            className="bg-neutral-50 rounded-lg px-3 py-2"
+                            className="bg-neutral-50 rounded-xl px-3 py-2"
                           >
                             <div className="flex items-center gap-2">
                               {/* Match number */}
@@ -1083,7 +1083,7 @@ function ViewPredictionsModal({
 
               {/* Champion highlight */}
               {champion && (
-                <div className="mt-2 text-center p-4 rounded-xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-50 border border-accent-100">
+                <div className="mt-2 text-center p-4 rounded-2xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-50 border border-accent-100">
                   <div className="text-3xl mb-1">&#127942;</div>
                   <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-0.5">
                     Predicted Champion
@@ -1233,7 +1233,7 @@ function ViewBracketPickerPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
           <h3 className="text-xl font-bold text-neutral-900">
@@ -1276,12 +1276,12 @@ function ViewBracketPickerPredictionsModal({
             <>
               {/* Champion highlight */}
               {bracket?.champion && (
-                <div className="mb-5 text-center p-4 rounded-xl bg-gradient-to-br from-warning-50 to-warning-100 border-2 border-warning-300">
+                <div className="mb-5 text-center p-4 rounded-2xl bg-gradient-to-br from-warning-50 to-warning-100 border-2 border-warning-300">
                   <div className="text-3xl mb-1">&#127942;</div>
                   <p className="text-xs font-semibold text-warning-600 uppercase tracking-wide mb-1">Predicted Champion</p>
                   <div className="flex items-center justify-center gap-2">
                     {bracket.champion.flag_url && (
-                      <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-sm object-cover" />
+                      <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-md object-cover" />
                     )}
                     <span className="text-lg font-bold text-neutral-900">{bracket.champion.country_name}</span>
                   </div>
@@ -1314,7 +1314,7 @@ function ViewBracketPickerPredictionsModal({
                       .sort((a, b) => a.predicted_position - b.predicted_position)
                     if (groupRanks.length === 0) return null
                     return (
-                      <div key={letter} className="bg-neutral-50 rounded-lg p-2.5">
+                      <div key={letter} className="bg-neutral-50 rounded-xl p-2.5">
                         <div className="text-xs font-bold text-neutral-700 mb-1.5">Group {letter}</div>
                         <div className="space-y-1">
                           {groupRanks.map((rank, i) => {
@@ -1325,7 +1325,7 @@ function ViewBracketPickerPredictionsModal({
                                   i === 0 ? 'text-success-600' : i === 1 ? 'text-primary-600' : 'text-neutral-400'
                                 }`}>{i + 1}</span>
                                 {team?.flag_url && (
-                                  <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                                  <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
                                 )}
                                 <span className="text-xs text-neutral-800 truncate">{team?.country_name || 'Unknown'}</span>
                               </div>
@@ -1341,7 +1341,7 @@ function ViewBracketPickerPredictionsModal({
               {/* Third-Place Rankings */}
               <div className="mb-5">
                 <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Third-Place Rankings</h4>
-                <div className="bg-neutral-50 rounded-lg p-3">
+                <div className="bg-neutral-50 rounded-xl p-3">
                   <div className="space-y-1">
                     {[...bpData.thirdPlaceRankings]
                       .sort((a, b) => a.rank - b.rank)
@@ -1354,7 +1354,7 @@ function ViewBracketPickerPredictionsModal({
                               {i + 1}
                             </span>
                             {team?.flag_url && (
-                              <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                              <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
                             )}
                             <span className="text-xs text-neutral-800 flex-1 truncate">{team?.country_name || 'Unknown'}</span>
                             <span className="text-xs text-neutral-400">Grp {ranking.group_letter}</span>
@@ -1393,7 +1393,7 @@ function ViewBracketPickerPredictionsModal({
                       </div>
                       <div className="space-y-1">
                         {stagePicks.map(({ match, pick, winnerTeam, resolved }) => (
-                          <div key={match.match_id} className="bg-neutral-50 rounded-lg px-3 py-2">
+                          <div key={match.match_id} className="bg-neutral-50 rounded-xl px-3 py-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono text-neutral-400 shrink-0 w-7 text-right">
                                 #{match.match_number}
@@ -1410,7 +1410,7 @@ function ViewBracketPickerPredictionsModal({
                               {winnerTeam ? (
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {winnerTeam.flag_url && (
-                                    <img src={winnerTeam.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
+                                    <img src={winnerTeam.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
                                   )}
                                   <span className="text-xs font-semibold text-success-700">{winnerTeam.country_name}</span>
                                   {pick?.predicted_penalty && (
@@ -1482,7 +1482,7 @@ function UnlockPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-lg font-bold text-neutral-900 mb-3">
           Unlock Predictions
         </h3>
@@ -1498,7 +1498,7 @@ function UnlockPredictionsModal({
               Select entry to unlock
             </label>
             <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-lg hover:bg-neutral-50">
+              <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-xl hover:bg-neutral-50">
                 <input
                   type="radio"
                   name="unlock_entry"
@@ -1512,7 +1512,7 @@ function UnlockPredictionsModal({
               {submittedEntries.map((entry) => (
                 <label
                   key={entry.entry_id}
-                  className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-lg hover:bg-neutral-50"
+                  className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-xl hover:bg-neutral-50"
                 >
                   <input
                     type="radio"
@@ -1533,7 +1533,7 @@ function UnlockPredictionsModal({
           </div>
         )}
 
-        <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
           <svg className="w-5 h-5 text-warning-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
@@ -1616,7 +1616,7 @@ function AdjustPointsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-xl font-bold text-neutral-900 mb-4">
           Adjust Points - {member.users.username}
         </h3>
@@ -1673,7 +1673,7 @@ function AdjustPointsModal({
               onChange={(e) =>
                 setPointAdjustment(parseInt(e.target.value) || 0)
               }
-              className="w-24 h-10 text-center border border-neutral-300 rounded-lg font-bold text-lg text-neutral-900"
+              className="w-24 h-10 text-center border border-neutral-300 rounded-xl font-bold text-lg text-neutral-900"
             />
             <button
               onClick={() => setPointAdjustment((p: number) => p + 1)}
@@ -1693,7 +1693,7 @@ function AdjustPointsModal({
             onChange={(e) => setAdjustReason(e.target.value)}
             placeholder="Explain the reason for this adjustment..."
             rows={3}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
 

@@ -48,7 +48,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseClasses = [
-    'rounded-lg font-semibold transition',
+    'rounded-xl font-semibold transition',
     variantClasses[variant],
     sizeClasses[size],
     fullWidth ? 'w-full' : '',

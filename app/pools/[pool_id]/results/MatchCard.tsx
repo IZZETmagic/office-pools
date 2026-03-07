@@ -129,7 +129,7 @@ export function MatchCard({
 
   return (
     <div
-      className={`rounded-lg shadow border border-neutral-200 overflow-hidden ${getCardBackground(pointsResult)}`}
+      className={`rounded-xl shadow border border-neutral-200 overflow-hidden ${getCardBackground(pointsResult)}`}
     >
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-100 bg-neutral-50/80">

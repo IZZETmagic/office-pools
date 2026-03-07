@@ -519,7 +519,7 @@ export default function ProgressivePredictionsFlow({
           onClick={(e) => { if (e.target === e.currentTarget) setShowSubmitModal(false) }}
         >
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-sm w-full p-6 space-y-4 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-sm w-full p-6 space-y-4 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900">Submit {roundName}?</h3>
             <p className="text-sm text-neutral-600">
               You&apos;re about to submit your predictions for <strong>{roundMatchCount}</strong> {roundName} matches.

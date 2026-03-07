@@ -510,7 +510,7 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
   else if (data.isCompleted && data.pickIsCorrect === false) borderClass = 'border-danger-300'
 
   return (
-    <div className={`border ${borderClass} rounded-lg bg-surface shadow-sm overflow-hidden`}>
+    <div className={`border ${borderClass} rounded-xl bg-surface shadow-sm overflow-hidden`}>
       <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between">
         <span className={`text-xs font-bold uppercase tracking-wider ${
           label === 'Final' ? 'text-warning-600' : 'text-neutral-500'
@@ -756,8 +756,8 @@ function KnockoutComparison({
         )}
       </div>
 
-      <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 mb-6 text-xs text-primary-700">
-        Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-sm align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-sm align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
+      <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-6 text-xs text-primary-700">
+        Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-md align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-md align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
       </div>
 
       {/* Split bracket — two halves stacked */}
@@ -1015,7 +1015,7 @@ export function BracketResultsTab({
   // If no predictions submitted
   if (!isSubmitted && groupRankings.length === 0) {
     return (
-      <div className="bg-surface rounded-lg shadow p-8 text-center">
+      <div className="bg-surface rounded-xl shadow p-8 text-center">
         <p className="text-neutral-600">
           {selectedEntryId === currentEntryId
             ? 'You haven\'t submitted your bracket picks yet. Head to the Predictions tab to get started!'
@@ -1034,7 +1034,7 @@ export function BracketResultsTab({
           <select
             value={selectedEntryId}
             onChange={e => setSelectedEntryId(e.target.value)}
-            className="text-sm border border-neutral-300 rounded-lg px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="text-sm border border-neutral-300 rounded-xl px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             {userEntries.map(entry => (
               <option key={entry.entry_id} value={entry.entry_id}>

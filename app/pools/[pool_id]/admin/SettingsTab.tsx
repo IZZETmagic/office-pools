@@ -370,7 +370,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your pool..."
               rows={3}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
             />
           </FormField>
 
@@ -385,7 +385,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   key={s.value}
                   type="button"
                   onClick={() => setStatus(s.value)}
-                  className={`p-3 rounded-lg border cursor-pointer transition text-left ${
+                  className={`p-3 rounded-xl border cursor-pointer transition text-left ${
                     status === s.value
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-neutral-200 hover:border-neutral-300'
@@ -418,7 +418,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
         </h3>
 
         {pool.prediction_mode === 'progressive' && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
             <p className="text-xs text-blue-800">
               This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
             </p>
@@ -463,7 +463,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               type="date"
               value={deadlineDate}
               onChange={(e) => setDeadlineDate(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -474,7 +474,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               type="time"
               value={deadlineTime}
               onChange={(e) => setDeadlineTime(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -519,7 +519,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   key={String(opt.value)}
                   type="button"
                   onClick={() => setIsPrivate(opt.value)}
-                  className={`p-3 rounded-lg border cursor-pointer transition text-left ${
+                  className={`p-3 rounded-xl border cursor-pointer transition text-left ${
                     isPrivate === opt.value
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-neutral-200 hover:border-neutral-300'
@@ -567,7 +567,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   key={n}
                   type="button"
                   onClick={() => setMaxEntries(String(n))}
-                  className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-lg last:rounded-r-lg transition ${
+                  className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
                     parseInt(maxEntries) === n
                       ? 'bg-primary-500 text-white border-primary-500 z-10'
                       : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
@@ -580,7 +580,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           </FormField>
 
           {parseInt(maxEntries) > 1 && (
-            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl">
               <svg className="w-5 h-5 text-primary-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
@@ -647,7 +647,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             }
           }}
         >
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Archive Pool
             </h3>
@@ -656,7 +656,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               Are you sure you want to archive this pool?
             </p>
 
-            <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
               <p className="text-sm font-bold text-warning-800 mb-2">
                 {pool.pool_name}
               </p>
@@ -701,7 +701,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             }
           }}
         >
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Delete Pool
             </h3>
@@ -710,7 +710,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               You are about to permanently delete this pool:
             </p>
 
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-4">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-4">
               <p className="text-sm font-bold text-danger-800 mb-2">
                 {pool.pool_name}
               </p>

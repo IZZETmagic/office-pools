@@ -498,6 +498,17 @@ body {
   animation: tab-fade-in 0.2s ease-out;
 }
 
+/* Match tab slide transitions */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Prevent iOS zoom on input focus (inputs < 16px trigger zoom) */
 @media screen and (max-width: 640px) {
   input[type="text"],

@@ -76,7 +76,7 @@ export default function ResetPasswordPage() {
           />
         </FormField>
 
-        <div className="bg-neutral-100 border border-neutral-200 rounded-lg p-4">
+        <div className="bg-neutral-100 border border-neutral-200 rounded-xl p-4">
           <p className="text-sm font-medium text-neutral-700 mb-2">Password requirements:</p>
           <ul className="text-sm text-neutral-600 space-y-1">
             <li className={password.length >= 8 ? 'text-success-600' : ''}>

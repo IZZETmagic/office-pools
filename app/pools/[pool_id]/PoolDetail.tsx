@@ -23,6 +23,7 @@ import { SettingsTab } from './admin/SettingsTab'
 import { RoundsTab } from './admin/RoundsTab'
 import { DEFAULT_POOL_SETTINGS, calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
+import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team } from '@/lib/tournament'
 import type {
@@ -159,6 +160,10 @@ export function PoolDetail({
     if (urlTab) return urlTab
     return hasSeenHowToPlay ? 'leaderboard' : 'how_to_play'
   })
+  const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab)
+
+  // Determine indicator color based on active tab
+  const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab)
 
   // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
   useEffect(() => {
@@ -930,14 +935,19 @@ export function PoolDetail({
       <div className="sticky top-[57px] z-[9] bg-surface">
         <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
-            <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
+            <div ref={poolDetailTabRef} className="relative flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
+              <div
+                className={`absolute top-2 bottom-2 ${isAdminTab ? 'bg-warning-600' : 'bg-primary-600'} rounded-xl shadow-sm pointer-events-none ${poolDetailTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                style={{ left: poolDetailIndicator.left, width: poolDetailIndicator.width }}
+              />
               {USER_TABS.map((tab) => (
                 <button
                   key={tab.key}
+                  data-tab-key={tab.key}
                   onClick={() => handleTabSwitch(tab.key)}
-                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`relative z-10 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.key
-                      ? 'bg-primary-600 text-white shadow-sm'
+                      ? 'text-white'
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
@@ -954,10 +964,11 @@ export function PoolDetail({
                   {ADMIN_TABS.map((tab) => (
                     <button
                       key={tab.key}
+                      data-tab-key={tab.key}
                       onClick={() => handleTabSwitch(tab.key)}
-                      className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                      className={`relative z-10 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                         activeTab === tab.key
-                          ? 'bg-warning-600 text-white shadow-sm'
+                          ? 'text-white'
                           : 'text-neutral-700 hover:bg-neutral-100'
                       }`}
                     >
@@ -975,7 +986,7 @@ export function PoolDetail({
                   </div>
                   <button
                     onClick={() => setShowLeaveModal(true)}
-                    className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
+                    className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
                   >
                     Leave Pool
                   </button>
@@ -1215,14 +1226,14 @@ export function PoolDetail({
                             if (e.key === 'Enter') handleRenameEntry()
                             if (e.key === 'Escape') setEditingEntryName(false)
                           }}
-                          className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+                          className="px-3 py-1.5 border border-primary-300 rounded-xl text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
                           maxLength={40}
                           placeholder="Entry name..."
                         />
                         <button
                           onClick={handleRenameEntry}
                           disabled={savingEntryName}
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                          className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-50"
                         >
                           {savingEntryName ? '...' : 'Save'}
                         </button>
@@ -1393,7 +1404,7 @@ export function PoolDetail({
       {showNavWarning && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Unsaved Changes</h3>
             <p className="text-sm text-neutral-600 mb-5">
               You have unsaved changes. What would you like to do?
@@ -1426,12 +1437,12 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!deletingEntry) setShowDeleteEntryModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Delete Entry</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to delete <span className="font-semibold text-neutral-900">{activeEntry.entry_name}</span>?
             </p>
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-5">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-5">
               <p className="text-sm text-danger-800">
                 All predictions for this entry will be permanently deleted. This cannot be undone.
               </p>
@@ -1468,12 +1479,12 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!leaving) setShowLeaveModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Leave Pool</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to leave <span className="font-semibold text-neutral-900">{pool.pool_name}</span>?
             </p>
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-3 mb-5">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-5">
               <ul className="text-sm text-danger-800 space-y-1">
                 <li>&#8226; Your predictions will be permanently deleted</li>
                 <li>&#8226; Your scores and ranking will be removed</li>

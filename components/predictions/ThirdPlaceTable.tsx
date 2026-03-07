@@ -100,7 +100,7 @@ export function ThirdPlaceTable({ rankedThirds, showConductScore, annexCOptionNu
 
       {/* Annex C option indicator */}
       {annexCOptionNumber != null && annexCQualifyingGroups && (
-        <div className="mt-3 px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
+        <div className="mt-3 px-3 py-2 bg-primary-50 rounded-xl border border-primary-100">
           <p className="text-xs text-primary-800">
             <span className="font-semibold">FIFA Annex C Option #{annexCOptionNumber}</span>
             {' '}applies (Groups: {annexCQualifyingGroups.join(', ')})

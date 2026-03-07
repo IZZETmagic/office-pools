@@ -577,7 +577,7 @@ export function ScoringTab({
             step={step}
             value={value}
             onChange={(e) => onChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-primary-600 min-w-0"
+            className="flex-1 h-2 bg-neutral-200 rounded-xl appearance-none cursor-pointer accent-primary-600 min-w-0"
           />
           <div className="flex items-center gap-1.5 shrink-0">
             <input
@@ -591,7 +591,7 @@ export function ScoringTab({
                 const v = parseFloat(e.target.value)
                 if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)))
               }}
-              className="w-14 sm:w-16 h-8 text-center text-sm font-bold border border-neutral-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
+              className="w-14 sm:w-16 h-8 text-center text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
             />
             <span className="text-xs text-neutral-600 w-10">{suffix}</span>
           </div>
@@ -1401,7 +1401,7 @@ export function ScoringTab({
             </div>
 
             {/* Coming Soon — Best Player & Top Scorer */}
-            <div className="mb-6 border border-neutral-200 rounded-lg px-4 py-3 bg-neutral-50">
+            <div className="mb-6 border border-neutral-200 rounded-xl px-4 py-3 bg-neutral-50">
               <p className="text-sm font-semibold text-neutral-400">
                 Bonus: Best Player &amp; Top Scorer
                 <span className="ml-2 inline-block px-2 py-0.5 text-xs bg-neutral-200 text-neutral-500 rounded-full">
@@ -1478,7 +1478,7 @@ export function ScoringTab({
       {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Confirm Scoring Changes
             </h3>

@@ -71,7 +71,7 @@ function CardInput({
 
   return (
     <div className="flex items-center gap-2">
-      <span className={`w-3 h-4 rounded-sm ${colorMap[color]} flex-shrink-0`} />
+      <span className={`w-3 h-4 rounded-md ${colorMap[color]} flex-shrink-0`} />
       <label className="text-xs text-neutral-600 flex-1 min-w-0">{label}</label>
       <input
         type="number"
@@ -675,7 +675,7 @@ export function MatchesTab({
             setStageFilter(e.target.value)
             if (e.target.value !== 'group') setGroupFilter('all')
           }}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Stages</option>
           {stages.map((s) => (
@@ -688,7 +688,7 @@ export function MatchesTab({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -701,7 +701,7 @@ export function MatchesTab({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
           >
             <option value="all">All Groups</option>
             {groups.map((g) => (
@@ -716,7 +716,7 @@ export function MatchesTab({
       {/* Matches — mobile cards */}
       <div className="sm:hidden space-y-3">
         {filteredMatches.length === 0 ? (
-          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+          <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
             No matches found with current filters.
           </div>
         ) : (
@@ -725,7 +725,7 @@ export function MatchesTab({
             const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
             const matchDate = new Date(match.match_date)
             return (
-              <div key={match.match_id} className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4">
+              <div key={match.match_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4">
                 {/* Top row: match #, stage, status */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs font-mono font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
@@ -792,7 +792,7 @@ export function MatchesTab({
       </div>
 
       {/* Matches — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
@@ -945,7 +945,7 @@ export function MatchesTab({
       {modal.type === 'enter_result' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 bg-danger-500 rounded-full" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -975,7 +975,7 @@ export function MatchesTab({
               })}
             </p>
 
-            <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4">
+            <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-xl px-4 py-2 mb-4">
               <svg className="w-5 h-5 text-warning-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
@@ -999,7 +999,7 @@ export function MatchesTab({
                   min="0"
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-xl focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                 />
               </div>
               <span className="text-2xl font-bold text-neutral-500 mt-6">-</span>
@@ -1014,7 +1014,7 @@ export function MatchesTab({
                   min="0"
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-neutral-300 rounded-xl focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                 />
               </div>
             </div>
@@ -1069,7 +1069,7 @@ export function MatchesTab({
 
                 {/* PSO score inputs */}
                 {resultType === 'pso' && (
-                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div className="flex items-center justify-center gap-4 mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-xl">
                     <div className="text-center">
                       <p className="text-xs text-neutral-600 mb-1">PSO</p>
                       <input
@@ -1077,7 +1077,7 @@ export function MatchesTab({
                         min="0"
                         value={psoHome}
                         onChange={(e) => setPsoHome(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
+                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-xl focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                       />
                     </div>
                     <span className="text-lg font-bold text-neutral-500 mt-4">
@@ -1090,7 +1090,7 @@ export function MatchesTab({
                         min="0"
                         value={psoAway}
                         onChange={(e) => setPsoAway(e.target.value)}
-                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
+                        className="w-16 h-10 text-center text-lg font-bold border border-neutral-300 rounded-xl focus:ring-2 focus:ring-danger-500 focus:border-transparent text-neutral-900"
                       />
                     </div>
                   </div>
@@ -1119,7 +1119,7 @@ export function MatchesTab({
                 </button>
 
                 {showConductFields && (
-                  <div className="mt-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg p-4">
+                  <div className="mt-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
                     <p className="text-xs text-neutral-500 mb-4">
                       Enter card counts per team. Each count represents distinct player incidents.
                       Used as FIFA tiebreaker in group standings.
@@ -1184,7 +1184,7 @@ export function MatchesTab({
       {modal.type === 'update_live_score' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-3 h-3 bg-warning-500 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -1214,7 +1214,7 @@ export function MatchesTab({
               })}
             </p>
 
-            <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4">
+            <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-xl px-4 py-2 mb-4">
               <svg className="w-5 h-5 text-warning-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
@@ -1239,7 +1239,7 @@ export function MatchesTab({
                   min="0"
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-lg focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-xl focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
                 />
               </div>
               <span className="text-2xl font-bold text-neutral-500 mt-6">-</span>
@@ -1254,7 +1254,7 @@ export function MatchesTab({
                   min="0"
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-lg focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
+                  className="w-20 h-14 text-center text-2xl font-bold border border-warning-300 rounded-xl focus:ring-2 focus:ring-warning-500 focus:border-transparent text-neutral-900"
                 />
               </div>
             </div>
@@ -1284,7 +1284,7 @@ export function MatchesTab({
       {modal.type === 'reset_match' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">
@@ -1292,7 +1292,7 @@ export function MatchesTab({
               </h3>
             </div>
 
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 mb-4">
               <p className="text-sm text-danger-700 font-medium mb-2">
                 WARNING: This is a destructive action!
               </p>
@@ -1322,7 +1322,7 @@ export function MatchesTab({
                 value={resetReason}
                 onChange={(e) => setResetReason(e.target.value)}
                 placeholder="e.g., Incorrect score entered"
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 
@@ -1335,7 +1335,7 @@ export function MatchesTab({
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="RESET"
-                className="w-full px-3 py-2 border border-danger-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-danger-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 
@@ -1365,7 +1365,7 @@ export function MatchesTab({
       {modal.type === 'set_status' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => { if (!saving) setModal({ type: 'none' }) }} />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               {modal.newStatus === 'live' ? 'Set Match Live' : 'Set Match Scheduled'}
             </h3>

@@ -135,7 +135,7 @@ function TeamButton({
       disabled={isDisabled}
       onClick={onClick}
       className={`
-        flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-lg border-2 transition-all duration-150
+        flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-xl border-2 transition-all duration-150
         ${isSelected
           ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
           : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50'
@@ -149,10 +149,10 @@ function TeamButton({
         <img
           src={flagUrl}
           alt={name}
-          className="w-7 h-5 rounded-sm object-cover shrink-0"
+          className="w-7 h-5 rounded-md object-cover shrink-0"
         />
       ) : (
-        <div className="w-7 h-5 rounded-sm bg-neutral-200 shrink-0 flex items-center justify-center">
+        <div className="w-7 h-5 rounded-md bg-neutral-200 shrink-0 flex items-center justify-center">
           <span className="text-[8px] text-neutral-400">?</span>
         </div>
       )}
@@ -197,7 +197,7 @@ function MatchCard({
   const awaySelected = pick?.winner_team_id === awayTeam?.team_id
 
   return (
-    <div className={`bg-surface rounded-xl border border-neutral-200 p-4 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
+    <div className={`bg-surface rounded-2xl border border-neutral-200 p-4 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
       {/* Match header */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-neutral-500">
@@ -268,11 +268,11 @@ function CascadeConfirmModal({
 }) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay sm:p-4" onClick={onCancel}>
-      <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
+      <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-neutral-900 mb-2">
           Change this pick?
         </h3>
-        <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mb-4">
+        <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
           <p className="text-sm text-warning-800">
             Changing this pick will <strong>reset {affectedCount} downstream {affectedCount === 1 ? 'pick' : 'picks'}</strong> in
             later rounds because those matches depend on this result.
@@ -282,14 +282,14 @@ function CascadeConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 rounded-lg border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-warning-600 text-white text-sm font-medium hover:bg-warning-700 transition"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-warning-600 text-white text-sm font-medium hover:bg-warning-700 transition"
           >
             Change &amp; Reset
           </button>

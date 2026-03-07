@@ -77,7 +77,7 @@ export function SummaryView({
     <div>
       {/* Champion highlight */}
       {champion && (
-        <div className="mb-8 text-center p-6 rounded-xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-100 border border-accent-100 shadow-sm">
+        <div className="mb-8 text-center p-6 rounded-2xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-100 border border-accent-100 shadow-sm">
           <div className="text-4xl mb-2">&#127942;</div>
           <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-1">Your Predicted Champion</p>
           <h2 className="text-3xl font-bold text-neutral-900">{champion.country_name}</h2>
@@ -178,7 +178,7 @@ export function SummaryView({
       {/* Submit button or submitted message */}
       {hasSubmitted ? (
         <div className="mt-8">
-          <div className="bg-success-50 border border-success-200 rounded-lg p-4 text-center">
+          <div className="bg-success-50 border border-success-200 rounded-xl p-4 text-center">
             <p className="text-sm font-semibold text-success-800">
               Your predictions have been submitted. Good luck!
             </p>
@@ -186,7 +186,7 @@ export function SummaryView({
         </div>
       ) : !readOnly ? (
         <div className="mt-8 space-y-4">
-          <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+          <div className="bg-warning-50 border border-warning-200 rounded-xl p-4">
             <p className="text-sm text-warning-800">
               Once submitted, predictions cannot be changed. Please review all your predictions before submitting.
             </p>

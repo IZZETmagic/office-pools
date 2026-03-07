@@ -269,7 +269,7 @@ function KnockoutMatchCard({
       {/* PSO Section - only for draws in knockout matches */}
       {bothResolved && hasPrediction && isDraw && (
         <div className="mt-4 pt-4 border-t-2 border-dashed border-neutral-200">
-          <div className="bg-primary-50 rounded-lg p-4">
+          <div className="bg-primary-50 rounded-xl p-4">
             {psoEnabled ? (
               /* PSO ENABLED: Show exact score inputs (required) */
               <>

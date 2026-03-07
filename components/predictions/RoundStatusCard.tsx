@@ -95,7 +95,7 @@ export function RoundStatusCard({ roundState, submission, matchCount, completedM
   const submissionStatus = getSubmissionStatus(roundState, submission)
 
   return (
-    <div className="bg-surface border border-border-default rounded-xl p-4 space-y-3">
+    <div className="bg-surface border border-border-default rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-neutral-900">{roundName}</h3>
         {getStateBadge(roundState.state)}
@@ -140,7 +140,7 @@ export function RoundStatusCard({ roundState, submission, matchCount, completedM
 
       {/* Missed round message */}
       {submissionStatus.label === 'Missed' && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3">
           <p className="text-xs text-red-700">
             You missed the deadline for this round. You scored 0 points but can still predict future rounds.
           </p>

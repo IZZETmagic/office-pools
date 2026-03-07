@@ -65,7 +65,7 @@ function SortableThirdPlaceItem({ team, rank }: SortableThirdPlaceItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:py-3 rounded-lg border transition-colors
+      className={`flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:py-3 rounded-xl border transition-colors
         ${isDragging
           ? 'bg-primary-50 border-primary-300 shadow-lg scale-[1.02] opacity-90'
           : `border-transparent ${qualifies ? 'hover:bg-success-50/30' : 'hover:bg-red-50/30'} hover:border-neutral-200`
@@ -74,7 +74,7 @@ function SortableThirdPlaceItem({ team, rank }: SortableThirdPlaceItemProps) {
     >
       {/* Rank number */}
       <span
-        className={`shrink-0 w-7 sm:w-8 text-center text-xs sm:text-sm font-bold py-0.5 rounded-md border
+        className={`shrink-0 w-7 sm:w-8 text-center text-xs sm:text-sm font-bold py-0.5 rounded-lg border
           ${qualifies
             ? 'bg-success-100 text-success-800 border-success-300'
             : 'bg-red-100 text-red-700 border-red-300'
@@ -108,7 +108,7 @@ function SortableThirdPlaceItem({ team, rank }: SortableThirdPlaceItemProps) {
 
       {/* Status badge */}
       <span
-        className={`shrink-0 text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md whitespace-nowrap
+        className={`shrink-0 text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-lg whitespace-nowrap
           ${qualifies
             ? 'bg-success-100 text-success-700'
             : 'bg-red-100 text-red-700'
@@ -120,7 +120,7 @@ function SortableThirdPlaceItem({ team, rank }: SortableThirdPlaceItemProps) {
       {/* Drag handle */}
       <button
         type="button"
-        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-none"
+        className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-none"
         aria-label={`Reorder ${team.country_name}`}
         {...attributes}
         {...listeners}
@@ -199,7 +199,7 @@ export function BPThirdPlaceStep({
       </div>
 
       {/* Sortable list */}
-      <div className="bg-surface rounded-xl border border-border-default shadow-sm dark:shadow-none overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border-default shadow-sm dark:shadow-none overflow-hidden">
         <div className="px-3.5 py-2.5 border-b border-border-default bg-surface-secondary flex items-center justify-between">
           <h3 className="text-sm font-bold text-neutral-900">Third-Place Rankings</h3>
           <span className="text-xs text-neutral-500">

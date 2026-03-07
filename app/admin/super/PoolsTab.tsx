@@ -189,12 +189,12 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
         >
           <option value="all">All Status</option>
           <option value="open">Open</option>
@@ -208,14 +208,14 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       {/* Pools cards */}
       <div className="grid gap-4">
         {filteredPools.length === 0 ? (
-          <div className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+          <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
             No pools found.
           </div>
         ) : (
           filteredPools.map((pool) => (
             <div
               key={pool.pool_id}
-              className="bg-surface rounded-lg shadow dark:shadow-none dark:border dark:border-border-default p-4 sm:p-6 hover:shadow-md dark:hover:border-neutral-600 transition"
+              className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 sm:p-6 hover:shadow-md dark:hover:border-neutral-600 transition"
             >
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="min-w-0">
@@ -285,13 +285,13 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       {modal.type === 'delete_pool' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" />
-          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">Delete Pool</h3>
             </div>
 
-            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
+            <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 mb-4">
               <p className="text-sm text-danger-700 font-medium mb-2">
                 WARNING: This action is PERMANENT and cannot be undone!
               </p>
@@ -322,7 +322,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 placeholder={modal.pool.pool_name}
-                className="w-full px-3 py-2 border border-danger-300 rounded-lg text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-danger-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-danger-500 focus:border-transparent"
               />
             </div>
 

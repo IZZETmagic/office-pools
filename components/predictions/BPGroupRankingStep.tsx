@@ -75,7 +75,7 @@ function SortableTeamItem({ team, position }: SortableTeamItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-lg border transition-colors
+      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl border transition-colors
         ${isDragging
           ? 'bg-primary-50 border-primary-300 shadow-lg opacity-90'
           : `border-transparent ${getRowHighlight(position)} hover:bg-neutral-50`
@@ -83,7 +83,7 @@ function SortableTeamItem({ team, position }: SortableTeamItemProps) {
         min-h-[44px] touch-manipulation select-none`}
     >
       <span
-        className={`shrink-0 w-9 text-center text-[11px] font-bold py-0.5 rounded-md border ${getPositionStyle(position)}`}
+        className={`shrink-0 w-9 text-center text-[11px] font-bold py-0.5 rounded-lg border ${getPositionStyle(position)}`}
       >
         {POSITION_LABELS[position]}
       </span>
@@ -106,7 +106,7 @@ function SortableTeamItem({ team, position }: SortableTeamItemProps) {
 
       <button
         type="button"
-        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-none"
+        className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-grab active:cursor-grabbing touch-none"
         aria-label={`Reorder ${team.country_name}`}
         {...attributes}
         {...listeners}
@@ -161,7 +161,7 @@ function GroupCard({ groupLetter, teamIds, teamsMap, onReorder }: GroupCardProps
   )
 
   return (
-    <div className="bg-surface rounded-xl border border-border-default shadow-sm dark:shadow-none overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-border-default shadow-sm dark:shadow-none overflow-hidden">
       <div className="px-3.5 py-2.5 border-b border-border-default bg-surface-secondary">
         <h3 className="text-sm font-bold text-neutral-900">Group {groupLetter}</h3>
       </div>

@@ -240,7 +240,7 @@ export function ResultsView({
   return (
     <div>
       {/* ── Points summary ── */}
-      <div className="mb-6 p-4 bg-surface rounded-lg shadow border border-neutral-200 flex items-center justify-between">
+      <div className="mb-6 p-4 bg-surface rounded-xl shadow border border-neutral-200 flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-600">
             {userEntries && userEntries.length > 1
@@ -272,7 +272,7 @@ export function ResultsView({
               setStageTab(tab.key)
               if (tab.key !== 'group') setGroupFilter('all')
             }}
-            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               stageTab === tab.key
                 ? 'bg-primary-600 text-white'
                 : 'text-neutral-600 hover:bg-neutral-100'
@@ -312,7 +312,7 @@ export function ResultsView({
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="px-3 py-1 text-sm border border-neutral-300 rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
             <option value="all">All Groups</option>
             {GROUP_LETTERS.map((g) => (
@@ -329,7 +329,7 @@ export function ResultsView({
             <select
               value={selectedEntryId || ''}
               onChange={(e) => onEntryChange(e.target.value)}
-              className="px-3 py-1 text-sm border border-neutral-300 rounded-md bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-3 py-1 text-sm border border-neutral-300 rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               {userEntries.map((entry) => (
                 <option key={entry.entry_id} value={entry.entry_id}>

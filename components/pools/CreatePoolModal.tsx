@@ -359,13 +359,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 shrink-0">
           <h2 id="create-pool-title" className="text-lg font-bold text-neutral-900">Create a Pool</h2>
           <button
             onClick={() => !loading && onClose()}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -450,7 +450,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         <button
                           key={t.tournament_id}
                           onClick={() => setSelectedTournamentId(t.tournament_id)}
-                          className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                          className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                             selectedTournamentId === t.tournament_id
                               ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
                               : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
@@ -485,7 +485,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       ))}
 
                       {/* Coming soon placeholders */}
-                      <div className="w-full text-left p-4 rounded-xl border-2 border-dashed border-neutral-200 opacity-50">
+                      <div className="w-full text-left p-4 rounded-2xl border-2 border-dashed border-neutral-200 opacity-50">
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="text-sm font-semibold text-neutral-400">More tournaments coming soon</h3>
@@ -541,7 +541,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         key={opt.value}
                         type="button"
                         onClick={() => setPredictionMode(opt.value)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                        className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                           predictionMode === opt.value
                             ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
                             : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
@@ -556,7 +556,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                     <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                     </svg>
@@ -588,7 +588,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Tell people about your pool..."
                       rows={2}
-                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-success-500 focus:border-transparent text-neutral-900"
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-success-500 focus:border-transparent text-neutral-900"
                     />
                   </FormField>
                 </div>
@@ -608,7 +608,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="date"
                           value={deadlineDate}
                           onChange={(e) => setDeadlineDate(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
                         />
                       </div>
                       <div>
@@ -617,7 +617,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="time"
                           value={deadlineTime}
                           onChange={(e) => setDeadlineTime(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -658,7 +658,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                               key={String(opt.value)}
                               type="button"
                               onClick={() => setIsPrivate(opt.value)}
-                              className={`p-3 rounded-lg border cursor-pointer transition text-left ${
+                              className={`p-3 rounded-xl border cursor-pointer transition text-left ${
                                 isPrivate === opt.value
                                   ? 'border-primary-500 bg-primary-50'
                                   : 'border-neutral-200 hover:border-neutral-300'
@@ -699,7 +699,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                               key={n}
                               type="button"
                               onClick={() => setMaxEntries(String(n))}
-                              className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-lg last:rounded-r-lg transition ${
+                              className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
                                 parseInt(maxEntries) === n
                                   ? 'bg-primary-500 text-white border-primary-500 z-10'
                                   : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
@@ -717,7 +717,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   <hr className="border-neutral-100" />
 
                   {/* Scoring info note */}
-                  <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                  <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl">
                     <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                     </svg>

@@ -260,7 +260,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       </Card>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800">
         <strong>How round management works:</strong> Open a round to allow predictions.
         Members will be notified by email. When the deadline passes, predictions auto-lock.
         After all matches in a round complete, mark it as completed to unlock scoring and
@@ -271,7 +271,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       {modal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setModal(null)} />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-1">
               {modal.type === 'open' ? 'Open Round' : 'Extend Deadline'}
             </h3>
@@ -288,7 +288,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                   type="date"
                   value={deadlineDate}
                   onChange={(e) => setDeadlineDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-border-default rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -297,7 +297,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                   type="time"
                   value={deadlineTime}
                   onChange={(e) => setDeadlineTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-border-default rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             </div>

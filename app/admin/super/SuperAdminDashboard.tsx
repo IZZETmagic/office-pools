@@ -13,6 +13,7 @@ import { UsersTab } from './UsersTab'
 import { PoolsTab } from './PoolsTab'
 import { AuditLogTab } from './AuditLogTab'
 import { formatNumber } from '@/lib/format'
+import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
 type Tab = 'matches' | 'users' | 'pools' | 'audit'
 
@@ -43,6 +44,7 @@ export function SuperAdminDashboard({
   const [users, setUsers] = useState(initialUsers)
   const [pools, setPools] = useState(initialPools)
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs)
+  const { containerRef: adminTabRef, indicatorStyle: adminIndicator, ready: adminTabReady } = useSlideIndicator(activeTab)
 
   // Summary stats
   const completedMatches = matches.filter((m) => m.is_completed).length
@@ -100,14 +102,19 @@ export function SuperAdminDashboard({
       {/* Tab navigation */}
       <div className="bg-surface border-b border-neutral-200 dark:border-neutral-700 sm:border-b-0">
         <div className="max-w-7xl mx-auto px-2 sm:px-6">
-          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
+          <div ref={adminTabRef} className="relative flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
+            <div
+              className={`absolute top-2 bottom-2 bg-primary-600 rounded-xl shadow-sm pointer-events-none ${adminTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+              style={{ left: adminIndicator.left, width: adminIndicator.width }}
+            />
             {TABS.map((tab) => (
               <button
                 key={tab.key}
+                data-tab-key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`relative z-10 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === tab.key
-                    ? 'bg-primary-600 text-white shadow-sm'
+                    ? 'text-white'
                     : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                 }`}
               >

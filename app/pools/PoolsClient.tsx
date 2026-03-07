@@ -11,6 +11,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
+import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
 // =====================
 // TYPES
@@ -124,7 +125,7 @@ function PoolRow({ pool }: { pool: PoolData }) {
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className="block bg-surface border border-neutral-200 dark:border-border-default rounded-lg px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 dark:hover:bg-surface-secondary transition-colors"
+      className="block bg-surface border border-neutral-200 dark:border-border-default rounded-xl px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 dark:hover:bg-surface-secondary transition-colors"
     >
       {/* Desktop layout – grid ensures columns align across rows */}
       <div className="hidden sm:grid sm:grid-cols-[1fr_4.5rem_5.5rem_4.5rem_5.5rem_6rem_1.25rem] items-center gap-x-3">
@@ -260,7 +261,7 @@ function PublicPoolRow({ pool, onJoin }: { pool: PublicPool; onJoin: (code: stri
   const deadline = formatDeadline(pool.prediction_deadline)
 
   return (
-    <div className="bg-surface border border-neutral-200 dark:border-border-default rounded-lg px-4 py-3">
+    <div className="bg-surface border border-neutral-200 dark:border-border-default rounded-xl px-4 py-3">
       {/* Desktop layout */}
       <div className="hidden sm:flex items-center gap-4">
         <div className="min-w-0 flex-1">
@@ -336,6 +337,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     const tabParam = searchParams.get('tab')
     return tabParam === 'discover' ? 'discover' : 'my-pools'
   })
+
+  const { containerRef: poolTabRef, indicatorStyle: poolIndicator, ready: poolTabReady } = useSlideIndicator(activeTab)
 
   // Filter state (My Pools)
   const [searchQuery, setSearchQuery] = useState('')
@@ -446,33 +449,49 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
       {/* Hero header */}
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white truncate">
+              <h2 className="text-lg sm:text-3xl font-bold text-white truncate">
                 Pools
               </h2>
-              <p className="text-primary-100 dark:text-white/60 text-sm sm:text-base">
+              <p className="text-primary-100 dark:text-white/60 text-xs sm:text-base">
                 Create, manage, and discover prediction pools
               </p>
             </div>
           </div>
 
-          {/* Quick stats in hero */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{stats.totalPools}</p>
+          {/* Quick stats in hero — compact on mobile, glass cards on desktop */}
+          <div className="flex items-center justify-around mt-3 sm:hidden">
+            <div className="text-center">
+              <p className="text-lg font-bold text-white">{stats.totalPools}</p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Total Pools</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-white">{stats.activePools}</p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Active</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-white">{formatNumber(stats.totalPoints)}</p>
+              <p className="text-[10px] text-primary-200 dark:text-white/50">Total Points</p>
+            </div>
+          </div>
+          <div className="hidden sm:grid grid-cols-3 gap-3 mt-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+              <p className="text-2xl font-bold text-white">{stats.totalPools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{stats.activePools}</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+              <p className="text-2xl font-bold text-white">{stats.activePools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Active</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">{formatNumber(stats.totalPoints)}</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+              <p className="text-2xl font-bold text-white">{formatNumber(stats.totalPoints)}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
@@ -482,22 +501,28 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Tab bar + Action buttons */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-1 bg-neutral-100 rounded-lg p-1">
+          <div ref={poolTabRef} className="relative flex gap-1 bg-neutral-100 rounded-xl p-1">
+            <div
+              className={`absolute top-1 bottom-1 bg-surface rounded-lg shadow-sm pointer-events-none ${poolTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+              style={{ left: poolIndicator.left, width: poolIndicator.width }}
+            />
             <button
+              data-tab-key="my-pools"
               onClick={() => setActiveTab('my-pools')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'my-pools'
-                  ? 'bg-surface text-neutral-900 shadow-sm'
+                  ? 'text-neutral-900'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               My Pools
             </button>
             <button
+              data-tab-key="discover"
               onClick={() => setActiveTab('discover')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'discover'
-                  ? 'bg-surface text-neutral-900 shadow-sm'
+                  ? 'text-neutral-900'
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
@@ -511,7 +536,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 setJoinInitialCode('')
                 setShowJoinModal(true)
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 hover:border-primary-300 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
@@ -520,7 +545,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-success-600 bg-success-50 border border-success-200 rounded-lg hover:bg-success-100 hover:border-success-300 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-success-600 bg-success-50 border border-success-200 rounded-xl hover:bg-success-100 hover:border-success-300 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -547,7 +572,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="all">All Statuses</option>
                   {availableStatuses.map((s) => (
@@ -559,7 +584,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="newest">Newest Joined</option>
                   <option value="oldest">Oldest Joined</option>

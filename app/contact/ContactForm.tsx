@@ -119,7 +119,7 @@ export function ContactForm() {
           onChange={(e) => setMessage(e.target.value)}
           rows={6}
           maxLength={5000}
-          className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900 resize-vertical"
+          className="w-full px-4 py-2 border border-neutral-300 rounded-xl bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900 resize-vertical"
         />
       </FormField>
 
