@@ -72,8 +72,8 @@ export default async function DashboardPage() {
         status,
         home_score_ft,
         away_score_ft,
-        home_team:teams!matches_home_team_id_fkey(country_name),
-        away_team:teams!matches_away_team_id_fkey(country_name),
+        home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
+        away_team:teams!matches_away_team_id_fkey(country_name, flag_url),
         home_team_placeholder,
         away_team_placeholder
       `)
@@ -94,8 +94,8 @@ export default async function DashboardPage() {
         stage,
         match_date,
         status,
-        home_team:teams!matches_home_team_id_fkey(country_name),
-        away_team:teams!matches_away_team_id_fkey(country_name),
+        home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
+        away_team:teams!matches_away_team_id_fkey(country_name, flag_url),
         home_team_placeholder,
         away_team_placeholder
       `)

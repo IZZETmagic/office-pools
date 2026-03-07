@@ -64,8 +64,8 @@ type UpcomingMatch = {
   stage: string
   match_date: string
   status: string
-  home_team: { country_name: string } | null
-  away_team: { country_name: string } | null
+  home_team: { country_name: string; flag_url: string | null } | null
+  away_team: { country_name: string; flag_url: string | null } | null
   home_team_placeholder: string | null
   away_team_placeholder: string | null
 }
@@ -164,8 +164,33 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function getElapsedTime(matchDate: string): string | null {
+  const start = new Date(matchDate)
+  const now = new Date()
+  const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / 60000)
+
+  if (elapsedMinutes < 0) return null
+  if (elapsedMinutes <= 45) return `${elapsedMinutes}'`
+  if (elapsedMinutes <= 60) return 'HT'
+  if (elapsedMinutes <= 105) return `${elapsedMinutes - 15}'` // subtract 15 min HT
+  if (elapsedMinutes <= 120) return 'FT'
+  return 'FT'
+}
+
+function formatDayHeader(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const activityDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+  if (activityDay.getTime() === today.getTime()) return 'Today'
+  if (activityDay.getTime() === yesterday.getTime()) return 'Yesterday'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
-  const base = 'w-4 h-4'
+  const base = 'w-4.5 h-4.5'
   switch (type) {
     case 'joined':
       return (
@@ -417,6 +442,8 @@ export function DashboardClient({
   // Modal state
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showAllActivity, setShowAllActivity] = useState(false)
+  const [matchTab, setMatchTab] = useState<'live' | 'upcoming'>(liveMatches.length > 0 ? 'live' : 'upcoming')
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -438,18 +465,23 @@ export function DashboardClient({
           </div>
 
           {/* Quick stats in hero */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+          <div className="grid grid-cols-3 gap-4 mt-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{totalPools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Active Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
-              <p className="text-xl sm:text-2xl font-bold text-white">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
+              <p className={`font-bold text-white flex items-center justify-center gap-1.5 ${bestRank === 1 ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
+                {bestRank === 1 && (
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-accent-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 3h14l-1.5 6.5a1 1 0 01-.97.75H7.47a1 1 0 01-.97-.75L5 3zm2.5 0L9 8h6l1.5-5h-9zM12 12a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 110 2 1 1 0 010-2zM8 20h8a1 1 0 110 2H8a1 1 0 110-2z"/>
+                  </svg>
+                )}
                 {bestRank ? `#${bestRank}` : '--'}
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
               <p className="text-xl sm:text-2xl font-bold text-white">{formatNumber(totalPoints)}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
@@ -474,7 +506,7 @@ export function DashboardClient({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
@@ -483,7 +515,7 @@ export function DashboardClient({
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-success-600 bg-success-50 border border-success-200 rounded-lg hover:bg-success-100 hover:border-success-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -509,20 +541,24 @@ export function DashboardClient({
             </Card>
           ) : (
             <>
-              {/* Mobile: compact horizontal scroll strip */}
-              <div className="md:hidden flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {[...pools].sort((a, b) => {
-                  const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
-                    ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
-                  const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
-                    ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
-                  if (aScore !== bScore) return aScore - bScore
-                  const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
-                  const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
-                  return aDeadline - bDeadline
-                }).map((pool) => (
-                  <MobilePoolCard key={pool.pool_id} pool={pool} />
-                ))}
+              {/* Mobile: compact horizontal scroll strip with edge fades */}
+              <div className="md:hidden relative">
+                <div className="absolute left-0 top-0 bottom-2 w-4 bg-gradient-to-r from-surface-secondary to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface-secondary to-transparent z-10 pointer-events-none" />
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  {[...pools].sort((a, b) => {
+                    const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
+                      ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
+                    const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
+                      ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
+                    if (aScore !== bScore) return aScore - bScore
+                    const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
+                    const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
+                    return aDeadline - bDeadline
+                  }).map((pool) => (
+                    <MobilePoolCard key={pool.pool_id} pool={pool} />
+                  ))}
+                </div>
               </div>
 
               {/* Desktop: full card grid */}
@@ -544,9 +580,174 @@ export function DashboardClient({
           )}
         </div>
 
-        {/* Live Matches — only shown when there are live matches */}
+        {/* ===== MOBILE: Combined Matches Section ===== */}
+        {(liveMatches.length > 0 || upcomingMatches.length > 0) && (
+          <div className="md:hidden mb-8">
+            {/* Header with live count */}
+            <div className="flex items-center gap-2.5 mb-4">
+              <h3 className="text-xl font-bold text-neutral-900">Matches</h3>
+              {liveMatches.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-danger-700 bg-danger-100 px-2.5 py-1 rounded-full">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
+                  </span>
+                  {liveMatches.length} LIVE
+                </span>
+              )}
+            </div>
+
+            {/* Tab toggle */}
+            <div className="bg-neutral-100 dark:bg-surface-tertiary rounded-lg p-1 flex mb-4">
+              <button
+                onClick={() => setMatchTab('live')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                  matchTab === 'live'
+                    ? 'bg-surface text-neutral-900 shadow-sm'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                }`}
+              >
+                Live Now
+              </button>
+              <button
+                onClick={() => setMatchTab('upcoming')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                  matchTab === 'upcoming'
+                    ? 'bg-surface text-neutral-900 shadow-sm'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                }`}
+              >
+                Upcoming
+              </button>
+            </div>
+
+            {/* Tab content */}
+            {matchTab === 'live' ? (
+              liveMatches.length === 0 ? (
+                <Card>
+                  <p className="text-neutral-500 text-sm text-center py-2">No live matches right now.</p>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {liveMatches.map((match) => {
+                    const homeTeamData = match.home_team as any
+                    const awayTeamData = match.away_team as any
+                    const homeTeam = homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD'
+                    const awayTeam = awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                    const homeFlagUrl = homeTeamData?.flag_url ?? null
+                    const awayFlagUrl = awayTeamData?.flag_url ?? null
+                    const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
+                    return (
+                      <Card key={match.match_id} className="border-danger-200/60 dark:border-danger-800/50">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-xs text-neutral-500">
+                            {formatStage(match.stage)} &middot; #{match.match_number}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-full">
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
+                              </span>
+                              LIVE
+                            </span>
+                            {elapsed && (
+                              <span className="text-xs font-semibold text-danger-600">{elapsed}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 flex items-center justify-end gap-2 pr-3">
+                            {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
+                            <p className="font-semibold text-neutral-900 text-sm">{homeTeam}</p>
+                          </div>
+                          <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-lg border border-neutral-200 dark:border-border-default">
+                            <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
+                            <span className="text-neutral-400 text-lg">-</span>
+                            <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2 pl-3">
+                            <p className="font-semibold text-neutral-900 text-sm">{awayTeam}</p>
+                            {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
+              upcomingMatches.length === 0 ? (
+                <Card>
+                  <p className="text-neutral-500 text-sm text-center py-2">
+                    {pools.length === 0 ? 'Join a pool to see upcoming matches.' : 'No upcoming matches scheduled.'}
+                  </p>
+                </Card>
+              ) : (() => {
+                const knownMatches = upcomingMatches.filter(m => m.home_team && m.away_team)
+                const tbdMatches = upcomingMatches.filter(m => !m.home_team || !m.away_team)
+                return (
+                  <div className="space-y-3">
+                    {knownMatches.map((match) => {
+                      const homeTeamData = match.home_team as any
+                      const awayTeamData = match.away_team as any
+                      const homeTeam = homeTeamData?.country_name ?? 'TBD'
+                      const awayTeam = awayTeamData?.country_name ?? 'TBD'
+                      const homeFlagUrl = homeTeamData?.flag_url ?? null
+                      const awayFlagUrl = awayTeamData?.flag_url ?? null
+                      return (
+                        <Card key={match.match_id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
+                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-5 h-3.5 rounded-[2px] object-cover shrink-0" />}
+                              <span className="font-semibold text-neutral-900 text-sm">{homeTeam}</span>
+                            </div>
+                            <span className="text-neutral-400 text-xs">vs</span>
+                            <div className="flex items-center gap-1.5">
+                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-5 h-3.5 rounded-[2px] object-cover shrink-0" />}
+                              <span className="font-semibold text-neutral-900 text-sm">{awayTeam}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 ml-3">
+                            <p className="text-xs font-medium text-neutral-600">
+                              {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
+                            </p>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                    {tbdMatches.length > 0 && (
+                      <Card>
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Awaiting Results</p>
+                        <ul className="divide-y divide-neutral-100 dark:divide-border-default">
+                          {tbdMatches.map((match) => {
+                            const homeLabel = match.home_team_placeholder ?? 'TBD'
+                            const awayLabel = match.away_team_placeholder ?? 'TBD'
+                            return (
+                              <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs text-neutral-400 shrink-0">#{match.match_number}</span>
+                                  <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
+                                </div>
+                                <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                                  {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </Card>
+                    )}
+                  </div>
+                )
+              })()
+            )}
+          </div>
+        )}
+
+        {/* ===== DESKTOP: Live Matches — only shown when there are live matches ===== */}
         {liveMatches.length > 0 && (
-          <div className="mb-8">
+          <div className="hidden md:block mb-8 bg-danger-50/40 dark:bg-danger-950/20 border border-danger-200/50 dark:border-danger-800/30 rounded-xl p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
@@ -554,17 +755,22 @@ export function DashboardClient({
               </span>
               <h3 className="text-xl font-bold text-neutral-900">Live Matches</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
               {liveMatches.map((match) => {
-                const homeTeam = (match.home_team as any)?.country_name ?? match.home_team_placeholder ?? 'TBD'
-                const awayTeam = (match.away_team as any)?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                const homeTeamData = match.home_team as any
+                const awayTeamData = match.away_team as any
+                const homeTeam = homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD'
+                const awayTeam = awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                const homeFlagUrl = homeTeamData?.flag_url ?? null
+                const awayFlagUrl = awayTeamData?.flag_url ?? null
+                const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
                 return (
-                  <Card key={match.match_id} className="border-danger-200 bg-danger-50/30">
-                    <div className="flex items-center justify-between mb-2">
+                  <Card key={match.match_id} className="border-danger-200 dark:border-danger-800/50 bg-surface">
+                    <div className="flex items-center justify-between mb-3">
                       <p className="text-xs text-neutral-500">
                         {formatStage(match.stage)} &middot; Match #{match.match_number}
                       </p>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-700 bg-danger-100 px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-full">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
@@ -573,21 +779,23 @@ export function DashboardClient({
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="flex-1 text-right pr-3">
+                      <div className="flex-1 flex items-center justify-end gap-2 pr-3">
+                        {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
                         <p className="font-semibold text-neutral-900">{homeTeam}</p>
                       </div>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-surface rounded-lg shadow-sm border border-neutral-200">
-                        <span className="text-xl font-bold text-neutral-900">{match.home_score_ft ?? 0}</span>
-                        <span className="text-neutral-400">-</span>
-                        <span className="text-xl font-bold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                      <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-lg shadow-sm border border-neutral-200 dark:border-border-default">
+                        <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
+                        <span className="text-neutral-400 text-lg">-</span>
+                        <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
                       </div>
-                      <div className="flex-1 pl-3">
+                      <div className="flex-1 flex items-center gap-2 pl-3">
                         <p className="font-semibold text-neutral-900">{awayTeam}</p>
+                        {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
                       </div>
                     </div>
-                    {match.match_date && (
-                      <p className="text-xs text-neutral-500 mt-2 text-center">
-                        Started {formatDateTime(match.match_date)}
+                    {elapsed && (
+                      <p className="text-sm font-semibold text-danger-600 mt-3 text-center">
+                        {elapsed}
                       </p>
                     )}
                   </Card>
@@ -597,8 +805,8 @@ export function DashboardClient({
           </div>
         )}
 
-        {/* Two column layout: Upcoming matches + Activity feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ===== DESKTOP: Two column layout: Upcoming matches + Activity feed ===== */}
+        <div className="hidden md:grid lg:grid-cols-5 gap-6">
           {/* Upcoming matches - 3/5 width */}
           <div className="lg:col-span-3">
             <h3 className="text-xl font-bold text-neutral-900 mb-4">Upcoming Matches</h3>
@@ -610,32 +818,70 @@ export function DashboardClient({
                     : 'No upcoming matches scheduled.'}
                 </p>
               </Card>
-            ) : (
-              <div className="space-y-3">
-                {upcomingMatches.map((match) => {
-                  const homeTeam = (match.home_team as any)?.country_name ?? match.home_team_placeholder ?? 'TBD'
-                  const awayTeam = (match.away_team as any)?.country_name ?? match.away_team_placeholder ?? 'TBD'
-                  return (
-                    <Card key={match.match_id} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-neutral-900">
-                          {homeTeam} vs {awayTeam}
-                        </p>
-                        <p className="text-xs text-neutral-500">
-                          {formatStage(match.stage)} &middot; Match #{match.match_number}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0 ml-4">
-                        <p className="text-sm font-medium text-neutral-700">
-                          {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
-                        </p>
-                        <Badge variant="outline-gray">{match.status}</Badge>
-                      </div>
+            ) : (() => {
+              const knownMatches = upcomingMatches.filter(m => m.home_team && m.away_team)
+              const tbdMatches = upcomingMatches.filter(m => !m.home_team || !m.away_team)
+              return (
+                <div className="space-y-3">
+                  {knownMatches.map((match) => {
+                    const homeTeamData = match.home_team as any
+                    const awayTeamData = match.away_team as any
+                    const homeTeam = homeTeamData?.country_name ?? 'TBD'
+                    const awayTeam = awayTeamData?.country_name ?? 'TBD'
+                    const homeFlagUrl = homeTeamData?.flag_url ?? null
+                    const awayFlagUrl = awayTeamData?.flag_url ?? null
+                    return (
+                      <Card key={match.match_id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-neutral-900 flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5">
+                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
+                              {homeTeam}
+                            </span>
+                            <span className="text-neutral-400 font-normal">vs</span>
+                            <span className="inline-flex items-center gap-1.5">
+                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
+                              {awayTeam}
+                            </span>
+                          </p>
+                          <p className="text-xs text-neutral-500">
+                            {formatStage(match.stage)} &middot; Match #{match.match_number}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <p className="text-sm font-medium text-neutral-700">
+                            {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
+                          </p>
+                          <Badge variant="outline-gray">{match.status}</Badge>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                  {tbdMatches.length > 0 && (
+                    <Card>
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Awaiting Results</p>
+                      <ul className="divide-y divide-neutral-100 dark:divide-border-default">
+                        {tbdMatches.map((match) => {
+                          const homeLabel = match.home_team_placeholder ?? 'TBD'
+                          const awayLabel = match.away_team_placeholder ?? 'TBD'
+                          return (
+                            <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs text-neutral-400 shrink-0">#{match.match_number}</span>
+                                <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
+                              </div>
+                              <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                                {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
+                              </span>
+                            </li>
+                          )
+                        })}
+                      </ul>
                     </Card>
-                  )
-                })}
-              </div>
-            )}
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Recent activity - 2/5 width */}
@@ -645,18 +891,95 @@ export function DashboardClient({
               <Card>
                 <p className="text-neutral-600">No recent activity.</p>
               </Card>
-            ) : (
+            ) : (() => {
+              const visibleActivities = showAllActivity ? activities : activities.slice(0, 5)
+              let lastDayHeader = ''
+              return (
+                <Card>
+                  <ul>
+                    {visibleActivities.map((activity, idx) => {
+                      const dayHeader = formatDayHeader(activity.date)
+                      const showHeader = dayHeader !== lastDayHeader
+                      lastDayHeader = dayHeader
+                      const poolLink = (
+                        <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
+                          {activity.poolName}
+                        </Link>
+                      )
+                      return (
+                        <li key={idx}>
+                          {showHeader && (
+                            <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${idx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
+                              {dayHeader}
+                            </p>
+                          )}
+                          <div className={`flex items-start gap-3 ${!showHeader && idx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < visibleActivities.length - 1 ? 'pb-3' : ''}`}>
+                            <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
+                              <ActivityIcon type={activity.type} />
+                            </span>
+                            <div className="min-w-0 pt-0.5">
+                              <p className="text-sm text-neutral-900">
+                                {activityDescription(activity, poolLink)}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
+                                {activity.type === 'joined' && !activity.hasPredictions && (
+                                  <Badge variant="yellow">Needs predictions</Badge>
+                                )}
+                                {activity.type === 'auto_submitted' && (
+                                  <Badge variant="blue">Auto</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  {activities.length > 5 && (
+                    <button
+                      onClick={() => setShowAllActivity(!showAllActivity)}
+                      className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                    >
+                      {showAllActivity ? 'Show less' : `Show ${activities.length - 5} more`}
+                    </button>
+                  )}
+                </Card>
+              )
+            })()}
+          </div>
+        </div>
+
+        {/* ===== MOBILE: Activity feed (separate from desktop grid) ===== */}
+        <div className="md:hidden mt-6">
+          <h3 className="text-xl font-bold text-neutral-900 mb-4">Recent Activity</h3>
+          {activities.length === 0 ? (
+            <Card>
+              <p className="text-neutral-600">No recent activity.</p>
+            </Card>
+          ) : (() => {
+            const visibleActivities = showAllActivity ? activities : activities.slice(0, 5)
+            let lastDayHeader = ''
+            return (
               <Card>
-                <ul className="divide-y divide-neutral-100">
-                  {activities.map((activity, idx) => {
+                <ul>
+                  {visibleActivities.map((activity, idx) => {
+                    const dayHeader = formatDayHeader(activity.date)
+                    const showHeader = dayHeader !== lastDayHeader
+                    lastDayHeader = dayHeader
                     const poolLink = (
                       <Link href={`/pools/${activity.poolId}`} className="font-medium text-primary-600 hover:underline">
                         {activity.poolName}
                       </Link>
                     )
                     return (
-                      <li key={idx} className="py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-start gap-3">
+                      <li key={idx}>
+                        {showHeader && (
+                          <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${idx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
+                            {dayHeader}
+                          </p>
+                        )}
+                        <div className={`flex items-start gap-3 ${!showHeader && idx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < visibleActivities.length - 1 ? 'pb-3' : ''}`}>
                           <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
                             <ActivityIcon type={activity.type} />
                           </span>
@@ -679,9 +1002,17 @@ export function DashboardClient({
                     )
                   })}
                 </ul>
+                {activities.length > 5 && (
+                  <button
+                    onClick={() => setShowAllActivity(!showAllActivity)}
+                    className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                  >
+                    {showAllActivity ? 'Show less' : `Show ${activities.length - 5} more`}
+                  </button>
+                )}
               </Card>
-            )}
-          </div>
+            )
+          })()}
         </div>
       </main>
 
