@@ -913,7 +913,7 @@ export function MatchesTab({
                               <Button size="sm" variant="warning" onClick={() => openLiveScoreModal(match)}>
                                 Update Score
                               </Button>
-                              <Button size="sm" variant="gray" onClick={() => handleSetMatchStatus(match, 'scheduled')}>
+                              <Button size="sm" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
                                 Set Scheduled
                               </Button>
                             </>
