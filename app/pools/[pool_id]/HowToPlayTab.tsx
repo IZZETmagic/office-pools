@@ -256,14 +256,24 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
                 : 'View and edit your prediction entries. This is where you fill in your match scores.'}
             </p>
           </div>
-          <div className="py-3">
-            <p className="text-sm font-semibold text-neutral-900">Results</p>
-            <p className="text-xs text-neutral-600 mt-0.5">See actual match results and the points you earned for each match.</p>
-          </div>
-          <div className="py-3">
-            <p className="text-sm font-semibold text-neutral-900">Standings</p>
-            <p className="text-xs text-neutral-600 mt-0.5">Live group standings showing team records, points, and goal differences.</p>
-          </div>
+          {isBracketPicker && (
+            <div className="py-3">
+              <p className="text-sm font-semibold text-neutral-900">My Bracket</p>
+              <p className="text-xs text-neutral-600 mt-0.5">View your submitted bracket alongside live results. See which picks are correct, incorrect, or still pending as the tournament progresses.</p>
+            </div>
+          )}
+          {!isBracketPicker && (
+            <>
+              <div className="py-3">
+                <p className="text-sm font-semibold text-neutral-900">Results</p>
+                <p className="text-xs text-neutral-600 mt-0.5">See actual match results and the points you earned for each match.</p>
+              </div>
+              <div className="py-3">
+                <p className="text-sm font-semibold text-neutral-900">Standings</p>
+                <p className="text-xs text-neutral-600 mt-0.5">Live group standings showing team records, points, and goal differences.</p>
+              </div>
+            </>
+          )}
           <div className="py-3 last:pb-0">
             <p className="text-sm font-semibold text-neutral-900">Scoring Rules</p>
             <p className="text-xs text-neutral-600 mt-0.5">Full breakdown of point values, multipliers, and bonus point categories for this pool.</p>

@@ -164,13 +164,49 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function activityIcon(type: ActivityItem['type']): string {
+function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
+  const base = 'w-4 h-4'
   switch (type) {
-    case 'joined': return '👋'
-    case 'submitted': return '✅'
-    case 'auto_submitted': return '⏰'
-    case 'entry_created': return '📝'
-    case 'deadline_passed': return '🔒'
+    case 'joined':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+        </svg>
+      )
+    case 'submitted':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'auto_submitted':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'entry_created':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+      )
+    case 'deadline_passed':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+        </svg>
+      )
+  }
+}
+
+function activityIconColor(type: ActivityItem['type']): string {
+  switch (type) {
+    case 'joined': return 'text-primary-500 bg-primary-50'
+    case 'submitted': return 'text-success-600 bg-success-50'
+    case 'auto_submitted': return 'text-warning-600 bg-warning-50'
+    case 'entry_created': return 'text-primary-500 bg-primary-50'
+    case 'deadline_passed': return 'text-neutral-500 bg-neutral-100'
   }
 }
 
@@ -543,11 +579,11 @@ export function DashboardClient({
                     )
                     return (
                       <li key={idx} className="py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-start gap-2">
-                          <span className="text-sm leading-5 shrink-0" aria-hidden="true">
-                            {activityIcon(activity.type)}
+                        <div className="flex items-start gap-3">
+                          <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
+                            <ActivityIcon type={activity.type} />
                           </span>
-                          <div className="min-w-0">
+                          <div className="min-w-0 pt-0.5">
                             <p className="text-sm text-neutral-900">
                               {activityDescription(activity, poolLink)}
                             </p>

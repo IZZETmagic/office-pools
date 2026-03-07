@@ -21,6 +21,7 @@ type ModalState =
   | { type: 'enter_result'; match: SuperMatchData }
   | { type: 'reset_match'; match: SuperMatchData }
   | { type: 'update_live_score'; match: SuperMatchData }
+  | { type: 'set_status'; match: SuperMatchData; newStatus: 'live' | 'scheduled' }
 
 function getStatusBadgeVariant(
   status: string
@@ -206,29 +207,76 @@ export function MatchesTab({
     setModal({ type: 'reset_match', match })
   }
 
-  async function handleSetMatchStatus(match: SuperMatchData, newStatus: 'live' | 'scheduled') {
-    const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
-    const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+  function openSetStatusModal(match: SuperMatchData, newStatus: 'live' | 'scheduled') {
+    setError(null)
+    setModal({ type: 'set_status', match, newStatus })
+  }
+
+  async function handleConfirmSetStatus() {
+    if (modal.type !== 'set_status') return
+    const { match, newStatus } = modal
     const label = newStatus === 'live' ? 'In Progress' : 'Scheduled'
 
-    if (!confirm(`Set Match #${match.match_number} (${home} vs ${away}) as "${label}"?`)) return
+    setSaving(true)
+    setError(null)
+
+    // When setting to live, also initialize scores to 0-0
+    const updatePayload = newStatus === 'live'
+      ? { status: newStatus, home_score_ft: 0, away_score_ft: 0 }
+      : { status: newStatus }
 
     const { error: updateError } = await supabase
       .from('matches')
-      .update({ status: newStatus })
+      .update(updatePayload)
       .eq('match_id', match.match_id)
 
     if (updateError) {
-      alert('Failed to update match status: ' + updateError.message)
+      setError('Failed to update match status: ' + updateError.message)
+      setSaving(false)
       return
     }
 
-    setMatches(
-      matches.map((m) =>
-        m.match_id === match.match_id ? { ...m, status: newStatus } : m
+    // When setting to live, recalculate leaderboards for all pools
+    if (newStatus === 'live') {
+      const { data: pools } = await supabase
+        .from('pools')
+        .select('pool_id, prediction_mode')
+        .eq('tournament_id', match.tournament_id)
+
+      if (pools) {
+        for (const pool of pools) {
+          if (pool.prediction_mode === 'bracket_picker') {
+            try {
+              await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+            } catch (e) {
+              console.error('Failed to recalculate bracket picker points for pool', pool.pool_id, e)
+            }
+          } else {
+            await supabase.rpc('recalculate_all_pool_points', {
+              pool_id_param: pool.pool_id,
+            })
+            try {
+              await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+            } catch (e) {
+              console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
+            }
+          }
+        }
+      }
+
+      await refreshMatches()
+      setSaving(false)
+      setModal({ type: 'none' })
+      showToast(
+        `Match #${match.match_number} is now live (0-0). Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
+        'success'
       )
-    )
-    showToast(`Match #${match.match_number} set to "${label}".`, 'success')
+    } else {
+      await refreshMatches()
+      setSaving(false)
+      setModal({ type: 'none' })
+      showToast(`Match #${match.match_number} set to "${label}".`, 'success')
+    }
   }
 
   function openLiveScoreModal(match: SuperMatchData) {
@@ -720,7 +768,7 @@ export function MatchesTab({
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2">
                   {match.status === 'scheduled' && (
-                    <Button size="sm" variant="warning" onClick={() => handleSetMatchStatus(match, 'live')}>Set Live</Button>
+                    <Button size="sm" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>Set Live</Button>
                   )}
                   {match.status === 'live' && (
                     <>
@@ -856,7 +904,7 @@ export function MatchesTab({
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-2 justify-end">
                           {match.status === 'scheduled' && (
-                            <Button size="sm" variant="warning" onClick={() => handleSetMatchStatus(match, 'live')}>
+                            <Button size="sm" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
                               Set Live
                             </Button>
                           )}
@@ -895,8 +943,9 @@ export function MatchesTab({
 
       {/* Enter/Edit Result Modal */}
       {modal.type === 'enter_result' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 bg-danger-500 rounded-full" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -928,7 +977,7 @@ export function MatchesTab({
 
             <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4">
               <svg className="w-5 h-5 text-warning-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
               <p className="text-xs text-warning-700 leading-5">
                 This will calculate/recalculate points for ALL pools linked to this tournament.
@@ -1133,8 +1182,9 @@ export function MatchesTab({
 
       {/* Update Live Score Modal */}
       {modal.type === 'update_live_score' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-3 h-3 bg-warning-500 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-neutral-900">
@@ -1166,7 +1216,7 @@ export function MatchesTab({
 
             <div className="flex items-start gap-3 bg-warning-50 border border-warning-200 rounded-lg px-4 py-2 mb-4">
               <svg className="w-5 h-5 text-warning-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
               <p className="text-xs text-warning-700 leading-5">
                 This updates the provisional score and recalculates leaderboards in real time.
@@ -1232,8 +1282,9 @@ export function MatchesTab({
 
       {/* Reset Match Modal */}
       {modal.type === 'reset_match' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">
@@ -1304,6 +1355,43 @@ export function MatchesTab({
                 loadingText="Resetting..."
               >
                 Reset Match
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Match Status Modal */}
+      {modal.type === 'set_status' && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => { if (!saving) setModal({ type: 'none' }) }} />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">
+              {modal.newStatus === 'live' ? 'Set Match Live' : 'Set Match Scheduled'}
+            </h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Set Match #{modal.match.match_number} ({modal.match.home_team?.country_name || modal.match.home_team_placeholder || 'TBD'} vs {modal.match.away_team?.country_name || modal.match.away_team_placeholder || 'TBD'}) to{' '}
+              <strong>{modal.newStatus === 'live' ? 'In Progress' : 'Scheduled'}</strong>?
+            </p>
+            {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+            <div className="flex gap-3">
+              <Button
+                variant="gray"
+                onClick={() => setModal({ type: 'none' })}
+                disabled={saving}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant={modal.newStatus === 'live' ? 'warning' : 'primary'}
+                onClick={handleConfirmSetStatus}
+                disabled={saving}
+                loading={saving}
+                loadingText="Updating..."
+                className="flex-1"
+              >
+                {modal.newStatus === 'live' ? 'Set Live' : 'Set Scheduled'}
               </Button>
             </div>
           </div>

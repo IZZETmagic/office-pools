@@ -271,7 +271,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       {modal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setModal(null)} />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-1">
               {modal.type === 'open' ? 'Open Round' : 'Extend Deadline'}
             </h3>

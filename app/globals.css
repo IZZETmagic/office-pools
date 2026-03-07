@@ -360,11 +360,11 @@ body {
 
 /* Hide scrollbar for tab navigation on mobile */
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;
+  display: none !important;
 }
 
 /* Toast animations — slide down from top */

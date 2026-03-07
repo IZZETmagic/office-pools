@@ -1393,7 +1393,7 @@ export function PoolDetail({
       {showNavWarning && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Unsaved Changes</h3>
             <p className="text-sm text-neutral-600 mb-5">
               You have unsaved changes. What would you like to do?
@@ -1426,7 +1426,7 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!deletingEntry) setShowDeleteEntryModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Delete Entry</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to delete <span className="font-semibold text-neutral-900">{activeEntry.entry_name}</span>?
@@ -1468,7 +1468,7 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!leaving) setShowLeaveModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Leave Pool</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to leave <span className="font-semibold text-neutral-900">{pool.pool_name}</span>?

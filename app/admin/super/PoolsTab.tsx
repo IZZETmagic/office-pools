@@ -283,8 +283,9 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
 
       {/* Delete Pool Modal */}
       {modal.type === 'delete_pool' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 dark:shadow-none dark:border dark:border-border-default">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-lg w-full p-6 dark:shadow-none dark:border dark:border-border-default">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-danger-600 rounded-full animate-pulse" />
               <h3 className="text-xl font-bold text-danger-700">Delete Pool</h3>

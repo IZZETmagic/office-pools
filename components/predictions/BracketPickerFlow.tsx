@@ -1253,7 +1253,7 @@ export default function BracketPickerFlow({
           ============================================= */}
       {showSubmitModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay sm:p-4" onClick={() => setShowSubmitModal(false)}>
-          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-surface sm:rounded-xl rounded-t-xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-neutral-900 mb-2">
               Submit Bracket Predictions?
             </h3>

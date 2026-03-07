@@ -387,7 +387,7 @@ export default function ProgressivePredictionsFlow({
   return (
     <div className="space-y-4">
       {/* Round selector pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
         {ROUND_KEYS.map(key => {
           const rs = roundStateMap.get(key)
           const state = rs?.state ?? 'locked'
@@ -515,10 +515,11 @@ export default function ProgressivePredictionsFlow({
       {/* Submit confirmation modal */}
       {showSubmitModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowSubmitModal(false) }}
         >
-          <div className="bg-surface rounded-xl shadow-xl max-w-sm w-full mx-4 p-6 space-y-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
+          <div className="relative bg-surface rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-sm w-full p-6 space-y-4 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-neutral-900">Submit {roundName}?</h3>
             <p className="text-sm text-neutral-600">
               You&apos;re about to submit your predictions for <strong>{roundMatchCount}</strong> {roundName} matches.
