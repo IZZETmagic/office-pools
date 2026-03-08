@@ -81,8 +81,8 @@ export type MatchData = {
   winner_team_id: string | null
   is_completed: boolean
   completed_at: string | null
-  home_team: { country_name: string } | null
-  away_team: { country_name: string } | null
+  home_team: { country_name: string; country_code: string; flag_url: string | null } | null
+  away_team: { country_name: string; country_code: string; flag_url: string | null } | null
 }
 
 export type SettingsData = {

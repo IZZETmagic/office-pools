@@ -638,7 +638,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       {/* Archive Confirmation Modal */}
       {showArchiveModal && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
           role="dialog"
           aria-modal="true"
           onClick={(e) => {
@@ -647,7 +647,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             }
           }}
         >
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Archive Pool
             </h3>
@@ -691,7 +691,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
           role="dialog"
           aria-modal="true"
           onClick={(e) => {
@@ -701,7 +701,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             }
           }}
         >
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
             <h3 className="text-lg font-bold text-neutral-900 mb-3">
               Delete Pool
             </h3>

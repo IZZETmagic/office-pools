@@ -6,7 +6,7 @@ import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './p
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import type { MatchData, TeamData, EntryData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from '../types'
+import type { MatchData, TeamData, EntryData, ExistingPrediction, BonusScoreData } from '../types'
 import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
 
 // =============================================
@@ -24,12 +24,12 @@ type StageTab =
 type StatusFilter = 'all' | 'completed' | 'live' | 'upcoming'
 
 const STAGE_TABS: { key: StageTab; label: string }[] = [
-  { key: 'all', label: 'All Matches' },
-  { key: 'group', label: 'Group Stage' },
-  { key: 'round_32', label: 'Round of 32' },
-  { key: 'round_16', label: 'Round of 16' },
-  { key: 'quarter_final', label: 'Quarter Finals' },
-  { key: 'semi_final', label: 'Semi Finals' },
+  { key: 'all', label: 'All' },
+  { key: 'group', label: 'Group' },
+  { key: 'round_32', label: 'R32' },
+  { key: 'round_16', label: 'R16' },
+  { key: 'quarter_final', label: 'QF' },
+  { key: 'semi_final', label: 'SF' },
   { key: 'finals', label: 'Finals' },
 ]
 
@@ -46,15 +46,13 @@ const STATUS_OPTIONS: { key: StatusFilter; label: string; activeColor: string }[
 export function ResultsView({
   matches,
   poolSettings,
+  predictionMode,
   // Group standings comparison props
   rawMatches,
   teams,
   conductData,
   userPredictions,
   bonusScores,
-  isAdmin,
-  members,
-  allPredictions,
   currentEntryId,
   // Entry selector
   userEntries,
@@ -63,15 +61,13 @@ export function ResultsView({
 }: {
   matches: ResultMatch[]
   poolSettings: PoolSettings
+  predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   // Group standings comparison props
   rawMatches: MatchData[]
   teams: TeamData[]
   conductData: MatchConductData[]
   userPredictions: ExistingPrediction[]
   bonusScores: BonusScoreData[]
-  isAdmin: boolean
-  members: MemberData[]
-  allPredictions: PredictionData[]
   currentEntryId: string
   // Entry selector
   userEntries?: EntryData[]
@@ -195,8 +191,8 @@ export function ResultsView({
       away_team_id: m.away_team_id,
       home_team_placeholder: m.home_team_placeholder,
       away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
       is_completed: m.is_completed,
       home_score_ft: m.home_score_ft,
       away_score_ft: m.away_score_ft,
@@ -239,54 +235,81 @@ export function ResultsView({
 
   return (
     <div>
-      {/* ── Points summary ── */}
-      <div className="mb-6 p-4 bg-surface rounded-xl shadow border border-neutral-200 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-neutral-600">
-            {userEntries && userEntries.length > 1
-              ? `${userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'} Points`
-              : 'Your Total Points'}
-          </p>
-          <p className="text-3xl font-extrabold text-primary-600">{totalPoints}</p>
-          {bonusPoints > 0 && (
-            <p className="text-xs text-neutral-500 mt-0.5">
-              {matchPoints} match + {bonusPoints} bonus
-            </p>
+      {/* ── Points summary strip ── */}
+      <div className="mb-4 px-4 h-[60px] bg-surface rounded-xl shadow-sm border border-neutral-200 flex items-center gap-3 text-sm">
+        <span className="font-semibold text-neutral-700 dark:text-neutral-200">
+          {userEntries && userEntries.length > 1
+            ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
+            : 'Your Points'}
+        </span>
+        <span className="text-lg font-extrabold text-primary-600">{totalPoints.toLocaleString()}<span className="text-xs font-medium text-neutral-500 ml-0.5">pts</span></span>
+        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <div className="flex items-center gap-2 text-xs text-neutral-500 ml-auto">
+          <span><span className="text-success-600 font-medium">{statusCounts.completed}</span> ✓</span>
+          {statusCounts.live > 0 && (
+            <span><span className="text-danger-600 font-medium">{statusCounts.live}</span> live</span>
           )}
-        </div>
-        <div className="text-right text-xs text-neutral-500">
-          <p>{statusCounts.completed} completed</p>
-          {statusCounts.live > 0 && <p>{statusCounts.live} live</p>}
-          <p>
-            {statusCounts.upcoming} upcoming
-          </p>
+          <span><span className="font-medium">{statusCounts.upcoming}</span> upcoming</span>
         </div>
       </div>
 
       {/* ── Stage tabs ── */}
-      <div className="flex gap-1 mb-4 border-b border-neutral-200 pb-3 overflow-x-auto">
-        {STAGE_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => {
-              setStageTab(tab.key)
-              if (tab.key !== 'group') setGroupFilter('all')
-            }}
-            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-              stageTab === tab.key
-                ? 'bg-primary-600 text-white'
-                : 'text-neutral-600 hover:bg-neutral-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="mb-4 border-b border-neutral-200 pb-3">
+        <div className="flex gap-1 overflow-x-auto">
+          {STAGE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setStageTab(tab.key)
+                if (tab.key !== 'group') setGroupFilter('all')
+              }}
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                stageTab === tab.key
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Group letter filter pills (only on Group Stage tab) ── */}
+        {stageTab === 'group' && (
+          <div className="flex gap-0.5 mt-2 overflow-x-auto">
+            <button
+              onClick={() => setGroupFilter('all')}
+              className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
+                groupFilter === 'all'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+              }`}
+            >
+              All
+            </button>
+            {GROUP_LETTERS.map((g, i) => (
+              <button
+                key={g}
+                onClick={() => setGroupFilter(g)}
+                className={`w-8 h-7 text-xs font-medium transition-colors ${
+                  i === GROUP_LETTERS.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
+                } ${
+                  groupFilter === g
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                }`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ── Status filter + Group filter + Entry selector row ── */}
+      {/* ── Status filter + Entry selector row ── */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Status buttons */}
-        <div className="flex gap-1">
+        {/* Status pills (desktop) */}
+        <div className="hidden sm:flex gap-1">
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.key}
@@ -294,7 +317,7 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
-                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
               }`}
             >
               {opt.label}
@@ -307,21 +330,18 @@ export function ResultsView({
           ))}
         </div>
 
-        {/* Group filter dropdown (only on Group Stage tab) */}
-        {stageTab === 'group' && (
-          <select
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-1 text-sm border border-neutral-300 rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          >
-            <option value="all">All Groups</option>
-            {GROUP_LETTERS.map((g) => (
-              <option key={g} value={g}>
-                Group {g}
-              </option>
-            ))}
-          </select>
-        )}
+        {/* Status dropdown (mobile) */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className="sm:hidden px-1.5 py-1.5 text-[10px] font-medium border border-neutral-300 rounded-md bg-surface text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-600"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}{opt.key !== 'all' ? ` (${statusCounts[opt.key]})` : ''}
+            </option>
+          ))}
+        </select>
 
         {/* Entry selector (right-aligned, only for multi-entry users) */}
         {userEntries && userEntries.length > 1 && onEntryChange && (
@@ -329,7 +349,7 @@ export function ResultsView({
             <select
               value={selectedEntryId || ''}
               onChange={(e) => onEntryChange(e.target.value)}
-              className="px-3 py-1 text-sm border border-neutral-300 rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-1.5 py-1.5 text-[10px] sm:px-3 sm:py-1 sm:text-sm font-medium border border-neutral-300 rounded-md sm:rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               {userEntries.map((entry) => (
                 <option key={entry.entry_id} value={entry.entry_id}>
@@ -350,10 +370,7 @@ export function ResultsView({
           userPredictions={userPredictions}
           poolSettings={poolSettings}
           bonusScores={bonusScores}
-          isAdmin={isAdmin}
-          members={members}
-          allPredictions={allPredictions}
-          currentEntryId={currentEntryId}
+          groupFilter={groupFilter}
         />
       )}
 
@@ -366,11 +383,13 @@ export function ResultsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {filtered.map((match) => (
+          {filtered.map((match, i) => (
             <MatchCard
               key={match.match_id}
               match={match}
               poolSettings={poolSettings}
+              predictionMode={predictionMode}
+              index={i}
             />
           ))}
         </div>

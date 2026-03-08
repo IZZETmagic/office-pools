@@ -350,6 +350,11 @@ html.theme-classic.dark {
   --color-border-default: var(--border-default);
   --color-border-subtle:  var(--border-subtle);
   --color-border-strong:  var(--border-strong);
+
+  /* Animations */
+  --animate-fade-up: fadeUp 0.25s ease both;
+  --animate-modal-backdrop: modalBackdropIn 0.35s ease both;
+  --animate-modal-slide-up: modalSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 body {
@@ -496,6 +501,29 @@ body {
 
 .tab-transition {
   animation: tab-fade-in 0.2s ease-out;
+}
+
+/* Staggered fade-up (leaderboard rows, predictions tab) */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Modal animations */
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(100px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bar fill animation — uses custom property for target width */
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 /* Match tab slide transitions */

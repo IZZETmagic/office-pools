@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Badge } from '@/components/ui/Badge'
+import { useMemo } from 'react'
+import { Card } from '@/components/ui/Card'
+import { Fragment } from 'react'
 import {
   calculateGroupStandings,
+  rankThirdPlaceTeams,
   GROUP_LETTERS,
   type GroupStanding,
+  type ThirdPlaceTeam,
   type PredictionMap,
   type Match,
   type Team,
   type MatchConductData,
 } from '@/lib/tournament'
 import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { MatchData, TeamData, ExistingPrediction, MemberData, PredictionData, BonusScoreData } from '../types'
+import type { MatchData, TeamData, ExistingPrediction, BonusScoreData } from '../types'
 import type { PoolSettings } from './points'
 
 // =============================================
@@ -26,12 +29,7 @@ type GroupStandingsComparisonProps = {
   userPredictions: ExistingPrediction[]
   poolSettings: PoolSettings
   bonusScores: BonusScoreData[]
-  // Admin member selection
-  isAdmin: boolean
-  members: MemberData[]
-  allPredictions: PredictionData[]
-  // Current user's entry ID (to default dropdown)
-  currentEntryId: string
+  groupFilter: string
 }
 
 // =============================================
@@ -69,8 +67,8 @@ function toTournamentMatches(matches: MatchData[]): Match[] {
     away_team_id: m.away_team_id,
     home_team_placeholder: m.home_team_placeholder,
     away_team_placeholder: m.away_team_placeholder,
-    home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-    away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+    home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
+    away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
   }))
 }
 
@@ -112,11 +110,11 @@ type ComputedGroupBonus = {
 }
 
 const GROUP_BONUS_CONFIG: Record<string, { bg: string; label: string }> = {
-  group_winner_and_runnerup: { bg: 'bg-warning-100 text-warning-800 border border-warning-500', label: 'Winner & Runner-up' },
-  both_qualify_swapped: { bg: 'bg-success-100 text-success-800 border border-success-500', label: 'Both Qualify (Swapped)' },
-  group_winner_only: { bg: 'bg-primary-100 text-primary-800 border border-primary-500', label: 'Correct Winner' },
-  group_runnerup_only: { bg: 'bg-primary-100 text-primary-800 border border-primary-500', label: 'Correct Runner-up' },
-  one_qualifies_wrong_position: { bg: 'bg-primary-100 text-primary-800 border border-primary-500', label: 'One Qualifier' },
+  group_winner_and_runnerup: { bg: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400', label: 'WINNER & RU' },
+  both_qualify_swapped: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'SWAPPED' },
+  group_winner_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'WINNER' },
+  group_runnerup_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'RUNNER-UP' },
+  one_qualifies_wrong_position: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: '1 QUALIFIER' },
 }
 
 /** Whether all group matches are completed */
@@ -181,12 +179,14 @@ function GroupComparisonCard({
   actualStandings,
   computedBonus,
   groupComplete,
+  index = 0,
 }: {
   groupLetter: string
   predictedStandings: GroupStanding[]
   actualStandings: GroupStanding[]
   computedBonus: ComputedGroupBonus | null
   groupComplete: boolean
+  index?: number
 }) {
   // Build lookup: team_id → actual position (0-indexed)
   const actualPositionMap = new Map<string, number>()
@@ -194,178 +194,236 @@ function GroupComparisonCard({
     actualPositionMap.set(actualStandings[i].team_id, i)
   }
 
-  // Build lookup: team_id → predicted position (0-indexed)
-  const predictedPositionMap = new Map<string, number>()
-  for (let i = 0; i < predictedStandings.length; i++) {
-    predictedPositionMap.set(predictedStandings[i].team_id, i)
-  }
-
   const hasActualData = actualStandings.some((s) => s.played > 0)
-
-  // Build sets of top-2 qualifying team IDs for both sides
+  // Actual top-2 qualifying team IDs
   const actualQualifiedIds = new Set(actualStandings.slice(0, 2).map((s) => s.team_id))
-  const predictedQualifiedIds = new Set(predictedStandings.slice(0, 2).map((s) => s.team_id))
-
-  // Split standings: top 2 (qualifying) vs bottom (no bonus possible)
-  const predictedTop2 = predictedStandings.slice(0, 2)
-  const predictedBottom = predictedStandings.slice(2)
-  const actualTop2 = actualStandings.slice(0, 2)
-  const actualBottom = actualStandings.slice(2)
 
   return (
-    <div className="border border-neutral-200 rounded-xl overflow-hidden bg-surface">
-      {/* Group header with bonus badge */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-neutral-50 border-b border-neutral-200">
-        <span className="text-sm font-bold text-neutral-900 shrink-0">Group {groupLetter}</span>
+    <div className="animate-fade-up" style={{ animationDelay: `${index * 0.03}s` }}>
+    <Card padding="md">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Group {groupLetter}</h3>
         {computedBonus ? (
-          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${computedBonus.bg}`}>
-            <span>{'\u2713'}</span>
-            <span>{computedBonus.label}</span>
-            <span>+{computedBonus.points}</span>
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${computedBonus.bg}`}>
+              {computedBonus.label}
+            </span>
+            <span className="text-xs font-bold tabular-nums text-success-600 dark:text-success-400">
+              +{computedBonus.points}
+            </span>
+          </div>
         ) : groupComplete ? (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-50 text-neutral-500 border border-neutral-200">
-            <span>{'\u2717'}</span>
-            <span>Miss</span>
-            <span>+0</span>
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400">
+              MISS
+            </span>
+            <span className="text-xs font-bold tabular-nums text-neutral-400 dark:text-neutral-500">
+              +0
+            </span>
+          </div>
         ) : null}
       </div>
 
-      {/* Side-by-side comparison */}
-      <div className="grid grid-cols-2 divide-x divide-neutral-200">
+      <div className="grid grid-cols-2 gap-3">
         {/* Predicted column */}
         <div>
-          <div className="px-2 py-1.5 bg-primary-50 border-b border-neutral-200">
-            <span className="text-[10px] sm:text-xs font-semibold text-primary-700 uppercase tracking-wide">
-              Predicted
-            </span>
+          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+            Your Picks
           </div>
-          <div className="divide-y divide-neutral-100">
-            {/* Top 2 — qualifying positions (full styling) */}
-            {predictedTop2.map((team, idx) => {
+          <div className="space-y-1">
+            {predictedStandings.map((team, idx) => {
+              const isTopTwo = idx < 2
               const actualPos = actualPositionMap.get(team.team_id)
-              const positionCorrect = groupComplete && actualPos === idx
-              const qualifiedWrongPos = groupComplete && !positionCorrect && actualQualifiedIds.has(team.team_id)
+
+              // Only color top-2 picks when group is complete (these affect scoring)
+              // Positions 3-4 don't earn bonus points so stay neutral
+              let rowStyle = 'bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+
+              if (hasActualData && groupComplete && isTopTwo) {
+                const exactPosition = actualPos === idx
+                const qualified = actualQualifiedIds.has(team.team_id)
+
+                if (exactPosition) {
+                  // Exact position match — contributes to winner/runner-up bonus
+                  rowStyle = 'bg-success-50 text-success-800 ring-1 ring-success-200 dark:bg-success-900/20 dark:text-success-300 dark:ring-success-800'
+                } else if (qualified) {
+                  // Qualified but swapped position — contributes to swapped/partial bonus
+                  rowStyle = 'bg-primary-50 text-primary-800 ring-1 ring-primary-200 dark:bg-primary-900/20 dark:text-primary-300 dark:ring-primary-800'
+                } else {
+                  // Didn't qualify at all — miss
+                  rowStyle = 'bg-danger-50 text-danger-700 ring-1 ring-danger-200 dark:bg-danger-900/20 dark:text-danger-300 dark:ring-danger-800'
+                }
+              } else if (hasActualData && groupComplete && !isTopTwo) {
+                // Positions 3-4: muted style
+                rowStyle = 'bg-neutral-50/50 text-neutral-400 dark:bg-neutral-800/50 dark:text-neutral-500'
+              }
 
               return (
                 <div
                   key={team.team_id}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 text-xs sm:text-sm ${
-                    groupComplete
-                      ? positionCorrect
-                        ? 'bg-success-50'
-                        : qualifiedWrongPos
-                          ? 'bg-warning-50'
-                          : 'bg-danger-50/50'
-                      : ''
-                  }`}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
                 >
-                  <span className="w-4 text-center font-bold text-[10px] sm:text-xs text-success-700">
-                    {idx + 1}
-                  </span>
-                  <span className="flex-1 font-medium text-neutral-900 truncate text-xs sm:text-sm">
-                    {team.country_name}
-                  </span>
-                  {groupComplete && (
-                    <span className="flex-shrink-0 w-4 text-center">
-                      {positionCorrect ? (
-                        <svg className="w-3.5 h-3.5 text-success-600 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : qualifiedWrongPos ? (
-                        <svg className="w-3.5 h-3.5 text-warning-500 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-                        </svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5 text-danger-400 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </span>
-                  )}
+                  <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               )
             })}
-            {/* Positions 3+ — greyed out (no bonus possible) */}
-            {predictedBottom.map((team, idx) => (
-              <div
-                key={team.team_id}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs bg-neutral-50/50"
-              >
-                <span className="w-4 text-center font-bold text-[10px] text-neutral-300">
-                  {idx + 3}
-                </span>
-                <span className="flex-1 font-medium text-neutral-400 truncate text-xs">
-                  {team.country_name}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
 
         {/* Actual column */}
         <div>
-          <div className="px-2 py-1.5 bg-neutral-50 border-b border-neutral-200">
-            <span className="text-[10px] sm:text-xs font-semibold text-neutral-600 uppercase tracking-wide">
-              Actual
-            </span>
+          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+            Actual
           </div>
-          <div className="divide-y divide-neutral-100">
-            {hasActualData ? (
-              <>
-                {/* Top 2 — qualifying positions (full styling) */}
-                {actualTop2.map((team, idx) => {
-                  const predictedPos = predictedPositionMap.get(team.team_id)
-                  const positionCorrect = groupComplete && predictedPos === idx
-                  const predictedToQualify = predictedQualifiedIds.has(team.team_id)
-                  const qualifiedWrongPos = groupComplete && !positionCorrect && predictedToQualify
-
-                  return (
-                    <div
-                      key={team.team_id}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs sm:text-sm ${
-                        groupComplete
-                          ? positionCorrect
-                            ? 'bg-success-50'
-                            : qualifiedWrongPos
-                              ? 'bg-warning-50'
-                              : ''
-                          : ''
-                      }`}
-                    >
-                      <span className="w-4 text-center font-bold text-[10px] sm:text-xs text-success-700">
-                        {idx + 1}
-                      </span>
-                      <span className="flex-1 font-medium text-neutral-900 truncate text-xs sm:text-sm">
-                        {team.country_name}
-                      </span>
-                    </div>
-                  )
-                })}
-                {/* Positions 3+ — greyed out */}
-                {actualBottom.map((team, idx) => (
-                  <div
-                    key={team.team_id}
-                    className="flex items-center gap-1.5 px-2 py-1 text-xs bg-neutral-50/50"
-                  >
-                    <span className="w-4 text-center font-bold text-[10px] text-neutral-300">
-                      {idx + 3}
-                    </span>
-                    <span className="flex-1 font-medium text-neutral-400 truncate text-xs">
-                      {team.country_name}
-                    </span>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div className="px-2 py-4 text-center">
-                <span className="text-xs text-neutral-400">No results yet</span>
-              </div>
-            )}
-          </div>
+          {!hasActualData ? (
+            <div className="text-xs text-neutral-400 italic py-2">
+              No results yet
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {actualStandings.map((team, idx) => (
+                <div
+                  key={team.team_id}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                >
+                  <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="truncate flex-1 font-medium">{team.country_name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+    </Card>
+    </div>
+  )
+}
+
+// =============================================
+// THIRD-PLACE COMPARISON CARD
+// =============================================
+
+function ThirdPlaceComparisonCard({
+  predictedThirds,
+  actualThirds,
+  hasActualData,
+  index = 0,
+}: {
+  predictedThirds: ThirdPlaceTeam[]
+  actualThirds: ThirdPlaceTeam[]
+  hasActualData: boolean
+  index?: number
+}) {
+  // Actual qualifiers (top 8)
+  const actualQualifierIds = new Set(actualThirds.slice(0, 8).map(t => t.team_id))
+
+  // Count correct qualifiers for points display
+  const correctQualifiers = predictedThirds.slice(0, 8).filter(t => actualQualifierIds.has(t.team_id)).length
+
+  return (
+    <div className="animate-fade-up" style={{ animationDelay: `${index * 0.03}s` }}>
+    <Card padding="md">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Third-Place Rankings</h3>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">Top 8 qualify</span>
+        </div>
+        {hasActualData && (
+          <span className="text-xs font-medium text-neutral-400 tabular-nums">
+            {correctQualifiers}/8 correct
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Predicted column */}
+        <div>
+          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+            Your Picks
+          </div>
+          <div className="space-y-1">
+            {predictedThirds.map((team, idx) => {
+              const isQualifier = idx < 8
+              const actuallyQualified = hasActualData && actualQualifierIds.has(team.team_id)
+
+              // Only top-8 picks matter (did you correctly predict they'd advance to R32?)
+              // Positions 9-12 stay muted since they don't earn points
+              let rowStyle = isQualifier
+                ? 'bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                : 'bg-neutral-50/50 text-neutral-400 dark:bg-neutral-800/50 dark:text-neutral-500'
+
+              if (hasActualData && isQualifier) {
+                if (actuallyQualified) {
+                  // Green: predicted to qualify and they did
+                  rowStyle = 'bg-success-50 text-success-800 ring-1 ring-success-200 dark:bg-success-900/20 dark:text-success-300 dark:ring-success-800'
+                } else {
+                  // Red: predicted to qualify but they didn't
+                  rowStyle = 'bg-danger-50 text-danger-700 ring-1 ring-danger-200 dark:bg-danger-900/20 dark:text-danger-300 dark:ring-danger-800'
+                }
+              }
+
+              return (
+                <Fragment key={team.team_id}>
+                  {idx === 8 && (
+                    <div className="flex items-center gap-2 py-0.5">
+                      <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                      <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
+                      <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                    </div>
+                  )}
+                  <div
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
+                  >
+                    <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                    <span className="truncate flex-1 font-medium">{team.country_name}</span>
+                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
+                  </div>
+                </Fragment>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Actual column */}
+        <div>
+          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+            Actual
+          </div>
+          {!hasActualData ? (
+            <div className="text-xs text-neutral-400 italic py-2">
+              No results yet
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {actualThirds.map((team, idx) => {
+                const isQualifier = idx < 8
+                return (
+                  <Fragment key={team.team_id}>
+                    {idx === 8 && (
+                      <div className="flex items-center gap-2 py-0.5">
+                        <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                        <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
+                        <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                      </div>
+                    )}
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                    >
+                      <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                      <span className="truncate flex-1 font-medium">{team.country_name}</span>
+                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
+                    </div>
+                  </Fragment>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
     </div>
   )
 }
@@ -381,68 +439,23 @@ export function GroupStandingsComparison({
   userPredictions,
   poolSettings,
   bonusScores,
-  isAdmin,
-  members,
-  allPredictions,
-  currentEntryId,
+  groupFilter,
 }: GroupStandingsComparisonProps) {
-  const [selectedEntryId, setSelectedEntryId] = useState<string>(currentEntryId)
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  // Build list of entries that have predictions (for admin dropdown)
-  // Uses allPredictions data instead of has_submitted_predictions flag which can be stale
-  const entriesWithPredictions = useMemo(() => {
-    // Build set of entry IDs that have at least one prediction
-    const entryIdsWithPreds = new Set<string>()
-    // Always include current user's entry
-    entryIdsWithPreds.add(currentEntryId)
-    for (const p of allPredictions) {
-      entryIdsWithPreds.add(p.entry_id)
-    }
-    // Also include entries with the submitted flag (belt-and-suspenders)
-    for (const m of members) {
-      for (const e of m.entries || []) {
-        if (e.has_submitted_predictions) {
-          entryIdsWithPreds.add(e.entry_id)
-        }
-      }
-    }
-    // Build flat list of entries with user info for dropdown
-    type EntryWithUser = { entry_id: string; member_id: string; entry_name: string; username: string; full_name: string }
-    const result: EntryWithUser[] = []
-    for (const m of members) {
-      for (const e of m.entries || []) {
-        if (entryIdsWithPreds.has(e.entry_id)) {
-          result.push({ entry_id: e.entry_id, member_id: m.member_id, entry_name: e.entry_name, username: m.users.username, full_name: m.users.full_name })
-        }
-      }
-    }
-    return result
-  }, [members, allPredictions, currentEntryId])
 
   // Convert to tournament lib types (stable reference via useMemo)
   const tournamentMatches = useMemo(() => toTournamentMatches(matches), [matches])
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
-  // Get active entry's predictions
-  const activePredictions = useMemo(() => {
-    if (selectedEntryId === currentEntryId) {
-      return userPredictions
-    }
-    // Admin viewing another entry
-    return allPredictions.filter((p) => p.entry_id === selectedEntryId)
-  }, [selectedEntryId, currentEntryId, userPredictions, allPredictions])
-
   // Build predicted standings via resolveFullBracket
   const predictedStandingsMap = useMemo(() => {
-    const predictionMap = buildPredictionMap(activePredictions)
+    const predictionMap = buildPredictionMap(userPredictions)
     const bracket = resolveFullBracket({
       matches: tournamentMatches,
       predictionMap,
       teams: tournamentTeams,
     })
     return bracket.allGroupStandings
-  }, [activePredictions, tournamentMatches, tournamentTeams])
+  }, [userPredictions, tournamentMatches, tournamentTeams])
 
   // Build actual standings from completed match results
   const actualStandingsMap = useMemo(() => {
@@ -468,109 +481,75 @@ export function GroupStandingsComparison({
 
   // Groups that have at least one completed/live match
   const activeGroups = useMemo(() => {
-    return GROUP_LETTERS.filter((letter) => {
+    const all = GROUP_LETTERS.filter((letter) => {
       const standings = actualStandingsMap.get(letter)
       return standings && standings.some((s) => s.played > 0)
     })
+    if (groupFilter !== 'all') {
+      return all.filter((letter) => letter === groupFilter)
+    }
+    return all
+  }, [actualStandingsMap, groupFilter])
+
+  // Third-place rankings: predicted vs actual
+  const predictedThirdPlaceTeams = useMemo(() => {
+    return rankThirdPlaceTeams(predictedStandingsMap)
+  }, [predictedStandingsMap])
+
+  const actualThirdPlaceTeams = useMemo(() => {
+    return rankThirdPlaceTeams(actualStandingsMap)
   }, [actualStandingsMap])
 
-  // Get selected entry's owner name for display
-  const selectedEntry = entriesWithPredictions.find((e) => e.entry_id === selectedEntryId)
-  const memberLabel = selectedEntryId === currentEntryId
-    ? 'Your'
-    : `${selectedEntry?.full_name || selectedEntry?.username || 'Unknown'}'s`
+  // Check if enough groups have data for third-place comparison (need all 12 groups to have standings)
+  const hasThirdPlaceData = predictedThirdPlaceTeams.length >= 12
 
   if (!hasAnyActualData && predictedStandingsMap.size === 0) return null
 
+  // Total active groups (ignoring filter) for the "no results" message
+  const totalActiveGroups = GROUP_LETTERS.filter((letter) => {
+    const standings = actualStandingsMap.get(letter)
+    return standings && standings.some((s) => s.played > 0)
+  }).length
+
   return (
-    <div className="mb-6">
-      {/* Header with collapse toggle */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-surface rounded-xl shadow border border-neutral-200 hover:bg-neutral-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-bold text-neutral-900">
-            Group Standings: Predicted vs Actual
-          </h3>
-          <Badge variant="blue">{activeGroups.length} groups</Badge>
-        </div>
-        <svg
-          className={`w-4 h-4 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+    <div className="mb-6 space-y-3">
+      {/* Group comparison grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {activeGroups.map((letter, i) => {
+          const predicted = predictedStandingsMap.get(letter) || []
+          const actual = actualStandingsMap.get(letter) || []
+          const groupComplete = isGroupComplete(matches, letter)
+          const bonus = computeGroupBonus(predicted, actual, groupComplete, poolSettings)
 
-      {isExpanded && (
-        <div className="mt-3 space-y-3">
-          {/* Admin entry selector */}
-          {isAdmin && entriesWithPredictions.length > 1 && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-neutral-600">Viewing:</label>
-              <select
-                value={selectedEntryId}
-                onChange={(e) => setSelectedEntryId(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                {entriesWithPredictions.map((e) => (
-                  <option key={e.entry_id} value={e.entry_id}>
-                    {e.entry_name} - {e.full_name || e.username || 'Unknown'}
-                    {e.entry_id === currentEntryId ? ' (You)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          return (
+            <GroupComparisonCard
+              key={letter}
+              groupLetter={letter}
+              predictedStandings={predicted}
+              actualStandings={actual}
+              computedBonus={bonus}
+              groupComplete={groupComplete}
+              index={i}
+            />
+          )
+        })}
+      </div>
 
-          {/* Info banner */}
-          <div className="flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-3 py-2">
-            <svg className="w-5 h-5 text-primary-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-            </svg>
-            <p className="text-xs text-primary-700 leading-5">
-              {memberLabel} predicted group standings compared to actual results.
-              <span className="inline-flex items-center gap-1 ml-1">
-                <svg className="w-3 h-3 text-success-600 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                = correct position
-              </span>
-            </p>
-          </div>
+      {/* Third-place rankings comparison (only when viewing all groups) */}
+      {groupFilter === 'all' && hasThirdPlaceData && (
+        <ThirdPlaceComparisonCard
+          predictedThirds={predictedThirdPlaceTeams}
+          actualThirds={actualThirdPlaceTeams}
+          hasActualData={hasAnyActualData}
+          index={activeGroups.length}
+        />
+      )}
 
-          {/* Group comparison grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {activeGroups.map((letter) => {
-              const predicted = predictedStandingsMap.get(letter) || []
-              const actual = actualStandingsMap.get(letter) || []
-              const groupComplete = isGroupComplete(matches, letter)
-              const bonus = computeGroupBonus(predicted, actual, groupComplete, poolSettings)
-
-              return (
-                <GroupComparisonCard
-                  key={letter}
-                  groupLetter={letter}
-                  predictedStandings={predicted}
-                  actualStandings={actual}
-                  computedBonus={bonus}
-                  groupComplete={groupComplete}
-                />
-              )
-            })}
-          </div>
-
-          {/* Show groups with no results yet */}
-          {activeGroups.length < GROUP_LETTERS.length && (
-            <p className="text-xs text-neutral-400 text-center">
-              {GROUP_LETTERS.length - activeGroups.length} groups have no match results yet
-            </p>
-          )}
-        </div>
+      {/* Show groups with no results yet (only when viewing all groups) */}
+      {groupFilter === 'all' && totalActiveGroups < GROUP_LETTERS.length && (
+        <p className="text-xs text-neutral-400 text-center">
+          {GROUP_LETTERS.length - totalActiveGroups} groups have no match results yet
+        </p>
       )}
     </div>
   )

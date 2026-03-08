@@ -4,8 +4,7 @@ import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { Badge, getStatusVariant } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
@@ -288,10 +287,11 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
       className="shrink-0 w-48 min-h-[10rem] bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default p-4 flex flex-col hover:shadow-md transition-shadow"
     >
       <h4 className="text-sm font-bold text-neutral-900 line-clamp-2">{pool.pool_name}</h4>
-      <div className="flex gap-1.5 flex-wrap mt-2 text-[10px] [&>span]:text-[10px] [&>span]:px-1.5 [&>span]:py-0">
-        {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
-        <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-      </div>
+      {pool.role === 'admin' && (
+        <div className="flex gap-1.5 flex-wrap mt-2 text-[10px] [&>span]:text-[10px] [&>span]:px-1.5 [&>span]:py-0">
+          <Badge variant="outline">Admin</Badge>
+        </div>
+      )}
       <div className="mt-auto pt-3 flex items-end justify-between">
         <div>
           <p className="text-xs text-neutral-500">Points</p>
@@ -313,52 +313,20 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
 // =====================
 function PoolCard({ pool }: { pool: PoolCardData }) {
   const deadline = formatDeadline(pool.prediction_deadline)
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(pool.pool_code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // fallback - ignore
-    }
-  }
 
   return (
-    <Card>
+    <Link
+      href={`/pools/${pool.pool_id}`}
+      className="block bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default p-6 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+    >
       {/* Header */}
       <div className="flex justify-between items-start mb-5">
-        <div className="min-w-0 flex-1 mr-3">
-          <h4 className="text-lg font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-          {pool.role === 'admin' ? (
-            <span className="inline-flex items-center gap-1 text-xs text-neutral-500 mt-0.5">
-              Code:
-              <button
-                onClick={handleCopy}
-                className="inline-flex items-center gap-1 font-mono text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
-                title="Copy pool code"
-              >
-                {pool.pool_code}
-                {copied ? (
-                  <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                  </svg>
-                ) : (
-                  <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                  </svg>
-                )}
-              </button>
-            </span>
-          ) : (
-            <span className="text-xs invisible mt-0.5">&#8203;</span>
-          )}
-        </div>
-        <div className="flex gap-1 shrink-0">
-          {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
-          <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-        </div>
+        <h4 className="text-lg font-bold text-neutral-900 truncate min-w-0 flex-1 mr-3">{pool.pool_name}</h4>
+        {pool.role === 'admin' && (
+          <div className="shrink-0">
+            <Badge variant="outline">Admin</Badge>
+          </div>
+        )}
       </div>
 
       {/* Stats row */}
@@ -387,32 +355,12 @@ function PoolCard({ pool }: { pool: PoolCardData }) {
         </div>
       </div>
 
-      {/* Status indicators */}
-      <div className="mb-5 text-xs">
+      {/* Deadline */}
+      <div className="text-xs">
         <span className="text-neutral-500">Pool closes: </span>
         <span className={deadline.className}>{deadline.text}</span>
       </div>
-
-      {/* CTA buttons — dynamic based on prediction status */}
-      <div className="flex gap-2">
-        <Button
-          href={`/pools/${pool.pool_id}`}
-          variant="primary"
-          size="sm"
-          fullWidth
-        >
-          View Pool
-        </Button>
-        <Button
-          href={`/pools/${pool.pool_id}?tab=predictions`}
-          variant="outline"
-          size="sm"
-          fullWidth
-        >
-          Predictions
-        </Button>
-      </div>
-    </Card>
+    </Link>
   )
 }
 
@@ -533,7 +481,7 @@ export function DashboardClient({
 
       {/* Hero header */}
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="max-w-6xl mx-auto px-6 sm:px-6 py-5 sm:py-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
           <div className="flex items-center gap-3 sm:gap-5">
             <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
@@ -596,7 +544,7 @@ export function DashboardClient({
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-6 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
         {/* My Pools section */}
         <div className="mb-8">

@@ -635,6 +635,7 @@ export function LeaderboardTab({
                   ? 'bg-warning-50 border-warning-200 active:bg-warning-100'
                   : 'bg-surface border-neutral-200 active:bg-neutral-50'
               }`}
+              style={{ animation: `fadeUp 0.3s ease ${index * 0.04}s both` }}
             >
               {/* Rank */}
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
@@ -754,6 +755,7 @@ export function LeaderboardTab({
                   className={`cursor-pointer transition-colors ${
                     isTopThree ? 'bg-warning-50 hover:bg-warning-100' : 'hover:bg-primary-50'
                   }`}
+                  style={{ animation: `fadeUp 0.3s ease ${index * 0.04}s both` }}
                 >
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">

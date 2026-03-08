@@ -88,8 +88,8 @@ export default async function PoolPage({
     .select(
       `
       *,
-      home_team:teams!matches_home_team_id_fkey(country_name),
-      away_team:teams!matches_away_team_id_fkey(country_name)
+      home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
+      away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
     `
     )
     .eq('tournament_id', pool.tournament_id)

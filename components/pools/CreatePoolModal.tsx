@@ -351,7 +351,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay animate-modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-pool-title"
@@ -359,7 +359,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 shrink-0">
           <h2 id="create-pool-title" className="text-lg font-bold text-neutral-900">Create a Pool</h2>

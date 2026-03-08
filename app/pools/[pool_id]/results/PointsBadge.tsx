@@ -4,31 +4,24 @@ import { type PointsResult } from './points'
 import { formatNumber } from '@/lib/format'
 
 const badgeStyles: Record<PointsResult['type'], string> = {
-  exact: 'bg-success-100 text-success-800 border border-success-500',
-  winner_gd: 'bg-warning-100 text-warning-800 border border-warning-400',
-  winner: 'bg-warning-100 text-warning-800 border border-warning-400',
-  miss: 'bg-neutral-50 text-neutral-500 border border-neutral-200',
-}
-
-const icons: Record<PointsResult['type'], string> = {
-  exact: '\u{1F3AF}',    // dart
-  winner_gd: '\u2713',   // checkmark
-  winner: '\u2713',      // checkmark
-  miss: '\u2717',        // x
+  exact: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400',
+  winner_gd: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
+  winner: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
+  miss: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400',
 }
 
 const typeLabels: Record<PointsResult['type'], string> = {
-  exact: 'Exact!',
-  winner_gd: 'Winner + GD',
-  winner: 'Winner',
-  miss: 'Miss',
+  exact: 'EXACT',
+  winner_gd: 'GD ✓',
+  winner: 'RESULT ✓',
+  miss: 'MISS',
 }
 
 const psoTypeLabels: Record<string, string> = {
   exact: 'PSO Exact',
-  winner_gd: 'PSO Winner+GD',
-  winner: 'PSO Winner',
-  miss: 'PSO Miss',
+  winner_gd: 'PSO GD',
+  winner: 'PSO Result',
+  miss: '',
 }
 
 export function PointsBadge({ result }: { result: PointsResult }) {
@@ -36,21 +29,28 @@ export function PointsBadge({ result }: { result: PointsResult }) {
   const ftPoints = result.points - (result.pso?.psoPoints ?? 0)
 
   return (
-    <div className="flex flex-col items-end gap-0.5">
+    <div className="flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${badgeStyles[result.type]}`}
+        className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${badgeStyles[result.type]}`}
       >
-        <span>{icons[result.type]}</span>
-        <span>{typeLabels[result.type]}</span>
-        <span>+{formatNumber(ftPoints)}</span>
+        {typeLabels[result.type]}
+      </span>
+      <span
+        className={`text-xs font-bold tabular-nums ${
+          ftPoints > 0
+            ? 'text-success-600 dark:text-success-400'
+            : 'text-neutral-400 dark:text-neutral-500'
+        }`}
+      >
+        +{formatNumber(ftPoints)}
       </span>
       {showMultiplier && (
-        <span className="text-[10px] text-neutral-500">
-          {formatNumber(result.basePoints)} x {result.multiplier}x
+        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+          ({formatNumber(result.basePoints)}×{result.multiplier})
         </span>
       )}
       {result.pso && result.pso.psoPoints > 0 && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-500">
+        <span className="text-[10px] font-medium text-accent-500">
           +{formatNumber(result.pso.psoPoints)} {psoTypeLabels[result.pso.psoType]}
         </span>
       )}

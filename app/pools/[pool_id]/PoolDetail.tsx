@@ -161,9 +161,10 @@ export function PoolDetail({
     return hasSeenHowToPlay ? 'leaderboard' : 'how_to_play'
   })
   const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab)
+  const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab)
 
   // Determine indicator color based on active tab
-  const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab)
+  const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds'
 
   // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
   useEffect(() => {
@@ -654,8 +655,8 @@ export function PoolDetail({
       away_team_id: m.away_team_id,
       home_team_placeholder: m.home_team_placeholder,
       away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
       is_completed: m.is_completed,
       home_score_ft: m.home_score_ft,
       away_score_ft: m.away_score_ft,
@@ -854,8 +855,8 @@ export function PoolDetail({
   // Transform matches for predictions flow (needs home_team/away_team with flag_url)
   const predictionsMatches = matches.map((m) => ({
     ...m,
-    home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-    away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+    home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: null } : null,
+    away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: null } : null,
   }))
 
   const adminTabs = isProgressive
@@ -864,7 +865,41 @@ export function PoolDetail({
   const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
   const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
-  // Swipe navigation for mobile
+  // Mobile: split tabs into primary (always visible) and overflow ("More" menu)
+  const mobilePrimaryKeys = useMemo<Tab[]>(
+    () => isBracketPicker
+      ? ['leaderboard', 'predictions', 'my_bracket']
+      : ['leaderboard', 'predictions', 'results', 'standings'],
+    [isBracketPicker]
+  )
+
+  const mobilePrimaryTabs = useMemo(
+    () => tabs.filter(t => mobilePrimaryKeys.includes(t.key)),
+    [tabs, mobilePrimaryKeys]
+  )
+  const mobileOverflowTabs = useMemo(
+    () => tabs.filter(t => !mobilePrimaryKeys.includes(t.key)),
+    [tabs, mobilePrimaryKeys]
+  )
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close "More" menu on outside click
+  useEffect(() => {
+    if (!moreMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [moreMenuOpen])
+
+  // Is the active tab in the overflow menu?
+  const isOverflowTabActive = mobileOverflowTabs.some(t => t.key === activeTab)
+
+  // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
 
@@ -889,17 +924,19 @@ export function PoolDetail({
     const target = e.target as HTMLElement
     if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll')) return
 
-    const currentIndex = allTabKeys.indexOf(activeTab)
+    // Swipe only cycles through mobile primary tabs
+    const swipeKeys = mobilePrimaryKeys
+    const currentIndex = swipeKeys.indexOf(activeTab)
     if (currentIndex === -1) return
 
     const nextIndex = deltaX < 0
-      ? Math.min(currentIndex + 1, allTabKeys.length - 1)  // swipe left = next tab
+      ? Math.min(currentIndex + 1, swipeKeys.length - 1)  // swipe left = next tab
       : Math.max(currentIndex - 1, 0)                       // swipe right = prev tab
 
     if (nextIndex !== currentIndex) {
-      handleTabSwitch(allTabKeys[nextIndex])
+      handleTabSwitch(swipeKeys[nextIndex])
     }
-  }, [activeTab, allTabKeys, handleTabSwitch])
+  }, [activeTab, mobilePrimaryKeys, handleTabSwitch])
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -935,7 +972,85 @@ export function PoolDetail({
       <div className="sticky top-[57px] z-[9] bg-surface">
         <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
-            <div ref={poolDetailTabRef} className="relative flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 py-2">
+
+            {/* ===== MOBILE tab bar ===== */}
+            <div ref={mobileTabRef} className="sm:hidden relative flex items-center gap-0.5 py-2">
+              <div
+                className={`absolute top-2 bottom-2 ${isAdminTab ? 'bg-warning-600' : 'bg-primary-600'} rounded-xl shadow-sm pointer-events-none ${mobileTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                style={{ left: mobileIndicator.left, width: mobileIndicator.width }}
+              />
+              {mobilePrimaryTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  data-tab-key={tab.key}
+                  onClick={() => handleTabSwitch(tab.key)}
+                  className={`relative z-10 flex-1 px-2 py-2 rounded-xl text-xs font-medium whitespace-nowrap text-center transition-colors ${
+                    activeTab === tab.key
+                      ? 'text-white'
+                      : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                >
+                  {tab.key === 'leaderboard' ? 'Board' : tab.label}
+                </button>
+              ))}
+
+              {/* More button + dropdown */}
+              {mobileOverflowTabs.length > 0 && (
+                <div ref={moreMenuRef} className="relative flex-1 min-w-0" data-tab-key={isOverflowTabActive ? activeTab : '__more__'}>
+                  <button
+                    onClick={() => setMoreMenuOpen(prev => !prev)}
+                    className={`w-full relative z-10 flex items-center justify-center gap-0.5 px-2 py-2 rounded-xl text-xs font-medium text-center transition-colors ${
+                      isOverflowTabActive
+                        ? 'text-white'
+                        : 'text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                  >
+                    {isOverflowTabActive ? (mobileOverflowTabs.find(t => t.key === activeTab)?.label ?? 'More') : 'More'}
+                    <svg className={`w-3 h-3 shrink-0 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-surface rounded-xl shadow-lg border border-border-default py-1 z-50">
+                      {mobileOverflowTabs.map((tab, i) => {
+                        const isAdminOverflow = ADMIN_TABS.some(a => a.key === tab.key) || tab.key === 'rounds'
+                        const showDivider = i > 0 && isAdminOverflow && !ADMIN_TABS.some(a => a.key === mobileOverflowTabs[i - 1].key) && mobileOverflowTabs[i - 1].key !== 'rounds'
+                        return (
+                          <div key={tab.key}>
+                            {showDivider && <div className="my-1 border-t border-border-default" />}
+                            <button
+                              onClick={() => { handleTabSwitch(tab.key); setMoreMenuOpen(false) }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                                activeTab === tab.key
+                                  ? isAdminOverflow ? 'bg-warning-50 text-warning-700 font-medium dark:bg-warning-900/20 dark:text-warning-400' : 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/20 dark:text-primary-400'
+                                  : isAdminOverflow ? 'text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-900/20' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          </div>
+                        )
+                      })}
+                      {!isSoleAdmin && !isSuperAdminViewing && (
+                        <>
+                          <div className="my-1 border-t border-border-default" />
+                          <button
+                            onClick={() => { setShowLeaveModal(true); setMoreMenuOpen(false) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
+                          >
+                            Leave Pool
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ===== DESKTOP tab bar ===== */}
+            <div ref={poolDetailTabRef} className="hidden sm:flex relative items-center gap-1 overflow-x-auto scrollbar-hide py-2">
               <div
                 className={`absolute top-2 bottom-2 ${isAdminTab ? 'bg-warning-600' : 'bg-primary-600'} rounded-xl shadow-sm pointer-events-none ${poolDetailTabReady ? 'transition-all duration-300 ease-out' : ''}`}
                 style={{ left: poolDetailIndicator.left, width: poolDetailIndicator.width }}
@@ -945,7 +1060,7 @@ export function PoolDetail({
                   key={tab.key}
                   data-tab-key={tab.key}
                   onClick={() => handleTabSwitch(tab.key)}
-                  className={`relative z-10 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.key
                       ? 'text-white'
                       : 'text-neutral-700 hover:bg-neutral-100'
@@ -957,16 +1072,16 @@ export function PoolDetail({
 
               {isAdmin && (
                 <>
-                  <div className="flex items-center px-1 sm:px-2">
+                  <div className="flex items-center px-2">
                     <div className="h-5 w-px bg-neutral-300" />
                   </div>
 
-                  {ADMIN_TABS.map((tab) => (
+                  {adminTabs.map((tab) => (
                     <button
                       key={tab.key}
                       data-tab-key={tab.key}
                       onClick={() => handleTabSwitch(tab.key)}
-                      className={`relative z-10 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                      className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                         activeTab === tab.key
                           ? 'text-white'
                           : 'text-neutral-700 hover:bg-neutral-100'
@@ -981,21 +1096,20 @@ export function PoolDetail({
               {/* Leave Pool button (hidden for super admin non-members) */}
               {!isSoleAdmin && !isSuperAdminViewing && (
                 <>
-                  <div className="flex items-center px-1 sm:px-2">
+                  <div className="flex items-center px-2">
                     <div className="h-5 w-px bg-neutral-300" />
                   </div>
                   <button
                     onClick={() => setShowLeaveModal(true)}
-                    className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
+                    className="px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
                   >
                     Leave Pool
                   </button>
                 </>
               )}
             </div>
+
           </div>
-          {/* Scroll fade indicator for mobile */}
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface to-transparent pointer-events-none sm:hidden" />
         </div>
       </div>
 
@@ -1307,6 +1421,7 @@ export function PoolDetail({
                 matches={matches}
                 predictions={userPredictionsList}
                 poolSettings={poolSettings}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
                 teams={teams}
                 conductData={conductData}
                 userPredictions={userPredictions}
@@ -1429,7 +1544,7 @@ export function PoolDetail({
       {/* Delete Entry Confirmation Modal */}
       {showDeleteEntryModal && activeEntry && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-modal-backdrop"
           role="dialog"
           aria-modal="true"
         >
@@ -1437,7 +1552,7 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!deletingEntry) setShowDeleteEntryModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Delete Entry</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to delete <span className="font-semibold text-neutral-900">{activeEntry.entry_name}</span>?
@@ -1471,7 +1586,7 @@ export function PoolDetail({
       {/* Leave Pool Confirmation Modal */}
       {showLeaveModal && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-modal-backdrop"
           role="dialog"
           aria-modal="true"
         >
@@ -1479,7 +1594,7 @@ export function PoolDetail({
             className="fixed inset-0 bg-black/50"
             onClick={() => { if (!leaving) setShowLeaveModal(false) }}
           />
-          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
             <h3 className="text-lg font-bold text-neutral-900 mb-2">Leave Pool</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to leave <span className="font-semibold text-neutral-900">{pool.pool_name}</span>?

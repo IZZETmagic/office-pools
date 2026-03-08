@@ -133,7 +133,7 @@ export function EntriesListView({
     !isPastDeadline && !entry.predictions_locked
 
   return (
-    <div>
+    <div style={{ animation: 'fadeUp 0.3s ease' }}>
       {/* Mobile card view */}
       <div className="sm:hidden space-y-2">
         {entries.map(entry => {
@@ -233,14 +233,14 @@ export function EntriesListView({
                 <span className="text-xs text-neutral-500 shrink-0">Progress</span>
                 <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${
+                    className={`h-full rounded-full ${
                       status.variant === 'green' || status.variant === 'blue'
                         ? 'bg-success-500'
                         : predictedCount > 0
                           ? 'bg-warning-500'
                           : 'bg-neutral-200'
                     }`}
-                    style={{ width: `${totalMatches > 0 ? (predictedCount / totalMatches) * 100 : 0}%` }}
+                    style={{ width: `${totalMatches > 0 ? (predictedCount / totalMatches) * 100 : 0}%`, transformOrigin: 'left', animation: 'barGrow 0.8s ease both' }}
                   />
                 </div>
                 <span className="text-xs text-neutral-700 font-medium shrink-0">{predictedCount}/{totalMatches}</span>
@@ -373,14 +373,14 @@ export function EntriesListView({
                       <span className="text-sm text-neutral-700">{predictedCount}/{totalMatches}</span>
                       <div className="w-20 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${
+                          className={`h-full rounded-full ${
                             status.variant === 'green' || status.variant === 'blue'
                               ? 'bg-success-500'
                               : predictedCount > 0
                                 ? 'bg-warning-500'
                                 : 'bg-neutral-200'
                           }`}
-                          style={{ width: `${progressPct}%` }}
+                          style={{ width: `${progressPct}%`, transformOrigin: 'left', animation: 'barGrow 0.8s ease both' }}
                         />
                       </div>
                     </div>

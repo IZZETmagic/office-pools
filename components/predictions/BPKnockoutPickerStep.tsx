@@ -267,8 +267,8 @@ function CascadeConfirmModal({
   onCancel: () => void
 }) {
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay sm:p-4" onClick={onCancel}>
-      <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay animate-modal-backdrop sm:p-4" onClick={onCancel}>
+      <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-neutral-900 mb-2">
           Change this pick?
         </h3>

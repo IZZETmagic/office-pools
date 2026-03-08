@@ -19,6 +19,7 @@ type ResultsTabProps = {
     predicted_winner_team_id: string | null
   }[]
   poolSettings: PoolSettings
+  predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   // Group standings comparison props
   teams: TeamData[]
   conductData: MatchConductData[]
@@ -35,6 +36,7 @@ export function ResultsTab({
   matches,
   predictions: initialPredictions,
   poolSettings,
+  predictionMode,
   teams,
   conductData,
   userPredictions: initialUserPredictions,
@@ -124,8 +126,8 @@ export function ResultsTab({
       away_team_id: m.away_team_id,
       home_team_placeholder: m.home_team_placeholder,
       away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: m.home_team.flag_url ?? null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: m.away_team.flag_url ?? null } : null,
     }))
 
     const bracket = resolveFullBracket({
@@ -156,8 +158,8 @@ export function ResultsTab({
       away_team_placeholder: m.away_team_placeholder,
       home_team_id: m.home_team_id,
       away_team_id: m.away_team_id,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: '' } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: '' } : null,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url } : null,
       prediction: predictionMap.has(m.match_id)
         ? {
             predicted_home_score: predictionMap.get(m.match_id)!.predicted_home_score,
@@ -186,15 +188,13 @@ export function ResultsTab({
     <ResultsView
       matches={resultMatches}
       poolSettings={poolSettings}
+      predictionMode={predictionMode}
       // Group standings comparison props
       rawMatches={matches}
       teams={teams}
       conductData={conductData}
       userPredictions={userPredictions}
       bonusScores={bonusScores}
-      isAdmin={isAdmin}
-      members={members}
-      allPredictions={allPredictions}
       currentEntryId={activeEntryId}
       // Entry selector
       userEntries={showEntrySelector ? userEntries : undefined}

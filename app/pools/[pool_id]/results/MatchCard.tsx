@@ -23,8 +23,8 @@ export type ResultMatch = {
   away_team_placeholder: string | null
   home_team_id: string | null
   away_team_id: string | null
-  home_team: { country_name: string; country_code: string } | null
-  away_team: { country_name: string; country_code: string } | null
+  home_team: { country_name: string; country_code: string; flag_url: string | null } | null
+  away_team: { country_name: string; country_code: string; flag_url: string | null } | null
   prediction: {
     predicted_home_score: number
     predicted_away_score: number
@@ -59,17 +59,32 @@ function formatDate(dateStr: string): string {
   })
 }
 
-function getCardBackground(result: PointsResult | null): string {
-  if (!result) return 'bg-surface'
+function countryCodeToEmoji(code: string): string {
+  if (!code) return ''
+  const upper = code.toUpperCase()
+  const offset = 0x1f1e6
+  const a = 'A'.charCodeAt(0)
+  return String.fromCodePoint(upper.charCodeAt(0) - a + offset, upper.charCodeAt(1) - a + offset)
+}
+
+function getLeftBorderColor(result: PointsResult | null, isUpcoming: boolean): string {
+  if (!result) return isUpcoming ? 'border-l-warning-400' : 'border-l-neutral-300 dark:border-l-neutral-600'
   switch (result.type) {
     case 'exact':
-      return 'bg-success-50/60'
+      return 'border-l-success-500'
     case 'winner_gd':
     case 'winner':
-      return 'bg-warning-50/60'
+      return 'border-l-primary-500'
     case 'miss':
-      return 'bg-danger-50/40'
+      return 'border-l-danger-500'
   }
+}
+
+function getCardBorder(result: PointsResult | null): string {
+  if (result?.type === 'exact') {
+    return 'border-success-300 dark:border-success-700'
+  }
+  return 'border-border-default'
 }
 
 // =============================================
@@ -78,18 +93,40 @@ function getCardBackground(result: PointsResult | null): string {
 export function MatchCard({
   match,
   poolSettings,
+  predictionMode,
+  index = 0,
 }: {
   match: ResultMatch
   poolSettings: PoolSettings
+  predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  index?: number
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
+  const isUpcoming = !isCompleted && !isLive
   const hasActualScores =
     match.home_score_ft !== null && match.away_score_ft !== null
   const hasPrediction = match.prediction !== null
 
   const hasPsoScores =
     match.home_score_pso !== null && match.away_score_pso !== null
+
+  // Knockout bracket prediction display (full_tournament only)
+  const isKnockout = match.stage !== 'group'
+  const showBracketTeams = predictionMode === 'full_tournament' && isKnockout &&
+    (match.predicted_home_team_name != null || match.predicted_away_team_name != null)
+
+  // Check if predicted teams match actual teams (only when both are known)
+  const hasActualTeams = match.home_team_id != null && match.away_team_id != null
+  const knockoutTeamsCorrect = showBracketTeams && hasActualTeams
+    ? checkKnockoutTeamsMatch(
+        match.stage,
+        match.home_team_id,
+        match.away_team_id,
+        match.predicted_home_team_id,
+        match.predicted_away_team_id,
+      )
+    : null // null = can't determine yet (upcoming / TBD teams)
 
   // Calculate points for completed and live matches with actual scores and a prediction
   let pointsResult: PointsResult | null = null
@@ -124,173 +161,155 @@ export function MatchCard({
     match.home_team?.country_name || match.home_team_placeholder || 'TBD'
   const awayName =
     match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+  const homeFlagUrl = match.home_team?.flag_url ?? null
+  const awayFlagUrl = match.away_team?.flag_url ?? null
+  const homeCode = match.home_team?.country_code ?? ''
+  const awayCode = match.away_team?.country_code ?? ''
 
-  const isKnockout = match.stage !== 'group'
+  // Build prediction display string
+  let predictionDisplay: string | null = null
+  if (hasPrediction) {
+    predictionDisplay = `${match.prediction!.predicted_home_score} - ${match.prediction!.predicted_away_score}`
+  }
 
   return (
     <div
-      className={`rounded-xl shadow border border-neutral-200 overflow-hidden ${getCardBackground(pointsResult)}`}
+      className={`rounded-[14px] bg-surface border ${getCardBorder(pointsResult)} border-l-[3px] ${getLeftBorderColor(pointsResult, isUpcoming)} overflow-hidden animate-fade-up`}
+      style={{ animationDelay: `${index * 0.03}s` }}
     >
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-100 bg-neutral-50/80">
-        {/* Stage + match number */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-primary-700 bg-primary-100 px-2 py-0.5 rounded-full">
-            {getStageLabel(match.stage, match.group_letter)}
-          </span>
-          <span className="text-xs text-neutral-500">#{match.match_number}</span>
-        </div>
-
-        {/* Date */}
-        <span className="text-xs text-neutral-600 hidden sm:block">
-          {formatDate(match.match_date)}
+      {/* ── Top Row: Stage label + Badge/Points ── */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+          {getStageLabel(match.stage, match.group_letter)} · Match #{match.match_number}
         </span>
-
-        {/* Status badge */}
-        {isCompleted && (
-          <span className="text-xs font-semibold text-success-700 bg-success-100 px-2 py-0.5 rounded-full">
-            Final
-          </span>
-        )}
-        {isLive && (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-700 bg-danger-100 px-2 py-0.5 rounded-full">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
+        <div>
+          {pointsResult ? (
+            <PointsBadge result={pointsResult} />
+          ) : isLive ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
+              </span>
+              LIVE
             </span>
-            LIVE
-          </span>
-        )}
-        {!isCompleted && !isLive && (
-          <span className="text-xs font-semibold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
-            Upcoming
-          </span>
-        )}
+          ) : isUpcoming ? (
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400">
+              Pending
+            </span>
+          ) : (isCompleted && !hasPrediction) ? (
+            <span className="text-[10px] italic text-neutral-400 dark:text-neutral-500">No prediction</span>
+          ) : null}
+        </div>
       </div>
 
-      {/* ── Date (mobile only) ── */}
-      <div className="px-4 pt-2 sm:hidden">
-        <span className="text-xs text-neutral-600">
-          {formatDate(match.match_date)}
-        </span>
-      </div>
-
-      {/* ── Main: Teams + Score ── */}
-      <div className="px-3 sm:px-4 py-3 sm:py-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2">
+      {/* ── Middle Row: Teams + Score ── */}
+      <div className="px-4 py-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           {/* Home team */}
-          <div className="text-right">
-            <p className="text-sm sm:text-base font-bold text-neutral-900 leading-tight">
-              {homeName}
-            </p>
-            {hasPrediction ? (
-              <div className="mt-1">
-                {isKnockout ? (
-                  <>
-                    <p className="text-xs text-neutral-400">
-                      {match.predicted_home_team_name ? match.predicted_home_team_name + ' ' : ''}
-                      <span className="font-semibold">{match.prediction!.predicted_home_score}</span>
-                    </p>
-                    {hasPsoScores && match.prediction!.predicted_home_pso != null && (
-                      <p className="text-xs text-neutral-400">
-                        PSO: <span className="font-semibold">{match.prediction!.predicted_home_pso}</span>
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-neutral-500">
-                    Your prediction{' '}
-                    <span className="font-semibold text-neutral-600">
-                      {match.prediction!.predicted_home_score}
-                    </span>
-                  </p>
-                )}
-              </div>
-            ) : isCompleted ? (
-              <p className="text-xs text-neutral-400 italic mt-1">No prediction</p>
+          <div className="flex items-center gap-2 min-w-0">
+            {homeFlagUrl ? (
+              <img src={homeFlagUrl} alt={homeName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+            ) : homeCode ? (
+              <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
+            <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+              {homeName}
+            </span>
           </div>
 
           {/* Score */}
-          <div className="text-center px-3">
+          <div className="text-center">
             {hasActualScores ? (
               <div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tabular-nums">
-                  {match.home_score_ft}{' '}
-                  <span className="text-neutral-400">-</span>{' '}
-                  {match.away_score_ft}
-                </p>
+                <div className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg px-3 py-1">
+                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                    {match.home_score_ft}
+                  </span>
+                  <span className="text-lg font-extrabold text-neutral-400 dark:text-neutral-500">-</span>
+                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                    {match.away_score_ft}
+                  </span>
+                </div>
                 {hasPsoScores && (
-                  <p className="text-xs font-semibold text-accent-500 mt-0.5">
+                  <p className="text-[10px] font-semibold text-accent-500 mt-0.5">
                     PSO: {match.home_score_pso} - {match.away_score_pso}
                   </p>
                 )}
               </div>
-            ) : isCompleted ? (
-              <p className="text-sm text-neutral-500 italic">Result pending</p>
-            ) : hasPrediction ? (
-              <p className="text-lg sm:text-xl font-bold text-neutral-400 tabular-nums">
-                {match.prediction!.predicted_home_score}{' '}
-                <span className="text-neutral-200">-</span>{' '}
-                {match.prediction!.predicted_away_score}
-              </p>
             ) : (
-              <p className="text-lg font-bold text-neutral-200">vs</p>
+              <span className="text-sm font-medium text-neutral-300 dark:text-neutral-600">vs</span>
             )}
           </div>
 
           {/* Away team */}
-          <div className="text-left">
-            <p className="text-sm sm:text-base font-bold text-neutral-900 leading-tight">
+          <div className="flex items-center justify-end gap-2 min-w-0">
+            <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
               {awayName}
-            </p>
-            {hasPrediction ? (
-              <div className="mt-1">
-                {isKnockout ? (
-                  <>
-                    <p className="text-xs text-neutral-400">
-                      <span className="font-semibold">{match.prediction!.predicted_away_score}</span>
-                      {match.predicted_away_team_name ? ' ' + match.predicted_away_team_name : ''}
-                    </p>
-                    {hasPsoScores && match.prediction!.predicted_away_pso != null && (
-                      <p className="text-xs text-neutral-400">
-                        <span className="font-semibold">{match.prediction!.predicted_away_pso}</span> PSO
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-neutral-500">
-                    <span className="font-semibold text-neutral-600">
-                      {match.prediction!.predicted_away_score}
-                    </span>
-                    {' '}Your prediction
-                  </p>
-                )}
-              </div>
-            ) : isCompleted ? (
-              <p className="text-xs text-neutral-400 italic mt-1">No prediction</p>
+            </span>
+            {awayFlagUrl ? (
+              <img src={awayFlagUrl} alt={awayName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+            ) : awayCode ? (
+              <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
             ) : null}
           </div>
         </div>
       </div>
 
-      {/* ── Footer ── */}
-      {(match.venue || pointsResult || ((isCompleted || isLive) && !hasPrediction)) && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-neutral-100">
-          <span className="text-xs text-neutral-500 truncate max-w-[60%]">
-            {match.venue || ''}
-          </span>
-          <div>
-            {pointsResult ? (
-              <PointsBadge result={pointsResult} />
-            ) : (isCompleted || isLive) && !hasPrediction ? (
-              <span className="text-xs text-neutral-500 italic">
-                No prediction
+      {/* ── Bottom Row: Prediction + Date ── */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-border-default">
+        <div className="text-xs text-neutral-400 dark:text-neutral-500 min-w-0">
+          {hasPrediction && showBracketTeams ? (
+            <span>
+              Your prediction:{' '}
+              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+                {match.predicted_home_team_name || '?'}
               </span>
-            ) : null}
-          </div>
+              {' '}
+              <span className="font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">
+                {predictionDisplay}
+              </span>
+              {' '}
+              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+                {match.predicted_away_team_name || '?'}
+              </span>
+              {hasPsoScores &&
+                match.prediction!.predicted_home_pso != null &&
+                match.prediction!.predicted_away_pso != null && (
+                  <span className="text-neutral-400 dark:text-neutral-500">
+                    {' '}(PSO: {match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})
+                  </span>
+                )}
+            </span>
+          ) : !hasPrediction && showBracketTeams ? (
+            <span>
+              Your bracket:{' '}
+              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+                {match.predicted_home_team_name || '?'} vs {match.predicted_away_team_name || '?'}
+              </span>
+            </span>
+          ) : hasPrediction ? (
+            <span>
+              Your prediction:{' '}
+              <span className="font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">
+                {predictionDisplay}
+              </span>
+              {hasPsoScores &&
+                match.prediction!.predicted_home_pso != null &&
+                match.prediction!.predicted_away_pso != null && (
+                  <span className="text-neutral-400 dark:text-neutral-500">
+                    {' '}(PSO: {match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})
+                  </span>
+                )}
+            </span>
+          ) : (isCompleted || isLive) ? (
+            <span className="italic">No prediction</span>
+          ) : null}
         </div>
-      )}
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2">
+          {formatDate(match.match_date)}
+        </span>
+      </div>
     </div>
   )
 }
