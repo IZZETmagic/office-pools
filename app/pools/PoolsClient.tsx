@@ -635,8 +635,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   {searchQuery || statusFilter !== 'all' ? ' found' : ''}
                 </p>
                 <div className="space-y-2">
-                  {filteredPools.map((pool) => (
-                    <PoolRow key={pool.pool_id} pool={pool} />
+                  {filteredPools.map((pool, i) => (
+                    <div key={pool.pool_id} className="animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
+                      <PoolRow pool={pool} />
+                    </div>
                   ))}
                 </div>
               </>
@@ -670,12 +672,13 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   {discoverResults.length} public pool{discoverResults.length !== 1 ? 's' : ''} found
                 </p>
                 <div className="space-y-2">
-                  {discoverResults.map((pool) => (
-                    <PublicPoolRow
-                      key={pool.pool_id}
-                      pool={pool}
-                      onJoin={handleJoinFromDiscover}
-                    />
+                  {discoverResults.map((pool, i) => (
+                    <div key={pool.pool_id} className="animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
+                      <PublicPoolRow
+                        pool={pool}
+                        onJoin={handleJoinFromDiscover}
+                      />
+                    </div>
                   ))}
                 </div>
               </>

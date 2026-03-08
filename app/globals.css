@@ -353,6 +353,7 @@ html.theme-classic.dark {
 
   /* Animations */
   --animate-fade-up: fadeUp 0.25s ease both;
+  --animate-slide-in-right: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-modal-backdrop: modalBackdropIn 0.35s ease both;
   --animate-modal-slide-up: modalSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -520,10 +521,39 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Progress bar fill animation — uses custom property for target width */
 @keyframes barGrow {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
+}
+
+/* ---- Profile Statistics tab animations ---- */
+
+/* Ring chart stroke draw-in (starts at full circumference, ends at calculated offset) */
+@keyframes profileRingDraw {
+  from { stroke-dashoffset: var(--ring-circumference); }
+}
+
+/* Horizontal bar width grow (width-based, not scaleX, for smooth rounded corners) */
+@keyframes profileBarGrow {
+  from { width: 0; }
+}
+
+/* Pool performance card staggered fade-up */
+@keyframes profileCardFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Prediction history card staggered fade-up (8px, tighter spacing) */
+@keyframes predCardFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Match tab slide transitions */

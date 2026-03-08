@@ -86,44 +86,69 @@ export default async function ProfileServerPage() {
   let predictions: any[] = []
 
   if (entryIds.length > 0) {
-    // Fetch predictions per entry separately to avoid join deduplication issues
+    // Fetch predictions and matches separately to avoid complex join issues
     const allPredictions: any[] = []
     for (const entryId of entryIds) {
-      const { data: predictionData } = await supabase
+      const { data: predictionData, error: predError } = await supabase
         .from('predictions')
         .select(`
           prediction_id,
           entry_id,
           match_id,
           predicted_home_score,
-          predicted_away_score,
-          points_awarded,
-          matches(
-            match_id,
-            match_number,
-            stage,
-            group_letter,
-            match_date,
-            status,
-            home_score_ft,
-            away_score_ft,
-            home_team_placeholder,
-            away_team_placeholder,
-            home_team:teams!matches_home_team_id_fkey(country_name),
-            away_team:teams!matches_away_team_id_fkey(country_name)
-          )
+          predicted_away_score
         `)
         .eq('entry_id', entryId)
 
+      if (predError) {
+        console.error(`[Profile] Error fetching predictions for entry ${entryId}:`, predError.message)
+      }
       if (predictionData) {
         allPredictions.push(...predictionData)
       }
     }
 
-    // Normalize: unwrap matches if returned as array
+    // Fetch all matches with team names (single query, no per-entry overhead)
+    const matchIds = [...new Set(allPredictions.map((p: any) => p.match_id))]
+    const matchLookup = new Map<string, any>()
+
+    if (matchIds.length > 0) {
+      const { data: matchData, error: matchError } = await supabase
+        .from('matches')
+        .select(`
+          match_id,
+          match_number,
+          stage,
+          group_letter,
+          match_date,
+          status,
+          home_score_ft,
+          away_score_ft,
+          home_team_placeholder,
+          away_team_placeholder,
+          home_team:teams!matches_home_team_id_fkey(country_name),
+          away_team:teams!matches_away_team_id_fkey(country_name)
+        `)
+        .in('match_id', matchIds)
+
+      if (matchError) {
+        console.error('[Profile] Error fetching matches:', matchError.message)
+      }
+      if (matchData) {
+        for (const m of matchData) {
+          matchLookup.set(m.match_id, {
+            ...m,
+            home_team: Array.isArray(m.home_team) ? m.home_team[0] : m.home_team,
+            away_team: Array.isArray(m.away_team) ? m.away_team[0] : m.away_team,
+          })
+        }
+      }
+    }
+
+    // Combine predictions with their match data
     predictions = allPredictions.map((p: any) => ({
       ...p,
-      matches: Array.isArray(p.matches) ? p.matches[0] : p.matches,
+      matches: matchLookup.get(p.match_id) ?? null,
     }))
 
     // Sort by match_date descending
@@ -298,6 +323,21 @@ export default async function ProfileServerPage() {
       match_points: matchPoints,
       bonus_points: bonusPoints,
       total_points: matchPoints + bonusPoints,
+    }
+
+    // Enrich predictions with predicted knockout team names (full_tournament only)
+    if (pool.prediction_mode === 'full_tournament' && pool.entry_id) {
+      const knockoutTeamMap = bracket.knockoutTeamMap
+      for (const pred of predictions) {
+        if (pred.entry_id !== pool.entry_id) continue
+        const m = pred.matches
+        if (!m || m.stage === 'group') continue
+        const resolved = knockoutTeamMap.get(m.match_number)
+        if (resolved) {
+          pred.predicted_home_team_name = resolved.home?.country_name ?? null
+          pred.predicted_away_team_name = resolved.away?.country_name ?? null
+        }
+      }
     }
   }
 

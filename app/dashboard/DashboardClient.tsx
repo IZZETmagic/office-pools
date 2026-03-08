@@ -284,7 +284,7 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className="shrink-0 w-48 min-h-[10rem] bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default p-4 flex flex-col hover:shadow-md transition-shadow"
+      className="shrink-0 w-48 min-h-[8.5rem] bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default p-3 flex flex-col hover:shadow-md transition-shadow"
     >
       <h4 className="text-sm font-bold text-neutral-900 line-clamp-2">{pool.pool_name}</h4>
       {pool.role === 'admin' && (
@@ -610,8 +610,10 @@ export function DashboardClient({
                     const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
                     const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
                     return aDeadline - bDeadline
-                  }).map((pool) => (
-                    <MobilePoolCard key={pool.pool_id} pool={pool} />
+                  }).map((pool, i) => (
+                    <div key={pool.pool_id} className="shrink-0 animate-slide-in-right" style={{ animationDelay: `${i * 0.08}s` }}>
+                      <MobilePoolCard pool={pool} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -661,7 +663,7 @@ export function DashboardClient({
               <button
                 data-tab-key="live"
                 onClick={() => switchMatchTab('live')}
-                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                   matchTab === 'live'
                     ? 'text-neutral-900'
                     : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
@@ -672,7 +674,7 @@ export function DashboardClient({
               <button
                 data-tab-key="upcoming"
                 onClick={() => switchMatchTab('upcoming')}
-                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                   matchTab === 'upcoming'
                     ? 'text-neutral-900'
                     : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
@@ -704,13 +706,13 @@ export function DashboardClient({
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
                     const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
                     return (
-                      <Card key={match.match_id} className="border-danger-200/60 dark:border-danger-800/50">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs text-neutral-500">
+                      <div key={match.match_id} className="bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default border border-danger-200/60 dark:border-danger-800/50 px-4 py-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[10px] text-neutral-500">
                             {formatStage(match.stage)} &middot; #{match.match_number}
                           </p>
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-full">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-danger-600">
                               <span className="relative flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
@@ -718,26 +720,26 @@ export function DashboardClient({
                               LIVE
                             </span>
                             {elapsed && (
-                              <span className="text-xs font-semibold text-danger-600">{elapsed}</span>
+                              <span className="text-[10px] font-semibold text-danger-600">{elapsed}</span>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="flex-1 flex items-center justify-end gap-2 pr-3">
-                            {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
-                            <p className="font-semibold text-neutral-900 text-sm">{homeTeam}</p>
+                          <div className="flex-1 flex items-center justify-end gap-1.5 pr-2">
+                            {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
+                            <p className="font-semibold text-neutral-900 text-xs">{homeTeam}</p>
                           </div>
-                          <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-xl border border-neutral-200 dark:border-border-default">
-                            <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
-                            <span className="text-neutral-400 text-lg">-</span>
-                            <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                          <div className="flex items-center gap-2 px-3 py-1 bg-neutral-50 dark:bg-surface-tertiary rounded-lg border border-neutral-200 dark:border-border-default">
+                            <span className="text-lg font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
+                            <span className="text-neutral-400 text-sm">-</span>
+                            <span className="text-lg font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
                           </div>
-                          <div className="flex-1 flex items-center gap-2 pl-3">
-                            <p className="font-semibold text-neutral-900 text-sm">{awayTeam}</p>
-                            {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-7 h-5 rounded-[2px] object-cover shrink-0" />}
+                          <div className="flex-1 flex items-center gap-1.5 pl-2">
+                            <p className="font-semibold text-neutral-900 text-xs">{awayTeam}</p>
+                            {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     )
                   })}
                 </div>

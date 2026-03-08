@@ -33,6 +33,7 @@ type PoolMembership = {
   member_id: string
   pool_id: string
   pool_name: string
+  prediction_mode: string
   role: string
   total_points: number
   current_rank: number | null
@@ -48,7 +49,8 @@ type Prediction = {
   match_id: string
   predicted_home_score: number
   predicted_away_score: number
-  points_awarded: number | null
+  predicted_home_team_name?: string | null
+  predicted_away_team_name?: string | null
   matches: {
     match_id: string
     match_number: number
@@ -65,7 +67,7 @@ type Prediction = {
   }
 }
 
-type Tab = 'edit' | 'statistics' | 'predictions' | 'settings'
+type Tab = 'statistics' | 'predictions' | 'account'
 
 type PlayerScoreEntry = {
   match_points: number
@@ -138,16 +140,6 @@ function getMatchWinner(homeScore: number, awayScore: number): 'home' | 'away' |
 
 const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.ReactNode }[] = [
   {
-    key: 'edit',
-    label: 'Edit Profile',
-    mobileLabel: 'Edit',
-    icon: (
-      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-      </svg>
-    ),
-  },
-  {
     key: 'statistics',
     label: 'Statistics',
     mobileLabel: 'Statistics',
@@ -168,9 +160,9 @@ const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.Re
     ),
   },
   {
-    key: 'settings',
-    label: 'Account Settings',
-    mobileLabel: 'Settings',
+    key: 'account',
+    label: 'Account',
+    mobileLabel: 'Account',
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
@@ -196,8 +188,8 @@ export default function ProfilePage({
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const tabParam = searchParams.get('tab') as Tab | null
-    const validTabs: Tab[] = ['edit', 'statistics', 'predictions', 'settings']
-    return tabParam && validTabs.includes(tabParam) ? tabParam : 'edit'
+    const validTabs: Tab[] = ['statistics', 'predictions', 'account']
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'statistics'
   })
   const router = useRouter()
   const supabase = createClient()
@@ -299,9 +291,6 @@ export default function ProfilePage({
 
           {/* Main content area */}
           <div className="flex-1 min-w-0">
-            {activeTab === 'edit' && (
-              <EditProfileTab profile={profile} supabase={supabase} router={router} />
-            )}
             {activeTab === 'statistics' && (
               <StatisticsTab
                 poolMemberships={poolMemberships}
@@ -318,7 +307,7 @@ export default function ProfilePage({
                 poolSettingsMap={poolSettingsMap}
               />
             )}
-            {activeTab === 'settings' && (
+            {activeTab === 'account' && (
               <AccountSettingsTab
                 profile={profile}
                 poolMemberships={poolMemberships}
@@ -334,195 +323,7 @@ export default function ProfilePage({
 }
 
 // =====================
-// TAB 1: EDIT PROFILE
-// =====================
-
-function EditProfileTab({
-  profile,
-  supabase,
-  router,
-}: {
-  profile: Profile
-  supabase: any
-  router: any
-}) {
-  const { showToast } = useToast()
-  const [username, setUsername] = useState(profile.username)
-  const [fullName, setFullName] = useState(profile.full_name ?? '')
-  const [email, setEmail] = useState(profile.email)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
-
-  const usernameChanged = username !== profile.username
-  const emailChanged = email !== profile.email
-  const hasChanges = usernameChanged || emailChanged || fullName !== (profile.full_name ?? '')
-
-  async function checkUsername(value: string) {
-    if (value === profile.username) {
-      setUsernameStatus('idle')
-      return
-    }
-    if (value.length < 3) {
-      setUsernameStatus('idle')
-      return
-    }
-    setUsernameStatus('checking')
-    const { data } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('username', value)
-      .single()
-    setUsernameStatus(data ? 'taken' : 'available')
-  }
-
-  async function handleSave() {
-    setError(null)
-
-    if (!username || username.length < 3 || username.length > 20) {
-      setError('Username must be 3-20 characters.')
-      return
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      setError('Username can only contain letters, numbers, and underscores.')
-      return
-    }
-    if (usernameStatus === 'taken') {
-      setError('That username is already taken.')
-      return
-    }
-
-    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email address.')
-      return
-    }
-
-    setSaving(true)
-
-    try {
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          username,
-          full_name: fullName || null,
-        })
-        .eq('user_id', profile.user_id)
-
-      if (profileError) throw profileError
-
-      if (emailChanged) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email,
-        })
-        if (emailError) throw emailError
-        showToast('Profile updated! A verification email has been sent to your new address.', 'success')
-      } else {
-        showToast('Profile updated successfully!', 'success')
-      }
-
-      router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Card>
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-100">
-        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-          </svg>
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-neutral-900">Edit Profile</h3>
-          <p className="text-neutral-500 text-sm">Update your personal information</p>
-        </div>
-      </div>
-
-      {error && <Alert variant="error">{error}</Alert>}
-
-      <div className="space-y-5">
-        <FormField label="Username *" helperText="Letters, numbers, and underscores only (3-20 characters)">
-          <div className="relative">
-            <Input
-              type="text"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value)
-                setUsernameStatus('idle')
-              }}
-              onBlur={() => checkUsername(username)}
-              maxLength={20}
-            />
-            {usernameStatus === 'checking' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500">Checking...</span>
-            )}
-            {usernameStatus === 'available' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-success-600 font-medium">Available</span>
-            )}
-            {usernameStatus === 'taken' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-danger-600 font-medium">Taken</span>
-            )}
-          </div>
-        </FormField>
-
-        <FormField label="Full Name">
-          <Input
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            maxLength={100}
-            placeholder="Your full name"
-          />
-        </FormField>
-
-        <FormField label="Email" helperText="Email changes require verification">
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-          />
-          {emailChanged && (
-            <p className="text-xs text-warning-600 mt-1">
-              You will need to verify your new email address.
-            </p>
-          )}
-        </FormField>
-
-        <div className="flex gap-3 pt-2">
-          <Button
-            variant="gray"
-            onClick={() => {
-              setUsername(profile.username)
-              setFullName(profile.full_name ?? '')
-              setEmail(profile.email)
-              setError(null)
-              setUsernameStatus('idle')
-            }}
-            disabled={!hasChanges}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving || !hasChanges || usernameStatus === 'taken'}
-            loading={saving}
-            loadingText="Saving..."
-          >
-            Save Changes
-          </Button>
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-// =====================
-// TAB 2: STATISTICS
+// TAB 1: STATISTICS
 // =====================
 
 function StatisticsTab({
@@ -625,7 +426,7 @@ function StatisticsTab({
   }, [poolStats])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ animation: 'fadeUp 0.3s ease both' }}>
       {/* Section header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -639,128 +440,192 @@ function StatisticsTab({
         </div>
       </div>
 
-      {/* Overview stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Performance rings */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <Card>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-primary-600">{totalPools}</p>
-              <p className="text-xs text-neutral-500">Active Pools</p>
-            </div>
+          <div className="flex flex-col items-center text-center py-1">
+            <PerformanceRing
+              percentage={totals.accuracy ?? 0}
+              color="stroke-success-500"
+              trackColor="stroke-success-100"
+            />
+            <p className="text-xs sm:text-sm font-semibold text-neutral-900 mt-2">Accuracy</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500">{totals.exact + totals.winnerGd + totals.winnerOnly}/{totals.completed} correct</p>
           </div>
         </Card>
         <Card>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-success-50 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-success-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-success-600">{formatNumber(totalPoints)}</p>
-              <p className="text-xs text-neutral-500">Total Points</p>
-            </div>
+          <div className="flex flex-col items-center text-center py-1">
+            <PerformanceRing
+              percentage={totals.completed > 0 ? Math.round((totals.exact / totals.completed) * 100) : 0}
+              color="stroke-accent-500"
+              trackColor="stroke-accent-100"
+            />
+            <p className="text-xs sm:text-sm font-semibold text-neutral-900 mt-2">Exact Scores</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500">{totals.exact}/{totals.completed} predictions</p>
           </div>
         </Card>
         <Card>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent-50 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-accent-500">{formatNumber(totalPredictions)}</p>
-              <p className="text-xs text-neutral-500">Predictions</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-warning-50 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-warning-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.003 6.003 0 01-3.77 1.522m0 0a6.003 6.003 0 01-3.77-1.522" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-warning-600">
-                {bestPool ? `#${bestPool.current_rank}` : '--'}
-              </p>
-              <p className="text-xs text-neutral-500 truncate">
-                {bestPool ? bestPool.pool_name : 'No rank yet'}
-              </p>
-            </div>
+          <div className="flex flex-col items-center text-center py-1">
+            <PerformanceRing
+              percentage={totalMatchCount > 0 ? Math.round((totalPredictions / (totalMatchCount * totalPools)) * 100) : 0}
+              color="stroke-primary-500"
+              trackColor="stroke-primary-100"
+            />
+            <p className="text-xs sm:text-sm font-semibold text-neutral-900 mt-2">Completion</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500">{totalPredictions}/{totalMatchCount * totalPools} submitted</p>
           </div>
         </Card>
       </div>
 
-      {/* Pool breakdown */}
+      {/* Points by Pool — horizontal bar chart */}
+      {poolMemberships.length > 0 && (() => {
+        const maxPoints = Math.max(
+          ...poolMemberships.map(p => playerScoresMap[p.entry_id || p.member_id]?.total_points ?? p.total_points),
+          1
+        )
+        const sorted = [...poolMemberships].sort((a, b) => {
+          const aPoints = playerScoresMap[a.entry_id || a.member_id]?.total_points ?? a.total_points
+          const bPoints = playerScoresMap[b.entry_id || b.member_id]?.total_points ?? b.total_points
+          return bPoints - aPoints
+        })
+        return (
+          <Card>
+            <h4 className="text-base font-semibold text-neutral-900 mb-4">Points by Pool</h4>
+            <div className="space-y-3">
+              {sorted.map(pool => {
+                const points = playerScoresMap[pool.entry_id || pool.member_id]?.total_points ?? pool.total_points
+                const pct = Math.round((points / maxPoints) * 100)
+                return (
+                  <div key={pool.pool_id} className="flex items-center gap-3">
+                    <span className="text-sm text-neutral-700 w-28 sm:w-36 shrink-0 truncate">{pool.pool_name}</span>
+                    <div className="flex-1 bg-neutral-100 rounded-full h-2.5 min-w-0 overflow-hidden">
+                      <div
+                        className="bg-primary-500 rounded-full h-2.5"
+                        style={{
+                          width: `${pct}%`,
+                          animation: 'profileBarGrow 0.8s ease both',
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-neutral-900 w-14 text-right shrink-0 font-mono tabular-nums">
+                      {formatNumber(points)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )
+      })()}
+
+      {/* Pool breakdown — cards on mobile, table on desktop */}
       {poolStats.length > 0 && (
-        <Card>
-          <h4 className="text-base font-semibold text-neutral-900 mb-4">Pool Performance</h4>
-          <div className="overflow-x-auto -mx-6">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50 dark:bg-neutral-100">
-                  <th className="text-left py-3 px-4 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Pool</th>
-                  <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Rank</th>
-                  <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Points</th>
-                  <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Predictions</th>
-                  <th className="text-center py-3 px-3 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Accuracy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {poolStats.map(pool => (
-                  <tr key={pool.pool_id} className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors">
-                    <td className="py-3 px-4 sm:px-6">
-                      <Link
-                        href={`/pools/${pool.pool_id}`}
-                        className="text-primary-600 hover:text-primary-700 hover:underline font-medium"
-                      >
-                        {pool.pool_name}
-                      </Link>
-                    </td>
-                    <td className="text-center py-3 px-3">
-                      {pool.current_rank ? (
-                        <span className="inline-flex items-center gap-1">
-                          {pool.current_rank <= 3 && (
-                            <span className="text-sm">{pool.current_rank === 1 ? '🥇' : pool.current_rank === 2 ? '🥈' : '🥉'}</span>
-                          )}
-                          <span className="text-neutral-900 font-medium">#{pool.current_rank}</span>
-                          <span className="text-neutral-400 text-xs">/{memberCounts[pool.pool_id] ?? '?'}</span>
-                        </span>
-                      ) : (
-                        <span className="text-neutral-400">--</span>
-                      )}
-                    </td>
-                    <td className="text-center py-3 px-3 font-semibold text-neutral-900">
-                      {formatNumber(playerScoresMap[pool.entry_id || pool.member_id]?.total_points ?? pool.total_points)}
-                    </td>
-                    <td className="text-center py-3 px-3 text-neutral-700">
-                      {pool.totalPredictions}/{totalMatchCount}
-                    </td>
-                    <td className="text-center py-3 px-3 sm:px-6">
-                      {pool.accuracy !== null ? (
-                        <span className={`font-semibold ${
-                          pool.accuracy >= 70 ? 'text-success-600' :
-                          pool.accuracy >= 40 ? 'text-warning-600' :
-                          'text-neutral-900'
-                        }`}>{pool.accuracy}%</span>
-                      ) : (
-                        <span className="text-neutral-400">--</span>
-                      )}
-                    </td>
+        <>
+          {/* Mobile: connected card rows */}
+          <Card className="sm:hidden">
+            <h4 className="text-base font-semibold text-neutral-900 mb-3">Pool Performance</h4>
+            <div className="divide-y divide-neutral-100">
+              {poolStats.map((pool, i) => (
+                <Link
+                  key={pool.pool_id}
+                  href={`/pools/${pool.pool_id}`}
+                  className="block py-3 first:pt-0 last:pb-0 hover:bg-neutral-50 -mx-1 px-1 rounded-lg transition-colors"
+                  style={{ animation: `profileCardFadeUp 0.3s ease ${i * 0.05}s both` }}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-primary-600 truncate mr-2">{pool.pool_name}</span>
+                    {pool.current_rank ? (
+                      <span className="inline-flex items-center gap-1 shrink-0">
+                        {pool.current_rank <= 3 && (
+                          <span className="text-sm">{pool.current_rank === 1 ? '🥇' : pool.current_rank === 2 ? '🥈' : '🥉'}</span>
+                        )}
+                        <span className="text-neutral-900 font-bold text-sm">#{pool.current_rank}</span>
+                        <span className="text-neutral-400 text-xs">/{memberCounts[pool.pool_id] ?? '?'}</span>
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 text-sm">--</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-neutral-500">
+                    <span><span className="font-semibold text-neutral-900">{formatNumber(playerScoresMap[pool.entry_id || pool.member_id]?.total_points ?? pool.total_points)}</span> pts</span>
+                    <span>{pool.totalPredictions}/{totalMatchCount} predictions</span>
+                    {pool.accuracy !== null ? (
+                      <span className={`font-semibold ${
+                        pool.accuracy >= 70 ? 'text-success-600' :
+                        pool.accuracy >= 40 ? 'text-warning-600' :
+                        'text-neutral-700'
+                      }`}>{pool.accuracy}% acc</span>
+                    ) : (
+                      <span className="text-neutral-400">--</span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Card>
+
+          {/* Desktop: table */}
+          <Card className="hidden sm:block">
+            <h4 className="text-base font-semibold text-neutral-900 mb-4">Pool Performance</h4>
+            <div className="overflow-x-auto -mx-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 bg-neutral-50 dark:bg-neutral-100">
+                    <th className="text-left py-3 px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Pool</th>
+                    <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Rank</th>
+                    <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Points</th>
+                    <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Predictions</th>
+                    <th className="text-center py-3 px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Accuracy</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody>
+                  {poolStats.map((pool, i) => (
+                    <tr key={pool.pool_id} className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors" style={{ animation: `profileCardFadeUp 0.3s ease ${i * 0.05}s both` }}>
+                      <td className="py-3 px-6">
+                        <Link
+                          href={`/pools/${pool.pool_id}`}
+                          className="text-primary-600 hover:text-primary-700 hover:underline font-medium"
+                        >
+                          {pool.pool_name}
+                        </Link>
+                      </td>
+                      <td className="text-center py-3 px-3">
+                        {pool.current_rank ? (
+                          <span className="inline-flex items-center gap-1">
+                            {pool.current_rank <= 3 && (
+                              <span className="text-sm">{pool.current_rank === 1 ? '🥇' : pool.current_rank === 2 ? '🥈' : '🥉'}</span>
+                            )}
+                            <span className="text-neutral-900 font-medium">#{pool.current_rank}</span>
+                            <span className="text-neutral-400 text-xs">/{memberCounts[pool.pool_id] ?? '?'}</span>
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400">--</span>
+                        )}
+                      </td>
+                      <td className="text-center py-3 px-3 font-semibold text-neutral-900">
+                        {formatNumber(playerScoresMap[pool.entry_id || pool.member_id]?.total_points ?? pool.total_points)}
+                      </td>
+                      <td className="text-center py-3 px-3 text-neutral-700">
+                        {pool.totalPredictions}/{totalMatchCount}
+                      </td>
+                      <td className="text-center py-3 px-6">
+                        {pool.accuracy !== null ? (
+                          <span className={`font-semibold ${
+                            pool.accuracy >= 70 ? 'text-success-600' :
+                            pool.accuracy >= 40 ? 'text-warning-600' :
+                            'text-neutral-900'
+                          }`}>{pool.accuracy}%</span>
+                        ) : (
+                          <span className="text-neutral-400">--</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
       )}
 
       {/* Prediction accuracy breakdown */}
@@ -804,15 +669,71 @@ function StatisticsTab({
   )
 }
 
+function PerformanceRing({
+  percentage,
+  color,
+  trackColor,
+  size = 80,
+  strokeWidth = 7,
+}: {
+  percentage: number
+  color: string
+  trackColor: string
+  size?: number
+  strokeWidth?: number
+}) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (percentage / 100) * circumference
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        className="-rotate-90"
+        style={{ '--ring-circumference': circumference } as React.CSSProperties}
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          className={trackColor}
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          className={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ animation: 'profileRingDraw 1s ease both' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-base sm:text-lg font-bold text-neutral-900">{percentage}%</span>
+      </div>
+    </div>
+  )
+}
+
 function AccuracyRow({ label, color, count, total }: { label: string; color: string; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
     <div className="flex items-center gap-3">
       <span className="text-sm text-neutral-700 w-28 sm:w-32 shrink-0">{label}</span>
-      <div className="flex-1 bg-neutral-100 rounded-full h-2.5 min-w-0">
+      <div className="flex-1 bg-neutral-100 rounded-full h-2.5 min-w-0 overflow-hidden">
         <div
-          className={`${color} rounded-full h-2.5 transition-all duration-500`}
-          style={{ width: `${pct}%` }}
+          className={`${color} rounded-full h-2.5`}
+          style={{
+            width: `${pct}%`,
+            animation: 'profileBarGrow 0.8s ease both',
+          }}
         />
       </div>
       <span className="text-sm font-medium text-neutral-700 w-20 text-right shrink-0">
@@ -823,7 +744,7 @@ function AccuracyRow({ label, color, count, total }: { label: string; color: str
 }
 
 // =====================
-// TAB 3: PREDICTION HISTORY
+// TAB 2: PREDICTION HISTORY
 // =====================
 
 function PredictionHistoryTab({
@@ -962,8 +883,11 @@ function PredictionHistoryTab({
     }
   }
 
+  // Composite key to force remount & re-trigger stagger on filter/page change
+  const filterKey = `${poolFilter}-${statusFilter}-${stageFilter}-${currentPage}`
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ animation: 'fadeUp 0.3s ease both' }}>
       {/* Section header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -1029,9 +953,9 @@ function PredictionHistoryTab({
         </div>
       </Card>
 
-      {/* Predictions table */}
-      <Card>
-        {paginated.length === 0 ? (
+      {/* Predictions */}
+      {paginated.length === 0 ? (
+        <Card>
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1041,40 +965,105 @@ function PredictionHistoryTab({
             <p className="text-neutral-700 font-medium mb-1">No predictions found</p>
             <p className="text-neutral-500 text-sm">Try adjusting your filters.</p>
           </div>
-        ) : (
-          <>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile: cards */}
+          <div key={`mobile-${filterKey}`} className="space-y-2.5 sm:hidden">
+            {paginated.map((pred, i) => {
+              const m = pred.matches
+              const homeTeam = m.home_team?.country_name ?? m.home_team_placeholder ?? 'TBD'
+              const awayTeam = m.away_team?.country_name ?? m.away_team_placeholder ?? 'TBD'
+              const hasResult = m.home_score_ft !== null && m.away_score_ft !== null
+              const isKnockout = m.stage !== 'group'
+              const pool = entryToPool[pred.entry_id]
+              const hasPredictedTeams = isKnockout && pool?.prediction_mode === 'full_tournament' &&
+                pred.predicted_home_team_name && pred.predicted_away_team_name
+              const predictedHome = hasPredictedTeams ? pred.predicted_home_team_name : homeTeam
+              const predictedAway = hasPredictedTeams ? pred.predicted_away_team_name : awayTeam
+              const teamsMatch = !hasPredictedTeams || (predictedHome === homeTeam && predictedAway === awayTeam) ||
+                (predictedHome === awayTeam && predictedAway === homeTeam)
+
+              return (
+                <div
+                  key={pred.prediction_id}
+                  className="bg-surface rounded-xl shadow-sm border border-neutral-200 dark:border-border-default px-4 py-3"
+                  style={{ animation: `predCardFadeUp 0.3s ease ${i * 0.04}s both` }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] text-neutral-500">
+                      {formatStage(m.stage)}{m.group_letter ? ` ${m.group_letter}` : ''} &middot; {homeTeam} vs {awayTeam}
+                    </span>
+                    {classificationBadge(pred.classification)}
+                  </div>
+                  {hasPredictedTeams && !teamsMatch && (
+                    <p className="text-[11px] text-warning-600 mb-1.5">
+                      Your matchup: {predictedHome} vs {predictedAway}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-sm">
+                      <span>Predicted: <span className="font-bold text-neutral-900">{predictedHome} {pred.predicted_home_score}-{pred.predicted_away_score}</span></span>
+                      {hasResult && (
+                        <span>Actual: <span className="font-bold text-neutral-900">{homeTeam} {m.home_score_ft}-{m.away_score_ft}</span></span>
+                      )}
+                    </div>
+                    <span className={`text-sm shrink-0 ml-2 ${pointsColor(pred.classification)}`}>{pred.pointsDisplay}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table */}
+          <Card key={`desktop-${filterKey}`} className="hidden sm:block">
             <div className="overflow-x-auto -mx-6">
-              <table className="w-full text-sm min-w-[520px]">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 bg-neutral-50 dark:bg-neutral-100">
-                    <th className="text-left py-3 px-4 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Match</th>
+                    <th className="text-left py-3 px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Match</th>
                     <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Prediction</th>
                     <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Result</th>
                     <th className="text-center py-3 px-3 text-neutral-600 font-medium text-xs uppercase tracking-wider">Status</th>
-                    <th className="text-center py-3 px-3 sm:px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Points</th>
+                    <th className="text-center py-3 px-6 text-neutral-600 font-medium text-xs uppercase tracking-wider">Points</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map(pred => {
+                  {paginated.map((pred, i) => {
                     const m = pred.matches
                     const homeTeam = m.home_team?.country_name ?? m.home_team_placeholder ?? 'TBD'
                     const awayTeam = m.away_team?.country_name ?? m.away_team_placeholder ?? 'TBD'
                     const result = m.home_score_ft !== null && m.away_score_ft !== null
                       ? `${m.home_score_ft}-${m.away_score_ft}`
                       : '-'
+                    const isKnockout = m.stage !== 'group'
+                    const pool = entryToPool[pred.entry_id]
+                    const hasPredictedTeams = isKnockout && pool?.prediction_mode === 'full_tournament' &&
+                      pred.predicted_home_team_name && pred.predicted_away_team_name
+                    const predictedHome = hasPredictedTeams ? pred.predicted_home_team_name : homeTeam
+                    const predictedAway = hasPredictedTeams ? pred.predicted_away_team_name : awayTeam
+                    const teamsMatch = !hasPredictedTeams || (predictedHome === homeTeam && predictedAway === awayTeam) ||
+                      (predictedHome === awayTeam && predictedAway === homeTeam)
 
                     return (
-                      <tr key={pred.prediction_id} className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors">
-                        <td className="py-3 px-4 sm:px-6">
+                      <tr
+                        key={pred.prediction_id}
+                        className="border-b border-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-100 transition-colors"
+                        style={{ animation: `predCardFadeUp 0.3s ease ${i * 0.04}s both` }}
+                      >
+                        <td className="py-3 px-6">
                           <p className="font-medium text-neutral-900">{homeTeam} vs {awayTeam}</p>
                           <p className="text-xs text-neutral-500 mt-0.5">
                             {formatDate(m.match_date)} &middot; {formatStage(m.stage)}
                             {m.group_letter ? ` (Group ${m.group_letter})` : ''}
                           </p>
+                          {hasPredictedTeams && !teamsMatch && (
+                            <p className="text-xs text-warning-600 mt-0.5">Your matchup: {predictedHome} vs {predictedAway}</p>
+                          )}
                         </td>
                         <td className="text-center py-3 px-3">
                           <span className="inline-block bg-neutral-100 rounded-lg px-2.5 py-1 font-mono font-bold text-neutral-900">
-                            {pred.predicted_home_score}-{pred.predicted_away_score}
+                            {hasPredictedTeams ? `${predictedHome} ${pred.predicted_home_score}-${pred.predicted_away_score}` : `${pred.predicted_home_score}-${pred.predicted_away_score}`}
                           </span>
                         </td>
                         <td className="text-center py-3 px-3">
@@ -1085,7 +1074,7 @@ function PredictionHistoryTab({
                         <td className="text-center py-3 px-3">
                           {classificationBadge(pred.classification)}
                         </td>
-                        <td className={`text-center py-3 px-3 sm:px-6 ${pointsColor(pred.classification)}`}>
+                        <td className={`text-center py-3 px-6 ${pointsColor(pred.classification)}`}>
                           {pred.pointsDisplay}
                         </td>
                       </tr>
@@ -1094,40 +1083,40 @@ function PredictionHistoryTab({
                 </tbody>
               </table>
             </div>
+          </Card>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-100">
-                <p className="text-sm text-neutral-500">
-                  Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, filtered.length)} of {filtered.length}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 text-sm rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 text-sm rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-neutral-500">
+                Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
               </div>
-            )}
-          </>
-        )}
-      </Card>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
 
 // =====================
-// TAB 4: ACCOUNT SETTINGS
+// TAB 3: ACCOUNT
 // =====================
 
 function AccountSettingsTab({
@@ -1144,6 +1133,92 @@ function AccountSettingsTab({
   const { colorMode, setColorMode } = useTheme()
   const { showToast } = useToast()
 
+  // Profile editing state
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [username, setUsername] = useState(profile.username)
+  const [fullName, setFullName] = useState(profile.full_name ?? '')
+  const [email, setEmail] = useState(profile.email)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+
+  const usernameChanged = username !== profile.username
+  const emailChanged = email !== profile.email
+  const hasProfileChanges = usernameChanged || emailChanged || fullName !== (profile.full_name ?? '')
+
+  async function checkUsername(value: string) {
+    if (value === profile.username) {
+      setUsernameStatus('idle')
+      return
+    }
+    if (value.length < 3) {
+      setUsernameStatus('idle')
+      return
+    }
+    setUsernameStatus('checking')
+    const { data } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('username', value)
+      .single()
+    setUsernameStatus(data ? 'taken' : 'available')
+  }
+
+  async function handleProfileSave(): Promise<boolean> {
+    setProfileError(null)
+
+    if (!username || username.length < 3 || username.length > 20) {
+      setProfileError('Username must be 3-20 characters.')
+      return false
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setProfileError('Username can only contain letters, numbers, and underscores.')
+      return false
+    }
+    if (usernameStatus === 'taken') {
+      setProfileError('That username is already taken.')
+      return false
+    }
+
+    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setProfileError('Please enter a valid email address.')
+      return false
+    }
+
+    setProfileSaving(true)
+
+    try {
+      const { error: profileErr } = await supabase
+        .from('users')
+        .update({
+          username,
+          full_name: fullName || null,
+        })
+        .eq('user_id', profile.user_id)
+
+      if (profileErr) throw profileErr
+
+      if (emailChanged) {
+        const { error: emailError } = await supabase.auth.updateUser({
+          email,
+        })
+        if (emailError) throw emailError
+        showToast('Profile updated! A verification email has been sent to your new address.', 'success')
+      } else {
+        showToast('Profile updated successfully!', 'success')
+      }
+
+      router.refresh()
+      return true
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to update profile.')
+      return false
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
+  // Password state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -1255,20 +1330,108 @@ function AccountSettingsTab({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Section header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+    <div className="space-y-6" style={{ animation: 'fadeUp 0.3s ease both' }}>
+      {/* Profile section */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-primary-50 flex items-center justify-center">
+            <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+          </div>
+          <h4 className="text-base font-semibold text-neutral-900">Profile</h4>
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-neutral-900">Account Settings</h3>
-          <p className="text-neutral-500 text-sm">Manage your account and security</p>
+
+        {profileError && <Alert variant="error">{profileError}</Alert>}
+
+        <div className="space-y-4">
+          <FormField label="Username *" helperText={profileEditing ? "Letters, numbers, and underscores only (3-20 characters)" : undefined}>
+            <div className="relative">
+              <Input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value)
+                  setUsernameStatus('idle')
+                }}
+                onBlur={() => checkUsername(username)}
+                maxLength={20}
+                disabled={!profileEditing}
+              />
+              {profileEditing && usernameStatus === 'checking' && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500">Checking...</span>
+              )}
+              {profileEditing && usernameStatus === 'available' && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-success-600 font-medium">Available</span>
+              )}
+              {profileEditing && usernameStatus === 'taken' && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-danger-600 font-medium">Taken</span>
+              )}
+            </div>
+          </FormField>
+
+          <FormField label="Full Name">
+            <Input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              maxLength={100}
+              placeholder="Your full name"
+              disabled={!profileEditing}
+            />
+          </FormField>
+
+          <FormField label="Email" helperText={profileEditing ? "Email changes require verification" : undefined}>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              disabled={!profileEditing}
+            />
+            {profileEditing && emailChanged && (
+              <p className="text-xs text-warning-600 mt-1">
+                You will need to verify your new email address.
+              </p>
+            )}
+          </FormField>
+
+          {profileEditing ? (
+            <div className="flex gap-3 pt-1 justify-end">
+              <Button
+                variant="gray"
+                onClick={() => {
+                  setUsername(profile.username)
+                  setFullName(profile.full_name ?? '')
+                  setEmail(profile.email)
+                  setProfileError(null)
+                  setUsernameStatus('idle')
+                  setProfileEditing(false)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  const success = await handleProfileSave()
+                  if (success) setProfileEditing(false)
+                }}
+                disabled={profileSaving || !hasProfileChanges || usernameStatus === 'taken'}
+                loading={profileSaving}
+                loadingText="Saving..."
+              >
+                Save Changes
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setProfileEditing(true)}>
+                Edit Profile
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
 
       {/* Security section */}
       <Card>
