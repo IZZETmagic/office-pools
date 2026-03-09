@@ -51,11 +51,11 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             <p><strong>Round of 16 &rarr; Final:</strong> Winners advance through the Round of 16, Quarter Finals, Semi Finals, Third Place Match, and the Final.</p>
           </div>
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>104 matches total</strong> &mdash; 48 group stage + 16 Round of 32 + 8 Round of 16 + 4 Quarter Finals + 2 Semi Finals + Third Place + Final.
           </p>
         </div>
@@ -195,7 +195,7 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
               <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
-              <p className="text-xs text-primary-800 leading-5">
+              <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
                 <strong>Tip:</strong> Check the <strong>Scoring Rules</strong> tab for the exact point values configured for this pool.
               </p>
             </div>
@@ -231,7 +231,7 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
               <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
-              <p className="text-xs text-primary-800 leading-5">
+              <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
                 <strong>Tip:</strong> Check the <strong>Scoring Rules</strong> tab for the exact point values and multipliers configured for this pool.
               </p>
             </div>

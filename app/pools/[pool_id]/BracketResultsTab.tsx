@@ -756,7 +756,7 @@ function KnockoutComparison({
         )}
       </div>
 
-      <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-6 text-xs text-primary-700">
+      <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-6 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
         Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-md align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-md align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
       </div>
 

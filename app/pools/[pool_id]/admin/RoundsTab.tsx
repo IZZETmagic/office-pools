@@ -139,8 +139,121 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
         </p>
       </div>
 
-      {/* Rounds table */}
-      <Card>
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {rounds.map((round) => {
+          const roundName = ROUND_LABELS[round.round_key as RoundKey] ?? round.round_key
+          const isPastDeadline = round.deadline ? new Date(round.deadline) < new Date() : false
+
+          return (
+            <Card key={round.round_key}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-neutral-900 dark:text-white">{roundName}</span>
+                {getStateBadge(round.state)}
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-600">Deadline</span>
+                  <span className={isPastDeadline && round.state === 'open' ? 'text-red-600 font-medium' : 'text-neutral-700 dark:text-neutral-500'}>
+                    {formatDeadline(round.deadline)}
+                  </span>
+                </div>
+
+                {round.state !== 'locked' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500 dark:text-neutral-600">Matches</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full"
+                          style={{
+                            width: round.match_count > 0
+                              ? `${(round.completed_match_count / round.match_count) * 100}%`
+                              : '0%',
+                          }}
+                        />
+                      </div>
+                      <span className="text-neutral-700 dark:text-neutral-500">
+                        {round.completed_match_count} / {round.match_count}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {round.admin_stats && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500 dark:text-neutral-600">Submissions</span>
+                    <span className="text-neutral-700 dark:text-neutral-500">
+                      {round.admin_stats.submitted_entries} / {round.admin_stats.total_entries}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {round.state !== 'completed' && (
+                <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-border-default">
+                  {round.state === 'locked' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => openModal('open', round.round_key)}
+                      loading={actionLoading === `${round.round_key}-open`}
+                      loadingText="Opening..."
+                    >
+                      Open Round
+                    </Button>
+                  )}
+
+                  {round.state === 'open' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openModal('extend_deadline', round.round_key)}
+                        loading={actionLoading === `${round.round_key}-extend_deadline`}
+                        loadingText="..."
+                      >
+                        Extend
+                      </Button>
+                      <Button
+                        variant="gray"
+                        size="sm"
+                        onClick={() => handleAction(round.round_key, 'close')}
+                        loading={actionLoading === `${round.round_key}-close`}
+                        loadingText="..."
+                      >
+                        Close
+                      </Button>
+                    </>
+                  )}
+
+                  {(round.state === 'in_progress' || round.state === 'open') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAction(round.round_key, 'complete')}
+                      loading={actionLoading === `${round.round_key}-complete`}
+                      loadingText="..."
+                    >
+                      Complete
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {round.state === 'completed' && (
+                <div className="mt-3 pt-3 border-t border-border-default">
+                  <span className="text-xs text-neutral-400">Done</span>
+                </div>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <Card className="hidden sm:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -260,7 +373,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       </Card>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-600">
         <strong>How round management works:</strong> Open a round to allow predictions.
         Members will be notified by email. When the deadline passes, predictions auto-lock.
         After all matches in a round complete, mark it as completed to unlock scoring and

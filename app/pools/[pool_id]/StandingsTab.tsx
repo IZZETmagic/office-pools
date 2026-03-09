@@ -594,7 +594,7 @@ export function StandingsTab({ matches, teams, conductData }: StandingsTabProps)
           </Card>
         ) : (
           <>
-            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-4 text-xs text-primary-700">
+            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-4 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
               Based on actual match results. FP (Fair Play) is the Team Conduct Score used as a FIFA tiebreaker.
             </div>
 

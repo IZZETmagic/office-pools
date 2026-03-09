@@ -162,11 +162,11 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
           <PointsRow label="Correct 3rd Place" value={s.bp_group_correct_3rd} />
           <PointsRow label="Correct 4th Place" value={s.bp_group_correct_4th} />
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>How it works:</strong> Rank all 4 teams in each group from 1st to 4th. You earn points for each team that finishes in the exact position you predicted. With 12 groups of 4 teams, there are up to {12 * 4} individual team positions to predict.
           </p>
         </div>
@@ -180,11 +180,11 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
           <PointsRow label="Correctly identified qualifier" value={s.bp_third_correct_qualifier} />
           <PointsRow label="Correctly identified eliminated team" value={s.bp_third_correct_eliminated} />
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>How it works:</strong> The 8 best 3rd-place teams advance to the Round of 32, while 4 are eliminated. Rank all 12 third-place teams to predict which 8 qualify and which 4 go home.
           </p>
         </div>
@@ -202,11 +202,11 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
           <PointsRow label="3rd Place Match" value={s.bp_third_place_match_correct} />
           <PointsRow label="Final" value={s.bp_final_correct} />
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>Example:</strong> Correctly predicting a team to win the Final earns <strong>{s.bp_final_correct} pts</strong>. If you also predicted them winning all the way from R32, that single team could earn you {totalKnockoutExample} pts across the bracket.
           </p>
         </div>
@@ -271,11 +271,11 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
           <PointsRow label="Correct Winner + Goal Difference" value={s.group_correct_difference} />
           <PointsRow label="Correct Result Only (Win/Draw/Loss)" value={s.group_correct_result} />
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>How it works:</strong> If the actual score is 2-1, predicting 2-1 earns {s.group_exact_score} pts (exact). Predicting 3-2 earns {s.group_correct_difference} pts (correct winner + goal difference of 1). Predicting 2-0 earns {s.group_correct_result} pts (correct winner only). Only the highest tier applies.
           </p>
         </div>
@@ -304,11 +304,11 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
           <MultiplierRow label="Third Place Match" value={s.third_place_multiplier} />
           <MultiplierRow label="Final" value={s.final_multiplier} />
         </div>
-        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
-          <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mt-4 flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+          <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
-          <p className="text-xs text-primary-800 leading-5">
+          <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
             <strong>Example:</strong> An exact score prediction in the Final earns {s.knockout_exact_score} x {s.final_multiplier} = <strong>{finalExactExample} pts</strong>.
           </p>
         </div>

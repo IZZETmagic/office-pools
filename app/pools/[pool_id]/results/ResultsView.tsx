@@ -282,7 +282,7 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
                 groupFilter === 'all'
                   ? 'bg-primary-600 text-white'
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
               }`}
             >
               All
@@ -296,7 +296,7 @@ export function ResultsView({
                 } ${
                   groupFilter === g
                     ? 'bg-primary-600 text-white'
-                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
                 }`}
               >
                 {g}
@@ -317,7 +317,7 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
               }`}
             >
               {opt.label}
@@ -330,18 +330,27 @@ export function ResultsView({
           ))}
         </div>
 
-        {/* Status dropdown (mobile) */}
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          className="sm:hidden px-1.5 py-1.5 text-[10px] font-medium border border-neutral-300 rounded-md bg-surface text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-600"
-        >
+        {/* Status pills (mobile) */}
+        <div className="sm:hidden flex gap-1">
           {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.label}{opt.key !== 'all' ? ` (${statusCounts[opt.key]})` : ''}
-            </option>
+            <button
+              key={opt.key}
+              onClick={() => setStatusFilter(opt.key)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                statusFilter === opt.key
+                  ? opt.activeColor
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
+              }`}
+            >
+              {opt.label}
+              {opt.key !== 'all' && (
+                <span className="ml-0.5 opacity-70">
+                  {statusCounts[opt.key]}
+                </span>
+              )}
+            </button>
           ))}
-        </select>
+        </div>
 
         {/* Entry selector (right-aligned, only for multi-entry users) */}
         {userEntries && userEntries.length > 1 && onEntryChange && (

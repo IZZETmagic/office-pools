@@ -418,8 +418,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
         </h3>
 
         {pool.prediction_mode === 'progressive' && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-            <p className="text-xs text-blue-800">
+          <div className="mb-4 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl dark:bg-blue-900/20 dark:border-blue-800">
+            <svg className="w-5 h-5 text-blue-800 dark:text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
+            <p className="text-xs text-blue-800 dark:text-blue-600 leading-5">
               This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
             </p>
           </div>
@@ -580,11 +583,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           </FormField>
 
           {parseInt(maxEntries) > 1 && (
-            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl">
-              <svg className="w-5 h-5 text-primary-800 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
+              <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
-              <p className="text-xs text-primary-800 leading-5">
+              <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
                 Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
               </p>
             </div>

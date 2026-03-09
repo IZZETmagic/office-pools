@@ -136,7 +136,7 @@ function SectionCard({
     <div
       className={`bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden ${className ?? ''}`}
     >
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
         <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</h3>
         {headerRight}
       </div>
@@ -648,7 +648,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <>
             {/* Response time area chart */}
             <div className="mb-5">
-              <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+              <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
                 Avg Response Time (ms)
               </h4>
               <div className="h-[200px] sm:h-[260px]">
@@ -689,7 +689,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Endpoint breakdown table */}
             {apiData.apiPerf.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
                   Endpoint Breakdown
                 </h4>
                 {/* Mobile cards */}
@@ -697,10 +697,10 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   {apiData.apiPerf.map((ep, i) => (
                     <div
                       key={`${ep.endpoint}-${ep.method}-${i}`}
-                      className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 text-sm"
+                      className="bg-neutral-50 dark:bg-neutral-200 rounded-lg p-3 text-sm"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <code className="text-xs font-mono text-neutral-700 dark:text-neutral-300 truncate mr-2">
+                        <code className="text-xs font-mono text-neutral-700 dark:text-neutral-700 truncate mr-2">
                           {ep.method} {ep.endpoint}
                         </code>
                         <Badge
@@ -711,7 +711,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                           {ep.error_rate}% err
                         </Badge>
                       </div>
-                      <div className="flex gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+                      <div className="flex gap-4 text-xs text-neutral-500 dark:text-neutral-500">
                         <span>Avg: {ep.avg_response_ms}ms</span>
                         <span>Max: {ep.max_response_ms}ms</span>
                         <span>{ep.request_count} reqs</span>
@@ -724,7 +724,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-neutral-500 dark:text-neutral-400 uppercase">
+                      <tr className="text-xs text-neutral-500 dark:text-neutral-600 uppercase">
                         <th className="text-left py-2 pr-4">Endpoint</th>
                         <th className="text-left py-2 px-3">Method</th>
                         <th className="text-right py-2 px-3">Avg (ms)</th>
@@ -737,17 +737,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       {apiData.apiPerf.map((ep, i) => (
                         <tr key={`${ep.endpoint}-${ep.method}-${i}`}>
                           <td className="py-2 pr-4">
-                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-500">
                               {ep.endpoint}
                             </code>
                           </td>
                           <td className="py-2 px-3">
                             <Badge variant="blue">{ep.method}</Badge>
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-300">
+                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-500">
                             {ep.avg_response_ms}
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-300">
+                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-500">
                             {ep.max_response_ms}
                           </td>
                           <td className="py-2 px-3 text-right font-medium text-neutral-900 dark:text-white">
@@ -787,7 +787,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <div className="space-y-4">
             {/* Audit activity */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-700 dark:text-neutral-300">
+              <span className="text-sm text-neutral-700 dark:text-neutral-500">
                 Admin audit activity (24h):
               </span>
               <Badge variant={apiData.recentAuditCount > 0 ? 'green' : 'gray'}>
@@ -798,14 +798,14 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Table sizes */}
             {apiData.tableSizes.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
                   Database Table Sizes
                 </h4>
                 {/* Mobile: compact list */}
                 <div className="sm:hidden space-y-1">
                   {apiData.tableSizes.map((t) => (
                     <div key={t.table_name} className="flex items-center justify-between text-sm py-1">
-                      <code className="text-xs font-mono text-neutral-600 dark:text-neutral-400">
+                      <code className="text-xs font-mono text-neutral-600 dark:text-neutral-500">
                         {t.table_name}
                       </code>
                       <span className="font-mono font-medium text-neutral-900 dark:text-white text-xs">
@@ -819,7 +819,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-neutral-500 dark:text-neutral-400 uppercase">
+                      <tr className="text-xs text-neutral-500 dark:text-neutral-600 uppercase">
                         <th className="text-left py-2 pr-4">Table</th>
                         <th className="text-right py-2">Row Count</th>
                       </tr>
@@ -828,7 +828,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       {apiData.tableSizes.map((t) => (
                         <tr key={t.table_name}>
                           <td className="py-1.5 pr-4">
-                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-500">
                               {t.table_name}
                             </code>
                           </td>

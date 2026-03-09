@@ -1024,7 +1024,7 @@ export function PoolDetail({
                               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                                 activeTab === tab.key
                                   ? isAdminOverflow ? 'bg-warning-50 text-warning-700 font-medium dark:bg-warning-900/20 dark:text-warning-400' : 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/20 dark:text-primary-400'
-                                  : isAdminOverflow ? 'text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-900/20' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                                  : isAdminOverflow ? 'text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-900/20' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200'
                               }`}
                             >
                               {tab.label}

@@ -213,7 +213,7 @@ export function MatchCard({
             ) : homeCode ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
-            <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+            <span className="text-sm font-semibold text-neutral-800 dark:text-white truncate">
               {homeName}
             </span>
           </div>
@@ -244,7 +244,7 @@ export function MatchCard({
 
           {/* Away team */}
           <div className="flex items-center justify-end gap-2 min-w-0">
-            <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+            <span className="text-sm font-semibold text-neutral-800 dark:text-white truncate">
               {awayName}
             </span>
             {awayFlagUrl ? (
