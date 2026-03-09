@@ -48,6 +48,7 @@ export type SuperPoolData = {
   pool_code: string
   description: string | null
   status: string
+  prediction_mode: string
   tournament_id: string
   admin_user_id: string
   created_at: string
@@ -57,23 +58,22 @@ export type SuperPoolData = {
 }
 
 export type AuditLogData = {
-  log_id: string
+  id: string
+  action: string
+  performed_by: string
+  performed_at: string
   match_id: string | null
-  reset_by_user_id: string | null
-  reset_at: string
-  previous_home_score: number | null
-  previous_away_score: number | null
-  previous_home_pso: number | null
-  previous_away_pso: number | null
-  previous_status: string | null
-  action_type: string | null
-  reason: string | null
+  target_user_id: string | null
+  pool_id: string | null
+  details: Record<string, any>
+  summary: string | null
+  performer: { username: string; email: string } | null
   matches: {
     match_number: number
     home_team: { country_name: string } | null
     away_team: { country_name: string } | null
   } | null
-  users: { username: string; email: string } | null
+  target_user: { username: string; email: string } | null
 }
 
 // =============================================
@@ -136,15 +136,16 @@ export default async function SuperAdminPage() {
 
     // Audit logs
     supabase
-      .from('match_reset_log')
+      .from('admin_audit_log')
       .select(
         `
         *,
+        performer:users!admin_audit_log_performed_by_fkey(username, email),
         matches(match_number, home_team:teams!matches_home_team_id_fkey(country_name), away_team:teams!matches_away_team_id_fkey(country_name)),
-        users(username, email)
+        target_user:users!admin_audit_log_target_user_id_fkey(username, email)
       `
       )
-      .order('reset_at', { ascending: false })
+      .order('performed_at', { ascending: false })
       .limit(100),
   ])
 
@@ -169,6 +170,7 @@ export default async function SuperAdminPage() {
     const matchData = Array.isArray(a.matches) ? a.matches[0] ?? null : a.matches
     return {
       ...a,
+      performer: Array.isArray(a.performer) ? a.performer[0] ?? null : a.performer,
       matches: matchData
         ? {
             ...matchData,
@@ -180,7 +182,7 @@ export default async function SuperAdminPage() {
               : matchData.away_team,
           }
         : null,
-      users: Array.isArray(a.users) ? a.users[0] ?? null : a.users,
+      target_user: Array.isArray(a.target_user) ? a.target_user[0] ?? null : a.target_user,
     }
   })
 

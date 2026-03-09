@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // GET /api/pools/:poolId/predictions - Get prediction status
 // =============================================================
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -134,7 +135,7 @@ export async function GET(
 // =============================================================
 // POST /api/pools/:poolId/predictions - Save predictions (draft)
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -306,7 +307,7 @@ export async function POST(
 // =============================================================
 // PUT /api/pools/:poolId/predictions - Submit final predictions
 // =============================================================
-export async function PUT(
+async function handlePUT(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -425,3 +426,7 @@ export async function PUT(
     submittedAt: now,
   })
 }
+
+export const GET = withPerfLogging('/api/pools/[id]/predictions', handleGET)
+export const POST = withPerfLogging('/api/pools/[id]/predictions', handlePOST)
+export const PUT = withPerfLogging('/api/pools/[id]/predictions', handlePUT)

@@ -27,6 +27,6 @@ export function Badge({ variant = 'blue', children, className }: BadgeProps) {
 
 export function getStatusVariant(status: string): BadgeVariant {
   if (status === 'open') return 'outline-green'
-  if (status === 'active') return 'outline-yellow'
+  if (status === 'closed') return 'outline-yellow'
   return 'outline-gray'
 }

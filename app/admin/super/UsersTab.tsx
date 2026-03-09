@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+import { logAuditEvent } from '@/lib/audit'
 
 type UsersTabProps = {
   users: SuperUserData[]
@@ -77,6 +78,12 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
         u.user_id === user.user_id ? { ...u, is_super_admin: false } : u
       )
     )
+    logAuditEvent({
+      action: 'demote_admin',
+      target_user_id: user.user_id,
+      details: { username: user.username, email: user.email },
+      summary: `Removed super admin from ${user.username}`,
+    })
   }
 
   async function handleConfirmPromote() {
@@ -110,6 +117,12 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
     setSaving(false)
     setModal({ type: 'none' })
     showToast(`${modal.user.username} promoted to super admin.`, 'success')
+    logAuditEvent({
+      action: 'promote_admin',
+      target_user_id: modal.user.user_id,
+      details: { username: modal.user.username, email: modal.user.email },
+      summary: `Promoted ${modal.user.username} to super admin`,
+    })
   }
 
   async function handleToggleActive(user: SuperUserData) {
@@ -138,20 +151,18 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
         u.user_id === user.user_id ? { ...u, is_active: newActive } : u
       )
     )
+    logAuditEvent({
+      action: 'toggle_active',
+      target_user_id: user.user_id,
+      details: { username: user.username, is_active: newActive },
+      summary: `${newActive ? 'Reactivated' : 'Deactivated'} user ${user.username}`,
+    })
   }
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
+      <div className="mb-6">
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">User Management</h2>
-        <div className="flex gap-3 text-sm">
-          <span className="px-3 py-1 bg-danger-100 text-danger-700 rounded-full font-medium">
-            {superAdminCount} Super Admin{superAdminCount !== 1 ? 's' : ''}
-          </span>
-          <span className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full font-medium">
-            {users.length} Total Users
-          </span>
-        </div>
       </div>
 
       {/* Filters */}
@@ -182,56 +193,63 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
             No users found.
           </div>
         ) : (
-          filteredUsers.map((user) => {
+          filteredUsers.map((user, i) => {
             const isCurrentUser = user.user_id === currentUserId
             return (
               <div
                 key={user.user_id}
-                className={`bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 ${isCurrentUser ? 'ring-1 ring-danger-300 dark:ring-danger-700' : ''}`}
+                className={`bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden animate-fade-up ${isCurrentUser ? 'ring-1 ring-danger-300 dark:ring-danger-700' : ''}`}
+                style={{ animationDelay: `${i * 0.05}s` }}
               >
-                {/* Top row: name, badges */}
-                <div className="flex items-center flex-wrap gap-2 mb-2">
-                  <span className="font-medium text-neutral-900 dark:text-white">
+                {/* Header bar: username + badges */}
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                  <span className="font-semibold text-sm text-neutral-900 dark:text-white truncate">
                     {user.username}
                   </span>
-                  {isCurrentUser && <span className="text-xs text-primary-500">(you)</span>}
-                  {user.is_super_admin ? (
-                    <Badge variant="yellow">Super Admin</Badge>
-                  ) : (
-                    <Badge variant="gray">User</Badge>
+                  {isCurrentUser && <span className="text-[11px] text-primary-500">(you)</span>}
+                  <div className="flex gap-1.5 ml-auto flex-shrink-0">
+                    {user.is_super_admin ? (
+                      <Badge variant="yellow">Super Admin</Badge>
+                    ) : (
+                      <Badge variant="gray">User</Badge>
+                    )}
+                    <Badge variant={user.is_active ? 'green' : 'gray'}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </div>
+                {/* Body: details + actions */}
+                <div className="px-3.5 py-3">
+                  <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                    {user.full_name && <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-0.5">{user.full_name}</p>}
+                    <p className="truncate">{user.email}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-3 text-[11px] text-neutral-400 dark:text-neutral-500">
+                      <span>Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>Login: {user.last_login ? new Date(user.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</span>
+                    </div>
+                  </div>
+                  {!isCurrentUser && (
+                    <div className="flex gap-1.5 mt-2.5">
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => handleToggleSuperAdmin(user, !user.is_super_admin)}
+                      >
+                        {user.is_super_admin ? 'Remove Admin' : 'Make Admin'}
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        className={user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}
+                        onClick={() => handleToggleActive(user)}
+                      >
+                        {user.is_active ? 'Deactivate' : 'Reactivate'}
+                      </Button>
+                    </div>
                   )}
-                  <Badge variant={user.is_active ? 'green' : 'gray'}>
-                    {user.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
                 </div>
-                {/* Details */}
-                <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                  {user.full_name && <p className="text-xs">{user.full_name}</p>}
-                  <p className="truncate">{user.email}</p>
-                  <div className="flex gap-4 text-xs text-neutral-500 dark:text-neutral-500">
-                    <span>Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    <span>Login: {user.last_login ? new Date(user.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</span>
-                  </div>
-                </div>
-                {/* Actions */}
-                {!isCurrentUser && (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={user.is_super_admin ? 'gray' : 'warning'}
-                      onClick={() => handleToggleSuperAdmin(user, !user.is_super_admin)}
-                    >
-                      {user.is_super_admin ? 'Remove Admin' : 'Make Admin'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={user.is_active ? 'danger' : 'green'}
-                      onClick={() => handleToggleActive(user)}
-                    >
-                      {user.is_active ? 'Deactivate' : 'Reactivate'}
-                    </Button>
-                  </div>
-                )}
               </div>
             )
           })
@@ -240,7 +258,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
 
       {/* Users — desktop table */}
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
+        <div>
           <table className="w-full">
             <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
@@ -275,12 +293,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => {
+                filteredUsers.map((user, i) => {
                   const isCurrentUser = user.user_id === currentUserId
                   return (
                     <tr
                       key={user.user_id}
-                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
+                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
+                      style={{ animationDelay: `${i * 0.03}s` }}
                     >
                       <td className="px-4 py-3">
                         <div>
@@ -326,12 +345,12 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                           : 'Never'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-1.5 justify-end">
                           {!isCurrentUser && (
                             <>
                               <Button
-                                size="sm"
-                                variant={user.is_super_admin ? 'gray' : 'warning'}
+                                size="xs"
+                                variant="outline"
                                 onClick={() =>
                                   handleToggleSuperAdmin(
                                     user,
@@ -344,8 +363,9 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                                   : 'Make Admin'}
                               </Button>
                               <Button
-                                size="sm"
-                                variant={user.is_active ? 'danger' : 'green'}
+                                size="xs"
+                                variant="outline"
+                                className={user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}
                                 onClick={() => handleToggleActive(user)}
                               >
                                 {user.is_active ? 'Deactivate' : 'Reactivate'}

@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // GET /api/pools/:poolId/entries - List user's entries for this pool
 // =============================================================
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -45,7 +46,7 @@ export async function GET(
 // =============================================================
 // POST /api/pools/:poolId/entries - Create a new entry
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -123,7 +124,7 @@ export async function POST(
 // =============================================================
 // PATCH /api/pools/:poolId/entries - Rename an entry
 // =============================================================
-export async function PATCH(
+async function handlePATCH(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -173,7 +174,7 @@ export async function PATCH(
 // =============================================================
 // DELETE /api/pools/:poolId/entries - Delete an entry
 // =============================================================
-export async function DELETE(
+async function handleDELETE(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -233,3 +234,8 @@ export async function DELETE(
 
   return NextResponse.json({ deleted: true })
 }
+
+export const GET = withPerfLogging('/api/pools/[id]/entries', handleGET)
+export const POST = withPerfLogging('/api/pools/[id]/entries', handlePOST)
+export const PATCH = withPerfLogging('/api/pools/[id]/entries', handlePATCH)
+export const DELETE = withPerfLogging('/api/pools/[id]/entries', handleDELETE)

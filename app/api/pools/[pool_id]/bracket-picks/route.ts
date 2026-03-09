@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // GET /api/pools/:poolId/bracket-picks - Load bracket picker data
 // =============================================================
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -71,7 +72,7 @@ export async function GET(
 // =============================================================
 // POST /api/pools/:poolId/bracket-picks - Save draft (auto-save)
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -214,7 +215,7 @@ export async function POST(
 // =============================================================
 // PUT /api/pools/:poolId/bracket-picks - Submit (lock predictions)
 // =============================================================
-export async function PUT(
+async function handlePUT(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -327,3 +328,7 @@ export async function PUT(
 
   return NextResponse.json({ submitted: true })
 }
+
+export const GET = withPerfLogging('/api/pools/[id]/bracket-picks', handleGET)
+export const POST = withPerfLogging('/api/pools/[id]/bracket-picks', handlePOST)
+export const PUT = withPerfLogging('/api/pools/[id]/bracket-picks', handlePUT)

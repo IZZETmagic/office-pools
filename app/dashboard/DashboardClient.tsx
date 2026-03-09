@@ -488,7 +488,7 @@ export function DashboardClient({
             </div>
             <div className="min-w-0">
               <h2 className="text-lg sm:text-3xl font-bold text-white truncate">
-                Welcome, {user.full_name || user.username || 'Player'}!
+                Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, {user.full_name || user.username || 'Player'}!
               </h2>
               <p className="text-primary-100 dark:text-white/60 text-xs sm:text-base">@{user.username}</p>
             </div>

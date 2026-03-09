@@ -2,17 +2,18 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
 import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { PredictionMap, ScoreEntry, Team, MatchConductData } from '@/lib/tournament'
+import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // POST /api/pools/:poolId/bonus/calculate
 // Recalculates bonus points for all members in the pool.
 // Admin or super admin only.
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -124,18 +125,39 @@ export async function POST(
     country_code: t.country_code?.trim() || '',
   }))
 
-  // 5. Process each entry that has predictions
-  // Don't rely solely on has_submitted_predictions flag — check actual prediction data
+  // 5. Batch-fetch ALL predictions for all entries in one query (eliminates N+1)
+  const entryIds = entries.map(e => e.entry_id)
+
+  const { data: allPredictions } = await supabase
+    .from('predictions')
+    .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+    .in('entry_id', entryIds)
+
+  // Group predictions by entry_id in memory
+  const predictionsByEntry = new Map<string, any[]>()
+  for (const p of (allPredictions || [])) {
+    const list = predictionsByEntry.get(p.entry_id) || []
+    list.push(p)
+    predictionsByEntry.set(p.entry_id, list)
+  }
+
+  // Bulk delete ALL existing bonus_scores for these entries in one query
+  if (entryIds.length > 0) {
+    await adminClient
+      .from('bonus_scores')
+      .delete()
+      .in('entry_id', entryIds)
+  }
+
+  // 6. Process each entry (pure computation — no DB calls in this loop)
   let totalBonusEntries = 0
   let totalBonusPoints = 0
+  const allBonusRows: any[] = []
+  const allGroupRows: any[] = []
+  const allSpecialRows: any[] = []
 
   for (const entry of entries) {
-    // Fetch this entry's predictions
-    const { data: predictions } = await supabase
-      .from('predictions')
-      .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .eq('entry_id', entry.entry_id)
-
+    const predictions = predictionsByEntry.get(entry.entry_id)
     if (!predictions || predictions.length === 0) continue
 
     // Build PredictionMap
@@ -150,7 +172,7 @@ export async function POST(
       })
     }
 
-    // Calculate bonus points
+    // Calculate bonus points (pure computation)
     const bonusEntries = calculateAllBonusPoints({
       memberId: entry.entry_id,
       memberPredictions: predictionMap,
@@ -161,44 +183,91 @@ export async function POST(
       tournamentAwards,
     })
 
-    // Delete existing bonus_scores for this entry (use admin client to bypass RLS)
-    await adminClient
-      .from('bonus_scores')
-      .delete()
-      .eq('entry_id', entry.entry_id)
-
-    // Insert new bonus_scores (use admin client to bypass RLS)
+    // Collect bonus rows for bulk insert
     if (bonusEntries.length > 0) {
-      const rows = bonusEntries.map(e => ({
-        entry_id: e.entry_id,
-        bonus_type: e.bonus_type,
-        bonus_category: e.bonus_category,
-        related_group_letter: e.related_group_letter,
-        related_match_id: e.related_match_id,
-        points_earned: e.points_earned,
-        description: e.description,
-      }))
-
-      const { error: insertError } = await adminClient
-        .from('bonus_scores')
-        .insert(rows)
-
-      if (insertError) {
-        console.error(`Failed to insert bonus_scores for entry ${entry.entry_id}:`, insertError)
+      for (const e of bonusEntries) {
+        allBonusRows.push({
+          entry_id: e.entry_id,
+          bonus_type: e.bonus_type,
+          bonus_category: e.bonus_category,
+          related_group_letter: e.related_group_letter,
+          related_match_id: e.related_match_id,
+          points_earned: e.points_earned,
+          description: e.description,
+        })
       }
     }
 
-    // Auto-populate group_predictions for this entry
-    await populateGroupPredictions(adminClient, entry.entry_id, pool.tournament_id, normalizedMatches, predictionMap, teamsData)
-
-    // Auto-populate special_predictions for this entry
-    await populateSpecialPredictions(adminClient, entry.entry_id, normalizedMatches, predictionMap, teamsData)
-
     totalBonusEntries += bonusEntries.length
     totalBonusPoints += bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+
+    // Compute group predictions rows (pure computation)
+    const bracket = resolveFullBracket({ matches: normalizedMatches, predictionMap, teams: teamsData })
+
+    for (const letter of GROUP_LETTERS) {
+      const standings = bracket.allGroupStandings.get(letter)
+      if (!standings || standings.length < 4) continue
+
+      allGroupRows.push({
+        entry_id: entry.entry_id,
+        tournament_id: pool.tournament_id,
+        group_letter: letter,
+        position_1_team_id: standings[0]?.team_id || null,
+        position_2_team_id: standings[1]?.team_id || null,
+        position_3_team_id: standings[2]?.team_id || null,
+        position_4_team_id: standings[3]?.team_id || null,
+        auto_calculated: true,
+      })
+    }
+
+    // Compute special predictions row (pure computation)
+    allSpecialRows.push({
+      entry_id: entry.entry_id,
+      predicted_champion_team_id: bracket.champion?.team_id || null,
+      predicted_runner_up_team_id: bracket.runnerUp?.team_id || null,
+      predicted_third_place_team_id: bracket.thirdPlace?.team_id || null,
+    })
   }
 
-  // 6. Recalculate leaderboard (use admin client to bypass RLS)
+  // 7. Bulk write all collected rows in parallel
+  const bulkOps = []
+
+  if (allBonusRows.length > 0) {
+    bulkOps.push(
+      adminClient
+        .from('bonus_scores')
+        .insert(allBonusRows)
+        .then(({ error }) => {
+          if (error) console.error('Failed to bulk insert bonus_scores:', error)
+        })
+    )
+  }
+
+  if (allGroupRows.length > 0) {
+    bulkOps.push(
+      adminClient
+        .from('group_predictions')
+        .upsert(allGroupRows, { onConflict: 'entry_id,group_letter' })
+        .then(({ error }) => {
+          if (error) console.error('Failed to bulk upsert group_predictions:', error)
+        })
+    )
+  }
+
+  if (allSpecialRows.length > 0) {
+    bulkOps.push(
+      adminClient
+        .from('special_predictions')
+        .upsert(allSpecialRows, { onConflict: 'entry_id' })
+        .then(({ error }) => {
+          if (error) console.error('Failed to bulk upsert special_predictions:', error)
+        })
+    )
+  }
+
+  await Promise.all(bulkOps)
+
+  // 8. Recalculate leaderboard (use admin client to bypass RLS)
   const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
     p_pool_id: pool_id,
   })
@@ -215,101 +284,4 @@ export async function POST(
   })
 }
 
-// =============================================
-// HELPER: Populate group_predictions table
-// =============================================
-
-async function populateGroupPredictions(
-  supabase: any,
-  entryId: string,
-  tournamentId: string,
-  matches: MatchWithResult[],
-  predictionMap: PredictionMap,
-  teams: Team[]
-) {
-  const bracket = resolveFullBracket({ matches, predictionMap, teams })
-
-  for (const letter of GROUP_LETTERS) {
-    const standings = bracket.allGroupStandings.get(letter)
-    if (!standings || standings.length < 4) continue
-
-    const row = {
-      entry_id: entryId,
-      tournament_id: tournamentId,
-      group_letter: letter,
-      position_1_team_id: standings[0]?.team_id || null,
-      position_2_team_id: standings[1]?.team_id || null,
-      position_3_team_id: standings[2]?.team_id || null,
-      position_4_team_id: standings[3]?.team_id || null,
-      auto_calculated: true,
-    }
-
-    // Upsert: try to find existing row first
-    const { data: existing, error: lookupError } = await supabase
-      .from('group_predictions')
-      .select('group_prediction_id')
-      .eq('entry_id', entryId)
-      .eq('group_letter', letter)
-      .single()
-
-    if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error(`Error looking up group_predictions for entry ${entryId}, group ${letter}:`, lookupError)
-      continue
-    }
-
-    if (existing) {
-      await supabase
-        .from('group_predictions')
-        .update(row)
-        .eq('group_prediction_id', existing.group_prediction_id)
-    } else {
-      await supabase
-        .from('group_predictions')
-        .insert(row)
-    }
-  }
-}
-
-// =============================================
-// HELPER: Populate special_predictions table
-// =============================================
-
-async function populateSpecialPredictions(
-  supabase: any,
-  entryId: string,
-  matches: MatchWithResult[],
-  predictionMap: PredictionMap,
-  teams: Team[]
-) {
-  const bracket = resolveFullBracket({ matches, predictionMap, teams })
-
-  const row = {
-    entry_id: entryId,
-    predicted_champion_team_id: bracket.champion?.team_id || null,
-    predicted_runner_up_team_id: bracket.runnerUp?.team_id || null,
-    predicted_third_place_team_id: bracket.thirdPlace?.team_id || null,
-  }
-
-  // Upsert
-  const { data: existing, error: lookupError } = await supabase
-    .from('special_predictions')
-    .select('special_prediction_id')
-    .eq('entry_id', entryId)
-    .single()
-
-  if (lookupError && lookupError.code !== 'PGRST116') {
-    console.error(`Error looking up special_predictions for entry ${entryId}:`, lookupError)
-    return
-  }
-
-  if (existing) {
-    await supabase
-      .from('special_predictions')
-      .update(row)
-      .eq('special_prediction_id', existing.special_prediction_id)
-  } else {
-    await supabase
-      .from('special_predictions')
-      .insert(row)
-  }
-}
+export const POST = withPerfLogging('/api/pools/[id]/bonus/calculate', handlePOST)

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+import { logAuditEvent } from '@/lib/audit'
 
 type MatchesTabProps = {
   matches: SuperMatchData[]
@@ -129,10 +130,16 @@ export function MatchesTab({
   const [awayDirectReds, setAwayDirectReds] = useState('0')
   const [awayYellowDirectReds, setAwayYellowDirectReds] = useState('0')
 
-  // Stats
-  const completedCount = matches.filter((m) => m.is_completed).length
-  const scheduledCount = matches.filter((m) => m.status === 'scheduled').length
-  const liveCount = matches.filter((m) => m.status === 'live').length
+  // Stats (scoped to current stage + group filters for status counts)
+  const stageFiltered = matches.filter((m) => {
+    if (stageFilter !== 'all' && m.stage !== stageFilter) return false
+    if (groupFilter !== 'all' && stageFilter === 'group' && m.group_letter !== groupFilter) return false
+    return true
+  })
+  const completedCount = stageFiltered.filter((m) => m.is_completed).length
+  const scheduledCount = stageFiltered.filter((m) => m.status === 'scheduled').length
+  const liveCount = stageFiltered.filter((m) => m.status === 'live').length
+  const cancelledCount = stageFiltered.filter((m) => m.status === 'cancelled').length
 
   // Get unique stages and groups
   const stages = [...new Set(matches.map((m) => m.stage))]
@@ -244,24 +251,20 @@ export function MatchesTab({
         .eq('tournament_id', match.tournament_id)
 
       if (pools) {
-        for (const pool of pools) {
-          if (pool.prediction_mode === 'bracket_picker') {
-            try {
+        await Promise.all(pools.map(async (pool) => {
+          try {
+            if (pool.prediction_mode === 'bracket_picker') {
               await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
-            } catch (e) {
-              console.error('Failed to recalculate bracket picker points for pool', pool.pool_id, e)
-            }
-          } else {
-            await supabase.rpc('recalculate_all_pool_points', {
-              pool_id_param: pool.pool_id,
-            })
-            try {
+            } else {
+              await supabase.rpc('recalculate_all_pool_points', {
+                pool_id_param: pool.pool_id,
+              })
               await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
-            } catch (e) {
-              console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
             }
+          } catch (e) {
+            console.error('Failed to recalculate points for pool', pool.pool_id, e)
           }
-        }
+        }))
       }
 
       await refreshMatches()
@@ -271,11 +274,23 @@ export function MatchesTab({
         `Match #${match.match_number} is now live (0-0). Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
         'success'
       )
+      logAuditEvent({
+        action: 'set_status',
+        match_id: match.match_id,
+        details: { new_status: 'live', match_number: match.match_number },
+        summary: `Set match #${match.match_number} to live`,
+      })
     } else {
       await refreshMatches()
       setSaving(false)
       setModal({ type: 'none' })
       showToast(`Match #${match.match_number} set to "${label}".`, 'success')
+      logAuditEvent({
+        action: 'set_status',
+        match_id: match.match_id,
+        details: { new_status: newStatus, match_number: match.match_number },
+        summary: `Set match #${match.match_number} to ${label}`,
+      })
     }
   }
 
@@ -353,6 +368,18 @@ export function MatchesTab({
       `Live score updated to ${hScore}-${aScore}. Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
       'success'
     )
+    logAuditEvent({
+      action: 'update_live_score',
+      match_id: match.match_id,
+      details: {
+        match_number: match.match_number,
+        previous_home_score: match.home_score_ft,
+        previous_away_score: match.away_score_ft,
+        new_home_score: hScore,
+        new_away_score: aScore,
+      },
+      summary: `Updated live score for #${match.match_number}: ${match.home_score_ft ?? 0}-${match.away_score_ft ?? 0} → ${hScore}-${aScore}`,
+    })
   }
 
   async function refreshMatches() {
@@ -377,11 +404,11 @@ export function MatchesTab({
 
   async function refreshAuditLogs() {
     const { data } = await supabase
-      .from('match_reset_log')
+      .from('admin_audit_log')
       .select(
-        `*, matches(match_number, home_team:teams!matches_home_team_id_fkey(country_name), away_team:teams!matches_away_team_id_fkey(country_name)), users(username, email)`
+        `*, performer:users!admin_audit_log_performed_by_fkey(username, email), matches(match_number, home_team:teams!matches_home_team_id_fkey(country_name), away_team:teams!matches_away_team_id_fkey(country_name)), target_user:users!admin_audit_log_target_user_id_fkey(username, email)`
       )
-      .order('reset_at', { ascending: false })
+      .order('performed_at', { ascending: false })
       .limit(100)
 
     if (data) {
@@ -390,6 +417,7 @@ export function MatchesTab({
           const matchData = Array.isArray(a.matches) ? a.matches[0] ?? null : a.matches
           return {
             ...a,
+            performer: Array.isArray(a.performer) ? a.performer[0] ?? null : a.performer,
             matches: matchData
               ? {
                   ...matchData,
@@ -401,7 +429,7 @@ export function MatchesTab({
                     : matchData.away_team,
                 }
               : null,
-            users: Array.isArray(a.users) ? a.users[0] ?? null : a.users,
+            target_user: Array.isArray(a.target_user) ? a.target_user[0] ?? null : a.target_user,
           }
         })
       )
@@ -495,20 +523,23 @@ export function MatchesTab({
 
     let bonusInfo = ''
     if (pools && pools.length > 0) {
-      for (const pool of pools) {
+      const results = await Promise.all(pools.map(async (pool) => {
         try {
-          // Use the appropriate calculation endpoint based on pool type
           const endpoint = pool.prediction_mode === 'bracket_picker'
             ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
             : `/api/pools/${pool.pool_id}/bonus/calculate`
           const res = await fetch(endpoint, { method: 'POST' })
-          if (res.ok) {
-            const data = await res.json()
-            bonusInfo = ` Bonus: ${data.totalBonusEntries} entries (${data.totalBonusPoints} pts).`
-          }
+          if (res.ok) return await res.json()
         } catch (e) {
           console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
+        return null
+      }))
+      const totals = results.filter(Boolean)
+      if (totals.length > 0) {
+        const totalEntries = totals.reduce((sum, d) => sum + (d.totalBonusEntries || 0), 0)
+        const totalPoints = totals.reduce((sum, d) => sum + (d.totalBonusPoints || 0), 0)
+        bonusInfo = ` Bonus: ${totalEntries} entries (${totalPoints} pts).`
       }
     }
 
@@ -546,6 +577,19 @@ export function MatchesTab({
       `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}${advanceInfo}`,
       'success'
     )
+    logAuditEvent({
+      action: 'enter_result',
+      match_id: match.match_id,
+      details: {
+        match_number: match.match_number,
+        home_score: hScore,
+        away_score: aScore,
+        home_pso: psoH,
+        away_pso: psoA,
+        predictions_processed: processed,
+      },
+      summary: `Entered result for #${match.match_number}: ${hScore}-${aScore}${psoH !== null ? ` (PSO ${psoH}-${psoA})` : ''}`,
+    })
   }
 
   async function handleResetMatch() {
@@ -578,7 +622,7 @@ export function MatchesTab({
       .eq('tournament_id', match.tournament_id)
 
     if (resetPools) {
-      for (const pool of resetPools) {
+      await Promise.all(resetPools.map(async (pool) => {
         try {
           const endpoint = pool.prediction_mode === 'bracket_picker'
             ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
@@ -587,7 +631,7 @@ export function MatchesTab({
         } catch (e) {
           console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
-      }
+      }))
     }
 
     await Promise.all([refreshMatches(), refreshAuditLogs()])
@@ -617,6 +661,19 @@ export function MatchesTab({
     setResetting(false)
     setModal({ type: 'none' })
     showToast(`Match has been reset. All affected pool points recalculated.${clearInfo}`, 'success')
+    logAuditEvent({
+      action: 'reset_match',
+      match_id: match.match_id,
+      details: {
+        match_number: match.match_number,
+        previous_home_score: match.home_score_ft,
+        previous_away_score: match.away_score_ft,
+        previous_home_pso: match.home_score_pso,
+        previous_away_pso: match.away_score_pso,
+        reason: resetReason || 'Manual reset by super admin',
+      },
+      summary: `Reset match #${match.match_number}: ${resetReason || 'Manual reset by super admin'}`,
+    })
   }
 
   async function handleManualAdvance() {
@@ -633,6 +690,14 @@ export function MatchesTab({
         showToast(data.message, 'success')
         if (data.advanced.length > 0) {
           await refreshMatches()
+          logAuditEvent({
+            action: 'advance_teams',
+            details: {
+              advanced_count: data.advanced.length,
+              advanced: data.advanced,
+            },
+            summary: `Manual team advancement: ${data.advanced.length} advanced`,
+          })
         }
       } else {
         const err = await res.json()
@@ -646,71 +711,101 @@ export function MatchesTab({
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Match Results</h2>
-        <div className="flex gap-3 items-center text-sm">
-          <span className="px-3 py-1 bg-success-100 text-success-700 rounded-full font-medium">
-            {completedCount} Completed
-          </span>
-          {liveCount > 0 && (
-            <span className="px-3 py-1 bg-warning-100 text-warning-700 rounded-full font-medium">
-              {liveCount} Live
-            </span>
-          )}
-          <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">
-            {scheduledCount} Scheduled
-          </span>
-          <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
-            Advance Teams
-          </Button>
-        </div>
+        <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
+          Advance Teams
+        </Button>
       </div>
 
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <select
-          value={stageFilter}
-          onChange={(e) => {
-            setStageFilter(e.target.value)
-            if (e.target.value !== 'group') setGroupFilter('all')
-          }}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
-        >
-          <option value="all">All Stages</option>
-          {stages.map((s) => (
-            <option key={s} value={s}>
-              {getStageName(s)}
-            </option>
+      {/* Stage filter buttons */}
+      <div className="mb-4 border-b border-neutral-200 dark:border-neutral-700 pb-3">
+        <div className="flex gap-1 overflow-x-auto">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'group', label: 'Group' },
+            { key: 'round_32', label: 'R32' },
+            { key: 'round_16', label: 'R16' },
+            { key: 'quarter_final', label: 'QF' },
+            { key: 'semi_final', label: 'SF' },
+            { key: 'third_place', label: '3rd' },
+            { key: 'final', label: 'Final' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setStageFilter(tab.key)
+                if (tab.key !== 'group') setGroupFilter('all')
+              }}
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                stageFilter === tab.key
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+              }`}
+            >
+              {tab.label}
+            </button>
           ))}
-        </select>
+        </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
-        >
-          <option value="all">All Status</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="live">Live</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-
+        {/* Group letter pills (only when Group tab active) */}
         {stageFilter === 'group' && (
-          <select
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
-          >
-            <option value="all">All Groups</option>
-            {groups.map((g) => (
-              <option key={g} value={g}>
-                Group {g}
-              </option>
+          <div className="flex gap-0.5 mt-2 overflow-x-auto">
+            <button
+              onClick={() => setGroupFilter('all')}
+              className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
+                groupFilter === 'all'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+              }`}
+            >
+              All
+            </button>
+            {groups.map((g, i) => (
+              <button
+                key={g}
+                onClick={() => setGroupFilter(g)}
+                className={`w-8 h-7 text-xs font-medium transition-colors ${
+                  i === groups.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
+                } ${
+                  groupFilter === g
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                }`}
+              >
+                {g}
+              </button>
             ))}
-          </select>
+          </div>
         )}
+      </div>
+
+      {/* Status filter buttons */}
+      <div className="flex gap-1 mb-6 overflow-x-auto">
+        {[
+          { key: 'all', label: 'All', count: null },
+          { key: 'scheduled', label: 'Scheduled', count: scheduledCount },
+          { key: 'live', label: 'Live', count: liveCount },
+          { key: 'completed', label: 'Completed', count: completedCount },
+          { key: 'cancelled', label: 'Cancelled', count: cancelledCount },
+        ].map((opt) => (
+          <button
+            key={opt.key}
+            onClick={() => setStatusFilter(opt.key)}
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+              statusFilter === opt.key
+                ? opt.key === 'live' ? 'bg-danger-600 text-white'
+                : opt.key === 'completed' ? 'bg-success-600 text-white'
+                : opt.key === 'scheduled' ? 'bg-primary-600 text-white'
+                : opt.key === 'cancelled' ? 'bg-neutral-600 text-white'
+                : 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
+            {opt.label}{opt.count != null && <span className="opacity-70"> {opt.count}</span>}
+          </button>
+        ))}
       </div>
 
       {/* Matches — mobile cards */}
@@ -720,69 +815,67 @@ export function MatchesTab({
             No matches found with current filters.
           </div>
         ) : (
-          filteredMatches.map((match) => {
+          filteredMatches.map((match, i) => {
             const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
             const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
             const matchDate = new Date(match.match_date)
             return (
-              <div key={match.match_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4">
-                {/* Top row: match #, stage, status */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-mono font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
-                    #{match.match_number}
-                  </span>
-                  <Badge variant="blue">
+              <div key={match.match_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden animate-fade-up" style={{ animationDelay: `${i * 0.05}s` }}>
+                {/* Row 1: metadata bar */}
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                  <span className="text-xs font-mono font-semibold text-neutral-500 dark:text-neutral-400">#{match.match_number}</span>
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500">&middot;</span>
+                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                     {getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}
-                  </Badge>
+                  </span>
                   <Badge variant={getStatusBadgeVariant(match.status)}>
                     {match.status}
                   </Badge>
-                  <span className="ml-auto text-xs text-neutral-500 dark:text-neutral-400">
+                  <span className="ml-auto text-[11px] text-neutral-400 dark:text-neutral-500">
                     {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
                     {matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 </div>
-                {/* Teams + score */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="font-medium text-neutral-900 dark:text-white">
-                    {home} <span className="text-neutral-400 mx-1">vs</span> {away}
+                {/* Row 2: teams + score */}
+                <div className="flex items-center justify-between px-3.5 py-3">
+                  <div className="font-semibold text-neutral-900 dark:text-white">
+                    {home} <span className="text-neutral-400 dark:text-neutral-500 font-normal mx-1">vs</span> {away}
                   </div>
-                  <div className="text-right flex-shrink-0 ml-3">
+                  <div className="flex-shrink-0 ml-3">
                     {match.is_completed ? (
-                      <span className="font-bold text-neutral-900 dark:text-white">
+                      <span className="font-bold font-mono text-lg text-neutral-900 dark:text-white">
                         {match.home_score_ft} - {match.away_score_ft}
                         {match.home_score_pso !== null && (
-                          <span className="text-xs text-neutral-500 block">PSO: {match.home_score_pso}-{match.away_score_pso}</span>
+                          <span className="text-[10px] font-normal font-sans text-neutral-500 block text-right">PSO {match.home_score_pso}-{match.away_score_pso}</span>
                         )}
                       </span>
                     ) : match.status === 'live' && match.home_score_ft !== null ? (
-                      <span className="font-bold text-warning-700">
+                      <span className="font-bold font-mono text-lg text-warning-700 dark:text-warning-400">
                         {match.home_score_ft} - {match.away_score_ft}
-                        <span className="text-xs text-warning-500 block">provisional</span>
                       </span>
                     ) : (
-                      <span className="text-neutral-400">—</span>
+                      <span className="text-neutral-300 dark:text-neutral-600">—</span>
                     )}
                   </div>
                 </div>
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2">
+                {/* Row 3: actions */}
+                <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
                   {match.status === 'scheduled' && (
-                    <Button size="sm" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>Set Live</Button>
+                    <Button size="xs" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>Set Live</Button>
                   )}
                   {match.status === 'live' && (
                     <>
-                      <Button size="sm" variant="warning" onClick={() => openLiveScoreModal(match)}>Update Score</Button>
-                      <Button size="sm" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>Set Scheduled</Button>
+                      <Button size="xs" variant="warning" onClick={() => openLiveScoreModal(match)}>Update Score</Button>
+                      <Button size="xs" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>Set Scheduled</Button>
                     </>
                   )}
                   {match.status !== 'cancelled' && (
-                    <Button size="sm" variant="primary" onClick={() => openResultModal(match)}>
+                    <Button size="xs" variant="outline" onClick={() => openResultModal(match)}>
                       {match.is_completed ? 'Edit Result' : 'Enter Result'}
                     </Button>
                   )}
                   {match.is_completed && (
-                    <Button size="sm" variant="primary" className="!bg-neutral-800 hover:!bg-neutral-900" onClick={() => openResetModal(match)}>Reset</Button>
+                    <Button size="xs" variant="outline" className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>Reset</Button>
                   )}
                 </div>
               </div>
@@ -793,9 +886,9 @@ export function MatchesTab({
 
       {/* Matches — desktop table */}
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
+        <div>
           <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <thead className="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
                   #
@@ -828,7 +921,7 @@ export function MatchesTab({
                   </td>
                 </tr>
               ) : (
-                filteredMatches.map((match) => {
+                filteredMatches.map((match, i) => {
                   const home =
                     match.home_team?.country_name ||
                     match.home_team_placeholder ||
@@ -840,7 +933,7 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
@@ -902,31 +995,31 @@ export function MatchesTab({
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-1.5 justify-end">
                           {match.status === 'scheduled' && (
-                            <Button size="sm" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
+                            <Button size="xs" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
                               Set Live
                             </Button>
                           )}
                           {match.status === 'live' && (
                             <>
-                              <Button size="sm" variant="warning" onClick={() => openLiveScoreModal(match)}>
+                              <Button size="xs" variant="warning" onClick={() => openLiveScoreModal(match)}>
                                 Update Score
                               </Button>
-                              <Button size="sm" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
+                              <Button size="xs" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
                                 Set Scheduled
                               </Button>
                             </>
                           )}
                           {match.status !== 'cancelled' && (
-                            <Button size="sm" variant="primary" onClick={() => openResultModal(match)}>
+                            <Button size="xs" variant="outline" onClick={() => openResultModal(match)}>
                               {match.is_completed
                                 ? 'Edit Result'
                                 : 'Enter Result'}
                             </Button>
                           )}
                           {match.is_completed && (
-                            <Button size="sm" variant="primary" className="!bg-neutral-800 hover:!bg-neutral-900" onClick={() => openResetModal(match)}>
+                            <Button size="xs" variant="outline" className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>
                               Reset
                             </Button>
                           )}

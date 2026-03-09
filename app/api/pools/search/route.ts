@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { withPerfLogging } from '@/lib/api-perf'
 
-export async function GET(request: Request) {
+async function handleGET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -70,3 +71,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ pools: poolsWithCounts })
 }
+
+export const GET = withPerfLogging('/api/pools/search', handleGET)

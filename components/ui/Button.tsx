@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 type ButtonBaseProps = {
   variant?: 'primary' | 'green' | 'outline' | 'gray' | 'danger' | 'warning'
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   fullWidth?: boolean
   loading?: boolean
   loadingText?: string
@@ -32,6 +32,7 @@ const variantClasses = {
 }
 
 const sizeClasses = {
+  xs: 'px-2.5 py-1 text-xs',
   sm: 'px-4 py-2 text-sm',
   md: 'px-4 py-2',
   lg: 'px-8 py-3',
@@ -48,7 +49,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseClasses = [
-    'rounded-xl font-semibold transition',
+    `${size === 'xs' ? 'rounded-lg' : 'rounded-xl'} font-semibold transition`,
     variantClasses[variant],
     sizeClasses[size],
     fullWidth ? 'w-full' : '',
