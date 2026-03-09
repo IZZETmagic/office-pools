@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+import { useRouter } from 'next/navigation'
 
 // =============================================
 // TYPES
@@ -183,6 +184,7 @@ export default function BracketPickerFlow({
   onSubmit,
 }: BracketPickerFlowProps) {
   const { showToast } = useToast()
+  const router = useRouter()
 
   // =============================================
   // STATE
@@ -427,7 +429,7 @@ export default function BracketPickerFlow({
         setError('Session expired. Please log in again.')
         onSaveStatusChange?.('error')
         showToast('Session expired. Redirecting to login...', 'error', { duration: 3000 })
-        setTimeout(() => { window.location.href = '/login' }, 2000)
+        setTimeout(() => { router.push('/login') }, 2000)
         savingRef.current = false
         return
       }

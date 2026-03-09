@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useToast } from '@/components/ui/Toast'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -55,6 +56,7 @@ export default function ProgressivePredictionsFlow({
   onStatusChange,
 }: Props) {
   const { showToast } = useToast()
+  const router = useRouter()
 
   // Round state maps for quick lookup
   const roundStateMap = useMemo(() => {
@@ -250,7 +252,7 @@ export default function ProgressivePredictionsFlow({
           for (const [k, v] of predictions) backup[k] = v
           localStorage.setItem(backupKey, JSON.stringify({ predictions: backup, timestamp: Date.now() }))
         } catch {}
-        window.location.href = '/login?reason=session_expired'
+        router.push('/login?reason=session_expired')
         return
       }
 

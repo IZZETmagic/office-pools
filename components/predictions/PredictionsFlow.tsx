@@ -23,6 +23,7 @@ import { SummaryView } from './SummaryView'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
+import { useRouter } from 'next/navigation'
 
 type Props = {
   matches: Match[]
@@ -108,6 +109,7 @@ export default function PredictionsFlow({
 
   const supabase = createClient()
   const { showToast } = useToast()
+  const router = useRouter()
 
   // Expose unsaved changes state to parent for nav warning
   useEffect(() => {
@@ -416,7 +418,7 @@ export default function PredictionsFlow({
               timestamp: Date.now(),
             }))
           } catch {}
-          setTimeout(() => { window.location.href = '/login' }, 2000)
+          setTimeout(() => { router.push('/login') }, 2000)
           setSaving(false)
           return
         }
