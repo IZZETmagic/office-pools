@@ -12,6 +12,7 @@ import { BracketResultsTab } from './BracketResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import { HowToPlayTab } from './HowToPlayTab'
+import { AnalyticsTab } from './AnalyticsTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
 import BracketPickerFlow from '@/components/predictions/BracketPickerFlow'
@@ -54,6 +55,7 @@ type Tab =
   | 'predictions'
   | 'results'
   | 'my_bracket'
+  | 'analytics'
   | 'standings'
   | 'scoring_rules'
   | 'how_to_play'
@@ -67,6 +69,7 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
+  { key: 'analytics', label: 'Analytics' },
   { key: 'standings', label: 'Standings' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
@@ -76,6 +79,7 @@ const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'my_bracket', label: 'My Bracket' },
+  { key: 'analytics', label: 'Analytics' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -1448,6 +1452,20 @@ export function PoolDetail({
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
+              />
+            )}
+
+            {activeTab === 'analytics' && (
+              <AnalyticsTab
+                matches={matches}
+                allPredictions={allPredictions}
+                members={members}
+                teams={teams}
+                conductData={conductData}
+                settings={poolSettings}
+                userEntries={entries}
+                currentEntryId={activeEntry?.entry_id || ''}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
               />
             )}
 
