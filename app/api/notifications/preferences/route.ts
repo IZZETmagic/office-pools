@@ -1,10 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { getResendClient } from '@/lib/email/resend'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 
-// GET - Fetch user's notification preferences
+const RESEND_API_KEY = process.env.RESEND_API_KEY!
+
+// Build a reverse map: topicId -> topicKey (e.g. "abc123" -> "POOL_ACTIVITY")
+function buildTopicIdToKeyMap(): Map<string, TopicKey> {
+  const map = new Map<string, TopicKey>()
+  for (const key of TOPIC_KEYS) {
+    const topicId = TOPICS[key]
+    if (topicId) map.set(topicId, key)
+  }
+  return map
+}
+
+// GET - Fetch user's real notification preferences from Resend
 export async function GET() {
   const supabase = await createClient()
 
@@ -27,36 +38,37 @@ export async function GET() {
     lastName: nameParts.slice(1).join(' ') || undefined,
   })
 
-  const resend = getResendClient()
-  const audienceId = process.env.RESEND_AUDIENCE_ID!
-
   try {
-    // Get contact by email to find their ID
-    const { data: contact } = await resend.contacts.get({
-      audienceId,
-      email: userData.email,
-    })
-
-    if (!contact) {
-      // Return all topics as opted-in by default
-      const preferences: Record<string, boolean> = {}
-      for (const key of TOPIC_KEYS) {
-        preferences[key] = true
+    // Fetch real topic subscriptions from Resend REST API
+    const res = await fetch(
+      `https://api.resend.com/contacts/${encodeURIComponent(userData.email)}/topics?limit=100`,
+      {
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
       }
-      return NextResponse.json({ preferences })
-    }
+    )
 
-    // Get topic subscriptions for this contact
-    // Since the Resend SDK may not have a direct listTopics for contacts,
-    // we'll return defaults (all opt_in) and let the PATCH endpoint handle updates
+    // Default: all opted in
     const preferences: Record<string, boolean> = {}
     for (const key of TOPIC_KEYS) {
-      preferences[key] = true // Default to opted in
+      preferences[key] = true
     }
 
-    return NextResponse.json({ preferences, contactId: contact.id })
+    if (res.ok) {
+      const body = await res.json()
+      const topicIdToKey = buildTopicIdToKeyMap()
+
+      // Update preferences with real subscription status from Resend
+      for (const topic of body.data || []) {
+        const key = topicIdToKey.get(topic.id)
+        if (key) {
+          preferences[key] = topic.subscription === 'opt_in'
+        }
+      }
+    }
+
+    return NextResponse.json({ preferences })
   } catch (err) {
-    console.error('[Preferences] Failed to fetch:', err)
+    console.error('[Preferences] Failed to fetch from Resend:', err)
     // Return defaults on error
     const preferences: Record<string, boolean> = {}
     for (const key of TOPIC_KEYS) {
@@ -66,7 +78,7 @@ export async function GET() {
   }
 }
 
-// PATCH - Update a notification preference
+// PATCH - Update a notification preference in Resend
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
 
@@ -95,30 +107,30 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Topic not configured' }, { status: 500 })
   }
 
-  const resend = getResendClient()
-  const audienceId = process.env.RESEND_AUDIENCE_ID!
-
   try {
-    // Get contact ID
-    const { data: contact } = await resend.contacts.get({
-      audienceId,
-      email: userData.email,
-    })
+    // Update topic subscription via Resend REST API
+    const res = await fetch(
+      `https://api.resend.com/contacts/${encodeURIComponent(userData.email)}/topics`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify([
+          {
+            id: topicId,
+            subscription: enabled ? 'opt_in' : 'opt_out',
+          },
+        ]),
+      }
+    )
 
-    if (!contact) {
-      return NextResponse.json({ error: 'Contact not found in Resend' }, { status: 404 })
+    if (!res.ok) {
+      const errorBody = await res.text()
+      console.error('[Preferences] Resend API error:', res.status, errorBody)
+      return NextResponse.json({ error: 'Failed to update preference in Resend' }, { status: 500 })
     }
-
-    // Update topic subscription
-    await resend.contacts.update({
-      audienceId,
-      id: contact.id,
-      unsubscribed: false, // Keep globally subscribed
-    })
-
-    // Note: Resend topic subscription updates are handled at send-time via topicId
-    // For now, we store preferences in a simple way using contact data
-    // The Resend API manages topic subscriptions
 
     return NextResponse.json({ updated: true, topicKey, enabled })
   } catch (err) {
