@@ -25,10 +25,10 @@ type ButtonProps = ButtonAsButtonProps | ButtonAsLinkProps
 const variantClasses = {
   primary: 'bg-primary-600 text-white hover:bg-primary-700',
   green: 'bg-success-600 text-white hover:bg-success-700',
-  outline: 'bg-surface text-primary-700 border-2 border-primary-700 hover:bg-primary-50',
+  outline: 'bg-surface text-primary-700 border-1 border-primary-700 hover:bg-primary-50',
   gray: 'bg-neutral-200 text-neutral-800 hover:bg-neutral-300',
   danger: 'bg-danger-600 text-white hover:bg-danger-700',
-  warning: 'bg-warning-500 text-white hover:bg-warning-600',
+  warning: 'bg-warning-500 dark:bg-warning-200 text-white hover:bg-warning-600 dark:hover:bg-warning-400',
 }
 
 const sizeClasses = {

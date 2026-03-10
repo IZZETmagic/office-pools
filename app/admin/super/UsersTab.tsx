@@ -172,13 +172,13 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
         />
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300"
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
@@ -202,7 +202,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                 style={{ animationDelay: `${i * 0.05}s` }}
               >
                 {/* Header bar: username + badges */}
-                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
                   <span className="font-semibold text-sm text-neutral-900 dark:text-white truncate">
                     {user.username}
                   </span>
@@ -231,9 +231,10 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                     </div>
                   </div>
                   {!isCurrentUser && (
-                    <div className="flex gap-1.5 mt-2.5">
+                    <div className="flex gap-1.5 mt-2.5 justify-end">
                       <Button
                         size="xs"
+                        className="min-w-[100px]"
                         variant="outline"
                         onClick={() => handleToggleSuperAdmin(user, !user.is_super_admin)}
                       >
@@ -242,7 +243,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                       <Button
                         size="xs"
                         variant="outline"
-                        className={user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}
+                        className={`min-w-[100px] ${user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}`}
                         onClick={() => handleToggleActive(user)}
                       >
                         {user.is_active ? 'Deactivate' : 'Reactivate'}
@@ -260,27 +261,27 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div>
           <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <thead className="bg-neutral-50 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Email
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Role
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Last Login
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -298,7 +299,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                   return (
                     <tr
                       key={user.user_id}
-                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
+                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
                       style={{ animationDelay: `${i * 0.03}s` }}
                     >
                       <td className="px-4 py-3">
@@ -350,6 +351,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                             <>
                               <Button
                                 size="xs"
+                                className="min-w-[100px]"
                                 variant="outline"
                                 onClick={() =>
                                   handleToggleSuperAdmin(
@@ -365,7 +367,7 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
                               <Button
                                 size="xs"
                                 variant="outline"
-                                className={user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}
+                                className={`min-w-[100px] ${user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}`}
                                 onClick={() => handleToggleActive(user)}
                               >
                                 {user.is_active ? 'Deactivate' : 'Reactivate'}

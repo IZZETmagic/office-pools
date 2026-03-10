@@ -741,7 +741,7 @@ export function MatchesTab({
               className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                 stageFilter === tab.key
                   ? 'bg-primary-600 text-white'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
               }`}
             >
               {tab.label}
@@ -800,7 +800,7 @@ export function MatchesTab({
                 : opt.key === 'scheduled' ? 'bg-primary-600 text-white'
                 : opt.key === 'cancelled' ? 'bg-neutral-600 text-white'
                 : 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
             }`}
           >
             {opt.label}{opt.count != null && <span className="opacity-70"> {opt.count}</span>}
@@ -822,10 +822,10 @@ export function MatchesTab({
             return (
               <div key={match.match_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden animate-fade-up" style={{ animationDelay: `${i * 0.05}s` }}>
                 {/* Row 1: metadata bar */}
-                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-                  <span className="text-xs font-mono font-semibold text-neutral-500 dark:text-neutral-400">#{match.match_number}</span>
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
+                  <span className="text-xs font-mono font-semibold text-neutral-500 dark:text-neutral-700">#{match.match_number}</span>
                   <span className="text-xs text-neutral-400 dark:text-neutral-500">&middot;</span>
-                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-700">
                     {getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}
                   </span>
                   <Badge variant={getStatusBadgeVariant(match.status)}>
@@ -859,23 +859,23 @@ export function MatchesTab({
                   </div>
                 </div>
                 {/* Row 3: actions */}
-                <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
+                <div className="flex flex-wrap gap-1.5 px-3.5 pb-3 justify-end">
                   {match.status === 'scheduled' && (
-                    <Button size="xs" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>Set Live</Button>
+                    <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>Set Live</Button>
                   )}
                   {match.status === 'live' && (
                     <>
-                      <Button size="xs" variant="warning" onClick={() => openLiveScoreModal(match)}>Update Score</Button>
-                      <Button size="xs" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>Set Scheduled</Button>
+                      <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openLiveScoreModal(match)}>Update Score</Button>
+                      <Button size="xs" className="min-w-[100px]" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>Set Scheduled</Button>
                     </>
                   )}
                   {match.status !== 'cancelled' && (
-                    <Button size="xs" variant="outline" onClick={() => openResultModal(match)}>
+                    <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => openResultModal(match)}>
                       {match.is_completed ? 'Edit Result' : 'Enter Result'}
                     </Button>
                   )}
                   {match.is_completed && (
-                    <Button size="xs" variant="outline" className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>Reset</Button>
+                    <Button size="xs" className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>Reset</Button>
                   )}
                 </div>
               </div>
@@ -888,27 +888,27 @@ export function MatchesTab({
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div>
           <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Stage
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Match
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Score
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -933,7 +933,7 @@ export function MatchesTab({
                   const matchDate = new Date(match.match_date)
 
                   return (
-                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
+                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
@@ -997,29 +997,29 @@ export function MatchesTab({
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-1.5 justify-end">
                           {match.status === 'scheduled' && (
-                            <Button size="xs" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
+                            <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
                               Set Live
                             </Button>
                           )}
                           {match.status === 'live' && (
                             <>
-                              <Button size="xs" variant="warning" onClick={() => openLiveScoreModal(match)}>
+                              <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openLiveScoreModal(match)}>
                                 Update Score
                               </Button>
-                              <Button size="xs" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
+                              <Button size="xs" className="min-w-[100px]" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
                                 Set Scheduled
                               </Button>
                             </>
                           )}
                           {match.status !== 'cancelled' && (
-                            <Button size="xs" variant="outline" onClick={() => openResultModal(match)}>
+                            <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => openResultModal(match)}>
                               {match.is_completed
                                 ? 'Edit Result'
                                 : 'Enter Result'}
                             </Button>
                           )}
                           {match.is_completed && (
-                            <Button size="xs" variant="outline" className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>
+                            <Button size="xs" className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>
                               Reset
                             </Button>
                           )}

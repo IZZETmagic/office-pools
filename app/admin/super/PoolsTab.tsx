@@ -209,7 +209,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-500"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
         />
         <div className="flex flex-wrap gap-1.5">
           {statusOptions.map((opt) => (
@@ -219,7 +219,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 statusFilter === opt.value
                   ? opt.color
-                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-300 dark:text-neutral-700 dark:hover:bg-neutral-200'
               }`}
             >
               {opt.label}{opt.count != null && <span className="ml-1 opacity-70">{opt.count}</span>}
@@ -242,7 +242,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
               style={{ animationDelay: `${i * 0.05}s` }}
             >
               {/* Header bar: pool name + status */}
-              <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
                 <span className="font-semibold text-sm text-neutral-900 dark:text-white truncate">
                   {pool.pool_name}
                 </span>
@@ -271,9 +271,10 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                     })}
                   </span>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 justify-end">
                   <Button
                     size="xs"
+                    className="min-w-[100px]"
                     variant="outline"
                     href={`/pools/${pool.pool_id}`}
                   >
@@ -282,7 +283,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                   <Button
                     size="xs"
                     variant="outline"
-                    className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
+                    className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
                     onClick={() => openDeleteModal(pool)}
                   >
                     Delete
@@ -298,30 +299,30 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div>
           <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Pool
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Code
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Members
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Admin
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Tournament
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Created
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -337,7 +338,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                 filteredPools.map((pool, i) => (
                   <tr
                     key={pool.pool_id}
-                    className="hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up"
+                    className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up"
                     style={{ animationDelay: `${i * 0.03}s` }}
                   >
                     <td className="px-4 py-3">
@@ -382,6 +383,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                       <div className="flex gap-1.5 justify-end">
                         <Button
                           size="xs"
+                          className="min-w-[100px]"
                           variant="outline"
                           href={`/pools/${pool.pool_id}`}
                         >
@@ -390,7 +392,7 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
                         <Button
                           size="xs"
                           variant="outline"
-                          className="!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
+                          className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
                           onClick={() => openDeleteModal(pool)}
                         >
                           Delete

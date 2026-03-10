@@ -192,7 +192,7 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
                 : opt.value === 'user' ? 'bg-warning-600 text-white'
                 : opt.value === 'pool' ? 'bg-success-600 text-white'
                 : 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
             }`}
           >
             {opt.label}{opt.count != null && <span className="opacity-70"> {opt.count}</span>}
@@ -216,7 +216,7 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
                 style={{ animationDelay: `${i * 0.05}s` }}
               >
                 {/* Header bar: action badge + time */}
-                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
                   <Badge variant={getActionBadgeVariant(log.action)}>
                     {getActionLabel(log.action)}
                   </Badge>
@@ -252,21 +252,21 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
       <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div>
           <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Time
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Action
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Target
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Details
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
                   Performed By
                 </th>
               </tr>
@@ -284,7 +284,7 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
                   return (
                     <tr
                       key={log.id ?? `log-${i}`}
-                      className="hover:bg-neutral-50 dark:hover:bg-neutral-800 animate-fade-up"
+                      className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up"
                       style={{ animationDelay: `${i * 0.03}s` }}
                     >
                       <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
