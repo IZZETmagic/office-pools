@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { PublicNav } from '@/components/PublicNav'
+import { Button } from '@/components/ui/Button'
 import { FAQPageContent } from './FAQPageContent'
 
 export const metadata: Metadata = {
