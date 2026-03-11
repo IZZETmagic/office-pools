@@ -68,9 +68,9 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'how_to_play', label: 'How to Play' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
+  { key: 'analytics', label: 'Form' },
   { key: 'results', label: 'Results' },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'standings', label: 'Standings' },
+  // { key: 'standings', label: 'Standings' }, // temporarily hidden — duplicate of info in Form
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -79,7 +79,7 @@ const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'my_bracket', label: 'My Bracket' },
-  { key: 'analytics', label: 'Analytics' },
+  { key: 'analytics', label: 'Form' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -873,7 +873,7 @@ export function PoolDetail({
   const mobilePrimaryKeys = useMemo<Tab[]>(
     () => isBracketPicker
       ? ['leaderboard', 'predictions', 'my_bracket']
-      : ['leaderboard', 'predictions', 'results', 'standings'],
+      : ['leaderboard', 'predictions', 'results', 'analytics'],
     [isBracketPicker]
   )
 

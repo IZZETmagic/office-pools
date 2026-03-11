@@ -94,7 +94,7 @@ export type PoolWideStats = {
 // CONSTANTS
 // =============================================
 
-const STAGE_LABELS: Record<string, string> = {
+export const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage',
   round_32: 'Round of 32',
   round_16: 'Round of 16',
@@ -104,7 +104,7 @@ const STAGE_LABELS: Record<string, string> = {
   final: 'Final',
 }
 
-const STAGE_ORDER = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+export const STAGE_ORDER = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
 
 // =============================================
 // HELPERS

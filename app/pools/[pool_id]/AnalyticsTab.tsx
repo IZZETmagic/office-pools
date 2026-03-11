@@ -6,16 +6,12 @@ import type { PoolSettings } from './results/points'
 import type { MatchConductData } from '@/lib/tournament'
 import {
   computePredictionResults,
-  computeAccuracyByStage,
-  computeOverallAccuracy,
   computeCrowdPredictions,
   computeStreaks,
   computePoolWideStats,
 } from './analytics/analyticsHelpers'
-import { AccuracySection } from './analytics/AccuracySection'
-import { StreaksSection } from './analytics/StreaksSection'
-import { CrowdSection } from './analytics/CrowdSection'
-import { PoolStatsSection } from './analytics/PoolStatsSection'
+import { computeFullXPBreakdown } from './analytics/xpSystem'
+import { XPProgressSection, PoolWideStatsSection } from './analytics/XPProgressSection'
 
 // =============================================
 // TYPES
@@ -31,6 +27,20 @@ type AnalyticsTabProps = {
   userEntries: EntryData[]
   currentEntryId: string
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
+}
+
+// =============================================
+// SECTION HEADER
+// =============================================
+
+function SectionHeader({ emoji, title }: { emoji: string; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-xl">{emoji}</span>
+      <h3 className="text-lg font-bold text-neutral-900 dark:text-white">{title}</h3>
+      <div className="flex-1 h-px bg-gradient-to-r from-neutral-200 dark:from-neutral-700 to-transparent" />
+    </div>
+  )
 }
 
 // =============================================
@@ -79,18 +89,6 @@ export function AnalyticsTab({
     return computePredictionResults(matches, entryPredictions, settings, teams, conductData)
   }, [matches, entryPredictions, settings, teams, conductData, isBracketPicker, isEntrySubmitted])
 
-  // Accuracy by stage
-  const stageAccuracy = useMemo(
-    () => computeAccuracyByStage(predictionResults),
-    [predictionResults]
-  )
-
-  // Overall accuracy
-  const overallAccuracy = useMemo(
-    () => computeOverallAccuracy(predictionResults),
-    [predictionResults]
-  )
-
   // Streaks
   const streaks = useMemo(
     () => computeStreaks(predictionResults),
@@ -108,6 +106,26 @@ export function AnalyticsTab({
     () => computePoolWideStats(matches, allPredictions, members, settings),
     [matches, allPredictions, members, settings]
   )
+
+  // =============================================
+  // XP SYSTEM (memoized)
+  // =============================================
+
+  const xpBreakdown = useMemo(() => {
+    if (isBracketPicker || !isEntrySubmitted || predictionResults.length === 0) return null
+
+    const entryRank = selectedEntry?.current_rank ?? null
+
+    return computeFullXPBreakdown({
+      predictionResults,
+      matches,
+      crowdData,
+      streaks,
+      entryPredictions,
+      entryRank,
+      totalMatches: matches.length,
+    })
+  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry])
 
   // =============================================
   // EMPTY STATE
@@ -155,7 +173,7 @@ export function AnalyticsTab({
       {!isEntrySubmitted && !isBracketPicker && (
         <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-xl p-4">
           <p className="text-sm text-warning-800 dark:text-warning-300">
-            Submit your predictions to see your personal accuracy breakdown, streaks, and crowd comparison.
+            Submit your predictions to see your XP progression, accuracy breakdown, streaks, and crowd comparison.
             Pool-wide stats are shown below.
           </p>
         </div>
@@ -165,28 +183,26 @@ export function AnalyticsTab({
       {isBracketPicker && (
         <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
           <p className="text-sm text-primary-800 dark:text-primary-300">
-            Bracket Picker pools use a different prediction format. Match-level accuracy and streak tracking are available for Full Tournament and Progressive pools. Pool-wide stats are shown below.
+            Bracket Picker pools use a different prediction format. XP progression, match-level accuracy and streak tracking are available for Full Tournament and Progressive pools. Pool-wide stats are shown below.
           </p>
         </div>
       )}
 
-      {/* Section 1: Accuracy (non-bracket-picker only, submitted entries only) */}
-      {!isBracketPicker && isEntrySubmitted && predictionResults.length > 0 && (
-        <AccuracySection stageAccuracy={stageAccuracy} overall={overallAccuracy} />
+      {/* Section 0: XP Progress (non-bracket-picker, submitted, has results) */}
+      {xpBreakdown && (
+        <div>
+          <SectionHeader emoji="⚡" title="XP Progression" />
+          <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} />
+        </div>
       )}
 
-      {/* Section 2: Streaks (non-bracket-picker only, submitted entries only) */}
-      {!isBracketPicker && isEntrySubmitted && predictionResults.length > 0 && (
-        <StreaksSection streaks={streaks} />
+      {/* Pool-Wide Stats fallback (when XP section doesn't render) */}
+      {!xpBreakdown && (
+        <div>
+          <SectionHeader emoji="📊" title="Pool Stats" />
+          <PoolWideStatsSection poolStats={poolStats} />
+        </div>
       )}
-
-      {/* Section 3: Crowd Comparison */}
-      {crowdData.length > 0 && (
-        <CrowdSection crowdData={crowdData} />
-      )}
-
-      {/* Section 4: Pool-Wide Stats (always shown) */}
-      <PoolStatsSection poolStats={poolStats} />
     </div>
   )
 }
