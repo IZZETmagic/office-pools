@@ -584,6 +584,12 @@ body {
   border-radius: 2px;
 }
 
+/* Podium crown float animation */
+@keyframes crownFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
 /* Match Results – exact-score shimmer line (opacity pulse) */
 @keyframes shimmerLine {
   0%, 100% { opacity: 0.4; }

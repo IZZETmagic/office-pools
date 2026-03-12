@@ -46,6 +46,7 @@ export type EntryData = {
   point_adjustment: number
   adjustment_reason: string | null
   current_rank: number | null
+  previous_rank: number | null
   last_rank_update: string | null
   created_at: string
 }

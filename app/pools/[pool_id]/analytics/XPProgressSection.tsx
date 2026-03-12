@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from './xpSystem'
 import type { StreakData, CrowdMatch, PoolWideStats, PredictionResult } from './analyticsHelpers'
 import type { PredictionData } from '../types'
@@ -560,8 +561,25 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
 // TOURNAMENT RUN (JOURNEY PATH)
 // =============================================
 
-function TournamentRunSection({ matchXP }: { matchXP: MatchXP[] }) {
-  const sorted = [...matchXP].sort((a, b) => a.matchNumber - b.matchNumber)
+function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crowdData: CrowdMatch[] }) {
+  const sorted = [...matchXP].sort((a, b) => b.matchNumber - a.matchNumber)
+  const crowdMap = useMemo(() => new Map(crowdData.map(c => [c.matchId, c])), [crowdData])
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number; matchId: string } | null>(null)
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, text: string, matchId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltip({ text, x: rect.left + rect.width / 2, y: rect.top, matchId })
+  }, [])
+
+  const handleMouseLeave = useCallback(() => setTooltip(null), [])
+
+  const handleTap = useCallback((e: React.MouseEvent<HTMLDivElement>, text: string, matchId: string) => {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltip(prev =>
+      prev?.matchId === matchId ? null : { text, x: rect.left + rect.width / 2, y: rect.top, matchId }
+    )
+  }, [])
 
   if (sorted.length === 0) return null
 
@@ -569,6 +587,7 @@ function TournamentRunSection({ matchXP }: { matchXP: MatchXP[] }) {
     <div
       className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
+      onClick={() => setTooltip(null)}
     >
       {/* Header */}
       <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
@@ -613,11 +632,16 @@ function TournamentRunSection({ matchXP }: { matchXP: MatchXP[] }) {
                 )
               }
 
-              // Node
+              // Node with hover tooltip
+              const crowd = crowdMap.get(match.matchId)
+              const tooltipText = crowd
+                ? `#${match.matchNumber} · ${crowd.homeTeamName} ${crowd.actualHomeScore} - ${crowd.actualAwayScore} ${crowd.awayTeamName}`
+                : `#${match.matchNumber} · ${config.label}`
+
               elements.push(
                 <div
                   key={match.matchId}
-                  className={`flex-shrink-0 w-[34px] h-[34px] rounded-full border-2 flex items-center justify-center ${
+                  className={`flex-shrink-0 w-[34px] h-[34px] rounded-full border-2 flex items-center justify-center cursor-default ${
                     isMiss ? 'bg-neutral-50 dark:bg-[#0f1525]' : ''
                   }`}
                   style={{
@@ -633,6 +657,9 @@ function TournamentRunSection({ matchXP }: { matchXP: MatchXP[] }) {
                       ? `nodeEnter 0.4s ease ${delay}s both, exactGlow 2s ease-in-out ${delay + 0.4}s infinite`
                       : `nodeEnter 0.4s ease ${delay}s both`,
                   }}
+                  onMouseEnter={(e) => handleMouseEnter(e, tooltipText, match.matchId)}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={(e) => handleTap(e, tooltipText, match.matchId)}
                 >
                   {match.tier === 'exact' && (
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -682,6 +709,30 @@ function TournamentRunSection({ matchXP }: { matchXP: MatchXP[] }) {
           </div>
         </div>
       </div>
+
+      {/* Portal tooltip — renders above all overflow containers */}
+      {tooltip && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{ left: tooltip.x, top: tooltip.y - 8, transform: 'translate(-50%, -100%)' }}
+        >
+          <div
+            className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-lg"
+            style={{ background: '#1e293b' }}
+          >
+            {tooltip.text}
+            <div
+              className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+              style={{
+                borderLeft: '5px solid transparent',
+                borderRight: '5px solid transparent',
+                borderTop: '5px solid #1e293b',
+              }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
@@ -1538,7 +1589,7 @@ export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, 
       <HotColdStreaksSection streaks={streaks} />
 
       {/* Tournament Run — Journey Path */}
-      <TournamentRunSection matchXP={xpBreakdown.matchXP} />
+      <TournamentRunSection matchXP={xpBreakdown.matchXP} crowdData={crowdData} />
 
       {/* You vs The Crowd + Pool-Wide Stats (side by side on desktop) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
