@@ -31,7 +31,7 @@ import { formatDayHeader, generateSystemEvents } from './helpers'
 import { computeFullXPBreakdown } from '../analytics/xpSystem'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import { computePredictionResults, computeCrowdPredictions, computeStreaks } from '../analytics/analyticsHelpers'
-import { calculatePoints, checkKnockoutTeamsMatch } from '../results/points'
+import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from '../results/points'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import { calculateAllBonusPoints } from '@/lib/bonusCalculation'
 import type { PinnedMessage, BadgeFlexMetadata, StandingsDropMetadata, ReactionCount } from './types'
@@ -122,7 +122,7 @@ export function CommunityTab({
       }
 
       try {
-        const predResults = computePredictionResults(matches, entryPreds, settings, teams, conductData)
+        const predResults = computePredictionResults(matches, entryPreds, settings as PoolSettings, teams, conductData)
         const streakData = computeStreaks(predResults)
         const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
 
@@ -221,7 +221,7 @@ export function CommunityTab({
           const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
           const result = calculatePoints(
             pred.predicted_home_score, pred.predicted_away_score,
-            m.home_score_ft, m.away_score_ft, m.stage, settings,
+            m.home_score_ft, m.away_score_ft, m.stage, settings as PoolSettings,
             hasPso ? {
               actualHomePso: m.home_score_pso!, actualAwayPso: m.away_score_pso!,
               predictedHomePso: pred.predicted_home_pso, predictedAwayPso: pred.predicted_away_pso,
@@ -236,7 +236,7 @@ export function CommunityTab({
       const bonusEntries = calculateAllBonusPoints({
         memberId: entryId, memberPredictions: predictionMap,
         matches: matchesWithResult, teams: tournamentTeams,
-        conductData, settings, tournamentAwards: null, predictionMode,
+        conductData, settings: settings as PoolSettings, tournamentAwards: null, predictionMode,
       })
       const totalBonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
 
