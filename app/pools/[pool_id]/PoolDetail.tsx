@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
@@ -67,8 +66,8 @@ type Tab =
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'how_to_play', label: 'How to Play' },
   { key: 'leaderboard', label: 'Leaderboard' },
-  { key: 'predictions', label: 'Predictions' },
   { key: 'analytics', label: 'Form' },
+  { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
   // { key: 'standings', label: 'Standings' }, // temporarily hidden — duplicate of info in Form
   { key: 'scoring_rules', label: 'Scoring Rules' },
@@ -77,9 +76,9 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
 const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
   { key: 'how_to_play', label: 'How to Play' },
   { key: 'leaderboard', label: 'Leaderboard' },
+  { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'my_bracket', label: 'My Bracket' },
-  { key: 'analytics', label: 'Form' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -872,8 +871,8 @@ export function PoolDetail({
   // Mobile: split tabs into primary (always visible) and overflow ("More" menu)
   const mobilePrimaryKeys = useMemo<Tab[]>(
     () => isBracketPicker
-      ? ['leaderboard', 'predictions', 'my_bracket']
-      : ['leaderboard', 'predictions', 'results', 'analytics'],
+      ? ['leaderboard', 'analytics', 'predictions', 'my_bracket']
+      : ['leaderboard', 'analytics', 'predictions', 'results'],
     [isBracketPicker]
   )
 
@@ -944,36 +943,45 @@ export function PoolDetail({
 
   return (
     <div className="min-h-screen bg-surface-secondary">
-      {/* Shared app header with breadcrumbs + pool badges */}
-      <AppHeader
-        breadcrumbs={[
-          { label: pool.pool_name },
-        ]}
-        badges={
-          <>
-            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-            {isAdmin && <Badge variant="outline">Admin</Badge>}
-          </>
-        }
-        isSuperAdmin={isSuperAdmin}
-      />
+      {/* Sticky header + tab bar wrapper */}
+      <div className="sticky top-0 z-40 bg-surface shadow-sm dark:shadow-none border-b border-neutral-200 dark:border-border-default [transform:translateZ(0)]">
+        <AppHeader
+          sticky={false}
+          breadcrumbs={[
+            { label: pool.pool_name },
+          ]}
+          badges={
+            <>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${
+                pool.status === 'open' || pool.status === 'active' ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
+                  : pool.status === 'upcoming' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                  : pool.status === 'closed' ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+              }`}>
+                {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status}
+              </span>
+              {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+            </>
+          }
+          isSuperAdmin={isSuperAdmin}
+        />
 
-      {/* Super Admin viewing banner */}
-      {isSuperAdminViewing && (
-        <div className="bg-warning-100 dark:bg-warning-900/30 border-b border-warning-300 dark:border-warning-700">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
-            <svg className="w-4 h-4 text-warning-700 dark:text-warning-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <span className="text-xs sm:text-sm font-medium text-warning-800 dark:text-warning-300">
-              Viewing as Super Admin — You are not a member of this pool
-            </span>
+        {/* Super Admin viewing banner */}
+        {isSuperAdminViewing && (
+          <div className="bg-warning-100 dark:bg-warning-900/30 border-b border-warning-300 dark:border-warning-700">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
+              <svg className="w-4 h-4 text-warning-700 dark:text-warning-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-xs sm:text-sm font-medium text-warning-800 dark:text-warning-300">
+                Viewing as Super Admin — You are not a member of this pool
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab navigation */}
-      <div className="sticky top-[57px] z-[9] bg-surface">
+        {/* Tab navigation */}
+        <div>
         <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
 
@@ -1115,6 +1123,7 @@ export function PoolDetail({
 
           </div>
         </div>
+        </div>
       </div>
 
       {/* Tab content */}
@@ -1140,6 +1149,20 @@ export function PoolDetail({
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
+              />
+            )}
+
+            {activeTab === 'analytics' && (
+              <AnalyticsTab
+                matches={matches}
+                allPredictions={allPredictions}
+                members={members}
+                teams={teams}
+                conductData={conductData}
+                settings={poolSettings}
+                userEntries={entries}
+                currentEntryId={activeEntry?.entry_id || ''}
+                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
               />
             )}
 
@@ -1452,20 +1475,6 @@ export function PoolDetail({
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
-              />
-            )}
-
-            {activeTab === 'analytics' && (
-              <AnalyticsTab
-                matches={matches}
-                allPredictions={allPredictions}
-                members={members}
-                teams={teams}
-                conductData={conductData}
-                settings={poolSettings}
-                userEntries={entries}
-                currentEntryId={activeEntry?.entry_id || ''}
-                predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
               />
             )}
 
