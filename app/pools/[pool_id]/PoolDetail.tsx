@@ -1504,7 +1504,7 @@ export function PoolDetail({
                 teams={teams}
                 allPredictions={allPredictions}
                 userEntries={userEntries}
-                settings={settings}
+                settings={settings!}
                 conductData={conductData}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
                 onShowHowToPlay={() => setShowHowToPlayModal(true)}
