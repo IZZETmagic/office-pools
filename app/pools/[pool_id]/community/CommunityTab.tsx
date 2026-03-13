@@ -689,16 +689,18 @@ export function CommunityTab({
 
     // Sort by timestamp
     items.sort((a, b) => {
-      const timeA = a.type === 'message' ? a.data.created_at : a.data.timestamp
-      const timeB = b.type === 'message' ? b.data.created_at : b.data.timestamp
-      return new Date(timeA).getTime() - new Date(timeB).getTime()
+      const getTime = (item: FeedItem) =>
+        item.type === 'message' ? item.data.created_at
+        : item.type === 'system_event' ? item.data.timestamp
+        : ''
+      return new Date(getTime(a)).getTime() - new Date(getTime(b)).getTime()
     })
 
     // Insert day headers
     const withHeaders: FeedItem[] = []
     let lastDay = ''
     for (const item of items) {
-      const timestamp = item.type === 'message' ? item.data.created_at : item.data.timestamp
+      const timestamp = item.type === 'message' ? item.data.created_at : item.type === 'system_event' ? item.data.timestamp : ''
       const dayText = formatDayHeader(timestamp)
       if (dayText !== lastDay) {
         withHeaders.push({ type: 'day_header', data: { text: dayText, key: `day-${timestamp}` } })
