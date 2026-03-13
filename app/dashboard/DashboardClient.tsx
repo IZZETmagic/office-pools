@@ -131,8 +131,8 @@ function formatDeadline(deadline: string | null) {
 
 function getStatusBorderColor(pool: PoolCardData): string {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  if (needsPredictions) return 'border-l-warning-400'
-  return 'border-l-transparent'
+  if (needsPredictions) return 'border-l-[3px] border-l-warning-400'
+  return ''
 }
 
 function getPoolStatusText(pool: PoolCardData): string {
@@ -351,11 +351,13 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`shrink-0 w-56 min-h-[9rem] rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] ${getStatusBorderColor(pool)} bg-surface p-3 flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200`}
+      className={`w-56 h-full min-h-[9rem] rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface p-3 flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200`}
     >
       <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
-      {needsPredictions && (
+      {needsPredictions ? (
         <p className="text-[10px] font-semibold text-warning-600 dark:text-warning-400 mt-1">Needs predictions</p>
+      ) : (
+        <p className="text-[10px] font-semibold text-success-700 dark:text-success-400 mt-1">All set</p>
       )}
 
       <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
@@ -406,7 +408,7 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`block rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
+      className={`block rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
       style={{ animationDelay: `${index * 0.06}s` }}
     >
       <div className="flex">
@@ -726,7 +728,7 @@ export function DashboardClient({
               <div className="md:hidden relative">
                 <div className="absolute left-0 top-0 bottom-2 w-4 bg-gradient-to-r from-surface-secondary to-transparent z-10 pointer-events-none" />
                 <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface-secondary to-transparent z-10 pointer-events-none" />
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {[...pools].sort((a, b) => {
                     const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
                       ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
@@ -737,14 +739,14 @@ export function DashboardClient({
                     const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
                     return aDeadline - bDeadline
                   }).map((pool, i) => (
-                    <div key={pool.pool_id} className="shrink-0 animate-slide-in-right" style={{ animationDelay: `${i * 0.08}s` }}>
+                    <div key={pool.pool_id} className="shrink-0 flex animate-slide-in-right" style={{ animationDelay: `${i * 0.08}s` }}>
                       <MobilePoolCard pool={pool} />
                     </div>
                   ))}
                   {/* View All arrow card */}
                   <Link
                     href="/pools"
-                    className="shrink-0 w-16 min-h-[9rem] rounded-xl border border-neutral-200 dark:border-border-default bg-surface flex flex-col items-center justify-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-surface-secondary active:scale-[0.98] transition-all duration-200"
+                    className="shrink-0 w-16 self-stretch rounded-xl border border-neutral-200 dark:border-border-default bg-surface flex flex-col items-center justify-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-surface-secondary active:scale-[0.98] transition-all duration-200"
                   >
                     <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

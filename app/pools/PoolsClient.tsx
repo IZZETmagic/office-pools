@@ -116,8 +116,8 @@ function getStatusAccentColor(status: string): string {
 
 function getStatusBorderColor(pool: PoolData): string {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  if (needsPredictions) return 'border-l-warning-400'
-  return 'border-l-transparent'
+  if (needsPredictions) return 'border-l-[3px] border-l-warning-400'
+  return ''
 }
 
 function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check' | null; className: string; isButton: boolean } {
@@ -579,7 +579,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <Link
                         key={pool.pool_id}
                         href={`/pools/${pool.pool_id}`}
-                        className={`block rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        className={`block rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
                         style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* ========== MOBILE CARD ========== */}
@@ -878,7 +878,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <button
                         key={pool.pool_id}
                         onClick={() => handleJoinFromDiscover(pool.pool_code, pool.pool_name)}
-                        className="w-full text-left rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] border-l-primary-400 bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up cursor-pointer"
+                        className="w-full text-left rounded-xl border border-neutral-200 dark:border-border-default bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up cursor-pointer"
                         style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* ========== DISCOVER MOBILE CARD ========== */}
