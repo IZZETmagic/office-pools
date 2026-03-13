@@ -149,8 +149,9 @@ export default async function PoolsPage() {
         conductData,
       })
 
-      // Calculate MATCH points
+      // Calculate MATCH points + form (last 5 results)
       let matchPoints = 0
+      const matchResults: { matchNumber: number; type: 'exact' | 'winner_gd' | 'winner' | 'miss' }[] = []
       const completedMatchesList = normalizedMatches.filter(
         (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
       )
@@ -185,8 +186,15 @@ export default async function PoolsPage() {
             teamsMatch,
           )
           matchPoints += result.points
+          matchResults.push({ matchNumber: match.match_number, type: result.type })
         }
       }
+
+      // Last 5 match results sorted by match number (most recent last)
+      const form = matchResults
+        .sort((a, b) => a.matchNumber - b.matchNumber)
+        .slice(-5)
+        .map(r => r.type)
 
       // Calculate BONUS points
       let bonusPoints = 0
@@ -214,6 +222,7 @@ export default async function PoolsPage() {
         has_submitted_predictions: anySubmitted,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
+        form,
       }
     })
   )

@@ -1169,11 +1169,11 @@ export function LeaderboardTab({
   const hasMore = visibleCount < afterPodium.length
 
   return (
-    <div className="max-w-[480px] mx-auto px-1 space-y-3">
+    <div className="max-w-[480px] sm:max-w-none mx-auto px-1 sm:px-0 space-y-3 sm:space-y-4">
       {/* Matchday MVP Banner */}
       {matchdayMVP && (
         <div
-          className="bg-accent-50 dark:bg-accent-500/10 border border-accent-500/20 rounded-xl px-3 py-2.5 flex items-center gap-2"
+          className="bg-accent-50 dark:bg-accent-500/10 border border-accent-500/20 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2"
           style={{ animation: 'fadeUp 0.3s ease 0.05s both' }}
         >
           <span className="text-base">⭐</span>
@@ -1189,49 +1189,53 @@ export function LeaderboardTab({
       )}
 
       {/* Podium */}
-      {sorted.length >= 2 && (() => {
+      {sorted.length >= 1 && (() => {
         const top3 = sorted.slice(0, Math.min(3, sorted.length))
         const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3.length === 2 ? [top3[1], top3[0]] : [top3[0]]
         return (
           <div
-            className="py-2"
+            className="py-2 sm:py-4"
             style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
           >
-            <div className="flex items-end justify-center gap-1">
+            <div className="flex items-end justify-center gap-1 sm:gap-4">
               {podiumOrder.map((entry) => {
                 const actualRank = sorted.indexOf(entry) + 1
                 const stats = entryStatsMap.get(entry.entry_id)
                 const isFirst = actualRank === 1
                 const delta = getRankDelta(entry, actualRank)
                 const ps = getPlayerScore(entry.entry_id)
-                const heightPx = actualRank === 1 ? 130 : actualRank === 2 ? 105 : 85
                 const gradientClass = actualRank === 1
                   ? 'from-accent-100 via-accent-50/60 to-accent-50/20 dark:from-accent-500/20 dark:via-accent-500/8 dark:to-accent-500/[0.03] border-t-2 border-t-accent-500/40'
                   : actualRank === 2
                   ? 'from-neutral-200 via-neutral-100/60 to-neutral-100/20 dark:from-neutral-500/20 dark:via-neutral-500/8 dark:to-neutral-500/[0.03] border-t-2 border-t-neutral-400/40'
                   : 'from-[#F4D0A0]/60 via-[#CD7F32]/15 to-[#CD7F32]/[0.06] dark:from-[#CD7F32]/20 dark:via-[#CD7F32]/8 dark:to-[#CD7F32]/[0.03] border-t-2 border-t-[#CD7F32]/40'
+                const pedestalClass = actualRank === 1
+                  ? 'h-[130px] sm:h-[180px]'
+                  : actualRank === 2
+                  ? 'h-[105px] sm:h-[145px]'
+                  : 'h-[85px] sm:h-[120px]'
 
                 return (
                   <div
                     key={entry.entry_id}
-                    className="flex flex-col items-center cursor-pointer flex-1 max-w-[130px]"
+                    className="flex flex-col items-center cursor-pointer flex-1 max-w-[130px] sm:max-w-[180px]"
                     onClick={() => setSelectedEntry(entry)}
                   >
-                    <div className="flex flex-col items-center mb-1">
-                      <div className="relative mb-1">
+                    <div className="flex flex-col items-center mb-1 sm:mb-2">
+                      <div className="relative mb-1 sm:mb-2">
                         <div
-                          className={`${isFirst ? 'w-14 h-14' : 'w-11 h-11'} rounded-full flex items-center justify-center border-2 ${getMedalRingClasses(actualRank)} bg-surface`}
+                          className={`${isFirst ? 'w-14 h-14 sm:w-20 sm:h-20' : 'w-11 h-11 sm:w-16 sm:h-16'} rounded-full flex items-center justify-center border-2 ${getMedalRingClasses(actualRank)} bg-surface`}
                           style={isFirst ? { animation: 'crownFloat 2s ease-in-out infinite' } : undefined}
                         >
-                          <span className={`${isFirst ? 'text-2xl' : 'text-lg'}`}>{getMedalEmoji(actualRank)}</span>
+                          <span className={`${isFirst ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl'}`}>{getMedalEmoji(actualRank)}</span>
                         </div>
-                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white ${
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black text-white ${
                           actualRank === 1 ? 'bg-accent-500' : actualRank === 2 ? 'bg-neutral-400' : 'bg-[#CD7F32]'
                         }`}>
                           {actualRank}
                         </div>
                         {delta !== null && delta !== 0 && (
-                          <div className={`absolute -bottom-1 -left-1 px-1 py-0.5 rounded-full text-[8px] font-bold ${
+                          <div className={`absolute -bottom-1 -left-1 px-1 py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold ${
                             delta > 0 ? 'bg-success-500 text-white' : 'bg-danger-500 text-white'
                           }`}>
                             {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
@@ -1239,36 +1243,35 @@ export function LeaderboardTab({
                         )}
                       </div>
 
-                      <div className="text-[11px] font-bold text-center truncate w-full text-neutral-900 dark:text-white">
+                      <div className="text-[11px] sm:text-sm font-bold text-center truncate w-full text-neutral-900 dark:text-white">
                         {getDisplayName(entry)}
                       </div>
-                      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 text-center truncate w-full">
+                      <div className="text-[10px] sm:text-xs text-neutral-400 dark:text-neutral-500 text-center truncate w-full">
                         @{getUsername(entry)}
                       </div>
-                      <div className={`mt-1 text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                      <div className={`mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
                         {stats?.levelName ?? 'Rookie'}
                       </div>
 
                       {!isBracketPicker && stats && stats.last5.length > 0 && (
-                        <div className="flex items-center gap-[3px] mt-1.5">
+                        <div className="flex items-center gap-[3px] sm:gap-1 mt-1.5">
                           {stats.last5.map((type, di) => (
-                            <div key={di} className={`w-2 h-2 rounded-full ${getFormDotClass(type)}`} />
+                            <div key={di} className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${getFormDotClass(type)}`} />
                           ))}
                         </div>
                       )}
                     </div>
 
                     <div
-                      className={`w-full rounded-t-xl bg-gradient-to-b ${gradientClass} flex flex-col items-center justify-start pt-3`}
-                      style={{ height: `${heightPx}px` }}
+                      className={`w-full rounded-t-xl bg-gradient-to-b ${gradientClass} flex flex-col items-center justify-start pt-3 sm:pt-4 ${pedestalClass}`}
                     >
-                      <div className="text-xl font-black text-primary-500">
+                      <div className="text-xl sm:text-2xl font-black text-primary-500">
                         {formatNumber(ps.total_points)}
                       </div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1">
+                      <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                         {formatNumber(stats?.matchPoints ?? 0)} + {formatNumber(stats?.bonusPoints ?? 0)} bonus
                       </div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">
                         {stats?.exactCount ?? 0} exact · {stats ? `${stats.hitRate.toFixed(0)}%` : '0%'} rate
                       </div>
                     </div>
@@ -1286,28 +1289,28 @@ export function LeaderboardTab({
           className="space-y-1.5"
           style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}
         >
-          <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
-            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
-            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
-            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">🎲 <span className="text-[#7c3aed] dark:text-[#a78bfa] font-medium">Contrarian King</span></span>
-            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
+          <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-4 gap-y-1">
+            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
+            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
+            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🎲 <span className="text-[#7c3aed] dark:text-[#a78bfa] font-medium">Contrarian King</span></span>
+            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1">
             <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] rounded-full bg-success-500" />
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Correct</span>
+              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-success-500" />
+              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Correct</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] rounded-full bg-accent-500" />
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Exact</span>
+              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-accent-500" />
+              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Exact</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] rounded-full bg-danger-400" />
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Miss</span>
+              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-danger-400" />
+              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Miss</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">No Pick</span>
+              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">No Pick</span>
             </div>
           </div>
         </div>
@@ -1315,14 +1318,126 @@ export function LeaderboardTab({
 
       {/* Tap hint */}
       <p
-        className="text-center text-[11px] text-neutral-400 dark:text-neutral-500"
+        className="text-center text-[11px] sm:text-xs text-neutral-400 dark:text-neutral-500"
         style={{ animation: 'fadeUp 0.3s ease 0.18s both' }}
       >
-        Tap a player to see their full breakdown
+        <span className="sm:hidden">Tap</span><span className="hidden sm:inline">Click</span> a player to see their full breakdown
       </p>
 
-      {/* Leaderboard rows (rank 4+) */}
-      <div className="space-y-2">
+      {/* Desktop table header */}
+      <div className={`hidden sm:grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 px-4 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider border-b border-border-default`}>
+        <div>Rank</div>
+        <div>Player</div>
+        {!isBracketPicker && <div className="text-center">Form</div>}
+        <div className="text-center">Awards</div>
+        <div className="text-right">Stats</div>
+      </div>
+
+      {/* Desktop leaderboard rows */}
+      <div className="hidden sm:block rounded-xl border border-border-default overflow-hidden bg-surface">
+        {visibleEntries.map((entry, i) => {
+          const rank = sorted.indexOf(entry) + 1
+          const ps = getPlayerScore(entry.entry_id)
+          const stats = entryStatsMap.get(entry.entry_id)
+          const isCurrentUser = entry.users?.user_id === currentUserId
+          const delta = getRankDelta(entry, rank)
+          const entryAwards = awardsByEntry.get(entry.entry_id) || []
+          return (
+            <div
+              key={entry.entry_id}
+              onClick={() => setSelectedEntry(entry)}
+              className={`grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 items-center px-4 py-3 cursor-pointer border-b border-border-default last:border-b-0 transition-colors ${
+                isCurrentUser
+                  ? 'bg-primary-50 dark:bg-primary-500/[0.08] border-l-2 border-l-primary-500'
+                  : 'hover:bg-surface-secondary'
+              }`}
+            >
+              {/* Rank */}
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-black text-neutral-700 dark:text-neutral-300">#{rank}</span>
+                {delta !== null && delta !== 0 && (
+                  <span className={`text-[10px] font-bold ${delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
+                    {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
+                  </span>
+                )}
+              </div>
+
+              {/* Player */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                    {getDisplayName(entry)}
+                  </span>
+                  {isCurrentUser && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                      YOU
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500">@{getUsername(entry)}</span>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                    Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Form dots */}
+              {!isBracketPicker && (
+                <div className="flex items-center gap-1 justify-center">
+                  {stats && stats.last5.length > 0 ? (
+                    <>
+                      {stats.last5.map((type, di) => (
+                        <div key={di} className={`w-2.5 h-2.5 rounded-full ${getFormDotClass(type)}`} />
+                      ))}
+                      {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
+                        <span className="ml-1 text-xs">
+                          {stats.currentStreak.type === 'hot' ? '🔥' : '❄️'}
+                          <span className={`font-bold ${stats.currentStreak.type === 'hot' ? 'text-danger-500' : 'text-primary-400'}`}>
+                            {stats.currentStreak.length}
+                          </span>
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-neutral-300 dark:text-neutral-600">—</span>
+                  )}
+                </div>
+              )}
+
+              {/* Awards */}
+              <div className="flex items-center gap-1 flex-wrap justify-center">
+                {entryAwards.length > 0 ? entryAwards.map((award, ai) => (
+                  <span
+                    key={ai}
+                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getAwardBadgeClasses(award.type)}`}
+                  >
+                    {award.emoji} {award.label}
+                  </span>
+                )) : (
+                  <span className="text-neutral-300 dark:text-neutral-600">—</span>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div className="text-right">
+                <div className="text-base font-black text-primary-500">{formatNumber(ps.total_points)}</div>
+                <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                  {formatNumber(stats?.matchPoints ?? 0)} + {formatNumber(stats?.bonusPoints ?? 0)} bonus
+                </div>
+                {!isBracketPicker && stats && (
+                  <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Mobile leaderboard rows (rank 4+) */}
+      <div className="sm:hidden space-y-2">
         {visibleEntries.map((entry, i) => {
           const rank = sorted.indexOf(entry) + 1
           const ps = getPlayerScore(entry.entry_id)
@@ -1453,7 +1568,7 @@ export function LeaderboardTab({
       {hasMore && (
         <button
           onClick={() => setVisibleCount(v => v + 20)}
-          className="w-full py-2.5 rounded-lg text-xs font-semibold transition-colors bg-surface-secondary text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+          className="w-full sm:max-w-xs sm:mx-auto py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-colors bg-surface-secondary text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-800"
         >
           Show More
         </button>
@@ -1465,8 +1580,8 @@ export function LeaderboardTab({
           className="bg-surface rounded-xl border border-border-default p-4"
           style={{ animation: 'fadeUp 0.3s ease 0.3s both' }}
         >
-          <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-3">Pool Superlatives</h3>
-          <div className="space-y-2">
+          <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white mb-3">Pool Superlatives</h3>
+          <div className="space-y-2 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3 sm:space-y-0">
             {poolSuperlatives.map((s) => (
               <div
                 key={s.type}
@@ -1474,8 +1589,8 @@ export function LeaderboardTab({
               >
                 <span className="text-lg flex-shrink-0">{s.emoji}</span>
                 <div className="min-w-0">
-                  <div className={`text-[11px] font-bold ${s.titleColorClass}`}>{s.title}</div>
-                  <div className="text-[11px] text-neutral-700 dark:text-neutral-300">
+                  <div className={`text-[11px] sm:text-xs font-bold ${s.titleColorClass}`}>{s.title}</div>
+                  <div className="text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300">
                     {s.name}
                     <span className="text-neutral-400 dark:text-neutral-500"> · {s.detail}</span>
                   </div>
@@ -1488,7 +1603,7 @@ export function LeaderboardTab({
 
       {/* Matchday indicator */}
       <div
-        className="flex items-center justify-between px-3 py-2 rounded-lg text-[11px] bg-surface-secondary border border-border-default"
+        className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-[11px] sm:text-xs bg-surface-secondary border border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.35s both' }}
       >
         <div className="text-neutral-400 dark:text-neutral-500">

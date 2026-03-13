@@ -10,7 +10,7 @@ type AutoArchiveResult = {
  * Auto-archive pools whose tournament has ended (all matches completed)
  * and at least 15 days have passed since the last match.
  *
- * Only pools with status 'open' or 'active' are considered.
+ * Only pools with status 'open' are considered.
  * Idempotent — safe to call multiple times.
  */
 export async function autoArchivePools(): Promise<AutoArchiveResult> {

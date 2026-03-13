@@ -222,9 +222,10 @@ export default async function DashboardPage() {
         conductData,
       })
 
-      // Calculate points — bracket picker uses DB bonus_scores, other modes compute client-side
+      // Calculate points + form (last 5 results) — bracket picker uses DB bonus_scores, other modes compute client-side
       let matchPoints = 0
       let bonusPoints = 0
+      const matchResults: { matchNumber: number; type: 'exact' | 'winner_gd' | 'winner' | 'miss' }[] = []
       const completedMatchesList = normalizedMatches.filter(
         (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
       )
@@ -270,6 +271,7 @@ export default async function DashboardPage() {
               teamsMatch,
             )
             matchPoints += result.points
+            matchResults.push({ matchNumber: match.match_number, type: result.type })
           }
         }
 
@@ -288,6 +290,12 @@ export default async function DashboardPage() {
           bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
         }
       }
+
+      // Last 5 match results sorted by match number (most recent last)
+      const form = matchResults
+        .sort((a, b) => a.matchNumber - b.matchNumber)
+        .slice(-5)
+        .map(r => r.type)
 
       // Count predicted matches (for default entry)
       const predictedMatches = predictions?.length ?? 0
@@ -332,6 +340,7 @@ export default async function DashboardPage() {
         completedMatches: completedMatchesList.length,
         predictedMatches,
         entries: entriesProgress,
+        form,
       }
     })
   )

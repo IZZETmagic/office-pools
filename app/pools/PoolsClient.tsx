@@ -4,13 +4,12 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { Badge, getStatusVariant } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
 // =====================
@@ -24,7 +23,7 @@ type PoolData = {
   status: string
   is_private: boolean
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive'
+  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   tournament_id: string
   created_at: string
   role: string
@@ -33,6 +32,7 @@ type PoolData = {
   has_submitted_predictions: boolean
   joined_at: string
   memberCount: number
+  form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
 }
 
 type PublicPool = {
@@ -42,7 +42,7 @@ type PublicPool = {
   description: string | null
   status: string
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive'
+  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string
   memberCount: number
 }
@@ -77,14 +77,6 @@ function getInitials(fullName: string | null, username: string): string {
   return (username?.[0] ?? '?').toUpperCase()
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 function formatDeadline(deadline: string | null) {
   if (!deadline) return { text: 'No deadline set', className: 'text-neutral-500' }
   const d = new Date(deadline)
@@ -107,222 +99,122 @@ function formatDeadline(deadline: string | null) {
   }
 }
 
-// =====================
-// POOL CARD (for My Pools)
-// =====================
-function PoolRow({ pool }: { pool: PoolData }) {
-  const deadline = formatDeadline(pool.prediction_deadline)
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    navigator.clipboard.writeText(pool.pool_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+function getStatusAccentColor(status: string): string {
+  switch (status) {
+    case 'open':
+    case 'active':
+      return 'bg-warning-400'
+    case 'upcoming':
+      return 'bg-primary-500'
+    case 'completed':
+    case 'closed':
+      return 'bg-neutral-300 dark:bg-neutral-600'
+    default:
+      return 'bg-neutral-200'
   }
-
-  return (
-    <Link
-      href={`/pools/${pool.pool_id}`}
-      className="block bg-surface border border-neutral-200 dark:border-border-default rounded-xl px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 dark:hover:bg-surface-secondary transition-colors"
-    >
-      {/* Desktop layout – grid ensures columns align across rows */}
-      <div className="hidden sm:grid sm:grid-cols-[1fr_4.5rem_5.5rem_4.5rem_5.5rem_6rem_1.25rem] items-center gap-x-3">
-        {/* Name + code + badges */}
-        <div className={`min-w-0 flex flex-col ${pool.role === 'admin' ? '' : 'justify-center min-h-[2.75rem]'}`}>
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-            {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
-            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-          </div>
-          {pool.role === 'admin' && (
-            <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
-              Code:
-              <button
-                onClick={handleCopy}
-                className="inline-flex items-center gap-1 font-mono text-xs text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
-                title="Copy pool code"
-              >
-                {pool.pool_code}
-                {copied ? (
-                  <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                  </svg>
-                ) : (
-                  <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                  </svg>
-                )}
-              </button>
-            </span>
-          )}
-        </div>
-
-        {/* Points */}
-        <div className="text-center text-sm">
-          <p className="font-bold text-neutral-900">{formatNumber(pool.total_points ?? 0)}</p>
-          <p className="text-[10px] text-neutral-500">Points</p>
-        </div>
-
-        {/* Rank */}
-        <div className="text-center text-sm">
-          <p className="font-bold text-neutral-900">
-            {pool.current_rank ? `#${pool.current_rank}` : '--'}
-            <span className="text-neutral-400 font-normal text-xs"> / {pool.memberCount}</span>
-          </p>
-          <p className="text-[10px] text-neutral-500">Rank</p>
-        </div>
-
-        {/* Members */}
-        <div className="text-center text-sm">
-          <p className="font-bold text-neutral-900">{pool.memberCount}</p>
-          <p className="text-[10px] text-neutral-500">Members</p>
-        </div>
-
-        {/* Type */}
-        <div className="text-center text-sm">
-          <p className="font-bold text-neutral-900">{pool.prediction_mode === 'progressive' ? 'Prog' : 'Full'}</p>
-          <p className="text-[10px] text-neutral-500">Type</p>
-        </div>
-
-        {/* Deadline */}
-        <div className="text-right">
-          <span className={`text-xs ${deadline.className}`}>{deadline.text}</span>
-        </div>
-
-        {/* Chevron */}
-        <div className="flex justify-end">
-          <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Mobile layout – fixed-width stat columns for alignment */}
-      <div className="sm:hidden">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-            {pool.role === 'admin' && (
-              <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
-                Code:
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center gap-1 font-mono text-xs text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-1.5 py-0.5 rounded transition-colors"
-                  title="Copy pool code"
-                >
-                  {pool.pool_code}
-                  {copied ? (
-                    <svg className="w-3 h-3 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  ) : (
-                    <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                    </svg>
-                  )}
-                </button>
-              </span>
-            )}
-          </div>
-          <div className="flex gap-1 shrink-0">
-            {pool.role === 'admin' && <Badge variant="outline">Admin</Badge>}
-            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-          </div>
-        </div>
-        <div className="grid grid-cols-[3.5rem_4rem_auto_1fr_auto] items-center gap-x-3 text-xs">
-          <span className="text-neutral-900">
-            <span className="font-bold">{formatNumber(pool.total_points ?? 0)}</span>
-            <span className="text-neutral-500 ml-0.5">pts</span>
-          </span>
-          <span className="text-neutral-900">
-            <span className="font-bold">{pool.current_rank ? `#${pool.current_rank}` : '--'}</span>
-            <span className="text-neutral-400">/{pool.memberCount}</span>
-          </span>
-          <span className="text-neutral-500">{pool.memberCount} members</span>
-          <span className="text-neutral-500">{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
-          <span className="flex items-center gap-1.5">
-            <span className={deadline.className}>{deadline.text}</span>
-            <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </div>
-    </Link>
-  )
 }
 
-// =====================
-// PUBLIC POOL ROW (for Discover)
-// =====================
-function PublicPoolRow({ pool, onJoin }: { pool: PublicPool; onJoin: (code: string, name: string) => void }) {
-  const deadline = formatDeadline(pool.prediction_deadline)
+function getStatusBorderColor(pool: PoolData): string {
+  const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
+  if (needsPredictions) return 'border-l-warning-400'
+  return 'border-l-transparent'
+}
 
-  return (
-    <div className="bg-surface border border-neutral-200 dark:border-border-default rounded-xl px-4 py-3">
-      {/* Desktop layout */}
-      <div className="hidden sm:flex items-center gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-          </div>
-          {pool.description && (
-            <p className="text-xs text-neutral-500 truncate mt-0.5">{pool.description}</p>
-          )}
-        </div>
+function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check' | null; className: string; isButton: boolean } {
+  if (pool.status === 'completed') return {
+    label: 'Results',
+    icon: 'arrow',
+    className: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300',
+    isButton: false,
+  }
+  if (pool.status === 'closed') return {
+    label: 'Closed',
+    icon: null,
+    className: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500',
+    isButton: false,
+  }
+  if (pool.has_submitted_predictions) return {
+    label: 'Submitted',
+    icon: 'check',
+    className: 'bg-success-100 dark:bg-success-900/30 text-success-500 dark:text-success-400 font-bold',
+    isButton: false,
+  }
+  return {
+    label: 'Predict',
+    icon: 'arrow',
+    className: 'bg-warning-500 text-white',
+    isButton: true,
+  }
+}
 
-        <div className="flex items-center gap-6 shrink-0 text-xs text-neutral-500">
-          <span className="inline-flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-            </svg>
-            {pool.memberCount} members
-          </span>
-          <span>{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
-          <span className={deadline.className}>{deadline.text}</span>
-        </div>
+function getPoolStatusText(pool: PoolData): string {
+  if (pool.total_points === 0 && !pool.has_submitted_predictions) return 'No results yet'
+  if (pool.total_points === 0 && pool.has_submitted_predictions) return 'Awaiting results'
+  if (pool.current_rank && pool.current_rank <= 3) return 'On the podium!'
+  if (pool.current_rank) return 'Keep climbing!'
+  return `${formatNumber(pool.total_points)} pts`
+}
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => onJoin(pool.pool_code, pool.pool_name)}
-          className="shrink-0"
-        >
-          Join Pool
-        </Button>
-      </div>
+function getLevel(points: number): { level: number; name: string } {
+  if (points >= 5000) return { level: 10, name: 'Legend' }
+  if (points >= 4000) return { level: 9, name: 'Master' }
+  if (points >= 3000) return { level: 8, name: 'Expert' }
+  if (points >= 2500) return { level: 7, name: 'Strategist' }
+  if (points >= 2000) return { level: 6, name: 'Tactician' }
+  if (points >= 1500) return { level: 5, name: 'Competitor' }
+  if (points >= 1000) return { level: 4, name: 'Contender' }
+  if (points >= 500) return { level: 3, name: 'Amateur' }
+  if (points >= 100) return { level: 2, name: 'Beginner' }
+  return { level: 1, name: 'Rookie' }
+}
 
-      {/* Mobile layout */}
-      <div className="sm:hidden">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-bold text-neutral-900 truncate">{pool.pool_name}</h4>
-            {pool.description && (
-              <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">{pool.description}</p>
-            )}
-          </div>
-          <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-xs text-neutral-500">
-            <span>{pool.memberCount} members</span>
-            <span>{pool.prediction_mode === 'progressive' ? 'Progressive' : 'Full'}</span>
-            <span className={deadline.className}>{deadline.text}</span>
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onJoin(pool.pool_code, pool.pool_name)}
-          >
-            Join
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
+function getModeName(mode: string): string {
+  switch (mode) {
+    case 'full_tournament': return 'Full'
+    case 'progressive': return 'Progressive'
+    case 'bracket_picker': return 'Bracket'
+    default: return mode
+  }
+}
+
+function getStatusTagClass(status: string): string {
+  switch (status) {
+    case 'open':
+    case 'active': return 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
+    case 'upcoming': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+    case 'closed': return 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
+    case 'completed': return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'open':
+    case 'active': return 'Open'
+    case 'upcoming': return 'Upcoming'
+    case 'closed': return 'Closed'
+    case 'completed': return 'Completed'
+    default: return status
+  }
+}
+
+function getModeTagClass(mode: string): string {
+  switch (mode) {
+    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+    case 'progressive': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+    case 'bracket_picker': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+  }
+}
+
+function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): string {
+  switch (type) {
+    case 'exact': return 'bg-accent-500'
+    case 'winner_gd': return 'bg-success-500'
+    case 'winner': return 'bg-primary-500'
+    case 'miss': return 'bg-danger-400'
+  }
 }
 
 // =====================
@@ -350,12 +242,16 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
   const [discoverResults, setDiscoverResults] = useState<PublicPool[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [discoverSearched, setDiscoverSearched] = useState(false)
+  const [discoverSort, setDiscoverSort] = useState<'newest' | 'members' | 'deadline'>('newest')
 
   // Modal state
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [joinInitialCode, setJoinInitialCode] = useState('')
   const [joinPoolName, setJoinPoolName] = useState('')
+
+  // Card interaction state
+  const [copiedPoolId, setCopiedPoolId] = useState<string | null>(null)
 
   // Client-side filtering for My Pools
   const filteredPools = useMemo(() => {
@@ -374,8 +270,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       result = result.filter((p) => p.status === statusFilter)
     }
 
-    // Sort: open pools first, then by selected sort
-    const statusOrder: Record<string, number> = { open: 0, active: 1, closed: 2, completed: 3 }
+    // Sort: open pools first, then upcoming, then closed/completed
+    const statusOrder: Record<string, number> = { open: 0, active: 0, upcoming: 1, closed: 2, completed: 3 }
     result.sort((a, b) => {
       const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
       if (statusDiff !== 0) return statusDiff
@@ -396,6 +292,24 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
     return result
   }, [pools, searchQuery, statusFilter, sortBy])
+
+  // Sort discover results client-side
+  const sortedDiscoverResults = useMemo(() => {
+    const results = [...discoverResults]
+    switch (discoverSort) {
+      case 'members':
+        return results.sort((a, b) => b.memberCount - a.memberCount)
+      case 'deadline':
+        return results.sort((a, b) => {
+          const aTime = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
+          const bTime = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
+          return aTime - bTime
+        })
+      case 'newest':
+      default:
+        return results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+  }, [discoverResults, discoverSort])
 
   // Discover search (debounced)
   const searchPublicPools = useCallback(async (query: string) => {
@@ -435,6 +349,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     if (activeTab === 'discover') {
       searchPublicPools(discoverQuery)
     }
+  }
+
+  const handleCopyCode = (e: React.MouseEvent, poolId: string, code: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    navigator.clipboard.writeText(code)
+    setCopiedPoolId(poolId)
+    setTimeout(() => setCopiedPoolId(null), 1500)
   }
 
   // Unique statuses for filter dropdown
@@ -594,26 +516,34 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               </div>
             </div>
 
-            {/* Pool grid */}
+            {/* Pool cards */}
             {filteredPools.length === 0 ? (
-              <Card padding="lg" className="text-center">
+              <Card padding="lg" className="text-center max-w-md mx-auto">
                 {pools.length === 0 ? (
                   <>
-                    <p className="text-neutral-600 text-lg mb-2">You haven&apos;t joined any pools yet.</p>
-                    <p className="text-neutral-500 mb-4">Use the Join or Create buttons above, or switch to the Discover tab to find public pools.</p>
-                    <div className="flex justify-center gap-3">
-                      <Button onClick={() => setShowJoinModal(true)} size="sm">
-                        Join a Pool
+                    <div className="text-4xl mb-3">&#9917;</div>
+                    <p className="text-neutral-900 dark:text-white text-lg font-semibold mb-1">
+                      You haven&apos;t joined any pools yet
+                    </p>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm mb-5">
+                      Compete with friends by predicting match results in the World Cup.
+                    </p>
+                    <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+                      <Button onClick={() => setActiveTab('discover')} size="sm">
+                        Browse Pools
                       </Button>
-                      <Button onClick={() => setActiveTab('discover')} variant="outline" size="sm">
-                        Discover Pools
-                      </Button>
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="text-sm text-primary-600 hover:underline font-medium"
+                      >
+                        or create your own
+                      </button>
                     </div>
                   </>
                 ) : (
                   <>
-                    <p className="text-neutral-600 text-lg mb-1">No pools match your filters.</p>
-                    <p className="text-neutral-500">
+                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">No pools match your filters</p>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">
                       Try adjusting your search or{' '}
                       <button
                         onClick={() => {
@@ -634,12 +564,268 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   {filteredPools.length} pool{filteredPools.length !== 1 ? 's' : ''}
                   {searchQuery || statusFilter !== 'all' ? ' found' : ''}
                 </p>
-                <div className="space-y-2">
-                  {filteredPools.map((pool, i) => (
-                    <div key={pool.pool_id} className="animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
-                      <PoolRow pool={pool} />
-                    </div>
-                  ))}
+                <div className={
+                  filteredPools.length <= 3
+                    ? 'max-w-[540px] space-y-2.5'
+                    : 'space-y-2.5 md:grid md:grid-cols-2 md:gap-4 md:space-y-0'
+                }>
+                  {filteredPools.map((pool, i) => {
+                    const deadline = formatDeadline(pool.prediction_deadline)
+                    const poolAction = getPoolAction(pool)
+                    const isCopied = copiedPoolId === pool.pool_id
+                    const statusText = getPoolStatusText(pool)
+
+                    return (
+                      <Link
+                        key={pool.pool_id}
+                        href={`/pools/${pool.pool_id}`}
+                        className={`block rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        style={{ animationDelay: `${i * 0.06}s` }}
+                      >
+                        {/* ========== MOBILE CARD ========== */}
+                        <div className="md:hidden flex">
+                          <div className="flex-1 px-4 py-3.5">
+                            {/* Header: name + tags + action pill */}
+                            <div className="flex items-center justify-between gap-3 mb-3">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
+                                  {pool.pool_name}
+                                </h4>
+                                {/* Badges + player count */}
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
+                                  <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-0.5">
+                                    {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              {poolAction.isButton ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    router.push(`/pools/${pool.pool_id}?tab=predictions`)
+                                  }}
+                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}
+                                >
+                                  {poolAction.label}
+                                  {poolAction.icon === 'arrow' && (
+                                    <span className="ml-0.5">&rarr;</span>
+                                  )}
+                                </button>
+                              ) : (
+                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}>
+                                  {poolAction.label}
+                                  {poolAction.icon === 'arrow' && (
+                                    <span className="ml-0.5">&rarr;</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Stats grid */}
+                            {(() => {
+                              const level = getLevel(pool.total_points ?? 0)
+                              return (
+                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mb-3 overflow-hidden">
+                                  {/* Points */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
+                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                      {formatNumber(pool.total_points ?? 0)}
+                                    </p>
+                                  </div>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  {/* Rank */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
+                                    <div className="flex items-baseline gap-1.5">
+                                      <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                        #{pool.current_rank ?? 0}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  {/* Level */}
+                                  <div className="flex-[1.2] py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
+                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                      {level.level}
+                                    </p>
+                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{level.name}</p>
+                                  </div>
+                                  {/* Form */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide text-right">Form</p>
+                                    <div className="flex items-center justify-end gap-[5px] mt-1.5">
+                                      {pool.form.length > 0
+                                        ? pool.form.map((type, i) => (
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotColor(type)}`} />
+                                          ))
+                                        : [0, 1, 2, 3, 4].map((i) => (
+                                            <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                                          ))
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })()}
+
+                            {/* Bottom row: status + deadline */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                {statusText}
+                              </span>
+                              {deadline.text !== 'No deadline set' && (
+                                <span className={`inline-flex items-center gap-1 text-xs font-semibold ${deadline.className}`}>
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                  {deadline.text}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Invite nudge — admin pools with fewer than 10 members */}
+                            {pool.role === 'admin' && pool.memberCount < 10 && (
+                              <div className="mt-2.5 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
+                                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                  {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more
+                                </span>
+                                <button
+                                  onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
+                                  className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline shrink-0 ml-2"
+                                >
+                                  {isCopied ? 'Copied!' : 'Copy Code'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* ========== DESKTOP CARD ========== */}
+                        <div className="hidden md:flex">
+                          <div className="flex-1 p-4">
+                            {/* Header row */}
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                                  {pool.pool_name}
+                                </h4>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
+                                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                    {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Desktop action pill */}
+                              {poolAction.isButton ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    router.push(`/pools/${pool.pool_id}?tab=predictions`)
+                                  }}
+                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}
+                                >
+                                  {poolAction.label}
+                                  {poolAction.icon === 'arrow' && <span className="ml-0.5">&rarr;</span>}
+                                </button>
+                              ) : (
+                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}>
+                                  {poolAction.label}
+                                  {poolAction.icon === 'arrow' && <span className="ml-0.5">&rarr;</span>}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Stats row */}
+                            {(() => {
+                              const level = getLevel(pool.total_points ?? 0)
+                              return (
+                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mt-3 overflow-hidden">
+                                  {/* Points */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
+                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                      {formatNumber(pool.total_points ?? 0)}
+                                    </p>
+                                  </div>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  {/* Rank */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
+                                    <div className="flex items-baseline gap-1.5">
+                                      <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                        #{pool.current_rank ?? 0}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  {/* Level */}
+                                  <div className="flex-[1.2] py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
+                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                      {level.level}
+                                    </p>
+                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{level.name}</p>
+                                  </div>
+                                  {/* Form */}
+                                  <div className="flex-1 py-3 px-3">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide text-right">Form</p>
+                                    <div className="flex items-center justify-end gap-[5px] mt-1.5">
+                                      {pool.form.length > 0
+                                        ? pool.form.map((type, i) => (
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotColor(type)}`} />
+                                          ))
+                                        : [0, 1, 2, 3, 4].map((i) => (
+                                            <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                                          ))
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })()}
+
+                            {/* Bottom row */}
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                              <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                {statusText}
+                              </span>
+                              {deadline.text !== 'No deadline set' && (
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}>
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                  {deadline.text}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Invite nudge — admin pools with fewer than 10 members */}
+                            {pool.role === 'admin' && pool.memberCount < 10 && (
+                              <div className="mt-3 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
+                                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                  {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more to make it interesting
+                                </span>
+                                <button
+                                  onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
+                                  className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline shrink-0 ml-2"
+                                >
+                                  {isCopied ? 'Copied!' : 'Copy Code'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
                 </div>
               </>
             )}
@@ -649,16 +835,25 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
         {/* DISCOVER TAB */}
         {activeTab === 'discover' && (
           <>
-            <div className="mb-6">
-              <Input
-                type="text"
-                value={discoverQuery}
-                onChange={(e) => setDiscoverQuery(e.target.value)}
-                placeholder="Search public pools by name, code, or description..."
-              />
-              <p className="text-xs text-neutral-500 mt-1.5">
-                Find and join public pools created by other users.
-              </p>
+            {/* Search + Sort controls */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="flex-1">
+                <Input
+                  type="text"
+                  value={discoverQuery}
+                  onChange={(e) => setDiscoverQuery(e.target.value)}
+                  placeholder="Search public pools by name, code, or description..."
+                />
+              </div>
+              <select
+                value={discoverSort}
+                onChange={(e) => setDiscoverSort(e.target.value as 'newest' | 'members' | 'deadline')}
+                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="newest">Newest</option>
+                <option value="members">Most Players</option>
+                <option value="deadline">Ending Soon</option>
+              </select>
             </div>
 
             {discoverLoading ? (
@@ -666,30 +861,171 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 <div className="inline-block w-6 h-6 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
                 <p className="text-neutral-500 text-sm mt-2">Searching pools...</p>
               </div>
-            ) : discoverResults.length > 0 ? (
+            ) : sortedDiscoverResults.length > 0 ? (
               <>
                 <p className="text-sm text-neutral-500 mb-3">
-                  {discoverResults.length} public pool{discoverResults.length !== 1 ? 's' : ''} found
+                  {sortedDiscoverResults.length} public pool{sortedDiscoverResults.length !== 1 ? 's' : ''} found
                 </p>
-                <div className="space-y-2">
-                  {discoverResults.map((pool, i) => (
-                    <div key={pool.pool_id} className="animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
-                      <PublicPoolRow
-                        pool={pool}
-                        onJoin={handleJoinFromDiscover}
-                      />
-                    </div>
-                  ))}
+                <div className={
+                  sortedDiscoverResults.length <= 3
+                    ? 'max-w-[540px] space-y-2.5'
+                    : 'space-y-2.5 md:grid md:grid-cols-2 md:gap-4 md:space-y-0'
+                }>
+                  {sortedDiscoverResults.map((pool, i) => {
+                    const deadline = formatDeadline(pool.prediction_deadline)
+
+                    return (
+                      <button
+                        key={pool.pool_id}
+                        onClick={() => handleJoinFromDiscover(pool.pool_code, pool.pool_name)}
+                        className="w-full text-left rounded-xl border border-neutral-200 dark:border-border-default border-l-[3px] border-l-primary-400 bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up cursor-pointer"
+                        style={{ animationDelay: `${i * 0.06}s` }}
+                      >
+                        {/* ========== DISCOVER MOBILE CARD ========== */}
+                        <div className="md:hidden flex">
+                          <div className="flex-1 px-4 py-3.5">
+                            {/* Header: name + tags */}
+                            <div className="mb-2">
+                              <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
+                                {pool.pool_name}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
+                                <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-0.5">
+                                  {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Stats section */}
+                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mb-3 overflow-hidden">
+                              {/* Members */}
+                              <div className="shrink-0 py-3 px-3">
+                                <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
+                                <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                  {pool.memberCount}
+                                </p>
+                              </div>
+                              {pool.description && (
+                                <>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="flex-1 py-3 px-3 min-w-0">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">About</p>
+                                    <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed line-clamp-2">
+                                      {pool.description}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Bottom row */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                Created {formatTimeAgo(pool.created_at)}
+                              </span>
+                              {deadline.text !== 'No deadline set' && (
+                                <span className={`inline-flex items-center gap-1 text-xs font-semibold ${deadline.className}`}>
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                  {deadline.text}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ========== DISCOVER DESKTOP CARD ========== */}
+                        <div className="hidden md:flex">
+                          <div className="flex-1 p-4">
+                            {/* Header row */}
+                            <div className="mb-2">
+                              <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                                {pool.pool_name}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
+                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                  {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Stats row */}
+                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mt-1 overflow-hidden">
+                              {/* Members */}
+                              <div className="shrink-0 py-3 px-3">
+                                <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
+                                <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                  {pool.memberCount}
+                                </p>
+                              </div>
+                              {pool.description && (
+                                <>
+                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="flex-1 py-3 px-3 min-w-0">
+                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">About</p>
+                                    <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed line-clamp-2">
+                                      {pool.description}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Bottom row */}
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                              <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                Created {formatTimeAgo(pool.created_at)}
+                              </span>
+                              {deadline.text !== 'No deadline set' && (
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}>
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                  {deadline.text}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </>
             ) : discoverSearched ? (
-              <Card padding="lg" className="text-center">
-                <p className="text-neutral-600 text-lg mb-1">No public pools found.</p>
-                <p className="text-neutral-500">
-                  {discoverQuery
-                    ? 'Try a different search term or create your own pool.'
-                    : 'There are no open public pools available right now.'}
-                </p>
+              <Card padding="lg" className="text-center max-w-md mx-auto">
+                {discoverQuery ? (
+                  <>
+                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">
+                      No pools found for &ldquo;{discoverQuery}&rdquo;
+                    </p>
+                    <button
+                      onClick={() => setDiscoverQuery('')}
+                      className="text-sm text-primary-600 hover:underline font-medium mt-2"
+                    >
+                      Clear search
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">No public pools available</p>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                      There are no open public pools right now. Why not{' '}
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="text-primary-600 hover:underline font-medium"
+                      >
+                        create one
+                      </button>
+                      ?
+                    </p>
+                  </>
+                )}
               </Card>
             ) : null}
           </>
