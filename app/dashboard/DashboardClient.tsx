@@ -59,6 +59,8 @@ type ActivityItem =
   | (ActivityItemBase & { type: 'auto_submitted'; entryName: string })
   | (ActivityItemBase & { type: 'entry_created'; entryName: string })
   | (ActivityItemBase & { type: 'deadline_passed' })
+  | (ActivityItemBase & { type: 'rank_up'; rankDelta: number; newRank: number; entryName: string })
+  | (ActivityItemBase & { type: 'rank_down'; rankDelta: number; newRank: number; entryName: string })
 
 type UpcomingMatch = {
   match_id: string
@@ -66,6 +68,7 @@ type UpcomingMatch = {
   stage: string
   match_date: string
   status: string
+  venue: string | null
   home_team: { country_name: string; flag_url: string | null } | null
   away_team: { country_name: string; flag_url: string | null } | null
   home_team_placeholder: string | null
@@ -313,6 +316,18 @@ function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
         </svg>
       )
+    case 'rank_up':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+        </svg>
+      )
+    case 'rank_down':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6L9 12.75l4.286-4.286a11.948 11.948 0 014.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.51l-5.511-3.181" />
+        </svg>
+      )
   }
 }
 
@@ -323,6 +338,8 @@ function activityIconColor(type: ActivityItem['type']): string {
     case 'auto_submitted': return 'text-warning-600 bg-warning-50'
     case 'entry_created': return 'text-primary-500 bg-primary-50'
     case 'deadline_passed': return 'text-neutral-500 bg-neutral-100'
+    case 'rank_up': return 'text-success-600 bg-success-50'
+    case 'rank_down': return 'text-neutral-500 bg-neutral-100'
   }
 }
 
@@ -338,6 +355,10 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
       return <>Added entry <span className="font-medium">{activity.entryName}</span> in {poolLink}</>
     case 'deadline_passed':
       return <>Predictions locked for {poolLink}</>
+    case 'rank_up':
+      return <>Moved up {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to <span className="font-semibold text-success-600 dark:text-success-400">#{activity.newRank}</span> in {poolLink}</>
+    case 'rank_down':
+      return <>Dropped {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to #{activity.newRank} in {poolLink}</>
   }
 }
 
@@ -541,10 +562,16 @@ function ActivityList({
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
               {activity.type === 'joined' && !activity.hasPredictions && (
-                <Badge variant="yellow">Needs predictions</Badge>
+                <Badge variant="yellow" className="!rounded">Needs predictions</Badge>
               )}
               {activity.type === 'auto_submitted' && (
-                <Badge variant="blue">Auto</Badge>
+                <Badge variant="blue" className="!rounded">Auto</Badge>
+              )}
+              {activity.type === 'rank_up' && activity.newRank === 1 && (
+                <Badge variant="green" className="!rounded">1st Place!</Badge>
+              )}
+              {activity.type === 'rank_up' && activity.newRank > 1 && activity.newRank <= 3 && (
+                <Badge variant="green" className="!rounded">Podium!</Badge>
               )}
             </div>
           </div>
@@ -918,6 +945,9 @@ export function DashboardClient({
                             <p className="text-xs font-medium text-neutral-600">
                               {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                             </p>
+                            {match.venue && (
+                              <p className="text-xs text-neutral-400 mt-0.5">{match.venue}</p>
+                            )}
                           </div>
                         </Card>
                       )
@@ -1059,7 +1089,9 @@ export function DashboardClient({
                           <p className="text-sm font-medium text-neutral-700">
                             {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                           </p>
-                          <Badge variant="outline-gray">{match.status}</Badge>
+                          {match.venue && (
+                            <p className="text-xs text-neutral-400 mt-0.5">{match.venue}</p>
+                          )}
                         </div>
                       </Card>
                     )

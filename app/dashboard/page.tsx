@@ -50,6 +50,8 @@ export default async function DashboardPage() {
         created_at,
         total_points,
         current_rank,
+        previous_rank,
+        last_rank_update,
         point_adjustment
       )
     `)
@@ -94,6 +96,7 @@ export default async function DashboardPage() {
         stage,
         match_date,
         status,
+        venue,
         home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
         away_team:teams!matches_away_team_id_fkey(country_name, flag_url),
         home_team_placeholder,
@@ -423,11 +426,44 @@ export default async function DashboardPage() {
         })
       }
     }
+
+    // 5. RANK MOVEMENT events (per entry with rank change)
+    for (const entry of entries) {
+      if (
+        entry.current_rank !== null &&
+        entry.previous_rank !== null &&
+        entry.last_rank_update &&
+        entry.current_rank !== entry.previous_rank
+      ) {
+        const delta = entry.previous_rank - entry.current_rank
+        if (delta > 0) {
+          allActivities.push({
+            type: 'rank_up' as const,
+            poolName,
+            poolId,
+            date: entry.last_rank_update,
+            rankDelta: delta,
+            newRank: entry.current_rank,
+            entryName: entry.entry_name,
+          })
+        } else {
+          allActivities.push({
+            type: 'rank_down' as const,
+            poolName,
+            poolId,
+            date: entry.last_rank_update,
+            rankDelta: Math.abs(delta),
+            newRank: entry.current_rank,
+            entryName: entry.entry_name,
+          })
+        }
+      }
+    }
   }
 
   const activities = allActivities
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 10)
+    .slice(0, 15)
 
   return (
     <DashboardClient
