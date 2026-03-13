@@ -1496,7 +1496,7 @@ export function PoolDetail({
             {activeTab === 'community' && (
               <CommunityTab
                 poolId={pool.pool_id}
-                poolName={pool.name}
+                poolName={pool.pool_name}
                 currentUserId={currentUserId}
                 members={members}
                 isAdmin={isAdmin}
