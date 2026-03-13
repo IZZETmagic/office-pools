@@ -27,67 +27,23 @@ export default function Footer() {
         &copy; 2026 Sport Pool. All rights reserved.
       </div>
 
-      {/* Desktop: full footer */}
-      <div className="hidden sm:block py-12">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="mb-8">
-            <span className="text-white dark:text-neutral-900 text-lg font-bold">&#9917; Sport Pool</span>
-            <p className="mt-3 text-sm">
-              The ultimate FIFA World Cup 2026 prediction pool platform.
-            </p>
-          </div>
-          <div className={`grid ${isLoggedIn ? 'grid-cols-2' : 'grid-cols-3'} gap-8`}>
+      {/* Desktop: compact single-row footer */}
+      <div className="hidden sm:block py-4">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between gap-6">
+          <span className="text-white dark:text-neutral-900 text-sm font-bold shrink-0">&#9917; Sport Pool</span>
+          <nav className="flex items-center gap-4 text-xs">
             {!isLoggedIn && (
-              <div>
-                <h4 className="text-white dark:text-neutral-900 font-semibold mb-3">Product</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <a href="#features" className="hover:text-white dark:hover:text-neutral-900 transition">
-                      Features
-                    </a>
-                  </li>
-                  <li>
-                    <Link href="/signup" className="hover:text-white dark:hover:text-neutral-900 transition">
-                      Get Started
-                    </Link>
-                  </li>
-                </ul>
-              </div>
+              <>
+                <a href="#features" className="hover:text-white dark:hover:text-neutral-900 transition">Features</a>
+                <Link href="/signup" className="hover:text-white dark:hover:text-neutral-900 transition">Get Started</Link>
+              </>
             )}
-            <div>
-              <h4 className="text-white dark:text-neutral-900 font-semibold mb-3">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/faq" className="hover:text-white dark:hover:text-neutral-900 transition">
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-white dark:hover:text-neutral-900 transition">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white dark:text-neutral-900 font-semibold mb-3">Legal</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/privacy" className="hover:text-white dark:hover:text-neutral-900 transition">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms" className="hover:text-white dark:hover:text-neutral-900 transition">
-                    Terms
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-10 pt-8 border-t border-neutral-800 dark:border-border-default text-center text-sm">
-            &copy; 2026 Sport Pool. All rights reserved.
-          </div>
+            <Link href="/faq" className="hover:text-white dark:hover:text-neutral-900 transition">FAQ</Link>
+            <Link href="/contact" className="hover:text-white dark:hover:text-neutral-900 transition">Contact</Link>
+            <Link href="/privacy" className="hover:text-white dark:hover:text-neutral-900 transition">Privacy</Link>
+            <Link href="/terms" className="hover:text-white dark:hover:text-neutral-900 transition">Terms</Link>
+          </nav>
+          <span className="text-xs shrink-0">&copy; 2026 Sport Pool</span>
         </div>
       </div>
     </footer>

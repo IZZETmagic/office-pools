@@ -461,6 +461,43 @@ export default async function DashboardPage() {
     }
   }
 
+  // 6. MENTIONED events — messages where current user is @mentioned
+  const poolIds = (userPools ?? []).map((m: any) => m.pools.pool_id)
+  if (poolIds.length > 0) {
+    const { data: mentionMessages } = await supabase
+      .from('pool_messages')
+      .select('message_id, pool_id, user_id, created_at')
+      .contains('mentions', [userData.user_id])
+      .in('pool_id', poolIds)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (mentionMessages && mentionMessages.length > 0) {
+      const mentionerIds = [...new Set(mentionMessages.map((m: any) => m.user_id))]
+      const { data: mentioners } = await supabase
+        .from('users')
+        .select('user_id, username')
+        .in('user_id', mentionerIds)
+
+      const mentionerMap = new Map(
+        (mentioners ?? []).map((u: any) => [u.user_id, u.username])
+      )
+
+      for (const msg of mentionMessages) {
+        const pool = (userPools ?? []).find((p: any) => p.pools.pool_id === msg.pool_id)
+        if (pool) {
+          allActivities.push({
+            type: 'mentioned' as const,
+            poolName: (pool as any).pools.pool_name,
+            poolId: msg.pool_id,
+            date: msg.created_at,
+            mentionedBy: mentionerMap.get(msg.user_id) ?? 'someone',
+          })
+        }
+      }
+    }
+  }
+
   const activities = allActivities
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 15)

@@ -10,7 +10,8 @@ import { ResultsTab } from './ResultsTab'
 import { BracketResultsTab } from './BracketResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
-import { HowToPlayTab } from './HowToPlayTab'
+import { CommunityTab } from './CommunityTab'
+import { HowToPlayModal } from './HowToPlayModal'
 import { AnalyticsTab } from './AnalyticsTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
@@ -57,14 +58,14 @@ type Tab =
   | 'analytics'
   | 'standings'
   | 'scoring_rules'
-  | 'how_to_play'
+  | 'community'
   | 'members'
   | 'scoring_config'
   | 'settings'
   | 'rounds'
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
-  { key: 'how_to_play', label: 'How to Play' },
+  { key: 'community', label: 'Community' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
@@ -74,7 +75,7 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
 ]
 
 const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
-  { key: 'how_to_play', label: 'How to Play' },
+  { key: 'community', label: 'Community' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
@@ -161,8 +162,9 @@ export function PoolDetail({
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const urlTab = searchParams.get('tab') as Tab
     if (urlTab) return urlTab
-    return hasSeenHowToPlay ? 'leaderboard' : 'how_to_play'
+    return 'leaderboard'
   })
+  const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay)
   const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab)
   const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab)
 
@@ -571,6 +573,7 @@ export function PoolDetail({
 
   const switchTab = useCallback((tab: Tab) => {
     setActiveTab(tab)
+    window.scrollTo({ top: 0 })
     // Update URL without full navigation so back/forward works
     const url = new URL(window.location.href)
     if (tab === 'leaderboard') {
@@ -871,8 +874,8 @@ export function PoolDetail({
   // Mobile: split tabs into primary (always visible) and overflow ("More" menu)
   const mobilePrimaryKeys = useMemo<Tab[]>(
     () => isBracketPicker
-      ? ['leaderboard', 'analytics', 'predictions', 'my_bracket']
-      : ['leaderboard', 'analytics', 'predictions', 'results'],
+      ? ['leaderboard', 'analytics', 'predictions', 'community']
+      : ['leaderboard', 'analytics', 'predictions', 'community'],
     [isBracketPicker]
   )
 
@@ -1002,7 +1005,7 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  {tab.key === 'leaderboard' ? 'Board' : tab.label}
+                  {tab.key === 'leaderboard' ? 'Board' : tab.key === 'community' ? 'Chat' : tab.label}
                 </button>
               ))}
 
@@ -1490,12 +1493,21 @@ export function PoolDetail({
               <ScoringRulesTab settings={settings} predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'} />
             )}
 
-            {activeTab === 'how_to_play' && (
-              <HowToPlayTab
-                poolName={pool.pool_name}
-                maxEntries={pool.max_entries_per_user}
-                isPastDeadline={isPastDeadline}
+            {activeTab === 'community' && (
+              <CommunityTab
+                poolId={pool.pool_id}
+                poolName={pool.name}
+                currentUserId={currentUserId}
+                members={members}
+                isAdmin={isAdmin}
+                matches={matches}
+                teams={teams}
+                allPredictions={allPredictions}
+                userEntries={userEntries}
+                settings={settings}
+                conductData={conductData}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+                onShowHowToPlay={() => setShowHowToPlayModal(true)}
               />
             )}
 
@@ -1611,6 +1623,16 @@ export function PoolDetail({
       )}
 
       {/* Leave Pool Confirmation Modal */}
+      {showHowToPlayModal && (
+        <HowToPlayModal
+          poolName={pool.pool_name}
+          maxEntries={pool.max_entries_per_user}
+          isPastDeadline={isPastDeadline}
+          predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+          onClose={() => setShowHowToPlayModal(false)}
+        />
+      )}
+
       {showLeaveModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-modal-backdrop"

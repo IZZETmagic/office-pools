@@ -61,6 +61,7 @@ type ActivityItem =
   | (ActivityItemBase & { type: 'deadline_passed' })
   | (ActivityItemBase & { type: 'rank_up'; rankDelta: number; newRank: number; entryName: string })
   | (ActivityItemBase & { type: 'rank_down'; rankDelta: number; newRank: number; entryName: string })
+  | (ActivityItemBase & { type: 'mentioned'; mentionedBy: string })
 
 type UpcomingMatch = {
   match_id: string
@@ -328,6 +329,12 @@ function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6L9 12.75l4.286-4.286a11.948 11.948 0 014.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.51l-5.511-3.181" />
         </svg>
       )
+    case 'mentioned':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        </svg>
+      )
   }
 }
 
@@ -340,6 +347,7 @@ function activityIconColor(type: ActivityItem['type']): string {
     case 'deadline_passed': return 'text-neutral-500 bg-neutral-100'
     case 'rank_up': return 'text-success-600 bg-success-50'
     case 'rank_down': return 'text-neutral-500 bg-neutral-100'
+    case 'mentioned': return 'text-primary-600 bg-primary-50'
   }
 }
 
@@ -359,6 +367,8 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
       return <>Moved up {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to <span className="font-semibold text-success-600 dark:text-success-400">#{activity.newRank}</span> in {poolLink}</>
     case 'rank_down':
       return <>Dropped {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to #{activity.newRank} in {poolLink}</>
+    case 'mentioned':
+      return <><span className="font-medium">@{activity.mentionedBy}</span> mentioned you in {poolLink}</>
   }
 }
 

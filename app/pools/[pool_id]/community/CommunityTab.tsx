@@ -1,0 +1,940 @@
+'use client'
+
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Card } from '@/components/ui/Card'
+import type { MemberData } from '../types'
+import type {
+  CommunityTabProps,
+  Message,
+  MessageWithReactions,
+  ReplyPreview,
+  MemberWithLevel,
+  FeedItem,
+  SystemEvent,
+} from './types'
+import { ChatMessage, DayHeader } from './ChatMessage'
+import { MessageInput } from './MessageInput'
+import { SystemEventCard } from './SystemEventCard'
+import { PinnedMessageCard } from './PinnedMessageCard'
+import { PinMessageModal } from './PinMessageModal'
+import { QuickActions } from './QuickActions'
+import { PredictionShareCard } from './PredictionShareCard'
+import { BadgeFlexCard } from './BadgeFlexCard'
+import { StandingsDropCard } from './StandingsDropCard'
+import { SharePredictionModal } from './SharePredictionModal'
+import { TypingIndicator } from './TypingIndicator'
+import { DesktopSidebar } from './DesktopSidebar'
+import { OnlineMembersStrip } from './OnlineMembersStrip'
+import { usePresence } from './usePresence'
+import { formatDayHeader, generateSystemEvents } from './helpers'
+import { computeFullXPBreakdown } from '../analytics/xpSystem'
+import type { EarnedBadge } from '../analytics/xpSystem'
+import { computePredictionResults, computeCrowdPredictions, computeStreaks } from '../analytics/analyticsHelpers'
+import { calculatePoints, checkKnockoutTeamsMatch } from '../results/points'
+import { resolveFullBracket } from '@/lib/bracketResolver'
+import { calculateAllBonusPoints } from '@/lib/bonusCalculation'
+import type { PinnedMessage, BadgeFlexMetadata, StandingsDropMetadata, ReactionCount } from './types'
+
+export function CommunityTab({
+  poolId,
+  poolName,
+  currentUserId,
+  members,
+  isAdmin,
+  matches,
+  teams,
+  allPredictions,
+  userEntries,
+  settings,
+  conductData,
+  predictionMode,
+  onShowHowToPlay,
+}: CommunityTabProps) {
+  // =====================
+  // STATE
+  // =====================
+  const [messages, setMessages] = useState<MessageWithReactions[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<MessageWithReactions | null>(null)
+  const [replyPreviews, setReplyPreviews] = useState<Map<string, ReplyPreview>>(new Map())
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [editingPin, setEditingPin] = useState<PinnedMessage | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
+
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const wasNearBottomRef = useRef(true)
+  const supabaseRef = useRef(createClient())
+
+  // =====================
+  // PRESENCE
+  // =====================
+  const currentMember = useMemo(() => members.find(m => m.user_id === currentUserId), [members, currentUserId])
+  const { onlineUsers, typingUsers, setIsTyping } = usePresence(poolId, {
+    user_id: currentUserId,
+    username: currentMember?.users.username ?? '',
+    full_name: currentMember?.users.full_name ?? '',
+  })
+
+  // =====================
+  // MEMBER LEVEL COMPUTATION (memoized)
+  // =====================
+  const memberLevels = useMemo(() => {
+    const map = new Map<string, MemberWithLevel>()
+
+    // Compute full XP breakdown for every member — same pipeline as LeaderboardTab & Form tab.
+    for (const member of members) {
+      const entries = member.entries ?? []
+      const bestEntry = entries.length > 0
+        ? entries.reduce((best, e) => (e.total_points > best.total_points ? e : best), entries[0])
+        : null
+
+      if (!bestEntry) {
+        map.set(member.user_id, {
+          user_id: member.user_id,
+          username: member.users.username,
+          full_name: member.users.full_name,
+          level: 1,
+          level_name: 'Rookie',
+          total_xp: 0,
+          current_rank: null,
+          badges: [],
+        })
+        continue
+      }
+
+      const entryPreds = allPredictions.filter(p => p.entry_id === bestEntry.entry_id)
+
+      if (entryPreds.length === 0) {
+        map.set(member.user_id, {
+          user_id: member.user_id,
+          username: member.users.username,
+          full_name: member.users.full_name,
+          level: 1,
+          level_name: 'Rookie',
+          total_xp: 0,
+          current_rank: bestEntry.current_rank ?? null,
+          badges: [],
+        })
+        continue
+      }
+
+      try {
+        const predResults = computePredictionResults(matches, entryPreds, settings, teams, conductData)
+        const streakData = computeStreaks(predResults)
+        const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
+
+        const xpBreakdown = computeFullXPBreakdown({
+          predictionResults: predResults,
+          matches,
+          crowdData,
+          streaks: streakData,
+          entryPredictions: entryPreds,
+          entryRank: bestEntry.current_rank,
+          totalMatches: matches.length,
+        })
+
+        map.set(member.user_id, {
+          user_id: member.user_id,
+          username: member.users.username,
+          full_name: member.users.full_name,
+          level: xpBreakdown.currentLevel.level,
+          level_name: xpBreakdown.currentLevel.name,
+          total_xp: xpBreakdown.totalXP,
+          current_rank: bestEntry.current_rank ?? null,
+          badges: xpBreakdown.earnedBadges,
+        })
+      } catch {
+        map.set(member.user_id, {
+          user_id: member.user_id,
+          username: member.users.username,
+          full_name: member.users.full_name,
+          level: 1,
+          level_name: 'Rookie',
+          total_xp: 0,
+          current_rank: bestEntry.current_rank ?? null,
+          badges: [],
+        })
+      }
+    }
+
+    return map
+  }, [members, allPredictions, matches, settings, teams, conductData])
+
+  // =====================
+  // COMPUTED SCORE MAP (matches LeaderboardTab logic)
+  // =====================
+  const computedScoreMap = useMemo(() => {
+    const map = new Map<string, number>()
+
+    // Convert matches/teams to the formats needed by scoring functions
+    const matchesWithResult = matches.map(m => ({
+      match_id: m.match_id, match_number: m.match_number, stage: m.stage,
+      group_letter: m.group_letter, match_date: m.match_date, venue: m.venue, status: m.status,
+      home_team_id: m.home_team_id, away_team_id: m.away_team_id,
+      home_team_placeholder: m.home_team_placeholder, away_team_placeholder: m.away_team_placeholder,
+      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      is_completed: m.is_completed,
+      home_score_ft: m.home_score_ft, away_score_ft: m.away_score_ft,
+      home_score_pso: m.home_score_pso, away_score_pso: m.away_score_pso,
+      winner_team_id: m.winner_team_id, tournament_id: m.tournament_id,
+    }))
+    const tournamentTeams = teams.map(t => ({
+      team_id: t.team_id, country_name: t.country_name, country_code: t.country_code,
+      group_letter: t.group_letter, fifa_ranking_points: t.fifa_ranking_points, flag_url: t.flag_url,
+    }))
+
+    // Group predictions by entry_id
+    const predsByEntry = new Map<string, typeof allPredictions>()
+    for (const p of allPredictions) {
+      const existing = predsByEntry.get(p.entry_id) || []
+      existing.push(p)
+      predsByEntry.set(p.entry_id, existing)
+    }
+
+    for (const [entryId, preds] of predsByEntry) {
+      // Match points
+      const predMap = new Map(preds.map(p => [p.match_id, p]))
+      const predictionMap = new Map(preds.map(p => [p.match_id, {
+        home: p.predicted_home_score, away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null, awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      }]))
+
+      const bracket = resolveFullBracket({ matches: matchesWithResult, predictionMap, teams: tournamentTeams, conductData })
+
+      let totalMatchPts = 0
+      for (const m of matches) {
+        if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
+          const pred = predMap.get(m.match_id)
+          if (!pred) continue
+
+          const resolved = bracket.knockoutTeamMap.get(m.match_number)
+          const teamsMatch = checkKnockoutTeamsMatch(
+            m.stage, m.home_team_id, m.away_team_id,
+            resolved?.home?.team_id ?? null, resolved?.away?.team_id ?? null,
+          )
+
+          const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
+          const result = calculatePoints(
+            pred.predicted_home_score, pred.predicted_away_score,
+            m.home_score_ft, m.away_score_ft, m.stage, settings,
+            hasPso ? {
+              actualHomePso: m.home_score_pso!, actualAwayPso: m.away_score_pso!,
+              predictedHomePso: pred.predicted_home_pso, predictedAwayPso: pred.predicted_away_pso,
+            } : undefined,
+            teamsMatch,
+          )
+          totalMatchPts += result.points
+        }
+      }
+
+      // Bonus points
+      const bonusEntries = calculateAllBonusPoints({
+        memberId: entryId, memberPredictions: predictionMap,
+        matches: matchesWithResult, teams: tournamentTeams,
+        conductData, settings, tournamentAwards: null, predictionMode,
+      })
+      const totalBonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+
+      // Point adjustment
+      const entry = members.flatMap(m => m.entries ?? []).find(e => e.entry_id === entryId)
+      const adjustment = entry?.point_adjustment ?? 0
+
+      map.set(entryId, totalMatchPts + totalBonusPts + adjustment)
+    }
+
+    return map
+  }, [allPredictions, matches, teams, settings, conductData, members, predictionMode])
+
+  // =====================
+  // SYSTEM EVENTS (memoized)
+  // =====================
+  const systemEvents = useMemo(() => {
+    return generateSystemEvents(matches, members, memberLevels)
+  }, [matches, members, memberLevels])
+
+  // =====================
+  // SCROLL HELPERS (uses browser scroll)
+  // =====================
+  const isNearBottom = useCallback(() => {
+    const { scrollTop, scrollHeight, clientHeight } = document.documentElement
+    return scrollHeight - scrollTop - clientHeight < 150
+  }, [])
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+  }, [])
+
+  // =====================
+  // LOAD MESSAGES
+  // =====================
+  useEffect(() => {
+    const loadMessages = async () => {
+      setLoading(true)
+      const { data } = await supabaseRef.current
+        .from('pool_messages')
+        .select('*')
+        .eq('pool_id', poolId)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (data) {
+        const msgs: MessageWithReactions[] = data.reverse().map(m => ({
+          ...m,
+          message_type: m.message_type ?? 'text',
+          reply_to_message_id: m.reply_to_message_id ?? null,
+          metadata: m.metadata ?? {},
+          reactions: [],
+        }))
+        setMessages(msgs)
+        setHasMore(data.length === 50)
+
+        // Load reply previews for messages with reply_to_message_id
+        const replyIds = msgs
+          .map(m => m.reply_to_message_id)
+          .filter((id): id is string => id !== null)
+
+        if (replyIds.length > 0) {
+          const { data: replyMsgs } = await supabaseRef.current
+            .from('pool_messages')
+            .select('message_id, content, user_id')
+            .in('message_id', replyIds)
+
+          if (replyMsgs) {
+            const previews = new Map<string, ReplyPreview>()
+            for (const rm of replyMsgs) {
+              const author = members.find(m => m.user_id === rm.user_id)
+              previews.set(rm.message_id, {
+                message_id: rm.message_id,
+                content: rm.content.slice(0, 60) + (rm.content.length > 60 ? '...' : ''),
+                author_name: author?.users.full_name || author?.users.username || 'Unknown',
+              })
+            }
+            setReplyPreviews(previews)
+          }
+        }
+      }
+      setLoading(false)
+      setTimeout(() => scrollToBottom('instant'), 50)
+    }
+    loadMessages()
+  }, [poolId, scrollToBottom, members])
+
+  // =====================
+  // REALTIME SUBSCRIPTION
+  // =====================
+  useEffect(() => {
+    const supabase = supabaseRef.current
+    const channel = supabase
+      .channel(`pool-community-${poolId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'pool_messages',
+          filter: `pool_id=eq.${poolId}`,
+        },
+        (payload) => {
+          const newMsg: MessageWithReactions = {
+            ...(payload.new as Message),
+            message_type: (payload.new as any).message_type ?? 'text',
+            reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
+            metadata: (payload.new as any).metadata ?? {},
+            reactions: [],
+          }
+          wasNearBottomRef.current = isNearBottom()
+          // Deduplicate: skip if already added optimistically
+          setMessages(prev =>
+            prev.some(m => m.message_id === newMsg.message_id)
+              ? prev
+              : [...prev, newMsg]
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [poolId, isNearBottom])
+
+  // Auto-scroll when new message arrives
+  useEffect(() => {
+    if (wasNearBottomRef.current) {
+      scrollToBottom()
+    }
+  }, [messages.length, scrollToBottom])
+
+  // =====================
+  // REACTION LOADING + REALTIME
+  // =====================
+  const loadReactionsForMessages = useCallback(async (messageIds: string[]) => {
+    if (messageIds.length === 0) return
+    const { data: reactions } = await supabaseRef.current
+      .from('pool_message_reactions')
+      .select('message_id, emoji, user_id')
+      .in('message_id', messageIds)
+
+    if (!reactions) return
+
+    // Aggregate into ReactionCount per message
+    const reactionMap = new Map<string, Map<string, { count: number; users: Set<string> }>>()
+    for (const r of reactions) {
+      if (!reactionMap.has(r.message_id)) reactionMap.set(r.message_id, new Map())
+      const emojiMap = reactionMap.get(r.message_id)!
+      if (!emojiMap.has(r.emoji)) emojiMap.set(r.emoji, { count: 0, users: new Set() })
+      const entry = emojiMap.get(r.emoji)!
+      entry.count++
+      entry.users.add(r.user_id)
+    }
+
+    setMessages(prev => prev.map(msg => {
+      const emojiMap = reactionMap.get(msg.message_id)
+      if (!emojiMap) return msg
+      const reactionCounts: ReactionCount[] = Array.from(emojiMap.entries()).map(([emoji, { count, users }]) => ({
+        emoji,
+        count,
+        reacted_by_me: users.has(currentUserId),
+      }))
+      return { ...msg, reactions: reactionCounts }
+    }))
+  }, [currentUserId])
+
+  // Load reactions when messages change
+  useEffect(() => {
+    const ids = messages.map(m => m.message_id)
+    if (ids.length > 0) loadReactionsForMessages(ids)
+  }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime reaction subscription
+  useEffect(() => {
+    const supabase = supabaseRef.current
+    const channel = supabase
+      .channel(`pool-reactions-${poolId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pool_message_reactions',
+        },
+        () => {
+          // Reload reactions for all current messages
+          const ids = messages.map(m => m.message_id)
+          loadReactionsForMessages(ids)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [poolId, messages.length, loadReactionsForMessages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toggle reaction (optimistic)
+  const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    const msg = messages.find(m => m.message_id === messageId)
+    if (!msg) return
+
+    const existing = msg.reactions.find(r => r.emoji === emoji)
+    const hasReacted = existing?.reacted_by_me ?? false
+
+    // Optimistic update
+    setMessages(prev => prev.map(m => {
+      if (m.message_id !== messageId) return m
+      let newReactions: ReactionCount[]
+      if (hasReacted) {
+        newReactions = m.reactions
+          .map(r => r.emoji === emoji ? { ...r, count: r.count - 1, reacted_by_me: false } : r)
+          .filter(r => r.count > 0)
+      } else {
+        const found = m.reactions.find(r => r.emoji === emoji)
+        if (found) {
+          newReactions = m.reactions.map(r => r.emoji === emoji ? { ...r, count: r.count + 1, reacted_by_me: true } : r)
+        } else {
+          newReactions = [...m.reactions, { emoji, count: 1, reacted_by_me: true }]
+        }
+      }
+      return { ...m, reactions: newReactions }
+    }))
+
+    // DB operation
+    if (hasReacted) {
+      await supabaseRef.current
+        .from('pool_message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', currentUserId)
+        .eq('emoji', emoji)
+    } else {
+      await supabaseRef.current
+        .from('pool_message_reactions')
+        .insert({ message_id: messageId, user_id: currentUserId, emoji })
+    }
+  }, [messages, currentUserId])
+
+  // =====================
+  // LOAD OLDER MESSAGES
+  // =====================
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return
+    setLoadingMore(true)
+
+    const oldestMessage = messages[0]
+    const { data } = await supabaseRef.current
+      .from('pool_messages')
+      .select('*')
+      .eq('pool_id', poolId)
+      .lt('created_at', oldestMessage.created_at)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (data) {
+      const older: MessageWithReactions[] = data.reverse().map(m => ({
+        ...m,
+        message_type: m.message_type ?? 'text',
+        reply_to_message_id: m.reply_to_message_id ?? null,
+        metadata: m.metadata ?? {},
+        reactions: [],
+      }))
+      setMessages(prev => [...older, ...prev])
+      setHasMore(data.length === 50)
+    }
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, messages, poolId])
+
+  // =====================
+  // SEND MESSAGE
+  // =====================
+  const handleSendMessage = useCallback(async (
+    content: string,
+    mentions: string[],
+    replyToId: string | null,
+  ) => {
+    const { data, error } = await supabaseRef.current
+      .from('pool_messages')
+      .insert({
+        pool_id: poolId,
+        user_id: currentUserId,
+        content,
+        mentions,
+        message_type: 'text',
+        reply_to_message_id: replyToId,
+        metadata: {},
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to send message:', error)
+      return
+    }
+
+    // Optimistically add the message to state immediately
+    if (data) {
+      const newMsg: MessageWithReactions = {
+        ...data,
+        message_type: data.message_type ?? 'text',
+        reply_to_message_id: data.reply_to_message_id ?? null,
+        metadata: data.metadata ?? {},
+        reactions: [],
+      }
+      wasNearBottomRef.current = true
+      setMessages(prev =>
+        prev.some(m => m.message_id === newMsg.message_id)
+          ? prev
+          : [...prev, newMsg]
+      )
+    }
+  }, [poolId, currentUserId])
+
+  // =====================
+  // TYPING
+  // =====================
+  const handleTyping = useCallback(() => {
+    setIsTyping(true)
+  }, [setIsTyping])
+
+  // =====================
+  // ACTION HANDLERS
+  // =====================
+  const handleReply = useCallback((message: MessageWithReactions) => {
+    setReplyingTo(message)
+  }, [])
+
+  const handleReact = useCallback((_message: MessageWithReactions, emoji: string) => {
+    handleToggleReaction(_message.message_id, emoji)
+  }, [handleToggleReaction])
+
+  const handlePin = useCallback((_message: MessageWithReactions) => {
+    // Open pin modal — admin can create a pinned challenge from any message
+    setEditingPin(null)
+    setShowPinModal(true)
+  }, [])
+
+  const handleEditPin = useCallback((pinned: PinnedMessage) => {
+    setEditingPin(pinned)
+    setShowPinModal(true)
+  }, [])
+
+  const handleShareBoldCall = useCallback(() => {
+    setShowShareModal(true)
+  }, [])
+
+  const handleFlexBadges = useCallback(async () => {
+    const myLevel = memberLevels.get(currentUserId)
+    if (!myLevel) return
+
+    const metadata: BadgeFlexMetadata = {
+      badges: myLevel.badges.map(b => ({
+        id: b.id,
+        emoji: b.emoji,
+        name: b.name,
+        tier: b.tier,
+        rarity: b.rarity,
+      })),
+      level: myLevel.level,
+      level_name: myLevel.level_name,
+      total_xp: myLevel.total_xp,
+    }
+
+    const { data, error } = await supabaseRef.current.from('pool_messages').insert({
+      pool_id: poolId,
+      user_id: currentUserId,
+      content: `🏆 Flexing my badges — Level ${myLevel.level} ${myLevel.level_name} with ${myLevel.badges.length} badge${myLevel.badges.length !== 1 ? 's' : ''}!`,
+      mentions: [],
+      message_type: 'badge_flex',
+      reply_to_message_id: null,
+      metadata,
+    }).select().single()
+
+    if (!error && data) {
+      wasNearBottomRef.current = true
+      setMessages(prev =>
+        prev.some(m => m.message_id === data.message_id)
+          ? prev
+          : [...prev, { ...data, message_type: data.message_type ?? 'badge_flex', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
+      )
+    }
+  }, [memberLevels, currentUserId, poolId])
+
+  const handleDropStandings = useCallback(async () => {
+    // Build top 5 leaderboard from member entries using computed scores
+    const ranked = members
+      .flatMap(m => (m.entries ?? []).map(e => ({
+        user_id: m.user_id,
+        full_name: m.users.full_name || m.users.username,
+        rank: e.current_rank ?? 999,
+        points: computedScoreMap.get(e.entry_id) ?? e.total_points,
+        delta: e.previous_rank !== null && e.current_rank !== null
+          ? e.previous_rank - e.current_rank
+          : 0,
+      })))
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 5)
+
+    if (ranked.length === 0) return
+
+    const metadata: StandingsDropMetadata = {
+      entries: ranked,
+      pool_name: poolName,
+      timestamp: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabaseRef.current.from('pool_messages').insert({
+      pool_id: poolId,
+      user_id: currentUserId,
+      content: `📊 Current standings — ${ranked[0]?.full_name} leads with ${ranked[0]?.points.toLocaleString()} pts!`,
+      mentions: [],
+      message_type: 'standings_drop',
+      reply_to_message_id: null,
+      metadata,
+    }).select().single()
+
+    if (!error && data) {
+      wasNearBottomRef.current = true
+      setMessages(prev =>
+        prev.some(m => m.message_id === data.message_id)
+          ? prev
+          : [...prev, { ...data, message_type: data.message_type ?? 'standings_drop', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
+      )
+    }
+  }, [members, poolName, poolId, currentUserId, computedScoreMap])
+
+  // Count of prediction_share messages (for pinned card counter)
+  const sharedCallsCount = useMemo(() => {
+    return messages.filter(m => m.message_type === 'prediction_share').length
+  }, [messages])
+
+  // =====================
+  // BUILD FEED (messages + system events interleaved)
+  // =====================
+  const feedItems = useMemo(() => {
+    const items: FeedItem[] = []
+
+    // Add messages
+    for (const msg of messages) {
+      items.push({ type: 'message', data: msg })
+    }
+
+    // Add system events (interleave by timestamp)
+    for (const event of systemEvents) {
+      items.push({ type: 'system_event', data: event })
+    }
+
+    // Sort by timestamp
+    items.sort((a, b) => {
+      const timeA = a.type === 'message' ? a.data.created_at : a.data.timestamp
+      const timeB = b.type === 'message' ? b.data.created_at : b.data.timestamp
+      return new Date(timeA).getTime() - new Date(timeB).getTime()
+    })
+
+    // Insert day headers
+    const withHeaders: FeedItem[] = []
+    let lastDay = ''
+    for (const item of items) {
+      const timestamp = item.type === 'message' ? item.data.created_at : item.data.timestamp
+      const dayText = formatDayHeader(timestamp)
+      if (dayText !== lastDay) {
+        withHeaders.push({ type: 'day_header', data: { text: dayText, key: `day-${timestamp}` } })
+        lastDay = dayText
+      }
+      withHeaders.push(item)
+    }
+
+    return withHeaders
+  }, [messages, systemEvents])
+
+  // =====================
+  // RENDER
+  // =====================
+  return (
+    <>
+      <div className="flex gap-0 md:gap-4 items-start">
+        {/* Left: Chat Panel */}
+        <div className="flex-1 min-w-0">
+          {/* Mobile Online Strip */}
+          <OnlineMembersStrip onlineUsers={onlineUsers} />
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Pool Chat</h3>
+            <button
+              onClick={onShowHowToPlay}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              How to Play
+            </button>
+          </div>
+
+          {/* Chat area — no overflow, flows with page. Bottom padding for sticky input bar. */}
+          <div className="space-y-3 px-1 pb-36">
+            {/* Pinned Message */}
+            <PinnedMessageCard
+              poolId={poolId}
+              isAdmin={isAdmin}
+              onShareBoldCall={handleShareBoldCall}
+              onEditPin={handleEditPin}
+              sharedCallsCount={sharedCallsCount}
+            />
+
+            {/* Load more */}
+            {hasMore && (
+              <div className="text-center pb-2">
+                <button
+                  onClick={loadOlderMessages}
+                  disabled={loadingMore}
+                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 disabled:opacity-50 transition-colors"
+                >
+                  {loadingMore ? 'Loading...' : 'Load earlier messages'}
+                </button>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {loading && (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!loading && feedItems.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">No messages yet</p>
+                <p className="text-xs text-neutral-500 mt-1">Be the first to say something!</p>
+              </div>
+            )}
+
+            {/* Feed items */}
+            {!loading && feedItems.map((item) => {
+              if (item.type === 'day_header') {
+                return <DayHeader key={item.data.key} text={item.data.text} />
+              }
+
+              if (item.type === 'system_event') {
+                return <SystemEventCard key={item.data.id} event={item.data} />
+              }
+
+              if (item.type === 'message') {
+                const msg = item.data
+
+                // Rich content cards by message_type
+                if (msg.message_type === 'prediction_share') {
+                  return (
+                    <PredictionShareCard
+                      key={msg.message_id}
+                      message={msg}
+                      members={members}
+                      memberLevels={memberLevels}
+                      currentUserId={currentUserId}
+                      reactions={msg.reactions}
+                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                    />
+                  )
+                }
+
+                if (msg.message_type === 'badge_flex') {
+                  return (
+                    <BadgeFlexCard
+                      key={msg.message_id}
+                      message={msg}
+                      members={members}
+                      memberLevels={memberLevels}
+                      reactions={msg.reactions}
+                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                    />
+                  )
+                }
+
+                if (msg.message_type === 'standings_drop') {
+                  return (
+                    <StandingsDropCard
+                      key={msg.message_id}
+                      message={msg}
+                      members={members}
+                      memberLevels={memberLevels}
+                      currentUserId={currentUserId}
+                      reactions={msg.reactions}
+                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                    />
+                  )
+                }
+
+                // Default text message
+                const reply = msg.reply_to_message_id
+                  ? replyPreviews.get(msg.reply_to_message_id) ?? null
+                  : null
+
+                return (
+                  <div key={msg.message_id}>
+                    <ChatMessage
+                      message={msg}
+                      members={members}
+                      memberLevels={memberLevels}
+                      currentUserId={currentUserId}
+                      replyPreview={reply}
+                      reactions={msg.reactions}
+                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                    />
+                  </div>
+                )
+              }
+
+              return null
+            })}
+
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        {/* Right: Desktop Sidebar — spacer div reserves width; sidebar itself is fixed */}
+        <div className="hidden md:block md:w-[260px] md:shrink-0">
+          <DesktopSidebar
+            members={members}
+            memberLevels={memberLevels}
+            currentUserId={currentUserId}
+            matches={matches}
+            allPredictions={allPredictions}
+            onlineUsers={onlineUsers}
+            systemEvents={systemEvents}
+            computedScoreMap={computedScoreMap}
+          />
+        </div>
+      </div>
+
+      {/* Sticky bottom bar — typing, quick actions, input */}
+      <div className="sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3">
+        <Card className="!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]">
+          {/* Typing Indicator */}
+          <TypingIndicator typingUsers={typingUsers} />
+
+          {/* Quick Actions */}
+          <QuickActions
+            onSharePrediction={handleShareBoldCall}
+            onFlexBadges={handleFlexBadges}
+            onDropStandings={handleDropStandings}
+          />
+
+          {/* Message Input */}
+          <MessageInput
+            poolId={poolId}
+            currentUserId={currentUserId}
+            members={members}
+            memberLevels={memberLevels}
+            replyingTo={replyingTo}
+            onClearReply={() => setReplyingTo(null)}
+            onSend={handleSendMessage}
+            onTyping={handleTyping}
+          />
+        </Card>
+      </div>
+
+      {/* Pin Message Modal */}
+      {showPinModal && (
+        <PinMessageModal
+          poolId={poolId}
+          currentUserId={currentUserId}
+          existingPin={editingPin}
+          onClose={() => {
+            setShowPinModal(false)
+            setEditingPin(null)
+          }}
+        />
+      )}
+
+      {/* Share Prediction Modal */}
+      {showShareModal && (
+        <SharePredictionModal
+          poolId={poolId}
+          currentUserId={currentUserId}
+          matches={matches}
+          allPredictions={allPredictions}
+          userEntries={userEntries}
+          onClose={() => setShowShareModal(false)}
+          onMessageSent={(data) => {
+            wasNearBottomRef.current = true
+            setMessages(prev =>
+              prev.some(m => m.message_id === data.message_id)
+                ? prev
+                : [...prev, { ...data, message_type: data.message_type ?? 'prediction_share', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
+            )
+          }}
+        />
+      )}
+    </>
+  )
+}
