@@ -62,7 +62,7 @@ export function parseMentionUserIds(content: string, members: MemberData[]): str
   return [...new Set(ids)]
 }
 
-export function renderMessageContent(content: string, members: MemberData[]): React.ReactNode {
+export function renderMessageContent(content: string, members: MemberData[], isOwn?: boolean): React.ReactNode {
   const parts = content.split(/(@\w+)/g)
   return parts.map((part, i) => {
     if (part.startsWith('@')) {
@@ -70,7 +70,7 @@ export function renderMessageContent(content: string, members: MemberData[]): Re
       const member = members.find(m => m.users.username.toLowerCase() === username)
       if (member) {
         return (
-          <span key={i} className="font-semibold text-primary-400">
+          <span key={i} className={`font-semibold ${isOwn ? 'text-primary-200' : 'text-primary-600 dark:text-primary-400'}`}>
             {part}
           </span>
         )

@@ -1,7 +1,6 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
-import { getInitials, formatMessageTime, renderMessageContent, getLevelPillClasses } from './helpers'
-import { EmojiReactions } from './EmojiReactions'
+import { getInitials, formatMessageTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
 
 // =====================
 // LEVEL PILL
@@ -9,8 +8,8 @@ import { EmojiReactions } from './EmojiReactions'
 
 function LevelPill({ level }: { level: number }) {
   return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none ${getLevelPillClasses(level)}`}>
-      Lvl {level}
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none whitespace-nowrap ${getLevelPillClasses(level)}`}>
+      Lvl {level} · {getRankTitle(level)}
     </span>
   )
 }
@@ -37,11 +36,19 @@ export function DayHeader({ text }: { text: string }) {
 
 function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) {
   return (
-    <div className={`flex items-center gap-1.5 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-      <div className={`w-0.5 h-4 rounded-full bg-primary-400 shrink-0`} />
-      <p className="text-[10px] text-neutral-400 truncate max-w-[200px]">
-        <span className="font-medium">↩ {reply.author_name}:</span> {reply.content}
-      </p>
+    <div className={`flex items-stretch gap-0 mb-0 ${isOwn ? 'justify-end' : ''}`}>
+      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-t-lg ${
+        isOwn
+          ? 'bg-primary-700/50'
+          : 'bg-neutral-100 dark:bg-neutral-800/80'
+      }`}>
+        <div className="w-0.5 h-4 rounded-full bg-primary-400 shrink-0" />
+        <p className={`text-[10px] truncate max-w-[200px] ${
+          isOwn ? 'text-primary-200' : 'text-neutral-500 dark:text-neutral-400'
+        }`}>
+          <span className="font-medium">↩ {reply.author_name}:</span> {reply.content}
+        </p>
+      </div>
     </div>
   )
 }
@@ -56,16 +63,14 @@ export function ChatMessage({
   memberLevels,
   currentUserId,
   replyPreview,
-  reactions,
-  onToggleReaction,
 }: {
   message: MessageWithReactions
   members: MemberData[]
   memberLevels: Map<string, MemberWithLevel>
   currentUserId: string
   replyPreview?: ReplyPreview | null
-  reactions: ReactionCount[]
-  onToggleReaction: (emoji: string) => void
+  reactions?: ReactionCount[]
+  onToggleReaction?: (emoji: string) => void
 }) {
   const author = members.find(m => m.user_id === message.user_id)
   const authorLevel = memberLevels.get(message.user_id)
@@ -76,35 +81,23 @@ export function ChatMessage({
       <div className={`flex gap-2.5 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
         {/* Avatar — hidden for own messages */}
         {!isOwn && (
-          <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300`}>
+          <div className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
             {getInitials(author?.users.full_name, author?.users.username)}
           </div>
         )}
 
-        <div className={`max-w-[75%] ${isOwn ? 'items-end' : ''}`}>
-          {/* Name + level + time — hidden for own messages */}
+        <div className={`max-w-[78%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+          {/* Name + level — hidden for own messages */}
           {!isOwn && (
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                 {author?.users.full_name || author?.users.username || 'Unknown'}
               </span>
               {authorLevel && <LevelPill level={authorLevel.level} />}
-              <span className="text-[10px] text-neutral-400" suppressHydrationWarning>
-                {formatMessageTime(message.created_at)}
-              </span>
             </div>
           )}
 
-          {/* Own message: just timestamp */}
-          {isOwn && (
-            <div className="flex justify-end mb-0.5">
-              <span className="text-[10px] text-neutral-400" suppressHydrationWarning>
-                {formatMessageTime(message.created_at)}
-              </span>
-            </div>
-          )}
-
-          {/* Reply preview */}
+          {/* Reply preview — connects to bubble */}
           {replyPreview && (
             <ReplyHeader reply={replyPreview} isOwn={isOwn} />
           )}
@@ -112,20 +105,16 @@ export function ChatMessage({
           {/* Message bubble */}
           <div className={`px-3 py-2 text-sm leading-relaxed ${
             isOwn
-              ? 'bg-primary-600 text-white rounded-2xl rounded-br-md'
-              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-2xl rounded-bl-md'
+              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-2xl rounded-tl-2xl rounded-tr-sm' : 'rounded-2xl rounded-br-sm'}`
+              : `bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-border-default ${replyPreview ? 'rounded-b-2xl rounded-tr-2xl rounded-tl-sm' : 'rounded-2xl rounded-bl-sm'}`
           }`}>
-            {renderMessageContent(message.content, members)}
+            {renderMessageContent(message.content, members, isOwn)}
           </div>
-        </div>
 
-        {/* Emoji reactions — beside the message */}
-        <div className="shrink-0 self-end mb-0.5">
-          <EmojiReactions
-            reactions={reactions}
-            onToggleReaction={onToggleReaction}
-            pickerSide={isOwn ? 'left' : 'right'}
-          />
+          {/* Timestamp below bubble */}
+          <span className={`text-[10px] text-neutral-400 mt-0.5 ${isOwn ? 'text-right' : ''}`} suppressHydrationWarning>
+            {formatMessageTime(message.created_at)}
+          </span>
         </div>
       </div>
     </div>

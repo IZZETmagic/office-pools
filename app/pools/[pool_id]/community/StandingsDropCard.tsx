@@ -1,7 +1,6 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, StandingsDropMetadata, MemberWithLevel, ReactionCount } from './types'
-import { getInitials, formatMessageTime, getLevelPillClasses } from './helpers'
-import { EmojiReactions } from './EmojiReactions'
+import { SharedCardWrapper } from './SharedCardWrapper'
 
 type StandingsDropCardProps = {
   message: MessageWithReactions
@@ -25,53 +24,41 @@ export function StandingsDropCard({
   const meta = message.metadata as unknown as StandingsDropMetadata
   if (!meta?.entries) return null
 
-  const author = members.find(m => m.user_id === message.user_id)
-  const authorLevel = memberLevels.get(message.user_id)
-
   return (
-    <div className="rounded-xl border border-neutral-200 dark:border-border-default bg-surface overflow-hidden">
-      <div className="px-3.5 py-3">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
-            {getInitials(author?.users.full_name, author?.users.username)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                {author?.users.full_name || author?.users.username || 'Unknown'}
-              </span>
-              {authorLevel && (
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none ${getLevelPillClasses(authorLevel.level)}`}>
-                  Lvl {authorLevel.level}
-                </span>
-              )}
-            </div>
-            <span className="text-[10px] text-neutral-400" suppressHydrationWarning>
-              {formatMessageTime(message.created_at)}
-            </span>
-          </div>
-          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
-            📊 Standings
+    <SharedCardWrapper
+      userId={message.user_id}
+      createdAt={message.created_at}
+      members={members}
+      memberLevels={memberLevels}
+      reactions={reactions}
+      onToggleReaction={onToggleReaction}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">📊</span>
+          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            Current Standings
           </span>
         </div>
+        <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
+          {meta.pool_name}
+        </span>
+      </div>
 
-        {/* Pool name */}
-        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">
-          {meta.pool_name} Leaderboard
-        </p>
+      {/* Divider */}
+      <div className="border-t border-neutral-100 dark:border-border-default/50" />
 
-        {/* Leaderboard rows */}
-        <div className="space-y-1">
-          {meta.entries.map((entry) => {
-            const isCurrentUser = entry.user_id === currentUserId
-            return (
+      {/* Leaderboard rows */}
+      <div className="px-1 py-1">
+        {meta.entries.map((entry, idx) => {
+          const isCurrentUser = entry.user_id === currentUserId
+          const isFirst = entry.rank === 1
+          return (
+            <div key={entry.user_id}>
               <div
-                key={entry.user_id}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${
-                  isCurrentUser
-                    ? 'bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-800'
-                    : ''
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg ${
+                  isFirst ? 'bg-accent-50/60 dark:bg-accent-900/10' : ''
                 }`}
               >
                 {/* Rank */}
@@ -91,31 +78,18 @@ export function StandingsDropCard({
                 </span>
 
                 {/* Points */}
-                <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                <span className="text-xs font-bold text-primary-600 dark:text-primary-400 tabular-nums font-mono">
                   {entry.points.toLocaleString()}
                 </span>
-
-                {/* Delta */}
-                {entry.delta !== 0 && (
-                  <span className={`text-[10px] font-medium w-8 text-right ${
-                    entry.delta > 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'
-                  }`}>
-                    {entry.delta > 0 ? '▲' : '▼'}{Math.abs(entry.delta)}
-                  </span>
-                )}
-                {entry.delta === 0 && (
-                  <span className="text-[10px] text-neutral-300 dark:text-neutral-600 w-8 text-right">—</span>
-                )}
               </div>
-            )
-          })}
-        </div>
-
-        {/* Reactions */}
-        <div className="mt-2.5 flex justify-start">
-          <EmojiReactions reactions={reactions} onToggleReaction={onToggleReaction} />
-        </div>
+              {/* Row divider */}
+              {idx < meta.entries.length - 1 && (
+                <div className="mx-3 border-t border-neutral-100 dark:border-border-default/30" />
+              )}
+            </div>
+          )
+        })}
       </div>
-    </div>
+    </SharedCardWrapper>
   )
 }

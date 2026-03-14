@@ -1,7 +1,6 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, PredictionShareMetadata, MemberWithLevel, ReactionCount } from './types'
-import { getInitials, formatMessageTime, getLevelPillClasses, getTierBorderClass } from './helpers'
-import { EmojiReactions } from './EmojiReactions'
+import { SharedCardWrapper } from './SharedCardWrapper'
 
 type PredictionShareCardProps = {
   message: MessageWithReactions
@@ -35,6 +34,14 @@ function OutcomeBadge({ outcome }: { outcome: 'exact' | 'correct' | 'miss' }) {
   }
 }
 
+function getOutcomeColor(outcome: 'exact' | 'correct' | 'miss') {
+  switch (outcome) {
+    case 'exact': return 'text-accent-600 dark:text-accent-400'
+    case 'correct': return 'text-success-600 dark:text-success-400'
+    case 'miss': return 'text-danger-600 dark:text-danger-400'
+  }
+}
+
 export function PredictionShareCard({
   message,
   members,
@@ -46,108 +53,71 @@ export function PredictionShareCard({
   const meta = message.metadata as unknown as PredictionShareMetadata
   if (!meta?.match_id) return null
 
-  const author = members.find(m => m.user_id === message.user_id)
-  const authorLevel = memberLevels.get(message.user_id)
   const isExact = meta.outcome === 'exact'
+  const matchName = `${meta.home_team_name} vs ${meta.away_team_name}`
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-border-default bg-surface">
+    <SharedCardWrapper
+      userId={message.user_id}
+      createdAt={message.created_at}
+      members={members}
+      memberLevels={memberLevels}
+      reactions={reactions}
+      onToggleReaction={onToggleReaction}
+    >
       {/* Gold shimmer bar for exact scores */}
       {isExact && (
         <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-accent-400 to-transparent animate-shimmer" style={{ backgroundSize: '200% auto' }} />
       )}
 
-      <div className="px-3.5 py-3">
-        {/* Header: avatar + name + level + outcome badge */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 ${
-              authorLevel?.badges?.[0]?.tier ? getTierBorderClass(authorLevel.badges[0].tier) : ''
-            }`}>
-              {getInitials(author?.users.full_name, author?.users.username)}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                  {author?.users.full_name || author?.users.username || 'Unknown'}
-                </span>
-                {authorLevel && (
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none ${getLevelPillClasses(authorLevel.level)}`}>
-                    Lvl {authorLevel.level}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-neutral-400" suppressHydrationWarning>
-                {formatMessageTime(message.created_at)}
-              </span>
-            </div>
-          </div>
-          <OutcomeBadge outcome={meta.outcome} />
+      {/* Header row */}
+      <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-sm">⚽</span>
+          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+            {matchName}
+          </span>
+        </div>
+        <OutcomeBadge outcome={meta.outcome} />
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-neutral-100 dark:border-border-default/50" />
+
+      {/* Two-column scores */}
+      <div className="flex items-stretch">
+        {/* My Pick */}
+        <div className="flex-1 flex flex-col items-center py-3 px-2">
+          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider mb-1.5">
+            My Pick
+          </span>
+          <span className="text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
+            {meta.predicted_home} - {meta.predicted_away}
+          </span>
         </div>
 
-        {/* Match label */}
-        <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider mb-2">
-          Match {meta.match_number} · {meta.stage.replace('_', ' ')}
-        </p>
+        {/* Vertical divider */}
+        <div className="w-px bg-neutral-100 dark:bg-border-default/50 my-2.5" />
 
-        {/* Score comparison */}
-        <div className="flex items-center gap-3 justify-center">
-          {/* Home team */}
-          <div className="flex items-center gap-2 flex-1 justify-end">
-            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate text-right">
-              {meta.home_team_name}
-            </span>
-            {meta.home_flag_url && (
-              <img src={meta.home_flag_url} alt="" className="w-6 h-4 rounded-sm object-cover shrink-0" />
-            )}
-          </div>
-
-          {/* Scores */}
-          <div className="flex flex-col items-center gap-0.5 shrink-0">
-            {/* Predicted */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-neutral-400 font-medium w-8 text-right">{meta.predicted_home}</span>
-              <span className="text-[10px] text-neutral-300">-</span>
-              <span className="text-xs text-neutral-400 font-medium w-8">{meta.predicted_away}</span>
-            </div>
-            {/* Actual */}
-            <div className="flex items-center gap-1">
-              <span className={`text-base font-bold w-8 text-right ${
-                isExact ? 'text-accent-600 dark:text-accent-400' : 'text-neutral-900 dark:text-neutral-100'
-              }`}>
-                {meta.actual_home}
-              </span>
-              <span className="text-xs text-neutral-400 font-bold">-</span>
-              <span className={`text-base font-bold w-8 ${
-                isExact ? 'text-accent-600 dark:text-accent-400' : 'text-neutral-900 dark:text-neutral-100'
-              }`}>
-                {meta.actual_away}
-              </span>
-            </div>
-          </div>
-
-          {/* Away team */}
-          <div className="flex items-center gap-2 flex-1">
-            {meta.away_flag_url && (
-              <img src={meta.away_flag_url} alt="" className="w-6 h-4 rounded-sm object-cover shrink-0" />
-            )}
-            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-              {meta.away_team_name}
-            </span>
-          </div>
-        </div>
-
-        {/* Labels */}
-        <div className="flex items-center justify-center gap-4 mt-1.5">
-          <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Predicted</span>
-          <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Actual</span>
-        </div>
-
-        {/* Reactions */}
-        <div className="mt-2.5 flex justify-start">
-          <EmojiReactions reactions={reactions} onToggleReaction={onToggleReaction} />
+        {/* Result */}
+        <div className="flex-1 flex flex-col items-center py-3 px-2">
+          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider mb-1.5">
+            Result
+          </span>
+          <span className={`text-2xl font-bold tabular-nums ${getOutcomeColor(meta.outcome)}`}>
+            {meta.actual_home} - {meta.actual_away}
+          </span>
         </div>
       </div>
-    </div>
+
+      {/* Exact match bragging footer */}
+      {isExact && (
+        <div className="bg-accent-50 dark:bg-accent-900/10 border-t border-accent-100 dark:border-accent-900/20 px-3.5 py-2">
+          <p className="text-xs text-accent-700 dark:text-accent-400 text-center">
+            🎯 Nailed the exact score!
+          </p>
+        </div>
+      )}
+    </SharedCardWrapper>
   )
 }

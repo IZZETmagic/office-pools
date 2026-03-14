@@ -63,6 +63,8 @@ export function CommunityTab({
   const [showPinModal, setShowPinModal] = useState(false)
   const [editingPin, setEditingPin] = useState<PinnedMessage | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [unseenCount, setUnseenCount] = useState(0)
+  const [showNewMessagesPill, setShowNewMessagesPill] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const wasNearBottomRef = useRef(true)
@@ -88,7 +90,6 @@ export function CommunityTab({
   const memberLevels = useMemo(() => {
     const map = new Map<string, MemberWithLevel>()
 
-    // Compute full XP breakdown for every member — same pipeline as LeaderboardTab & Form tab.
     for (const member of members) {
       const entries = member.entries ?? []
       const bestEntry = entries.length > 0
@@ -168,12 +169,11 @@ export function CommunityTab({
   }, [members, allPredictions, matches, settings, teams, conductData])
 
   // =====================
-  // COMPUTED SCORE MAP (matches LeaderboardTab logic)
+  // COMPUTED SCORE MAP
   // =====================
   const computedScoreMap = useMemo(() => {
     const map = new Map<string, number>()
 
-    // Convert matches/teams to the formats needed by scoring functions
     const matchesWithResult = matches.map(m => ({
       match_id: m.match_id, match_number: m.match_number, stage: m.stage,
       group_letter: m.group_letter, match_date: m.match_date, venue: m.venue, status: m.status,
@@ -191,7 +191,6 @@ export function CommunityTab({
       group_letter: t.group_letter, fifa_ranking_points: t.fifa_ranking_points, flag_url: t.flag_url,
     }))
 
-    // Group predictions by entry_id
     const predsByEntry = new Map<string, typeof allPredictions>()
     for (const p of allPredictions) {
       const existing = predsByEntry.get(p.entry_id) || []
@@ -200,7 +199,6 @@ export function CommunityTab({
     }
 
     for (const [entryId, preds] of predsByEntry) {
-      // Match points
       const predMap = new Map(preds.map(p => [p.match_id, p]))
       const predictionMap = new Map(preds.map(p => [p.match_id, {
         home: p.predicted_home_score, away: p.predicted_away_score,
@@ -236,7 +234,6 @@ export function CommunityTab({
         }
       }
 
-      // Bonus points
       const bonusEntries = calculateAllBonusPoints({
         memberId: entryId, memberPredictions: predictionMap,
         matches: matchesWithResult, teams: tournamentTeams,
@@ -244,7 +241,6 @@ export function CommunityTab({
       })
       const totalBonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
 
-      // Point adjustment
       const entry = members.flatMap(m => m.entries ?? []).find(e => e.entry_id === entryId)
       const adjustment = entry?.point_adjustment ?? 0
 
@@ -262,15 +258,15 @@ export function CommunityTab({
   }, [matches, members, memberLevels])
 
   // =====================
-  // SCROLL HELPERS (mobile: container scroll, desktop: page scroll)
+  // SCROLL HELPERS
   // =====================
   const isNearBottom = useCallback(() => {
     if (isMobile && scrollContainerRef.current) {
       const el = scrollContainerRef.current
-      return el.scrollHeight - el.scrollTop - el.clientHeight < 150
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 100
     }
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement
-    return scrollHeight - scrollTop - clientHeight < 150
+    return scrollHeight - scrollTop - clientHeight < 100
   }, [isMobile])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -280,6 +276,8 @@ export function CommunityTab({
     } else {
       bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
     }
+    setShowNewMessagesPill(false)
+    setUnseenCount(0)
   }, [isMobile])
 
   // =====================
@@ -293,7 +291,7 @@ export function CommunityTab({
         .select('*')
         .eq('pool_id', poolId)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(40)
 
       if (data) {
         const msgs: MessageWithReactions[] = data.reverse().map(m => ({
@@ -304,9 +302,9 @@ export function CommunityTab({
           reactions: [],
         }))
         setMessages(msgs)
-        setHasMore(data.length === 50)
+        setHasMore(data.length === 40)
 
-        // Load reply previews for messages with reply_to_message_id
+        // Load reply previews
         const replyIds = msgs
           .map(m => m.reply_to_message_id)
           .filter((id): id is string => id !== null)
@@ -361,7 +359,13 @@ export function CommunityTab({
             reactions: [],
           }
           wasNearBottomRef.current = isNearBottom()
-          // Deduplicate: skip if already added optimistically
+
+          // Show new messages pill if scrolled up and not own message
+          if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
+            setUnseenCount(prev => prev + 1)
+            setShowNewMessagesPill(true)
+          }
+
           setMessages(prev =>
             prev.some(m => m.message_id === newMsg.message_id)
               ? prev
@@ -374,7 +378,7 @@ export function CommunityTab({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [poolId, isNearBottom])
+  }, [poolId, isNearBottom, currentUserId])
 
   // Auto-scroll when new message arrives
   useEffect(() => {
@@ -384,7 +388,7 @@ export function CommunityTab({
   }, [messages.length, scrollToBottom])
 
   // =====================
-  // MOBILE VIEWPORT (keyboard-aware contained layout)
+  // MOBILE VIEWPORT
   // =====================
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)')
@@ -402,13 +406,11 @@ export function CommunityTab({
 
     const vv = window.visualViewport
 
-    // Lock body scroll
     const prevOverflow = document.body.style.overflow
     const prevPosition = document.body.style.position
     const prevWidth = document.body.style.width
     const prevTop = document.body.style.top
 
-    // Scroll to top so sticky header is in view
     window.scrollTo(0, 0)
 
     document.body.style.overflow = 'hidden'
@@ -423,7 +425,6 @@ export function CommunityTab({
         if (!chatWrapperRef.current) return
         const topOffset = chatWrapperRef.current.getBoundingClientRect().top
         const viewportH = vv ? vv.height : window.innerHeight
-        // Account for PWA BottomNav if present
         const bottomNav = document.querySelector('nav.fixed.bottom-0')
         const bottomOffset = bottomNav ? bottomNav.getBoundingClientRect().height : 0
         setMobileHeight(Math.max(0, viewportH - topOffset - bottomOffset))
@@ -446,7 +447,6 @@ export function CommunityTab({
       }
       window.removeEventListener('resize', recalc)
 
-      // Restore body scroll
       document.body.style.overflow = prevOverflow
       document.body.style.position = prevPosition
       document.body.style.width = prevWidth
@@ -454,7 +454,6 @@ export function CommunityTab({
     }
   }, [isMobile])
 
-  // Auto-scroll when keyboard opens (mobileHeight shrinks) if near bottom
   useEffect(() => {
     if (!isMobile || mobileHeight === null) return
     if (wasNearBottomRef.current) {
@@ -462,12 +461,17 @@ export function CommunityTab({
     }
   }, [mobileHeight, isMobile, scrollToBottom])
 
-  // Track scroll position in mobile container
+  // Track scroll position
   useEffect(() => {
     if (!isMobile || !scrollContainerRef.current) return
     const el = scrollContainerRef.current
     const handleScroll = () => {
-      wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+      wasNearBottomRef.current = nearBottom
+      if (nearBottom) {
+        setShowNewMessagesPill(false)
+        setUnseenCount(0)
+      }
     }
     el.addEventListener('scroll', handleScroll, { passive: true })
     return () => el.removeEventListener('scroll', handleScroll)
@@ -485,7 +489,6 @@ export function CommunityTab({
 
     if (!reactions) return
 
-    // Aggregate into ReactionCount per message
     const reactionMap = new Map<string, Map<string, { count: number; users: Set<string> }>>()
     for (const r of reactions) {
       if (!reactionMap.has(r.message_id)) reactionMap.set(r.message_id, new Map())
@@ -508,13 +511,11 @@ export function CommunityTab({
     }))
   }, [currentUserId])
 
-  // Load reactions when messages change
   useEffect(() => {
     const ids = messages.map(m => m.message_id)
     if (ids.length > 0) loadReactionsForMessages(ids)
   }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Realtime reaction subscription
   useEffect(() => {
     const supabase = supabaseRef.current
     const channel = supabase
@@ -527,7 +528,6 @@ export function CommunityTab({
           table: 'pool_message_reactions',
         },
         () => {
-          // Reload reactions for all current messages
           const ids = messages.map(m => m.message_id)
           loadReactionsForMessages(ids)
         }
@@ -539,7 +539,6 @@ export function CommunityTab({
     }
   }, [poolId, messages.length, loadReactionsForMessages]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Toggle reaction (optimistic)
   const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const msg = messages.find(m => m.message_id === messageId)
     if (!msg) return
@@ -566,7 +565,6 @@ export function CommunityTab({
       return { ...m, reactions: newReactions }
     }))
 
-    // DB operation
     if (hasReacted) {
       await supabaseRef.current
         .from('pool_message_reactions')
@@ -595,7 +593,7 @@ export function CommunityTab({
       .eq('pool_id', poolId)
       .lt('created_at', oldestMessage.created_at)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(40)
 
     if (data) {
       const older: MessageWithReactions[] = data.reverse().map(m => ({
@@ -606,7 +604,7 @@ export function CommunityTab({
         reactions: [],
       }))
       setMessages(prev => [...older, ...prev])
-      setHasMore(data.length === 50)
+      setHasMore(data.length === 40)
     }
     setLoadingMore(false)
   }, [loadingMore, hasMore, messages, poolId])
@@ -638,7 +636,6 @@ export function CommunityTab({
       return
     }
 
-    // Optimistically add the message to state immediately
     if (data) {
       const newMsg: MessageWithReactions = {
         ...data,
@@ -654,7 +651,6 @@ export function CommunityTab({
           : [...prev, newMsg]
       )
 
-      // Notify mentioned users via email (fire-and-forget)
       if (mentions.length > 0) {
         fetch('/api/notifications/mention', {
           method: 'POST',
@@ -688,7 +684,6 @@ export function CommunityTab({
   }, [handleToggleReaction])
 
   const handlePin = useCallback((_message: MessageWithReactions) => {
-    // Open pin modal — admin can create a pinned challenge from any message
     setEditingPin(null)
     setShowPinModal(true)
   }, [])
@@ -740,7 +735,6 @@ export function CommunityTab({
   }, [memberLevels, currentUserId, poolId])
 
   const handleDropStandings = useCallback(async () => {
-    // Build top 5 leaderboard from member entries using computed scores
     const ranked = members
       .flatMap(m => (m.entries ?? []).map(e => ({
         user_id: m.user_id,
@@ -782,28 +776,24 @@ export function CommunityTab({
     }
   }, [members, poolName, poolId, currentUserId, computedScoreMap])
 
-  // Count of prediction_share messages (for pinned card counter)
   const sharedCallsCount = useMemo(() => {
     return messages.filter(m => m.message_type === 'prediction_share').length
   }, [messages])
 
   // =====================
-  // BUILD FEED (messages + system events interleaved)
+  // BUILD FEED
   // =====================
   const feedItems = useMemo(() => {
     const items: FeedItem[] = []
 
-    // Add messages
     for (const msg of messages) {
       items.push({ type: 'message', data: msg })
     }
 
-    // Add system events (interleave by timestamp)
     for (const event of systemEvents) {
       items.push({ type: 'system_event', data: event })
     }
 
-    // Sort by timestamp
     items.sort((a, b) => {
       const getTime = (item: FeedItem) =>
         item.type === 'message' ? item.data.created_at
@@ -832,8 +822,42 @@ export function CommunityTab({
   // RENDER
   // =====================
   const mobileChat = isMobile && mobileHeight !== null
+  const hasMessages = messages.length > 0 || systemEvents.length > 0
 
-  // Shared message feed content (rendered in both mobile and desktop layouts)
+  // Empty state
+  const emptyState = (
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
+      <span className="text-5xl mb-4">💬</span>
+      <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
+        Start the conversation
+      </h3>
+      <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 max-w-[280px]">
+        Share a prediction, flex your badges, or just talk trash
+      </p>
+      <div className="flex flex-col gap-2.5 w-full max-w-[260px]">
+        <button
+          onClick={handleShareBoldCall}
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/15 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
+        >
+          🎯 Share Prediction
+        </button>
+        <button
+          onClick={handleFlexBadges}
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+        >
+          🏆 Flex Badges
+        </button>
+        <button
+          onClick={handleDropStandings}
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+        >
+          📊 Drop Standings
+        </button>
+      </div>
+    </div>
+  )
+
+  // Feed content
   const feedContent = (
     <>
       {/* Pinned Message */}
@@ -866,17 +890,7 @@ export function CommunityTab({
       )}
 
       {/* Empty state */}
-      {!loading && feedItems.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-            </svg>
-          </div>
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">No messages yet</p>
-          <p className="text-xs text-neutral-500 mt-1">Be the first to say something!</p>
-        </div>
-      )}
+      {!loading && !hasMessages && emptyState}
 
       {/* Feed items */}
       {!loading && feedItems.map((item) => {
@@ -891,7 +905,7 @@ export function CommunityTab({
         if (item.type === 'message') {
           const msg = item.data
 
-          // Rich content cards by message_type
+          // Rich content cards — reactions only on these
           if (msg.message_type === 'prediction_share') {
             return (
               <PredictionShareCard
@@ -933,23 +947,20 @@ export function CommunityTab({
             )
           }
 
-          // Default text message
+          // Text message — no reactions per spec
           const reply = msg.reply_to_message_id
             ? replyPreviews.get(msg.reply_to_message_id) ?? null
             : null
 
           return (
-            <div key={msg.message_id}>
-              <ChatMessage
-                message={msg}
-                members={members}
-                memberLevels={memberLevels}
-                currentUserId={currentUserId}
-                replyPreview={reply}
-                reactions={msg.reactions}
-                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
-              />
-            </div>
+            <ChatMessage
+              key={msg.message_id}
+              message={msg}
+              members={members}
+              memberLevels={memberLevels}
+              currentUserId={currentUserId}
+              replyPreview={reply}
+            />
           )
         }
 
@@ -960,7 +971,7 @@ export function CommunityTab({
     </>
   )
 
-  // Shared input bar content
+  // Input bar content
   const inputBarContent = (
     <>
       <TypingIndicator typingUsers={typingUsers} />
@@ -996,34 +1007,30 @@ export function CommunityTab({
             {/* Mobile Online Strip */}
             <OnlineMembersStrip onlineUsers={onlineUsers} />
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Pool Chat</h3>
-              <button
-                onClick={onShowHowToPlay}
-                className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                </svg>
-                How to Play
-              </button>
-            </div>
-
             {/* Chat area */}
             <div
               ref={mobileChat ? scrollContainerRef : undefined}
               className={
                 mobileChat
-                  ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-1'
+                  ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-4 relative'
                   : 'space-y-3 px-1 pb-36'
               }
             >
               {feedContent}
+
+              {/* New messages pill */}
+              {showNewMessagesPill && (
+                <button
+                  onClick={() => scrollToBottom()}
+                  className="sticky bottom-3 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary-600 text-white text-xs font-medium shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-95 transition-all"
+                >
+                  ↓ {unseenCount > 0 ? `${unseenCount} new message${unseenCount !== 1 ? 's' : ''}` : 'New messages'}
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Right: Desktop Sidebar — spacer div reserves width; sidebar itself is fixed */}
+          {/* Right: Desktop Sidebar */}
           <div className="hidden md:block md:w-[260px] md:shrink-0">
             <DesktopSidebar
               members={members}
@@ -1038,7 +1045,7 @@ export function CommunityTab({
           </div>
         </div>
 
-        {/* Input bar — mobile: flex-shrink-0 at bottom; desktop: sticky */}
+        {/* Input bar */}
         <div className={
           mobileChat
             ? 'shrink-0'
@@ -1054,7 +1061,7 @@ export function CommunityTab({
         </div>
       </div>
 
-      {/* Modals (outside measured container) */}
+      {/* Modals */}
       {showPinModal && (
         <PinMessageModal
           poolId={poolId}

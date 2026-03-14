@@ -577,6 +577,12 @@ body {
   to { transform: scaleX(1); }
 }
 
+/* Typing indicator pulse — staggered opacity */
+@keyframes typing-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
 /* Shimmer effect for legendary/platinum badges and max level */
 @keyframes shimmer {
   0% { background-position: -200% center; }

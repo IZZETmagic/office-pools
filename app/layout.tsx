@@ -4,7 +4,7 @@ import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
 import FeedbackButton from "@/components/ui/FeedbackButton";
 import Footer from "@/components/ui/Footer";
-import { BottomNav } from "@/components/ui/BottomNav";
+
 import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
@@ -69,7 +69,6 @@ export default function RootLayout({
           <ToastProvider>
             {children}
             <Footer />
-            <BottomNav />
             <FeedbackButton />
           </ToastProvider>
         </ThemeProvider>

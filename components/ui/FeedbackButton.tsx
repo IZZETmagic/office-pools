@@ -1,6 +1,9 @@
 'use client';
 
 export default function FeedbackButton() {
+  // Temporarily hidden — return null to disable without removing code
+  return null;
+
   return (
     <a
       href="https://docs.google.com/forms/d/e/1FAIpQLSdYWKCdg11UZixjBgSiRpeeiOPT3RkYEHG17k8VRYRvYNQxbA/viewform?usp=publish-editor"
