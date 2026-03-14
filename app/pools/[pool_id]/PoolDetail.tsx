@@ -874,8 +874,8 @@ export function PoolDetail({
   // Mobile: split tabs into primary (always visible) and overflow ("More" menu)
   const mobilePrimaryKeys = useMemo<Tab[]>(
     () => isBracketPicker
-      ? ['leaderboard', 'analytics', 'predictions', 'community']
-      : ['leaderboard', 'analytics', 'predictions', 'community'],
+      ? ['community', 'leaderboard', 'analytics', 'predictions']
+      : ['community', 'leaderboard', 'analytics', 'predictions'],
     [isBracketPicker]
   )
 
@@ -928,7 +928,7 @@ export function PoolDetail({
 
     // Ignore swipes that started on interactive elements (inputs, textareas, selects, scrollable tables)
     const target = e.target as HTMLElement
-    if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll, .overflow-y-auto')) return
+    if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll')) return
 
     // Swipe only cycles through mobile primary tabs
     const swipeKeys = mobilePrimaryKeys
