@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useStandaloneMode } from '@/hooks/useStandaloneMode'
 import type { MatchData, PredictionData, EntryData } from '../types'
 import type { PredictionShareMetadata } from './types'
 import { formatStageLabel } from './helpers'
@@ -55,6 +56,7 @@ export function SharePredictionModal({
   const [selectedMatch, setSelectedMatch] = useState<ShareableMatch | null>(null)
   const [sharing, setSharing] = useState(false)
   const supabaseRef = useRef(createClient())
+  const isStandalone = useStandaloneMode()
 
   // Find completed matches where user has predictions
   const shareableMatches = useMemo(() => {
@@ -221,7 +223,7 @@ export function SharePredictionModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-neutral-100 dark:border-border-default px-4 sm:px-6 pt-4 pb-10 shrink-0">
+        <div className={`border-t border-neutral-100 dark:border-border-default px-4 sm:px-6 pt-4 ${isStandalone ? 'pb-10' : 'pb-4'} shrink-0`}>
           <div className="flex items-center gap-3">
             <button
               type="button"

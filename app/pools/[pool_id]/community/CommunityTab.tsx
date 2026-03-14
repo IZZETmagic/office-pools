@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
+import { useStandaloneMode } from '@/hooks/useStandaloneMode'
 import type { MemberData } from '../types'
 import type {
   CommunityTabProps,
@@ -74,6 +75,7 @@ export function CommunityTab({
   const [isMobile, setIsMobile] = useState(false)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const isStandalone = useStandaloneMode()
 
   // =====================
   // PRESENCE
@@ -1056,7 +1058,7 @@ export function CommunityTab({
         }>
           <Card className={
             mobileChat
-              ? `!p-0 ${keyboardOpen ? '' : '!pb-6'} !rounded-none border-t border-neutral-200 dark:border-border-default`
+              ? `!p-0 ${isStandalone && !keyboardOpen ? '!pb-6' : ''} !rounded-none border-t border-neutral-200 dark:border-border-default`
               : '!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]'
           }>
             {inputBarContent}
