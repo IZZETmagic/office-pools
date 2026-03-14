@@ -234,12 +234,12 @@ function MatchCard({
       </div>
 
       {/* Penalties toggle */}
-      {bothResolved && pick && (
+      {bothResolved && (
         <div className="mt-3 pt-3 border-t border-neutral-100">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={pick.predicted_penalty}
+              checked={pick?.predicted_penalty ?? false}
               onChange={() => onTogglePenalty(match.match_id)}
               className="w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
             />
@@ -451,12 +451,10 @@ export function BPKnockoutPickerStep({
 
   const handleTogglePenalty = useCallback((matchId: string) => {
     const existing = knockoutPicks.get(matchId)
-    if (!existing) return
-
     const next = new Map(knockoutPicks)
     next.set(matchId, {
-      ...existing,
-      predicted_penalty: !existing.predicted_penalty,
+      winner_team_id: existing?.winner_team_id ?? '',
+      predicted_penalty: !(existing?.predicted_penalty ?? false),
     })
     onPicksChange(next)
   }, [knockoutPicks, onPicksChange])

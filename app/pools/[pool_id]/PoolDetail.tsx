@@ -65,7 +65,7 @@ type Tab =
   | 'rounds'
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
-  { key: 'community', label: 'Community' },
+  { key: 'community', label: 'Banter' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
@@ -75,7 +75,7 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
 ]
 
 const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
-  { key: 'community', label: 'Community' },
+  { key: 'community', label: 'Banter' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
@@ -1005,7 +1005,7 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  {tab.key === 'leaderboard' ? 'Board' : tab.key === 'community' ? 'Chat' : tab.label}
+                  {tab.key === 'leaderboard' ? 'Board' : tab.label}
                 </button>
               ))}
 
@@ -1170,6 +1170,13 @@ export function PoolDetail({
                 userEntries={entries}
                 currentEntryId={activeEntry?.entry_id || ''}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+                bpGroupRankings={activeBPGroupRankings}
+                bpThirdPlaceRankings={activeBPThirdPlaceRankings}
+                bpKnockoutPicks={activeBPKnockoutPicks}
+                allBPGroupRankings={allBPGroupRankings}
+                allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+                allBPKnockoutPicks={allBPKnockoutPicks}
+                poolCreatedAt={pool.created_at}
               />
             )}
 
