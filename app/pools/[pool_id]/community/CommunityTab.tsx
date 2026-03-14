@@ -1045,10 +1045,10 @@ export function CommunityTab({
           </div>
         </div>
 
-        {/* Input bar */}
+        {/* Input bar — full-width on mobile by breaking out of parent px-4 padding */}
         <div className={
           mobileChat
-            ? 'shrink-0'
+            ? 'shrink-0 -mx-4'
             : 'sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3'
         }>
           <Card className={
