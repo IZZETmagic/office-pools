@@ -221,7 +221,7 @@ export function SharePredictionModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-neutral-100 dark:border-border-default px-4 sm:px-6 pt-4 pb-6 shrink-0">
+        <div className="border-t border-neutral-100 dark:border-border-default px-4 sm:px-6 pt-4 pb-10 shrink-0">
           <div className="flex items-center gap-3">
             <button
               type="button"

@@ -1053,7 +1053,7 @@ export function CommunityTab({
         }>
           <Card className={
             mobileChat
-              ? '!p-0 !pb-3 !rounded-none border-t border-neutral-200 dark:border-border-default'
+              ? '!p-0 !pb-6 !rounded-none border-t border-neutral-200 dark:border-border-default'
               : '!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]'
           }>
             {inputBarContent}
