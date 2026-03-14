@@ -928,7 +928,7 @@ export function PoolDetail({
 
     // Ignore swipes that started on interactive elements (inputs, textareas, selects, scrollable tables)
     const target = e.target as HTMLElement
-    if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll')) return
+    if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll, .overflow-y-auto')) return
 
     // Swipe only cycles through mobile primary tabs
     const swipeKeys = mobilePrimaryKeys
@@ -1131,7 +1131,11 @@ export function PoolDetail({
 
       {/* Tab content */}
       <main
-        className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8"
+        className={`max-w-6xl mx-auto px-4 sm:px-6 ${
+          activeTab === 'community'
+            ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
+            : 'py-6 sm:py-8'
+        }`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

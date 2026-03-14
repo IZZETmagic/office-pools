@@ -222,12 +222,12 @@ export function MatchCard({
           <div className="text-center">
             {hasActualScores ? (
               <div>
-                <div className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg px-3 py-1">
-                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                <div className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-400 rounded-lg px-3 py-1">
+                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-800 tabular-nums">
                     {match.home_score_ft}
                   </span>
-                  <span className="text-lg font-extrabold text-neutral-400 dark:text-neutral-500">-</span>
-                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                  <span className="text-lg font-extrabold text-neutral-400 dark:text-neutral-800">-</span>
+                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-800 tabular-nums">
                     {match.away_score_ft}
                   </span>
                 </div>

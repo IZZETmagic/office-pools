@@ -67,6 +67,10 @@ export function CommunityTab({
   const bottomRef = useRef<HTMLDivElement>(null)
   const wasNearBottomRef = useRef(true)
   const supabaseRef = useRef(createClient())
+  const chatWrapperRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileHeight, setMobileHeight] = useState<number | null>(null)
 
   // =====================
   // PRESENCE
@@ -258,16 +262,25 @@ export function CommunityTab({
   }, [matches, members, memberLevels])
 
   // =====================
-  // SCROLL HELPERS (uses browser scroll)
+  // SCROLL HELPERS (mobile: container scroll, desktop: page scroll)
   // =====================
   const isNearBottom = useCallback(() => {
+    if (isMobile && scrollContainerRef.current) {
+      const el = scrollContainerRef.current
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 150
+    }
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement
     return scrollHeight - scrollTop - clientHeight < 150
-  }, [])
+  }, [isMobile])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
-  }, [])
+    if (isMobile && scrollContainerRef.current) {
+      const el = scrollContainerRef.current
+      el.scrollTo({ top: el.scrollHeight, behavior })
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+    }
+  }, [isMobile])
 
   // =====================
   // LOAD MESSAGES
@@ -369,6 +382,96 @@ export function CommunityTab({
       scrollToBottom()
     }
   }, [messages.length, scrollToBottom])
+
+  // =====================
+  // MOBILE VIEWPORT (keyboard-aware contained layout)
+  // =====================
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileHeight(null)
+      return
+    }
+
+    const vv = window.visualViewport
+
+    // Lock body scroll
+    const prevOverflow = document.body.style.overflow
+    const prevPosition = document.body.style.position
+    const prevWidth = document.body.style.width
+    const prevTop = document.body.style.top
+
+    // Scroll to top so sticky header is in view
+    window.scrollTo(0, 0)
+
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.width = '100%'
+    document.body.style.top = '0'
+
+    let rafId: number
+    const recalc = () => {
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        if (!chatWrapperRef.current) return
+        const topOffset = chatWrapperRef.current.getBoundingClientRect().top
+        const viewportH = vv ? vv.height : window.innerHeight
+        // Account for PWA BottomNav if present
+        const bottomNav = document.querySelector('nav.fixed.bottom-0')
+        const bottomOffset = bottomNav ? bottomNav.getBoundingClientRect().height : 0
+        setMobileHeight(Math.max(0, viewportH - topOffset - bottomOffset))
+      })
+    }
+
+    recalc()
+
+    if (vv) {
+      vv.addEventListener('resize', recalc)
+      vv.addEventListener('scroll', recalc)
+    }
+    window.addEventListener('resize', recalc)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      if (vv) {
+        vv.removeEventListener('resize', recalc)
+        vv.removeEventListener('scroll', recalc)
+      }
+      window.removeEventListener('resize', recalc)
+
+      // Restore body scroll
+      document.body.style.overflow = prevOverflow
+      document.body.style.position = prevPosition
+      document.body.style.width = prevWidth
+      document.body.style.top = prevTop
+    }
+  }, [isMobile])
+
+  // Auto-scroll when keyboard opens (mobileHeight shrinks) if near bottom
+  useEffect(() => {
+    if (!isMobile || mobileHeight === null) return
+    if (wasNearBottomRef.current) {
+      requestAnimationFrame(() => scrollToBottom('instant'))
+    }
+  }, [mobileHeight, isMobile, scrollToBottom])
+
+  // Track scroll position in mobile container
+  useEffect(() => {
+    if (!isMobile || !scrollContainerRef.current) return
+    const el = scrollContainerRef.current
+    const handleScroll = () => {
+      wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150
+    }
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [isMobile])
 
   // =====================
   // REACTION LOADING + REALTIME
@@ -550,6 +653,19 @@ export function CommunityTab({
           ? prev
           : [...prev, newMsg]
       )
+
+      // Notify mentioned users via email (fire-and-forget)
+      if (mentions.length > 0) {
+        fetch('/api/notifications/mention', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pool_id: poolId,
+            message_content: content,
+            mentioned_user_ids: mentions,
+          }),
+        }).catch(() => {})
+      }
     }
   }, [poolId, currentUserId])
 
@@ -715,197 +831,230 @@ export function CommunityTab({
   // =====================
   // RENDER
   // =====================
+  const mobileChat = isMobile && mobileHeight !== null
+
+  // Shared message feed content (rendered in both mobile and desktop layouts)
+  const feedContent = (
+    <>
+      {/* Pinned Message */}
+      <PinnedMessageCard
+        poolId={poolId}
+        isAdmin={isAdmin}
+        onShareBoldCall={handleShareBoldCall}
+        onEditPin={handleEditPin}
+        sharedCallsCount={sharedCallsCount}
+      />
+
+      {/* Load more */}
+      {hasMore && (
+        <div className="text-center pb-2">
+          <button
+            onClick={loadOlderMessages}
+            disabled={loadingMore}
+            className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 disabled:opacity-50 transition-colors"
+          >
+            {loadingMore ? 'Loading...' : 'Load earlier messages'}
+          </button>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && feedItems.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-3">
+            <svg className="w-6 h-6 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">No messages yet</p>
+          <p className="text-xs text-neutral-500 mt-1">Be the first to say something!</p>
+        </div>
+      )}
+
+      {/* Feed items */}
+      {!loading && feedItems.map((item) => {
+        if (item.type === 'day_header') {
+          return <DayHeader key={item.data.key} text={item.data.text} />
+        }
+
+        if (item.type === 'system_event') {
+          return <SystemEventCard key={item.data.id} event={item.data} />
+        }
+
+        if (item.type === 'message') {
+          const msg = item.data
+
+          // Rich content cards by message_type
+          if (msg.message_type === 'prediction_share') {
+            return (
+              <PredictionShareCard
+                key={msg.message_id}
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+              />
+            )
+          }
+
+          if (msg.message_type === 'badge_flex') {
+            return (
+              <BadgeFlexCard
+                key={msg.message_id}
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+              />
+            )
+          }
+
+          if (msg.message_type === 'standings_drop') {
+            return (
+              <StandingsDropCard
+                key={msg.message_id}
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+              />
+            )
+          }
+
+          // Default text message
+          const reply = msg.reply_to_message_id
+            ? replyPreviews.get(msg.reply_to_message_id) ?? null
+            : null
+
+          return (
+            <div key={msg.message_id}>
+              <ChatMessage
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+                replyPreview={reply}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+              />
+            </div>
+          )
+        }
+
+        return null
+      })}
+
+      <div ref={bottomRef} />
+    </>
+  )
+
+  // Shared input bar content
+  const inputBarContent = (
+    <>
+      <TypingIndicator typingUsers={typingUsers} />
+      <QuickActions
+        onSharePrediction={handleShareBoldCall}
+        onFlexBadges={handleFlexBadges}
+        onDropStandings={handleDropStandings}
+      />
+      <MessageInput
+        poolId={poolId}
+        currentUserId={currentUserId}
+        members={members}
+        memberLevels={memberLevels}
+        replyingTo={replyingTo}
+        onClearReply={() => setReplyingTo(null)}
+        onSend={handleSendMessage}
+        onTyping={handleTyping}
+      />
+    </>
+  )
+
   return (
     <>
-      <div className="flex gap-0 md:gap-4 items-start">
-        {/* Left: Chat Panel */}
-        <div className="flex-1 min-w-0">
-          {/* Mobile Online Strip */}
-          <OnlineMembersStrip onlineUsers={onlineUsers} />
+      <div
+        ref={chatWrapperRef}
+        className={mobileChat ? 'flex flex-col overflow-hidden' : undefined}
+        style={mobileChat ? { height: `${mobileHeight}px` } : undefined}
+      >
+        {/* Main content area */}
+        <div className={`flex gap-0 md:gap-4 items-start ${mobileChat ? 'flex-1 min-h-0 flex-col' : ''}`}>
+          {/* Left: Chat Panel */}
+          <div className={`flex-1 min-w-0 ${mobileChat ? 'flex flex-col min-h-0 w-full' : ''}`}>
+            {/* Mobile Online Strip */}
+            <OnlineMembersStrip onlineUsers={onlineUsers} />
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Pool Chat</h3>
-            <button
-              onClick={onShowHowToPlay}
-              className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Pool Chat</h3>
+              <button
+                onClick={onShowHowToPlay}
+                className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                </svg>
+                How to Play
+              </button>
+            </div>
+
+            {/* Chat area */}
+            <div
+              ref={mobileChat ? scrollContainerRef : undefined}
+              className={
+                mobileChat
+                  ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-1'
+                  : 'space-y-3 px-1 pb-36'
+              }
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-              </svg>
-              How to Play
-            </button>
+              {feedContent}
+            </div>
           </div>
 
-          {/* Chat area — no overflow, flows with page. Bottom padding for sticky input bar. */}
-          <div className="space-y-3 px-1 pb-36">
-            {/* Pinned Message */}
-            <PinnedMessageCard
-              poolId={poolId}
-              isAdmin={isAdmin}
-              onShareBoldCall={handleShareBoldCall}
-              onEditPin={handleEditPin}
-              sharedCallsCount={sharedCallsCount}
+          {/* Right: Desktop Sidebar — spacer div reserves width; sidebar itself is fixed */}
+          <div className="hidden md:block md:w-[260px] md:shrink-0">
+            <DesktopSidebar
+              members={members}
+              memberLevels={memberLevels}
+              currentUserId={currentUserId}
+              matches={matches}
+              allPredictions={allPredictions}
+              onlineUsers={onlineUsers}
+              systemEvents={systemEvents}
+              computedScoreMap={computedScoreMap}
             />
-
-            {/* Load more */}
-            {hasMore && (
-              <div className="text-center pb-2">
-                <button
-                  onClick={loadOlderMessages}
-                  disabled={loadingMore}
-                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 disabled:opacity-50 transition-colors"
-                >
-                  {loadingMore ? 'Loading...' : 'Load earlier messages'}
-                </button>
-              </div>
-            )}
-
-            {/* Loading state */}
-            {loading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!loading && feedItems.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">No messages yet</p>
-                <p className="text-xs text-neutral-500 mt-1">Be the first to say something!</p>
-              </div>
-            )}
-
-            {/* Feed items */}
-            {!loading && feedItems.map((item) => {
-              if (item.type === 'day_header') {
-                return <DayHeader key={item.data.key} text={item.data.text} />
-              }
-
-              if (item.type === 'system_event') {
-                return <SystemEventCard key={item.data.id} event={item.data} />
-              }
-
-              if (item.type === 'message') {
-                const msg = item.data
-
-                // Rich content cards by message_type
-                if (msg.message_type === 'prediction_share') {
-                  return (
-                    <PredictionShareCard
-                      key={msg.message_id}
-                      message={msg}
-                      members={members}
-                      memberLevels={memberLevels}
-                      currentUserId={currentUserId}
-                      reactions={msg.reactions}
-                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
-                    />
-                  )
-                }
-
-                if (msg.message_type === 'badge_flex') {
-                  return (
-                    <BadgeFlexCard
-                      key={msg.message_id}
-                      message={msg}
-                      members={members}
-                      memberLevels={memberLevels}
-                      reactions={msg.reactions}
-                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
-                    />
-                  )
-                }
-
-                if (msg.message_type === 'standings_drop') {
-                  return (
-                    <StandingsDropCard
-                      key={msg.message_id}
-                      message={msg}
-                      members={members}
-                      memberLevels={memberLevels}
-                      currentUserId={currentUserId}
-                      reactions={msg.reactions}
-                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
-                    />
-                  )
-                }
-
-                // Default text message
-                const reply = msg.reply_to_message_id
-                  ? replyPreviews.get(msg.reply_to_message_id) ?? null
-                  : null
-
-                return (
-                  <div key={msg.message_id}>
-                    <ChatMessage
-                      message={msg}
-                      members={members}
-                      memberLevels={memberLevels}
-                      currentUserId={currentUserId}
-                      replyPreview={reply}
-                      reactions={msg.reactions}
-                      onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
-                    />
-                  </div>
-                )
-              }
-
-              return null
-            })}
-
-            <div ref={bottomRef} />
           </div>
         </div>
 
-        {/* Right: Desktop Sidebar — spacer div reserves width; sidebar itself is fixed */}
-        <div className="hidden md:block md:w-[260px] md:shrink-0">
-          <DesktopSidebar
-            members={members}
-            memberLevels={memberLevels}
-            currentUserId={currentUserId}
-            matches={matches}
-            allPredictions={allPredictions}
-            onlineUsers={onlineUsers}
-            systemEvents={systemEvents}
-            computedScoreMap={computedScoreMap}
-          />
+        {/* Input bar — mobile: flex-shrink-0 at bottom; desktop: sticky */}
+        <div className={
+          mobileChat
+            ? 'shrink-0'
+            : 'sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3'
+        }>
+          <Card className={
+            mobileChat
+              ? '!p-0 !rounded-none border-t border-neutral-200 dark:border-border-default'
+              : '!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]'
+          }>
+            {inputBarContent}
+          </Card>
         </div>
       </div>
 
-      {/* Sticky bottom bar — typing, quick actions, input */}
-      <div className="sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3">
-        <Card className="!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]">
-          {/* Typing Indicator */}
-          <TypingIndicator typingUsers={typingUsers} />
-
-          {/* Quick Actions */}
-          <QuickActions
-            onSharePrediction={handleShareBoldCall}
-            onFlexBadges={handleFlexBadges}
-            onDropStandings={handleDropStandings}
-          />
-
-          {/* Message Input */}
-          <MessageInput
-            poolId={poolId}
-            currentUserId={currentUserId}
-            members={members}
-            memberLevels={memberLevels}
-            replyingTo={replyingTo}
-            onClearReply={() => setReplyingTo(null)}
-            onSend={handleSendMessage}
-            onTyping={handleTyping}
-          />
-        </Card>
-      </div>
-
-      {/* Pin Message Modal */}
+      {/* Modals (outside measured container) */}
       {showPinModal && (
         <PinMessageModal
           poolId={poolId}
@@ -918,7 +1067,6 @@ export function CommunityTab({
         />
       )}
 
-      {/* Share Prediction Modal */}
       {showShareModal && (
         <SharePredictionModal
           poolId={poolId}

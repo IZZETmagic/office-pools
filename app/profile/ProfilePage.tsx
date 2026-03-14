@@ -1237,6 +1237,7 @@ function AccountSettingsTab({
     MATCH_RESULTS: true,
     LEADERBOARD: true,
     ADMIN: true,
+    COMMUNITY: true,
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifUpdating, setNotifUpdating] = useState<string | null>(null)
@@ -1247,6 +1248,7 @@ function AccountSettingsTab({
     { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Match results and points earned' },
     { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings' },
     { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed, predictions unlocked' },
+    { key: 'COMMUNITY', label: 'Community & Mentions', desc: 'When someone @mentions you in a pool chat' },
   ]
 
   useEffect(() => {

@@ -171,7 +171,7 @@ function getModeName(mode: string): string {
 
 function getModeTagClass(mode: string): string {
   switch (mode) {
-    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-500'
     case 'progressive': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
     case 'bracket_picker': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
     default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
@@ -452,10 +452,10 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
               </h4>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -467,7 +467,7 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
           </div>
 
           {/* KPI section */}
-          <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mt-3 overflow-hidden">
+          <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-3 overflow-hidden">
             {/* Points */}
             <div className="flex-1 py-3 px-3">
               <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
@@ -490,7 +490,7 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
               <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
                 {level.level}
               </p>
-              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{level.name}</p>
+              <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
             </div>
             {/* Form */}
             <div className="flex-1 py-3 px-3">
@@ -510,7 +510,7 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
 
           {/* Bottom row */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-            <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
               {statusText}
             </span>
             {deadline.text !== 'No deadline set' && (

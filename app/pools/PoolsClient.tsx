@@ -183,8 +183,8 @@ function getStatusTagClass(status: string): string {
     case 'active': return 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
     case 'upcoming': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
     case 'closed': return 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
-    case 'completed': return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+    case 'completed': return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
+    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
   }
 }
 
@@ -201,10 +201,10 @@ function getStatusLabel(status: string): string {
 
 function getModeTagClass(mode: string): string {
   switch (mode) {
-    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-500'
     case 'progressive': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
     case 'bracket_picker': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
   }
 }
 
@@ -525,7 +525,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                     <p className="text-neutral-900 dark:text-white text-lg font-semibold mb-1">
                       You haven&apos;t joined any pools yet
                     </p>
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm mb-5">
+                    <p className="text-neutral-500 dark:text-neutral-700 text-sm mb-5">
                       Compete with friends by predicting match results in the World Cup.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
@@ -542,8 +542,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   </>
                 ) : (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">No pools match your filters</p>
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">No pools match your filters</p>
+                    <p className="text-neutral-500 dark:text-neutral-700 text-sm">
                       Try adjusting your search or{' '}
                       <button
                         onClick={() => {
@@ -593,10 +593,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 </h4>
                                 {/* Badges + player count */}
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                  <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-0.5">
+                                  <span className="text-xs text-neutral-500 dark:text-neutral-700 ml-0.5">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                   </span>
                                 </div>
@@ -628,7 +628,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {(() => {
                               const level = getLevel(pool.total_points ?? 0)
                               return (
-                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mb-3 overflow-hidden">
+                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mb-3 overflow-hidden">
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
@@ -653,7 +653,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
                                       {level.level}
                                     </p>
-                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{level.name}</p>
+                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
                                   </div>
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
@@ -675,7 +675,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row: status + deadline */}
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                              <span className="text-xs text-neutral-500 dark:text-neutral-700">
                                 {statusText}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -691,7 +691,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {/* Invite nudge — admin pools with fewer than 10 members */}
                             {pool.role === 'admin' && pool.memberCount < 10 && (
                               <div className="mt-2.5 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more
                                 </span>
                                 <button
@@ -715,10 +715,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {pool.pool_name}
                                 </h4>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                  <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                   </span>
                                 </div>
@@ -747,7 +747,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {(() => {
                               const level = getLevel(pool.total_points ?? 0)
                               return (
-                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mt-3 overflow-hidden">
+                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-3 overflow-hidden">
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
@@ -772,7 +772,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
                                       {level.level}
                                     </p>
-                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{level.name}</p>
+                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
                                   </div>
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
@@ -794,7 +794,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row */}
                             <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                              <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                              <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                 {statusText}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -810,7 +810,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {/* Invite nudge — admin pools with fewer than 10 members */}
                             {pool.role === 'admin' && pool.memberCount < 10 && (
                               <div className="mt-3 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more to make it interesting
                                 </span>
                                 <button
@@ -892,14 +892,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-0.5">
+                                <span className="text-xs text-neutral-500 dark:text-neutral-700 ml-0.5">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
 
                             {/* Stats section */}
-                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mb-3 overflow-hidden">
+                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mb-3 overflow-hidden">
                               {/* Members */}
                               <div className="shrink-0 py-3 px-3">
                                 <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
@@ -922,7 +922,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row */}
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                              <span className="text-xs text-neutral-500 dark:text-neutral-700">
                                 Created {formatTimeAgo(pool.created_at)}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -948,14 +948,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
 
                             {/* Stats row */}
-                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-800/50 mt-1 overflow-hidden">
+                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-1 overflow-hidden">
                               {/* Members */}
                               <div className="shrink-0 py-3 px-3">
                                 <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
@@ -978,7 +978,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row */}
                             <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                              <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                              <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                 Created {formatTimeAgo(pool.created_at)}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -1001,7 +1001,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               <Card padding="lg" className="text-center max-w-md mx-auto">
                 {discoverQuery ? (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">
+                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">
                       No pools found for &ldquo;{discoverQuery}&rdquo;
                     </p>
                     <button
@@ -1013,8 +1013,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   </>
                 ) : (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-400 text-lg mb-1">No public pools available</p>
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">No public pools available</p>
+                    <p className="text-neutral-500 dark:text-neutral-700 text-sm">
                       There are no open public pools right now. Why not{' '}
                       <button
                         onClick={() => setShowCreateModal(true)}

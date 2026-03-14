@@ -4,6 +4,7 @@ export const TOPICS = {
   MATCH_RESULTS: process.env.RESEND_TOPIC_MATCH_RESULTS!,
   LEADERBOARD: process.env.RESEND_TOPIC_LEADERBOARD!,
   ADMIN: process.env.RESEND_TOPIC_ADMIN!,
+  COMMUNITY: process.env.RESEND_TOPIC_COMMUNITY!,
 } as const
 
 export const TOPIC_KEYS = [
@@ -12,6 +13,7 @@ export const TOPIC_KEYS = [
   'MATCH_RESULTS',
   'LEADERBOARD',
   'ADMIN',
+  'COMMUNITY',
 ] as const
 
 export type TopicKey = (typeof TOPIC_KEYS)[number]
@@ -36,5 +38,9 @@ export const TOPIC_LABELS: Record<TopicKey, { name: string; description: string 
   ADMIN: {
     name: 'Admin Notifications',
     description: 'Settings changed, member removed, predictions unlocked',
+  },
+  COMMUNITY: {
+    name: 'Community & Mentions',
+    description: 'When someone @mentions you in a pool chat',
   },
 }

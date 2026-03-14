@@ -237,7 +237,7 @@ export function ResultsView({
     <div>
       {/* ── Points summary strip ── */}
       <div className="mb-4 px-4 h-[60px] bg-surface rounded-xl shadow-sm border border-neutral-200 flex items-center gap-3 text-sm">
-        <span className="font-semibold text-neutral-700 dark:text-neutral-200">
+        <span className="font-semibold text-neutral-700 dark:text-neutral-600">
           {userEntries && userEntries.length > 1
             ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
             : 'Your Points'}

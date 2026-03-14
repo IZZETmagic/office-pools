@@ -482,3 +482,32 @@ export function roundDeadlineReminderTemplate(params: {
     }),
   }
 }
+
+// --- Community Templates ---
+
+export function mentionNotificationTemplate(params: {
+  recipientName: string
+  mentionerName: string
+  poolName: string
+  messageContent: string
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { recipientName, mentionerName, poolName, messageContent, poolUrl } = params
+  const truncated = messageContent.length > 200 ? messageContent.slice(0, 200) + '...' : messageContent
+  return {
+    subject: `@${mentionerName} mentioned you in ${poolName}`,
+    html: baseTemplate({
+      preheader: `${mentionerName} mentioned you in the ${poolName} chat`,
+      heading: `You were mentioned in ${poolName}`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${recipientName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 16px;"><strong>${mentionerName}</strong> mentioned you in the <strong>${poolName}</strong> chat:</p>
+        <div style="background:#f5f5f5;border-left:3px solid #16a34a;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 16px;">
+          <p style="color:#404040;line-height:1.6;margin:0;font-size:14px;">${truncated}</p>
+        </div>
+      `,
+      ctaText: 'View in Chat',
+      ctaUrl: `${poolUrl}?tab=community`,
+    }),
+  }
+}

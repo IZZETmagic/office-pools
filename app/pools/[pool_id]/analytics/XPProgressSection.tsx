@@ -180,7 +180,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         className={`relative rounded-xl p-3 text-center transition-all cursor-pointer ${
           earned
             ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-none hover:shadow-md dark:hover:border-neutral-600`
-            : 'bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 opacity-50 hover:opacity-70'
+            : 'bg-neutral-100 dark:bg-neutral-400/90 border border-neutral-200 dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
         } ${def.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
         onClick={onSelect}
         role="button"
@@ -188,12 +188,12 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       >
         {/* Emoji */}
-        <div className={`text-2xl sm:text-3xl mb-1.5 ${earned ? '' : 'grayscale opacity-40'}`}>
+        <div className={`text-2xl sm:text-3xl mb-1.5 ${earned ? '' : 'grayscale opacity-50 dark:opacity-70'}`}>
           {def.emoji}
         </div>
 
         {/* Name */}
-        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500'}`}>
+        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-600'}`}>
           {def.name}
         </div>
 
@@ -211,7 +211,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         {/* Lock overlay for unearned */}
         {!earned && (
           <div className="absolute top-1.5 right-1.5">
-            <svg className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
             </svg>
           </div>
@@ -261,7 +261,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
 
         <div className="p-6 pt-8 text-center">
           {/* Large emoji */}
-          <div className={`text-5xl mb-3 ${earned ? '' : 'grayscale opacity-40'}`}>
+          <div className={`text-5xl mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
             {badge.emoji}
           </div>
 
@@ -1514,12 +1514,12 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
                     <div className={`text-sm font-semibold ${
                       isCurrent ? 'text-accent-700 dark:text-accent-500'
                         : isReached ? 'text-neutral-900 dark:text-white'
-                          : 'text-neutral-500 dark:text-neutral-400'
+                          : 'text-neutral-500 dark:text-neutral-600'
                     }`}>
                       {level.name}
                     </div>
                     {level.badge && (
-                      <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                      <div className="text-[10px] text-neutral-400 dark:text-neutral-600">
                         Unlocks: {level.badge}
                       </div>
                     )}
@@ -1529,7 +1529,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
                   <span className={`text-xs font-medium tabular-nums flex-shrink-0 ${
                     isCurrent ? 'text-accent-700 dark:text-accent-500'
                       : isReached ? 'text-success-600 dark:text-success-400'
-                        : 'text-neutral-400 dark:text-neutral-500'
+                        : 'text-neutral-400 dark:text-neutral-600'
                   }`}>
                     {level.xpRequired.toLocaleString()} XP
                   </span>
