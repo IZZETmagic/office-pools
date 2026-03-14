@@ -419,6 +419,7 @@ export function CommunityTab({
     document.body.style.width = '100%'
     document.body.style.top = '0'
 
+    const initialHeight = window.innerHeight
     let rafId: number
     const recalc = () => {
       cancelAnimationFrame(rafId)
@@ -429,7 +430,7 @@ export function CommunityTab({
         const bottomNav = document.querySelector('nav.fixed.bottom-0')
         const bottomOffset = bottomNav ? bottomNav.getBoundingClientRect().height : 0
         setMobileHeight(Math.max(0, viewportH - topOffset - bottomOffset))
-        setKeyboardOpen(vv ? vv.height < window.innerHeight * 0.75 : false)
+        setKeyboardOpen(viewportH < initialHeight * 0.75)
       })
     }
 
