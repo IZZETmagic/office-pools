@@ -66,6 +66,7 @@ export function CommunityTab({
   const [showShareModal, setShowShareModal] = useState(false)
   const [unseenCount, setUnseenCount] = useState(0)
   const [showNewMessagesPill, setShowNewMessagesPill] = useState(false)
+  const [showScrollDown, setShowScrollDown] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const wasNearBottomRef = useRef(true)
@@ -501,6 +502,7 @@ export function CommunityTab({
     const handleScroll = () => {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
       wasNearBottomRef.current = nearBottom
+      setShowScrollDown(!nearBottom)
       if (nearBottom) {
         setShowNewMessagesPill(false)
         setUnseenCount(0)
@@ -1046,7 +1048,7 @@ export function CommunityTab({
           {/* Left: Chat Panel */}
           <div className={`flex-1 min-w-0 flex flex-col min-h-0 ${mobileChat ? 'w-full' : ''}`}>
             {/* Mobile Online Strip */}
-            <OnlineMembersStrip onlineUsers={onlineUsers} />
+            <OnlineMembersStrip members={members} onlineUsers={onlineUsers} currentUserId={currentUserId} />
 
             {/* Chat area */}
             <div
@@ -1054,19 +1056,32 @@ export function CommunityTab({
               className={
                 mobileChat
                   ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-4 relative'
-                  : 'flex-1 min-h-0 overflow-y-auto scrollbar-none space-y-3 px-1 pb-4'
+                  : 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain scrollbar-none space-y-3 px-1 pb-4'
               }
             >
               {feedContent}
 
-              {/* New messages pill */}
-              {showNewMessagesPill && (
-                <button
-                  onClick={() => scrollToBottom()}
-                  className="sticky bottom-3 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary-600 text-white text-xs font-medium shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-95 transition-all"
-                >
-                  ↓ {unseenCount > 0 ? `${unseenCount} new message${unseenCount !== 1 ? 's' : ''}` : 'New messages'}
-                </button>
+              {/* Scroll to bottom / new messages — sticky at bottom of chat area */}
+              {showScrollDown && (
+                <div className="sticky bottom-3 z-10 flex flex-col items-center gap-1.5 pointer-events-none">
+                  {showNewMessagesPill && (
+                    <button
+                      onClick={() => scrollToBottom()}
+                      className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary-600 text-white text-xs font-medium shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-95 transition-all"
+                    >
+                      ↓ {unseenCount > 0 ? `${unseenCount} new message${unseenCount !== 1 ? 's' : ''}` : 'New messages'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => scrollToBottom()}
+                    className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 active:scale-90 transition-all"
+                    aria-label="Scroll to bottom"
+                  >
+                    <svg className="w-5 h-5 text-neutral-600 dark:text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
           </div>
