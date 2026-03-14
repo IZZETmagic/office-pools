@@ -8,9 +8,12 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const { pool_id, message_content, mentioned_user_ids } = await request.json()
+
   if (!pool_id || !message_content || !mentioned_user_ids?.length) {
     return NextResponse.json({ error: 'pool_id, message_content, and mentioned_user_ids are required' }, { status: 400 })
   }
@@ -22,7 +25,9 @@ export async function POST(request: NextRequest) {
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!senderData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!senderData) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
 
   // Get pool info
   const { data: pool } = await supabase
@@ -31,10 +36,13 @@ export async function POST(request: NextRequest) {
     .eq('pool_id', pool_id)
     .single()
 
-  if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+  if (!pool) {
+    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+  }
 
   // Get mentioned users' emails (excluding the sender)
   const mentionedIds = (mentioned_user_ids as string[]).filter(id => id !== senderData.user_id)
+
   if (mentionedIds.length === 0) {
     return NextResponse.json({ sent: true, count: 0 })
   }
@@ -63,7 +71,7 @@ export async function POST(request: NextRequest) {
       to: recipient.email,
       subject,
       html,
-      topicId: TOPICS.COMMUNITY,
+      ...(TOPICS.COMMUNITY ? { topicId: TOPICS.COMMUNITY } : {}),
       tags: [{ name: 'category', value: 'community' }],
     }
   })
