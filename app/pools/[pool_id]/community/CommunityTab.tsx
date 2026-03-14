@@ -997,7 +997,7 @@ export function CommunityTab({
     <>
       <div
         ref={chatWrapperRef}
-        className={mobileChat ? 'flex flex-col overflow-hidden' : undefined}
+        className={mobileChat ? 'flex flex-col overflow-hidden -mx-4' : undefined}
         style={mobileChat ? { height: `${mobileHeight}px` } : undefined}
       >
         {/* Main content area */}
@@ -1045,10 +1045,10 @@ export function CommunityTab({
           </div>
         </div>
 
-        {/* Input bar — full-width on mobile by breaking out of parent px-4 padding */}
+        {/* Input bar — full-width on mobile (parent already breaks out of page padding) */}
         <div className={
           mobileChat
-            ? 'shrink-0 -mx-4'
+            ? 'shrink-0'
             : 'sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3'
         }>
           <Card className={
