@@ -74,6 +74,7 @@ export function CommunityTab({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
+  const [desktopChatHeight, setDesktopChatHeight] = useState<number | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const isStandalone = useStandaloneMode()
 
@@ -264,24 +265,21 @@ export function CommunityTab({
   // SCROLL HELPERS
   // =====================
   const isNearBottom = useCallback(() => {
-    if (isMobile && scrollContainerRef.current) {
+    if (scrollContainerRef.current) {
       const el = scrollContainerRef.current
       return el.scrollHeight - el.scrollTop - el.clientHeight < 100
     }
-    const { scrollTop, scrollHeight, clientHeight } = document.documentElement
-    return scrollHeight - scrollTop - clientHeight < 100
-  }, [isMobile])
+    return true
+  }, [])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (isMobile && scrollContainerRef.current) {
+    if (scrollContainerRef.current) {
       const el = scrollContainerRef.current
       el.scrollTo({ top: el.scrollHeight, behavior })
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
     }
     setShowNewMessagesPill(false)
     setUnseenCount(0)
-  }, [isMobile])
+  }, [])
 
   // =====================
   // LOAD MESSAGES
@@ -333,7 +331,11 @@ export function CommunityTab({
         }
       }
       setLoading(false)
-      setTimeout(() => scrollToBottom('instant'), 50)
+      // Scroll to newest messages — double-tap to ensure DOM has rendered
+      requestAnimationFrame(() => {
+        scrollToBottom('instant')
+        setTimeout(() => scrollToBottom('instant'), 100)
+      })
     }
     loadMessages()
   }, [poolId, scrollToBottom, members])
@@ -466,9 +468,35 @@ export function CommunityTab({
     }
   }, [mobileHeight, isMobile, scrollToBottom])
 
+  // Measure available desktop chat wrapper height (viewport minus wrapper top offset minus footer)
+  useEffect(() => {
+    if (isMobile) return
+    const measure = () => {
+      const el = chatWrapperRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top
+      const footer = document.querySelector('footer')
+      const footerH = footer ? footer.getBoundingClientRect().height : 0
+      setDesktopChatHeight(window.innerHeight - top - footerH)
+    }
+    // Measure after layout settles
+    requestAnimationFrame(measure)
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [isMobile, loading])
+
+  // Prevent body scrolling on desktop — chat has its own scroll container
+  useEffect(() => {
+    if (isMobile) return
+    document.documentElement.style.overflow = 'hidden'
+    return () => {
+      document.documentElement.style.overflow = ''
+    }
+  }, [isMobile])
+
   // Track scroll position
   useEffect(() => {
-    if (!isMobile || !scrollContainerRef.current) return
+    if (!scrollContainerRef.current) return
     const el = scrollContainerRef.current
     const handleScroll = () => {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
@@ -480,7 +508,7 @@ export function CommunityTab({
     }
     el.addEventListener('scroll', handleScroll, { passive: true })
     return () => el.removeEventListener('scroll', handleScroll)
-  }, [isMobile])
+  }, [])
 
   // =====================
   // REACTION LOADING + REALTIME
@@ -665,7 +693,14 @@ export function CommunityTab({
             message_content: content,
             mentioned_user_ids: mentions,
           }),
-        }).catch(() => {})
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}))
+              console.error('[Mention notification] API error:', res.status, body)
+            }
+          })
+          .catch((err) => console.error('[Mention notification] fetch failed:', err))
       }
     }
   }, [poolId, currentUserId])
@@ -713,6 +748,7 @@ export function CommunityTab({
         name: b.name,
         tier: b.tier,
         rarity: b.rarity,
+        xpBonus: b.xpBonus,
       })),
       level: myLevel.level,
       level_name: myLevel.level_name,
@@ -1002,23 +1038,23 @@ export function CommunityTab({
     <>
       <div
         ref={chatWrapperRef}
-        className={mobileChat ? 'flex flex-col overflow-hidden -mx-4' : undefined}
-        style={mobileChat ? { height: `${mobileHeight}px` } : undefined}
+        className={mobileChat ? 'flex flex-col overflow-hidden -mx-4' : 'flex flex-col overflow-hidden'}
+        style={mobileChat ? { height: `${mobileHeight}px` } : desktopChatHeight ? { height: `${desktopChatHeight}px` } : undefined}
       >
         {/* Main content area */}
-        <div className={`flex gap-0 md:gap-4 items-start ${mobileChat ? 'flex-1 min-h-0 flex-col' : ''}`}>
+        <div className={`flex gap-0 md:gap-4 ${mobileChat ? 'flex-1 min-h-0 flex-col items-start' : 'flex-1 min-h-0 items-stretch'}`}>
           {/* Left: Chat Panel */}
-          <div className={`flex-1 min-w-0 ${mobileChat ? 'flex flex-col min-h-0 w-full' : ''}`}>
+          <div className={`flex-1 min-w-0 flex flex-col min-h-0 ${mobileChat ? 'w-full' : ''}`}>
             {/* Mobile Online Strip */}
             <OnlineMembersStrip onlineUsers={onlineUsers} />
 
             {/* Chat area */}
             <div
-              ref={mobileChat ? scrollContainerRef : undefined}
+              ref={scrollContainerRef}
               className={
                 mobileChat
                   ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-4 relative'
-                  : 'space-y-3 px-1 pb-36'
+                  : 'flex-1 min-h-0 overflow-y-auto scrollbar-none space-y-3 px-1 pb-4'
               }
             >
               {feedContent}
@@ -1054,7 +1090,7 @@ export function CommunityTab({
         <div className={
           mobileChat
             ? 'shrink-0'
-            : 'sticky bottom-0 z-20 -mx-4 sm:-mx-6 md:-mx-0 mt-3'
+            : 'shrink-0 mt-0'
         }>
           <Card className={
             mobileChat

@@ -53,7 +53,7 @@ export type PredictionShareMetadata = {
 }
 
 export type BadgeFlexMetadata = {
-  badges: { id: string; emoji: string; name: string; tier: string; rarity: string }[]
+  badges: { id: string; emoji: string; name: string; tier: string; rarity: string; xpBonus: number }[]
   level: number
   level_name: string
   total_xp: number

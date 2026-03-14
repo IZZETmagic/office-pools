@@ -10,14 +10,19 @@ type BadgeFlexCardProps = {
   onToggleReaction: (emoji: string) => void
 }
 
-function badgeBgColor(tier: string): string {
-  switch (tier) {
-    case 'Platinum': return 'bg-neutral-100 dark:bg-neutral-700/50'
-    case 'Gold': return 'bg-accent-50 dark:bg-accent-900/15'
-    case 'Silver': return 'bg-neutral-50 dark:bg-neutral-800'
-    case 'Bronze': return 'bg-neutral-50 dark:bg-neutral-800/50'
-    default: return 'bg-neutral-50 dark:bg-neutral-800'
-  }
+const TIER_BORDER_COLORS: Record<string, string> = {
+  Bronze: 'border-l-warning-500',
+  Silver: 'border-l-neutral-400',
+  Gold: 'border-l-accent-500',
+  Platinum: 'border-l-accent-500',
+}
+
+const RARITY_COLORS: Record<string, string> = {
+  Common: 'text-neutral-500 dark:text-neutral-400',
+  Uncommon: 'text-success-600 dark:text-success-400',
+  Rare: 'text-primary-600 dark:text-primary-400',
+  'Very Rare': 'text-accent-500 dark:text-accent-500',
+  Legendary: 'text-warning-500 dark:text-warning-400',
 }
 
 export function BadgeFlexCard({
@@ -30,8 +35,7 @@ export function BadgeFlexCard({
   const meta = message.metadata as unknown as BadgeFlexMetadata
   if (!meta?.badges) return null
 
-  // Show top 3 badges
-  const topBadges = meta.badges.slice(0, 3)
+  const badges = meta.badges
 
   return (
     <SharedCardWrapper
@@ -53,24 +57,27 @@ export function BadgeFlexCard({
       {/* Divider */}
       <div className="border-t border-neutral-100 dark:border-border-default/50" />
 
-      {/* Badges row */}
-      <div className="px-3.5 py-3">
-        {topBadges.length > 0 ? (
-          <div className="flex gap-3 justify-center">
-            {topBadges.map((badge) => (
-              <div key={badge.id} className="flex flex-col items-center gap-1.5">
-                {/* Emoji in rounded square */}
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${badgeBgColor(badge.tier)}`}>
+      {/* Badges grid — matching XP tab BadgeCard style */}
+      <div className="px-3 py-3">
+        {badges.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {badges.map((badge) => (
+              <div
+                key={badge.id}
+                className={`relative w-[90px] rounded-lg px-1.5 py-1.5 text-center bg-surface border-l-[3px] ${TIER_BORDER_COLORS[badge.tier] || 'border-l-neutral-300'} border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-none ${badge.tier === 'Platinum' ? 'shimmer-effect' : ''}`}
+              >
+                {/* Emoji */}
+                <div className="text-lg mb-1">
                   {badge.emoji}
                 </div>
-                {/* Badge name */}
-                <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 text-center leading-tight max-w-[80px]">
+                {/* Name */}
+                <div className="text-[10px] font-semibold text-neutral-900 dark:text-white mb-0.5 leading-tight">
                   {badge.name}
-                </span>
+                </div>
                 {/* Rarity */}
-                <span className="text-[10px] font-semibold text-accent-600 dark:text-accent-400">
+                <div className={`text-[9px] font-medium ${RARITY_COLORS[badge.rarity] || 'text-neutral-500'}`}>
                   {badge.rarity}
-                </span>
+                </div>
               </div>
             ))}
           </div>

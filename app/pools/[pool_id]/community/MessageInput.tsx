@@ -31,7 +31,7 @@ export function MessageInput({
   const [mentionCursorPos, setMentionCursorPos] = useState(0)
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0)
 
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Filtered members for @mention autocomplete
   const filteredMembers = useMemo(() => {
@@ -60,14 +60,22 @@ export function MessageInput({
     setMentionQuery(null)
     onClearReply()
     setSending(false)
-    inputRef.current?.focus()
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto'
+      inputRef.current.focus()
+    }
   }, [newMessage, sending, members, onSend, replyingTo, onClearReply])
 
   // Handle input change with @mention detection + typing indicator
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setNewMessage(value)
     onTyping()
+
+    // Auto-resize textarea
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
 
     const cursorPos = e.target.selectionStart ?? value.length
     const textBeforeCursor = value.slice(0, cursorPos)
@@ -93,7 +101,7 @@ export function MessageInput({
   }, [newMessage, mentionCursorPos])
 
   // Keyboard navigation for mention dropdown
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionQuery !== null && filteredMembers.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -157,16 +165,16 @@ export function MessageInput({
           />
         )}
 
-        <form onSubmit={handleSend} className="flex items-center gap-2">
-          <input
+        <form onSubmit={handleSend} className="flex items-end gap-2">
+          <textarea
             ref={inputRef}
-            type="text"
             value={newMessage}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Message the pool..."
             maxLength={2000}
-            className="flex-1 text-sm bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
+            rows={1}
+            className="flex-1 text-sm bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none overflow-y-auto scrollbar-none"
           />
           <button
             type="submit"
