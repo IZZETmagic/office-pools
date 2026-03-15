@@ -18,7 +18,7 @@ const TIER_BORDER_COLORS: Record<string, string> = {
 }
 
 const RARITY_COLORS: Record<string, string> = {
-  Common: 'text-neutral-500 dark:text-neutral-400',
+  Common: 'text-neutral-500 dark:text-neutral-800',
   Uncommon: 'text-success-600 dark:text-success-400',
   Rare: 'text-primary-600 dark:text-primary-400',
   'Very Rare': 'text-accent-500 dark:text-accent-500',
@@ -49,7 +49,7 @@ export function BadgeFlexCard({
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">
         <span className="text-sm">🏆</span>
-        <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+        <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-700">
           Badge Flex
         </span>
       </div>
@@ -64,7 +64,7 @@ export function BadgeFlexCard({
             {badges.map((badge) => (
               <div
                 key={badge.id}
-                className={`relative w-[90px] rounded-lg px-1.5 py-1.5 text-center bg-surface border-l-[3px] ${TIER_BORDER_COLORS[badge.tier] || 'border-l-neutral-300'} border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-none ${badge.tier === 'Platinum' ? 'shimmer-effect' : ''}`}
+                className={`relative w-[90px] rounded-lg px-1.5 py-1.5 text-center bg-surface border-l-[3px] ${TIER_BORDER_COLORS[badge.tier] || 'border-l-neutral-300'} border border-neutral-200 dark:border-neutral-400 shadow-sm dark:shadow-none ${badge.tier === 'Platinum' ? 'shimmer-effect' : ''}`}
               >
                 {/* Emoji */}
                 <div className="text-lg mb-1">

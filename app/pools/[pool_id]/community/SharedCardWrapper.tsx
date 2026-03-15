@@ -29,10 +29,10 @@ export function SharedCardWrapper({
     <div>
       {/* Attribution row */}
       <div className="flex items-center gap-2 mb-1.5">
-        <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+        <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold bg-neutral-100 dark:bg-neutral-800/15 text-neutral-600 dark:text-neutral-700">
           {getInitials(author?.users.full_name, author?.users.username)}
         </div>
-        <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+        <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-700 truncate">
           {author?.users.full_name || author?.users.username || 'Unknown'}
         </span>
         {authorLevel && (
@@ -46,7 +46,7 @@ export function SharedCardWrapper({
       </div>
 
       {/* Card */}
-      <div className="rounded-xl border border-neutral-200 dark:border-border-default bg-white dark:bg-neutral-800/50 overflow-hidden">
+      <div className="rounded-xl border border-neutral-200 dark:border-border-default bg-white dark:bg-neutral-400/50 overflow-hidden">
         {children}
       </div>
 

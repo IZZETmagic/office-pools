@@ -20,13 +20,13 @@ export function QuickActions({
         </button>
         <button
           onClick={onFlexBadges}
-          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-neutral-50 dark:bg-neutral-400/15 text-neutral-600 dark:text-neutral-700 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
         >
           🏆 Flex Badges
         </button>
         <button
           onClick={onDropStandings}
-          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-neutral-50 dark:bg-neutral-400/15 text-neutral-600 dark:text-neutral-700 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
         >
           📊 Drop Standings
         </button>
