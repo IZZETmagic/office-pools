@@ -8,7 +8,7 @@ import { getInitials, formatMessageTime, renderMessageContent, getLevelPillClass
 
 function LevelPill({ level }: { level: number }) {
   return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none whitespace-nowrap ${getLevelPillClasses(level)}`}>
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none whitespace-nowrap ${getLevelPillClasses(level)}`}>
       Lvl {level} · {getRankTitle(level)}
     </span>
   )
@@ -81,7 +81,7 @@ export function ChatMessage({
       <div className={`flex gap-2.5 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
         {/* Avatar — hidden for own messages */}
         {!isOwn && (
-          <div className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+          <div className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold bg-primary-100 dark:bg-primary-600/15 text-primary-700 dark:text-primary-600">
             {getInitials(author?.users.full_name, author?.users.username)}
           </div>
         )}
@@ -90,7 +90,7 @@ export function ChatMessage({
           {/* Name + level — hidden for own messages */}
           {!isOwn && (
             <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+              <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-700">
                 {author?.users.full_name || author?.users.username || 'Unknown'}
               </span>
               {authorLevel && <LevelPill level={authorLevel.level} />}
@@ -106,7 +106,7 @@ export function ChatMessage({
           <div className={`px-3 py-2 text-sm leading-relaxed ${
             isOwn
               ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-2xl rounded-tl-2xl rounded-tr-sm' : 'rounded-2xl rounded-br-sm'}`
-              : `bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-border-default ${replyPreview ? 'rounded-b-2xl rounded-tr-2xl rounded-tl-sm' : 'rounded-2xl rounded-bl-sm'}`
+              : `bg-white dark:bg-neutral-300 text-neutral-900 dark:text-neutral-700 border border-neutral-200 dark:border-border-default ${replyPreview ? 'rounded-b-2xl rounded-tr-2xl rounded-tl-sm' : 'rounded-2xl rounded-bl-sm'}`
           }`}>
             {renderMessageContent(message.content, members, isOwn)}
           </div>
