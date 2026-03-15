@@ -37,7 +37,7 @@ export function StandingsDropCard({
       <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">📊</span>
-          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-700">
             Current Standings
           </span>
         </div>
@@ -58,27 +58,27 @@ export function StandingsDropCard({
             <div key={entry.user_id}>
               <div
                 className={`flex items-center gap-2 px-2.5 py-2 rounded-lg ${
-                  isFirst ? 'bg-accent-50/60 dark:bg-accent-900/10' : ''
+                  isFirst ? 'bg-accent-50/60 dark:bg-accent-400/30' : ''
                 }`}
               >
                 {/* Rank */}
                 <span className="w-6 text-center text-sm shrink-0">
                   {RANK_MEDALS[entry.rank] ?? (
-                    <span className="text-xs text-neutral-400 font-medium">{entry.rank}</span>
+                    <span className="text-xs text-neutral-400 dark:text-neutral-700 font-medium">{entry.rank}</span>
                   )}
                 </span>
 
                 {/* Name */}
                 <span className={`text-xs flex-1 truncate ${
                   isCurrentUser
-                    ? 'font-semibold text-primary-700 dark:text-primary-400'
-                    : 'font-medium text-neutral-900 dark:text-neutral-100'
+                    ? 'font-semibold text-primary-700 dark:text-neutral-700'
+                    : 'font-medium text-neutral-900 dark:text-neutral-700'
                 }`}>
                   {entry.full_name}
                 </span>
 
                 {/* Points */}
-                <span className="text-xs font-bold text-primary-600 dark:text-primary-400 tabular-nums font-mono">
+                <span className="text-xs font-bold text-primary-600 dark:text-neutral-700 tabular-nums font-mono">
                   {entry.points.toLocaleString()}
                 </span>
               </div>

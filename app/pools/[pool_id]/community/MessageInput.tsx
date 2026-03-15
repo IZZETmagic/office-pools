@@ -174,7 +174,7 @@ export function MessageInput({
             placeholder="Message the pool..."
             maxLength={2000}
             rows={1}
-            className="flex-1 text-sm bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none overflow-y-auto scrollbar-none"
+            className="flex-1 text-sm bg-neutral-50 dark:bg-neutral-800/15 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none overflow-y-auto scrollbar-none"
           />
           <button
             type="submit"

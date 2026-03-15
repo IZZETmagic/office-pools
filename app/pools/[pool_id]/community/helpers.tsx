@@ -80,7 +80,7 @@ export function renderMessageContent(content: string, members: MemberData[], isO
       const member = members.find(m => m.users.username.toLowerCase() === username)
       if (member) {
         return (
-          <span key={i} className={`font-semibold ${isOwn ? 'text-primary-200' : 'text-primary-600 dark:text-primary-400'}`}>
+          <span key={i} className={`font-semibold ${isOwn ? 'text-accent-800' : 'text-primary-600 dark:text-primary-600'}`}>
             {part}
           </span>
         )
@@ -110,7 +110,7 @@ export function computeLevelFromXP(totalXP: number): { level: number; levelName:
 export function getLevelPillClasses(level: number): string {
   if (level >= 9) return 'bg-warning-200 dark:bg-warning-900/30 text-warning-900 dark:text-warning-300'
   if (level >= 5) return 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-  return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'
+  return 'bg-neutral-100 dark:bg-neutral-800/15 text-neutral-500 dark:text-neutral-600'
 }
 
 /**

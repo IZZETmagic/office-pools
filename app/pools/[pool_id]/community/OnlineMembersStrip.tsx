@@ -46,7 +46,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId }: Onli
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
                 {getInitials(member.users.full_name, member.users.username)}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white dark:ring-neutral-900 bg-success-500" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white dark:ring-success-500 bg-success-500" />
             </div>
           </div>
         ))}
@@ -60,10 +60,10 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId }: Onli
         {offlineMembers.map((member) => (
           <div key={member.user_id} className="flex flex-col items-center shrink-0">
             <div className="relative">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-300">
                 {getInitials(member.users.full_name, member.users.username)}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white dark:ring-neutral-900 bg-neutral-300 dark:bg-neutral-600" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white dark:ring-neutral-600 bg-neutral-300 dark:bg-neutral-600" />
             </div>
           </div>
         ))}
