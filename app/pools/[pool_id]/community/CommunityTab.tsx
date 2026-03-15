@@ -687,22 +687,39 @@ export function CommunityTab({
       )
 
       if (mentions.length > 0) {
-        fetch('/api/notifications/mention', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pool_id: poolId,
-            message_content: content,
-            mentioned_user_ids: mentions,
-          }),
+        const mentionPayload = JSON.stringify({
+          pool_id: poolId,
+          message_content: content,
+          mentioned_user_ids: mentions,
         })
-          .then(async (res) => {
+
+        // Send with keepalive so the request survives component unmount / navigation
+        const sendMentionNotification = async (attempt = 1): Promise<void> => {
+          try {
+            const res = await fetch('/api/notifications/mention', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: mentionPayload,
+              keepalive: true,
+            })
             if (!res.ok) {
               const body = await res.json().catch(() => ({}))
-              console.error('[Mention notification] API error:', res.status, body)
+              console.error(`[Mention notification] API error (attempt ${attempt}):`, res.status, body)
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 1500))
+                return sendMentionNotification(attempt + 1)
+              }
             }
-          })
-          .catch((err) => console.error('[Mention notification] fetch failed:', err))
+          } catch (err) {
+            console.error(`[Mention notification] fetch failed (attempt ${attempt}):`, err)
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 1500))
+              return sendMentionNotification(attempt + 1)
+            }
+          }
+        }
+
+        sendMentionNotification()
       }
     }
   }, [poolId, currentUserId])
