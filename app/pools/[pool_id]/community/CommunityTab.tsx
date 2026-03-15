@@ -652,6 +652,8 @@ export function CommunityTab({
     mentions: string[],
     replyToId: string | null,
   ) => {
+    console.log('[Mention DEBUG] handleSendMessage called:', { content, mentions, replyToId })
+
     const { data, error } = await supabaseRef.current
       .from('pool_messages')
       .insert({
@@ -686,7 +688,10 @@ export function CommunityTab({
           : [...prev, newMsg]
       )
 
+      console.log('[Mention DEBUG] mentions array:', mentions, 'length:', mentions.length)
+
       if (mentions.length > 0) {
+        console.log('[Mention DEBUG] Firing notification fetch...')
         const mentionPayload = JSON.stringify({
           pool_id: poolId,
           message_content: content,
