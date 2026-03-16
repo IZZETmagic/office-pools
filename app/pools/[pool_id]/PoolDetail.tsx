@@ -169,9 +169,10 @@ export function PoolDetail({
 
   // Unread banter badge (must be above useSlideIndicator so we can pass banterUnreadCount as a layout dep)
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
-  const { unreadCounts, markAsRead } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
+  const { unreadCounts, markAsRead, initialLastReadMap } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
   const banterUnreadCount = unreadCounts.get(initialPool.pool_id) ?? 0
   const hasUnreadBanter = banterUnreadCount > 0 && activeTab !== 'community'
+  const banterInitialLastReadAt = initialLastReadMap.get(initialPool.pool_id) ?? null
 
   const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
   const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
@@ -1558,6 +1559,7 @@ export function PoolDetail({
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
                 poolCreatedAt={pool.created_at}
+                initialLastReadAt={banterInitialLastReadAt}
               />
             )}
 

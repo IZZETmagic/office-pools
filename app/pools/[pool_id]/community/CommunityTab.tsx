@@ -59,6 +59,7 @@ export function CommunityTab({
   allBPThirdPlaceRankings = [],
   allBPKnockoutPicks = [],
   poolCreatedAt = '',
+  initialLastReadAt,
 }: CommunityTabProps) {
   // =====================
   // STATE
@@ -78,7 +79,12 @@ export function CommunityTab({
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const newDividerRef = useRef<HTMLDivElement>(null)
-  const lastReadAtRef = useRef<string | null>(null)
+  // Use the pre-fetched last_read_at from useUnreadBanter (captured before markAsRead runs)
+  const lastReadAtRef = useRef<string | null>(initialLastReadAt ?? null)
+  // If the prop arrives after initial render (async fetch completed), update the ref once
+  if (initialLastReadAt && !lastReadAtRef.current) {
+    lastReadAtRef.current = initialLastReadAt
+  }
   const wasNearBottomRef = useRef(true)
   const supabaseRef = useRef(createClient())
   const chatWrapperRef = useRef<HTMLDivElement>(null)
@@ -364,19 +370,6 @@ export function CommunityTab({
   useEffect(() => {
     const loadMessages = async () => {
       setLoading(true)
-
-      // Capture last_read_at before markAsRead updates it
-      if (lastReadAtRef.current === null) {
-        const { data: memberData } = await supabaseRef.current
-          .from('pool_members')
-          .select('last_read_at')
-          .eq('pool_id', poolId)
-          .eq('user_id', currentUserId)
-          .single()
-        if (memberData?.last_read_at) {
-          lastReadAtRef.current = memberData.last_read_at
-        }
-      }
 
       const { data } = await supabaseRef.current
         .from('pool_messages')
@@ -981,7 +974,7 @@ export function CommunityTab({
     }
 
     // Insert "New messages" divider before the first unread message from others
-    const lastRead = lastReadAtRef.current
+    const lastRead = initialLastReadAt ?? lastReadAtRef.current
     if (lastRead) {
       const lastReadTime = new Date(lastRead).getTime()
       let dividerInserted = false
@@ -1000,7 +993,7 @@ export function CommunityTab({
     }
 
     return withHeaders
-  }, [messages, systemEvents, currentUserId])
+  }, [messages, systemEvents, currentUserId, initialLastReadAt])
 
   // =====================
   // RENDER

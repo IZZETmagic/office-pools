@@ -164,4 +164,6 @@ export type CommunityTabProps = {
   allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
   allBPKnockoutPicks?: BPKnockoutPick[]
   poolCreatedAt?: string
+  /** Pre-fetched last_read_at from useUnreadBanter (captured before markAsRead runs) */
+  initialLastReadAt?: string | null
 }

@@ -506,6 +506,27 @@ export function LeaderboardTab({
     return map
   }, [predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, matches, tournamentTeams, conductData, poolSettings])
 
+  // Compute bracket picker accuracy stats per entry
+  const bpStatsMap = useMemo(() => {
+    const map = new Map<string, { correct: number; total: number; accuracy: number }>()
+    if (predictionMode !== 'bracket_picker') return map
+
+    for (const [entryId, bonusData] of computedBPBonusMap) {
+      // Only count individual pick entries (bp_group, bp_third_place, bp_knockout), not bonus entries
+      const pickCategories = new Set(['bp_group', 'bp_third_place', 'bp_knockout'])
+      const picks = bonusData.filter(e => pickCategories.has(e.bonus_category))
+      // Exclude pending picks and bonus-type entries like bp_third_all_correct
+      const bonusTypes = new Set(['bp_third_all_correct'])
+      const resolved = picks.filter(e => !e.bonus_type.endsWith('_pending') && !bonusTypes.has(e.bonus_type))
+      const correct = resolved.filter(e => !e.bonus_type.endsWith('_miss')).length
+      const total = resolved.length
+      const accuracy = total > 0 ? (correct / total) * 100 : 0
+      map.set(entryId, { correct, total, accuracy })
+    }
+
+    return map
+  }, [predictionMode, computedBPBonusMap])
+
   // Get bonus data for an entry — prefer computed, fall back to DB
   const getBonusForEntry = (entryId: string): BonusScoreData[] => {
     // For bracket picker, prefer computed BP scores
@@ -1269,10 +1290,15 @@ export function LeaderboardTab({
                         {formatNumber(ps.total_points)}
                       </div>
                       <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                        {formatNumber(stats?.matchPoints ?? 0)} + {formatNumber(stats?.bonusPoints ?? 0)} bonus
+                        {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                       </div>
                       <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">
-                        {stats?.exactCount ?? 0} exact · {stats ? `${stats.hitRate.toFixed(0)}%` : '0%'} rate
+                        {isBracketPicker ? (() => {
+                          const bpStats = bpStatsMap.get(entry.entry_id)
+                          return bpStats && bpStats.total > 0
+                            ? `${bpStats.correct}/${bpStats.total} correct · ${bpStats.accuracy.toFixed(0)}%`
+                            : 'No picks resolved'
+                        })() : `${stats?.exactCount ?? 0} exact · ${stats ? `${stats.hitRate.toFixed(0)}%` : '0%'} rate`}
                       </div>
                     </div>
                   </div>
@@ -1423,13 +1449,21 @@ export function LeaderboardTab({
               <div className="text-right">
                 <div className="text-base font-black text-primary-500">{formatNumber(ps.total_points)}</div>
                 <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                  {formatNumber(stats?.matchPoints ?? 0)} + {formatNumber(stats?.bonusPoints ?? 0)} bonus
+                  {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                 </div>
                 {!isBracketPicker && stats && (
                   <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
                     {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                   </div>
                 )}
+                {isBracketPicker && (() => {
+                  const bpStats = bpStatsMap.get(entry.entry_id)
+                  return bpStats && bpStats.total > 0 ? (
+                    <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                      {bpStats.correct}/{bpStats.total} correct · {bpStats.accuracy.toFixed(0)}%
+                    </div>
+                  ) : null
+                })()}
               </div>
             </div>
           )
@@ -1535,13 +1569,21 @@ export function LeaderboardTab({
                     {formatNumber(ps.total_points)}
                   </div>
                   <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                    {formatNumber(stats?.matchPoints ?? 0)} + {formatNumber(stats?.bonusPoints ?? 0)} bonus
+                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                   </div>
                   {!isBracketPicker && stats && (
                     <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">
                       {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                     </div>
                   )}
+                  {isBracketPicker && (() => {
+                    const bpStats = bpStatsMap.get(entry.entry_id)
+                    return bpStats && bpStats.total > 0 ? (
+                      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+                        {bpStats.correct}/{bpStats.total} correct · {bpStats.accuracy.toFixed(0)}%
+                      </div>
+                    ) : null
+                  })()}
                 </div>
               </div>
 
