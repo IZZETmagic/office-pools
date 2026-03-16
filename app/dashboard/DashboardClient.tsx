@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -10,6 +10,7 @@ import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
+import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 
 // =====================
 // TYPES
@@ -375,7 +376,7 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 // =====================
 // MOBILE POOL CARD
 // =====================
-function MobilePoolCard({ pool }: { pool: PoolCardData }) {
+function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
   const level = getLevel(pool.total_points ?? 0)
 
@@ -384,7 +385,14 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
       href={`/pools/${pool.pool_id}`}
       className={`w-56 h-full min-h-[9rem] rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface p-3 flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200`}
     >
-      <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
+      <div className="flex items-center gap-1.5">
+        <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
+        {unreadCount > 0 && (
+          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </div>
       {needsPredictions ? (
         <p className="text-[10px] font-semibold text-warning-600 dark:text-warning-400 mt-1">Needs predictions</p>
       ) : (
@@ -431,7 +439,7 @@ function MobilePoolCard({ pool }: { pool: PoolCardData }) {
 // =====================
 // POOL CARD (desktop — matches pools page design)
 // =====================
-function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
+function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?: number; unreadCount: number }) {
   const deadline = formatDeadline(pool.prediction_deadline)
   const statusText = getPoolStatusText(pool)
   const level = getLevel(pool.total_points ?? 0)
@@ -447,9 +455,16 @@ function PoolCard({ pool, index = 0 }: { pool: PoolCardData; index?: number }) {
           {/* Header row */}
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="min-w-0 flex-1">
-              <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
-                {pool.pool_name}
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                  {pool.pool_name}
+                </h4>
+                {unreadCount > 0 && (
+                  <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
@@ -631,6 +646,10 @@ export function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter()
 
+  // Unread banter badges
+  const poolIds = useMemo(() => pools.map(p => p.pool_id), [pools])
+  const { unreadCounts } = useUnreadBanter({ userId: user.user_id, poolIds })
+
   // Best active streak across all pools (consecutive non-miss from most recent)
   const bestStreak = pools.reduce((best, pool) => {
     if (pool.form.length === 0) return best
@@ -767,6 +786,10 @@ export function DashboardClient({
                 <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface-secondary to-transparent z-10 pointer-events-none" />
                 <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {[...pools].sort((a, b) => {
+                    // Pools with unread banter first
+                    const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
+                    const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
+                    if (aUnread !== bUnread) return aUnread - bUnread
                     const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
                       ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
                     const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
@@ -777,7 +800,7 @@ export function DashboardClient({
                     return aDeadline - bDeadline
                   }).map((pool, i) => (
                     <div key={pool.pool_id} className="shrink-0 flex animate-slide-in-right" style={{ animationDelay: `${i * 0.08}s` }}>
-                      <MobilePoolCard pool={pool} />
+                      <MobilePoolCard pool={pool} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
                     </div>
                   ))}
                   {/* View All arrow card */}
@@ -796,6 +819,10 @@ export function DashboardClient({
               {/* Desktop: full card grid */}
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...pools].sort((a, b) => {
+                  // Pools with unread banter first
+                  const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
+                  const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
+                  if (aUnread !== bUnread) return aUnread - bUnread
                   const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
                     ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
                   const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
@@ -805,7 +832,7 @@ export function DashboardClient({
                   const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
                   return aDeadline - bDeadline
                 }).map((pool, i) => (
-                  <PoolCard key={pool.pool_id} pool={pool} index={i} />
+                  <PoolCard key={pool.pool_id} pool={pool} index={i} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
                 ))}
               </div>
             </>

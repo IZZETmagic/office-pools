@@ -25,6 +25,7 @@ import { RoundsTab } from './admin/RoundsTab'
 import { DEFAULT_POOL_SETTINGS, calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
 import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
+import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team } from '@/lib/tournament'
 import type {
@@ -167,6 +168,17 @@ export function PoolDetail({
   const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay)
   const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab)
   const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab)
+
+  // Unread banter badge
+  const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
+  const { unreadCounts, markAsRead } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
+  const hasUnreadBanter = (unreadCounts.get(initialPool.pool_id) ?? 0) > 0 && activeTab !== 'community'
+
+  useEffect(() => {
+    if (activeTab === 'community') {
+      markAsRead(initialPool.pool_id)
+    }
+  }, [activeTab, initialPool.pool_id, markAsRead])
 
   // Determine indicator color based on active tab
   const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds'
@@ -1005,7 +1017,12 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  {tab.key === 'leaderboard' ? 'Board' : tab.label}
+                  <span className="inline-flex items-center gap-1">
+                    {tab.key === 'leaderboard' ? 'Board' : tab.label}
+                    {tab.key === 'community' && hasUnreadBanter && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-danger-500" />
+                    )}
+                  </span>
                 </button>
               ))}
 
@@ -1042,7 +1059,12 @@ export function PoolDetail({
                                   : isAdminOverflow ? 'text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-900/20' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200'
                               }`}
                             >
-                              {tab.label}
+                              <span className="inline-flex items-center gap-1.5">
+                                {tab.label}
+                                {tab.key === 'community' && hasUnreadBanter && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-danger-500" />
+                                )}
+                              </span>
                             </button>
                           </div>
                         )
@@ -1081,7 +1103,12 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  {tab.label}
+                  <span className="inline-flex items-center gap-1.5">
+                    {tab.label}
+                    {tab.key === 'community' && hasUnreadBanter && (
+                      <span className="w-2 h-2 rounded-full bg-danger-500" />
+                    )}
+                  </span>
                 </button>
               ))}
 
@@ -1519,6 +1546,10 @@ export function PoolDetail({
                 conductData={conductData}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
                 onShowHowToPlay={() => setShowHowToPlayModal(true)}
+                allBPGroupRankings={allBPGroupRankings}
+                allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+                allBPKnockoutPicks={allBPKnockoutPicks}
+                poolCreatedAt={pool.created_at}
               />
             )}
 
