@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -232,6 +233,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
   const { containerRef: poolTabRef, indicatorStyle: poolIndicator, ready: poolTabReady } = useSlideIndicator(activeTab)
 
+  // Unread banter badges
+  const poolIds = useMemo(() => pools.map(p => p.pool_id), [pools])
+  const { unreadCounts } = useUnreadBanter({ userId: user.user_id, poolIds })
+
   // Filter state (My Pools)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -271,10 +276,16 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     }
 
     // Sort: open pools first, then upcoming, then closed/completed
+    // Within each tier, pools with unread banter float to top
     const statusOrder: Record<string, number> = { open: 0, active: 0, upcoming: 1, closed: 2, completed: 3 }
     result.sort((a, b) => {
       const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
       if (statusDiff !== 0) return statusDiff
+
+      // Pools with unread banter first
+      const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
+      const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
+      if (aUnread !== bUnread) return aUnread - bUnread
 
       switch (sortBy) {
         case 'newest':
@@ -291,7 +302,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     })
 
     return result
-  }, [pools, searchQuery, statusFilter, sortBy])
+  }, [pools, searchQuery, statusFilter, sortBy, unreadCounts])
 
   // Sort discover results client-side
   const sortedDiscoverResults = useMemo(() => {
@@ -588,9 +599,16 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {/* Header: name + tags + action pill */}
                             <div className="flex items-center justify-between gap-3 mb-3">
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
-                                  {pool.pool_name}
-                                </h4>
+                                <div className="flex items-center gap-1.5">
+                                  <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
+                                    {pool.pool_name}
+                                  </h4>
+                                  {(unreadCounts.get(pool.pool_id) ?? 0) > 0 && (
+                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                      {(unreadCounts.get(pool.pool_id) ?? 0) > 99 ? '99+' : unreadCounts.get(pool.pool_id)}
+                                    </span>
+                                  )}
+                                </div>
                                 {/* Badges + player count */}
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
@@ -711,9 +729,16 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {/* Header row */}
                             <div className="flex items-center justify-between gap-3 mb-2">
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
-                                  {pool.pool_name}
-                                </h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                                    {pool.pool_name}
+                                  </h4>
+                                  {(unreadCounts.get(pool.pool_id) ?? 0) > 0 && (
+                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                      {(unreadCounts.get(pool.pool_id) ?? 0) > 99 ? '99+' : unreadCounts.get(pool.pool_id)}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
