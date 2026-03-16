@@ -1103,12 +1103,10 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  <span className="inline-flex items-center gap-1.5">
-                    {tab.label}
-                    {tab.key === 'community' && hasUnreadBanter && (
-                      <span className="w-2 h-2 rounded-full bg-danger-500" />
-                    )}
-                  </span>
+                  {tab.label}
+                  {tab.key === 'community' && hasUnreadBanter && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-danger-500 border-2 border-surface" />
+                  )}
                 </button>
               ))}
 
