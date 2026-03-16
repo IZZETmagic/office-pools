@@ -1,4 +1,4 @@
-import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData } from '../types'
+import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -129,6 +129,7 @@ export type FeedItem =
   | { type: 'message'; data: MessageWithReactions }
   | { type: 'system_event'; data: SystemEvent }
   | { type: 'day_header'; data: { text: string; key: string } }
+  | { type: 'new_divider'; data: null }
 
 // =====================
 // REPLY PREVIEW
@@ -158,4 +159,9 @@ export type CommunityTabProps = {
   conductData: MatchConductData[]
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   onShowHowToPlay: () => void
+  // Bracket picker data (for BP badge computation)
+  allBPGroupRankings?: BPGroupRanking[]
+  allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
+  allBPKnockoutPicks?: BPKnockoutPick[]
+  poolCreatedAt?: string
 }

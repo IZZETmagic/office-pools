@@ -31,10 +31,14 @@ import { usePresence } from './usePresence'
 import { formatDayHeader, generateSystemEvents } from './helpers'
 import { computeFullXPBreakdown } from '../analytics/xpSystem'
 import type { EarnedBadge } from '../analytics/xpSystem'
+import { computeFullBPXPBreakdown } from '../analytics/bracketPickerXpSystem'
 import { computePredictionResults, computeCrowdPredictions, computeStreaks } from '../analytics/analyticsHelpers'
 import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from '../results/points'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import { calculateAllBonusPoints } from '@/lib/bonusCalculation'
+import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
+import type { GroupStanding, Team } from '@/lib/tournament'
+import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 import type { PinnedMessage, BadgeFlexMetadata, StandingsDropMetadata, ReactionCount } from './types'
 
 export function CommunityTab({
@@ -51,6 +55,10 @@ export function CommunityTab({
   conductData,
   predictionMode,
   onShowHowToPlay,
+  allBPGroupRankings = [],
+  allBPThirdPlaceRankings = [],
+  allBPKnockoutPicks = [],
+  poolCreatedAt = '',
 }: CommunityTabProps) {
   // =====================
   // STATE
@@ -69,6 +77,8 @@ export function CommunityTab({
   const [showScrollDown, setShowScrollDown] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const newDividerRef = useRef<HTMLDivElement>(null)
+  const lastReadAtRef = useRef<string | null>(null)
   const wasNearBottomRef = useRef(true)
   const supabaseRef = useRef(createClient())
   const chatWrapperRef = useRef<HTMLDivElement>(null)
@@ -94,6 +104,62 @@ export function CommunityTab({
   // =====================
   const memberLevels = useMemo(() => {
     const map = new Map<string, MemberWithLevel>()
+    const isBP = predictionMode === 'bracket_picker'
+
+    // Pre-compute bracket picker tournament data once (shared across all members)
+    let bpActualGroupStandings: Map<string, GroupStanding[]> | null = null
+    let bpActualThirdPlaceQualifierTeamIds: Set<string> | null = null
+    let bpCompletedMatches: MatchWithResult[] = []
+
+    if (isBP) {
+      // Actual scores for group standings
+      const actualScores = new Map<string, { home: number; away: number }>()
+      for (const m of matches) {
+        if (m.stage === 'group' && (m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
+          actualScores.set(m.match_id, { home: m.home_score_ft, away: m.away_score_ft })
+        }
+      }
+
+      const tournamentTeams: Team[] = teams.map(t => ({
+        team_id: t.team_id, country_name: t.country_name, country_code: t.country_code,
+        group_letter: t.group_letter, fifa_ranking_points: t.fifa_ranking_points, flag_url: t.flag_url,
+      }))
+      const tournamentMatches = matches.map(m => ({
+        match_id: m.match_id, match_number: m.match_number, stage: m.stage, group_letter: m.group_letter,
+        match_date: m.match_date, venue: m.venue, status: m.status, home_team_id: m.home_team_id,
+        away_team_id: m.away_team_id, home_team_placeholder: m.home_team_placeholder,
+        away_team_placeholder: m.away_team_placeholder,
+        home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+        away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+      }))
+      const groupMatches = tournamentMatches.filter(m => m.stage === 'group')
+
+      bpActualGroupStandings = new Map<string, GroupStanding[]>()
+      for (const letter of GROUP_LETTERS) {
+        const gMatches = groupMatches.filter(m => m.group_letter === letter)
+        bpActualGroupStandings.set(letter, calculateGroupStandings(letter, gMatches, actualScores, tournamentTeams, conductData))
+      }
+
+      const rankedThirds = rankThirdPlaceTeams(bpActualGroupStandings)
+      bpActualThirdPlaceQualifierTeamIds = new Set(rankedThirds.slice(0, 8).map(t => t.team_id))
+
+      bpCompletedMatches = matches
+        .filter(m => m.stage !== 'group' && m.is_completed)
+        .map(m => ({
+          match_id: m.match_id, match_number: m.match_number, stage: m.stage,
+          group_letter: m.group_letter, match_date: m.match_date, venue: m.venue,
+          status: m.status, home_team_id: m.home_team_id, away_team_id: m.away_team_id,
+          home_team_placeholder: m.home_team_placeholder, away_team_placeholder: m.away_team_placeholder,
+          home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
+          away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
+          is_completed: m.is_completed, home_score_ft: m.home_score_ft, away_score_ft: m.away_score_ft,
+          home_score_pso: m.home_score_pso, away_score_pso: m.away_score_pso, winner_team_id: m.winner_team_id,
+        }))
+    }
+
+    const defaultLevel = (userId: string, username: string, fullName: string, rank: number | null): MemberWithLevel => ({
+      user_id: userId, username, full_name: fullName, level: 1, level_name: 'Rookie', total_xp: 0, current_rank: rank, badges: [],
+    })
 
     for (const member of members) {
       const entries = member.entries ?? []
@@ -102,76 +168,86 @@ export function CommunityTab({
         : null
 
       if (!bestEntry) {
-        map.set(member.user_id, {
-          user_id: member.user_id,
-          username: member.users.username,
-          full_name: member.users.full_name,
-          level: 1,
-          level_name: 'Rookie',
-          total_xp: 0,
-          current_rank: null,
-          badges: [],
-        })
-        continue
-      }
-
-      const entryPreds = allPredictions.filter(p => p.entry_id === bestEntry.entry_id)
-
-      if (entryPreds.length === 0) {
-        map.set(member.user_id, {
-          user_id: member.user_id,
-          username: member.users.username,
-          full_name: member.users.full_name,
-          level: 1,
-          level_name: 'Rookie',
-          total_xp: 0,
-          current_rank: bestEntry.current_rank ?? null,
-          badges: [],
-        })
+        map.set(member.user_id, defaultLevel(member.user_id, member.users.username, member.users.full_name, null))
         continue
       }
 
       try {
-        const predResults = computePredictionResults(matches, entryPreds, settings as PoolSettings, teams, conductData)
-        const streakData = computeStreaks(predResults)
-        const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
+        if (isBP && bpActualGroupStandings && bpActualThirdPlaceQualifierTeamIds) {
+          // Bracket picker mode: use BP XP system
+          const entryGroupRankings = allBPGroupRankings.filter(r => r.entry_id === bestEntry.entry_id)
+          const entryThirdPlaceRankings = allBPThirdPlaceRankings.filter(r => r.entry_id === bestEntry.entry_id)
+          const entryKnockoutPicks = allBPKnockoutPicks.filter(r => r.entry_id === bestEntry.entry_id)
 
-        const xpBreakdown = computeFullXPBreakdown({
-          predictionResults: predResults,
-          matches,
-          crowdData,
-          streaks: streakData,
-          entryPredictions: entryPreds,
-          entryRank: bestEntry.current_rank,
-          totalMatches: matches.length,
-        })
+          if (entryGroupRankings.length === 0 && entryKnockoutPicks.length === 0) {
+            map.set(member.user_id, defaultLevel(member.user_id, member.users.username, member.users.full_name, bestEntry.current_rank ?? null))
+            continue
+          }
 
-        map.set(member.user_id, {
-          user_id: member.user_id,
-          username: member.users.username,
-          full_name: member.users.full_name,
-          level: xpBreakdown.currentLevel.level,
-          level_name: xpBreakdown.currentLevel.name,
-          total_xp: xpBreakdown.totalXP,
-          current_rank: bestEntry.current_rank ?? null,
-          badges: xpBreakdown.earnedBadges,
-        })
+          const bpBreakdown = computeFullBPXPBreakdown({
+            groupRankings: entryGroupRankings,
+            thirdPlaceRankings: entryThirdPlaceRankings,
+            knockoutPicks: entryKnockoutPicks,
+            actualGroupStandings: bpActualGroupStandings,
+            actualThirdPlaceQualifierTeamIds: bpActualThirdPlaceQualifierTeamIds,
+            completedMatches: bpCompletedMatches,
+            matches,
+            teams,
+            submittedAt: bestEntry.predictions_submitted_at ?? null,
+            poolCreatedAt,
+          })
+
+          map.set(member.user_id, {
+            user_id: member.user_id,
+            username: member.users.username,
+            full_name: member.users.full_name,
+            level: bpBreakdown.currentLevel.level,
+            level_name: bpBreakdown.currentLevel.name,
+            total_xp: bpBreakdown.totalXP,
+            current_rank: bestEntry.current_rank ?? null,
+            badges: bpBreakdown.earnedBadges,
+          })
+        } else {
+          // Standard mode: use regular XP system
+          const entryPreds = allPredictions.filter(p => p.entry_id === bestEntry.entry_id)
+
+          if (entryPreds.length === 0) {
+            map.set(member.user_id, defaultLevel(member.user_id, member.users.username, member.users.full_name, bestEntry.current_rank ?? null))
+            continue
+          }
+
+          const predResults = computePredictionResults(matches, entryPreds, settings as PoolSettings, teams, conductData)
+          const streakData = computeStreaks(predResults)
+          const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
+
+          const xpBreakdown = computeFullXPBreakdown({
+            predictionResults: predResults,
+            matches,
+            crowdData,
+            streaks: streakData,
+            entryPredictions: entryPreds,
+            entryRank: bestEntry.current_rank,
+            totalMatches: matches.length,
+          })
+
+          map.set(member.user_id, {
+            user_id: member.user_id,
+            username: member.users.username,
+            full_name: member.users.full_name,
+            level: xpBreakdown.currentLevel.level,
+            level_name: xpBreakdown.currentLevel.name,
+            total_xp: xpBreakdown.totalXP,
+            current_rank: bestEntry.current_rank ?? null,
+            badges: xpBreakdown.earnedBadges,
+          })
+        }
       } catch {
-        map.set(member.user_id, {
-          user_id: member.user_id,
-          username: member.users.username,
-          full_name: member.users.full_name,
-          level: 1,
-          level_name: 'Rookie',
-          total_xp: 0,
-          current_rank: bestEntry.current_rank ?? null,
-          badges: [],
-        })
+        map.set(member.user_id, defaultLevel(member.user_id, member.users.username, member.users.full_name, bestEntry.current_rank ?? null))
       }
     }
 
     return map
-  }, [members, allPredictions, matches, settings, teams, conductData])
+  }, [members, allPredictions, matches, settings, teams, conductData, predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, poolCreatedAt])
 
   // =====================
   // COMPUTED SCORE MAP
@@ -288,6 +364,20 @@ export function CommunityTab({
   useEffect(() => {
     const loadMessages = async () => {
       setLoading(true)
+
+      // Capture last_read_at before markAsRead updates it
+      if (lastReadAtRef.current === null) {
+        const { data: memberData } = await supabaseRef.current
+          .from('pool_members')
+          .select('last_read_at')
+          .eq('pool_id', poolId)
+          .eq('user_id', currentUserId)
+          .single()
+        if (memberData?.last_read_at) {
+          lastReadAtRef.current = memberData.last_read_at
+        }
+      }
+
       const { data } = await supabaseRef.current
         .from('pool_messages')
         .select('*')
@@ -332,10 +422,20 @@ export function CommunityTab({
         }
       }
       setLoading(false)
-      // Scroll to newest messages — double-tap to ensure DOM has rendered
+      // Scroll to new messages divider if it exists, otherwise bottom
       requestAnimationFrame(() => {
-        scrollToBottom('instant')
-        setTimeout(() => scrollToBottom('instant'), 100)
+        if (newDividerRef.current) {
+          newDividerRef.current.scrollIntoView({ behavior: 'instant', block: 'center' })
+        } else {
+          scrollToBottom('instant')
+        }
+        setTimeout(() => {
+          if (newDividerRef.current) {
+            newDividerRef.current.scrollIntoView({ behavior: 'instant', block: 'center' })
+          } else {
+            scrollToBottom('instant')
+          }
+        }, 100)
       })
     }
     loadMessages()
@@ -880,8 +980,27 @@ export function CommunityTab({
       withHeaders.push(item)
     }
 
+    // Insert "New messages" divider before the first unread message from others
+    const lastRead = lastReadAtRef.current
+    if (lastRead) {
+      const lastReadTime = new Date(lastRead).getTime()
+      let dividerInserted = false
+      const withDivider: FeedItem[] = []
+      for (const item of withHeaders) {
+        if (!dividerInserted && item.type === 'message' && item.data.user_id !== currentUserId) {
+          const msgTime = new Date(item.data.created_at).getTime()
+          if (msgTime > lastReadTime) {
+            withDivider.push({ type: 'new_divider', data: null })
+            dividerInserted = true
+          }
+        }
+        withDivider.push(item)
+      }
+      if (dividerInserted) return withDivider
+    }
+
     return withHeaders
-  }, [messages, systemEvents])
+  }, [messages, systemEvents, currentUserId])
 
   // =====================
   // RENDER
@@ -959,6 +1078,18 @@ export function CommunityTab({
 
       {/* Feed items */}
       {!loading && feedItems.map((item) => {
+        if (item.type === 'new_divider') {
+          return (
+            <div key="new-divider" ref={newDividerRef} className="flex items-center gap-3 my-4">
+              <div className="flex-1 border-t border-danger-400" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-danger-500">
+                New messages
+              </span>
+              <div className="flex-1 border-t border-danger-400" />
+            </div>
+          )
+        }
+
         if (item.type === 'day_header') {
           return <DayHeader key={item.data.key} text={item.data.text} />
         }

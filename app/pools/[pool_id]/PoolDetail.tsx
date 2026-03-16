@@ -166,13 +166,15 @@ export function PoolDetail({
     return 'leaderboard'
   })
   const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay)
-  const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab)
-  const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab)
 
-  // Unread banter badge
+  // Unread banter badge (must be above useSlideIndicator so we can pass banterUnreadCount as a layout dep)
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
   const { unreadCounts, markAsRead } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
-  const hasUnreadBanter = (unreadCounts.get(initialPool.pool_id) ?? 0) > 0 && activeTab !== 'community'
+  const banterUnreadCount = unreadCounts.get(initialPool.pool_id) ?? 0
+  const hasUnreadBanter = banterUnreadCount > 0 && activeTab !== 'community'
+
+  const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
+  const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
 
   useEffect(() => {
     if (activeTab === 'community') {
@@ -1020,7 +1022,9 @@ export function PoolDetail({
                   <span className="inline-flex items-center gap-1">
                     {tab.key === 'leaderboard' ? 'Board' : tab.label}
                     {tab.key === 'community' && hasUnreadBanter && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-danger-500" />
+                      <span className="min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white text-[9px] font-bold flex items-center justify-center">
+                        {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
+                      </span>
                     )}
                   </span>
                 </button>
@@ -1062,7 +1066,9 @@ export function PoolDetail({
                               <span className="inline-flex items-center gap-1.5">
                                 {tab.label}
                                 {tab.key === 'community' && hasUnreadBanter && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-danger-500" />
+                                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold inline-flex items-center justify-center">
+                                    {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
+                                  </span>
                                 )}
                               </span>
                             </button>
@@ -1103,10 +1109,14 @@ export function PoolDetail({
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  {tab.label}
-                  {tab.key === 'community' && hasUnreadBanter && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-danger-500 border-2 border-surface" />
-                  )}
+                  <span className="inline-flex items-center gap-1.5">
+                    {tab.label}
+                    {tab.key === 'community' && hasUnreadBanter && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
 
