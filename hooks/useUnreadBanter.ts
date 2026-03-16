@@ -18,12 +18,16 @@ type UseUnreadBanterOptions = {
 type UseUnreadBanterReturn = {
   unreadCounts: Map<string, number>
   markAsRead: (poolId: string) => void
+  /** The original last_read_at values fetched on mount — never overwritten by markAsRead */
+  initialLastReadMap: Map<string, string>
 }
 
 export function useUnreadBanter({ userId, poolIds }: UseUnreadBanterOptions): UseUnreadBanterReturn {
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map())
   const supabaseRef = useRef(createClient())
   const lastReadMapRef = useRef<Map<string, string>>(new Map())
+  // Immutable copy of last_read_at values as fetched on mount — never overwritten by markAsRead
+  const initialLastReadMapRef = useRef<Map<string, string>>(new Map())
 
   // Stable key for poolIds dependency
   const poolIdsKey = useMemo(() => [...poolIds].sort().join(','), [poolIds])
@@ -48,6 +52,10 @@ export function useUnreadBanter({ userId, poolIds }: UseUnreadBanterOptions): Us
         lastReadMap.set(m.pool_id, m.last_read_at ?? new Date(0).toISOString())
       }
       lastReadMapRef.current = lastReadMap
+      // Store immutable copy for consumers (e.g. "New messages" divider)
+      if (initialLastReadMapRef.current.size === 0) {
+        initialLastReadMapRef.current = new Map(lastReadMap)
+      }
 
       // Check each pool for messages newer than last_read_at
       const counts = new Map<string, number>()
@@ -152,5 +160,5 @@ export function useUnreadBanter({ userId, poolIds }: UseUnreadBanterOptions): Us
     [userId]
   )
 
-  return { unreadCounts, markAsRead }
+  return { unreadCounts, markAsRead, initialLastReadMap: initialLastReadMapRef.current }
 }
