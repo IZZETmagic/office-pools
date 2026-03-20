@@ -44,3 +44,17 @@ nul
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Xcode / iOS
+ios/OfficePools/OfficePools.xcodeproj/xcuserdata/
+ios/OfficePools/OfficePools.xcodeproj/project.xcworkspace/xcuserdata/
+ios/OfficePools/*.xcworkspace/xcuserdata/
+DerivedData/
+*.xcuserstate
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.swiftpm/
+.build/
