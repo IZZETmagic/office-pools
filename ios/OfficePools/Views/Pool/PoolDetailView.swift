@@ -60,7 +60,7 @@ struct PoolDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .padding(.horizontal, 16)
-                            .foregroundStyle(selectedTab == tab ? .accent : .secondary)
+                            .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
                         }
                     }
                 }
@@ -76,11 +76,15 @@ struct PoolDetailView: View {
                     PredictionsTabView(
                         viewModel: PredictionsViewModel(poolId: viewModel.poolId),
                         matches: viewModel.matches,
-                        entry: viewModel.selectedEntry
+                        entry: viewModel.selectedEntry,
+                        computedPoints: viewModel.selectedEntry.flatMap { viewModel.displayPoints(for: $0.entryId) }
                     )
 
                 case .leaderboard:
-                    LeaderboardTabView(leaderboard: viewModel.leaderboard)
+                    LeaderboardTabView(
+                        leaderboard: viewModel.leaderboard,
+                        pointsForEntry: { viewModel.displayPoints(for: $0) }
+                    )
 
                 case .results:
                     ResultsTabView(matches: viewModel.matches)

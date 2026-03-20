@@ -14,7 +14,7 @@ struct LoginView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accentColor)
 
                     Text("Office Pools")
                         .font(.largeTitle.bold())
@@ -62,7 +62,7 @@ struct LoginView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.accent)
+                        .background(Color.accentColor)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .font(.headline)
@@ -73,7 +73,7 @@ struct LoginView: View {
                         showForgotPassword = true
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accentColor)
                 }
 
                 Spacer()

@@ -4,6 +4,7 @@ struct PredictionsTabView: View {
     @Bindable var viewModel: PredictionsViewModel
     let matches: [Match]
     let entry: Entry?
+    var computedPoints: Int?
 
     var body: some View {
         Group {
@@ -39,7 +40,7 @@ struct PredictionsTabView: View {
                     Text("Predictions submitted")
                         .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text("\(entry.totalPoints) pts")
+                    Text("\(computedPoints ?? entry.totalPoints) pts")
                         .font(.headline.monospacedDigit())
                 }
             }
@@ -108,7 +109,7 @@ struct PredictionsTabView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(.accent)
+                    .background(Color.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .font(.headline)

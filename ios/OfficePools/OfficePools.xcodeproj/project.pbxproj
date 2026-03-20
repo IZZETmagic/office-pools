@@ -23,6 +23,7 @@
 		49F48C395194EC1EFF88AA0B /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86C50E486C26FD94CD5E97D /* AuthViewModel.swift */; };
 		57273C144ABCE86F15056557 /* PredictionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E374395DE8572EB9F8880 /* PredictionService.swift */; };
 		599329A21AF4C321A9E5ED4C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CADCDFDB4455B5405418782 /* ContentView.swift */; };
+		5A029C3986D287B8A052A1F6 /* LeaderboardResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C429A14C2CC2A93864565A /* LeaderboardResponse.swift */; };
 		66B22084A8ECA49AF39B552B /* BanterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35511BB8A2EE69E5F20ABCA /* BanterViewModel.swift */; };
 		71F1A46CAAA1B71B9EB590C6 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */; };
 		77A335CAD99A3E14E8ABBB89 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA589A5883F2F54179C208 /* Config.swift */; };
@@ -43,6 +44,7 @@
 		D3EBE811802EF88A66F3851C /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A4890B5E8EA56341973CE7D /* APIService.swift */; };
 		EB1BE683D9D12D424F26A53D /* ProgressiveRound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1155ED462E8C626C56F459 /* ProgressiveRound.swift */; };
 		EE1FF9B51C9A8C26241D9C9E /* Prediction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD1EC19406A20CD191C9C3F /* Prediction.swift */; };
+		F9013C454F921CBD480B12C4 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41712D32039A4640D93EF42 /* PlayerScore.swift */; };
 		FDC4401E215A19D28D757595 /* Pool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142DD2B3B8F225FCA31FB190 /* Pool.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +53,7 @@
 		142DD2B3B8F225FCA31FB190 /* Pool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pool.swift; sourceTree = "<group>"; };
 		178CBEACE616DDD0627FCF55 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		1A4890B5E8EA56341973CE7D /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+		24C429A14C2CC2A93864565A /* LeaderboardResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardResponse.swift; sourceTree = "<group>"; };
 		2EB43957E22AEFCF51890705 /* PoolDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolDetailViewModel.swift; sourceTree = "<group>"; };
 		385F4D63EECE25D0D5D05FDE /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
@@ -70,11 +73,12 @@
 		99615A862B410E2B4846C737 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
 		9CADCDFDB4455B5405418782 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A5BF321B5CEEE61D562773E8 /* LeaderboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardTabView.swift; sourceTree = "<group>"; };
-		A9D1CBD1E789FD6835F30ABE /* OfficePools.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OfficePools.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9D1CBD1E789FD6835F30ABE /* OfficePools.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OfficePools.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ADC5B571B2AC59945F099757 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
 		BF913EFCAE9281DEC4211660 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		C1013EFC18558A172E27B74A /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		C146B2BC07D15E65FFD553F2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C41712D32039A4640D93EF42 /* PlayerScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerScore.swift; sourceTree = "<group>"; };
 		C47B7E2E0B2B95292A9A6EF4 /* ResultsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsTabView.swift; sourceTree = "<group>"; };
 		C4D8B1EE590073B8BD657028 /* PredictionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionsTabView.swift; sourceTree = "<group>"; };
 		CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolDetailView.swift; sourceTree = "<group>"; };
@@ -146,9 +150,11 @@
 			isa = PBXGroup;
 			children = (
 				ADC5B571B2AC59945F099757 /* Entry.swift */,
+				24C429A14C2CC2A93864565A /* LeaderboardResponse.swift */,
 				9559CE0A33901D69C80F97D5 /* Match.swift */,
 				6D94D34573055E47A4D0395C /* Member.swift */,
 				99615A862B410E2B4846C737 /* Message.swift */,
+				C41712D32039A4640D93EF42 /* PlayerScore.swift */,
 				142DD2B3B8F225FCA31FB190 /* Pool.swift */,
 				8BD1EC19406A20CD191C9C3F /* Prediction.swift */,
 				4F1155ED462E8C626C56F459 /* ProgressiveRound.swift */,
@@ -285,7 +291,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					532DD365CE0D282E3559A6A3 = {
+						DevelopmentTeam = "";
+					};
+				};
 			};
 			buildConfigurationList = 321A98BA7C6016321A4DDA0C /* Build configuration list for PBXProject "OfficePools" */;
 			developmentRegion = en;
@@ -336,12 +347,14 @@
 				71F1A46CAAA1B71B9EB590C6 /* DashboardViewModel.swift in Sources */,
 				AA77CD7D86D4890898920F97 /* Entry.swift in Sources */,
 				01B7EE4753E94620657C08FE /* ForgotPasswordView.swift in Sources */,
+				5A029C3986D287B8A052A1F6 /* LeaderboardResponse.swift in Sources */,
 				33F8AEB03F70499F7A0FF753 /* LeaderboardTabView.swift in Sources */,
 				3C786F1E95B22C8EAFEC8297 /* LoginView.swift in Sources */,
 				B1E002CDA0DC35D25BE88E9B /* Match.swift in Sources */,
 				7BD51B0CB44B50B217A0E053 /* Member.swift in Sources */,
 				01C147FE71642E898FCAEA02 /* Message.swift in Sources */,
 				0899A3B89B6B28E1496D7DD1 /* OfficePoolsApp.swift in Sources */,
+				F9013C454F921CBD480B12C4 /* PlayerScore.swift in Sources */,
 				FDC4401E215A19D28D757595 /* Pool.swift in Sources */,
 				9E3A1434827C5AAB1DB6B9F1 /* PoolDetailView.swift in Sources */,
 				259B082805A4EFA5B7393471 /* PoolDetailViewModel.swift in Sources */,
@@ -370,7 +383,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -402,10 +414,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 86Y27Z536L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -426,7 +436,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -439,6 +448,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -458,6 +468,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -475,7 +486,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -507,10 +517,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 86Y27Z536L;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -524,7 +532,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

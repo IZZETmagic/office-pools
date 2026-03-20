@@ -18,18 +18,31 @@ final class AuthService {
         Task {
             await listenForAuthChanges()
         }
+        // Safety timeout — if auth state never fires, stop loading after 5 seconds
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if isLoading {
+                print("[AuthService] Timeout — no auth event received, stopping loading")
+                isLoading = false
+            }
+        }
     }
 
     // MARK: - Auth State Listener
 
     private func listenForAuthChanges() async {
+        print("[AuthService] Starting auth state listener...")
         for await (event, session) in supabase.auth.authStateChanges {
+            print("[AuthService] Auth event: \(event)")
             switch event {
             case .initialSession:
                 if let session {
+                    print("[AuthService] Initial session found for user: \(session.user.email ?? "unknown")")
                     currentUser = session.user
                     isAuthenticated = true
                     await fetchAppUser()
+                } else {
+                    print("[AuthService] No initial session — user not logged in")
                 }
                 isLoading = false
 

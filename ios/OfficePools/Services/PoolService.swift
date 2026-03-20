@@ -177,6 +177,48 @@ final class PoolService {
         return matches
     }
 
+    // MARK: - Fetch All Predictions for a Pool
+
+    func fetchAllPredictions(poolId: String, members: [Member]) async throws -> [Prediction] {
+        // Get all entry IDs from the already-fetched members
+        let entryIds = members.flatMap { $0.entries ?? [] }.map(\.entryId)
+        guard !entryIds.isEmpty else { return [] }
+
+        // Fetch predictions for each entry
+        var allPredictions: [Prediction] = []
+        for entryId in entryIds {
+            do {
+                let preds: [Prediction] = try await supabase
+                    .from("predictions")
+                    .select("prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id")
+                    .eq("entry_id", value: entryId)
+                    .execute()
+                    .value
+                allPredictions.append(contentsOf: preds)
+            } catch {
+                print("[PoolService] Failed to fetch predictions for entry \(entryId): \(error)")
+            }
+        }
+
+        print("[PoolService] Fetched \(allPredictions.count) total predictions for \(entryIds.count) entries in pool \(poolId)")
+        return allPredictions
+    }
+
+    // MARK: - Fetch Player Scores
+
+    func fetchPlayerScores(entryIds: [String]) async throws -> [PlayerScore] {
+        guard !entryIds.isEmpty else { return [] }
+
+        let scores: [PlayerScore] = try await supabase
+            .from("player_scores")
+            .select("entry_id, match_points, bonus_points, total_points")
+            .in("entry_id", values: entryIds)
+            .execute()
+            .value
+
+        return scores
+    }
+
     // MARK: - Fetch Pool Settings
 
     func fetchSettings(poolId: String) async throws -> PoolSettings? {

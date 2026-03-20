@@ -2,14 +2,15 @@ import SwiftUI
 
 struct LeaderboardTabView: View {
     let leaderboard: [LeaderboardEntry]
+    let pointsForEntry: (String) -> Int
 
     var body: some View {
         if leaderboard.isEmpty {
             ContentUnavailableView("No Entries Yet", systemImage: "trophy", description: Text("The leaderboard will appear once entries are submitted."))
         } else {
             List {
-                ForEach(leaderboard) { item in
-                    LeaderboardRow(item: item)
+                ForEach(Array(leaderboard.enumerated()), id: \.element.id) { index, item in
+                    LeaderboardRow(item: item, rank: index + 1, points: pointsForEntry(item.entry.entryId))
                 }
             }
             .listStyle(.plain)
@@ -19,19 +20,16 @@ struct LeaderboardTabView: View {
 
 struct LeaderboardRow: View {
     let item: LeaderboardEntry
+    let rank: Int
+    let points: Int
 
     var body: some View {
         HStack(spacing: 12) {
             // Rank
-            Text(rankDisplay)
+            Text("\(rank)")
                 .font(.headline.monospacedDigit())
                 .frame(width: 32)
                 .foregroundStyle(rankColor)
-
-            // Rank movement indicator
-            if let delta = item.entry.rankDelta {
-                rankMovement(delta)
-            }
 
             // Name & entry
             VStack(alignment: .leading, spacing: 2) {
@@ -47,7 +45,7 @@ struct LeaderboardRow: View {
 
             // Points
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(item.entry.totalPoints)")
+                Text("\(points)")
                     .font(.headline.monospacedDigit())
 
                 Text("pts")
@@ -58,15 +56,8 @@ struct LeaderboardRow: View {
         .padding(.vertical, 4)
     }
 
-    private var rankDisplay: String {
-        if let rank = item.entry.currentRank {
-            return "\(rank)"
-        }
-        return "-"
-    }
-
     private var rankColor: Color {
-        switch item.entry.currentRank {
+        switch rank {
         case 1: return .yellow
         case 2: return .gray
         case 3: return .orange

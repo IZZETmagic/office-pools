@@ -49,7 +49,7 @@ final class DashboardViewModel {
     }
 
     var activePools: [Pool] {
-        pools.filter { $0.status == "active" }
+        pools.filter { $0.status != "archived" }
     }
 
     var archivedPools: [Pool] {

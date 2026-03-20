@@ -141,7 +141,7 @@ struct DashboardView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.accent)
+                    .background(Color.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .font(.headline)

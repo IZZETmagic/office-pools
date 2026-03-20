@@ -10,7 +10,7 @@ struct ProfileView: View {
                     HStack(spacing: 16) {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 48))
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(Color.accentColor)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(user.fullName)

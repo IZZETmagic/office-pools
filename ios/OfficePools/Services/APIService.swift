@@ -114,6 +114,12 @@ final class APIService {
         ))
     }
 
+    // MARK: - Leaderboard
+
+    func fetchLeaderboard(poolId: String) async throws -> LeaderboardResponse {
+        try await request("GET", path: "/api/pools/\(poolId)/leaderboard")
+    }
+
     // MARK: - Admin Endpoints
 
     func calculateBonusPoints(poolId: String) async throws {

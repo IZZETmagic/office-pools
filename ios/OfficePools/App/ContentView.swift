@@ -11,7 +11,7 @@ struct ContentView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 56))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accentColor)
                     ProgressView()
                 }
             } else if authService.isAuthenticated {
