@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -35,10 +36,29 @@ async function handleGET(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  // 1. Authenticate
-  const { data: { user } } = await supabase.auth.getUser()
+  // 1. Authenticate — supports both cookie auth (web) and Bearer token auth (iOS)
+  let supabase: any
+  let user: any = null
+
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    // iOS / mobile client — use Bearer token
+    const token = authHeader.replace('Bearer ', '')
+    supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    )
+    const { data } = await supabase.auth.getUser(token)
+    user = data?.user
+  } else {
+    // Web client — use cookie-based auth
+    supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data?.user
+  }
+
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: userData } = await supabase
