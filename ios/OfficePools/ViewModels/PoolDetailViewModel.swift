@@ -16,8 +16,10 @@ final class PoolDetailViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    /// Server-computed leaderboard data (entryId → LeaderboardEntryData)
+    /// Server-computed leaderboard data
     var leaderboardData: [LeaderboardEntryData] = []
+    var leaderboardResponse: LeaderboardResponse?
+    var currentUserId: String?
     private var leaderboardMap: [String: LeaderboardEntryData] = [:]
 
     private let poolService = PoolService()
@@ -30,6 +32,7 @@ final class PoolDetailViewModel {
     func load(userId: String) async {
         isLoading = true
         errorMessage = nil
+        currentUserId = userId
 
         // Fetch pool first (required for tournament_id)
         do {
@@ -83,9 +86,10 @@ final class PoolDetailViewModel {
         // Fetch server-computed leaderboard (single source of truth for points)
         do {
             let response = try await apiService.fetchLeaderboard(poolId: poolId)
+            leaderboardResponse = response
             leaderboardData = response.entries
             leaderboardMap = Dictionary(uniqueKeysWithValues: response.entries.map { ($0.entryId, $0) })
-            print("[PoolDetail] Leaderboard loaded: \(response.entries.count) entries")
+            print("[PoolDetail] Leaderboard loaded: \(response.entries.count) entries, awards: \(response.awards?.count ?? 0), superlatives: \(response.superlatives?.count ?? 0)")
         } catch {
             print("[PoolDetail] Failed to load leaderboard: \(error)")
             leaderboardData = []
@@ -157,6 +161,18 @@ final class PoolDetailViewModel {
     /// Get the bonus points only for an entry.
     func bonusPoints(for entryId: String) -> Int {
         leaderboardMap[entryId]?.bonusPoints ?? 0
+    }
+
+    /// Check if an entry belongs to the current user
+    func isCurrentUser(entryId: String) -> Bool {
+        guard let userId = currentUserId else { return false }
+        guard let data = leaderboardMap[entryId] else { return false }
+        return data.userId == userId
+    }
+
+    /// Get awards for a specific entry
+    func awards(for entryId: String) -> [PoolAward] {
+        leaderboardResponse?.awards?.filter { $0.entryId == entryId } ?? []
     }
 
     var isAdmin: Bool {

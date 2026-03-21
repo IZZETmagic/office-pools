@@ -6,6 +6,9 @@ import Supabase
 final class PoolService {
     private let supabase = SupabaseService.shared.client
 
+    /// In-memory cache for pool settings (poolId → settings)
+    private static var settingsCache: [String: PoolSettings] = [:]
+
     // MARK: - Fetch User's Pools
 
     func fetchUserPools(userId: String) async throws -> [Pool] {
@@ -234,6 +237,11 @@ final class PoolService {
     // MARK: - Fetch Pool Settings
 
     func fetchSettings(poolId: String) async throws -> PoolSettings? {
+        // Return cached settings if available
+        if let cached = PoolService.settingsCache[poolId] {
+            return cached
+        }
+
         // Use array fetch instead of .single() to avoid throwing when no settings exist
         let settings: [PoolSettings] = try await supabase
             .from("pool_settings")
@@ -243,7 +251,15 @@ final class PoolService {
             .execute()
             .value
 
+        if let result = settings.first {
+            PoolService.settingsCache[poolId] = result
+        }
         return settings.first
+    }
+
+    /// Clear the settings cache (e.g. on logout or pull-to-refresh)
+    static func clearSettingsCache() {
+        settingsCache.removeAll()
     }
 }
 

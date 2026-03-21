@@ -48,6 +48,33 @@ struct Match: Codable, Identifiable, Hashable {
         awayTeam?.countryName ?? awayTeamPlaceholder ?? "TBD"
     }
 
+    /// Merge this match's updated fields with team info from another match (for realtime updates).
+    func mergedWithTeamInfo(from other: Match) -> Match {
+        Match(
+            matchId: matchId,
+            tournamentId: tournamentId,
+            matchNumber: matchNumber,
+            stage: stage,
+            groupLetter: groupLetter,
+            homeTeamId: homeTeamId,
+            awayTeamId: awayTeamId,
+            homeTeamPlaceholder: homeTeamPlaceholder,
+            awayTeamPlaceholder: awayTeamPlaceholder,
+            matchDate: matchDate,
+            venue: venue ?? other.venue,
+            status: status,
+            homeScoreFt: homeScoreFt,
+            awayScoreFt: awayScoreFt,
+            homeScorePso: homeScorePso,
+            awayScorePso: awayScorePso,
+            winnerTeamId: winnerTeamId,
+            isCompleted: isCompleted,
+            completedAt: completedAt,
+            homeTeam: homeTeam ?? other.homeTeam,
+            awayTeam: awayTeam ?? other.awayTeam
+        )
+    }
+
     var scoreDisplay: String? {
         guard let home = homeScoreFt, let away = awayScoreFt else { return nil }
         var display = "\(home) - \(away)"

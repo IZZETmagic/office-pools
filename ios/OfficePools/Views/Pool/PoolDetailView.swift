@@ -117,8 +117,11 @@ struct PoolDetailView: View {
 
                 case .leaderboard:
                     LeaderboardTabView(
-                        leaderboard: viewModel.leaderboard,
-                        pointsForEntry: { viewModel.displayPoints(for: $0) }
+                        leaderboardData: viewModel.leaderboardData,
+                        response: viewModel.leaderboardResponse,
+                        currentUserId: viewModel.currentUserId,
+                        awardsForEntry: { viewModel.awards(for: $0) },
+                        isCurrentUser: { viewModel.isCurrentUser(entryId: $0) }
                     )
 
                 case .banter:

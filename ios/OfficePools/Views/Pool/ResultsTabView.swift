@@ -216,14 +216,22 @@ struct ResultsTabView<HeaderContent: View>: View {
                         }
                         .background(Color(.systemGroupedBackground))
                         .onAppear {
-                            if filterMode == .date,
-                               let todaySection = sections.first(where: { section in
-                                   section.label == "Today"
-                               }) {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    withAnimation {
-                                        proxy.scrollTo(todaySection.id, anchor: .top)
-                                    }
+                            if filterMode == .date {
+                                // Priority 1: Scroll to section containing a live match
+                                if let liveSection = sections.first(where: { section in
+                                    section.matches.contains { $0.status == "live" }
+                                }) {
+                                    proxy.scrollTo(liveSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                }
+                                // Priority 2: Scroll to section with next scheduled match
+                                else if let nextSection = sections.first(where: { section in
+                                    section.matches.contains { $0.status == "scheduled" }
+                                }) {
+                                    proxy.scrollTo(nextSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                }
+                                // Priority 3: Scroll to today
+                                else if let todaySection = sections.first(where: { $0.label == "Today" }) {
+                                    proxy.scrollTo(todaySection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
                                 }
                             }
                         }
@@ -342,6 +350,16 @@ struct ResultsTabView<HeaderContent: View>: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(.systemBackground).opacity(0.7),
+                    Color(.systemBackground).opacity(0.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 
     private func pillLabel(for mode: FilterMode) -> String {

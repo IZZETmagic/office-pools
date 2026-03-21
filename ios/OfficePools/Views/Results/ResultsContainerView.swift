@@ -28,7 +28,11 @@ struct ResultsContainerView: View {
             .task {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadMatches(userId: userId)
+                    await viewModel.subscribeToMatchUpdates()
                 }
+            }
+            .onDisappear {
+                Task { await viewModel.unsubscribeFromMatchUpdates() }
             }
             .refreshable {
                 if let userId = authService.appUser?.userId {

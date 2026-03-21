@@ -1,48 +1,61 @@
 import SwiftUI
 
 struct MatchDetailView: View {
-    let match: Match
+    let initialMatch: Match
     let authService: AuthService
 
     @State private var viewModel: MatchDetailViewModel
 
     init(match: Match, authService: AuthService) {
-        self.match = match
+        self.initialMatch = match
         self.authService = authService
         self._viewModel = State(initialValue: MatchDetailViewModel(match: match))
     }
 
+    @State private var headerHeight: CGFloat = 140
+
+    /// Use viewModel.match for live-updating data
+    private var match: Match { viewModel.match }
     private var isLive: Bool { match.status == "live" }
     private var isFinished: Bool { match.isCompleted || match.status == "completed" }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                matchHeader
-                matchInfo
-                predictionsSection
+        ZStack(alignment: .top) {
+            // MARK: - Scrollable Content (behind header)
+            ScrollView {
+                VStack(spacing: 20) {
+                    matchInfo
+                    predictionsSection
+                }
+                .padding(.top, headerHeight + 20)
+                .padding(.bottom, 24)
             }
-            .padding(.bottom, 24)
+            .background(Color(.systemGroupedBackground))
+
+            // MARK: - Fixed Header (floats on top with glass)
+            matchHeader
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Match #\(match.matchNumber)")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if let userId = authService.appUser?.userId {
                 await viewModel.loadPredictions(userId: userId)
+                await viewModel.subscribeToMatchUpdates()
             }
+        }
+        .onDisappear {
+            Task { await viewModel.unsubscribeFromMatchUpdates() }
         }
     }
 
-    // MARK: - Match Header
+    // MARK: - Match Header (Fixed)
 
     private var matchHeader: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             // Teams + Score/Time
             HStack(spacing: 0) {
                 // Home team
-                VStack(spacing: 8) {
-                    flagView(url: match.homeTeam?.flagUrl, size: 48)
+                VStack(spacing: 6) {
+                    flagView(url: match.homeTeam?.flagUrl, size: 56)
                     Text(match.homeDisplayName)
                         .font(.subheadline.weight(.semibold))
                         .multilineTextAlignment(.center)
@@ -93,14 +106,16 @@ struct MatchDetailView: View {
                     } else {
                         Text(formattedTime)
                             .font(.title2.weight(.semibold))
+                        Text(formattedShortDate)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .frame(width: 100)
 
                 // Away team
-                VStack(spacing: 8) {
-                    flagView(url: match.awayTeam?.flagUrl, size: 48)
+                VStack(spacing: 6) {
+                    flagView(url: match.awayTeam?.flagUrl, size: 56)
                     Text(match.awayDisplayName)
                         .font(.subheadline.weight(.semibold))
                         .multilineTextAlignment(.center)
@@ -111,13 +126,19 @@ struct MatchDetailView: View {
             }
             .padding(.horizontal, 20)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .padding(.horizontal)
-        .padding(.top, 8)
+        .background(.ultraThinMaterial)
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .overlay(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { headerHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { _, newHeight in
+                        headerHeight = newHeight
+                    }
+            }
+        )
     }
 
     // MARK: - Match Info
@@ -126,12 +147,9 @@ struct MatchDetailView: View {
         VStack(spacing: 0) {
             infoRow(icon: "sportscourt", label: stageLabel)
 
-            Divider().padding(.horizontal, 16)
-
             infoRow(icon: "calendar", label: formattedDate)
 
             if let venue = match.venue, !venue.isEmpty {
-                Divider().padding(.horizontal, 16)
                 infoRow(icon: "mappin.and.ellipse", label: venue)
             }
         }
@@ -156,6 +174,19 @@ struct MatchDetailView: View {
     }
 
     // MARK: - Predictions Section
+
+    /// Group prediction infos by pool name, preserving order.
+    private var groupedPredictions: [(poolName: String, entries: [MatchPredictionInfo])] {
+        var order: [String] = []
+        var grouped: [String: [MatchPredictionInfo]] = [:]
+        for info in viewModel.predictionInfos {
+            if grouped[info.poolName] == nil {
+                order.append(info.poolName)
+            }
+            grouped[info.poolName, default: []].append(info)
+        }
+        return order.map { (poolName: $0, entries: grouped[$0]!) }
+    }
 
     private var predictionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -185,66 +216,110 @@ struct MatchDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(viewModel.predictionInfos.enumerated()), id: \.element.id) { index, info in
-                        predictionRow(info: info)
+                ForEach(groupedPredictions, id: \.poolName) { group in
+                    VStack(spacing: 0) {
+                        // Pool name header
+                        HStack {
+                            Text(group.poolName)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
 
-                        if index < viewModel.predictionInfos.count - 1 {
-                            Divider().padding(.horizontal, 16)
+                        Divider().padding(.horizontal, 16)
+
+                        // Entry rows
+                        ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, info in
+                            predictionRow(info: info)
+
+                            if index < group.entries.count - 1 {
+                                Divider().padding(.horizontal, 16)
+                            }
                         }
                     }
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                    .padding(.horizontal)
                 }
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-                .padding(.horizontal)
             }
         }
     }
 
+    private var isKnockout: Bool {
+        match.groupLetter == nil
+    }
+
     private func predictionRow(info: MatchPredictionInfo) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(info.poolName)
-                    .font(.subheadline.weight(.medium))
+        VStack(alignment: .leading, spacing: 4) {
+            // Top line: entry name, then badge + points right-aligned
+            HStack {
                 Text(info.entryName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+
+                Spacer()
+
+                if (isFinished || isLive), let pred = info.prediction {
+                    resultBadge(for: pred)
+
+                    if let pts = info.matchPoints {
+                        Text("+\(pts) pts")
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(pts > 0 ? .green : .secondary)
+                    }
+                }
             }
 
-            Spacer()
-
+            // Bottom line: teams and score, right-aligned
             if let pred = info.prediction {
                 HStack(spacing: 4) {
+                    Spacer()
+
+                    if isKnockout {
+                        Text(match.homeDisplayName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+
                     Text("\(pred.predictedHomeScore)")
                         .font(.subheadline.weight(.bold).monospacedDigit())
                     Text("-")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
                     Text("\(pred.predictedAwayScore)")
                         .font(.subheadline.weight(.bold).monospacedDigit())
 
+                    if isKnockout {
+                        Text(match.awayDisplayName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+
                     if let homePso = pred.predictedHomePso, let awayPso = pred.predictedAwayPso {
-                        Text("(\(homePso)-\(awayPso))")
+                        Text("(\(homePso)-\(awayPso) PSO)")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.purple)
                     }
                 }
-
-                // Result badge if match is completed
-                if isFinished {
-                    resultBadge(for: pred)
-                }
             } else {
-                Text("No prediction")
-                    .font(.caption)
-                    .italic()
-                    .foregroundStyle(.tertiary)
+                HStack {
+                    Spacer()
+                    Text("No prediction")
+                        .font(.caption)
+                        .italic()
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
     }
+
 
     // MARK: - Result Badge
 
@@ -311,6 +386,13 @@ struct MatchDetailView: View {
         guard let date = match.parsedDate else { return match.matchDate }
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMMM d 'at' h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private var formattedShortDate: String {
+        guard let date = match.parsedDate else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
     }
 
