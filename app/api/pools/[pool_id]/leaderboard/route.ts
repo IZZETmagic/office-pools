@@ -463,10 +463,15 @@ async function handleGET(
   // Crowd Follower = highest crowd_agreement_pct (min 3 completed)
   const crowdFollower = leaderboard.filter(e => e.total_completed >= 3).reduce((max, e) => (e.crowd_agreement_pct > (max?.crowd_agreement_pct ?? 0)) ? e : max, null as LeaderboardEntryResponse | null)
   if (crowdFollower) awards.push({ type: 'crowd', emoji: '👥', label: 'Crowd Follower', entry_id: crowdFollower.entry_id })
-  // Hot Streak = current hot streak >= 3
-  for (const e of leaderboard) { if (e.current_streak.type === 'hot' && e.current_streak.length >= 3) awards.push({ type: 'hot', emoji: '🔥', label: `On Fire (${e.current_streak.length})`, entry_id: e.entry_id }) }
-  // Cold Streak = current cold streak >= 3
-  for (const e of leaderboard) { if (e.current_streak.type === 'cold' && e.current_streak.length >= 3) awards.push({ type: 'cold', emoji: '❄️', label: 'Ice Cold', entry_id: e.entry_id }) }
+  // Hot Streak = longest current hot streak >= 3 (one person only)
+  const hottestEntry = leaderboard.filter(e => e.current_streak.type === 'hot' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (hottestEntry) awards.push({ type: 'hot', emoji: '🔥', label: `On Fire (${hottestEntry.current_streak.length})`, entry_id: hottestEntry.entry_id })
+  // Cold Streak = longest current cold streak >= 3 (one person only)
+  const coldestEntry = leaderboard.filter(e => e.current_streak.type === 'cold' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (coldestEntry) awards.push({ type: 'cold', emoji: '❄️', label: 'Ice Cold', entry_id: coldestEntry.entry_id })
+  // Sharpshooter = most exact scores (one person only)
+  const sharpshooterEntry = leaderboard.filter(e => e.exact_count > 0).sort((a, b) => b.exact_count - a.exact_count)[0]
+  if (sharpshooterEntry) awards.push({ type: 'sharpshooter', emoji: '🎯', label: 'Sharpshooter', entry_id: sharpshooterEntry.entry_id })
 
   // --- Superlatives ---
   const superlatives: { type: string; emoji: string; title: string; entry_id: string; name: string; detail: string }[] = []

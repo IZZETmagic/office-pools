@@ -61,8 +61,9 @@ struct LeaderboardTabView: View {
 
     private func matchdayMVPBanner(_ mvp: MatchdayMVP) -> some View {
         HStack(spacing: 8) {
-            Text("⭐")
+            Image(systemName: "star.fill")
                 .font(.title3)
+                .foregroundStyle(.yellow)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Matchday MVP")
                     .font(.caption.weight(.semibold))
@@ -82,27 +83,69 @@ struct LeaderboardTabView: View {
     private var podiumView: some View {
         HStack(alignment: .bottom, spacing: 8) {
             // 2nd place
-            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medal: "🥈", ringColor: .gray)
+            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: .gray)
 
             // 1st place
-            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medal: "🏆", ringColor: .yellow)
+            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: .yellow)
 
             // 3rd place
-            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medal: "🥉", ringColor: .orange)
+            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: .orange)
         }
         .padding(.top, 8)
     }
 
-    private func podiumEntry(entry: LeaderboardEntryData, rank: Int, pedestalHeight: CGFloat, medal: String, ringColor: Color) -> some View {
-        VStack(spacing: 6) {
-            // Medal
+    private func podiumEntry(entry: LeaderboardEntryData, rank: Int, pedestalHeight: CGFloat, medalIcon: String, ringColor: Color) -> some View {
+        let entryAwards = awardsForEntry(entry.entryId)
+
+        return VStack(spacing: 6) {
+            // Medal + rank delta + awards
             ZStack {
                 Circle()
                     .stroke(ringColor, lineWidth: 3)
                     .frame(width: 52, height: 52)
-                Text(medal)
-                    .font(.title2)
+                    .overlay {
+                        Image(systemName: medalIcon)
+                            .font(.title2)
+                            .foregroundStyle(ringColor)
+                    }
+
+                // Rank delta — bottom trailing
+                if let delta = entry.rankDelta(currentPosition: rank), delta != 0 {
+                    HStack(spacing: 1) {
+                        Image(systemName: delta > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                            .font(.system(size: 7))
+                        Text("\(abs(delta))")
+                            .font(.system(size: 8, weight: .bold).monospacedDigit())
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(delta > 0 ? Color.green : Color.red)
+                    .clipShape(Capsule())
+                    .offset(x: 22, y: 20)
+                }
+
+                // Award badges — bottom leading, fanned like cards
+                if !entryAwards.isEmpty {
+                    ZStack {
+                        ForEach(Array(entryAwards.enumerated()), id: \.element.id) { index, award in
+                            let fanAngle = Double(index) * 15 - Double(entryAwards.count - 1) * 7.5
+                            let xOffset = Double(index) * 6
+
+                            Image(systemName: podiumAwardIcon(for: award.type))
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .padding(5)
+                                .background(podiumAwardColor(for: award.type))
+                                .clipShape(Circle())
+                                .rotationEffect(.degrees(fanAngle))
+                                .offset(x: xOffset - Double(entryAwards.count - 1) * 3)
+                        }
+                    }
+                    .offset(x: -22, y: 20)
+                }
             }
+            .frame(height: 60)
 
             // Name
             Text(entry.entryName.isEmpty ? entry.fullName : entry.entryName)
@@ -156,6 +199,28 @@ struct LeaderboardTabView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private func podiumAwardIcon(for type: String) -> String {
+        switch type {
+        case "mvp": return "trophy.fill"
+        case "contrarian": return "dice.fill"
+        case "crowd": return "person.3.fill"
+        case "hot": return "flame.fill"
+        case "cold": return "snowflake"
+        default: return "star.fill"
+        }
+    }
+
+    private func podiumAwardColor(for type: String) -> Color {
+        switch type {
+        case "mvp": return .orange
+        case "contrarian": return .purple
+        case "crowd": return .blue
+        case "hot": return .red
+        case "cold": return .cyan
+        default: return .gray
+        }
+    }
+
     private func pedestalColors(for rank: Int) -> [Color] {
         switch rank {
         case 1: return [.yellow.opacity(0.3), .yellow.opacity(0.1), .yellow.opacity(0.05)]
@@ -201,7 +266,7 @@ struct LeaderboardTabView: View {
                     .font(.subheadline.weight(.black).monospacedDigit())
                     .foregroundStyle(rankColor(rank))
 
-                if let delta = entry.rankDelta, delta != 0 {
+                if let delta = entry.rankDelta(currentPosition: rank), delta != 0 {
                     HStack(spacing: 1) {
                         Image(systemName: delta > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
                             .font(.system(size: 8))
@@ -308,8 +373,9 @@ struct LeaderboardTabView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(superlatives) { superlative in
                     VStack(spacing: 6) {
-                        Text(superlative.emoji)
+                        Image(systemName: superlativeIcon(for: superlative.type))
                             .font(.title2)
+                            .foregroundStyle(superlativeColor(for: superlative.type))
                         Text(superlative.title)
                             .font(.caption.weight(.semibold))
                             .multilineTextAlignment(.center)
@@ -328,6 +394,32 @@ struct LeaderboardTabView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
+        }
+    }
+
+    private func superlativeIcon(for type: String) -> String {
+        switch type {
+        case "hot": return "flame.fill"
+        case "cold": return "snowflake"
+        case "contrarian": return "dice.fill"
+        case "crowd": return "person.3.fill"
+        case "sharpshooter": return "scope"
+        case "climber": return "arrow.up.right"
+        case "faller": return "arrow.down.right"
+        default: return "star.fill"
+        }
+    }
+
+    private func superlativeColor(for type: String) -> Color {
+        switch type {
+        case "hot": return .red
+        case "cold": return .blue
+        case "contrarian": return .purple
+        case "crowd": return .blue
+        case "sharpshooter": return .orange
+        case "climber": return .green
+        case "faller": return .red
+        default: return .yellow
         }
     }
 
@@ -394,8 +486,9 @@ struct FormDotsView: View {
 
             if let streak = streak, streak.length >= 3 {
                 HStack(spacing: 1) {
-                    Text(streak.type == "hot" ? "🔥" : "❄️")
-                        .font(.system(size: 10))
+                    Image(systemName: streak.type == "hot" ? "flame.fill" : "snowflake")
+                        .font(.system(size: 9))
+                        .foregroundStyle(streak.type == "hot" ? .red : .blue)
                     Text("\(streak.length)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(streak.type == "hot" ? .red : .blue)
@@ -455,9 +548,9 @@ struct AwardBadgeView: View {
     let award: PoolAward
 
     var body: some View {
-        HStack(spacing: 2) {
-            Text(award.emoji)
-                .font(.system(size: 10))
+        HStack(spacing: 3) {
+            Image(systemName: awardIcon)
+                .font(.system(size: 9))
             Text(award.label)
                 .font(.system(size: 9, weight: .medium))
         }
@@ -466,6 +559,17 @@ struct AwardBadgeView: View {
         .background(badgeBackground)
         .foregroundStyle(badgeForeground)
         .clipShape(Capsule())
+    }
+
+    private var awardIcon: String {
+        switch award.type {
+        case "mvp": return "trophy.fill"
+        case "contrarian": return "dice.fill"
+        case "crowd": return "person.3.fill"
+        case "hot": return "flame.fill"
+        case "cold": return "snowflake"
+        default: return "star.fill"
+        }
     }
 
     private var badgeBackground: Color {

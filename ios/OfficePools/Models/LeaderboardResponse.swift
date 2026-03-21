@@ -52,9 +52,10 @@ struct LeaderboardEntryData: Codable, Identifiable {
 
     var id: String { entryId }
 
-    var rankDelta: Int? {
-        guard let current = currentRank, let previous = previousRank else { return nil }
-        return previous - current
+    /// Compute rank movement using the actual sorted position (not the stale DB current_rank)
+    func rankDelta(currentPosition: Int) -> Int? {
+        guard let previous = previousRank else { return nil }
+        return previous - currentPosition
     }
 
     enum CodingKeys: String, CodingKey {
