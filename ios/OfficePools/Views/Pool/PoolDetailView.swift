@@ -117,6 +117,7 @@ struct PoolDetailView: View {
 
                 case .leaderboard:
                     LeaderboardTabView(
+                        poolId: viewModel.poolId,
                         leaderboardData: viewModel.leaderboardData,
                         response: viewModel.leaderboardResponse,
                         currentUserId: viewModel.currentUserId,

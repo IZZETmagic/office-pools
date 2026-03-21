@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LeaderboardTabView: View {
+    let poolId: String
     let leaderboardData: [LeaderboardEntryData]
     let response: LeaderboardResponse?
     let currentUserId: String?
@@ -97,7 +98,14 @@ struct LeaderboardTabView: View {
     private func podiumEntry(entry: LeaderboardEntryData, rank: Int, pedestalHeight: CGFloat, medalIcon: String, ringColor: Color) -> some View {
         let entryAwards = awardsForEntry(entry.entryId)
 
-        return VStack(spacing: 6) {
+        return NavigationLink(destination: PointsBreakdownView(
+            poolId: poolId,
+            entryId: entry.entryId,
+            entryName: entry.entryName,
+            playerName: entry.fullName,
+            rank: rank
+        )) {
+        VStack(spacing: 6) {
             // Medal + rank delta + awards
             ZStack {
                 Circle()
@@ -197,6 +205,8 @@ struct LeaderboardTabView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
     }
 
     private func podiumAwardIcon(for type: String) -> String {
@@ -259,7 +269,14 @@ struct LeaderboardTabView: View {
         let isCurrent = isCurrentUser(entry.entryId)
         let entryAwards = awardsForEntry(entry.entryId)
 
-        return HStack(spacing: 12) {
+        return NavigationLink(destination: PointsBreakdownView(
+            poolId: poolId,
+            entryId: entry.entryId,
+            entryName: entry.entryName,
+            playerName: entry.fullName,
+            rank: rank
+        )) {
+        HStack(spacing: 12) {
             // Rank + delta
             VStack(spacing: 2) {
                 Text("#\(rank)")
@@ -341,6 +358,10 @@ struct LeaderboardTabView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(12)
         .background(
@@ -351,6 +372,8 @@ struct LeaderboardTabView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isCurrent ? Color.blue.opacity(0.3) : Color(.separator).opacity(0.3), lineWidth: isCurrent ? 1.5 : 0.5)
         )
+        }
+        .buttonStyle(.plain)
     }
 
     private func rankColor(_ rank: Int) -> Color {
