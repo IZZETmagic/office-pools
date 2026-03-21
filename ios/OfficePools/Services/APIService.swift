@@ -124,6 +124,10 @@ final class APIService {
         try await request("GET", path: "/api/pools/\(poolId)/entries/\(entryId)/breakdown")
     }
 
+    func fetchAnalytics(poolId: String, entryId: String) async throws -> AnalyticsResponse {
+        try await request("GET", path: "/api/pools/\(poolId)/entries/\(entryId)/analytics")
+    }
+
     // MARK: - Admin Endpoints
 
     func calculateBonusPoints(poolId: String) async throws {

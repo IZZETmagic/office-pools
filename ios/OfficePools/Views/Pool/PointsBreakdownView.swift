@@ -168,8 +168,7 @@ struct PointsBreakdownView: View {
 
     private func matchPointsSection(_ results: [MatchResultData]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Match Points")
-                .font(.headline)
+            sectionHeader("Match Points")
 
             let grouped = Dictionary(grouping: results, by: { $0.stage })
 
@@ -319,8 +318,7 @@ struct PointsBreakdownView: View {
 
     private func bonusPointsSection(_ entries: [BonusEntryData]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Bonus Points")
-                .font(.headline)
+            sectionHeader("Bonus Points")
 
             let grouped = Dictionary(grouping: entries, by: { $0.bonusCategory })
 
@@ -344,37 +342,34 @@ struct PointsBreakdownView: View {
         let subtotal = entries.reduce(0) { $0 + $1.pointsEarned }
 
         return VStack(spacing: 0) {
-            DisclosureGroup {
-                VStack(spacing: 0) {
-                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        HStack {
-                            Text(entry.description)
-                                .font(.subheadline)
-                            Spacer()
-                            Text("+\(entry.pointsEarned)")
-                                .font(.subheadline.weight(.bold).monospacedDigit())
-                                .foregroundStyle(.green)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-
-                        if index < entries.count - 1 {
-                            Divider().padding(.horizontal, 16)
-                        }
-                    }
-                }
-            } label: {
-                HStack {
-                    Text(bonusCategoryLabel(category))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(subtotal) pts")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.green)
-                }
+            // Category header
+            HStack {
+                Text(bonusCategoryLabel(category))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(subtotal) pts")
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.green)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+
+            // Bonus rows
+            ForEach(entries) { entry in
+                HStack {
+                    Text(entry.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("+\(entry.pointsEarned)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.green)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+            }
+
+            Spacer().frame(height: 6)
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -385,75 +380,58 @@ struct PointsBreakdownView: View {
 
     private func scoringRulesSection(_ settings: BreakdownPoolSettings) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Scoring Rules")
-                .font(.headline)
+            sectionHeader("Scoring Rules")
 
             // Group Stage
-            rulesCard(title: "Group Stage Points") {
+            sectionCard(title: "Group Stage Points") {
                 ruleRow("Exact Score", value: settings.groupExactScore)
-                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Winner + GD", value: settings.groupCorrectDifference)
-                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Result Only", value: settings.groupCorrectResult)
             }
 
             // Knockout Base
-            rulesCard(title: "Knockout Base Points") {
+            sectionCard(title: "Knockout Base Points") {
                 ruleRow("Exact Score", value: settings.knockoutExactScore)
-                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Winner + GD", value: settings.knockoutCorrectDifference)
-                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Result Only", value: settings.knockoutCorrectResult)
             }
 
             // Multipliers
-            rulesCard(title: "Round Multipliers") {
+            sectionCard(title: "Round Multipliers") {
                 ruleRowMultiplier("Round of 32", multiplier: settings.round32Multiplier)
-                Divider().padding(.horizontal, 16)
                 ruleRowMultiplier("Round of 16", multiplier: settings.round16Multiplier)
-                Divider().padding(.horizontal, 16)
                 ruleRowMultiplier("Quarter Finals", multiplier: settings.quarterFinalMultiplier)
-                Divider().padding(.horizontal, 16)
                 ruleRowMultiplier("Semi Finals", multiplier: settings.semiFinalMultiplier)
-                Divider().padding(.horizontal, 16)
                 ruleRowMultiplier("Third Place", multiplier: settings.thirdPlaceMultiplier)
-                Divider().padding(.horizontal, 16)
                 ruleRowMultiplier("Final", multiplier: settings.finalMultiplier)
             }
 
             // PSO
             if settings.psoEnabled {
-                rulesCard(title: "Penalty Shootout Bonus") {
-                    if let v = settings.psoExactScore {
-                        ruleRow("Exact PSO Score", value: v)
-                    }
-                    if let v = settings.psoCorrectDifference {
-                        if settings.psoExactScore != nil { Divider().padding(.horizontal, 16) }
-                        ruleRow("Correct PSO Winner + GD", value: v)
-                    }
-                    if let v = settings.psoCorrectResult {
-                        if settings.psoExactScore != nil || settings.psoCorrectDifference != nil {
-                            Divider().padding(.horizontal, 16)
-                        }
-                        ruleRow("Correct PSO Winner", value: v)
-                    }
+                sectionCard(title: "Penalty Shootout Bonus") {
+                    if let v = settings.psoExactScore { ruleRow("Exact PSO Score", value: v) }
+                    if let v = settings.psoCorrectDifference { ruleRow("Correct PSO Winner + GD", value: v) }
+                    if let v = settings.psoCorrectResult { ruleRow("Correct PSO Winner", value: v) }
                 }
             }
         }
     }
 
-    private func rulesCard(title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
+    private func sectionCard(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: 0) {
-            DisclosureGroup {
-                VStack(spacing: 0) {
-                    content()
-                }
-            } label: {
+            // Header
+            HStack {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
+                Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+
+            // Rows
+            content()
+
+            Spacer().frame(height: 6)
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -463,27 +441,42 @@ struct PointsBreakdownView: View {
     private func ruleRow(_ label: String, value: Int) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Spacer()
             Text("\(value) pts")
-                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
 
     private func ruleRowMultiplier(_ label: String, multiplier: Double) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Spacer()
             Text("\(String(format: "%.1f", multiplier))x")
-                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.blue)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Section Header
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     // MARK: - Helpers

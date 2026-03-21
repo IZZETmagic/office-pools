@@ -3,6 +3,7 @@ import SwiftUI
 enum PoolTab: String, CaseIterable {
     case predictions = "Predictions"
     case leaderboard = "Leaderboard"
+    case form = "Form"
     case banter = "Banter"
     case settings = "Settings"
 
@@ -10,6 +11,7 @@ enum PoolTab: String, CaseIterable {
         switch self {
         case .predictions: return "pencil.line"
         case .leaderboard: return "trophy"
+        case .form: return "chart.bar.xaxis"
         case .banter: return "bubble.left.and.bubble.right"
         case .settings: return "gearshape"
         }
@@ -125,6 +127,13 @@ struct PoolDetailView: View {
                         isCurrentUser: { viewModel.isCurrentUser(entryId: $0) }
                     )
 
+                case .form:
+                    FormTabView(
+                        poolId: viewModel.poolId,
+                        entries: viewModel.currentMember?.entries ?? [],
+                        selectedEntry: viewModel.selectedEntry
+                    )
+
                 case .banter:
                     BanterTabView(
                         viewModel: BanterViewModel(poolId: viewModel.poolId),
@@ -144,7 +153,7 @@ struct PoolDetailView: View {
     }
 
     private var visibleTabs: [PoolTab] {
-        var tabs: [PoolTab] = [.predictions, .leaderboard, .banter]
+        var tabs: [PoolTab] = [.predictions, .leaderboard, .form, .banter]
         if viewModel.isAdmin {
             tabs.append(.settings)
         }
