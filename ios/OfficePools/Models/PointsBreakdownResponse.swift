@@ -74,6 +74,9 @@ struct MatchResultData: Codable, Identifiable {
     let actualAwayPso: Int?
     let predictedHomePso: Int?
     let predictedAwayPso: Int?
+    let predictedHomeTeam: String?
+    let predictedAwayTeam: String?
+    let teamsMatch: Bool
     let type: String  // "exact", "winner_gd", "winner", "miss"
     let basePoints: Int
     let multiplier: Double
@@ -97,6 +100,9 @@ struct MatchResultData: Codable, Identifiable {
         case actualAwayPso = "actual_away_pso"
         case predictedHomePso = "predicted_home_pso"
         case predictedAwayPso = "predicted_away_pso"
+        case predictedHomeTeam = "predicted_home_team"
+        case predictedAwayTeam = "predicted_away_team"
+        case teamsMatch = "teams_match"
         case type
         case basePoints = "base_points"
         case multiplier

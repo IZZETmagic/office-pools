@@ -29,6 +29,9 @@ type MatchResultRow = {
   actual_away_pso: number | null
   predicted_home_pso: number | null
   predicted_away_pso: number | null
+  predicted_home_team: string | null
+  predicted_away_team: string | null
+  teams_match: boolean
   type: 'exact' | 'winner_gd' | 'winner' | 'miss'
   base_points: number
   multiplier: number
@@ -329,6 +332,9 @@ async function handleGET(
       actual_away_pso: m.away_score_pso ?? null,
       predicted_home_pso: pred.predicted_home_pso ?? null,
       predicted_away_pso: pred.predicted_away_pso ?? null,
+      predicted_home_team: m.stage !== 'group' ? (resolved?.home?.country_name ?? null) : null,
+      predicted_away_team: m.stage !== 'group' ? (resolved?.away?.country_name ?? null) : null,
+      teams_match: teamsMatch,
       type: result.type,
       base_points: result.basePoints,
       multiplier: result.multiplier,

@@ -10,6 +10,7 @@ struct PointsBreakdownView: View {
     @State private var breakdown: PointsBreakdownResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var headerHeight: CGFloat = 120
 
     private let apiService = APIService()
 
@@ -26,7 +27,6 @@ struct PointsBreakdownView: View {
                 breakdownContent(breakdown)
             }
         }
-        .navigationTitle("Points Breakdown")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadBreakdown()
@@ -36,60 +36,83 @@ struct PointsBreakdownView: View {
     // MARK: - Main Content
 
     private func breakdownContent(_ data: PointsBreakdownResponse) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                // Header
-                headerSection(data)
+        ZStack(alignment: .top) {
+            // Scrollable content
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Summary Cards
+                    summaryCards(data.summary, adjustment: data.entry.pointAdjustment)
 
-                // Summary Cards
-                summaryCards(data.summary, adjustment: data.entry.pointAdjustment)
+                    // Match Points Breakdown
+                    if !data.matchResults.isEmpty {
+                        matchPointsSection(data.matchResults)
+                    }
 
-                // Match Points Breakdown
-                if !data.matchResults.isEmpty {
-                    matchPointsSection(data.matchResults)
+                    // Bonus Points Breakdown
+                    if !data.bonusEntries.isEmpty {
+                        bonusPointsSection(data.bonusEntries)
+                    }
+
+                    // Scoring Rules
+                    scoringRulesSection(data.poolSettings)
                 }
-
-                // Bonus Points Breakdown
-                if !data.bonusEntries.isEmpty {
-                    bonusPointsSection(data.bonusEntries)
-                }
-
-                // Scoring Rules
-                scoringRulesSection(data.poolSettings)
+                .padding(.top, headerHeight + 16)
+                .padding(.horizontal)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 20)
+            .background(Color(.systemGroupedBackground))
+
+            // Fixed header
+            headerSection(data)
         }
     }
 
-    // MARK: - Header
+    // MARK: - Header (Fixed, glass)
 
     private func headerSection(_ data: PointsBreakdownResponse) -> some View {
         VStack(spacing: 6) {
-            // Rank badge
-            Text("#\(rank)")
-                .font(.caption.weight(.black))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(rankColor)
-                .clipShape(Capsule())
+            HStack(spacing: 12) {
+                // Rank badge
+                Text("#\(rank)")
+                    .font(.title3.weight(.black).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(rankColor)
+                    .clipShape(Circle())
 
-            // Player name
-            Text(data.user.fullName)
-                .font(.title2.weight(.bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(data.user.fullName)
+                        .font(.headline.weight(.bold))
 
-            // Entry name + username
-            if !data.entry.entryName.isEmpty {
-                Text(data.entry.entryName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        if !data.entry.entryName.isEmpty {
+                            Text(data.entry.entryName)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("@\(data.user.username)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
             }
-            Text("@\(data.user.username)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .padding(.horizontal, 20)
         }
-        .padding(.top, 8)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .overlay(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { headerHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { _, newHeight in
+                        headerHeight = newHeight
+                    }
+            }
+        )
     }
 
     private var rankColor: Color {
@@ -104,61 +127,61 @@ struct PointsBreakdownView: View {
     // MARK: - Summary Cards
 
     private func summaryCards(_ summary: BreakdownSummary, adjustment: Int) -> some View {
-        let columns = adjustment != 0
-            ? [GridItem(.flexible()), GridItem(.flexible())]
-            : [GridItem(.flexible()), GridItem(.flexible())]
-
-        return LazyVGrid(columns: columns, spacing: 10) {
-            summaryCard(title: "Match Points", value: summary.matchPoints, color: .blue)
-            summaryCard(title: "Bonus Points", value: summary.bonusPoints, color: .green)
-
-            if adjustment != 0 {
-                summaryCard(title: "Adjustment", value: adjustment, color: .orange)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                summaryCell(title: "Match", value: "\(summary.matchPoints)", color: .blue)
+                verticalDivider
+                summaryCell(title: "Bonus", value: "\(summary.bonusPoints)", color: .green)
+                if adjustment != 0 {
+                    verticalDivider
+                    summaryCell(title: "Adj.", value: "\(adjustment)", color: .orange)
+                }
+                verticalDivider
+                summaryCell(title: "Total", value: "\(summary.totalPoints)", color: .primary, bold: true)
             }
-
-            summaryCard(title: "Total Points", value: summary.totalPoints, color: .primary, bordered: true)
+            .padding(.vertical, 14)
         }
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
-    private func summaryCard(title: String, value: Int, color: Color, bordered: Bool = false) -> some View {
+    private var verticalDivider: some View {
+        Rectangle()
+            .fill(Color(.separator).opacity(0.3))
+            .frame(width: 1, height: 36)
+    }
+
+    private func summaryCell(title: String, value: String, color: Color, bold: Bool = false) -> some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text("\(value)")
-                .font(.title2.weight(.black).monospacedDigit())
+            Text(value)
+                .font(bold ? .title2.weight(.black).monospacedDigit() : .title3.weight(.bold).monospacedDigit())
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
-        .padding(12)
-        .background(bordered ? Color(.secondarySystemBackground) : color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            bordered
-                ? RoundedRectangle(cornerRadius: 10).stroke(Color(.separator), lineWidth: 1)
-                : nil
-        )
     }
 
     // MARK: - Match Points Section
 
     private func matchPointsSection(_ results: [MatchResultData]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Match Points Breakdown")
+            Text("Match Points")
                 .font(.headline)
-                .padding(.top, 8)
 
             let grouped = Dictionary(grouping: results, by: { $0.stage })
 
             ForEach(stageOrder, id: \.self) { stage in
                 if let stageResults = grouped[stage], !stageResults.isEmpty {
-                    stageSection(stage: stage, results: stageResults)
+                    stageCard(stage: stage, results: stageResults)
                 }
             }
         }
     }
 
-    private func stageSection(stage: String, results: [MatchResultData]) -> some View {
+    private func stageCard(stage: String, results: [MatchResultData]) -> some View {
         let stageTotal = results.reduce(0) { $0 + $1.totalPoints }
         let exactCount = results.filter { $0.type == "exact" }.count
         let wgdCount = results.filter { $0.type == "winner_gd" }.count
@@ -166,24 +189,8 @@ struct PointsBreakdownView: View {
         let missCount = results.filter { $0.type == "miss" }.count
         let multiplier = results.first?.multiplier ?? 1.0
 
-        return DisclosureGroup {
-            VStack(spacing: 0) {
-                // Summary pills
-                HStack(spacing: 6) {
-                    if exactCount > 0 { countPill("\(exactCount) Exact", color: .green) }
-                    if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: .blue) }
-                    if winnerCount > 0 { countPill("\(winnerCount) Winner", color: .orange) }
-                    if missCount > 0 { countPill("\(missCount) Miss", color: .gray) }
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-
-                // Match rows
-                ForEach(results.sorted(by: { $0.matchNumber < $1.matchNumber })) { result in
-                    matchRow(result)
-                }
-            }
-        } label: {
+        return VStack(spacing: 0) {
+            // Stage header
             HStack {
                 Text(stageLabel(stage))
                     .font(.subheadline.weight(.semibold))
@@ -193,7 +200,7 @@ struct PointsBreakdownView: View {
                         .font(.caption2.weight(.bold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.blue.opacity(0.15))
+                        .background(.blue.opacity(0.12))
                         .foregroundStyle(.blue)
                         .clipShape(Capsule())
                 }
@@ -204,10 +211,30 @@ struct PointsBreakdownView: View {
                     .font(.subheadline.weight(.bold).monospacedDigit())
                     .foregroundStyle(.blue)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            // Summary pills
+            HStack(spacing: 6) {
+                if exactCount > 0 { countPill("\(exactCount) Exact", color: .green) }
+                if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: .blue) }
+                if winnerCount > 0 { countPill("\(winnerCount) Winner", color: .orange) }
+                if missCount > 0 { countPill("\(missCount) Miss", color: Color(.systemGray3)) }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            // Match rows
+            ForEach(results.sorted(by: { $0.matchNumber < $1.matchNumber })) { result in
+                matchRow(result)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+            }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     private func countPill(_ text: String, color: Color) -> some View {
@@ -215,73 +242,91 @@ struct PointsBreakdownView: View {
             .font(.system(size: 10, weight: .semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(color.opacity(0.15))
+            .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
     }
 
     private func matchRow(_ result: MatchResultData) -> some View {
-        HStack(spacing: 8) {
-            // Type badge
-            Text(typeLabel(result.type))
-                .font(.system(size: 9, weight: .bold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(typeColor(result.type).opacity(0.15))
-                .foregroundStyle(typeColor(result.type))
-                .clipShape(Capsule())
-                .frame(width: 52)
+        let hasDifferentTeams = !result.teamsMatch
+            && result.predictedHomeTeam != nil
+            && result.predictedAwayTeam != nil
 
-            // Predicted score
-            VStack(spacing: 1) {
-                Text("\(result.predictedHome)-\(result.predictedAway)")
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                Text("Pred")
-                    .font(.system(size: 8))
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                // Type badge
+                Text(typeLabel(result.type))
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(typeColor(result.type).opacity(0.12))
+                    .foregroundStyle(typeColor(result.type))
+                    .clipShape(Capsule())
+                    .frame(width: 52)
+
+                // Predicted score
+                VStack(spacing: 1) {
+                    Text("\(result.predictedHome)-\(result.predictedAway)")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                    Text("Pred")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(width: 36)
+
+                // Actual score
+                VStack(spacing: 1) {
+                    Text("\(result.actualHome)-\(result.actualAway)")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                    Text("Actual")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(width: 40)
+
+                // Teams
+                Text("\(result.homeTeam) v \(result.awayTeam)")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                // Points
+                Text(result.totalPoints > 0 ? "+\(result.totalPoints)" : "0")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(result.totalPoints > 0 ? .green : Color(.systemGray4))
             }
-            .frame(width: 36)
 
-            // Actual score
-            VStack(spacing: 1) {
-                Text("\(result.actualHome)-\(result.actualAway)")
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                Text("Actual")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.secondary)
+            // Second line: predicted teams (only when they differ)
+            if hasDifferentTeams {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.orange)
+
+                    Text("You predicted: \(result.predictedHomeTeam!) v \(result.predictedAwayTeam!)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                }
+                .padding(.leading, 60)
             }
-            .frame(width: 40)
-
-            // Teams
-            Text("\(result.homeTeam) v \(result.awayTeam)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer()
-
-            // Points
-            Text(result.totalPoints > 0 ? "+\(result.totalPoints)" : "0")
-                .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundStyle(result.totalPoints > 0 ? .green : Color(.systemGray4))
         }
-        .padding(.vertical, 6)
     }
 
     // MARK: - Bonus Points Section
 
     private func bonusPointsSection(_ entries: [BonusEntryData]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Bonus Points Breakdown")
+            Text("Bonus Points")
                 .font(.headline)
-                .padding(.top, 8)
 
             let grouped = Dictionary(grouping: entries, by: { $0.bonusCategory })
 
             ForEach(bonusCategoryOrder, id: \.self) { category in
                 if let categoryEntries = grouped[category], !categoryEntries.isEmpty {
-                    bonusCategorySection(category: category, entries: categoryEntries)
+                    bonusCategoryCard(category: category, entries: categoryEntries)
                 }
             }
 
@@ -289,43 +334,51 @@ struct PointsBreakdownView: View {
             let remainingCategories = Set(grouped.keys).subtracting(Set(bonusCategoryOrder))
             ForEach(Array(remainingCategories).sorted(), id: \.self) { category in
                 if let categoryEntries = grouped[category] {
-                    bonusCategorySection(category: category, entries: categoryEntries)
+                    bonusCategoryCard(category: category, entries: categoryEntries)
                 }
             }
         }
     }
 
-    private func bonusCategorySection(category: String, entries: [BonusEntryData]) -> some View {
+    private func bonusCategoryCard(category: String, entries: [BonusEntryData]) -> some View {
         let subtotal = entries.reduce(0) { $0 + $1.pointsEarned }
 
-        return DisclosureGroup {
-            VStack(spacing: 0) {
-                ForEach(entries) { entry in
-                    HStack {
-                        Text(entry.description)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text("+\(entry.pointsEarned)")
-                            .font(.caption.weight(.bold).monospacedDigit())
-                            .foregroundStyle(.green)
+        return VStack(spacing: 0) {
+            DisclosureGroup {
+                VStack(spacing: 0) {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        HStack {
+                            Text(entry.description)
+                                .font(.subheadline)
+                            Spacer()
+                            Text("+\(entry.pointsEarned)")
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(.green)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+
+                        if index < entries.count - 1 {
+                            Divider().padding(.horizontal, 16)
+                        }
                     }
-                    .padding(.vertical, 5)
+                }
+            } label: {
+                HStack {
+                    Text(bonusCategoryLabel(category))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(subtotal) pts")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.green)
                 }
             }
-        } label: {
-            HStack {
-                Text(bonusCategoryLabel(category))
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(subtotal) pts")
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.green)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     // MARK: - Scoring Rules
@@ -334,89 +387,103 @@ struct PointsBreakdownView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Scoring Rules")
                 .font(.headline)
-                .padding(.top, 8)
 
             // Group Stage
-            DisclosureGroup {
+            rulesCard(title: "Group Stage Points") {
                 ruleRow("Exact Score", value: settings.groupExactScore)
+                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Winner + GD", value: settings.groupCorrectDifference)
+                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Result Only", value: settings.groupCorrectResult)
-            } label: {
-                Text("Group Stage Points")
-                    .font(.subheadline.weight(.semibold))
             }
-            .padding(12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // Knockout Base
-            DisclosureGroup {
+            rulesCard(title: "Knockout Base Points") {
                 ruleRow("Exact Score", value: settings.knockoutExactScore)
+                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Winner + GD", value: settings.knockoutCorrectDifference)
+                Divider().padding(.horizontal, 16)
                 ruleRow("Correct Result Only", value: settings.knockoutCorrectResult)
-            } label: {
-                Text("Knockout Base Points")
-                    .font(.subheadline.weight(.semibold))
             }
-            .padding(12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // Multipliers
-            DisclosureGroup {
-                ruleRow("Round of 32", multiplier: settings.round32Multiplier)
-                ruleRow("Round of 16", multiplier: settings.round16Multiplier)
-                ruleRow("Quarter Finals", multiplier: settings.quarterFinalMultiplier)
-                ruleRow("Semi Finals", multiplier: settings.semiFinalMultiplier)
-                ruleRow("Third Place", multiplier: settings.thirdPlaceMultiplier)
-                ruleRow("Final", multiplier: settings.finalMultiplier)
-            } label: {
-                Text("Round Multipliers")
-                    .font(.subheadline.weight(.semibold))
+            rulesCard(title: "Round Multipliers") {
+                ruleRowMultiplier("Round of 32", multiplier: settings.round32Multiplier)
+                Divider().padding(.horizontal, 16)
+                ruleRowMultiplier("Round of 16", multiplier: settings.round16Multiplier)
+                Divider().padding(.horizontal, 16)
+                ruleRowMultiplier("Quarter Finals", multiplier: settings.quarterFinalMultiplier)
+                Divider().padding(.horizontal, 16)
+                ruleRowMultiplier("Semi Finals", multiplier: settings.semiFinalMultiplier)
+                Divider().padding(.horizontal, 16)
+                ruleRowMultiplier("Third Place", multiplier: settings.thirdPlaceMultiplier)
+                Divider().padding(.horizontal, 16)
+                ruleRowMultiplier("Final", multiplier: settings.finalMultiplier)
             }
-            .padding(12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // PSO
             if settings.psoEnabled {
-                DisclosureGroup {
-                    if let v = settings.psoExactScore { ruleRow("Exact PSO Score", value: v) }
-                    if let v = settings.psoCorrectDifference { ruleRow("Correct PSO Winner + GD", value: v) }
-                    if let v = settings.psoCorrectResult { ruleRow("Correct PSO Winner", value: v) }
-                } label: {
-                    Text("Penalty Shootout Bonus")
-                        .font(.subheadline.weight(.semibold))
+                rulesCard(title: "Penalty Shootout Bonus") {
+                    if let v = settings.psoExactScore {
+                        ruleRow("Exact PSO Score", value: v)
+                    }
+                    if let v = settings.psoCorrectDifference {
+                        if settings.psoExactScore != nil { Divider().padding(.horizontal, 16) }
+                        ruleRow("Correct PSO Winner + GD", value: v)
+                    }
+                    if let v = settings.psoCorrectResult {
+                        if settings.psoExactScore != nil || settings.psoCorrectDifference != nil {
+                            Divider().padding(.horizontal, 16)
+                        }
+                        ruleRow("Correct PSO Winner", value: v)
+                    }
                 }
-                .padding(12)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
+    }
+
+    private func rulesCard(title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
+        VStack(spacing: 0) {
+            DisclosureGroup {
+                VStack(spacing: 0) {
+                    content()
+                }
+            } label: {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     private func ruleRow(_ label: String, value: Int) -> some View {
         HStack {
             Text(label)
-                .font(.caption)
+                .font(.subheadline)
             Spacer()
             Text("\(value) pts")
-                .font(.caption.weight(.semibold).monospacedDigit())
+                .font(.subheadline.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 3)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
-    private func ruleRow(_ label: String, multiplier: Double) -> some View {
+    private func ruleRowMultiplier(_ label: String, multiplier: Double) -> some View {
         HStack {
             Text(label)
-                .font(.caption)
+                .font(.subheadline)
             Spacer()
             Text("\(String(format: "%.1f", multiplier))x")
-                .font(.caption.weight(.semibold).monospacedDigit())
+                .font(.subheadline.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.blue)
         }
-        .padding(.vertical, 3)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Helpers
