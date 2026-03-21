@@ -1,6 +1,6 @@
 import Foundation
 
-struct Entry: Codable, Identifiable {
+struct Entry: Codable, Identifiable, Hashable {
     let entryId: String
     let memberId: String
     let entryName: String

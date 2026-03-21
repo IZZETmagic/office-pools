@@ -19,6 +19,20 @@ final class PredictionService {
         return predictions
     }
 
+    // MARK: - Fetch Predictions for a Match Across Entries
+
+    func fetchPredictionsForMatch(matchId: String, entryIds: [String]) async throws -> [Prediction] {
+        guard !entryIds.isEmpty else { return [] }
+        let predictions: [Prediction] = try await supabase
+            .from("predictions")
+            .select()
+            .eq("match_id", value: matchId)
+            .in("entry_id", values: entryIds)
+            .execute()
+            .value
+        return predictions
+    }
+
     // MARK: - Save Draft Predictions (upsert)
 
     func saveDraft(entryId: String, predictions: [PredictionInput]) async throws {

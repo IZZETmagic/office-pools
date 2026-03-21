@@ -36,3 +36,13 @@ struct PredictionInput {
     var awayPso: Int?
     var winnerTeamId: String?
 }
+
+/// Payload sent to the API for saving prediction drafts.
+struct PredictionDraftPayload: Encodable {
+    let matchId: String
+    let homeScore: Int
+    let awayScore: Int
+    let homePso: Int?
+    let awayPso: Int?
+    let winnerTeamId: String?
+}

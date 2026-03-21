@@ -1,6 +1,6 @@
 import Foundation
 
-struct TeamInfo: Codable {
+struct TeamInfo: Codable, Hashable {
     let countryName: String
     let countryCode: String
     let flagUrl: String?
@@ -12,7 +12,10 @@ struct TeamInfo: Codable {
     }
 }
 
-struct Match: Codable, Identifiable {
+struct Match: Codable, Identifiable, Hashable {
+    func hash(into hasher: inout Hasher) { hasher.combine(matchId) }
+    static func == (lhs: Match, rhs: Match) -> Bool { lhs.matchId == rhs.matchId }
+
     let matchId: String
     let tournamentId: String
     let matchNumber: Int

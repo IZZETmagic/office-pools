@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Root view — shows login or dashboard based on auth state.
+/// Root view — shows login or the main tab bar based on auth state.
 struct ContentView: View {
     @Bindable var authService: AuthService
 
@@ -15,10 +15,7 @@ struct ContentView: View {
                     ProgressView()
                 }
             } else if authService.isAuthenticated {
-                DashboardView(
-                    viewModel: DashboardViewModel(),
-                    authService: authService
-                )
+                MainTabView(authService: authService)
             } else {
                 LoginView(viewModel: AuthViewModel(authService: authService))
             }

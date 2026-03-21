@@ -3,7 +3,6 @@ import SwiftUI
 enum PoolTab: String, CaseIterable {
     case predictions = "Predictions"
     case leaderboard = "Leaderboard"
-    case results = "Results"
     case banter = "Banter"
     case settings = "Settings"
 
@@ -11,7 +10,6 @@ enum PoolTab: String, CaseIterable {
         switch self {
         case .predictions: return "pencil.line"
         case .leaderboard: return "trophy"
-        case .results: return "checkmark.circle"
         case .banter: return "bubble.left.and.bubble.right"
         case .settings: return "gearshape"
         }
@@ -22,6 +20,12 @@ struct PoolDetailView: View {
     @Bindable var viewModel: PoolDetailViewModel
     let authService: AuthService
     @State private var selectedTab: PoolTab = .predictions
+    @State private var showingEntryDetail = false
+    @State private var predictionsViewModel: PredictionsViewModel?
+
+    private var isMultiEntry: Bool {
+        (viewModel.pool?.maxEntriesPerUser ?? 1) > 1
+    }
 
     var body: some View {
         Group {
@@ -35,9 +39,25 @@ struct PoolDetailView: View {
         }
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isMultiEntry && showingEntryDetail)
+        .toolbar {
+            if isMultiEntry && showingEntryDetail {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingEntryDetail = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                    }
+                }
+            }
+        }
         .task {
             if let userId = authService.appUser?.userId {
                 await viewModel.load(userId: userId)
+                if predictionsViewModel == nil {
+                    predictionsViewModel = PredictionsViewModel(poolId: viewModel.poolId)
+                }
             }
         }
     }
@@ -73,21 +93,33 @@ struct PoolDetailView: View {
             Group {
                 switch selectedTab {
                 case .predictions:
-                    PredictionsTabView(
-                        viewModel: PredictionsViewModel(poolId: viewModel.poolId),
-                        matches: viewModel.matches,
-                        entry: viewModel.selectedEntry,
-                        computedPoints: viewModel.selectedEntry.flatMap { viewModel.displayPoints(for: $0.entryId) }
-                    )
+                    if let predVM = predictionsViewModel {
+                        PredictionsTabView(
+                            viewModel: predVM,
+                            matches: viewModel.matches,
+                            teams: viewModel.teams,
+                            selectedEntry: $viewModel.selectedEntry,
+                            entries: viewModel.currentMember?.entries ?? [],
+                            pool: viewModel.pool,
+                            settings: viewModel.settings,
+                            computedPoints: viewModel.selectedEntry.flatMap { viewModel.displayPoints(for: $0.entryId) },
+                            pointsForEntry: { viewModel.displayPoints(for: $0) },
+                            onEntryCreated: {
+                                if let userId = authService.appUser?.userId {
+                                    await viewModel.load(userId: userId)
+                                }
+                            },
+                            showingEntryDetail: $showingEntryDetail
+                        )
+                    } else {
+                        ProgressView("Loading...")
+                    }
 
                 case .leaderboard:
                     LeaderboardTabView(
                         leaderboard: viewModel.leaderboard,
                         pointsForEntry: { viewModel.displayPoints(for: $0) }
                     )
-
-                case .results:
-                    ResultsTabView(matches: viewModel.matches)
 
                 case .banter:
                     BanterTabView(
@@ -108,7 +140,7 @@ struct PoolDetailView: View {
     }
 
     private var visibleTabs: [PoolTab] {
-        var tabs: [PoolTab] = [.predictions, .leaderboard, .results, .banter]
+        var tabs: [PoolTab] = [.predictions, .leaderboard, .banter]
         if viewModel.isAdmin {
             tabs.append(.settings)
         }

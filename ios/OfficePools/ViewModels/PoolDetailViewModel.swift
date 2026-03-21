@@ -9,6 +9,7 @@ final class PoolDetailViewModel {
     var pool: Pool?
     var members: [Member] = []
     var matches: [Match] = []
+    var teams: [Team] = []
     var settings: PoolSettings?
     var currentMember: Member?
     var selectedEntry: Entry?
@@ -59,7 +60,7 @@ final class PoolDetailViewModel {
             settings = nil
         }
 
-        // Fetch matches
+        // Fetch matches and teams
         if let tournamentId = pool?.tournamentId {
             do {
                 matches = try await poolService.fetchMatches(tournamentId: tournamentId)
@@ -67,6 +68,15 @@ final class PoolDetailViewModel {
             } catch {
                 print("[PoolDetail] Failed to load matches: \(error)")
                 matches = []
+            }
+
+            do {
+                let fetchedTeams = try await poolService.fetchTeams(tournamentId: tournamentId)
+                teams = fetchedTeams
+                print("[PoolDetail] Teams loaded: \(fetchedTeams.count)")
+            } catch {
+                print("[PoolDetail] Failed to load teams: \(error)")
+                teams = []
             }
         }
 

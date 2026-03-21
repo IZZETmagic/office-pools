@@ -1,0 +1,93 @@
+import SwiftUI
+
+/// Horizontal scrollable bar showing all 7 wizard stages as tappable pills.
+/// Each pill displays the stage label, completion count, and color-coded status.
+struct StagePillsBar: View {
+    let stages: [WizardStage]
+    @Binding var currentStage: WizardStage
+    let viewModel: PredictionEditViewModel
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(stages, id: \.self) { stage in
+                        pillButton(for: stage)
+                            .id(stage)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .onChange(of: currentStage) { _, newStage in
+                withAnimation {
+                    proxy.scrollTo(newStage, anchor: .center)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    // MARK: - Pill Button
+
+    private func pillButton(for stage: WizardStage) -> some View {
+        Button {
+            currentStage = stage
+        } label: {
+            VStack(spacing: 2) {
+                Text(pillLabel(for: stage))
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+
+                if stage != .summary {
+                    let counts = viewModel.stageCompletionCount(stage)
+                    Text("\(counts.completed)/\(counts.total)")
+                        .font(.caption2.monospacedDigit())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(pillColor(for: stage))
+            .foregroundStyle(stage == currentStage ? .white : .primary)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(stage == currentStage ? Color.clear : Color(.systemGray4), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Pill Label
+
+    private func pillLabel(for stage: WizardStage) -> String {
+        switch stage {
+        case .groupStage: return "Groups"
+        case .roundOf32: return "R32"
+        case .roundOf16: return "R16"
+        case .quarterFinals: return "QF"
+        case .semiFinals: return "SF"
+        case .finals: return "Finals"
+        case .summary: return "Summary"
+        }
+    }
+
+    // MARK: - Pill Color
+
+    private func pillColor(for stage: WizardStage) -> Color {
+        if stage == currentStage {
+            return .blue
+        }
+        if stage == .summary {
+            return viewModel.isComplete ? .green.opacity(0.2) : Color(.systemGray5)
+        }
+        let counts = viewModel.stageCompletionCount(stage)
+        if counts.completed == counts.total && counts.total > 0 {
+            return .green.opacity(0.2)
+        } else if counts.completed > 0 {
+            return .yellow.opacity(0.2)
+        } else {
+            return Color(.systemGray5)
+        }
+    }
+}

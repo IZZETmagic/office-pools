@@ -49,6 +49,7 @@ next-env.d.ts
 ios/OfficePools/OfficePools.xcodeproj/xcuserdata/
 ios/OfficePools/OfficePools.xcodeproj/project.xcworkspace/xcuserdata/
 ios/OfficePools/*.xcworkspace/xcuserdata/
+ios/OfficePools/Services/Config.swift
 DerivedData/
 *.xcuserstate
 *.moved-aside

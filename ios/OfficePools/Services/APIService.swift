@@ -130,6 +130,45 @@ final class APIService {
         try await requestVoid("POST", path: "/api/pools/\(poolId)/bracket-picks/calculate")
     }
 
+    // MARK: - Predictions
+
+    struct SaveDraftResponse: Decodable {
+        let saved: Bool
+        let lastSaved: String?
+        let progress: DraftProgress?
+
+        struct DraftProgress: Decodable {
+            let predicted: Int
+        }
+    }
+
+    func savePredictionDrafts(
+        poolId: String,
+        entryId: String,
+        predictions: [PredictionDraftPayload]
+    ) async throws -> SaveDraftResponse {
+        struct Body: Encodable {
+            let entryId: String
+            let predictions: [PredictionDraftPayload]
+        }
+        return try await request("POST", path: "/api/pools/\(poolId)/predictions", body: Body(
+            entryId: entryId,
+            predictions: predictions
+        ))
+    }
+
+    struct SubmitResponse: Decodable {
+        let submitted: Bool
+        let submittedAt: String?
+    }
+
+    func submitPredictions(poolId: String, entryId: String) async throws {
+        struct Body: Encodable {
+            let entryId: String
+        }
+        let _: SubmitResponse = try await request("PUT", path: "/api/pools/\(poolId)/predictions", body: Body(entryId: entryId))
+    }
+
     // MARK: - Contact
 
     func sendContactForm(name: String, email: String, message: String) async throws {

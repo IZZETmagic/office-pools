@@ -1,0 +1,308 @@
+import SwiftUI
+
+/// Main wizard container that orchestrates the 7-stage prediction flow.
+/// Provides stage navigation via pills, stage content, and bottom navigation with save/submit actions.
+struct PredictionWizardView: View {
+    @Bindable var viewModel: PredictionEditViewModel
+    let entry: Entry
+    var initialStage: WizardStage = .groupStage
+    let onSubmitSuccess: () -> Void
+
+    @State private var currentStage: WizardStage = .groupStage
+    @State private var showSubmitConfirmation = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Save status bar
+            saveStatusBar
+
+            // Stage title
+            if currentStage != .summary {
+                Text(currentStage.label)
+                    .font(.title2.weight(.bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    .padding(.bottom, 4)
+            }
+
+            // Stage content
+            ScrollView {
+                stageContent
+            }
+            .scrollDismissesKeyboard(.interactively)
+
+            // Bottom navigation
+            navigationBar
+        }
+        .onAppear {
+            currentStage = initialStage
+        }
+        .alert("Submit Predictions?", isPresented: $showSubmitConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Submit", role: .destructive) {
+                Task {
+                    await viewModel.submitPredictions(entryId: entry.entryId)
+                    if viewModel.submitSuccess {
+                        onSubmitSuccess()
+                    }
+                }
+            }
+        } message: {
+            Text("Once submitted, predictions cannot be changed. Make sure you are happy with all \(viewModel.totalCount) predictions.")
+        }
+    }
+
+    // MARK: - Stage Content
+
+    @ViewBuilder
+    private var stageContent: some View {
+        switch currentStage {
+        case .groupStage:
+            GroupStageView(viewModel: viewModel)
+        case .roundOf32, .roundOf16, .quarterFinals, .semiFinals, .finals:
+            KnockoutStageView(stage: currentStage, viewModel: viewModel)
+        case .summary:
+            summaryContent
+        }
+    }
+
+    // MARK: - Summary Content
+
+    private var summaryContent: some View {
+        LazyVStack(spacing: 16) {
+            // Champion card
+            if let champion = viewModel.champion {
+                VStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.yellow)
+                    Text(champion.teamName)
+                        .font(.title2.weight(.bold))
+                    Text("Your predicted champion")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(Color.yellow.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.yellow.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.horizontal)
+            }
+
+            // Overall progress
+            HStack {
+                Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
+                    .foregroundStyle(viewModel.isComplete ? .green : .orange)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.progressText)
+                        .font(.headline)
+                    if !viewModel.isComplete {
+                        Text("\(viewModel.totalCount - viewModel.completedCount) predictions remaining")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal)
+
+            // Stage completion list with edit buttons
+            VStack(spacing: 0) {
+                ForEach(WizardStage.allCases.filter({ $0 != .summary }), id: \.self) { stage in
+                    stageRow(stage)
+                    if stage != .finals {
+                        Divider().padding(.horizontal)
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+            )
+            .padding(.horizontal)
+
+            // Error message
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Spacer().frame(height: 16)
+        }
+        .padding(.top, 8)
+    }
+
+    private func stageRow(_ stage: WizardStage) -> some View {
+        let counts = viewModel.stageCompletionCount(stage)
+        let isComplete = viewModel.isStageComplete(stage)
+
+        return HStack {
+            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
+                .font(.subheadline)
+                .foregroundStyle(isComplete ? .green : .secondary)
+
+            Text(stage.label)
+                .font(.subheadline)
+
+            Spacer()
+
+            Text("\(counts.completed)/\(counts.total)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            Button("Edit") {
+                currentStage = stage
+            }
+            .font(.caption.weight(.medium))
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Save Status Bar
+
+    private var saveStatusBar: some View {
+        HStack {
+            Text(viewModel.progressText)
+                .font(.caption.weight(.medium))
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                if viewModel.saveStatus == .saving {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Saving...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if case .error(let msg) = viewModel.saveStatus {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                } else if let lastSaved = viewModel.lastSavedAt {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    Text("Saved \(lastSaved.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not saved yet")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    // MARK: - Navigation Bar
+
+    private var navigationBar: some View {
+        HStack(spacing: 12) {
+            // Back button
+            if currentStage != .groupStage {
+                Button {
+                    if let prevStage = previousStage {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            currentStage = prevStage
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.caption.weight(.semibold))
+                        Text("Back")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemGray5))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+
+            // Forward / Submit button
+            if currentStage == .summary {
+                Button {
+                    showSubmitConfirmation = true
+                } label: {
+                    HStack {
+                        if viewModel.isSubmitting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text("Submit Predictions")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(viewModel.isComplete ? Color.accentColor : Color.gray)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(!viewModel.isComplete || viewModel.isSubmitting)
+            } else if let next = nextStage {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        currentStage = next
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(next == .summary ? "Summary" : "Next Round")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(viewModel.isStageComplete(currentStage) ? Color.accentColor : Color.gray.opacity(0.5))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(!viewModel.isStageComplete(currentStage))
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    // MARK: - Navigation Helpers
+
+    private var previousStage: WizardStage? {
+        let allCases = WizardStage.allCases
+        guard let idx = allCases.firstIndex(of: currentStage), idx > 0 else { return nil }
+        return allCases[idx - 1]
+    }
+
+    private var nextStage: WizardStage? {
+        let allCases = WizardStage.allCases
+        guard let idx = allCases.firstIndex(of: currentStage), idx < allCases.count - 1 else { return nil }
+        return allCases[idx + 1]
+    }
+
+}

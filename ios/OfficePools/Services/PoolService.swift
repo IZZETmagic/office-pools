@@ -219,6 +219,18 @@ final class PoolService {
         return scores
     }
 
+    // MARK: - Fetch Teams
+
+    func fetchTeams(tournamentId: String) async throws -> [Team] {
+        let teams: [Team] = try await supabase
+            .from("teams")
+            .select("team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url")
+            .eq("tournament_id", value: tournamentId)
+            .execute()
+            .value
+        return teams
+    }
+
     // MARK: - Fetch Pool Settings
 
     func fetchSettings(poolId: String) async throws -> PoolSettings? {
