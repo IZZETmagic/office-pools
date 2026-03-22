@@ -9,6 +9,7 @@ struct FormTabView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedEntryId: String?
+    @State private var tappedMatchNumber: Int?
 
     private let apiService = APIService()
 
@@ -41,27 +42,32 @@ struct FormTabView: View {
     private func analyticsContent(_ data: AnalyticsResponse) -> some View {
         ScrollView {
             LazyVStack(spacing: 16) {
+                Spacer().frame(height: 4)
+
                 // Entry selector (multi-entry)
                 if entries.count > 1 {
                     entrySelector
                 }
 
                 // XP Hero Card
-                xpHeroCard(data.xp)
+                NavigationLink(destination: LevelRoadmapView(xp: data.xp)) {
+                    xpHeroCard(data.xp)
+                }
+                .buttonStyle(.plain)
 
                 // Badges
                 if !data.xp.allBadges.isEmpty {
                     badgesSection(earned: data.xp.earnedBadges, all: data.xp.allBadges)
                 }
 
-                // Accuracy Overview
-                if data.accuracy.overall.totalMatches > 0 {
-                    accuracySection(data.accuracy)
+                // Hot & Cold Streaks KPIs
+                if data.streaks.longestHotStreak > 0 || data.streaks.longestColdStreak > 0 {
+                    hotColdStreakCards(data.streaks)
                 }
 
-                // Streaks
-                if !data.streaks.timeline.isEmpty {
-                    streaksSection(data.streaks)
+                // Your Tournament Run
+                if !data.xp.matchXp.isEmpty {
+                    tournamentRunSection(data.xp.matchXp, crowd: data.crowd.matches)
                 }
 
                 // You vs Crowd
@@ -78,6 +84,99 @@ struct FormTabView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - XP Hero Card
+
+    private func xpHeroCard(_ xp: XPData) -> some View {
+        let lvlColor = levelColor(xp.currentLevel.level)
+
+        return VStack(spacing: 16) {
+            HStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .stroke(lvlColor.opacity(0.2), lineWidth: 6)
+                        .frame(width: 72, height: 72)
+                    Circle()
+                        .trim(from: 0, to: xp.levelProgress)
+                        .stroke(lvlColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .frame(width: 72, height: 72)
+                        .rotationEffect(.degrees(-90))
+                    Text("\(xp.currentLevel.level)")
+                        .font(.title2.weight(.black).monospacedDigit())
+                        .foregroundStyle(lvlColor)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(xp.currentLevel.name)
+                        .font(.title3.weight(.bold))
+                    Text("\(xp.totalXp) XP")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    if let next = xp.nextLevel {
+                        xpToNextLabel(xp: xp, next: next)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            if xp.nextLevel != nil {
+                xpProgressBar(xp: xp)
+            }
+
+            HStack(spacing: 0) {
+                xpStat("Match", value: xp.totalBaseXp, color: .blue)
+                xpStat("Bonus", value: xp.totalBonusXp, color: .orange)
+                xpStat("Badges", value: xp.totalBadgeXp, color: .purple)
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+
+    private func xpToNextLabel(xp: XPData, next: LevelInfo) -> some View {
+        HStack(spacing: 4) {
+            Text("\(xp.xpToNextLevel) XP to")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(next.name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(levelColor(next.level))
+        }
+    }
+
+    private func xpProgressBar(xp: XPData) -> some View {
+        let lvlColor = levelColor(xp.currentLevel.level)
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(.systemGray5))
+                    .frame(height: 8)
+                Capsule()
+                    .fill(lvlColor)
+                    .frame(width: max(geo.size.width * xp.levelProgress, 8), height: 8)
+            }
+        }
+        .frame(height: 8)
+    }
+
+    private func xpStat(_ title: String, value: Int, color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(color)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Entry Selector
@@ -105,95 +204,6 @@ struct FormTabView: View {
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
-    // MARK: - XP Hero Card
-
-    private func xpHeroCard(_ xp: XPData) -> some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 20) {
-                // Level circle
-                ZStack {
-                    Circle()
-                        .stroke(levelColor(xp.currentLevel.level).opacity(0.2), lineWidth: 6)
-                        .frame(width: 72, height: 72)
-
-                    Circle()
-                        .trim(from: 0, to: xp.levelProgress)
-                        .stroke(levelColor(xp.currentLevel.level), style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                        .frame(width: 72, height: 72)
-                        .rotationEffect(.degrees(-90))
-
-                    VStack(spacing: 0) {
-                        Text("\(xp.currentLevel.level)")
-                            .font(.title2.weight(.black).monospacedDigit())
-                            .foregroundStyle(levelColor(xp.currentLevel.level))
-                    }
-                }
-
-                // Level info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(xp.currentLevel.name)
-                        .font(.title3.weight(.bold))
-
-                    Text("\(xp.totalXp) XP")
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.secondary)
-
-                    if let next = xp.nextLevel {
-                        HStack(spacing: 4) {
-                            Text("\(xp.xpToNextLevel) XP to")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(next.name)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(levelColor(next.level))
-                        }
-                    }
-                }
-
-                Spacer()
-            }
-
-            // Progress bar
-            if xp.nextLevel != nil {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color(.systemGray5))
-                            .frame(height: 8)
-
-                        Capsule()
-                            .fill(levelColor(xp.currentLevel.level))
-                            .frame(width: max(geo.size.width * xp.levelProgress, 8), height: 8)
-                    }
-                }
-                .frame(height: 8)
-            }
-
-            // XP breakdown row
-            HStack(spacing: 0) {
-                xpStat("Match", value: xp.totalBaseXp, color: .blue)
-                xpStat("Bonus", value: xp.totalBonusXp, color: .orange)
-                xpStat("Badges", value: xp.totalBadgeXp, color: .purple)
-            }
-        }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
-
-    private func xpStat(_ title: String, value: Int, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.subheadline.weight(.bold).monospacedDigit())
-                .foregroundStyle(color)
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private func levelColor(_ level: Int) -> Color {
         switch level {
         case 10: return .yellow
@@ -208,17 +218,26 @@ struct FormTabView: View {
 
     private func badgesSection(earned: [BadgeInfo], all: [BadgeInfo]) -> some View {
         let earnedIds = Set(earned.map { $0.id })
+        let sorted = all.sorted { a, b in
+            let aEarned = earnedIds.contains(a.id)
+            let bEarned = earnedIds.contains(b.id)
+            if aEarned != bEarned { return aEarned }
+            return false
+        }
 
-        return VStack(spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             sectionHeader("Badges", subtitle: "\(earned.count)/\(all.count) earned")
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(all) { badge in
-                    let isEarned = earnedIds.contains(badge.id)
-                    badgeCell(badge, earned: isEarned)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(sorted) { badge in
+                        let isEarned = earnedIds.contains(badge.id)
+                        badgeCell(badge, earned: isEarned)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .padding(16)
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -250,7 +269,7 @@ struct FormTabView: View {
 
             Text("+\(badge.xpBonus) XP")
                 .font(.system(size: 8))
-                .foregroundStyle(earned ? rarityColor(badge.rarity) : .quaternary)
+                .foregroundStyle(earned ? rarityColor(badge.rarity) : Color(.systemGray4))
         }
     }
 
@@ -283,303 +302,582 @@ struct FormTabView: View {
         }
     }
 
-    // MARK: - Accuracy
+    // MARK: - Hot & Cold Streak KPIs
 
-    private func accuracySection(_ accuracy: AccuracyData) -> some View {
-        VStack(spacing: 0) {
-            sectionHeader("Accuracy")
+    private func hotColdStreakCards(_ streaks: AnalyticsStreakData) -> some View {
+        let currentHot = streaks.currentStreak.type == "hot" ? streaks.currentStreak.length : 0
+        let coldStreak = streaks.longestColdStreak
 
-            // Stat cards
-            HStack(spacing: 0) {
-                statCell("Hit Rate", value: "\(Int(accuracy.overall.hitRate))%", color: .green)
-                statCell("Exact", value: "\(accuracy.overall.exact)", color: .yellow)
-                statCell("Scored", value: "\(accuracy.overall.totalMatches)", color: .blue)
-                statCell("Points", value: "\(accuracy.overall.totalPoints)", color: .primary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+        return HStack(spacing: 12) {
+            // Hot Streak Card
+            VStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                    .font(.title2)
+                    .foregroundStyle(.orange)
 
-            // Per-stage bars
-            ForEach(accuracy.byStage) { stage in
-                stageAccuracyRow(stage)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-            }
-
-            Spacer().frame(height: 10)
-        }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
-
-    private func statCell(_ title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.headline.weight(.bold).monospacedDigit())
-                .foregroundStyle(color)
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func stageAccuracyRow(_ stage: StageAccuracy) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(stage.stageLabel)
-                    .font(.caption.weight(.medium))
-                Spacer()
-                Text("\(Int(stage.hitRate))% · \(stage.total) matches")
-                    .font(.caption)
+                Text("Current Hot Streak")
+                    .font(.system(size: 9, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
                     .foregroundStyle(.secondary)
-            }
 
-            // Stacked bar
-            GeometryReader { geo in
-                let total = max(stage.total, 1)
-                HStack(spacing: 1) {
-                    if stage.exact > 0 {
-                        Rectangle().fill(Color.green)
-                            .frame(width: geo.size.width * Double(stage.exact) / Double(total))
-                    }
-                    if stage.winnerGd > 0 {
-                        Rectangle().fill(Color.blue)
-                            .frame(width: geo.size.width * Double(stage.winnerGd) / Double(total))
-                    }
-                    if stage.winner > 0 {
-                        Rectangle().fill(Color.orange)
-                            .frame(width: geo.size.width * Double(stage.winner) / Double(total))
-                    }
-                    if stage.miss > 0 {
-                        Rectangle().fill(Color(.systemGray4))
-                            .frame(width: geo.size.width * Double(stage.miss) / Double(total))
+                Text("\(currentHot)")
+                    .font(.system(size: 36, weight: .heavy).monospacedDigit())
+                    .foregroundStyle(.orange)
+
+                // Progress pips
+                HStack(spacing: 3) {
+                    ForEach(0..<5, id: \.self) { i in
+                        Capsule()
+                            .fill(i < min(currentHot, 5)
+                                ? Color.orange
+                                : Color(.systemGray5))
+                            .frame(width: 20, height: 5)
                     }
                 }
-                .clipShape(Capsule())
+                .padding(.bottom, 2)
+
+                Text("Personal best: **\(streaks.longestHotStreak)**")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
             }
-            .frame(height: 6)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 10)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+
+            // Cold Streak Card
+            VStack(spacing: 6) {
+                Image(systemName: "snowflake")
+                    .font(.title2)
+                    .foregroundStyle(.cyan)
+
+                Text("Worst Cold Streak")
+                    .font(.system(size: 9, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                    .foregroundStyle(.secondary)
+
+                Text("\(coldStreak)")
+                    .font(.system(size: 36, weight: .heavy).monospacedDigit())
+                    .foregroundStyle(.cyan)
+
+                // Progress pips (cold intensifying)
+                HStack(spacing: 3) {
+                    ForEach(0..<5, id: \.self) { i in
+                        let filled = i < min(coldStreak, 5)
+                        let opacity: Double = 0.15 + 0.17 * Double(i + 1)
+                        Capsule()
+                            .fill(filled ? Color.cyan.opacity(opacity) : Color(.systemGray5))
+                            .frame(width: 20, height: 5)
+                    }
+                }
+                .padding(.bottom, 2)
+
+                Text("Keep this one low!")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 10)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
         }
     }
 
-    // MARK: - Streaks
+    // MARK: - Tournament Run
 
-    private func streaksSection(_ streaks: AnalyticsStreakData) -> some View {
-        VStack(spacing: 0) {
-            sectionHeader("Streaks")
+    private func tournamentRunSection(_ matchXP: [MatchXPItem], crowd: [CrowdMatchItem]) -> some View {
+        let sorted = matchXP.sorted { $0.matchNumber > $1.matchNumber }
+        let crowdMap = Dictionary(uniqueKeysWithValues: crowd.map { ($0.matchNumber, $0) })
 
-            // Stat cards
-            HStack(spacing: 10) {
-                streakCard(
-                    title: "Current",
-                    value: streaks.currentStreak.length,
-                    type: streaks.currentStreak.type,
-                    icon: streaks.currentStreak.type == "hot" ? "flame.fill" : (streaks.currentStreak.type == "cold" ? "snowflake" : "minus")
-                )
-                streakCard(title: "Best Hot", value: streaks.longestHotStreak, type: "hot", icon: "flame.fill")
-                streakCard(title: "Worst Cold", value: streaks.longestColdStreak, type: "cold", icon: "snowflake")
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+        return VStack(spacing: 0) {
+            sectionHeader("Your Tournament Run", subtitle: "\(sorted.count) matches")
 
-            // Timeline dots
+            // Scrollable journey path
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 3) {
-                    ForEach(streaks.timeline) { entry in
-                        Circle()
-                            .fill(timelineColor(entry.type))
-                            .frame(width: 10, height: 10)
+                HStack(spacing: 0) {
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { idx, match in
+                        HStack(spacing: 0) {
+                            // Connector line (not before first node)
+                            if idx > 0 {
+                                let prevTier = sorted[idx - 1].tier
+                                let lineColor: Color = prevTier == "submitted"
+                                    ? Color(.systemGray4).opacity(0.3)
+                                    : tierColor(prevTier).opacity(0.35)
+                                Rectangle()
+                                    .fill(lineColor)
+                                    .frame(width: 14, height: 2)
+                            }
+
+                            // Node
+                            tournamentNode(match, crowdMatch: crowdMap[match.matchNumber])
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.vertical, 4)
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 8)
 
             // Legend
-            HStack(spacing: 12) {
-                legendDot(color: .yellow, label: "Exact")
-                legendDot(color: .green, label: "W+GD")
-                legendDot(color: .blue, label: "Winner")
-                legendDot(color: Color(.systemGray4), label: "Miss")
+            HStack(spacing: 14) {
+                runLegendItem(color: .yellow, label: "Exact Score")
+                runLegendItem(color: .green, label: "Winner + GD")
+                runLegendItem(color: .blue, label: "Correct Result")
+                runLegendItem(color: Color(.systemGray4), label: "Miss")
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
             .padding(.horizontal, 16)
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
-    private func streakCard(title: String, value: Int, type: String, icon: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(type == "hot" ? .red : (type == "cold" ? .blue : .secondary))
+    private func tournamentNode(_ match: MatchXPItem, crowdMatch: CrowdMatchItem?) -> some View {
+        let isMiss = match.tier == "submitted"
+        let color: Color = tierColor(match.tier)
+        let fillColor: Color = isMiss ? Color(.systemGray6) : color.opacity(0.2)
+        let borderColor: Color = isMiss ? Color(.systemGray3) : color
+        let shadowColor: Color = isMiss ? .clear : color.opacity(0.25)
 
-            Text("\(value)")
-                .font(.title3.weight(.bold).monospacedDigit())
+        return VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(fillColor)
+                    .frame(width: 32, height: 32)
 
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Circle()
+                    .strokeBorder(borderColor, lineWidth: 2)
+                    .frame(width: 32, height: 32)
+
+                tierIcon(match.tier)
+                    .foregroundStyle(borderColor)
+            }
+            .shadow(color: shadowColor, radius: 4, y: 0)
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    tappedMatchNumber = tappedMatchNumber == match.matchNumber ? nil : match.matchNumber
+                }
+            }
+
+            // Match number label
+            Text("#\(match.matchNumber)")
+                .font(.system(size: 8, weight: .medium).monospacedDigit())
+                .foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .top) {
+            if tappedMatchNumber == match.matchNumber, let cm = crowdMatch {
+                tooltipBubble("\(cm.homeTeam) \(cm.actualScore) \(cm.awayTeam)")
+                    .offset(y: -42)
+            }
+        }
     }
 
-    private func timelineColor(_ type: String) -> Color {
-        switch type {
+    private func tooltipBubble(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color(.darkGray), in: RoundedRectangle(cornerRadius: 6))
+            .fixedSize()
+            .zIndex(10)
+            .transition(.scale.combined(with: .opacity))
+    }
+
+    @ViewBuilder
+    private func tierIcon(_ tier: String) -> some View {
+        switch tier {
+        case "exact":
+            Image(systemName: "star.fill")
+                .font(.system(size: 12))
+        case "winner_gd":
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .bold))
+        case "winner":
+            Text("~")
+                .font(.system(size: 14, weight: .black))
+        default: // submitted / miss
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+        }
+    }
+
+    private func tierColor(_ tier: String) -> Color {
+        switch tier {
         case "exact": return .yellow
         case "winner_gd": return .green
         case "winner": return .blue
-        case "miss": return Color(.systemGray4)
-        default: return Color(.systemGray5)
+        default: return Color(.systemGray4)
         }
     }
 
-    private func legendDot(color: Color, label: String) -> some View {
+    private func runLegendItem(color: Color, label: String) -> some View {
         HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 8, height: 8)
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
             Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
         }
     }
 
     // MARK: - You vs Crowd
 
     private func crowdSection(_ crowd: CrowdData, poolAvg: Double, userHitRate: Double) -> some View {
-        VStack(spacing: 0) {
-            sectionHeader("You vs Crowd")
+        let stats = computeCrowdStats(crowd: crowd, poolAvg: poolAvg)
 
-            // Stat cards
-            HStack(spacing: 10) {
-                crowdStat("Consensus", value: crowd.consensusCount, total: crowd.totalMatches, color: .blue)
-                crowdStat("Contrarian", value: crowd.contrarianCount, total: crowd.totalMatches, color: .purple)
-                crowdStat("Contrarian Wins", value: crowd.contrarianWins, total: max(crowd.contrarianCount, 1), color: .green)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+        return VStack(spacing: 0) {
+            vsFaceoff(userAccuracy: stats.userAccuracy, crowdAccuracy: stats.crowdAccuracy)
 
-            // Accuracy comparison
-            VStack(spacing: 8) {
-                comparisonBar(label: "You", value: userHitRate, color: .blue)
-                comparisonBar(label: "Pool Avg", value: poolAvg, color: .secondary)
+            // Battle Bars
+            VStack(spacing: 16) {
+                battleBar(label: "Consensus Picks", you: crowd.consensusCount, crowd: stats.crowdAvgConsensus)
+                battleBar(label: "Contrarian Picks", you: crowd.contrarianCount, crowd: stats.crowdAvgContrarian)
+                battleBar(label: "Contrarian Wins", you: crowd.contrarianWins, crowd: stats.crowdAvgContrarianWins)
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
+
+            // Performance callout
+            if stats.accuracyDiff != 0 {
+                performanceCallout(
+                    isOutperforming: stats.isOutperforming,
+                    accuracyDiff: stats.accuracyDiff,
+                    contrarianAdv: stats.contrarianAdv,
+                    showContrarian: crowd.contrarianCount > 0 && stats.contrarianAdv > 0
+                )
+                .padding(.horizontal, 18)
+                .padding(.bottom, 16)
+            }
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
-    private func crowdStat(_ title: String, value: Int, total: Int, color: Color) -> some View {
-        let pct = total > 0 ? Int(Double(value) / Double(total) * 100) : 0
-        return VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.headline.weight(.bold).monospacedDigit())
-                .foregroundStyle(color)
-            Text("\(pct)%")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+    private struct CrowdStats {
+        let userAccuracy: Int
+        let crowdAccuracy: Int
+        let accuracyDiff: Int
+        let isOutperforming: Bool
+        let crowdAvgConsensus: Int
+        let crowdAvgContrarian: Int
+        let crowdAvgContrarianWins: Int
+        let contrarianAdv: Int
     }
 
-    private func comparisonBar(label: String, value: Double, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.caption.weight(.medium))
-                .frame(width: 55, alignment: .leading)
+    private func computeCrowdStats(crowd: CrowdData, poolAvg: Double) -> CrowdStats {
+        let userCorrect = crowd.matches.filter { $0.isCorrect }.count
+        let total = Double(max(crowd.totalMatches, 1))
+        let userAcc = Int(round(Double(userCorrect) / total * 100))
+        let crowdAcc = Int(round(poolAvg * 100))
+
+        let consensusSum = crowd.matches.reduce(0.0) { sum, m in
+            sum + max(m.homeWinPct, m.drawPct, m.awayWinPct)
+        }
+        let avgConsensus = Int(round(consensusSum))
+        let avgContrarian = max(0, crowd.totalMatches - avgConsensus)
+        let crowdAccRate = Double(crowdAcc) / 100.0
+        let avgContrarianWins = Int(round(Double(avgContrarian) * crowdAccRate))
+
+        let userContPct = crowd.contrarianCount > 0
+            ? Int(round(Double(crowd.contrarianWins) / Double(crowd.contrarianCount) * 100)) : 0
+        let crowdContPct = avgContrarian > 0
+            ? Int(round(Double(avgContrarianWins) / Double(avgContrarian) * 100)) : 0
+
+        return CrowdStats(
+            userAccuracy: userAcc,
+            crowdAccuracy: crowdAcc,
+            accuracyDiff: userAcc - crowdAcc,
+            isOutperforming: userAcc > crowdAcc,
+            crowdAvgConsensus: avgConsensus,
+            crowdAvgContrarian: avgContrarian,
+            crowdAvgContrarianWins: avgContrarianWins,
+            contrarianAdv: userContPct - crowdContPct
+        )
+    }
+
+    private func vsFaceoff(userAccuracy: Int, crowdAccuracy: Int) -> some View {
+        VStack(spacing: 16) {
+            Text("You vs The Crowd")
+                .font(.system(size: 15, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                Spacer()
+                VStack(spacing: 4) {
+                    Text("YOU")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(.blue)
+                    Text("\(userAccuracy)%")
+                        .font(.system(size: 32, weight: .heavy).monospacedDigit())
+                        .foregroundStyle(.blue)
+                }
+
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.12), Color.purple.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                        )
+                    Text("VS")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(spacing: 4) {
+                    Text("POOL AVG")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(.purple)
+                    Text("\(crowdAccuracy)%")
+                        .font(.system(size: 32, weight: .heavy).monospacedDigit())
+                        .foregroundStyle(Color(.systemGray3))
+                }
+
+                Spacer()
+            }
+            .padding(.bottom, 8)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+    }
+
+    private func battleBar(label: String, you: Int, crowd: Int) -> some View {
+        let total = you + crowd
+        let youPct = total > 0 ? Double(you) / Double(total) * 100 : 50
+        let crowdPct = total > 0 ? Double(crowd) / Double(total) * 100 : 50
+
+        return VStack(spacing: 5) {
+            HStack {
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(you) vs \(crowd)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color(.systemGray3))
+            }
 
             GeometryReader { geo in
-                ZStack(alignment: .leading) {
+                HStack(spacing: 2) {
+                    // You fill (blue, left)
                     Capsule()
-                        .fill(Color(.systemGray5))
-                        .frame(height: 10)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue, Color.blue.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geo.size.width * youPct / 100 - 1, 2))
 
+                    // Crowd fill (purple, right)
                     Capsule()
-                        .fill(color)
-                        .frame(width: max(geo.size.width * value / 100, 4), height: 10)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.67), Color.purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geo.size.width * crowdPct / 100 - 1, 2))
                 }
             }
-            .frame(height: 10)
-
-            Text("\(Int(value))%")
-                .font(.caption.weight(.bold).monospacedDigit())
-                .frame(width: 34, alignment: .trailing)
+            .frame(height: 8)
         }
+    }
+
+    private func performanceCallout(isOutperforming: Bool, accuracyDiff: Int, contrarianAdv: Int, showContrarian: Bool) -> some View {
+        let accentColor: Color = isOutperforming ? .green : .blue
+        let iconName = isOutperforming ? "chart.line.uptrend.xyaxis" : "target"
+        let message = isOutperforming
+            ? "Outperforming the crowd by \(accuracyDiff)%"
+            : "The crowd leads by \(abs(accuracyDiff))%"
+
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: iconName)
+                .font(.system(size: 18))
+                .foregroundStyle(accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(message)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(accentColor)
+
+                if showContrarian {
+                    Text("Your contrarian win rate is \(contrarianAdv)% higher than average")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [accentColor.opacity(0.1), .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(accentColor.opacity(0.13), lineWidth: 1)
+        )
     }
 
     // MARK: - Pool Stats
 
     private func poolStatsSection(_ stats: PoolStatsData) -> some View {
-        VStack(spacing: 0) {
-            sectionHeader("Pool Stats")
+        let topPredictable = Array(stats.mostPredictable.prefix(3))
+        let topUpsets = Array(stats.leastPredictable.prefix(3))
 
-            // Summary
+        return VStack(alignment: .leading, spacing: 0) {
+            // Header
+            Text("Pool-Wide Stats")
+                .font(.system(size: 15, weight: .bold))
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
+
+            // Summary stats row
             HStack(spacing: 0) {
-                statCell("Avg Accuracy", value: "\(Int(stats.avgAccuracy))%", color: .green)
-                statCell("Completed", value: "\(stats.completedMatches)", color: .blue)
-                statCell("Entries", value: "\(stats.totalEntries)", color: .secondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+                VStack(spacing: 2) {
+                    Text("\(Int(round(stats.avgAccuracy * 100)))%")
+                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                    Text("Avg Pool Accuracy")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
 
-            // Most predictable
-            if !stats.mostPredictable.isEmpty {
-                predictabilityList(title: "Most Predictable", matches: stats.mostPredictable, color: .green)
+                VStack(spacing: 2) {
+                    Text("\(stats.totalEntries)")
+                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                    Text("Competitors")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 2) {
+                    Text("\(stats.completedMatches)")
+                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                    Text("Matches Scored")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
+
+            // Most Predictable
+            if !topPredictable.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.green)
+                    Text("Most Predictable")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.green)
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 8)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(topPredictable.enumerated()), id: \.element.id) { idx, match in
+                        predictableMatchRow(index: idx, match: match, color: .green, isLast: idx == topPredictable.count - 1)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 14)
             }
 
-            // Least predictable
-            if !stats.leastPredictable.isEmpty {
-                predictabilityList(title: "Biggest Upsets", matches: stats.leastPredictable, color: .red)
-            }
+            // Biggest Upsets
+            if !topUpsets.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.red)
+                    Text("Biggest Upsets")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 8)
 
-            Spacer().frame(height: 6)
+                VStack(spacing: 0) {
+                    ForEach(Array(topUpsets.enumerated()), id: \.element.id) { idx, match in
+                        predictableMatchRow(index: idx, match: match, color: .red, isLast: idx == topUpsets.count - 1)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 16)
+            }
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
-    private func predictabilityList(title: String, matches: [PredictableMatch], color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(color)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+    private func predictableMatchRow(index: Int, match: PredictableMatch, color: Color, isLast: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("\(index + 1). \(match.homeTeam) vs \(match.awayTeam)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
-            ForEach(matches) { match in
-                HStack {
-                    Text("\(match.homeTeam) v \(match.awayTeam)")
-                        .font(.caption)
-                        .lineLimit(1)
+                Spacer()
 
-                    Text(match.actualScore)
-                        .font(.caption.weight(.semibold).monospacedDigit())
-
-                    Spacer()
-
-                    Text("\(Int(match.hitRate))%")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(color)
+                // Mini progress bar
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 40, height: 4)
+                    Capsule()
+                        .fill(color)
+                        .frame(width: max(40 * match.hitRate, 2), height: 4)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
+
+                Text("\(Int(round(match.hitRate * 100)))%")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .frame(width: 34, alignment: .trailing)
+            }
+            .padding(.vertical, 8)
+
+            if !isLast {
+                Divider()
+                    .foregroundStyle(Color(.systemGray5))
             }
         }
     }
@@ -620,6 +918,201 @@ struct FormTabView: View {
             errorMessage = error.localizedDescription
             isLoading = false
             print("[FormTab] Error loading analytics: \(error)")
+        }
+    }
+}
+
+// MARK: - Level Roadmap Page
+
+struct LevelRoadmapView: View {
+    let xp: XPData
+    @State private var headerHeight: CGFloat = 100
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Spacer for header
+                    Color.clear.frame(height: headerHeight + 8)
+
+                    VStack(spacing: 8) {
+                        ForEach(xp.levels) { level in
+                            levelRow(level)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+
+                    xpSummary
+                }
+                .padding(.bottom, 24)
+            }
+            .background(Color(.systemGroupedBackground))
+
+            // Fixed glass header
+            roadmapHeader
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var roadmapHeader: some View {
+        let lvlColor = levelColor(xp.currentLevel.level)
+        let progressText: String = xp.nextLevel != nil
+            ? "\(xp.xpToNextLevel.formatted()) XP to \(xp.nextLevel!.name)"
+            : "Maximum level reached"
+
+        return VStack(spacing: 4) {
+            HStack(spacing: 14) {
+                // Level circle
+                ZStack {
+                    Circle()
+                        .stroke(lvlColor.opacity(0.2), lineWidth: 5)
+                        .frame(width: 52, height: 52)
+                    Circle()
+                        .trim(from: 0, to: xp.levelProgress)
+                        .stroke(lvlColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .frame(width: 52, height: 52)
+                        .rotationEffect(.degrees(-90))
+                    Text("\(xp.currentLevel.level)")
+                        .font(.system(size: 18, weight: .black).monospacedDigit())
+                        .foregroundStyle(lvlColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(xp.currentLevel.name)
+                        .font(.headline.weight(.bold))
+                    Text("\(xp.totalXp.formatted()) XP")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text(progressText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .overlay(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { headerHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { _, newHeight in
+                        headerHeight = newHeight
+                    }
+            }
+        )
+    }
+
+    private func levelRow(_ level: LevelInfo) -> some View {
+        let isReached = xp.totalXp >= level.xpRequired
+        let isCurrent = level.level == xp.currentLevel.level
+        let lvlColor = levelColor(level.level)
+        let circleFill: Color = isReached ? .green : Color(.systemGray4)
+        let nameColor: Color = isCurrent ? lvlColor : (isReached ? .primary : .secondary)
+        let xpColor: Color = isCurrent ? lvlColor : (isReached ? .green : Color(.systemGray3))
+        let bgColor: Color = isCurrent ? lvlColor.opacity(0.08) : (isReached ? Color.green.opacity(0.04) : Color(.systemGray6))
+
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(circleFill)
+                    .frame(width: 32, height: 32)
+
+                if isReached {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                } else {
+                    Text("\(level.level)")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(level.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(nameColor)
+
+                if let badge = level.badge {
+                    Text("Unlocks: \(badge)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Spacer()
+
+            Text("\(level.xpRequired.formatted()) XP")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(xpColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(bgColor)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(isCurrent ? lvlColor.opacity(0.3) : .clear, lineWidth: 1)
+        )
+    }
+
+    private var xpSummary: some View {
+        VStack(spacing: 8) {
+            Text("\(xp.totalXp.formatted()) XP")
+                .font(.system(size: 28, weight: .black).monospacedDigit())
+                .foregroundStyle(levelColor(xp.currentLevel.level))
+
+            if let next = xp.nextLevel {
+                Text("\(xp.xpToNextLevel.formatted()) XP to \(next.name)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Maximum level reached")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                xpPill("Match XP", value: xp.totalBaseXp, color: .blue)
+                xpPill("Bonus XP", value: xp.totalBonusXp, color: .green)
+                xpPill("Badge XP", value: xp.totalBadgeXp, color: .orange)
+            }
+            .padding(.top, 4)
+        }
+        .padding(.vertical, 16)
+    }
+
+    private func xpPill(_ label: String, value: Int, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(color)
+            Text("\(value.formatted())")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(color.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func levelColor(_ level: Int) -> Color {
+        switch level {
+        case 10: return .yellow
+        case 8...9: return .orange
+        case 6...7: return .purple
+        case 4...5: return .blue
+        default: return .green
         }
     }
 }

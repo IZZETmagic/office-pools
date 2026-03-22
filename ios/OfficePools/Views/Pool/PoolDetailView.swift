@@ -65,90 +65,88 @@ struct PoolDetailView: View {
     }
 
     private var tabContent: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(visibleTabs, id: \.self) { tab in
-                        Button {
-                            selectedTab = tab
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 16))
-                                Text(tab.rawValue)
-                                    .font(.caption2)
+        Group {
+            switch selectedTab {
+            case .predictions:
+                if let predVM = predictionsViewModel {
+                    PredictionsTabView(
+                        viewModel: predVM,
+                        matches: viewModel.matches,
+                        teams: viewModel.teams,
+                        selectedEntry: $viewModel.selectedEntry,
+                        entries: viewModel.currentMember?.entries ?? [],
+                        pool: viewModel.pool,
+                        settings: viewModel.settings,
+                        computedPoints: viewModel.selectedEntry.flatMap { viewModel.displayPoints(for: $0.entryId) },
+                        pointsForEntry: { viewModel.displayPoints(for: $0) },
+                        onEntryCreated: {
+                            if let userId = authService.appUser?.userId {
+                                await viewModel.load(userId: userId)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
+                        },
+                        showingEntryDetail: $showingEntryDetail
+                    )
+                } else {
+                    ProgressView("Loading...")
+                }
+
+            case .leaderboard:
+                LeaderboardTabView(
+                    poolId: viewModel.poolId,
+                    leaderboardData: viewModel.leaderboardData,
+                    response: viewModel.leaderboardResponse,
+                    currentUserId: viewModel.currentUserId,
+                    awardsForEntry: { viewModel.awards(for: $0) },
+                    isCurrentUser: { viewModel.isCurrentUser(entryId: $0) }
+                )
+
+            case .form:
+                FormTabView(
+                    poolId: viewModel.poolId,
+                    entries: viewModel.currentMember?.entries ?? [],
+                    selectedEntry: viewModel.selectedEntry
+                )
+
+            case .banter:
+                BanterTabView(
+                    viewModel: BanterViewModel(poolId: viewModel.poolId),
+                    authService: authService
+                )
+
+            case .settings:
+                PoolSettingsTabView(
+                    pool: viewModel.pool,
+                    settings: viewModel.settings,
+                    isAdmin: viewModel.isAdmin
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        ForEach(visibleTabs, id: \.self) { tab in
+                            Button {
+                                selectedTab = tab
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: tab.icon)
+                                        .font(.system(size: 16))
+                                    Text(tab.rawValue)
+                                        .font(.caption2)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
+                            }
                         }
                     }
                 }
+                Divider()
             }
-            .background(.bar)
-
-            Divider()
-
-            // Tab content
-            Group {
-                switch selectedTab {
-                case .predictions:
-                    if let predVM = predictionsViewModel {
-                        PredictionsTabView(
-                            viewModel: predVM,
-                            matches: viewModel.matches,
-                            teams: viewModel.teams,
-                            selectedEntry: $viewModel.selectedEntry,
-                            entries: viewModel.currentMember?.entries ?? [],
-                            pool: viewModel.pool,
-                            settings: viewModel.settings,
-                            computedPoints: viewModel.selectedEntry.flatMap { viewModel.displayPoints(for: $0.entryId) },
-                            pointsForEntry: { viewModel.displayPoints(for: $0) },
-                            onEntryCreated: {
-                                if let userId = authService.appUser?.userId {
-                                    await viewModel.load(userId: userId)
-                                }
-                            },
-                            showingEntryDetail: $showingEntryDetail
-                        )
-                    } else {
-                        ProgressView("Loading...")
-                    }
-
-                case .leaderboard:
-                    LeaderboardTabView(
-                        poolId: viewModel.poolId,
-                        leaderboardData: viewModel.leaderboardData,
-                        response: viewModel.leaderboardResponse,
-                        currentUserId: viewModel.currentUserId,
-                        awardsForEntry: { viewModel.awards(for: $0) },
-                        isCurrentUser: { viewModel.isCurrentUser(entryId: $0) }
-                    )
-
-                case .form:
-                    FormTabView(
-                        poolId: viewModel.poolId,
-                        entries: viewModel.currentMember?.entries ?? [],
-                        selectedEntry: viewModel.selectedEntry
-                    )
-
-                case .banter:
-                    BanterTabView(
-                        viewModel: BanterViewModel(poolId: viewModel.poolId),
-                        authService: authService
-                    )
-
-                case .settings:
-                    PoolSettingsTabView(
-                        pool: viewModel.pool,
-                        settings: viewModel.settings,
-                        isAdmin: viewModel.isAdmin
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.ultraThinMaterial)
         }
     }
 
