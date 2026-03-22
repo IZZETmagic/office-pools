@@ -261,6 +261,102 @@ final class PoolService {
     static func clearSettingsCache() {
         settingsCache.removeAll()
     }
+
+    // MARK: - Admin Operations
+
+    /// Update pool properties
+    func updatePool(poolId: String, updates: PoolUpdatePayload) async throws {
+        try await supabase
+            .from("pools")
+            .update(updates)
+            .eq("pool_id", value: poolId)
+            .execute()
+    }
+
+    /// Update a member's role (admin/player)
+    func updateMemberRole(memberId: String, role: String) async throws {
+        struct RoleUpdate: Codable { let role: String }
+        try await supabase
+            .from("pool_members")
+            .update(RoleUpdate(role: role))
+            .eq("member_id", value: memberId)
+            .execute()
+    }
+
+    /// Remove a member and all their entries/predictions from the pool
+    func removeMember(memberId: String) async throws {
+        // Fetch entry IDs first
+        struct EntryRow: Codable {
+            let entryId: String
+            enum CodingKeys: String, CodingKey { case entryId = "entry_id" }
+        }
+        let entries: [EntryRow] = try await supabase
+            .from("pool_entries")
+            .select("entry_id")
+            .eq("member_id", value: memberId)
+            .execute()
+            .value
+
+        for entry in entries {
+            try await supabase.from("predictions").delete().eq("entry_id", value: entry.entryId).execute()
+            try await supabase.from("pool_entries").delete().eq("entry_id", value: entry.entryId).execute()
+        }
+
+        try await supabase.from("pool_members").delete().eq("member_id", value: memberId).execute()
+    }
+
+    /// Adjust points for a specific entry
+    func adjustEntryPoints(entryId: String, adjustment: Int, reason: String) async throws {
+        struct AdjustPayload: Codable {
+            let pointAdjustment: Int
+            let adjustmentReason: String
+            enum CodingKeys: String, CodingKey {
+                case pointAdjustment = "point_adjustment"
+                case adjustmentReason = "adjustment_reason"
+            }
+        }
+        try await supabase
+            .from("pool_entries")
+            .update(AdjustPayload(pointAdjustment: adjustment, adjustmentReason: reason))
+            .eq("entry_id", value: entryId)
+            .execute()
+    }
+
+    /// Delete a pool and all related data (cascade)
+    func deletePool(poolId: String) async throws {
+        let members = try await fetchMembers(poolId: poolId)
+        let entryIds = members.flatMap { $0.entries ?? [] }.map(\.entryId)
+
+        for eid in entryIds {
+            try await supabase.from("predictions").delete().eq("entry_id", value: eid).execute()
+        }
+        for eid in entryIds {
+            try await supabase.from("pool_entries").delete().eq("entry_id", value: eid).execute()
+        }
+        try await supabase.from("pool_members").delete().eq("pool_id", value: poolId).execute()
+        try await supabase.from("pool_settings").delete().eq("pool_id", value: poolId).execute()
+        try await supabase.from("pools").delete().eq("pool_id", value: poolId).execute()
+    }
+}
+
+// MARK: - Payloads
+
+struct PoolUpdatePayload: Codable {
+    var poolName: String?
+    var description: String?
+    var status: String?
+    var isPrivate: Bool?
+    var maxEntriesPerUser: Int?
+    var predictionDeadline: String?
+
+    enum CodingKeys: String, CodingKey {
+        case poolName = "pool_name"
+        case description
+        case status
+        case isPrivate = "is_private"
+        case maxEntriesPerUser = "max_entries_per_user"
+        case predictionDeadline = "prediction_deadline"
+    }
 }
 
 // MARK: - Errors

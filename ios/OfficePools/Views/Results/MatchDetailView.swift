@@ -25,6 +25,9 @@ struct MatchDetailView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     matchInfo
+                    if let stats = viewModel.matchStats, stats.totalPredictions > 0 {
+                        predictionStatsSection(stats)
+                    }
                     predictionsSection
                 }
                 .padding(.top, headerHeight + 20)
@@ -171,6 +174,170 @@ struct MatchDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    // MARK: - Prediction Stats Section
+
+    private func predictionStatsSection(_ stats: MatchStatsResponse) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("How Others Predicted")
+                .font(.headline)
+                .padding(.horizontal)
+
+            // Result distribution bar
+            resultDistributionCard(stats)
+
+            // Top predicted scores
+            if !stats.topScores.isEmpty {
+                topScoresCard(stats)
+            }
+
+            // Accuracy stats (only if match is completed)
+            if stats.exactCorrectPct != nil || stats.resultCorrectPct != nil {
+                accuracyCard(stats)
+            }
+        }
+    }
+
+    private func resultDistributionCard(_ stats: MatchStatsResponse) -> some View {
+        VStack(spacing: 12) {
+            // Total predictions count
+            HStack {
+                Text("\(stats.totalPredictions) predictions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            // Three-segment bar
+            resultBar(stats)
+
+            // Labels
+            HStack {
+                resultLabel(
+                    match.homeTeam?.countryName ?? stats.homeTeam ?? "Home",
+                    pct: stats.homeWinPct,
+                    color: .blue
+                )
+                Spacer()
+                resultLabel("Draw", pct: stats.drawPct, color: .gray)
+                Spacer()
+                resultLabel(
+                    match.awayTeam?.countryName ?? stats.awayTeam ?? "Away",
+                    pct: stats.awayWinPct,
+                    color: .red
+                )
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .padding(.horizontal, 16)
+    }
+
+    private func resultBar(_ stats: MatchStatsResponse) -> some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let homeW = width * stats.homeWinPct
+            let drawW = width * stats.drawPct
+            let awayW = width * stats.awayWinPct
+
+            HStack(spacing: 2) {
+                if stats.homeWinPct > 0 {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.blue)
+                        .frame(width: max(homeW, 4))
+                }
+                if stats.drawPct > 0 {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.5))
+                        .frame(width: max(drawW, 4))
+                }
+                if stats.awayWinPct > 0 {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.red)
+                        .frame(width: max(awayW, 4))
+                }
+            }
+        }
+        .frame(height: 8)
+    }
+
+    private func resultLabel(_ team: String, pct: Double, color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text("\(Int(pct * 100))%")
+                .font(.system(.title3, design: .rounded, weight: .bold))
+                .foregroundStyle(color)
+            Text(team)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func topScoresCard(_ stats: MatchStatsResponse) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Most Predicted Scores")
+                .font(.subheadline.weight(.semibold))
+
+            ForEach(stats.topScores.prefix(5)) { score in
+                HStack {
+                    Text("\(score.home) - \(score.away)")
+                        .font(.subheadline.weight(.medium).monospacedDigit())
+
+                    GeometryReader { geo in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: geo.size.width * score.pct)
+                    }
+                    .frame(height: 6)
+
+                    Text("\(score.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, alignment: .trailing)
+
+                    Text("(\(Int(score.pct * 100))%)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, alignment: .trailing)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .padding(.horizontal, 16)
+    }
+
+    private func accuracyCard(_ stats: MatchStatsResponse) -> some View {
+        HStack(spacing: 16) {
+            if let exactPct = stats.exactCorrectPct {
+                accuracyStat("Exact Score", pct: exactPct, color: .green)
+            }
+            if let resultPct = stats.resultCorrectPct {
+                accuracyStat("Correct Result", pct: resultPct, color: .blue)
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .padding(.horizontal, 16)
+    }
+
+    private func accuracyStat(_ label: String, pct: Double, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text("\(Int(pct * 100))%")
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Predictions Section

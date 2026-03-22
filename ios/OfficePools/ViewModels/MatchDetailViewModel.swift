@@ -18,11 +18,13 @@ final class MatchDetailViewModel {
     var match: Match
 
     var predictionInfos: [MatchPredictionInfo] = []
+    var matchStats: MatchStatsResponse?
     var isLoading = false
     var errorMessage: String?
 
     private let poolService = PoolService()
     private let predictionService = PredictionService()
+    private let apiService = APIService()
     private let supabase = SupabaseService.shared.client
     private var matchChannel: RealtimeChannelV2?
     private var matchSubscription: RealtimeSubscription?
@@ -86,6 +88,16 @@ final class MatchDetailViewModel {
         }
 
         isLoading = false
+
+        // Load match stats (non-blocking)
+        Task {
+            do {
+                matchStats = try await apiService.fetchMatchStats(matchId: match.matchId)
+                print("[MatchDetail] Match stats loaded: \(matchStats?.totalPredictions ?? 0) predictions")
+            } catch {
+                print("[MatchDetail] Failed to load match stats: \(error)")
+            }
+        }
     }
 
     // MARK: - Realtime

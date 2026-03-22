@@ -4,9 +4,10 @@ struct FormTabView: View {
     let poolId: String
     let entries: [Entry]
     let selectedEntry: Entry?
+    let preloadedAnalytics: [String: AnalyticsResponse]
 
     @State private var analytics: AnalyticsResponse?
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedEntryId: String?
     @State private var tappedMatchNumber: Int?
@@ -23,18 +24,30 @@ struct FormTabView: View {
                 ProgressView("Loading analytics...")
             } else if let error = errorMessage {
                 ContentUnavailableView("Error", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else if let analytics = analytics {
-                analyticsContent(analytics)
+            } else if let data = currentAnalytics {
+                analyticsContent(data)
             } else {
                 ContentUnavailableView("Analytics Coming Soon", systemImage: "chart.bar.xaxis", description: Text("Analytics will appear once matches are completed."))
             }
         }
         .task {
-            await loadAnalytics()
+            if currentAnalytics == nil {
+                await loadAnalytics()
+            }
         }
         .onChange(of: selectedEntryId) { _, _ in
-            Task { await loadAnalytics() }
+            if currentAnalytics == nil {
+                Task { await loadAnalytics() }
+            }
         }
+    }
+
+    /// Use preloaded data if available, fall back to locally fetched
+    private var currentAnalytics: AnalyticsResponse? {
+        if let entryId = activeEntryId, let preloaded = preloadedAnalytics[entryId] {
+            return preloaded
+        }
+        return analytics
     }
 
     // MARK: - Main Content

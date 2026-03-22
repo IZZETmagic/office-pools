@@ -19,6 +19,9 @@ final class PoolDetailViewModel {
     /// Server-computed leaderboard data
     var leaderboardData: [LeaderboardEntryData] = []
     var leaderboardResponse: LeaderboardResponse?
+
+    /// Analytics data (pre-loaded)
+    var analyticsData: [String: AnalyticsResponse] = [:]  // entryId → response
     var currentUserId: String?
     private var leaderboardMap: [String: LeaderboardEntryData] = [:]
 
@@ -104,6 +107,21 @@ final class PoolDetailViewModel {
         selectedEntry = currentMember?.entries?.first
 
         isLoading = false
+
+        // Pre-load analytics for all entries (non-blocking)
+        if let entries = currentMember?.entries {
+            for entry in entries {
+                Task {
+                    do {
+                        let response = try await apiService.fetchAnalytics(poolId: poolId, entryId: entry.entryId)
+                        analyticsData[entry.entryId] = response
+                        print("[PoolDetail] Analytics loaded for entry: \(entry.entryName)")
+                    } catch {
+                        print("[PoolDetail] Failed to load analytics for \(entry.entryName): \(error)")
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Computed Properties
