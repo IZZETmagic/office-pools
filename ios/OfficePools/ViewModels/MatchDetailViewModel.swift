@@ -6,9 +6,15 @@ import Realtime
 struct MatchPredictionInfo: Identifiable {
     let id: String  // entryId
     let poolName: String
+    let poolId: String
     let entryName: String
     let prediction: Prediction?
     let matchPoints: Int?  // Calculated from pool settings, nil if match not completed
+    var predictedHomeTeam: String?  // Resolved from bracket for knockout matches
+    var predictedAwayTeam: String?  // Resolved from bracket for knockout matches
+    var teamsMatch: Bool?  // Whether predicted teams match actual teams (knockout only)
+    var breakdownResultType: String?  // "exact", "winner_gd", "winner", "miss", "wrong_teams" from breakdown API
+    var breakdownPoints: Int?  // Points from breakdown API (accounts for team mismatch)
 }
 
 /// View model for the match detail page — loads the user's predictions across all pools.
@@ -33,8 +39,11 @@ final class MatchDetailViewModel {
     private var cachedPredictions: [String: Prediction] = [:]  // entryId → prediction
     private var cachedEntrySettings: [String: PoolSettings] = [:]  // entryId → settings
     private var cachedEntryPool: [String: String] = [:]  // entryId → poolName
+    private var cachedEntryPoolId: [String: String] = [:]  // entryId → poolId
     private var cachedEntryName: [String: String] = [:]  // entryId → entryName
     private var cachedEntryIds: [String] = []
+    private var cachedPredictedTeams: [String: (home: String?, away: String?)] = [:]  // entryId → predicted teams
+    private var cachedBreakdownData: [String: (teamsMatch: Bool, resultType: String, points: Int)] = [:]  // entryId → breakdown results
 
     init(match: Match) {
         self.match = match
@@ -51,6 +60,7 @@ final class MatchDetailViewModel {
             // 2. For each pool, get members to find user's entries + fetch pool settings
             cachedEntryIds = []
             cachedEntryPool = [:]
+            cachedEntryPoolId = [:]
             cachedEntryName = [:]
             cachedEntrySettings = [:]
 
@@ -64,6 +74,7 @@ final class MatchDetailViewModel {
                 for entry in myMember.entries ?? [] {
                     cachedEntryIds.append(entry.entryId)
                     cachedEntryPool[entry.entryId] = pool.poolName
+                    cachedEntryPoolId[entry.entryId] = pool.poolId
                     cachedEntryName[entry.entryId] = entry.entryName
                     if let settings = settings {
                         cachedEntrySettings[entry.entryId] = settings
@@ -87,17 +98,38 @@ final class MatchDetailViewModel {
             errorMessage = error.localizedDescription
         }
 
-        isLoading = false
-
-        // Load match stats (non-blocking)
-        Task {
-            do {
-                matchStats = try await apiService.fetchMatchStats(matchId: match.matchId)
-                print("[MatchDetail] Match stats loaded: \(matchStats?.totalPredictions ?? 0) predictions")
-            } catch {
-                print("[MatchDetail] Failed to load match stats: \(error)")
+        // For knockout matches, resolve predicted teams from breakdown API
+        let isKnockout = match.groupLetter == nil
+        if isKnockout {
+            for entryId in cachedEntryIds {
+                guard let poolId = cachedEntryPoolId[entryId] else { continue }
+                do {
+                    let breakdown = try await apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
+                    if let matchData = breakdown.matchResults.first(where: { $0.matchNumber == match.matchNumber }) {
+                        cachedPredictedTeams[entryId] = (home: matchData.predictedHomeTeam, away: matchData.predictedAwayTeam)
+                        cachedBreakdownData[entryId] = (
+                            teamsMatch: matchData.teamsMatch,
+                            resultType: matchData.type,
+                            points: matchData.totalPoints
+                        )
+                    }
+                } catch {
+                    print("[MatchDetail] Failed to fetch breakdown for entry \(entryId): \(error)")
+                }
             }
+            // Rebuild with predicted teams
+            rebuildPredictionInfos()
         }
+
+        // Load match stats before finishing load
+        do {
+            matchStats = try await apiService.fetchMatchStats(matchId: match.matchId)
+            print("[MatchDetail] Match stats loaded: \(matchStats?.totalPredictions ?? 0) predictions")
+        } catch {
+            print("[MatchDetail] Failed to load match stats: \(error)")
+        }
+
+        isLoading = false
     }
 
     // MARK: - Realtime
@@ -195,12 +227,20 @@ final class MatchDetailViewModel {
                 )
             }
 
+            let teams = cachedPredictedTeams[entryId]
+            let breakdown = cachedBreakdownData[entryId]
             allInfos.append(MatchPredictionInfo(
                 id: entryId,
                 poolName: cachedEntryPool[entryId] ?? "Unknown Pool",
+                poolId: cachedEntryPoolId[entryId] ?? "",
                 entryName: cachedEntryName[entryId] ?? "Entry",
                 prediction: pred,
-                matchPoints: points
+                matchPoints: points,
+                predictedHomeTeam: teams?.home,
+                predictedAwayTeam: teams?.away,
+                teamsMatch: breakdown?.teamsMatch,
+                breakdownResultType: breakdown?.resultType,
+                breakdownPoints: breakdown?.points
             ))
         }
 

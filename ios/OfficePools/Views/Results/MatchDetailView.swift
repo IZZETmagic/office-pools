@@ -427,10 +427,12 @@ struct MatchDetailView: View {
 
                 Spacer()
 
-                if (isFinished || isLive), let pred = info.prediction {
-                    resultBadge(for: pred)
+                if (isFinished || isLive), info.prediction != nil {
+                    resultBadge(for: info)
 
-                    if let pts = info.matchPoints {
+                    // Prefer breakdown points (accounts for team mismatch) over client-calculated
+                    let pts = info.breakdownPoints ?? info.matchPoints
+                    if let pts = pts {
                         Text("+\(pts) pts")
                             .font(.caption.weight(.semibold).monospacedDigit())
                             .foregroundStyle(pts > 0 ? .green : .secondary)
@@ -444,7 +446,8 @@ struct MatchDetailView: View {
                     Spacer()
 
                     if isKnockout {
-                        Text(match.homeDisplayName)
+                        // Show predicted teams (resolved from bracket), fallback to actual teams
+                        Text(info.predictedHomeTeam ?? match.homeDisplayName)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -460,7 +463,7 @@ struct MatchDetailView: View {
                         .font(.subheadline.weight(.bold).monospacedDigit())
 
                     if isKnockout {
-                        Text(match.awayDisplayName)
+                        Text(info.predictedAwayTeam ?? match.awayDisplayName)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -491,8 +494,8 @@ struct MatchDetailView: View {
     // MARK: - Result Badge
 
     @ViewBuilder
-    private func resultBadge(for prediction: Prediction) -> some View {
-        let type = resultType(for: prediction)
+    private func resultBadge(for info: MatchPredictionInfo) -> some View {
+        let type = resultType(for: info)
         Text(type.label)
             .font(.caption2.weight(.bold))
             .padding(.horizontal, 6)
@@ -502,8 +505,21 @@ struct MatchDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
-    private func resultType(for pred: Prediction) -> (label: String, color: Color) {
-        guard let homeActual = match.homeScoreFt, let awayActual = match.awayScoreFt else {
+    private func resultType(for info: MatchPredictionInfo) -> (label: String, color: Color) {
+        // For knockout matches with breakdown data, use the server's result type
+        // This accounts for team mismatch in full bracket tournament style
+        if let breakdownType = info.breakdownResultType, isKnockout {
+            // If teams don't match, override to "Wrong Teams" regardless of score result
+            if let teamsMatch = info.teamsMatch, !teamsMatch {
+                return ("Wrong Teams", .orange)
+            }
+            return breakdownResultLabel(breakdownType)
+        }
+
+        // Fallback: client-side calculation (group matches or when breakdown unavailable)
+        guard let pred = info.prediction,
+              let homeActual = match.homeScoreFt,
+              let awayActual = match.awayScoreFt else {
             return ("Pending", .orange)
         }
 
@@ -527,6 +543,17 @@ struct MatchDetailView: View {
         }
 
         return ("Miss", .red)
+    }
+
+    private func breakdownResultLabel(_ type: String) -> (label: String, color: Color) {
+        switch type {
+        case "exact": return ("Exact", .green)
+        case "winner_gd": return ("Winner+GD", .blue)
+        case "winner": return ("Winner", .blue)
+        case "miss": return ("Miss", .red)
+        case "wrong_teams": return ("Wrong Teams", .orange)
+        default: return (type.capitalized, .secondary)
+        }
     }
 
     // MARK: - Helpers
@@ -575,13 +602,7 @@ struct MatchDetailView: View {
         let width = size
         let height = size * 0.67
         if let flagUrl = url, let imageUrl = URL(string: flagUrl) {
-            AsyncImage(url: imageUrl) { image in
-                image.resizable().scaledToFit()
-            } placeholder: {
-                Color.clear
-            }
-            .frame(width: width, height: height)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            CachedAsyncImage(url: imageUrl, width: width, height: height, cornerRadius: 4)
         } else {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color(.systemGray5))

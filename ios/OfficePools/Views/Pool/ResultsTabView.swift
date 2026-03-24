@@ -216,22 +216,31 @@ struct ResultsTabView<HeaderContent: View>: View {
                         }
                         .background(Color(.systemGroupedBackground))
                         .onAppear {
-                            if filterMode == .date {
-                                // Priority 1: Scroll to section containing a live match
-                                if let liveSection = sections.first(where: { section in
-                                    section.matches.contains { $0.status == "live" }
-                                }) {
-                                    proxy.scrollTo(liveSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
-                                }
-                                // Priority 2: Scroll to section with next scheduled match
-                                else if let nextSection = sections.first(where: { section in
-                                    section.matches.contains { $0.status == "scheduled" }
-                                }) {
-                                    proxy.scrollTo(nextSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
-                                }
-                                // Priority 3: Scroll to today
-                                else if let todaySection = sections.first(where: { $0.label == "Today" }) {
-                                    proxy.scrollTo(todaySection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                            // Delay to let LazyVStack layout complete before scrolling
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                if filterMode == .date {
+                                    // Priority 1: Scroll to section containing a live match
+                                    if let liveSection = sections.first(where: { section in
+                                        section.matches.contains { $0.status == "live" }
+                                    }) {
+                                        withAnimation(.easeOut(duration: 0.3)) {
+                                            proxy.scrollTo(liveSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                        }
+                                    }
+                                    // Priority 2: Scroll to section with next scheduled match
+                                    else if let nextSection = sections.first(where: { section in
+                                        section.matches.contains { $0.status == "scheduled" }
+                                    }) {
+                                        withAnimation(.easeOut(duration: 0.3)) {
+                                            proxy.scrollTo(nextSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                        }
+                                    }
+                                    // Priority 3: Scroll to today
+                                    else if let todaySection = sections.first(where: { $0.label == "Today" }) {
+                                        withAnimation(.easeOut(duration: 0.3)) {
+                                            proxy.scrollTo(todaySection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -325,22 +334,22 @@ struct ResultsTabView<HeaderContent: View>: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(pillLabel(for: mode))
-                                .font(.caption.weight(filterMode == mode ? .semibold : .regular))
+                                .font(.subheadline.weight(filterMode == mode ? .semibold : .regular))
 
                             // Show X to clear or chevron to open
                             if mode == .team && filterMode == .team && selectedTeamId != nil {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 12))
                             } else if mode == .group && filterMode == .group && selectedGroupLetter != nil {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 12))
                             } else if mode == .team || mode == .group {
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 8, weight: .semibold))
+                                    .font(.system(size: 9, weight: .semibold))
                             }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         .background(.ultraThinMaterial, in: Capsule())
                         .foregroundStyle(filterMode == mode ? Color.accentColor : .primary)
                     }
@@ -428,13 +437,7 @@ struct TeamPickerSheet: View {
                 } label: {
                     HStack(spacing: 10) {
                         if let flagUrl = team.flagUrl, let url = URL(string: flagUrl) {
-                            AsyncImage(url: url) { image in
-                                image.resizable().scaledToFit()
-                            } placeholder: {
-                                Color.clear
-                            }
-                            .frame(width: 28, height: 18)
-                            .clipShape(RoundedRectangle(cornerRadius: 2))
+                            CachedAsyncImage(url: url, width: 28, height: 18, cornerRadius: 2)
                         }
 
                         Text(team.name)
@@ -601,13 +604,7 @@ struct MatchResultRow: View {
     @ViewBuilder
     private func flagView(url: String?) -> some View {
         if let flagUrl = url, let imageUrl = URL(string: flagUrl) {
-            AsyncImage(url: imageUrl) { image in
-                image.resizable().scaledToFit()
-            } placeholder: {
-                Color.clear
-            }
-            .frame(width: 24, height: 16)
-            .clipShape(RoundedRectangle(cornerRadius: 2))
+            CachedAsyncImage(url: imageUrl, width: 24, height: 16, cornerRadius: 2)
         } else {
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color(.systemGray5))

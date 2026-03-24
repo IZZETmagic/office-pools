@@ -96,16 +96,7 @@ struct MatchCardView: View {
     @ViewBuilder
     private func teamFlag(_ team: TeamInfo?) -> some View {
         if let flagUrl = team?.flagUrl, let url = URL(string: flagUrl) {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(.quaternary)
-            }
-            .frame(width: 28, height: 20)
-            .clipShape(RoundedRectangle(cornerRadius: 2))
+            CachedAsyncImage(url: url, width: 28, height: 20, cornerRadius: 2)
         } else {
             RoundedRectangle(cornerRadius: 2)
                 .fill(.quaternary)
