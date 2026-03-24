@@ -5,6 +5,7 @@ import SwiftUI
 struct KnockoutStageView: View {
     let stage: WizardStage
     @Bindable var viewModel: PredictionEditViewModel
+    var readOnly: Bool = false
 
     var body: some View {
         let matches = viewModel.matchesForWizardStage(stage)
@@ -64,13 +65,13 @@ struct KnockoutStageView: View {
 
         return VStack(spacing: 0) {
             // Bracket source label
-            if !bothResolved {
+            if !bothResolved && !readOnly {
                 bracketSourceLabel(match: match, resolved: resolved)
                     .padding(.horizontal)
                     .padding(.top, 4)
             }
 
-            if bothResolved {
+            if bothResolved || readOnly {
                 MatchPredictionRow(
                     match: match,
                     isKnockout: true,
@@ -82,6 +83,7 @@ struct KnockoutStageView: View {
                     onPsoUpdate: { homePso, awayPso in
                         viewModel.updatePso(matchId: match.matchId, homePso: homePso, awayPso: awayPso)
                     },
+                    readOnly: readOnly,
                     homeTeamOverride: resolved.home?.teamName,
                     awayTeamOverride: resolved.away?.teamName,
                     homeSubtitle: match.homeTeamPlaceholder,

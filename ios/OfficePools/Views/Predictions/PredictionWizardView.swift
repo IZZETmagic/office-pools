@@ -2,23 +2,30 @@ import SwiftUI
 
 /// Main wizard container that orchestrates the 7-stage prediction flow.
 /// Provides stage navigation via pills, stage content, and bottom navigation with save/submit actions.
+/// When `readOnly` is true, hides save status bar and submit button, shows only navigation.
 struct PredictionWizardView: View {
     @Bindable var viewModel: PredictionEditViewModel
     let entry: Entry
     var initialStage: WizardStage = .groupStage
-    let onSubmitSuccess: () -> Void
+    var readOnly: Bool = false
+    var readOnlyPoints: Int? = nil
+    var onSubmitSuccess: (() -> Void)? = nil
 
     @State private var currentStage: WizardStage = .groupStage
     @State private var showSubmitConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Save status bar
-            saveStatusBar
+            // Save status bar (hidden in read-only mode)
+            if !readOnly {
+                saveStatusBar
+            } else {
+                readOnlyStatusBar
+            }
 
             // Stage title
-            if currentStage != .summary {
-                Text(currentStage.label)
+            if currentStage != .summary || readOnly {
+                Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
                     .font(.title2.weight(.bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
@@ -44,7 +51,7 @@ struct PredictionWizardView: View {
                 Task {
                     await viewModel.submitPredictions(entryId: entry.entryId)
                     if viewModel.submitSuccess {
-                        onSubmitSuccess()
+                        onSubmitSuccess?()
                     }
                 }
             }
@@ -59,15 +66,131 @@ struct PredictionWizardView: View {
     private var stageContent: some View {
         switch currentStage {
         case .groupStage:
-            GroupStageView(viewModel: viewModel)
+            GroupStageView(viewModel: viewModel, readOnly: readOnly)
         case .roundOf32, .roundOf16, .quarterFinals, .semiFinals, .finals:
-            KnockoutStageView(stage: currentStage, viewModel: viewModel)
+            KnockoutStageView(stage: currentStage, viewModel: viewModel, readOnly: readOnly)
         case .summary:
-            summaryContent
+            if readOnly {
+                readOnlySummaryContent
+            } else {
+                summaryContent
+            }
         }
     }
 
-    // MARK: - Summary Content
+    // MARK: - Read-Only Status Bar
+
+    private var readOnlyStatusBar: some View {
+        HStack {
+            HStack(spacing: 6) {
+                if entry.hasSubmittedPredictions {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                    Text("Submitted")
+                        .font(.caption.weight(.medium))
+                } else if entry.predictionsLocked {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.orange)
+                    Text("Locked")
+                        .font(.caption.weight(.medium))
+                } else {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .foregroundStyle(.red)
+                    Text("Deadline Passed")
+                        .font(.caption.weight(.medium))
+                }
+            }
+
+            Spacer()
+
+            if let pts = readOnlyPoints {
+                Text("\(pts) pts")
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    // MARK: - Read-Only Summary
+
+    private var readOnlySummaryContent: some View {
+        LazyVStack(spacing: 16) {
+            // Champion card
+            if let champion = viewModel.champion {
+                VStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.yellow)
+                    Text(champion.teamName)
+                        .font(.title2.weight(.bold))
+                    Text("Your predicted champion")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(Color.yellow.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.yellow.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.horizontal)
+            }
+
+            // Stage list (view-only, no edit buttons)
+            VStack(spacing: 0) {
+                ForEach(WizardStage.allCases.filter({ $0 != .summary }), id: \.self) { stage in
+                    readOnlyStageRow(stage)
+                    if stage != .finals {
+                        Divider().padding(.horizontal)
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+            )
+            .padding(.horizontal)
+
+            Spacer().frame(height: 16)
+        }
+        .padding(.top, 8)
+    }
+
+    private func readOnlyStageRow(_ stage: WizardStage) -> some View {
+        let counts = viewModel.stageCompletionCount(stage)
+
+        return HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.subheadline)
+                .foregroundStyle(.green)
+
+            Text(stage.label)
+                .font(.subheadline)
+
+            Spacer()
+
+            Text("\(counts.completed)/\(counts.total)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            Button("View") {
+                currentStage = stage
+            }
+            .font(.caption.weight(.medium))
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Summary Content (edit mode)
 
     private var summaryContent: some View {
         LazyVStack(spacing: 16) {
@@ -245,7 +368,28 @@ struct PredictionWizardView: View {
             }
 
             // Forward / Submit button
-            if currentStage == .summary {
+            if readOnly {
+                // Read-only: just navigate forward, no submit
+                if let next = nextStage {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            currentStage = next
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(next == .summary ? "Summary" : "Next")
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.accentColor)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            } else if currentStage == .summary {
                 Button {
                     showSubmitConfirmation = true
                 } label: {

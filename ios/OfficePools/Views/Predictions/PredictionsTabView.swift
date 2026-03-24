@@ -22,6 +22,10 @@ struct PredictionsTabView: View {
     @State private var isRenamingEntry = false
     @State private var renameEntryName = ""
     @State private var entryToRename: Entry?
+    @State private var isDeletingEntry = false
+    @State private var entryToDelete: Entry?
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
 
     private var isMultiEntry: Bool {
         (pool?.maxEntriesPerUser ?? 1) > 1
@@ -77,6 +81,23 @@ struct PredictionsTabView: View {
         } message: {
             Text("Enter a new name for this entry")
         }
+        .alert("Delete Entry", isPresented: $isDeletingEntry) {
+            Button("Cancel", role: .cancel) {
+                entryToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                Task { await deleteEntry() }
+            }
+        } message: {
+            if let entry = entryToDelete {
+                Text("All predictions for \"\(entry.entryName)\" will be permanently deleted. This cannot be undone.")
+            }
+        }
+        .alert("Unable to Delete", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteError ?? "Something went wrong.")
+        }
     }
 
     // MARK: - Prediction Content (shared by single & multi entry)
@@ -107,6 +128,7 @@ struct PredictionsTabView: View {
         hasLoadedPredictions = false
         isEditing = false
         editViewModel = nil
+        readOnlyEditVM = nil
         await viewModel.loadPredictions(entryId: entryId)
         hasLoadedPredictions = true
     }
@@ -114,83 +136,130 @@ struct PredictionsTabView: View {
     // MARK: - Entry List Page (multi-entry pools)
 
     private var entryListPage: some View {
-        List {
-            Section {
-                ForEach(entries) { entry in
-                    Button {
-                        selectedEntry = entry
-                        Task {
-                            await loadPredictions(entryId: entry.entryId)
-                            showingEntryDetail = true
-                        }
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    Text(entry.entryName)
-                                        .font(.body.weight(.medium))
-                                        .foregroundStyle(.primary)
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                Spacer().frame(height: 4)
 
-                                    if entry.hasSubmittedPredictions {
-                                        Image(systemName: "checkmark.seal.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(.green)
+                // Your Entries card
+                VStack(alignment: .leading, spacing: 0) {
+                    // Section header
+                    VStack(spacing: 10) {
+                        HStack {
+                            Text("Your Entries")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        Divider()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+
+                    // Entry rows
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        Button {
+                            selectedEntry = entry
+                            Task {
+                                await loadPredictions(entryId: entry.entryId)
+                                showingEntryDetail = true
+                            }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text(entry.entryName)
+                                            .font(.body.weight(.medium))
+                                            .foregroundStyle(.primary)
+
+                                        if entry.hasSubmittedPredictions {
+                                            Image(systemName: "checkmark.seal.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.green)
+                                        }
                                     }
+
+                                    Text(entryStatusText(entry))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
 
-                                Text(entryStatusText(entry))
-                                    .font(.caption)
+                                Spacer()
+
+                                Text("\(pointsForEntry(entry.entryId)) pts")
+                                    .font(.subheadline.weight(.semibold).monospacedDigit())
                                     .foregroundStyle(.secondary)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                entryToRename = entry
+                                renameEntryName = entry.entryName
+                                isRenamingEntry = true
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
                             }
 
-                            Spacer()
-
-                            Text("\(pointsForEntry(entry.entryId)) pts")
-                                .font(.subheadline.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(.secondary)
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                            if entries.count > 1 && !entry.hasSubmittedPredictions {
+                                Button(role: .destructive) {
+                                    entryToDelete = entry
+                                    isDeletingEntry = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
-                        .padding(.vertical, 4)
+
                     }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing) {
-                        Button {
-                            entryToRename = entry
-                            renameEntryName = entry.entryName
-                            isRenamingEntry = true
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
-                        .tint(.blue)
-                    }
+
                 }
-            } header: {
-                Text("Your Entries")
-            } footer: {
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+
+                // Footer note
                 if let pool = pool {
-                    Text("\(entries.count) of \(pool.maxEntriesPerUser) entries used")
+                    HStack {
+                        Spacer()
+                        Text("\(entries.count) of \(pool.maxEntriesPerUser) entries used")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 4)
                 }
-            }
 
-            if canCreateNewEntry {
-                Section {
+                // Add Entry button
+                if canCreateNewEntry {
                     Button {
                         isCreatingEntry = true
                     } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                            Text("Add New Entry")
-                                .foregroundStyle(Color.accentColor)
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Add Entry")
+                                .font(.subheadline.weight(.semibold))
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .buttonStyle(.plain)
                 }
+
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
         }
-        .listStyle(.insetGrouped)
+        .background(Color(.systemGroupedBackground))
     }
 
     private func entryStatusText(_ entry: Entry) -> String {
@@ -227,75 +296,47 @@ struct PredictionsTabView: View {
         return false
     }
 
-    // MARK: - Submitted View (read-only)
+    // MARK: - Submitted View (read-only wizard)
+
+    @State private var readOnlyEditVM: PredictionEditViewModel?
 
     private func submittedView(entry: Entry) -> some View {
-        List {
-            Section {
-                HStack {
-                    if entry.hasSubmittedPredictions {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(.green)
-                        Text("Predictions submitted")
-                            .font(.subheadline.weight(.medium))
-                    } else if entry.predictionsLocked {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(.orange)
-                        Text("Predictions locked")
-                            .font(.subheadline.weight(.medium))
-                    } else if isPastDeadline {
-                        Image(systemName: "clock.badge.exclamationmark")
-                            .foregroundStyle(.red)
-                        Text("Deadline has passed")
-                            .font(.subheadline.weight(.medium))
-                    }
-                    Spacer()
-                    Text("\(computedPoints ?? entry.totalPoints) pts")
-                        .font(.headline.monospacedDigit())
-                }
-            }
-
-            ForEach(groupedSubmittedMatches, id: \.stage) { group in
-                Section(header: Text(group.stage)) {
-                    ForEach(group.matches) { match in
-                        if let pred = viewModel.existingPredictions.first(where: { $0.matchId == match.matchId }) {
-                            SubmittedPredictionRow(match: match, prediction: pred)
-                        }
-                    }
-                }
+        Group {
+            if let editVM = readOnlyEditVM {
+                PredictionWizardView(
+                    viewModel: editVM,
+                    entry: entry,
+                    initialStage: .summary,
+                    readOnly: true,
+                    readOnlyPoints: computedPoints ?? entry.totalPoints
+                )
+            } else {
+                ProgressView("Loading predictions...")
             }
         }
-        .listStyle(.insetGrouped)
-    }
-
-    private var groupedSubmittedMatches: [(stage: String, matches: [Match])] {
-        var grouped: [String: [Match]] = [:]
-        for match in matches {
-            let key = stageKey(for: match)
-            grouped[key, default: []].append(match)
-        }
-        for key in grouped.keys {
-            grouped[key]?.sort { $0.matchNumber < $1.matchNumber }
-        }
-        return PredictionEditViewModel.stageOrder.compactMap { stage in
-            guard let stageMatches = grouped[stage], !stageMatches.isEmpty else { return nil }
-            return (stage: stage, matches: stageMatches)
+        .onAppear {
+            setupReadOnlyViewModel(entry: entry)
         }
     }
 
-    private func stageKey(for match: Match) -> String {
-        if match.stage == "group", let group = match.groupLetter {
-            return "Group \(group)"
+    private func setupReadOnlyViewModel(entry: Entry) {
+        guard readOnlyEditVM == nil else { return }
+
+        let editVM = PredictionEditViewModel(poolId: viewModel.poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in viewModel.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
         }
-        switch match.stage {
-        case "round_32", "round_of_32": return "Round of 32"
-        case "round_16", "round_of_16": return "Round of 16"
-        case "quarter_final": return "Quarter-finals"
-        case "semi_final": return "Semi-finals"
-        case "third_place": return "Third Place"
-        case "final": return "Final"
-        default: return match.stage.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+
+        readOnlyEditVM = editVM
     }
 
     // MARK: - Edit View (Wizard)
@@ -339,6 +380,45 @@ struct PredictionsTabView: View {
     }
 
     // MARK: - Rename Entry
+
+    private func deleteEntry() async {
+        guard let entry = entryToDelete else { return }
+
+        // Guard: can't delete last entry
+        guard entries.count > 1 else {
+            deleteError = "Cannot delete your only entry."
+            showDeleteError = true
+            entryToDelete = nil
+            return
+        }
+
+        // Guard: can't delete submitted entry
+        guard !entry.hasSubmittedPredictions else {
+            deleteError = "Cannot delete a submitted entry."
+            showDeleteError = true
+            entryToDelete = nil
+            return
+        }
+
+        do {
+            let service = PredictionService()
+            try await service.deleteEntry(entryId: entry.entryId)
+
+            // If the deleted entry was selected, clear selection
+            if selectedEntry?.entryId == entry.entryId {
+                selectedEntry = nil
+            }
+
+            entryToDelete = nil
+            // Reload pool data to refresh entry list
+            await onEntryCreated?()
+        } catch {
+            print("[PredictionsTab] Failed to delete entry: \(error)")
+            deleteError = "Failed to delete entry. Please try again."
+            showDeleteError = true
+            entryToDelete = nil
+        }
+    }
 
     private func renameEntry() async {
         guard let entry = entryToRename else { return }
@@ -398,50 +478,3 @@ struct PredictionsTabView: View {
     }
 }
 
-// MARK: - Submitted Prediction Row
-
-struct SubmittedPredictionRow: View {
-    let match: Match
-    let prediction: Prediction
-
-    var body: some View {
-        HStack {
-            Text(match.homeDisplayName)
-                .font(.subheadline)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            VStack(spacing: 1) {
-                Text("\(prediction.predictedHomeScore) - \(prediction.predictedAwayScore)")
-                    .font(.headline.monospacedDigit())
-                if let homePso = prediction.predictedHomePso, let awayPso = prediction.predictedAwayPso {
-                    Text("(\(homePso)-\(awayPso) PSO)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 12)
-
-            Text(match.awayDisplayName)
-                .font(.subheadline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            if match.isCompleted {
-                pointsBadge
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private var pointsBadge: some View {
-        if let homeActual = match.homeScoreFt, let awayActual = match.awayScoreFt {
-            let isExact = prediction.predictedHomeScore == homeActual && prediction.predictedAwayScore == awayActual
-            Image(systemName: isExact ? "checkmark.circle.fill" : "xmark.circle")
-                .foregroundStyle(isExact ? .green : .red)
-        }
-    }
-}

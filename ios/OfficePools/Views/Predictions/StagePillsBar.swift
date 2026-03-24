@@ -36,17 +36,17 @@ struct StagePillsBar: View {
         } label: {
             VStack(spacing: 2) {
                 Text(pillLabel(for: stage))
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
 
                 if stage != .summary {
                     let counts = viewModel.stageCompletionCount(stage)
                     Text("\(counts.completed)/\(counts.total)")
-                        .font(.caption2.monospacedDigit())
+                        .font(.caption.monospacedDigit())
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .background(pillColor(for: stage))
             .foregroundStyle(stage == currentStage ? .white : .primary)
             .clipShape(Capsule())

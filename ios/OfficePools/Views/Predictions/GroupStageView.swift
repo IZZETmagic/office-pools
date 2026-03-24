@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// Shows all 12 groups as collapsible sections with match prediction rows and live standings.
-/// The first incomplete group is expanded by default.
+/// The first incomplete group is expanded by default. In read-only mode, all groups start collapsed.
 struct GroupStageView: View {
     @Bindable var viewModel: PredictionEditViewModel
+    var readOnly: Bool = false
 
     @State private var expandedGroups: Set<String> = []
     @State private var didSetDefaults = false
@@ -27,6 +28,10 @@ struct GroupStageView: View {
         .onAppear {
             guard !didSetDefaults else { return }
             didSetDefaults = true
+            if readOnly {
+                // In read-only mode, start with all groups collapsed
+                return
+            }
             // Expand first incomplete group by default
             for letter in GROUP_LETTERS {
                 let matches = viewModel.matchesForGroup(letter)
@@ -77,13 +82,15 @@ struct GroupStageView: View {
 
                     Spacer()
 
-                    Text("\(completedCount)/\(totalCount)")
-                        .font(.caption.weight(.medium).monospacedDigit())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(isGroupComplete ? Color.green.opacity(0.15) : (completedCount > 0 ? Color.yellow.opacity(0.15) : Color(.systemGray5)))
-                        .foregroundStyle(isGroupComplete ? .green : (completedCount > 0 ? .orange : .secondary))
-                        .clipShape(Capsule())
+                    if !readOnly {
+                        Text("\(completedCount)/\(totalCount)")
+                            .font(.caption.weight(.medium).monospacedDigit())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(isGroupComplete ? Color.green.opacity(0.15) : (completedCount > 0 ? Color.yellow.opacity(0.15) : Color(.systemGray5)))
+                            .foregroundStyle(isGroupComplete ? .green : (completedCount > 0 ? .orange : .secondary))
+                            .clipShape(Capsule())
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
@@ -104,7 +111,8 @@ struct GroupStageView: View {
                             onScoreUpdate: { home, away in
                                 viewModel.updateScore(matchId: match.matchId, homeScore: home, awayScore: away)
                             },
-                            onPsoUpdate: { _, _ in }
+                            onPsoUpdate: { _, _ in },
+                            readOnly: readOnly
                         )
                         .padding(.horizontal)
 
