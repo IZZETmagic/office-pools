@@ -6,15 +6,16 @@ struct PoolSettingsTabView: View {
     let poolService: PoolService
     var onPoolDeleted: (() -> Void)?
 
-    // Admin editing state
+    // Editing state
     @State private var editName = ""
     @State private var editDescription = ""
     @State private var editStatus = "active"
     @State private var editIsPrivate = false
     @State private var editMaxEntries = 1
+    @State private var editMaxParticipants = 0
     @State private var editDeadline = Date()
     @State private var isSaving = false
-    @State private var saveError: String?
+    @State private var saveMessage: (text: String, isError: Bool)?
 
     // Danger zone
     @State private var showArchiveAlert = false
@@ -23,23 +24,21 @@ struct PoolSettingsTabView: View {
     @State private var isDeleting = false
     @State private var actionError: String?
 
+    // Copy feedback
+    @State private var copiedCode = false
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 Spacer().frame(height: 4)
 
-                // Pool Info
-                if let pool {
-                    poolInfoCard(pool)
-                }
-
-                // Edit Pool Settings
-                if let pool {
-                    adminSettingsCard(pool)
-                }
-
-                // Danger Zone
-                dangerZoneCard()
+                poolCodeCard
+                poolInfoCard
+                deadlineCard
+                privacyCard
+                entriesCard
+                saveCard
+                dangerZoneCard
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
@@ -50,7 +49,7 @@ struct PoolSettingsTabView: View {
             Button("Cancel", role: .cancel) {}
             Button("Archive", role: .destructive) { archivePool() }
         } message: {
-            Text("This will mark the pool as completed. Members can still view results but no new activity will be allowed.")
+            Text("Members can still view results but no new predictions or changes will be allowed. You can reactivate later.")
         }
         .alert("Error", isPresented: .init(
             get: { actionError != nil },
@@ -60,7 +59,389 @@ struct PoolSettingsTabView: View {
         } message: {
             Text(actionError ?? "")
         }
+        .alert("Delete Pool", isPresented: $showDeleteAlert) {
+            TextField("Type pool name to confirm", text: $deleteConfirmText)
+            Button("Cancel", role: .cancel) { deleteConfirmText = "" }
+            Button("Delete", role: .destructive) { deletePool() }
+                .disabled(deleteConfirmText != pool?.poolName)
+        } message: {
+            Text("Type \"\(pool?.poolName ?? "")\" to confirm. This will permanently delete the pool, all predictions, and all member data. This cannot be undone.")
+        }
     }
+
+    // MARK: - Card Builder (matches Rules tab)
+
+    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            content()
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+            }
+            Divider()
+        }
+    }
+
+    private func settingsRow(_ label: String, value: some View) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            value
+        }
+    }
+
+    // MARK: - Pool Code
+
+    private var poolCodeCard: some View {
+        card {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pool Code")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(pool?.poolCode ?? "—")
+                        .font(.system(.title2, design: .monospaced, weight: .bold))
+                }
+
+                Spacer()
+
+                Button {
+                    UIPasteboard.general.string = pool?.poolCode ?? ""
+                    copiedCode = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        copiedCode = false
+                    }
+                } label: {
+                    Label(copiedCode ? "Copied!" : "Copy", systemImage: copiedCode ? "checkmark" : "doc.on.doc")
+                        .font(.subheadline.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .tint(copiedCode ? .green : .blue)
+            }
+        }
+    }
+
+    // MARK: - Pool Information
+
+    private var poolInfoCard: some View {
+        card {
+            VStack(spacing: 10) {
+                HStack {
+                    Text("Pool Information")
+                        .font(.headline)
+                    Spacer()
+                    if let pool {
+                        Text(modeLabel(pool.predictionMode))
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundStyle(.blue)
+                            .clipShape(Capsule())
+                    }
+                }
+                Divider()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pool Name")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Pool Name", text: $editName)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Description")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Description (optional)", text: $editDescription, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...4)
+            }
+
+            Divider().padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Status")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Status", selection: $editStatus) {
+                    Text("Active").tag("active")
+                    Text("Closed").tag("closed")
+                    Text("Completed").tag("completed")
+                }
+                .pickerStyle(.segmented)
+
+                Text(statusDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+        }
+    }
+
+    // MARK: - Prediction Deadline
+
+    private var deadlineCard: some View {
+        card {
+            sectionHeader(pool?.predictionMode == .progressive ? "Group Stage Deadline" : "Prediction Deadline")
+
+            if let pool, pool.predictionMode == .progressive {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                        .font(.subheadline)
+                    Text("Round deadlines are managed separately. This deadline applies to the initial group stage.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .background(Color.blue.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            DatePicker("Deadline", selection: $editDeadline, displayedComponents: [.date, .hourAndMinute])
+                .font(.subheadline)
+
+            if let pool, let deadline = pool.predictionDeadline {
+                let countdown = deadlineCountdown(deadline)
+                if !countdown.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: countdown.contains("passed") ? "exclamationmark.circle.fill" : "clock.fill")
+                            .font(.caption)
+                        Text(countdown)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(countdown.contains("passed") ? .red : .green)
+                }
+            }
+
+            Divider().padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Quick Set")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    quickDeadlineButton("Tournament Start", date: tournamentStartDate)
+                    quickDeadlineButton("1 Day Before", date: tournamentStartDate?.addingTimeInterval(-86400))
+                    quickDeadlineButton("1 Week Before", date: tournamentStartDate?.addingTimeInterval(-604800))
+                }
+            }
+        }
+    }
+
+    // MARK: - Privacy & Capacity
+
+    private var privacyCard: some View {
+        card {
+            sectionHeader("Privacy & Capacity")
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pool Visibility")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Visibility", selection: $editIsPrivate) {
+                    Text("Public").tag(false)
+                    Text("Private").tag(true)
+                }
+                .pickerStyle(.segmented)
+
+                Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider().padding(.vertical, 2)
+
+            settingsRow("Max Members", value:
+                HStack(spacing: 4) {
+                    TextField("0", value: $editMaxParticipants, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .font(.subheadline.weight(.bold))
+                        .frame(width: 50)
+                    Text(editMaxParticipants == 0 ? "(unlimited)" : "")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            )
+        }
+    }
+
+    // MARK: - Prediction Entries
+
+    private var entriesCard: some View {
+        card {
+            sectionHeader("Prediction Entries")
+
+            Text("Allow members to submit multiple prediction entries. Each is scored independently on the leaderboard.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Max Entries Per Member")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 0) {
+                    ForEach(1...10, id: \.self) { n in
+                        Button {
+                            editMaxEntries = n
+                        } label: {
+                            Text("\(n)")
+                                .font(.subheadline.weight(editMaxEntries == n ? .bold : .regular))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(editMaxEntries == n ? Color.accentColor : Color(.tertiarySystemFill))
+                                .foregroundStyle(editMaxEntries == n ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            if editMaxEntries > 1 {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                        .font(.subheadline)
+                    Text("Members can create up to \(editMaxEntries) entries (e.g. \"Serious\", \"Fun\"). Each appears as its own row on the leaderboard.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .background(Color.blue.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    // MARK: - Save
+
+    private var saveCard: some View {
+        card {
+            Button {
+                saveSettings()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isSaving {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .padding(.trailing, 4)
+                            .tint(.white)
+                    }
+                    Text("Save Changes")
+                        .fontWeight(.semibold)
+                    Spacer()
+                }
+                .padding(.vertical, 10)
+                .background(hasChanges ? Color.accentColor : Color(.tertiarySystemFill))
+                .foregroundStyle(hasChanges ? .white : .secondary)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasChanges || isSaving)
+
+            if let msg = saveMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                    Text(msg.text)
+                }
+                .font(.caption)
+                .foregroundStyle(msg.isError ? .red : .green)
+            }
+        }
+    }
+
+    // MARK: - Danger Zone
+
+    private var dangerZoneCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("Danger Zone")
+
+            Button {
+                showArchiveAlert = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "archivebox")
+                        .font(.body)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Archive Pool")
+                            .font(.subheadline.weight(.medium))
+                        Text("Preserve data but prevent new activity")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 4)
+                .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            Button {
+                showDeleteAlert = true
+            } label: {
+                HStack(spacing: 12) {
+                    if isDeleting {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "trash")
+                            .font(.body)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Delete Pool")
+                            .font(.subheadline.weight(.medium))
+                        Text("Permanently delete pool and all data")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 4)
+                .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeleting)
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.red.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+
+    // MARK: - Init State
 
     private func initEditState() {
         guard let pool else { return }
@@ -69,6 +450,7 @@ struct PoolSettingsTabView: View {
         editStatus = pool.status
         editIsPrivate = pool.isPrivate
         editMaxEntries = pool.maxEntriesPerUser
+        editMaxParticipants = pool.maxParticipants ?? 0
         if let deadline = pool.predictionDeadline {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -76,161 +458,7 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Pool Info Card (All Members)
-
-    private func poolInfoCard(_ pool: Pool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Pool Info", icon: "info.circle")
-
-            // Pool code row with copy
-            HStack {
-                Text("Pool Code")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(pool.poolCode)
-                    .font(.system(.body, design: .monospaced, weight: .semibold))
-                Button {
-                    UIPasteboard.general.string = pool.poolCode
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                }
-            }
-
-            Divider()
-
-            infoRow("Name", value: pool.poolName)
-            if let desc = pool.description, !desc.isEmpty {
-                infoRow("Description", value: desc)
-            }
-
-            Divider()
-
-            HStack(spacing: 12) {
-                infoBadge(modeLabel(pool.predictionMode), color: .blue)
-                infoBadge(statusLabel(pool.status), color: statusColor(pool.status))
-                if pool.isPrivate {
-                    infoBadge("Private", color: .orange)
-                } else {
-                    infoBadge("Public", color: .green)
-                }
-            }
-
-            Divider()
-
-            // Member count omitted — see Members tab
-            infoRow("Max Entries", value: "\(pool.maxEntriesPerUser) per member")
-
-            if let deadline = pool.predictionDeadline {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    infoRow("Deadline", value: formatDeadline(deadline))
-                    let remaining = deadlineCountdown(deadline)
-                    if !remaining.isEmpty {
-                        Text(remaining)
-                            .font(.caption)
-                            .foregroundStyle(remaining.contains("ago") ? .red : .green)
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
-
-    // MARK: - Scoring Rules Card (All Members)
-
-
-
-    // MARK: - Admin Settings Card
-
-    private func adminSettingsCard(_ pool: Pool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Edit Settings", icon: "gearshape")
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Pool Name").font(.caption).foregroundStyle(.secondary)
-                TextField("Pool Name", text: $editName)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Description").font(.caption).foregroundStyle(.secondary)
-                TextField("Description (optional)", text: $editDescription, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(3)
-            }
-
-            Divider()
-
-            // Status
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Status").font(.caption).foregroundStyle(.secondary)
-                Picker("Status", selection: $editStatus) {
-                    Text("Active").tag("active")
-                    Text("Closed").tag("closed")
-                    Text("Completed").tag("completed")
-                }
-                .pickerStyle(.segmented)
-            }
-
-            Divider()
-
-            // Deadline
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Prediction Deadline").font(.caption).foregroundStyle(.secondary)
-                DatePicker("Deadline", selection: $editDeadline, displayedComponents: [.date, .hourAndMinute])
-                    .labelsHidden()
-            }
-
-            Divider()
-
-            // Privacy
-            Toggle("Private Pool", isOn: $editIsPrivate)
-
-            // Max Entries
-            HStack {
-                Text("Max Entries Per Member")
-                Spacer()
-                Stepper("\(editMaxEntries)", value: $editMaxEntries, in: 1...10)
-            }
-
-            Divider()
-
-            // Save button
-            Button {
-                saveSettings()
-            } label: {
-                HStack {
-                    if isSaving {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    }
-                    Text("Save Changes")
-                        .fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(hasChanges ? Color.blue : Color.gray.opacity(0.3))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(!hasChanges || isSaving)
-
-            if let saveError {
-                Text(saveError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-        }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
+    // MARK: - Computed
 
     private var hasChanges: Bool {
         guard let pool else { return false }
@@ -239,68 +467,26 @@ struct PoolSettingsTabView: View {
             || editStatus != pool.status
             || editIsPrivate != pool.isPrivate
             || editMaxEntries != pool.maxEntriesPerUser
+            || editMaxParticipants != (pool.maxParticipants ?? 0)
     }
 
-    // MARK: - Danger Zone
-
-    private func dangerZoneCard() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Danger Zone", icon: "exclamationmark.triangle")
-
-            Button {
-                showArchiveAlert = true
-            } label: {
-                HStack {
-                    Image(systemName: "archivebox")
-                    Text("Archive Pool")
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.orange.opacity(0.1))
-                .foregroundStyle(.orange)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-
-            VStack(spacing: 8) {
-                Button {
-                    showDeleteAlert = true
-                } label: {
-                    HStack {
-                        if isDeleting {
-                            ProgressView().scaleEffect(0.8)
-                        }
-                        Image(systemName: "trash")
-                        Text("Delete Pool")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.red.opacity(0.1))
-                    .foregroundStyle(.red)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .disabled(isDeleting)
-
-                Text("This will permanently delete the pool and all predictions for all members.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+    private var statusDescription: String {
+        switch editStatus {
+        case "active": return "Pool is open and accepting new members."
+        case "closed": return "Pool is closed to new members."
+        case "completed": return "Tournament is over. No new activity allowed."
+        default: return ""
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.red.opacity(0.2), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .alert("Delete Pool", isPresented: $showDeleteAlert) {
-            TextField("Type pool name to confirm", text: $deleteConfirmText)
-            Button("Cancel", role: .cancel) { deleteConfirmText = "" }
-            Button("Delete", role: .destructive) { deletePool() }
-                .disabled(deleteConfirmText != pool?.poolName)
-        } message: {
-            Text("Type \"\(pool?.poolName ?? "")\" to confirm. This action cannot be undone.")
-        }
+    }
+
+    private var tournamentStartDate: Date? {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 6
+        components.day = 11
+        components.hour = 13
+        components.minute = 0
+        return Calendar.current.date(from: components)
     }
 
     // MARK: - Actions
@@ -308,7 +494,7 @@ struct PoolSettingsTabView: View {
     private func saveSettings() {
         guard let pool else { return }
         isSaving = true
-        saveError = nil
+        saveMessage = nil
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -325,9 +511,10 @@ struct PoolSettingsTabView: View {
         Task {
             do {
                 try await poolService.updatePool(poolId: pool.poolId, updates: payload)
+                saveMessage = (text: "Settings saved", isError: false)
                 isSaving = false
             } catch {
-                saveError = error.localizedDescription
+                saveMessage = (text: error.localizedDescription, isError: true)
                 isSaving = false
             }
         }
@@ -338,6 +525,7 @@ struct PoolSettingsTabView: View {
         Task {
             do {
                 try await poolService.updatePool(poolId: pool.poolId, updates: PoolUpdatePayload(status: "completed"))
+                editStatus = "completed"
             } catch {
                 actionError = "Failed to archive: \(error.localizedDescription)"
             }
@@ -361,73 +549,26 @@ struct PoolSettingsTabView: View {
 
     // MARK: - Helpers
 
-    private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.blue)
-            Text(title)
-                .font(.headline)
-            Spacer()
-        }
-    }
-
-    private func infoRow(_ label: String, value: String) -> some View {
-        HStack {
+    private func quickDeadlineButton(_ label: String, date: Date?) -> some View {
+        Button {
+            if let date { editDeadline = date }
+        } label: {
             Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
+                .font(.caption2.weight(.medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(.tertiarySystemFill))
+                .clipShape(Capsule())
         }
-        .font(.subheadline)
+        .buttonStyle(.plain)
     }
 
-    private func infoBadge(_ label: String, color: Color) -> some View {
-        Text(label)
-            .font(.system(size: 10, weight: .semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.12))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
-    }
-
-private func modeLabel(_ mode: PredictionMode) -> String {
+    private func modeLabel(_ mode: PredictionMode) -> String {
         switch mode {
         case .fullTournament: return "Full Tournament"
         case .progressive: return "Progressive"
         case .bracketPicker: return "Bracket Picker"
         }
-    }
-
-    private func statusLabel(_ status: String) -> String {
-        switch status {
-        case "active": return "Active"
-        case "closed": return "Closed"
-        case "completed": return "Completed"
-        case "archived": return "Archived"
-        default: return status.capitalized
-        }
-    }
-
-    private func statusColor(_ status: String) -> Color {
-        switch status {
-        case "active": return .green
-        case "closed": return .orange
-        case "completed", "archived": return .gray
-        default: return .gray
-        }
-    }
-
-    private func formatDeadline(_ iso: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = formatter.date(from: iso) else { return iso }
-        let df = DateFormatter()
-        df.dateStyle = .medium
-        df.timeStyle = .short
-        return df.string(from: date)
     }
 
     private func deadlineCountdown(_ iso: String) -> String {

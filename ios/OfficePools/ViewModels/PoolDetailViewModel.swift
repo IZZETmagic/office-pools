@@ -13,7 +13,7 @@ final class PoolDetailViewModel {
     var settings: PoolSettings?
     var currentMember: Member?
     var selectedEntry: Entry?
-    var isLoading = false
+    var isLoading = true
     var errorMessage: String?
 
     /// Server-computed leaderboard data
@@ -48,53 +48,78 @@ final class PoolDetailViewModel {
             return
         }
 
-        // Fetch members (independent, don't crash if it fails)
-        do {
-            members = try await poolService.fetchMembers(poolId: poolId)
-            print("[PoolDetail] Members loaded: \(members.count)")
-        } catch {
-            print("[PoolDetail] Failed to load members: \(error)")
-            members = []
-        }
+        // Kick off all independent fetches concurrently using Task (inherits @MainActor)
+        let tournamentId = pool?.tournamentId ?? ""
+        let pid = poolId
 
-        // Fetch settings (independent, optional — pool may not have custom settings)
-        do {
-            settings = try await poolService.fetchSettings(poolId: poolId)
-            print("[PoolDetail] Settings loaded")
-        } catch {
-            print("[PoolDetail] Settings not found or failed: \(error)")
-            settings = nil
-        }
-
-        // Fetch matches and teams
-        if let tournamentId = pool?.tournamentId {
+        let membersTask = Task { () -> [Member] in
             do {
-                matches = try await poolService.fetchMatches(tournamentId: tournamentId)
-                print("[PoolDetail] Matches loaded: \(matches.count)")
+                let result = try await self.poolService.fetchMembers(poolId: pid)
+                print("[PoolDetail] Members loaded: \(result.count)")
+                return result
+            } catch {
+                print("[PoolDetail] Failed to load members: \(error)")
+                return []
+            }
+        }
+
+        let settingsTask = Task { () -> PoolSettings? in
+            do {
+                let result = try await self.poolService.fetchSettings(poolId: pid)
+                print("[PoolDetail] Settings loaded")
+                return result
+            } catch {
+                print("[PoolDetail] Settings not found or failed: \(error)")
+                return nil
+            }
+        }
+
+        let matchesTask = Task { () -> [Match] in
+            guard !tournamentId.isEmpty else { return [] }
+            do {
+                let result = try await self.poolService.fetchMatches(tournamentId: tournamentId)
+                print("[PoolDetail] Matches loaded: \(result.count)")
+                return result
             } catch {
                 print("[PoolDetail] Failed to load matches: \(error)")
-                matches = []
-            }
-
-            do {
-                let fetchedTeams = try await poolService.fetchTeams(tournamentId: tournamentId)
-                teams = fetchedTeams
-                print("[PoolDetail] Teams loaded: \(fetchedTeams.count)")
-            } catch {
-                print("[PoolDetail] Failed to load teams: \(error)")
-                teams = []
+                return []
             }
         }
 
-        // Fetch server-computed leaderboard (single source of truth for points)
-        do {
-            let response = try await apiService.fetchLeaderboard(poolId: poolId)
+        let teamsTask = Task { () -> [Team] in
+            guard !tournamentId.isEmpty else { return [] }
+            do {
+                let result = try await self.poolService.fetchTeams(tournamentId: tournamentId)
+                print("[PoolDetail] Teams loaded: \(result.count)")
+                return result
+            } catch {
+                print("[PoolDetail] Failed to load teams: \(error)")
+                return []
+            }
+        }
+
+        let leaderboardTask = Task { () -> LeaderboardResponse? in
+            do {
+                let response = try await self.apiService.fetchLeaderboard(poolId: pid)
+                print("[PoolDetail] Leaderboard loaded: \(response.entries.count) entries")
+                return response
+            } catch {
+                print("[PoolDetail] Failed to load leaderboard: \(error)")
+                return nil
+            }
+        }
+
+        // Await all results — they've all been running concurrently on the main actor
+        members = await membersTask.value
+        settings = await settingsTask.value
+        matches = await matchesTask.value
+        teams = await teamsTask.value
+
+        if let response = await leaderboardTask.value {
             leaderboardResponse = response
             leaderboardData = response.entries
             leaderboardMap = Dictionary(uniqueKeysWithValues: response.entries.map { ($0.entryId, $0) })
-            print("[PoolDetail] Leaderboard loaded: \(response.entries.count) entries, awards: \(response.awards?.count ?? 0), superlatives: \(response.superlatives?.count ?? 0)")
-        } catch {
-            print("[PoolDetail] Failed to load leaderboard: \(error)")
+        } else {
             leaderboardData = []
             leaderboardMap = [:]
         }
@@ -108,13 +133,13 @@ final class PoolDetailViewModel {
 
         isLoading = false
 
-        // Pre-load analytics for all entries (non-blocking)
+        // Pre-load analytics for all entries concurrently (non-blocking)
         if let entries = currentMember?.entries {
             for entry in entries {
                 Task {
                     do {
-                        let response = try await apiService.fetchAnalytics(poolId: poolId, entryId: entry.entryId)
-                        analyticsData[entry.entryId] = response
+                        let response = try await self.apiService.fetchAnalytics(poolId: self.poolId, entryId: entry.entryId)
+                        self.analyticsData[entry.entryId] = response
                         print("[PoolDetail] Analytics loaded for entry: \(entry.entryName)")
                     } catch {
                         print("[PoolDetail] Failed to load analytics for \(entry.entryName): \(error)")
@@ -212,4 +237,5 @@ final class PoolDetailViewModel {
     func matchesByStage() -> [String: [Match]] {
         Dictionary(grouping: knockoutMatches, by: { $0.stage })
     }
+
 }

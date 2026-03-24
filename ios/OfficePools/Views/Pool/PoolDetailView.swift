@@ -24,29 +24,85 @@ enum PoolTab: String, CaseIterable {
 
 struct PoolDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable var viewModel: PoolDetailViewModel
+    @State var viewModel: PoolDetailViewModel
     let authService: AuthService
-    @State private var selectedTab: PoolTab = .leaderboard
+    var onPoolDeleted: ((String) -> Void)?  // poolId
+    @State private var selectedTab: PoolTab? = .leaderboard
     @State private var showingEntryDetail = false
     @State private var predictionsViewModel: PredictionsViewModel?
+    @State private var tabBarHeight: CGFloat = 40
+    @State private var showingBanter = false
+    @State private var banterViewModel: BanterViewModel?
 
     private var isMultiEntry: Bool {
         (viewModel.pool?.maxEntriesPerUser ?? 1) > 1
     }
 
-    var body: some View {
-        Group {
-            if viewModel.isLoading {
-                ProgressView("Loading pool...")
-            } else if let error = viewModel.errorMessage {
-                ContentUnavailableView("Error", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else {
-                tabContent
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewModel.isLoading {
+            ProgressView("Loading pool...")
+        } else if let error = viewModel.errorMessage {
+            ContentUnavailableView("Error", systemImage: "exclamationmark.triangle", description: Text(error))
+        } else {
+            ZStack(alignment: .top) {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(visibleTabs, id: \.self) { tab in
+                            contentForTab(tab)
+                                .safeAreaPadding(.top, tabBarHeight)
+                                .containerRelativeFrame(.horizontal)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollIndicators(.hidden)
+                .scrollPosition(id: $selectedTab)
+
+                tabBar
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    if banterViewModel == nil {
+                        banterViewModel = BanterViewModel(poolId: viewModel.poolId)
+                    }
+                    showingBanter = true
+                } label: {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: 60)
+                        .background(
+                            Circle()
+                                .fill(Color.accentColor)
+                                .shadow(color: Color.accentColor.opacity(0.4), radius: 12, y: 6)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(.white.opacity(0.3), lineWidth: 1.5)
+                        )
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 16)
             }
         }
+    }
+
+    var body: some View {
+        mainContent
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isMultiEntry && showingEntryDetail)
+        .navigationDestination(for: Member.self) { member in
+            MemberDetailView(
+                member: member,
+                leaderboardData: viewModel.leaderboardData,
+                currentUserId: viewModel.currentUserId ?? "",
+                poolService: PoolService(),
+                adminCount: viewModel.members.filter(\.isAdmin).count
+            )
+        }
         .toolbar {
             if isMultiEntry && showingEntryDetail {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -59,26 +115,31 @@ struct PoolDetailView: View {
                 }
             }
         }
-        .task {
-            if let userId = authService.appUser?.userId {
-                await viewModel.load(userId: userId)
-                if predictionsViewModel == nil {
-                    predictionsViewModel = PredictionsViewModel(poolId: viewModel.poolId)
+        .fullScreenCover(isPresented: $showingBanter) {
+            BanterFullScreenView(
+                viewModel: banterViewModel ?? BanterViewModel(poolId: viewModel.poolId),
+                authService: authService,
+                poolName: viewModel.pool?.poolName ?? "Chat",
+                matches: viewModel.matches,
+                leaderboardEntries: viewModel.leaderboardData,
+                analyticsData: viewModel.selectedEntry.flatMap { viewModel.analyticsData[$0.entryId] },
+                entryId: viewModel.selectedEntry?.entryId
+            )
+        }
+        .onAppear {
+            guard viewModel.pool == nil else { return }  // Already loaded
+            Task {
+                if let userId = authService.appUser?.userId {
+                    print("[PoolDetailView] Loading pool \(viewModel.poolId)")
+                    await viewModel.load(userId: userId)
+                    if predictionsViewModel == nil {
+                        predictionsViewModel = PredictionsViewModel(poolId: viewModel.poolId)
+                    }
+                } else {
+                    viewModel.errorMessage = "Not signed in"
+                    viewModel.isLoading = false
                 }
             }
-        }
-    }
-
-    private var tabContent: some View {
-        TabView(selection: $selectedTab) {
-            ForEach(visibleTabs, id: \.self) { tab in
-                contentForTab(tab)
-                    .tag(tab)
-            }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            tabBar
         }
     }
 
@@ -88,7 +149,9 @@ struct PoolDetailView: View {
                 HStack(spacing: 20) {
                     ForEach(visibleTabs, id: \.self) { tab in
                         Button {
-                            selectedTab = tab
+                            withAnimation {
+                                selectedTab = tab
+                            }
                         } label: {
                             Text(tab.rawValue)
                                 .font(.subheadline.weight(selectedTab == tab ? .bold : .regular))
@@ -108,6 +171,15 @@ struct PoolDetailView: View {
             }
         }
         .background(.ultraThinMaterial)
+        .overlay(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { tabBarHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { _, newHeight in
+                        tabBarHeight = newHeight
+                    }
+            }
+        )
     }
 
     @ViewBuilder
@@ -119,7 +191,7 @@ struct PoolDetailView: View {
                         viewModel: predVM,
                         matches: viewModel.matches,
                         teams: viewModel.teams,
-                        selectedEntry: $viewModel.selectedEntry,
+                        selectedEntry: Bindable(viewModel).selectedEntry,
                         entries: viewModel.currentMember?.entries ?? [],
                         pool: viewModel.pool,
                         settings: viewModel.settings,
@@ -179,16 +251,33 @@ struct PoolDetailView: View {
                     pool: viewModel.pool,
                     currentUserId: viewModel.currentUserId ?? "",
                     poolService: PoolService(),
-                    onPoolDeleted: { dismiss() }
+                    onPoolDeleted: {
+                        onPoolDeleted?(viewModel.poolId)
+                        dismiss()
+                    }
                 )
             }
     }
 
     private var visibleTabs: [PoolTab] {
-        var tabs: [PoolTab] = [.leaderboard, .predictions, .form, .banter, .rules]
+        var tabs: [PoolTab] = [.leaderboard, .predictions, .form, .rules]
         if viewModel.isAdmin {
             tabs.append(contentsOf: [.members, .settings])
         }
         return tabs
+    }
+}
+
+// MARK: - Liquid Glass Bar Modifier
+
+private struct LiquidGlassBar: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect)
+        } else {
+            content
+                .background(.ultraThinMaterial)
+        }
     }
 }

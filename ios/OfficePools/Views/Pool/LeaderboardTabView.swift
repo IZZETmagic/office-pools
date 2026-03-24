@@ -55,6 +55,7 @@ struct LeaderboardTabView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 20)
             }
+            .background(Color(.systemGroupedBackground))
         }
     }
 
