@@ -1,7 +1,7 @@
 import Foundation
 import Supabase
 
-/// Aggregated data for a single pool displayed on the Home tab.
+/// Aggregated data for a single pool displayed on the Home and Pools tabs.
 struct PoolCardData: Identifiable {
     let pool: Pool
     let userRank: Int?
@@ -11,25 +11,35 @@ struct PoolCardData: Identifiable {
     let deadline: Date?
     let unreadBanterCount: Int
     let needsPredictions: Bool
+    let memberCount: Int
+    let isAdmin: Bool
+    let levelNumber: Int
+    let levelName: String
 
     var id: String { pool.poolId }
+
+    /// Compute level from points (matches web app thresholds).
+    static func getLevel(points: Int) -> (number: Int, name: String) {
+        if points >= 5000 { return (10, "Legend") }
+        if points >= 4000 { return (9, "Master") }
+        if points >= 3000 { return (8, "Expert") }
+        if points >= 2500 { return (7, "Strategist") }
+        if points >= 2000 { return (6, "Tactician") }
+        if points >= 1500 { return (5, "Competitor") }
+        if points >= 1000 { return (4, "Contender") }
+        if points >= 500 { return (3, "Amateur") }
+        if points >= 100 { return (2, "Beginner") }
+        return (1, "Rookie")
+    }
 }
 
 /// Represents a single match result for the form dots display.
 enum FormResult {
-    case correct   // green - exact or close prediction
-    case partial   // yellow - got outcome right
-    case incorrect // red - wrong
-    case missed    // gray - no prediction submitted
-
-    var color: String {
-        switch self {
-        case .correct: return "green"
-        case .partial: return "yellow"
-        case .incorrect: return "red"
-        case .missed: return "gray"
-        }
-    }
+    case exact      // gold/accent - exact score prediction
+    case winnerGd   // green - correct winner + goal difference
+    case winner     // blue - correct winner only
+    case miss       // red - wrong prediction
+    case placeholder // gray - no data yet
 }
 
 /// View model for the Home tab.
@@ -77,20 +87,30 @@ final class HomeViewModel {
             // 1. Fetch user's pools
             pools = try await poolService.fetchUserPools(userId: userId)
 
-            // 2. Fetch leaderboard data for each pool + build pool cards
-            var cards: [PoolCardData] = []
-            var allBestRanks: [Int] = []
-            var aggregateTotalPoints = 0
-            var aggregateBestStreak = 0
-
             // Collect unique tournament IDs for match queries
             let tournamentIds = Set(pools.map(\.tournamentId))
 
-            for pool in pools {
-                let cardData = await buildPoolCard(pool: pool, userId: userId)
-                cards.append(cardData)
+            // 2. Kick off ALL pool card builds concurrently using Task (inherits @MainActor)
+            let poolsSnapshot = pools
+            var cardTasks: [Task<PoolCardData, Never>] = []
+            for pool in poolsSnapshot {
+                let task = Task {
+                    await self.buildPoolCard(pool: pool, userId: userId)
+                }
+                cardTasks.append(task)
+            }
 
-                // Aggregate stats
+            // Kick off streak fetch concurrently while cards build
+            let streakTask = Task { await self.fetchBestStreak(userId: userId) }
+
+            // Collect all card results
+            var cards: [PoolCardData] = []
+            var allBestRanks: [Int] = []
+            var aggregateTotalPoints = 0
+
+            for task in cardTasks {
+                let cardData = await task.value
+                cards.append(cardData)
                 if let rank = cardData.userRank {
                     allBestRanks.append(rank)
                 }
@@ -102,7 +122,6 @@ final class HomeViewModel {
                 if a.needsPredictions != b.needsPredictions {
                     return a.needsPredictions
                 }
-                // Both need or both don't need predictions — sort by deadline (soonest first)
                 switch (a.deadline, b.deadline) {
                 case let (aDate?, bDate?): return aDate < bDate
                 case (nil, .some): return false
@@ -115,8 +134,8 @@ final class HomeViewModel {
             bestRank = allBestRanks.min()
             totalPoints = aggregateTotalPoints
 
-            // 3. Fetch streak from player_scores for the user's entries
-            bestStreak = await fetchBestStreak(userId: userId)
+            // 3. Collect streak result (already running concurrently)
+            bestStreak = await streakTask.value
 
             // 4. Fetch live and upcoming matches
             await fetchMatches(tournamentIds: tournamentIds)
@@ -131,13 +150,17 @@ final class HomeViewModel {
 
     // MARK: - Build Individual Pool Card
 
-    private func buildPoolCard(pool: Pool, userId: String) async -> PoolCardData {
+    func buildPoolCard(pool: Pool, userId: String) async -> PoolCardData {
         var userRank: Int? = nil
         var totalEntries = 0
         var userPoints = 0
         var needsPredictions = false
         var formResults: [FormResult] = []
         var unreadBanter = 0
+        var memberCount = 0
+        var isAdmin = false
+        var levelNumber = 1
+        var levelName = "Rookie"
 
         do {
             let leaderboard = try await apiService.fetchLeaderboard(poolId: pool.poolId)
@@ -149,21 +172,43 @@ final class HomeViewModel {
                 userRank = bestEntry.currentRank
                 userPoints = bestEntry.totalPoints
                 needsPredictions = !bestEntry.hasSubmittedPredictions
+
+                // Use lastFive from API if available (already computed server-side)
+                if let lastFive = bestEntry.lastFive {
+                    formResults = lastFive.map { parseFormResult($0) }
+                }
+
+                // Use level from API if available
+                if let apiLevel = bestEntry.level, let apiLevelName = bestEntry.levelName {
+                    levelNumber = apiLevel
+                    levelName = apiLevelName
+                }
             }
 
-            // Fetch form results (last 5 match scores for the user's entry)
-            if let bestEntry = userEntries.first {
+            // Fallback: fetch form from player_scores if API didn't provide it
+            if formResults.isEmpty, let bestEntry = userEntries.first {
                 formResults = await fetchFormResults(entryId: bestEntry.entryId, tournamentId: pool.tournamentId)
             }
         } catch {
             print("[HomeViewModel] Failed to fetch leaderboard for pool \(pool.poolId): \(error)")
         }
 
-        // Fetch unread banter count
-        unreadBanter = await fetchUnreadBanterCount(poolId: pool.poolId, userId: userId)
+        // Fetch member info and unread banter concurrently
+        let memberInfoTask = Task { await self.fetchMemberInfo(poolId: pool.poolId, userId: userId) }
+        let unreadBanterTask = Task { await self.fetchUnreadBanterCount(poolId: pool.poolId, userId: userId) }
+
+        (memberCount, isAdmin) = await memberInfoTask.value
+        unreadBanter = await unreadBanterTask.value
 
         // Parse deadline
         let deadline = parseDate(pool.predictionDeadline)
+
+        // Compute level from points if not already set from API
+        if levelNumber == 1 && levelName == "Rookie" && userPoints > 0 {
+            let level = PoolCardData.getLevel(points: userPoints)
+            levelNumber = level.number
+            levelName = level.name
+        }
 
         return PoolCardData(
             pool: pool,
@@ -173,8 +218,24 @@ final class HomeViewModel {
             formResults: formResults,
             deadline: deadline,
             unreadBanterCount: unreadBanter,
-            needsPredictions: needsPredictions
+            needsPredictions: needsPredictions,
+            memberCount: memberCount,
+            isAdmin: isAdmin,
+            levelNumber: levelNumber,
+            levelName: levelName
         )
+    }
+
+    // MARK: - Parse Form Result String
+
+    private func parseFormResult(_ value: String) -> FormResult {
+        switch value {
+        case "exact": return .exact
+        case "winner_gd": return .winnerGd
+        case "winner": return .winner
+        case "miss": return .miss
+        default: return .miss
+        }
     }
 
     // MARK: - Fetch Form Results (Last 5)
@@ -182,35 +243,37 @@ final class HomeViewModel {
     private func fetchFormResults(entryId: String, tournamentId: String) async -> [FormResult] {
         do {
             struct ScoreRow: Codable {
-                let matchPoints: Int
-                let totalPoints: Int
-                let matchId: String
+                let pointsEarned: Int
+                let isExactScore: Bool
+                let isCorrectDifference: Bool
+                let isCorrectResult: Bool
 
                 enum CodingKeys: String, CodingKey {
-                    case matchPoints = "match_points"
-                    case totalPoints = "total_points"
-                    case matchId = "match_id"
+                    case pointsEarned = "points_earned"
+                    case isExactScore = "is_exact_score"
+                    case isCorrectDifference = "is_correct_difference"
+                    case isCorrectResult = "is_correct_result"
                 }
             }
 
             let scores: [ScoreRow] = try await supabase
-                .from("player_scores")
-                .select("match_points, total_points, match_id")
+                .from("match_scores")
+                .select("points_earned, is_exact_score, is_correct_difference, is_correct_result")
                 .eq("entry_id", value: entryId)
-                .order("created_at", ascending: false)
+                .order("calculated_at", ascending: false)
                 .limit(5)
                 .execute()
                 .value
 
             return scores.map { score in
-                if score.matchPoints >= 8 {
-                    return .correct
-                } else if score.matchPoints >= 3 {
-                    return .partial
-                } else if score.matchPoints > 0 {
-                    return .partial
+                if score.isExactScore {
+                    return .exact
+                } else if score.isCorrectDifference {
+                    return .winnerGd
+                } else if score.isCorrectResult {
+                    return .winner
                 } else {
-                    return .incorrect
+                    return .miss
                 }
             }
         } catch {
@@ -223,30 +286,25 @@ final class HomeViewModel {
 
     private func fetchBestStreak(userId: String) async -> Int {
         do {
-            // Get all entry IDs for this user
-            struct EntryRow: Codable {
-                let entryId: String
-                enum CodingKeys: String, CodingKey {
-                    case entryId = "entry_id"
-                }
-            }
-
-            let memberEntries: [EntryRow] = try await supabase
-                .from("pool_entries")
-                .select("entry_id")
-                .eq("member_id", value: userId)
-                .execute()
-                .value
-
-            // For simplicity, we look at the user's pool_members to get entries
-            // Then check player_scores for consecutive non-zero scores
             struct MemberRow: Codable {
                 let memberId: String
+                enum CodingKeys: String, CodingKey { case memberId = "member_id" }
+            }
+            struct EntryRow: Codable {
+                let entryId: String
+                enum CodingKeys: String, CodingKey { case entryId = "entry_id" }
+            }
+            struct ScoreCheck: Codable {
+                let entryId: String
+                let pointsEarned: Int
+                var matchPoints: Int { pointsEarned }
                 enum CodingKeys: String, CodingKey {
-                    case memberId = "member_id"
+                    case entryId = "entry_id"
+                    case pointsEarned = "points_earned"
                 }
             }
 
+            // 1. Single query: get all member IDs for this user
             let memberships: [MemberRow] = try await supabase
                 .from("pool_members")
                 .select("member_id")
@@ -254,49 +312,34 @@ final class HomeViewModel {
                 .execute()
                 .value
 
-            let memberIds = memberships.map(\.memberId)
-            guard !memberIds.isEmpty else { return 0 }
+            guard !memberships.isEmpty else { return 0 }
 
-            // Get entries for these members
-            var allEntryIds: [String] = []
-            for memberId in memberIds {
-                let entries: [EntryRow] = try await supabase
-                    .from("pool_entries")
-                    .select("entry_id")
-                    .eq("member_id", value: memberId)
-                    .execute()
-                    .value
-                allEntryIds.append(contentsOf: entries.map(\.entryId))
-            }
+            // 2. Single query: get all entry IDs for those members
+            let entries: [EntryRow] = try await supabase
+                .from("pool_entries")
+                .select("entry_id")
+                .in("member_id", values: memberships.map(\.memberId))
+                .execute()
+                .value
 
-            guard !allEntryIds.isEmpty else { return 0 }
+            guard !entries.isEmpty else { return 0 }
 
-            // Get player scores ordered by match, check consecutive non-misses
+            // 3. Single query: get ALL match_scores for all entries at once
+            let allScores: [ScoreCheck] = try await supabase
+                .from("match_scores")
+                .select("entry_id, points_earned")
+                .in("entry_id", values: entries.map(\.entryId))
+                .order("calculated_at", ascending: false)
+                .execute()
+                .value
+
+            // 4. Group by entry and compute streaks client-side
+            let grouped = Dictionary(grouping: allScores, by: \.entryId)
             var maxStreak = 0
-            for entryId in allEntryIds {
-                struct ScoreCheck: Codable {
-                    let matchPoints: Int
-                    enum CodingKeys: String, CodingKey {
-                        case matchPoints = "match_points"
-                    }
-                }
-
-                let scores: [ScoreCheck] = try await supabase
-                    .from("player_scores")
-                    .select("match_points")
-                    .eq("entry_id", value: entryId)
-                    .order("created_at", ascending: false)
-                    .execute()
-                    .value
-
-                // Count consecutive non-zero from the most recent
+            for (_, scores) in grouped {
                 var streak = 0
                 for score in scores {
-                    if score.matchPoints > 0 {
-                        streak += 1
-                    } else {
-                        break
-                    }
+                    if score.matchPoints > 0 { streak += 1 } else { break }
                 }
                 maxStreak = max(maxStreak, streak)
             }
@@ -305,6 +348,34 @@ final class HomeViewModel {
         } catch {
             print("[HomeViewModel] Failed to fetch streak: \(error)")
             return 0
+        }
+    }
+
+    // MARK: - Fetch Member Info (count + admin status)
+
+    func fetchMemberInfo(poolId: String, userId: String) async -> (memberCount: Int, isAdmin: Bool) {
+        do {
+            struct MemberRow: Codable {
+                let userId: String
+                let role: String
+                enum CodingKeys: String, CodingKey {
+                    case userId = "user_id"
+                    case role
+                }
+            }
+
+            let members: [MemberRow] = try await supabase
+                .from("pool_members")
+                .select("user_id, role")
+                .eq("pool_id", value: poolId)
+                .execute()
+                .value
+
+            let isAdmin = members.first(where: { $0.userId == userId })?.role == "admin"
+            return (members.count, isAdmin)
+        } catch {
+            print("[HomeViewModel] Failed to fetch member info for pool \(poolId): \(error)")
+            return (0, false)
         }
     }
 
@@ -319,9 +390,9 @@ final class HomeViewModel {
                 }
             }
 
-            // Get user's last read timestamp for this pool
+            // Get user's last_read_at from pool_members
             let readRows: [ReadRow] = try await supabase
-                .from("banter_read_status")
+                .from("pool_members")
                 .select("last_read_at")
                 .eq("pool_id", value: poolId)
                 .eq("user_id", value: userId)
@@ -338,13 +409,14 @@ final class HomeViewModel {
                 }
             }
 
-            // Count messages after last_read_at (fetch IDs only for a lightweight query)
+            // Count messages after last_read_at from pool_messages
             if let lastReadAt {
                 let messages: [MessageId] = try await supabase
-                    .from("banter_messages")
+                    .from("pool_messages")
                     .select("message_id")
                     .eq("pool_id", value: poolId)
                     .gt("created_at", value: lastReadAt)
+                    .neq("user_id", value: userId)
                     .execute()
                     .value
 
@@ -352,9 +424,10 @@ final class HomeViewModel {
             } else {
                 // Never read -- count all messages
                 let messages: [MessageId] = try await supabase
-                    .from("banter_messages")
+                    .from("pool_messages")
                     .select("message_id")
                     .eq("pool_id", value: poolId)
+                    .neq("user_id", value: userId)
                     .execute()
                     .value
 
@@ -380,48 +453,49 @@ final class HomeViewModel {
             away_team:teams!away_team_id(country_name, country_code, flag_url)
         """
 
-        // Fetch live matches
-        do {
+        // Fetch live and upcoming matches concurrently
+        let liveTask = Task {
             var allLive: [Match] = []
             for tournamentId in tournamentIds {
-                let matches: [Match] = try await supabase
-                    .from("matches")
-                    .select(matchSelect)
-                    .eq("tournament_id", value: tournamentId)
-                    .eq("status", value: "live")
-                    .execute()
-                    .value
-                allLive.append(contentsOf: matches)
+                do {
+                    let matches: [Match] = try await self.supabase
+                        .from("matches")
+                        .select(matchSelect)
+                        .eq("tournament_id", value: tournamentId)
+                        .eq("status", value: "live")
+                        .execute()
+                        .value
+                    allLive.append(contentsOf: matches)
+                } catch {
+                    print("[HomeViewModel] Failed to fetch live matches for \(tournamentId): \(error)")
+                }
             }
-            liveMatches = allLive.sorted { $0.matchNumber < $1.matchNumber }
-        } catch {
-            print("[HomeViewModel] Failed to fetch live matches: \(error)")
+            return allLive.sorted { $0.matchNumber < $1.matchNumber }
         }
 
-        // Fetch upcoming matches
-        do {
+        let upcomingTask = Task {
             var allUpcoming: [Match] = []
             for tournamentId in tournamentIds {
-                let matches: [Match] = try await supabase
-                    .from("matches")
-                    .select(matchSelect)
-                    .eq("tournament_id", value: tournamentId)
-                    .in("status", values: ["scheduled", "upcoming"])
-                    .order("match_date")
-                    .limit(10)
-                    .execute()
-                    .value
-                allUpcoming.append(contentsOf: matches)
+                do {
+                    let matches: [Match] = try await self.supabase
+                        .from("matches")
+                        .select(matchSelect)
+                        .eq("tournament_id", value: tournamentId)
+                        .in("status", values: ["scheduled", "upcoming"])
+                        .order("match_date")
+                        .limit(10)
+                        .execute()
+                        .value
+                    allUpcoming.append(contentsOf: matches)
+                } catch {
+                    print("[HomeViewModel] Failed to fetch upcoming matches for \(tournamentId): \(error)")
+                }
             }
-            // Sort by date and take first 5
-            upcomingMatches = Array(
-                allUpcoming
-                    .sorted { $0.matchDate < $1.matchDate }
-                    .prefix(5)
-            )
-        } catch {
-            print("[HomeViewModel] Failed to fetch upcoming matches: \(error)")
+            return Array(allUpcoming.sorted { $0.matchDate < $1.matchDate }.prefix(5))
         }
+
+        liveMatches = await liveTask.value
+        upcomingMatches = await upcomingTask.value
     }
 
     // MARK: - Helpers

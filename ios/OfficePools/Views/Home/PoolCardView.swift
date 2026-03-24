@@ -96,10 +96,11 @@ struct PoolCardView: View {
 
     private func formColor(for result: FormResult) -> Color {
         switch result {
-        case .correct: return .green
-        case .partial: return .yellow
-        case .incorrect: return .red
-        case .missed: return .gray
+        case .exact: return Color(red: 0.85, green: 0.65, blue: 0.13) // gold
+        case .winnerGd: return .green
+        case .winner: return .blue
+        case .miss: return .red
+        case .placeholder: return Color(.systemGray4)
         }
     }
 
@@ -135,10 +136,14 @@ struct PoolCardView: View {
                     createdAt: "", updatedAt: ""
                 ),
                 userRank: 2, totalEntries: 13, totalPoints: 87,
-                formResults: [.correct, .partial, .incorrect, .correct, .correct],
+                formResults: [.exact, .winnerGd, .miss, .exact, .winner],
                 deadline: Date().addingTimeInterval(86400),
                 unreadBanterCount: 3,
-                needsPredictions: false
+                needsPredictions: false,
+                memberCount: 13,
+                isAdmin: true,
+                levelNumber: 2,
+                levelName: "Beginner"
             ))
         }
         .padding()

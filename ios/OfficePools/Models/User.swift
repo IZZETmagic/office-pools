@@ -20,7 +20,7 @@ struct AppUser: Codable, Identifiable {
     }
 }
 
-struct UserProfile: Codable {
+struct UserProfile: Codable, Hashable {
     let userId: String
     let username: String
     let fullName: String

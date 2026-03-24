@@ -9,6 +9,201 @@ final class PoolService {
     /// In-memory cache for pool settings (poolId → settings)
     private static var settingsCache: [String: PoolSettings] = [:]
 
+    // MARK: - Fetch Tournaments
+
+    func fetchTournaments() async throws -> [Tournament] {
+        let tournaments: [Tournament] = try await supabase
+            .from("tournaments")
+            .select("tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description")
+            .order("start_date", ascending: false)
+            .execute()
+            .value
+        return tournaments
+    }
+
+    // MARK: - Create Pool
+
+    /// Create a new pool with all related records (member, entry, settings, round states).
+    /// Mirrors the web's CreatePoolModal.handleCreatePool().
+    func createPool(
+        poolName: String,
+        description: String?,
+        tournamentId: String,
+        adminUserId: String,
+        username: String,
+        predictionDeadline: Date,
+        predictionMode: PredictionMode,
+        isPrivate: Bool,
+        maxParticipants: Int?,
+        maxEntriesPerUser: Int
+    ) async throws -> Pool {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let deadlineISO = formatter.string(from: predictionDeadline)
+
+        // 1. Insert pool
+        struct NewPool: Codable {
+            let poolName: String
+            let description: String?
+            let tournamentId: String
+            let adminUserId: String
+            let predictionDeadline: String
+            let predictionMode: String
+            let status: String
+            let isPrivate: Bool
+            let maxParticipants: Int?
+            let maxEntriesPerUser: Int
+
+            enum CodingKeys: String, CodingKey {
+                case poolName = "pool_name"
+                case description
+                case tournamentId = "tournament_id"
+                case adminUserId = "admin_user_id"
+                case predictionDeadline = "prediction_deadline"
+                case predictionMode = "prediction_mode"
+                case status
+                case isPrivate = "is_private"
+                case maxParticipants = "max_participants"
+                case maxEntriesPerUser = "max_entries_per_user"
+            }
+        }
+
+        let maxP = (maxParticipants ?? 0) > 0 ? maxParticipants : nil
+        let maxE = max(1, min(10, maxEntriesPerUser))
+
+        let pool: Pool = try await supabase
+            .from("pools")
+            .insert(NewPool(
+                poolName: poolName.trimmingCharacters(in: .whitespacesAndNewlines),
+                description: description?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true ? nil : description?.trimmingCharacters(in: .whitespacesAndNewlines),
+                tournamentId: tournamentId,
+                adminUserId: adminUserId,
+                predictionDeadline: deadlineISO,
+                predictionMode: predictionMode.rawValue,
+                status: "open",
+                isPrivate: isPrivate,
+                maxParticipants: maxP,
+                maxEntriesPerUser: maxE
+            ))
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+            .single()
+            .execute()
+            .value
+
+        print("[PoolService] Pool created: \(pool.poolName) (code: \(pool.poolCode))")
+
+        // 2. Add creator as admin member
+        struct NewMemberReturn: Codable {
+            let memberId: String
+            enum CodingKeys: String, CodingKey { case memberId = "member_id" }
+        }
+
+        struct NewAdminMember: Codable {
+            let poolId: String
+            let userId: String
+            let role: String
+            enum CodingKeys: String, CodingKey {
+                case poolId = "pool_id"
+                case userId = "user_id"
+                case role
+            }
+        }
+
+        let memberResult: NewMemberReturn = try await supabase
+            .from("pool_members")
+            .insert(NewAdminMember(poolId: pool.poolId, userId: adminUserId, role: "admin"))
+            .select("member_id")
+            .single()
+            .execute()
+            .value
+
+        // 3. Auto-create first entry
+        try await createPoolEntry(
+            memberId: memberResult.memberId,
+            entryName: username.isEmpty ? "Entry 1" : username,
+            entryNumber: 1
+        )
+
+        // 4. Update pool_settings with defaults (row auto-created by DB trigger)
+        try await supabase
+            .from("pool_settings")
+            .update(ScoringDefaultsPayload.defaults)
+            .eq("pool_id", value: pool.poolId)
+            .execute()
+
+        // 5. For progressive mode: seed round states and disable bracket pairing bonus
+        if predictionMode == .progressive {
+            struct RoundState: Codable {
+                let poolId: String
+                let roundKey: String
+                let state: String
+                let deadline: String?
+                let openedAt: String?
+                enum CodingKeys: String, CodingKey {
+                    case poolId = "pool_id"
+                    case roundKey = "round_key"
+                    case state
+                    case deadline
+                    case openedAt = "opened_at"
+                }
+            }
+
+            let roundKeys = ["group", "round_32", "round_16", "quarter_final", "semi_final", "third_place", "final"]
+            let nowISO = formatter.string(from: Date())
+            let roundStates = roundKeys.map { key in
+                RoundState(
+                    poolId: pool.poolId,
+                    roundKey: key,
+                    state: key == "group" ? "open" : "locked",
+                    deadline: key == "group" ? deadlineISO : nil,
+                    openedAt: key == "group" ? nowISO : nil
+                )
+            }
+
+            try? await supabase
+                .from("pool_round_states")
+                .insert(roundStates)
+                .execute()
+
+            // Disable bracket pairing bonus for progressive pools
+            struct BracketPairingUpdate: Codable {
+                let bonusCorrectBracketPairing: Int
+                enum CodingKeys: String, CodingKey {
+                    case bonusCorrectBracketPairing = "bonus_correct_bracket_pairing"
+                }
+            }
+            try? await supabase
+                .from("pool_settings")
+                .update(BracketPairingUpdate(bonusCorrectBracketPairing: 0))
+                .eq("pool_id", value: pool.poolId)
+                .execute()
+        }
+
+        print("[PoolService] Pool setup complete: \(pool.poolId)")
+        return pool
+    }
+
+    // MARK: - Create Pool Entry
+
+    /// Insert a pool entry for a member. Used by both createPool and joinPool.
+    func createPoolEntry(memberId: String, entryName: String, entryNumber: Int) async throws {
+        struct NewEntry: Codable {
+            let memberId: String
+            let entryName: String
+            let entryNumber: Int
+            enum CodingKeys: String, CodingKey {
+                case memberId = "member_id"
+                case entryName = "entry_name"
+                case entryNumber = "entry_number"
+            }
+        }
+
+        try await supabase
+            .from("pool_entries")
+            .insert(NewEntry(memberId: memberId, entryName: entryName, entryNumber: entryNumber))
+            .execute()
+    }
+
     // MARK: - Fetch User's Pools
 
     func fetchUserPools(userId: String) async throws -> [Pool] {
@@ -67,7 +262,7 @@ final class PoolService {
 
     // MARK: - Join Pool by Code
 
-    func joinPool(poolCode: String, userId: String) async throws -> Pool {
+    func joinPool(poolCode: String, userId: String, username: String = "Entry 1") async throws -> Pool {
         let pools: [Pool] = try await supabase
             .from("pools")
             .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
@@ -100,7 +295,7 @@ final class PoolService {
             throw PoolError.alreadyMember
         }
 
-        // Insert membership
+        // Insert membership and get member_id back
         struct NewMember: Codable {
             let poolId: String
             let userId: String
@@ -112,10 +307,25 @@ final class PoolService {
             }
         }
 
-        try await supabase
+        struct MemberReturn: Codable {
+            let memberId: String
+            enum CodingKeys: String, CodingKey { case memberId = "member_id" }
+        }
+
+        let memberResult: MemberReturn = try await supabase
             .from("pool_members")
             .insert(NewMember(poolId: pool.poolId, userId: userId, role: "member"))
+            .select("member_id")
+            .single()
             .execute()
+            .value
+
+        // Auto-create first entry (matching web behavior)
+        try? await createPoolEntry(
+            memberId: memberResult.memberId,
+            entryName: username.isEmpty ? "Entry 1" : username,
+            entryNumber: 1
+        )
 
         return pool
     }

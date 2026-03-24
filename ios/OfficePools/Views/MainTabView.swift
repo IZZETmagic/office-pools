@@ -6,6 +6,13 @@ struct MainTabView: View {
 
     @State private var selectedTab: AppTab = .home
 
+    init(authService: AuthService) {
+        self.authService = authService
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Home", systemImage: "house.fill", value: .home) {

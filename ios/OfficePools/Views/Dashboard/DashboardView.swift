@@ -9,13 +9,15 @@ struct DashboardView: View {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading pools...")
-                } else if viewModel.pools.isEmpty {
+                } else if viewModel.poolCards.isEmpty && viewModel.searchText.isEmpty {
                     emptyState
                 } else {
                     poolList
                 }
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("My Pools")
+            .searchable(text: $viewModel.searchText, prompt: "Search pools...")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -57,26 +59,27 @@ struct DashboardView: View {
     // MARK: - Pool List
 
     private var poolList: some View {
-        List {
-            if !viewModel.activePools.isEmpty {
-                Section("Active") {
-                    ForEach(viewModel.activePools) { pool in
-                        NavigationLink(value: pool) {
-                            PoolRow(pool: pool)
-                        }
-                    }
-                }
-            }
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                // Filter bar
+                filterBar
+                    .padding(.bottom, 4)
 
-            if !viewModel.archivedPools.isEmpty {
-                Section("Archived") {
-                    ForEach(viewModel.archivedPools) { pool in
-                        NavigationLink(value: pool) {
-                            PoolRow(pool: pool)
+                // Pool cards
+                if viewModel.filteredPools.isEmpty {
+                    emptyFilterState
+                } else {
+                    ForEach(viewModel.filteredPools) { card in
+                        NavigationLink(value: card.pool) {
+                            PoolListCardView(data: card)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
         .navigationDestination(for: Pool.self) { pool in
             PoolDetailView(
@@ -86,7 +89,64 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - Filter Bar
+
+    private var filterBar: some View {
+        HStack(spacing: 8) {
+            // Status filter pills
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PoolStatusFilter.allCases, id: \.self) { filter in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewModel.statusFilter = filter
+                            }
+                        } label: {
+                            Text(filter.rawValue)
+                                .font(.subheadline.weight(viewModel.statusFilter == filter ? .semibold : .regular))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(
+                                    viewModel.statusFilter == filter
+                                        ? Color.accentColor
+                                        : Color(.systemBackground)
+                                )
+                                .foregroundStyle(
+                                    viewModel.statusFilter == filter
+                                        ? .white
+                                        : .primary
+                                )
+                                .clipShape(Capsule())
+                                .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Sort menu
+            Menu {
+                ForEach(PoolSortOption.allCases, id: \.self) { option in
+                    Button {
+                        viewModel.sortBy = option
+                    } label: {
+                        HStack {
+                            Text(option.rawValue)
+                            if viewModel.sortBy == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down.circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Empty States
 
     private var emptyState: some View {
         ContentUnavailableView {
@@ -99,6 +159,24 @@ struct DashboardView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+    }
+
+    private var emptyFilterState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("No pools match your search")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("Clear Filters") {
+                viewModel.searchText = ""
+                viewModel.statusFilter = .all
+            }
+            .font(.subheadline)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
 
     // MARK: - Join Pool Sheet
@@ -128,7 +206,7 @@ struct DashboardView: View {
                 Button {
                     Task {
                         if let userId = authService.appUser?.userId {
-                            await viewModel.joinPool(userId: userId)
+                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1")
                         }
                     }
                 } label: {
@@ -160,44 +238,5 @@ struct DashboardView: View {
             }
         }
         .presentationDetents([.medium])
-    }
-}
-
-// MARK: - Pool Row
-
-struct PoolRow: View {
-    let pool: Pool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(pool.poolName)
-                .font(.headline)
-
-            HStack {
-                Label(pool.predictionMode.rawValue.replacingOccurrences(of: "_", with: " ").capitalized,
-                      systemImage: modeIcon)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(pool.status.capitalized)
-                    .font(.caption2.weight(.medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(pool.status == "active" ? Color.green.opacity(0.15) : Color.secondary.opacity(0.15))
-                    .foregroundStyle(pool.status == "active" ? .green : .secondary)
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var modeIcon: String {
-        switch pool.predictionMode {
-        case .fullTournament: return "list.bullet"
-        case .progressive: return "arrow.forward.circle"
-        case .bracketPicker: return "square.grid.2x2"
-        }
     }
 }

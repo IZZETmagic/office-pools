@@ -5,8 +5,19 @@ struct HomeView: View {
     let authService: AuthService
     @State private var viewModel = HomeViewModel()
 
+    // Join/Create pool state
+    @State private var showJoinSheet = false
+    @State private var showCreateSheet = false
+    @State private var joinPoolCode = ""
+    @State private var isJoining = false
+    @State private var joinError: String?
+    @State private var navigationPath = NavigationPath()
+    @State private var pendingCreatedPool: Pool?
+
+    private let poolService = PoolService()
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if viewModel.isLoading && viewModel.poolCards.isEmpty {
                     loadingState
@@ -26,6 +37,35 @@ struct HomeView: View {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadHomeData(userId: userId)
                 }
+            }
+            .sheet(isPresented: $showJoinSheet) {
+                homeJoinPoolSheet
+            }
+            .fullScreenCover(isPresented: $showCreateSheet, onDismiss: {
+                if let pool = pendingCreatedPool {
+                    pendingCreatedPool = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigationPath.append(pool)
+                    }
+                }
+            }) {
+                CreatePoolView(
+                    userId: authService.appUser?.userId ?? "",
+                    username: authService.appUser?.username ?? "Entry 1"
+                ) { pool in
+                    pendingCreatedPool = pool
+                    Task {
+                        if let userId = authService.appUser?.userId {
+                            await viewModel.loadHomeData(userId: userId)
+                        }
+                    }
+                }
+            }
+            .navigationDestination(for: Pool.self) { pool in
+                PoolDetailView(
+                    viewModel: PoolDetailViewModel(poolId: pool.poolId),
+                    authService: authService
+                )
             }
         }
     }
@@ -145,7 +185,7 @@ struct HomeView: View {
 
                     HStack(spacing: 8) {
                         Button {
-                            // TODO: Navigate to join pool flow
+                            showJoinSheet = true
                         } label: {
                             Label("Join", systemImage: "plus.circle")
                                 .font(.caption.bold())
@@ -155,7 +195,7 @@ struct HomeView: View {
                         .controlSize(.small)
 
                         Button {
-                            // TODO: Navigate to create pool flow
+                            showCreateSheet = true
                         } label: {
                             Label("Create", systemImage: "square.and.pencil")
                                 .font(.caption.bold())
@@ -194,14 +234,14 @@ struct HomeView: View {
 
                 HStack(spacing: 12) {
                     Button {
-                        // TODO: Navigate to join pool flow
+                        showJoinSheet = true
                     } label: {
                         Label("Join a Pool", systemImage: "plus.circle")
                     }
                     .buttonStyle(.borderedProminent)
 
                     Button {
-                        // TODO: Navigate to create pool flow
+                        showCreateSheet = true
                     } label: {
                         Label("Create Pool", systemImage: "square.and.pencil")
                     }
@@ -266,6 +306,77 @@ struct HomeView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+    }
+    // MARK: - Join Pool Sheet
+
+    private var homeJoinPoolSheet: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Enter a pool code to join")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                TextField("Pool Code", text: $joinPoolCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .padding()
+                    .background(.fill.tertiary)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .font(.title3.monospaced())
+                    .multilineTextAlignment(.center)
+
+                if let error = joinError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Button {
+                    Task {
+                        guard let userId = authService.appUser?.userId else { return }
+                        let username = authService.appUser?.username ?? "Entry 1"
+                        isJoining = true
+                        joinError = nil
+                        do {
+                            _ = try await poolService.joinPool(poolCode: joinPoolCode, userId: userId, username: username)
+                            joinPoolCode = ""
+                            showJoinSheet = false
+                            // Reload home data to show new pool
+                            await viewModel.loadHomeData(userId: userId)
+                        } catch {
+                            joinError = error.localizedDescription
+                        }
+                        isJoining = false
+                    }
+                } label: {
+                    Group {
+                        if isJoining {
+                            ProgressView()
+                        } else {
+                            Text("Join Pool")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.accentColor)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .font(.headline)
+                }
+                .disabled(isJoining || joinPoolCode.isEmpty)
+
+                Spacer()
+            }
+            .padding(24)
+            .navigationTitle("Join Pool")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showJoinSheet = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 

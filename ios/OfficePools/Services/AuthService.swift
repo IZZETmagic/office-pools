@@ -20,7 +20,7 @@ final class AuthService {
         }
         // Safety timeout — if auth state never fires, stop loading after 5 seconds
         Task {
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: .seconds(2))
             if isLoading {
                 print("[AuthService] Timeout — no auth event received, stopping loading")
                 isLoading = false
