@@ -4,60 +4,69 @@ struct BanterTabView: View {
     @Bindable var viewModel: BanterViewModel
     let authService: AuthService
     @State private var scrollProxy: ScrollViewProxy?
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(viewModel.messages) { message in
-                            MessageBubble(
-                                message: message,
-                                isOwnMessage: message.userId == authService.appUser?.userId
-                            )
-                            .id(message.messageId)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(viewModel.messages) { message in
+                        MessageBubble(
+                            message: message,
+                            isOwnMessage: message.userId == authService.appUser?.userId
+                        )
+                        .id(message.messageId)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                    HStack(spacing: 12) {
+                        TextField("Message", text: $viewModel.messageText, axis: .vertical)
+                            .focused($isTextFieldFocused)
+                            .lineLimit(1...4)
+                            .padding(10)
+                            .background(.fill.tertiary)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+
+                        Button {
+                            Task {
+                                if let userId = authService.appUser?.userId {
+                                    await viewModel.sendMessage(userId: userId)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
                         }
+                        .disabled(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
-                .onAppear { scrollProxy = proxy }
-                .onChange(of: viewModel.messages.count) {
-                    if let lastId = viewModel.messages.last?.messageId {
+                .background(.bar)
+            }
+            .onAppear { scrollProxy = proxy }
+            .onChange(of: viewModel.messages.count) {
+                if let lastId = viewModel.messages.last?.messageId {
+                    withAnimation {
+                        proxy.scrollTo(lastId, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: isTextFieldFocused) {
+                if isTextFieldFocused, let lastId = viewModel.messages.last?.messageId {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation {
                             proxy.scrollTo(lastId, anchor: .bottom)
                         }
                     }
                 }
             }
-
-            Divider()
-
-            // Input bar
-            HStack(spacing: 12) {
-                TextField("Message", text: $viewModel.messageText, axis: .vertical)
-                    .lineLimit(1...4)
-                    .padding(10)
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-
-                Button {
-                    Task {
-                        if let userId = authService.appUser?.userId {
-                            await viewModel.sendMessage(userId: userId)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
-                }
-                .disabled(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending)
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(.bar)
         }
         .task {
             await viewModel.load()

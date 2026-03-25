@@ -14,6 +14,7 @@ struct BanterFullScreenView: View {
     @State private var showingQuickActions = false
     @State private var showingMatchPicker = false
     @State private var showingBadgePicker = false
+    @FocusState private var isTextFieldFocused: Bool
     @Namespace private var quickActionAnimation
 
     var body: some View {
@@ -47,6 +48,15 @@ struct BanterFullScreenView: View {
                             }
                         } else {
                             // New message — animate
+                            withAnimation {
+                                proxy.scrollTo(lastId, anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                .onChange(of: isTextFieldFocused) {
+                    if isTextFieldFocused, let lastId = viewModel.messages.last?.messageId {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             withAnimation {
                                 proxy.scrollTo(lastId, anchor: .bottom)
                             }
@@ -248,6 +258,7 @@ struct BanterFullScreenView: View {
             // Text field in capsule
             HStack(alignment: .bottom, spacing: 4) {
                 TextField("Banter", text: $viewModel.messageText, axis: .vertical)
+                    .focused($isTextFieldFocused)
                     .lineLimit(1...6)
                     .padding(.leading, 12)
                     .padding(.vertical, 8)
