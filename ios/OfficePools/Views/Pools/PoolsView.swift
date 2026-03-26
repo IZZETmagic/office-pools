@@ -3,6 +3,7 @@ import SwiftUI
 /// Pools tab — lists all pools the user has joined, with rich card data.
 struct PoolsView: View {
     let authService: AuthService
+    @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @State private var viewModel = DashboardViewModel()
     @State private var navigationPath = NavigationPath()
     @State private var pendingCreatedPool: Pool?
@@ -56,11 +57,24 @@ struct PoolsView: View {
             .task {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadPools(userId: userId)
+                    badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
                 }
             }
             .refreshable {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadPools(userId: userId, forceRefresh: true)
+                }
+            }
+            .onChange(of: viewModel.poolCards.map(\.unreadBanterCount)) {
+                badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
+            }
+            .onChange(of: badgeTracker?.refreshTrigger) {
+                // Re-fetch pool cards when a chat was marked as read
+                if let userId = authService.appUser?.userId {
+                    Task {
+                        await viewModel.loadPools(userId: userId, forceRefresh: true)
+                        badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
+                    }
                 }
             }
         }

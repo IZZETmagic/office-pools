@@ -24,6 +24,7 @@ enum PoolTab: String, CaseIterable {
 
 struct PoolDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @State var viewModel: PoolDetailViewModel
     let authService: AuthService
     var onPoolDeleted: ((String) -> Void)?  // poolId
@@ -33,9 +34,103 @@ struct PoolDetailView: View {
     @State private var tabBarHeight: CGFloat = 40
     @State private var showingBanter = false
     @State private var banterViewModel: BanterViewModel?
+    @State private var banterPulse = false
+    @State private var banterGlowRadius: CGFloat = 12
+    @State private var banterSquishY: CGFloat = 1.0
+    @State private var banterSquishX: CGFloat = 1.0
 
     private var isMultiEntry: Bool {
         (viewModel.pool?.maxEntriesPerUser ?? 1) > 1
+    }
+
+    private func triggerBanterJelly() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+
+        // Squish down — like someone poked it
+        withAnimation(.easeIn(duration: 0.12)) {
+            banterSquishY = 0.7
+            banterSquishX = 1.2
+        }
+        generator.impactOccurred()
+
+        // Spring back with overshoot
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.35, blendDuration: 0)) {
+                banterSquishY = 1.0
+                banterSquishX = 1.0
+            }
+
+            // Second lighter squish for extra bounce
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                let light = UIImpactFeedbackGenerator(style: .light)
+                withAnimation(.easeIn(duration: 0.1)) {
+                    banterSquishY = 0.85
+                    banterSquishX = 1.1
+                }
+                light.impactOccurred()
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.4, blendDuration: 0)) {
+                        banterSquishY = 1.0
+                        banterSquishX = 1.0
+                    }
+                }
+            }
+        }
+    }
+
+    private func triggerBanterPulse() {
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.prepare()
+
+        // Pulse 1
+        withAnimation(.easeInOut(duration: 0.3)) {
+            banterPulse = true
+            banterGlowRadius = 24
+        }
+        generator.impactOccurred()
+
+        // Return
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                banterPulse = false
+                banterGlowRadius = 12
+            }
+
+            // Pulse 2
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    banterPulse = true
+                    banterGlowRadius = 20
+                }
+                generator.impactOccurred()
+
+                // Return
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        banterPulse = false
+                        banterGlowRadius = 12
+                    }
+
+                    // Pulse 3 (softer)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            banterPulse = true
+                            banterGlowRadius = 16
+                        }
+                        generator.impactOccurred()
+
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                banterPulse = false
+                                banterGlowRadius = 12
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -64,9 +159,6 @@ struct PoolDetailView: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 Button {
-                    if banterViewModel == nil {
-                        banterViewModel = BanterViewModel(poolId: viewModel.poolId)
-                    }
                     showingBanter = true
                 } label: {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -76,12 +168,26 @@ struct PoolDetailView: View {
                         .background(
                             Circle()
                                 .fill(Color.accentColor)
-                                .shadow(color: Color.accentColor.opacity(0.4), radius: 12, y: 6)
+                                .shadow(color: Color.accentColor.opacity(banterPulse ? 0.8 : 0.4), radius: banterGlowRadius, y: 6)
                         )
                         .overlay(
                             Circle()
                                 .stroke(.white.opacity(0.3), lineWidth: 1.5)
                         )
+                        .scaleEffect(x: banterSquishX, y: banterSquishY)
+                        .scaleEffect(banterPulse ? 1.12 : 1.0)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if let vm = banterViewModel, vm.unreadCount > 0 {
+                        Text("\(vm.unreadCount)")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.red, in: Capsule())
+                            .offset(x: 4, y: -4)
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
                 .padding(.trailing, 16)
                 .padding(.bottom, 16)
@@ -115,18 +221,64 @@ struct PoolDetailView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showingBanter) {
-            BanterFullScreenView(
-                viewModel: banterViewModel ?? BanterViewModel(poolId: viewModel.poolId),
-                authService: authService,
-                poolName: viewModel.pool?.poolName ?? "Chat",
-                matches: viewModel.matches,
-                leaderboardEntries: viewModel.leaderboardData,
-                analyticsData: viewModel.selectedEntry.flatMap { viewModel.analyticsData[$0.entryId] },
-                entryId: viewModel.selectedEntry?.entryId
-            )
+        .sheet(isPresented: $showingBanter) {
+            if let banterVM = banterViewModel {
+                BanterFullScreenView(
+                    viewModel: banterVM,
+                    authService: authService,
+                    poolName: viewModel.pool?.poolName ?? "Chat",
+                    matches: viewModel.matches,
+                    leaderboardEntries: viewModel.leaderboardData,
+                    analyticsData: viewModel.selectedEntry.flatMap { viewModel.analyticsData[$0.entryId] },
+                    entryId: viewModel.selectedEntry?.entryId
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .onChange(of: showingBanter) { _, isShowing in
+            if isShowing, let userId = authService.appUser?.userId {
+                // Tell the badge tracker we're viewing this pool's chat
+                badgeTracker?.activePoolId = viewModel.poolId
+                let previousCount = banterViewModel?.unreadCount ?? 0
+                Task {
+                    await banterViewModel?.markAsRead(userId: userId)
+                    // Update tab badge immediately
+                    if previousCount > 0 {
+                        badgeTracker?.totalUnreadBanter = max(0, (badgeTracker?.totalUnreadBanter ?? 0) - previousCount)
+                        badgeTracker?.refreshTrigger += 1
+                    }
+                }
+            }
+            if !isShowing, let userId = authService.appUser?.userId {
+                // No longer viewing this pool's chat
+                badgeTracker?.activePoolId = nil
+                // Refresh unread count when returning from chat
+                Task {
+                    await banterViewModel?.fetchUnreadCount(userId: userId)
+                }
+            }
+        }
+        .onChange(of: badgeTracker?.refreshTrigger) {
+            // New message arrived — refresh the banter button badge
+            if !showingBanter, let userId = authService.appUser?.userId {
+                Task {
+                    await banterViewModel?.fetchUnreadCount(userId: userId)
+                }
+                // Pulse glow animation with haptic
+                triggerBanterPulse()
+            }
         }
         .onAppear {
+            if banterViewModel == nil {
+                banterViewModel = BanterViewModel(poolId: viewModel.poolId)
+            }
+            // Fetch unread count for chat button badge
+            if let userId = authService.appUser?.userId {
+                Task {
+                    await banterViewModel?.fetchUnreadCount(userId: userId)
+                }
+            }
             guard viewModel.pool == nil else { return }  // Already loaded
             Task {
                 if let userId = authService.appUser?.userId {
@@ -227,10 +379,13 @@ struct PoolDetailView: View {
                 )
 
             case .banter:
-                BanterTabView(
-                    viewModel: BanterViewModel(poolId: viewModel.poolId),
-                    authService: authService
-                )
+                if let banterVM = banterViewModel {
+                    BanterTabView(
+                        viewModel: banterVM,
+                        authService: authService,
+                        leaderboardEntries: viewModel.leaderboardData
+                    )
+                }
 
             case .rules:
                 ScoringRulesTabView(

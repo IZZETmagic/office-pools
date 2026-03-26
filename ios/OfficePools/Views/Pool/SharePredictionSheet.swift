@@ -149,19 +149,16 @@ struct SharePredictionSheet: View {
     // MARK: - Actions
 
     private func selectMatch(_ result: MatchPredictionResult) {
-        let home = result.match.homeDisplayName
-        let away = result.match.awayDisplayName
-        let score = "\(result.match.homeScoreFt!) - \(result.match.awayScoreFt!)"
+        let m = result.match
+        let p = result.prediction
+        let outcomeTag = result.outcome == .exact ? "exact" : (result.outcome == .correct ? "correct" : "miss")
+        let homeCode = m.homeTeam?.countryCode ?? ""
+        let awayCode = m.awayTeam?.countryCode ?? ""
+        let homeFlagUrl = m.homeTeam?.flagUrl ?? ""
+        let awayFlagUrl = m.awayTeam?.flagUrl ?? ""
 
-        let text: String
-        switch result.outcome {
-        case .exact:
-            text = "🎯 Nailed it! \(home) \(score) \(away) — exact score!"
-        case .correct:
-            text = "✓ Called it! \(home) \(score) \(away)"
-        case .miss:
-            text = "\(home) \(score) \(away) — missed this one"
-        }
+        // Format: 🎯 match_number|stage|homeName|awayName|homeCode|awayCode|actualHome|actualAway|predHome|predAway|outcome|homeFlagUrl|awayFlagUrl
+        let text = "🎯 \(m.matchNumber)|\(m.stage)|\(m.homeDisplayName)|\(m.awayDisplayName)|\(homeCode)|\(awayCode)|\(m.homeScoreFt!)|\(m.awayScoreFt!)|\(p.predictedHomeScore)|\(p.predictedAwayScore)|\(outcomeTag)|\(homeFlagUrl)|\(awayFlagUrl)"
 
         onSelect(text)
         dismiss()

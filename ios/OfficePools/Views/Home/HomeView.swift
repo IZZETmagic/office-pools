@@ -3,6 +3,7 @@ import SwiftUI
 /// Home tab -- shows greeting, stats, live matches, pool cards, and upcoming matches.
 struct HomeView: View {
     let authService: AuthService
+    @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @State private var viewModel = HomeViewModel()
 
     // Join/Create pool state
@@ -36,6 +37,13 @@ struct HomeView: View {
             .refreshable {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadHomeData(userId: userId)
+                }
+            }
+            .onChange(of: badgeTracker?.refreshTrigger) {
+                if let userId = authService.appUser?.userId {
+                    Task {
+                        await viewModel.loadHomeData(userId: userId)
+                    }
                 }
             }
             .sheet(isPresented: $showJoinSheet) {

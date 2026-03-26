@@ -38,7 +38,11 @@ struct BadgePickerSheet: View {
                             Button {
                                 let badgeCount = earnedBadges.count
                                 let plural = badgeCount != 1 ? "s" : ""
-                                onSelect("🏆 Flexing my badges — Level \(level) \(levelName) with \(badgeCount) badge\(plural)!")
+                                var text = "🏆 Flexing my badges — Level \(level) \(levelName) with \(badgeCount) badge\(plural)!"
+                                for badge in sortedBadges {
+                                    text += "\n\(badge.name)|\(badge.rarity)|\(badge.id)"
+                                }
+                                onSelect(text)
                                 dismiss()
                             } label: {
                                 HStack(spacing: 12) {
@@ -111,8 +115,8 @@ struct BadgePickerSheet: View {
 
     private func badgeRow(_ badge: BadgeInfo) -> some View {
         HStack(spacing: 12) {
-            // Rarity icon
-            Image(systemName: badgeIcon(badge.rarity))
+            // Badge-specific icon
+            Image(systemName: badgeIcon(badge.id))
                 .font(.title3)
                 .foregroundStyle(rarityColor(badge.rarity))
                 .frame(width: 40, height: 40)
@@ -155,7 +159,7 @@ struct BadgePickerSheet: View {
     // MARK: - Actions
 
     private func selectBadge(_ badge: BadgeInfo) {
-        let text = "🏆 Flexing my \(badge.rarity) badge: \(badge.name)! \(badge.condition)"
+        let text = "🏆 Flexing a badge — \(badge.name)|\(badge.rarity)|\(badge.condition)|\(badge.xpBonus)|\(badge.id)"
         onSelect(text)
         dismiss()
     }
@@ -173,22 +177,31 @@ struct BadgePickerSheet: View {
     }
 
     private func rarityColor(_ rarity: String) -> Color {
-        switch rarity.lowercased() {
-        case "legendary": return .orange
-        case "epic": return .purple
-        case "rare": return .blue
-        case "common": return .gray
-        default: return .secondary
+        switch rarity {
+        case "Common": return .gray
+        case "Uncommon": return .green
+        case "Rare": return .blue
+        case "Very Rare": return .purple
+        case "Legendary": return .yellow
+        default: return .gray
         }
     }
 
-    private func badgeIcon(_ rarity: String) -> String {
-        switch rarity.lowercased() {
-        case "legendary": return "star.circle.fill"
-        case "epic": return "shield.fill"
-        case "rare": return "medal.fill"
-        case "common": return "seal.fill"
-        default: return "seal"
+    private func badgeIcon(_ id: String) -> String {
+        switch id {
+        case "sharpshooter": return "scope"
+        case "oracle": return "eye.fill"
+        case "dark_horse": return "hare.fill"
+        case "ice_breaker": return "snowflake"
+        case "on_fire": return "flame.fill"
+        case "top_dog": return "crown.fill"
+        case "globe_trotter": return "globe"
+        case "lightning_rod": return "bolt.fill"
+        case "stadium_regular": return "building.columns.fill"
+        case "showtime": return "sparkles"
+        case "grand_finale": return "trophy.fill"
+        case "legend": return "star.fill"
+        default: return "star.fill"
         }
     }
 }
