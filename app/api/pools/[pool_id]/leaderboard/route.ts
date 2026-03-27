@@ -94,8 +94,15 @@ async function handleGET(
     return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
   }
 
+  // Use admin client for all data queries to bypass RLS
+  // (pool membership was already verified above, so this is safe)
+  const adminClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   // 3. Fetch pool info
-  const { data: pool } = await supabase
+  const { data: pool } = await adminClient
     .from('pools')
     .select('pool_id, tournament_id, prediction_mode')
     .eq('pool_id', pool_id)
@@ -112,29 +119,29 @@ async function handleGET(
     { data: _tournamentAwardsRow },
     { data: poolMembers },
   ] = await Promise.all([
-    supabase
+    adminClient
       .from('matches')
       .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
       .eq('tournament_id', pool.tournament_id)
       .order('match_number', { ascending: true }),
-    supabase
+    adminClient
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    supabase
+    adminClient
       .from('match_conduct')
       .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    supabase
+    adminClient
       .from('pool_settings')
       .select('*')
       .eq('pool_id', pool_id)
       .single(),
-    supabase
+    adminClient
       .from('tournament_awards')
       .select('champion_team_id, runner_up_team_id, third_place_team_id, best_player, top_scorer')
       .eq('tournament_id', pool.tournament_id)
       .single(),
-    supabase
+    adminClient
       .from('pool_members')
       .select('member_id, user_id, role, users(user_id, username, full_name)')
       .eq('pool_id', pool_id),
@@ -146,7 +153,7 @@ async function handleGET(
 
   // Fetch all entries for these members
   const memberIds = poolMembers.map((m: any) => m.member_id)
-  const { data: entries } = await supabase
+  const { data: entries } = await adminClient
     .from('pool_entries')
     .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank, match_points, bonus_points, scored_total_points')
     .in('member_id', memberIds)
@@ -163,7 +170,7 @@ async function handleGET(
     let offset = 0
     let hasMore = true
     while (hasMore) {
-      const { data: page } = await supabase
+      const { data: page } = await adminClient
         .from('predictions')
         .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
         .in('entry_id', entryIds)
@@ -235,6 +242,9 @@ async function handleGET(
         current_rank: e.current_rank,
         previous_rank: e.previous_rank,
         last_rank_update: null,
+        match_points: e.match_points ?? 0,
+        bonus_points: e.bonus_points ?? 0,
+        scored_total_points: e.scored_total_points ?? 0,
         created_at: '',
       })),
     }
@@ -260,7 +270,7 @@ async function handleGET(
     let offset = 0
     let hasMore = true
     while (hasMore) {
-      const { data: page } = await supabase
+      const { data: page } = await adminClient
         .from('match_scores')
         .select('entry_id, match_id, match_number, stage, score_type, total_points')
         .in('entry_id', allEntryIds)

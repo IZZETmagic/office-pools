@@ -64,8 +64,15 @@ async function handleGET(
     return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
   }
 
+  // Use admin client for all data queries to bypass RLS
+  // (pool membership was already verified above, so this is safe)
+  const adminClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   // 4. Fetch pool info
-  const { data: pool } = await supabase
+  const { data: pool } = await adminClient
     .from('pools')
     .select('pool_id, tournament_id, prediction_mode')
     .eq('pool_id', pool_id)
@@ -74,7 +81,7 @@ async function handleGET(
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
 
   // 5. Verify entry belongs to this pool (entry -> member -> pool)
-  const { data: entry } = await supabase
+  const { data: entry } = await adminClient
     .from('pool_entries')
     .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, adjustment_reason, current_rank, previous_rank')
     .eq('entry_id', entry_id)
@@ -83,7 +90,7 @@ async function handleGET(
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
 
   // Verify the entry's member belongs to this pool
-  const { data: entryMember } = await supabase
+  const { data: entryMember } = await adminClient
     .from('pool_members')
     .select('member_id, user_id')
     .eq('member_id', entry.member_id)
@@ -103,28 +110,28 @@ async function handleGET(
     { data: entryPredictions },
     { data: members },
   ] = await Promise.all([
-    supabase
+    adminClient
       .from('matches')
       .select('*, home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)')
       .eq('tournament_id', pool.tournament_id)
       .order('match_number', { ascending: true }),
-    supabase
+    adminClient
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    supabase
+    adminClient
       .from('match_conduct')
       .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    supabase
+    adminClient
       .from('pool_settings')
       .select('*')
       .eq('pool_id', pool_id)
       .single(),
-    supabase
+    adminClient
       .from('predictions')
       .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
       .eq('entry_id', entry_id),
-    supabase
+    adminClient
       .from('pool_members')
       .select('member_id, pool_id, user_id, role, joined_at, entry_fee_paid, users(user_id, username, full_name, email), pool_entries(entry_id, member_id, entry_name, entry_number, has_submitted_predictions, predictions_submitted_at, predictions_locked, auto_submitted, predictions_last_saved_at, total_points, point_adjustment, adjustment_reason, current_rank, previous_rank, last_rank_update, created_at)')
       .eq('pool_id', pool_id),
@@ -174,7 +181,7 @@ async function handleGET(
     let offset = 0
     let hasMore = true
     while (hasMore) {
-      const { data: page } = await supabase
+      const { data: page } = await adminClient
         .from('predictions')
         .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
         .in('entry_id', entryIds)
@@ -230,12 +237,12 @@ async function handleGET(
   // 7. Compute analytics (wrapped in try/catch so basic data still returns if helpers fail)
   try {
     // Fetch stored match_scores for this entry
-    const { data: entryMatchScores } = await supabase
+    const { data: entryMatchScores } = await adminClient
       .from('match_scores')
       .select('entry_id, match_id, match_number, stage, score_type, total_points')
       .eq('entry_id', entry_id)
 
-    const predictionResults = matchScoresToPredictionResults(entryMatchScores || [])
+    const predictionResults = matchScoresToPredictionResults((entryMatchScores || []) as any)
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)
