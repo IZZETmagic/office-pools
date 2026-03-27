@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ProfilePage from './ProfilePage'
-import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
-import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
+// resolveFullBracket is used for enriching knockout predictions with team names (display only)
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 
@@ -42,7 +41,10 @@ export default async function ProfileServerPage() {
         entry_number,
         has_submitted_predictions,
         total_points,
-        current_rank
+        current_rank,
+        match_points,
+        bonus_points,
+        scored_total_points
       )
     `)
     .eq('user_id', profile.user_id)
@@ -199,39 +201,46 @@ export default async function ProfileServerPage() {
 
   const conductData: MatchConductData[] = (conductRes ?? []) as MatchConductData[]
 
-  // Calculate match + bonus points on-the-fly for each membership (same as dashboard)
+  // Read stored v2 scores for each membership (instead of computing on-the-fly)
   const playerScoresMap: Record<string, { match_points: number; bonus_points: number; total_points: number }> = {}
 
   for (const pool of poolMemberships) {
-    // Get ALL matches for this pool's tournament
+    // Find the best entry to read v2 scores from
+    const poolData = (userPools ?? []).find((m: any) => m.pool_id === pool.pool_id)
+    const entries = (poolData?.pool_entries || []) as any[]
+    const bestEntry = entries.length > 0
+      ? entries.reduce((best: any, e: any) => ((e.scored_total_points ?? 0) > (best.scored_total_points ?? 0) ? e : best), entries[0])
+      : null
+
+    const matchPoints = bestEntry?.match_points ?? 0
+    const bonusPoints = bestEntry?.bonus_points ?? 0
+
+    playerScoresMap[pool.entry_id || pool.member_id] = {
+      match_points: matchPoints,
+      bonus_points: bonusPoints,
+      total_points: matchPoints + bonusPoints,
+    }
+
+    // Get ALL matches for this pool's tournament (needed for bracket resolution)
     const { data: allMatches } = await supabase
       .from('matches')
       .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
       .eq('tournament_id', pool.tournament_id)
       .order('match_number', { ascending: true })
 
-    const normalizedMatches: MatchWithResult[] = (allMatches ?? []).map((match: any) => ({
+    const normalizedMatches = (allMatches ?? []).map((match: any) => ({
       ...match,
       home_team: Array.isArray(match.home_team) ? match.home_team[0] ?? null : match.home_team,
       away_team: Array.isArray(match.away_team) ? match.away_team[0] ?? null : match.away_team,
     }))
 
-    // Get user's predictions for this pool (with PSO + winner fields for bonus calc)
+    // Get user's predictions for this pool (needed for bracket resolution)
     const { data: memberPredictions } = pool.entry_id
       ? await supabase
           .from('predictions')
           .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
           .eq('entry_id', pool.entry_id)
       : { data: null }
-
-    const poolSettings: PoolSettings = poolSettingsMap[pool.pool_id]
-      ? { ...DEFAULT_POOL_SETTINGS, ...poolSettingsMap[pool.pool_id] }
-      : DEFAULT_POOL_SETTINGS
-
-    // Build prediction maps
-    const predictionLookup = new Map(
-      (memberPredictions ?? []).map((p: any) => [p.match_id, p])
-    )
 
     const predictionMap: PredictionMap = new Map()
     for (const p of (memberPredictions ?? [])) {
@@ -251,79 +260,6 @@ export default async function ProfileServerPage() {
       teams,
       conductData,
     })
-
-    // Calculate points — bracket picker uses DB bonus_scores, other modes compute client-side
-    let matchPoints = 0
-    let bonusPoints = 0
-    const completedMatchesList = normalizedMatches.filter(
-      (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
-    )
-
-    if (pool.prediction_mode === 'bracket_picker') {
-      // For bracket picker pools, read pre-computed scores from bonus_scores table
-      if (pool.entry_id) {
-        const { data: bpBonusScores } = await supabase
-          .from('bonus_scores')
-          .select('points_earned')
-          .eq('entry_id', pool.entry_id)
-
-        bonusPoints = (bpBonusScores ?? []).reduce((sum: number, e: any) => sum + e.points_earned, 0)
-      }
-    } else {
-      for (const match of completedMatchesList) {
-        const pred = predictionLookup.get(match.match_id)
-        if (pred && match.home_score_ft !== null && match.away_score_ft !== null) {
-          const resolved = bracket.knockoutTeamMap.get(match.match_number)
-          const teamsMatch = checkKnockoutTeamsMatch(
-            match.stage,
-            match.home_team_id,
-            match.away_team_id,
-            resolved?.home?.team_id ?? null,
-            resolved?.away?.team_id ?? null,
-          )
-          const hasPso = match.home_score_pso !== null && match.away_score_pso !== null
-          const result = calculatePoints(
-            pred.predicted_home_score,
-            pred.predicted_away_score,
-            match.home_score_ft,
-            match.away_score_ft,
-            match.stage,
-            poolSettings,
-            hasPso
-              ? {
-                  actualHomePso: match.home_score_pso!,
-                  actualAwayPso: match.away_score_pso!,
-                  predictedHomePso: pred.predicted_home_pso ?? null,
-                  predictedAwayPso: pred.predicted_away_pso ?? null,
-                }
-              : undefined,
-            teamsMatch,
-          )
-          matchPoints += result.points
-        }
-      }
-
-      // Calculate BONUS points for non-BP modes
-      if (memberPredictions && memberPredictions.length > 0) {
-        const bonusEntries = calculateAllBonusPoints({
-          memberId: pool.entry_id,
-          memberPredictions: predictionMap,
-          matches: normalizedMatches,
-          teams,
-          conductData,
-          settings: poolSettings,
-          tournamentAwards: null,
-        })
-
-        bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
-      }
-    }
-
-    playerScoresMap[pool.entry_id || pool.member_id] = {
-      match_points: matchPoints,
-      bonus_points: bonusPoints,
-      total_points: matchPoints + bonusPoints,
-    }
 
     // Enrich predictions with predicted knockout team names (full_tournament only)
     if (pool.prediction_mode === 'full_tournament' && pool.entry_id) {

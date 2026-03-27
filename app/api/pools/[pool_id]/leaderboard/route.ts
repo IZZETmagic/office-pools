@@ -148,7 +148,7 @@ async function handleGET(
   const memberIds = poolMembers.map((m: any) => m.member_id)
   const { data: entries } = await supabase
     .from('pool_entries')
-    .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank, v2_match_points, v2_bonus_points, v2_total_points')
+    .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank, match_points, bonus_points, scored_total_points')
     .in('member_id', memberIds)
 
   if (!entries) {
@@ -281,8 +281,8 @@ async function handleGET(
 
     if (predictions.length > 0) {
       // Read stored v2 scores (authoritative, computed by scoring engine)
-      matchPoints = entry.v2_match_points ?? 0
-      bonusPoints = entry.v2_bonus_points ?? 0
+      matchPoints = entry.match_points ?? 0
+      bonusPoints = entry.bonus_points ?? 0
 
       // --- Analytics computation ---
       try {
@@ -375,7 +375,7 @@ async function handleGET(
       match_points: matchPoints,
       bonus_points: bonusPoints,
       point_adjustment: adjustment,
-      total_points: entry.v2_total_points ?? (matchPoints + bonusPoints + adjustment),
+      total_points: entry.scored_total_points ?? (matchPoints + bonusPoints + adjustment),
       current_rank: entry.current_rank,
       previous_rank: entry.previous_rank,
       has_submitted_predictions: entry.has_submitted_predictions,

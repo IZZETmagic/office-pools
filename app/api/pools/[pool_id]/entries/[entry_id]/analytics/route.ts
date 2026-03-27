@@ -167,13 +167,27 @@ async function handleGET(
   const entryIds = membersData.flatMap(m => m.entries?.map(e => e.entry_id) || [])
 
   // Fetch all predictions for these entries (needed for crowd data)
+  // Paginate to avoid Supabase's default 1000-row limit
   let allPredictions: any[] = []
   if (entryIds.length > 0) {
-    const { data: allPreds } = await supabase
-      .from('predictions')
-      .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .in('entry_id', entryIds)
-    allPredictions = allPreds || []
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('predictions')
+        .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+        .in('entry_id', entryIds)
+        .range(offset, offset + pageSize - 1)
+
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        allPredictions.push(...page)
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
   }
 
   // Normalize match data

@@ -175,7 +175,7 @@ async function handleGET(
     { data: teams },
   ] = await Promise.all([
     supabase
-      .from('match_scores_v2')
+      .from('match_scores')
       .select('*')
       .eq('entry_id', entry_id)
       .order('match_number', { ascending: true }),

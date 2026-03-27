@@ -98,28 +98,25 @@ final class MatchDetailViewModel {
             errorMessage = error.localizedDescription
         }
 
-        // For knockout matches, resolve predicted teams from breakdown API
-        let isKnockout = match.groupLetter == nil
-        if isKnockout {
-            for entryId in cachedEntryIds {
-                guard let poolId = cachedEntryPoolId[entryId] else { continue }
-                do {
-                    let breakdown = try await apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
-                    if let matchData = breakdown.matchResults.first(where: { $0.matchNumber == match.matchNumber }) {
-                        cachedPredictedTeams[entryId] = (home: matchData.predictedHomeTeam, away: matchData.predictedAwayTeam)
-                        cachedBreakdownData[entryId] = (
-                            teamsMatch: matchData.teamsMatch,
-                            resultType: matchData.type,
-                            points: matchData.totalPoints
-                        )
-                    }
-                } catch {
-                    print("[MatchDetail] Failed to fetch breakdown for entry \(entryId): \(error)")
+        // Fetch breakdown API for all matches (server-computed points + knockout team names)
+        for entryId in cachedEntryIds {
+            guard let poolId = cachedEntryPoolId[entryId] else { continue }
+            do {
+                let breakdown = try await apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
+                if let matchData = breakdown.matchResults.first(where: { $0.matchNumber == match.matchNumber }) {
+                    cachedPredictedTeams[entryId] = (home: matchData.predictedHomeTeam, away: matchData.predictedAwayTeam)
+                    cachedBreakdownData[entryId] = (
+                        teamsMatch: matchData.teamsMatch,
+                        resultType: matchData.type,
+                        points: matchData.totalPoints
+                    )
                 }
+            } catch {
+                print("[MatchDetail] Failed to fetch breakdown for entry \(entryId): \(error)")
             }
-            // Rebuild with predicted teams
-            rebuildPredictionInfos()
         }
+        // Rebuild with server-computed points and predicted teams
+        rebuildPredictionInfos()
 
         // Load match stats before finishing load
         do {
@@ -186,45 +183,9 @@ final class MatchDetailViewModel {
             let pred = cachedPredictions[entryId]
             var points: Int? = nil
 
-            if isCompleted,
-               let pred = pred,
-               let homeActual = match.homeScoreFt,
-               let awayActual = match.awayScoreFt,
-               let settings = cachedEntrySettings[entryId] {
-
-                let isGroup = match.stage == "group"
-                let multiplier = isGroup ? 1.0 : ScoringCalculator.multiplier(for: match.stage, settings: settings)
-
-                let rules = ScoringCalculator.ScoringRules(
-                    exactScore: isGroup ? settings.groupExactScore : settings.knockoutExactScore,
-                    correctDifference: isGroup ? settings.groupCorrectDifference : settings.knockoutCorrectDifference,
-                    correctResult: isGroup ? settings.groupCorrectResult : settings.knockoutCorrectResult,
-                    multiplier: multiplier,
-                    psoEnabled: settings.psoEnabled,
-                    psoExactScore: settings.psoExactScore,
-                    psoCorrectDifference: settings.psoCorrectDifference,
-                    psoCorrectResult: settings.psoCorrectResult
-                )
-
-                let actual = ScoringCalculator.MatchResult(
-                    homeScore: homeActual,
-                    awayScore: awayActual,
-                    homePso: match.homeScorePso,
-                    awayPso: match.awayScorePso
-                )
-
-                let prediction = ScoringCalculator.PredictionResult(
-                    homeScore: pred.predictedHomeScore,
-                    awayScore: pred.predictedAwayScore,
-                    homePso: pred.predictedHomePso,
-                    awayPso: pred.predictedAwayPso
-                )
-
-                points = ScoringCalculator.calculatePoints(
-                    prediction: prediction,
-                    actual: actual,
-                    rules: rules
-                )
+            // Use server-computed points from breakdown API
+            if isCompleted, let breakdown = cachedBreakdownData[entryId] {
+                points = breakdown.points
             }
 
             let teams = cachedPredictedTeams[entryId]

@@ -1,10 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
-import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
-import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
+import type { MatchWithResult } from '@/lib/bonusCalculation'
+import type { Team, MatchConductData } from '@/lib/tournament'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -52,6 +50,9 @@ export default async function DashboardPage() {
         current_rank,
         previous_rank,
         last_rank_update,
+        match_points,
+        bonus_points,
+        scored_total_points,
         point_adjustment
       )
     `)
@@ -182,126 +183,24 @@ export default async function DashboardPage() {
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
 
-      // Get user's predictions for this pool (with winner_team_id for bonus calc)
-      const { data: predictions } = defaultEntryId
-        ? await supabase
-            .from('predictions')
-            .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-            .eq('entry_id', defaultEntryId)
-        : { data: null }
+      // Read stored v2 scores instead of computing on-the-fly
+      const matchPoints = defaultEntry?.match_points ?? 0
+      const bonusPoints = defaultEntry?.bonus_points ?? 0
 
-      // Get pool settings
-      const { data: rawPoolSettings } = await supabase
-        .from('pool_settings')
-        .select('*')
-        .eq('pool_id', pool.pool_id)
-        .single()
+      // Fetch last 5 match results from match_scores for form display
+      let form: string[] = []
+      if (defaultEntryId) {
+        const { data: recentScores } = await supabase
+          .from('match_scores')
+          .select('score_type, match_number')
+          .eq('entry_id', defaultEntryId)
+          .order('match_number', { ascending: false })
+          .limit(5)
 
-      const poolSettings: PoolSettings = rawPoolSettings
-        ? { ...DEFAULT_POOL_SETTINGS, ...rawPoolSettings }
-        : DEFAULT_POOL_SETTINGS
-
-      // Build prediction maps
-      const predictionLookup = new Map(
-        (predictions ?? []).map((p: any) => [p.match_id, p])
-      )
-
-      const predictionMap: PredictionMap = new Map()
-      for (const p of (predictions ?? [])) {
-        predictionMap.set(p.match_id, {
-          home: p.predicted_home_score,
-          away: p.predicted_away_score,
-          homePso: p.predicted_home_pso ?? null,
-          awayPso: p.predicted_away_pso ?? null,
-          winnerTeamId: p.predicted_winner_team_id ?? null,
-        })
+        form = (recentScores ?? [])
+          .reverse()
+          .map((s: any) => s.score_type)
       }
-
-      // Resolve bracket for knockout team matching
-      const bracket = resolveFullBracket({
-        matches: normalizedMatches,
-        predictionMap,
-        teams,
-        conductData,
-      })
-
-      // Calculate points + form (last 5 results) — bracket picker uses DB bonus_scores, other modes compute client-side
-      let matchPoints = 0
-      let bonusPoints = 0
-      const matchResults: { matchNumber: number; type: 'exact' | 'winner_gd' | 'winner' | 'miss' }[] = []
-      const completedMatchesList = normalizedMatches.filter(
-        (match: any) => (match.status === 'completed' || match.status === 'live') && match.home_score_ft !== null && match.away_score_ft !== null
-      )
-
-      if (pool.prediction_mode === 'bracket_picker') {
-        // For bracket picker pools, read pre-computed scores from bonus_scores table
-        if (defaultEntryId) {
-          const { data: bpBonusScores } = await supabase
-            .from('bonus_scores')
-            .select('points_earned')
-            .eq('entry_id', defaultEntryId)
-
-          bonusPoints = (bpBonusScores ?? []).reduce((sum: number, e: any) => sum + e.points_earned, 0)
-        }
-      } else {
-        for (const match of completedMatchesList) {
-          const pred = predictionLookup.get(match.match_id)
-          if (pred && match.home_score_ft !== null && match.away_score_ft !== null) {
-            const resolved = bracket.knockoutTeamMap.get(match.match_number)
-            const teamsMatch = checkKnockoutTeamsMatch(
-              match.stage,
-              match.home_team_id,
-              match.away_team_id,
-              resolved?.home?.team_id ?? null,
-              resolved?.away?.team_id ?? null,
-            )
-            const hasPso = match.home_score_pso !== null && match.away_score_pso !== null
-            const result = calculatePoints(
-              pred.predicted_home_score,
-              pred.predicted_away_score,
-              match.home_score_ft,
-              match.away_score_ft,
-              match.stage,
-              poolSettings,
-              hasPso
-                ? {
-                    actualHomePso: match.home_score_pso!,
-                    actualAwayPso: match.away_score_pso!,
-                    predictedHomePso: pred.predicted_home_pso ?? null,
-                    predictedAwayPso: pred.predicted_away_pso ?? null,
-                  }
-                : undefined,
-              teamsMatch,
-            )
-            matchPoints += result.points
-            matchResults.push({ matchNumber: match.match_number, type: result.type })
-          }
-        }
-
-        // Calculate BONUS points for non-BP modes
-        if (predictions && predictions.length > 0) {
-          const bonusEntries = calculateAllBonusPoints({
-            memberId: defaultEntryId,
-            memberPredictions: predictionMap,
-            matches: normalizedMatches,
-            teams,
-            conductData,
-            settings: poolSettings,
-            tournamentAwards: null,
-          })
-
-          bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
-        }
-      }
-
-      // Last 5 match results sorted by match number (most recent last)
-      const form = matchResults
-        .sort((a, b) => a.matchNumber - b.matchNumber)
-        .slice(-5)
-        .map(r => r.type)
-
-      // Count predicted matches (for default entry)
-      const predictedMatches = predictions?.length ?? 0
 
       // Build per-entry progress (prediction counts for each entry)
       const entryIds = entries.map((e: any) => e.entry_id)
@@ -340,8 +239,8 @@ export default async function DashboardPage() {
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         totalMatches: totalMatchesCount ?? 0,
-        completedMatches: completedMatchesList.length,
-        predictedMatches,
+        completedMatches: normalizedMatches.filter((m: any) => m.is_completed).length,
+        predictedMatches: entryPredCounts[defaultEntryId] || 0,
         entries: entriesProgress,
         form,
       }
