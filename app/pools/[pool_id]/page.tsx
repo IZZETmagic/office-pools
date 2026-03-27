@@ -141,7 +141,7 @@ export default async function PoolPage({
     allEntryIds.length > 0
       ? supabase
           .from('bonus_scores')
-          .select('bonus_score_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
+          .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
           .in('entry_id', allEntryIds)
       : Promise.resolve({ data: [] }),
   ])

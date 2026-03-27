@@ -162,7 +162,7 @@ export function LeaderboardTab({
 
       // Convert BonusScoreEntry[] to BonusScoreData[]
       const bonusData: BonusScoreData[] = bonusEntries.map((e, i) => ({
-        bonus_score_id: `computed-${entryId}-${i}`,
+        bonus_id: `computed-${entryId}-${i}`,
         entry_id: e.entry_id,
         bonus_type: e.bonus_type,
         bonus_category: e.bonus_category,
@@ -398,7 +398,7 @@ export function LeaderboardTab({
             : `Predicted ${teamName} at position ${d.position} in Group ${d.group_letter}`
         }
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: `bp_group_position_${d.position}${d.correct ? '' : '_miss'}`,
           bonus_category: 'bp_group',
@@ -421,7 +421,7 @@ export function LeaderboardTab({
           description = `Predicted ${teamName} (Group ${d.group_letter}) ${predictedLabel} (actually ${actualLabel})`
         }
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: `bp_third_${predictedLabel}${d.correct ? '' : '_miss'}`,
           bonus_category: 'bp_third_place',
@@ -434,7 +434,7 @@ export function LeaderboardTab({
 
       if (breakdown.thirdPlaceAllCorrectBonus > 0) {
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: 'bp_third_all_correct',
           bonus_category: 'bp_third_place',
@@ -463,7 +463,7 @@ export function LeaderboardTab({
           typeSuffix = '_miss'
         }
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: `bp_knockout_${d.stage}${typeSuffix}`,
           bonus_category: 'bp_knockout',
@@ -476,7 +476,7 @@ export function LeaderboardTab({
 
       if (breakdown.penaltyPoints > 0) {
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: 'bp_penalty_predictions',
           bonus_category: 'bp_bonus',
@@ -489,7 +489,7 @@ export function LeaderboardTab({
 
       if (breakdown.championBonus > 0) {
         bonusData.push({
-          bonus_score_id: `bp-computed-${entryId}-${idx++}`,
+          bonus_id: `bp-computed-${entryId}-${idx++}`,
           entry_id: entryId,
           bonus_type: 'bp_champion',
           bonus_category: 'bp_bonus',
