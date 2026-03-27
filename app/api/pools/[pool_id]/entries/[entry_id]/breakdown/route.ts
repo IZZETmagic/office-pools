@@ -166,6 +166,13 @@ async function handleGET(
   // 6. Entry owner's user profile
   const entryOwner = (entryMember as any).users
 
+  // Use admin client for data queries to bypass RLS
+  // (pool membership was already verified above, so this is safe)
+  const adminClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   // 7. Fetch stored v2 scores, matches (for display names), settings, and bonus scores in parallel
   const [
     { data: matchScoresV2 },
@@ -174,25 +181,25 @@ async function handleGET(
     { data: bonusScores },
     { data: teams },
   ] = await Promise.all([
-    supabase
+    adminClient
       .from('match_scores')
       .select('*')
       .eq('entry_id', entry_id)
       .order('match_number', { ascending: true }),
-    supabase
+    adminClient
       .from('matches')
       .select('match_id, match_number, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
       .eq('tournament_id', pool.tournament_id),
-    supabase
+    adminClient
       .from('pool_settings')
       .select('*')
       .eq('pool_id', pool_id)
       .single(),
-    supabase
+    adminClient
       .from('bonus_scores')
       .select('bonus_category, bonus_type, description, points_earned')
       .eq('entry_id', entry_id),
-    supabase
+    adminClient
       .from('teams')
       .select('team_id, country_name')
       .eq('tournament_id', pool.tournament_id),
