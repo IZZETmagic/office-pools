@@ -155,12 +155,29 @@ async function handleGET(
     return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 })
   }
 
-  // Fetch all predictions for all entries in one query
+  // Fetch all predictions for all entries — paginate to avoid Supabase's 1000-row limit
   const entryIds = entries.map((e: any) => e.entry_id)
-  const { data: allPredictions } = await supabase
-    .from('predictions')
-    .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-    .in('entry_id', entryIds)
+  const allPredictions: any[] = []
+  {
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('predictions')
+        .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+        .in('entry_id', entryIds)
+        .range(offset, offset + pageSize - 1)
+
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        allPredictions.push(...page)
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
+  }
 
   // Normalize data
   const normalizedMatches: MatchWithResult[] = matches.map((m: any) => ({
@@ -179,7 +196,7 @@ async function handleGET(
 
   // Group predictions by entry_id
   const predictionsByEntry = new Map<string, any[]>()
-  for (const p of (allPredictions || [])) {
+  for (const p of allPredictions) {
     const list = predictionsByEntry.get(p.entry_id) || []
     list.push(p)
     predictionsByEntry.set(p.entry_id, list)
@@ -224,7 +241,7 @@ async function handleGET(
   })
 
   // Build allPredictions as PredictionData[] (with prediction_id)
-  const allPredsTyped: PredictionData[] = (allPredictions || []).map((p: any) => ({
+  const allPredsTyped: PredictionData[] = allPredictions.map((p: any) => ({
     prediction_id: p.prediction_id || '',
     entry_id: p.entry_id,
     match_id: p.match_id,
