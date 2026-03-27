@@ -8,7 +8,7 @@ export const maxDuration = 120
 // =============================================================
 // POST /api/admin/scoring-v2
 // One-time recalculation: runs the v2 scoring engine against
-// all pools with submitted entries, populates match_scores_v2
+// all pools with submitted entries, populates match_scores
 // and v2_* columns, then returns a comparison report.
 //
 // Super admin only. No side effects on existing scores.
@@ -64,33 +64,33 @@ export async function POST(request: NextRequest) {
       entry_id,
       entry_name,
       total_points,
-      v2_match_points,
-      v2_bonus_points,
-      v2_total_points,
+      match_points,
+      bonus_points,
+      scored_total_points,
       point_adjustment,
       member_id,
       pool_members!inner(pool_id, pools!inner(pool_name, prediction_mode))
     `)
-    .not('v2_total_points', 'is', null)
+    .not('scored_total_points', 'is', null)
     .order('entry_name')
 
   // Compute discrepancies
   const discrepancies = (comparison || [])
-    .filter((e: any) => e.total_points !== e.v2_total_points)
+    .filter((e: any) => e.total_points !== e.scored_total_points)
     .map((e: any) => ({
       entry_id: e.entry_id,
       entry_name: e.entry_name,
       pool_name: e.pool_members?.pools?.pool_name,
       prediction_mode: e.pool_members?.pools?.prediction_mode,
       old_total: e.total_points,
-      v2_match: e.v2_match_points,
-      v2_bonus: e.v2_bonus_points,
-      v2_total: e.v2_total_points,
-      difference: e.v2_total_points - e.total_points,
+      v2_match: e.match_points,
+      v2_bonus: e.bonus_points,
+      v2_total: e.scored_total_points,
+      difference: e.scored_total_points - e.total_points,
     }))
 
   const matches = (comparison || [])
-    .filter((e: any) => e.total_points === e.v2_total_points)
+    .filter((e: any) => e.total_points === e.scored_total_points)
     .length
 
   return NextResponse.json({
@@ -132,32 +132,32 @@ export async function GET(request: NextRequest) {
       entry_id,
       entry_name,
       total_points,
-      v2_match_points,
-      v2_bonus_points,
-      v2_total_points,
+      match_points,
+      bonus_points,
+      scored_total_points,
       point_adjustment,
       member_id,
       pool_members!inner(pool_id, pools!inner(pool_name, prediction_mode))
     `)
-    .not('v2_total_points', 'is', null)
+    .not('scored_total_points', 'is', null)
     .order('entry_name')
 
   const discrepancies = (comparison || [])
-    .filter((e: any) => e.total_points !== e.v2_total_points)
+    .filter((e: any) => e.total_points !== e.scored_total_points)
     .map((e: any) => ({
       entry_id: e.entry_id,
       entry_name: e.entry_name,
       pool_name: e.pool_members?.pools?.pool_name,
       prediction_mode: e.pool_members?.pools?.prediction_mode,
       old_total: e.total_points,
-      v2_match: e.v2_match_points,
-      v2_bonus: e.v2_bonus_points,
-      v2_total: e.v2_total_points,
-      difference: e.v2_total_points - e.total_points,
+      v2_match: e.match_points,
+      v2_bonus: e.bonus_points,
+      v2_total: e.scored_total_points,
+      difference: e.scored_total_points - e.total_points,
     }))
 
   const matches = (comparison || [])
-    .filter((e: any) => e.total_points === e.v2_total_points)
+    .filter((e: any) => e.total_points === e.scored_total_points)
     .length
 
   // Per-match comparison with existing match_scores table

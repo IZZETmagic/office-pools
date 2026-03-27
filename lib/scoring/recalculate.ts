@@ -325,7 +325,7 @@ async function writeScoresToDB(
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
 
-  // Write match_scores_v2 (upsert by entry_id + match_id)
+  // Write match_scores (upsert by entry_id + match_id)
   // Phase 1: Shadow table — does NOT touch the existing match_scores table
   if (matchScores.length > 0) {
     // Process in batches of 500 to avoid payload limits
@@ -333,7 +333,7 @@ async function writeScoresToDB(
     for (let i = 0; i < matchScores.length; i += batchSize) {
       const batch = matchScores.slice(i, i + batchSize)
       const { error } = await adminClient
-        .from('match_scores_v2')
+        .from('match_scores')
         .upsert(batch, { onConflict: 'entry_id,match_id' })
 
       if (error) {
@@ -345,15 +345,15 @@ async function writeScoresToDB(
   }
 
   // Update entry totals on pool_entries
-  // Phase 1: Write to a new column (v2_total_points) for comparison,
+  // Phase 1: Write to a new column (scored_total_points) for comparison,
   // NOT overwriting the existing total_points yet.
   for (const totals of entryTotals) {
     const { error } = await adminClient
       .from('pool_entries')
       .update({
-        v2_match_points: totals.match_points,
-        v2_bonus_points: totals.bonus_points,
-        v2_total_points: totals.total_points,
+        match_points: totals.match_points,
+        bonus_points: totals.bonus_points,
+        scored_total_points: totals.total_points,
       })
       .eq('entry_id', totals.entry_id)
 

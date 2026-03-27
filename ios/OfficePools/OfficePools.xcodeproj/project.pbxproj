@@ -60,7 +60,6 @@
 		A3DD9C4000206052C3089EA0 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A587D2E36A8CA740A652D7 /* ProfileView.swift */; };
 		AA77CD7D86D4890898920F97 /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADC5B571B2AC59945F099757 /* Entry.swift */; };
 		AB3F23AABDB806AD67090743 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C146B2BC07D15E65FFD553F2 /* Assets.xcassets */; };
-		AB5CF73882FE9AE034949D99 /* ScoringCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D783249F3756336D66B2BA /* ScoringCalculator.swift */; };
 		B1E002CDA0DC35D25BE88E9B /* Match.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9559CE0A33901D69C80F97D5 /* Match.swift */; };
 		B211C310503272864637A329 /* BanterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87171D9DF9E0E74148D8876 /* BanterTabView.swift */; };
 		B34B749364585858A6A8C1DE /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593CAE7964DE5A372A862C3E /* MainTabView.swift */; };
@@ -117,7 +116,6 @@
 		5452CCCAC8BE1784E0E05082 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		551964F18F8EB5D7CC4D2537 /* PoolSettingsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolSettingsTabView.swift; sourceTree = "<group>"; };
 		593CAE7964DE5A372A862C3E /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
-		59D783249F3756336D66B2BA /* ScoringCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringCalculator.swift; sourceTree = "<group>"; };
 		5B1E374395DE8572EB9F8880 /* PredictionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionService.swift; sourceTree = "<group>"; };
 		5CDA539E7B61229279894F0D /* GroupStandingsCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupStandingsCalculator.swift; sourceTree = "<group>"; };
 		65DB42B956F5E96A77FD2978 /* PredictionEditViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionEditViewModel.swift; sourceTree = "<group>"; };
@@ -286,7 +284,6 @@
 				F7224E8F7FE060E8A2C09E0A /* AnnexCData.swift */,
 				D963D2BE777C4AD6927F154E /* BracketResolver.swift */,
 				5CDA539E7B61229279894F0D /* GroupStandingsCalculator.swift */,
-				59D783249F3756336D66B2BA /* ScoringCalculator.swift */,
 				B7448132784B9FF633558D0C /* ScoringDefaults.swift */,
 				DAA18728F37CA15861D3B3C7 /* TournamentConstants.swift */,
 			);
@@ -553,7 +550,6 @@
 				1A05E72F4B7707ACB952429A /* ResultsContainerView.swift in Sources */,
 				2D070CCDB5068866F3D8AD2A /* ResultsTabView.swift in Sources */,
 				59062F8D03F0017B50530381 /* ResultsViewModel.swift in Sources */,
-				AB5CF73882FE9AE034949D99 /* ScoringCalculator.swift in Sources */,
 				45BB521FE38873BF1FC64DF3 /* ScoringDefaults.swift in Sources */,
 				8278B0743F6661A7F901AC77 /* ScoringRulesTabView.swift in Sources */,
 				95DEF52A21B6B21820A344C3 /* Settings.swift in Sources */,
