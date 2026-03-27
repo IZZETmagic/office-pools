@@ -173,7 +173,7 @@ export type PlayerScoreData = {
 }
 
 export type BonusScoreData = {
-  bonus_score_id: string
+  bonus_id: string
   entry_id: string
   bonus_type: string
   bonus_category: string
