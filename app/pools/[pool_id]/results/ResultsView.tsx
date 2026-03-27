@@ -2,12 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { MatchCard, type ResultMatch } from './MatchCard'
-import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './points'
+import type { PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
-import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import type { MatchData, TeamData, EntryData, ExistingPrediction, BonusScoreData } from '../types'
-import type { PredictionMap, MatchConductData, Team } from '@/lib/tournament'
+import type { MatchData, TeamData, EntryData, ExistingPrediction, BonusScoreData, MatchScoreData } from '../types'
+import type { MatchConductData } from '@/lib/tournament'
 
 // =============================================
 // TYPES
@@ -54,6 +53,9 @@ export function ResultsView({
   userPredictions,
   bonusScores,
   currentEntryId,
+  // Stored scoring data
+  entryMatchScores,
+  currentEntry,
   // Entry selector
   userEntries,
   selectedEntryId,
@@ -69,6 +71,9 @@ export function ResultsView({
   userPredictions: ExistingPrediction[]
   bonusScores: BonusScoreData[]
   currentEntryId: string
+  // Stored scoring data
+  entryMatchScores: MatchScoreData[]
+  currentEntry?: EntryData
   // Entry selector
   userEntries?: EntryData[]
   selectedEntryId?: string
@@ -123,108 +128,18 @@ export function ResultsView({
     return result
   }, [matches, stageTab, statusFilter, groupFilter])
 
-  // Match points summary
-  const matchPoints = useMemo(() => {
-    let sum = 0
-    for (const m of matches) {
-      if (
-        (m.status === 'completed' || m.status === 'live') &&
-        m.home_score_ft !== null &&
-        m.away_score_ft !== null &&
-        m.prediction
-      ) {
-        const teamsMatch = checkKnockoutTeamsMatch(
-          m.stage,
-          m.home_team_id,
-          m.away_team_id,
-          m.predicted_home_team_id,
-          m.predicted_away_team_id,
-        )
-        const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-        const res = calculatePoints(
-          m.prediction.predicted_home_score,
-          m.prediction.predicted_away_score,
-          m.home_score_ft,
-          m.away_score_ft,
-          m.stage,
-          poolSettings,
-          hasPso
-            ? {
-                actualHomePso: m.home_score_pso!,
-                actualAwayPso: m.away_score_pso!,
-                predictedHomePso: m.prediction.predicted_home_pso,
-                predictedAwayPso: m.prediction.predicted_away_pso,
-              }
-            : undefined,
-          teamsMatch,
-        )
-        sum += res.points
-      }
-    }
-    return sum
-  }, [matches, poolSettings])
+  // Read stored match/bonus/total points from entry (single source of truth)
+  const matchPoints = currentEntry?.match_points ?? entryMatchScores.reduce((sum, ms) => sum + ms.total_points, 0)
+  const bonusPoints = currentEntry?.bonus_points ?? bonusScores.reduce((sum, bs) => sum + bs.points_earned, 0)
+  const adjustment = currentEntry?.point_adjustment ?? 0
+  const totalPoints = currentEntry?.scored_total_points ?? (matchPoints + bonusPoints + adjustment)
 
-  // Bonus points — computed client-side from current user's predictions
-  const bonusPoints = useMemo(() => {
-    if (!userPredictions || userPredictions.length === 0) return 0
-
-    const predictionMap: PredictionMap = new Map()
-    for (const p of userPredictions) {
-      predictionMap.set(p.match_id, {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        homePso: p.predicted_home_pso ?? null,
-        awayPso: p.predicted_away_pso ?? null,
-        winnerTeamId: p.predicted_winner_team_id ?? null,
-      })
-    }
-
-    const matchesWithResult: MatchWithResult[] = rawMatches.map((m) => ({
-      match_id: m.match_id,
-      match_number: m.match_number,
-      stage: m.stage,
-      group_letter: m.group_letter,
-      match_date: m.match_date,
-      venue: m.venue,
-      status: m.status,
-      home_team_id: m.home_team_id,
-      away_team_id: m.away_team_id,
-      home_team_placeholder: m.home_team_placeholder,
-      away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
-      is_completed: m.is_completed,
-      home_score_ft: m.home_score_ft,
-      away_score_ft: m.away_score_ft,
-      home_score_pso: m.home_score_pso,
-      away_score_pso: m.away_score_pso,
-      winner_team_id: m.winner_team_id,
-      tournament_id: m.tournament_id,
-    }))
-
-    const tournamentTeams: Team[] = teams.map((t) => ({
-      team_id: t.team_id,
-      country_name: t.country_name,
-      country_code: t.country_code,
-      group_letter: t.group_letter,
-      fifa_ranking_points: t.fifa_ranking_points,
-      flag_url: t.flag_url,
-    }))
-
-    const bonusEntries = calculateAllBonusPoints({
-      memberId: currentEntryId,
-      memberPredictions: predictionMap,
-      matches: matchesWithResult,
-      teams: tournamentTeams,
-      conductData,
-      settings: poolSettings,
-      tournamentAwards: null,
-    })
-
-    return bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
-  }, [userPredictions, rawMatches, teams, conductData, poolSettings, currentEntryId])
-
-  const totalPoints = matchPoints + bonusPoints
+  // Build match_scores lookup by match_id for passing to MatchCard
+  const matchScoreByMatchId = useMemo(() => {
+    const map = new Map<string, MatchScoreData>()
+    for (const ms of entryMatchScores) map.set(ms.match_id, ms)
+    return map
+  }, [entryMatchScores])
 
   // Check if any group matches have results (for showing comparison section)
   const hasGroupResults = useMemo(() => {
@@ -399,6 +314,7 @@ export function ResultsView({
               poolSettings={poolSettings}
               predictionMode={predictionMode}
               index={i}
+              storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
             />
           ))}
         </div>

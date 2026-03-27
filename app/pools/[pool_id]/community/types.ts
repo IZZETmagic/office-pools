@@ -1,4 +1,4 @@
-import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
+import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, MatchScoreData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -158,6 +158,7 @@ export type CommunityTabProps = {
   settings: SettingsData
   conductData: MatchConductData[]
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  matchScores: MatchScoreData[]
   onShowHowToPlay: () => void
   // Bracket picker data (for BP badge computation)
   allBPGroupRankings?: BPGroupRanking[]

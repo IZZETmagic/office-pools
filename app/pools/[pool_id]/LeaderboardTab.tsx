@@ -2,23 +2,20 @@
 
 import { useState, useMemo } from 'react'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
-import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
-import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
-import { resolveFullBracket } from '@/lib/bracketResolver'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
-import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
+import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
-import { computePredictionResults, computeStreaks, computeCrowdPredictions } from './analytics/analyticsHelpers'
+import { computeStreaks, computeCrowdPredictions } from './analytics/analyticsHelpers'
 // Types used implicitly through function returns
 import { computeFullXPBreakdown, computeLevel } from './analytics/xpSystem'
 
 type LeaderboardTabProps = {
   members: MemberData[]
-  playerScores: PlayerScoreData[]
+  matchScores: MatchScoreData[]
   bonusScores: BonusScoreData[]
-  // Data for client-side bonus computation
   matches: MatchData[]
   teams: TeamData[]
   conductData: MatchConductData[]
@@ -34,33 +31,8 @@ type LeaderboardTabProps = {
 }
 
 // =============================================
-// HELPERS — convert between MatchData and lib types
+// HELPERS
 // =============================================
-
-function toMatchWithResult(m: MatchData): MatchWithResult {
-  return {
-    match_id: m.match_id,
-    match_number: m.match_number,
-    stage: m.stage,
-    group_letter: m.group_letter,
-    match_date: m.match_date,
-    venue: m.venue,
-    status: m.status,
-    home_team_id: m.home_team_id,
-    away_team_id: m.away_team_id,
-    home_team_placeholder: m.home_team_placeholder,
-    away_team_placeholder: m.away_team_placeholder,
-    home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-    away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
-    is_completed: m.is_completed,
-    home_score_ft: m.home_score_ft,
-    away_score_ft: m.away_score_ft,
-    home_score_pso: m.home_score_pso,
-    away_score_pso: m.away_score_pso,
-    winner_team_id: m.winner_team_id,
-    tournament_id: m.tournament_id,
-  }
-}
 
 function toTournamentTeams(teams: TeamData[]): Team[] {
   return teams.map((t) => ({
@@ -73,27 +45,13 @@ function toTournamentTeams(teams: TeamData[]): Team[] {
   }))
 }
 
-function buildPredictionMap(predictions: PredictionData[]): PredictionMap {
-  const map: PredictionMap = new Map()
-  for (const p of predictions) {
-    map.set(p.match_id, {
-      home: p.predicted_home_score,
-      away: p.predicted_away_score,
-      homePso: p.predicted_home_pso ?? null,
-      awayPso: p.predicted_away_pso ?? null,
-      winnerTeamId: p.predicted_winner_team_id ?? null,
-    })
-  }
-  return map
-}
-
 // =============================================
 // COMPONENT
 // =============================================
 
 export function LeaderboardTab({
   members,
-  playerScores,
+  matchScores,
   bonusScores,
   matches,
   teams,
@@ -124,129 +82,50 @@ export function LeaderboardTab({
     return entries
   }, [members])
 
-  // Build lookup map for player scores (by entry_id)
-  const scoreMap = new Map<string, PlayerScoreData>()
-  for (const ps of playerScores) {
-    scoreMap.set(ps.entry_id, ps)
-  }
+  // Build match_scores lookup: entry_id → MatchScoreData[]
+  const matchScoresByEntry = useMemo(() => {
+    const map = new Map<string, MatchScoreData[]>()
+    for (const ms of matchScores) {
+      const existing = map.get(ms.entry_id) || []
+      existing.push(ms)
+      map.set(ms.entry_id, existing)
+    }
+    return map
+  }, [matchScores])
 
-  // Pre-compute shared data for bonus calculation
-  const matchesWithResult = useMemo(() => matches.map(toMatchWithResult), [matches])
+  // Build match_scores lookup: entry_id → match_id → MatchScoreData
+  const matchScoresLookup = useMemo(() => {
+    const map = new Map<string, Map<string, MatchScoreData>>()
+    for (const ms of matchScores) {
+      if (!map.has(ms.entry_id)) map.set(ms.entry_id, new Map())
+      map.get(ms.entry_id)!.set(ms.match_id, ms)
+    }
+    return map
+  }, [matchScores])
+
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
-  // Compute bonus scores for ALL entries client-side
-  const computedBonusMap = useMemo(() => {
+  // Read bonus scores from DB (grouped by entry_id)
+  const dbBonusByEntry = useMemo(() => {
     const map = new Map<string, BonusScoreData[]>()
-
-    // Group predictions by entry_id
-    const predsByEntry = new Map<string, PredictionData[]>()
-    for (const p of allPredictions) {
-      const existing = predsByEntry.get(p.entry_id) || []
-      existing.push(p)
-      predsByEntry.set(p.entry_id, existing)
+    for (const bs of bonusScores) {
+      const existing = map.get(bs.entry_id) || []
+      existing.push(bs)
+      map.set(bs.entry_id, existing)
     }
-
-    // Calculate bonus for each entry with predictions
-    for (const [entryId, preds] of predsByEntry) {
-      const predictionMap = buildPredictionMap(preds)
-      const bonusEntries = calculateAllBonusPoints({
-        memberId: entryId,
-        memberPredictions: predictionMap,
-        matches: matchesWithResult,
-        teams: tournamentTeams,
-        conductData,
-        settings: poolSettings,
-        tournamentAwards: null,
-        predictionMode,
-      })
-
-      // Convert BonusScoreEntry[] to BonusScoreData[]
-      const bonusData: BonusScoreData[] = bonusEntries.map((e, i) => ({
-        bonus_id: `computed-${entryId}-${i}`,
-        entry_id: e.entry_id,
-        bonus_type: e.bonus_type,
-        bonus_category: e.bonus_category,
-        related_group_letter: e.related_group_letter,
-        related_match_id: e.related_match_id,
-        points_earned: e.points_earned,
-        description: e.description,
-      }))
-
-      map.set(entryId, bonusData)
-    }
-
     return map
-  }, [allPredictions, matchesWithResult, tournamentTeams, conductData, poolSettings])
+  }, [bonusScores])
 
-  // Compute match points for each entry client-side too
-  const computedMatchPointsMap = useMemo(() => {
+  // Read stored match points per entry from match_scores
+  const storedMatchPointsMap = useMemo(() => {
     const map = new Map<string, number>()
-
-    // Group predictions by entry_id
-    const predsByEntry = new Map<string, PredictionData[]>()
-    for (const p of allPredictions) {
-      const existing = predsByEntry.get(p.entry_id) || []
-      existing.push(p)
-      predsByEntry.set(p.entry_id, existing)
+    for (const [entryId, scores] of matchScoresByEntry) {
+      map.set(entryId, scores.reduce((sum, s) => sum + s.total_points, 0))
     }
-
-    for (const [entryId, preds] of predsByEntry) {
-      const predMap = new Map(preds.map(p => [p.match_id, p]))
-      let totalMatchPts = 0
-
-      // Resolve bracket for this entry to check knockout team matches
-      const predictionMap = buildPredictionMap(preds)
-      const bracket = resolveFullBracket({
-        matches: matchesWithResult,
-        predictionMap,
-        teams: tournamentTeams,
-        conductData,
-      })
-
-      for (const m of matches) {
-        if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
-          const pred = predMap.get(m.match_id)
-          if (!pred) continue
-
-          // For knockout: check if predicted teams match actual teams
-          const resolved = bracket.knockoutTeamMap.get(m.match_number)
-          const teamsMatch = checkKnockoutTeamsMatch(
-            m.stage,
-            m.home_team_id,
-            m.away_team_id,
-            resolved?.home?.team_id ?? null,
-            resolved?.away?.team_id ?? null,
-          )
-
-          const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-          const result = calculatePoints(
-            pred.predicted_home_score,
-            pred.predicted_away_score,
-            m.home_score_ft,
-            m.away_score_ft,
-            m.stage,
-            poolSettings,
-            hasPso
-              ? {
-                  actualHomePso: m.home_score_pso!,
-                  actualAwayPso: m.away_score_pso!,
-                  predictedHomePso: pred.predicted_home_pso,
-                  predictedAwayPso: pred.predicted_away_pso,
-                }
-              : undefined,
-            teamsMatch,
-          )
-          totalMatchPts += result.points
-        }
-      }
-
-      map.set(entryId, totalMatchPts)
-    }
-
     return map
-  }, [allPredictions, matches, poolSettings])
+  }, [matchScoresByEntry])
 
-  // Compute bracket picker scores client-side (mirrors computedBonusMap for full_tournament)
+  // Compute bracket picker scores client-side (bracket picker has different scoring model)
   const computedBPBonusMap = useMemo(() => {
     const map = new Map<string, BonusScoreData[]>()
     if (predictionMode !== 'bracket_picker' || allBPGroupRankings.length === 0) return map
@@ -527,36 +406,30 @@ export function LeaderboardTab({
     return map
   }, [predictionMode, computedBPBonusMap])
 
-  // Get bonus data for an entry — prefer computed, fall back to DB
+  // Get bonus data for an entry from DB
   const getBonusForEntry = (entryId: string): BonusScoreData[] => {
-    // For bracket picker, prefer computed BP scores
+    // For bracket picker, prefer computed BP scores (bracket picker breakdown not stored in bonus_scores the same way)
     if (predictionMode === 'bracket_picker') {
-      return computedBPBonusMap.get(entryId) || bonusScores.filter(bs => bs.entry_id === entryId)
+      return computedBPBonusMap.get(entryId) || dbBonusByEntry.get(entryId) || []
     }
-    return computedBonusMap.get(entryId) || bonusScores.filter(bs => bs.entry_id === entryId)
+    return dbBonusByEntry.get(entryId) || []
   }
 
-  // Check if any entry has computed bonus points
+  // Check if any entry has bonus points
   const hasAnyBonusPoints = useMemo(() => {
-    for (const entries of computedBonusMap.values()) {
-      if (entries.length > 0) return true
-    }
-    // For bracket picker, check computed BP scores
+    if (bonusScores.length > 0) return true
     for (const entries of computedBPBonusMap.values()) {
       if (entries.length > 0) return true
     }
-    if (bonusScores.length > 0) return true
-    return playerScores.some(ps => ps.bonus_points > 0)
-  }, [computedBonusMap, computedBPBonusMap, playerScores, bonusScores])
+    return leaderboardEntries.some(e => (e.bonus_points ?? 0) > 0)
+  }, [computedBPBonusMap, bonusScores, leaderboardEntries])
 
-  // Build computed player score for modal
+  // Build player score for modal — reads from stored entry values (single source of truth)
   const getPlayerScore = (entryId: string): PlayerScoreData => {
     const entry = leaderboardEntries.find(e => e.entry_id === entryId)
     const adjustment = entry?.point_adjustment ?? 0
 
-    // For bracket picker pools, use client-side computed BP scores
-    // Base "picks" = bp_group, bp_third_place, bp_knockout
-    // True bonus = bp_bonus (champion, penalty, all-correct)
+    // For bracket picker pools, use client-side computed BP scores for breakdown display
     if (predictionMode === 'bracket_picker') {
       const computedBP = computedBPBonusMap.get(entryId)
       if (computedBP) {
@@ -570,53 +443,21 @@ export function LeaderboardTab({
           total_points: picksPts + bonusPts + adjustment,
         }
       }
-
-      // Fall back to DB data if no BP data available
-      const dbBonusEntries = bonusScores.filter(bs => bs.entry_id === entryId)
-      const baseCats = new Set(['bp_group', 'bp_third_place', 'bp_knockout'])
-      const dbPicksPts = dbBonusEntries.filter(e => baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
-      const dbBonusPts = dbBonusEntries.filter(e => !baseCats.has(e.bonus_category)).reduce((sum, e) => sum + e.points_earned, 0)
-
-      return {
-        entry_id: entryId,
-        match_points: dbPicksPts,
-        bonus_points: dbBonusPts,
-        total_points: dbPicksPts + dbBonusPts + adjustment,
-      }
     }
 
-    const computedMatchPts = computedMatchPointsMap.get(entryId)
-    const computedBonus = computedBonusMap.get(entryId)
-    const computedBonusPts = computedBonus ? computedBonus.reduce((sum, e) => sum + e.points_earned, 0) : 0
+    // Read from stored pool_entries values
+    const matchPts = entry?.match_points ?? storedMatchPointsMap.get(entryId) ?? 0
+    const bonusPts = entry?.bonus_points ?? 0
 
-    if (computedMatchPts !== undefined) {
-      return {
-        entry_id: entryId,
-        match_points: computedMatchPts,
-        bonus_points: computedBonusPts,
-        total_points: computedMatchPts + computedBonusPts + adjustment,
-      }
-    }
-
-    // Fall back to DB
-    const dbScore = scoreMap.get(entryId)
-    if (dbScore) {
-      return {
-        ...dbScore,
-        total_points: dbScore.total_points + adjustment,
-      }
-    }
-
-    // Last resort: entry's total_points
     return {
       entry_id: entryId,
-      match_points: entry?.total_points ?? 0,
-      bonus_points: 0,
-      total_points: (entry?.total_points ?? 0) + adjustment,
+      match_points: matchPts,
+      bonus_points: bonusPts,
+      total_points: entry?.scored_total_points ?? (matchPts + bonusPts + adjustment),
     }
   }
 
-  // Sort entries by computed total points (descending), then by rank as tiebreaker
+  // Sort entries by stored total points (descending), then by rank as tiebreaker
   const sorted = useMemo(() => {
     return [...leaderboardEntries].sort((a, b) => {
       const aScore = getPlayerScore(a.entry_id).total_points
@@ -624,7 +465,7 @@ export function LeaderboardTab({
       if (bScore !== aScore) return bScore - aScore
       return (a.current_rank ?? 999) - (b.current_rank ?? 999)
     })
-  }, [leaderboardEntries, computedMatchPointsMap, computedBonusMap, computedBPBonusMap, bonusScores, predictionMode])
+  }, [leaderboardEntries, storedMatchPointsMap, computedBPBonusMap, bonusScores, predictionMode])
 
   // =============================================
   // PER-ENTRY STATS (XP, streaks, form, hit rate)
@@ -654,7 +495,7 @@ export function LeaderboardTab({
     const completedMatches = matches.filter(m => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
     if (completedMatches.length === 0) return map
 
-    // Group predictions by entry
+    // Group predictions by entry (still needed for crowd/XP computation)
     const predsByEntry = new Map<string, PredictionData[]>()
     for (const p of allPredictions) {
       const arr = predsByEntry.get(p.entry_id) || []
@@ -664,10 +505,15 @@ export function LeaderboardTab({
 
     for (const entry of sorted) {
       const entryPreds = predsByEntry.get(entry.entry_id) || []
-      const mPts = computedMatchPointsMap.get(entry.entry_id) ?? 0
-      const bPts = (computedBonusMap.get(entry.entry_id) ?? []).reduce((s, e) => s + e.points_earned, 0)
+      const mPts = entry.match_points ?? storedMatchPointsMap.get(entry.entry_id) ?? 0
+      const bPts = entry.bonus_points ?? 0
 
-      if (entryPreds.length === 0) {
+      // Get this entry's match scores from DB (sorted by match_number for form display)
+      const entryMatchScores = (matchScoresByEntry.get(entry.entry_id) || [])
+        .slice()
+        .sort((a, b) => a.match_number - b.match_number)
+
+      if (entryMatchScores.length === 0 && entryPreds.length === 0) {
         map.set(entry.entry_id, {
           hitRate: 0, exactCount: 0,
           currentStreak: { type: 'none', length: 0 },
@@ -677,9 +523,16 @@ export function LeaderboardTab({
         continue
       }
 
-      const predResults = computePredictionResults(matches, entryPreds, poolSettings, teams, conductData)
-      const streakData = computeStreaks(predResults)
+      // Derive prediction results from stored match_scores (single source of truth)
+      const predResults = entryMatchScores.map(ms => ({
+        matchId: ms.match_id,
+        matchNumber: ms.match_number,
+        type: ms.score_type as 'exact' | 'winner_gd' | 'winner' | 'miss',
+        points: ms.total_points,
+        stage: ms.stage,
+      }))
 
+      const streakData = computeStreaks(predResults)
       const hits = predResults.filter(r => r.type !== 'miss').length
       const exactCount = predResults.filter(r => r.type === 'exact').length
       const hitRate = predResults.length > 0 ? (hits / predResults.length) * 100 : 0
@@ -737,7 +590,7 @@ export function LeaderboardTab({
     }
 
     return map
-  }, [sorted, allPredictions, matches, poolSettings, teams, conductData, members, isBracketPicker, computedMatchPointsMap, computedBonusMap])
+  }, [sorted, allPredictions, matches, teams, conductData, members, isBracketPicker, storedMatchPointsMap, matchScoresByEntry])
 
   // =============================================
   // MATCHDAY MVP
@@ -759,27 +612,18 @@ export function LeaderboardTab({
     if (completed.length === 0) return null
 
     const lastMatch = completed[0]
-    const predsByEntry = new Map<string, PredictionData[]>()
-    for (const p of allPredictions) {
-      const arr = predsByEntry.get(p.entry_id) || []
-      arr.push(p)
-      predsByEntry.set(p.entry_id, arr)
-    }
 
     let bestEntry: LeaderboardEntry | null = null
     let bestPoints = 0
 
     for (const entry of sorted) {
-      const preds = predsByEntry.get(entry.entry_id) || []
-      const pred = preds.find(p => p.match_id === lastMatch.match_id)
-      if (!pred) continue
+      // Look up this entry's score for the last match from stored match_scores
+      const entryScores = matchScoresLookup.get(entry.entry_id)
+      const matchScore = entryScores?.get(lastMatch.match_id)
+      if (!matchScore) continue
 
-      const predResults = computePredictionResults(
-        [lastMatch], [pred], poolSettings, teams, conductData
-      )
-      const pts = predResults.reduce((s, r) => s + r.points, 0)
-      if (pts > bestPoints) {
-        bestPoints = pts
+      if (matchScore.total_points > bestPoints) {
+        bestPoints = matchScore.total_points
         bestEntry = entry
       }
     }
@@ -890,7 +734,7 @@ export function LeaderboardTab({
     }
 
     return { ptsBehind, personAboveName, ptsAhead, personBelowName }
-  }, [sorted, currentUserId, computedMatchPointsMap, computedBonusMap])
+  }, [sorted, currentUserId, storedMatchPointsMap, bonusScores])
 
   // =============================================
   // POOL SUPERLATIVES
@@ -1670,9 +1514,7 @@ export function LeaderboardTab({
           isMultiEntry={isMultiEntry}
           poolSettings={poolSettings}
           matches={matches}
-          entryPredictions={allPredictions.filter(p => p.entry_id === selectedEntry.entry_id)}
-          teams={teams}
-          conductData={conductData}
+          entryMatchScores={matchScoresByEntry.get(selectedEntry.entry_id) || []}
           predictionMode={predictionMode}
         />
       )}

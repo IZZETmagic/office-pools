@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { ResultsView } from './results/ResultsView'
 import type { ResultMatch } from './results/MatchCard'
 import type { PoolSettings } from './results/points'
-import type { MatchData, TeamData, ExistingPrediction, EntryData, MemberData, PredictionData, BonusScoreData } from './types'
+import type { MatchData, TeamData, ExistingPrediction, EntryData, MemberData, PredictionData, BonusScoreData, MatchScoreData } from './types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 
@@ -28,6 +28,7 @@ type ResultsTabProps = {
   isAdmin: boolean
   members: MemberData[]
   allPredictions: PredictionData[]
+  matchScores: MatchScoreData[]
   currentEntryId: string
   userEntries: EntryData[]
 }
@@ -44,6 +45,7 @@ export function ResultsTab({
   isAdmin,
   members,
   allPredictions,
+  matchScores,
   currentEntryId,
   userEntries,
 }: ResultsTabProps) {
@@ -89,6 +91,17 @@ export function ResultsTab({
   }, [selectedEntryId, currentEntryId, initialUserPredictions, allPredictions, isEntrySubmitted])
 
   const activeEntryId = selectedEntryId || currentEntryId
+
+  // Filter match_scores and bonus_scores for the selected entry
+  const entryMatchScores = useMemo(() =>
+    matchScores.filter(ms => ms.entry_id === activeEntryId),
+    [matchScores, activeEntryId]
+  )
+  const entryBonusScores = useMemo(() =>
+    bonusScores.filter(bs => bs.entry_id === activeEntryId),
+    [bonusScores, activeEntryId]
+  )
+  const currentEntry = userEntries.find(e => e.entry_id === activeEntryId)
 
   // Build prediction lookup (memoized so downstream useMemos react to entry changes)
   const predictionMap = useMemo(
@@ -194,8 +207,11 @@ export function ResultsTab({
       teams={teams}
       conductData={conductData}
       userPredictions={userPredictions}
-      bonusScores={bonusScores}
+      bonusScores={entryBonusScores}
       currentEntryId={activeEntryId}
+      // Stored scoring data
+      entryMatchScores={entryMatchScores}
+      currentEntry={currentEntry}
       // Entry selector
       userEntries={showEntrySelector ? userEntries : undefined}
       selectedEntryId={selectedEntryId}

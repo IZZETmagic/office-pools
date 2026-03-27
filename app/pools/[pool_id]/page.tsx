@@ -12,6 +12,7 @@ import type {
   ExistingPrediction,
   PlayerScoreData,
   BonusScoreData,
+  MatchScoreData,
   PoolRoundState,
   EntryRoundSubmission,
   BPGroupRanking,
@@ -127,17 +128,11 @@ export default async function PoolPage({
   const userEntries = currentMember?.entries || []
   const userEntryIds = userEntries.map((e) => e.entry_id)
 
-  // Fetch conduct data, player scores, bonus scores (by entry_id now)
-  const [{ data: conductRes }, { data: playerScoresRes }, { data: bonusScoresRes }] = await Promise.all([
+  // Fetch conduct data and bonus scores (by entry_id)
+  const [{ data: conductRes }, { data: bonusScoresRes }] = await Promise.all([
     supabase
       .from('match_conduct')
       .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    allEntryIds.length > 0
-      ? supabase
-          .from('player_scores')
-          .select('entry_id, match_points, bonus_points, total_points')
-          .in('entry_id', allEntryIds)
-      : Promise.resolve({ data: [] }),
     allEntryIds.length > 0
       ? supabase
           .from('bonus_scores')
@@ -155,8 +150,30 @@ export default async function PoolPage({
     yellow_direct_red_cards: number
   }[]
 
-  const playerScores = (playerScoresRes || []) as PlayerScoreData[]
   const bonusScores = (bonusScoresRes || []) as BonusScoreData[]
+
+  // Fetch stored match_scores for all entries (paginated to avoid 1000-row limit)
+  let allMatchScores: MatchScoreData[] = []
+  if (allEntryIds.length > 0) {
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('match_scores')
+        .select('*')
+        .in('entry_id', allEntryIds)
+        .range(offset, offset + pageSize - 1)
+
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        allMatchScores.push(...(page as MatchScoreData[]))
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
+  }
 
   // Fetch user's predictions for the first entry (default active entry)
   const defaultEntry = userEntries[0]
@@ -297,7 +314,7 @@ export default async function PoolPage({
       allPredictions={allPredictions}
       teams={teams}
       conductData={conductData}
-      playerScores={playerScores}
+      matchScores={allMatchScores}
       bonusScores={bonusScores}
       memberId={membership?.member_id ?? null}
       currentUserId={userData.user_id}
