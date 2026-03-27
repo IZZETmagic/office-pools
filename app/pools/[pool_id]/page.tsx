@@ -142,14 +142,16 @@ export default async function PoolPage({
     yellow_direct_red_cards: number
   }[]
 
-  // Fetch bonus scores — paginate to avoid Supabase's 1000-row silent truncation
+  // Fetch bonus scores — use admin client to bypass RLS (so we can see all entries' bonuses)
+  // and paginate to avoid Supabase's 1000-row silent truncation
+  const adminClient = createAdminClient()
   let bonusScores: BonusScoreData[] = []
   if (allEntryIds.length > 0) {
     const pageSize = 1000
     let offset = 0
     let hasMore = true
     while (hasMore) {
-      const { data: page } = await supabase
+      const { data: page } = await adminClient
         .from('bonus_scores')
         .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
         .in('entry_id', allEntryIds)
@@ -165,9 +167,7 @@ export default async function PoolPage({
     }
   }
 
-  // Fetch stored match_scores for all entries in this pool (admin client bypasses RLS
-  // so we can read scores for ALL entries, not just the current user's)
-  const adminClient = createAdminClient()
+  // Fetch stored match_scores for all entries in this pool (admin client already created above)
   let allMatchScores: MatchScoreData[] = []
   {
     const pageSize = 1000
