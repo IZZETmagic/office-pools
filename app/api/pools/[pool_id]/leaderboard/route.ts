@@ -6,7 +6,7 @@ import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
 import { withPerfLogging } from '@/lib/api-perf'
-import { computePredictionResults, computeStreaks, computeCrowdPredictions } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
+import { matchScoresToPredictionResults, computeStreaks, computeCrowdPredictions } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, computeLevel } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import type { MatchData, PredictionData, MemberData } from '@/app/pools/[pool_id]/types'
@@ -252,6 +252,33 @@ async function handleGET(
     predicted_winner_team_id: p.predicted_winner_team_id ?? null,
   }))
 
+  // Fetch stored match_scores for all entries (for analytics)
+  const allEntryIds = entries.map((e: any) => e.entry_id)
+  const matchScoresByEntry = new Map<string, any[]>()
+  if (allEntryIds.length > 0) {
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('match_scores')
+        .select('entry_id, match_id, match_number, stage, score_type, total_points')
+        .in('entry_id', allEntryIds)
+        .range(offset, offset + pageSize - 1)
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        for (const ms of page) {
+          const existing = matchScoresByEntry.get(ms.entry_id) || []
+          existing.push(ms)
+          matchScoresByEntry.set(ms.entry_id, existing)
+        }
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
+  }
+
   // 5. Compute points for each entry
   const leaderboard: LeaderboardEntryResponse[] = []
   const entryPredResultsMap = new Map<string, PredictionResult[]>()
@@ -298,13 +325,8 @@ async function handleGET(
           predicted_winner_team_id: p.predicted_winner_team_id ?? null,
         }))
 
-        const predResults = computePredictionResults(
-          normalizedMatches as MatchData[],
-          entryPreds as PredictionData[],
-          settings,
-          teamsData as any,
-          conduct,
-        )
+        const entryMatchScores = matchScoresByEntry.get(entry.entry_id) || []
+        const predResults = matchScoresToPredictionResults(entryMatchScores)
 
         // Store for matchday MVP calculation
         entryPredResultsMap.set(entry.entry_id, predResults)

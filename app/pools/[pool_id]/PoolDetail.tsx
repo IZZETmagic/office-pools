@@ -22,12 +22,9 @@ import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
 import { RoundsTab } from './admin/RoundsTab'
-import { DEFAULT_POOL_SETTINGS, calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
-import { calculateAllBonusPoints, type MatchWithResult } from '@/lib/bonusCalculation'
+import { DEFAULT_POOL_SETTINGS, type PoolSettings } from './results/points'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
-import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { PredictionMap, Team } from '@/lib/tournament'
 import type {
   PoolData,
   MemberData,
@@ -37,7 +34,7 @@ import type {
   PredictionData,
   TeamData,
   ExistingPrediction,
-  PlayerScoreData,
+  MatchScoreData,
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
@@ -102,7 +99,7 @@ type PoolDetailProps = {
   allPredictions: PredictionData[]
   teams: TeamData[]
   conductData: MatchConductData[]
-  playerScores: PlayerScoreData[]
+  matchScores: MatchScoreData[]
   bonusScores: BonusScoreData[]
   memberId: string | null
   currentUserId: string
@@ -137,7 +134,7 @@ export function PoolDetail({
   allPredictions: initialAllPredictions,
   teams,
   conductData,
-  playerScores,
+  matchScores,
   bonusScores,
   memberId,
   currentUserId,
@@ -656,139 +653,20 @@ export function PoolDetail({
     : DEFAULT_POOL_SETTINGS
 
   // =============================================
-  // Compute true total points (match + bonus) for each entry — same logic as LeaderboardTab
+  // Read stored total points for each entry from pool_entries (single source of truth)
   // =============================================
   const computedEntryTotals = useMemo(() => {
     const map = new Map<string, number>()
-
-    // Convert data to types needed by scoring functions
-    const matchesWithResult: MatchWithResult[] = matches.map((m) => ({
-      match_id: m.match_id,
-      match_number: m.match_number,
-      stage: m.stage,
-      group_letter: m.group_letter,
-      match_date: m.match_date,
-      venue: m.venue,
-      status: m.status,
-      home_team_id: m.home_team_id,
-      away_team_id: m.away_team_id,
-      home_team_placeholder: m.home_team_placeholder,
-      away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
-      is_completed: m.is_completed,
-      home_score_ft: m.home_score_ft,
-      away_score_ft: m.away_score_ft,
-      home_score_pso: m.home_score_pso,
-      away_score_pso: m.away_score_pso,
-      winner_team_id: m.winner_team_id,
-      tournament_id: m.tournament_id,
-    }))
-
-    const tournamentTeams: Team[] = teams.map((t) => ({
-      team_id: t.team_id,
-      country_name: t.country_name,
-      country_code: t.country_code,
-      group_letter: t.group_letter,
-      fifa_ranking_points: t.fifa_ranking_points,
-      flag_url: t.flag_url,
-    }))
-
-    // Build lookup for point adjustments from member entries
-    const adjustmentMap = new Map<string, number>()
     for (const member of members) {
       for (const entry of member.entries || []) {
-        adjustmentMap.set(entry.entry_id, entry.point_adjustment ?? 0)
+        const matchPts = entry.match_points ?? 0
+        const bonusPts = entry.bonus_points ?? 0
+        const adjustment = entry.point_adjustment ?? 0
+        map.set(entry.entry_id, entry.scored_total_points ?? (matchPts + bonusPts + adjustment))
       }
     }
-
-    // Group predictions by entry_id
-    const predsByEntry = new Map<string, PredictionData[]>()
-    for (const p of allPredictions) {
-      const existing = predsByEntry.get(p.entry_id) || []
-      existing.push(p)
-      predsByEntry.set(p.entry_id, existing)
-    }
-
-    for (const [entryId, preds] of predsByEntry) {
-      // Build prediction map for this entry
-      const predictionMap: PredictionMap = new Map()
-      const predMap = new Map(preds.map(p => [p.match_id, p]))
-      for (const p of preds) {
-        predictionMap.set(p.match_id, {
-          home: p.predicted_home_score,
-          away: p.predicted_away_score,
-          homePso: p.predicted_home_pso ?? null,
-          awayPso: p.predicted_away_pso ?? null,
-          winnerTeamId: p.predicted_winner_team_id ?? null,
-        })
-      }
-
-      // Resolve bracket for knockout team matching
-      const bracket = resolveFullBracket({
-        matches: matchesWithResult,
-        predictionMap,
-        teams: tournamentTeams,
-        conductData,
-      })
-
-      // Compute match points
-      let matchPts = 0
-      for (const m of matches) {
-        if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
-          const pred = predMap.get(m.match_id)
-          if (!pred) continue
-
-          const resolved = bracket.knockoutTeamMap.get(m.match_number)
-          const teamsMatch = checkKnockoutTeamsMatch(
-            m.stage,
-            m.home_team_id,
-            m.away_team_id,
-            resolved?.home?.team_id ?? null,
-            resolved?.away?.team_id ?? null,
-          )
-
-          const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-          const result = calculatePoints(
-            pred.predicted_home_score,
-            pred.predicted_away_score,
-            m.home_score_ft,
-            m.away_score_ft,
-            m.stage,
-            poolSettings,
-            hasPso
-              ? {
-                  actualHomePso: m.home_score_pso!,
-                  actualAwayPso: m.away_score_pso!,
-                  predictedHomePso: pred.predicted_home_pso,
-                  predictedAwayPso: pred.predicted_away_pso,
-                }
-              : undefined,
-            teamsMatch,
-          )
-          matchPts += result.points
-        }
-      }
-
-      // Compute bonus points
-      const bonusEntries = calculateAllBonusPoints({
-        memberId: entryId,
-        memberPredictions: predictionMap,
-        matches: matchesWithResult,
-        teams: tournamentTeams,
-        conductData,
-        settings: poolSettings,
-        tournamentAwards: null,
-        predictionMode: pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker',
-      })
-      const bonusPts = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
-      const adjustment = adjustmentMap.get(entryId) ?? 0
-
-      map.set(entryId, matchPts + bonusPts + adjustment)
-    }
-
     return map
-  }, [allPredictions, matches, teams, conductData, poolSettings, members])
+  }, [members])
 
   // Fetch predictions/BP data when switching to predictions/my_bracket tab or changing active entry
   useEffect(() => {
@@ -1177,7 +1055,7 @@ export function PoolDetail({
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
                 members={members}
-                playerScores={playerScores}
+                matchScores={matchScores}
                 bonusScores={bonusScores}
                 matches={matches}
                 teams={teams}
@@ -1197,6 +1075,7 @@ export function PoolDetail({
               <AnalyticsTab
                 matches={matches}
                 allPredictions={allPredictions}
+                matchScores={matchScores}
                 members={members}
                 teams={teams}
                 conductData={conductData}
@@ -1504,6 +1383,7 @@ export function PoolDetail({
                 isAdmin={isAdmin}
                 members={members}
                 allPredictions={allPredictions}
+                matchScores={matchScores}
                 currentEntryId={activeEntry?.entry_id || ''}
                 userEntries={entries}
               />
@@ -1552,6 +1432,7 @@ export function PoolDetail({
                 settings={settings!}
                 conductData={conductData}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+                matchScores={matchScores}
                 onShowHowToPlay={() => setShowHowToPlayModal(true)}
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}

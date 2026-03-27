@@ -277,6 +277,24 @@ export default async function ProfileServerPage() {
     }
   }
 
+  // Fetch stored match_scores for all user entries (for prediction classification)
+  let matchScoresMap: Record<string, { score_type: string; total_points: number }> = {}
+  if (entryIds.length > 0) {
+    const { data: matchScoresData } = await supabase
+      .from('match_scores')
+      .select('entry_id, match_id, score_type, total_points')
+      .in('entry_id', entryIds)
+
+    if (matchScoresData) {
+      for (const ms of matchScoresData) {
+        matchScoresMap[`${ms.entry_id}:${ms.match_id}`] = {
+          score_type: ms.score_type,
+          total_points: ms.total_points,
+        }
+      }
+    }
+  }
+
   // Get total match counts per pool's tournament for prediction ratio
   const { count: totalMatchCount } = await supabase
     .from('matches')
@@ -298,6 +316,7 @@ export default async function ProfileServerPage() {
       totalMatchCount={totalMatchCount ?? 0}
       poolSettingsMap={poolSettingsMap}
       playerScoresMap={playerScoresMap}
+      matchScoresMap={matchScoresMap}
     />
   )
 }

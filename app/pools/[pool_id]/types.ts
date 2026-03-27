@@ -49,6 +49,10 @@ export type EntryData = {
   previous_rank: number | null
   last_rank_update: string | null
   created_at: string
+  // Stored scoring engine values
+  match_points: number | null
+  bonus_points: number | null
+  scored_total_points: number | null
 }
 
 // Flattened entry with user info for leaderboard display
@@ -254,4 +258,34 @@ export type BPKnockoutPick = {
   match_number: number
   winner_team_id: string
   predicted_penalty: boolean
+}
+
+// ========================
+// STORED MATCH SCORES (from scoring engine)
+// ========================
+
+export type MatchScoreData = {
+  id: string
+  entry_id: string
+  match_id: string
+  pool_id: string
+  match_number: number
+  stage: string
+  score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+  base_points: number
+  multiplier: number
+  pso_points: number
+  total_points: number
+  teams_match: boolean
+  predicted_home_score: number
+  predicted_away_score: number
+  actual_home_score: number
+  actual_away_score: number
+  predicted_home_pso: number | null
+  predicted_away_pso: number | null
+  actual_home_pso: number | null
+  actual_away_pso: number | null
+  predicted_home_team_id: string | null
+  predicted_away_team_id: string | null
+  calculated_at: string
 }

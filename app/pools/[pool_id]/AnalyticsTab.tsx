@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { MatchData, PredictionData, TeamData, MemberData, EntryData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
 import type { PoolSettings } from './results/points'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import {
-  computePredictionResults,
+  matchScoresToPredictionResults,
   computeCrowdPredictions,
   computeStreaks,
   computePoolWideStats,
@@ -24,6 +24,7 @@ import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 type AnalyticsTabProps = {
   matches: MatchData[]
   allPredictions: PredictionData[]
+  matchScores: MatchScoreData[]
   members: MemberData[]
   teams: TeamData[]
   conductData: MatchConductData[]
@@ -62,6 +63,7 @@ function SectionHeader({ emoji, title }: { emoji: string; title: string }) {
 export function AnalyticsTab({
   matches,
   allPredictions,
+  matchScores,
   members,
   teams,
   conductData,
@@ -102,11 +104,16 @@ export function AnalyticsTab({
   // COMPUTED ANALYTICS (memoized)
   // =============================================
 
-  // Per-entry prediction results (only for non-bracket-picker modes)
+  // Per-entry prediction results from stored match_scores (single source of truth)
+  const entryMatchScores = useMemo(() =>
+    matchScores.filter(ms => ms.entry_id === selectedEntryId),
+    [matchScores, selectedEntryId]
+  )
+
   const predictionResults = useMemo(() => {
-    if (isBracketPicker || !isEntrySubmitted || entryPredictions.length === 0) return []
-    return computePredictionResults(matches, entryPredictions, settings, teams, conductData)
-  }, [matches, entryPredictions, settings, teams, conductData, isBracketPicker, isEntrySubmitted])
+    if (isBracketPicker || !isEntrySubmitted || entryMatchScores.length === 0) return []
+    return matchScoresToPredictionResults(entryMatchScores)
+  }, [entryMatchScores, isBracketPicker, isEntrySubmitted])
 
   // Streaks
   const streaks = useMemo(

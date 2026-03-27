@@ -1,5 +1,5 @@
 import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings, type PointsResult } from '../results/points'
-import type { MatchData, PredictionData, TeamData, MemberData } from '../types'
+import type { MatchData, PredictionData, TeamData, MemberData, MatchScoreData } from '../types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 
@@ -13,6 +13,22 @@ export type PredictionResult = {
   stage: string
   type: 'exact' | 'winner_gd' | 'winner' | 'miss'
   points: number
+}
+
+/**
+ * Convert stored match_scores to PredictionResult[] (single source of truth).
+ * Use this instead of computePredictionResults() for client-side code.
+ */
+export function matchScoresToPredictionResults(matchScores: MatchScoreData[]): PredictionResult[] {
+  return matchScores
+    .map(ms => ({
+      matchId: ms.match_id,
+      matchNumber: ms.match_number,
+      stage: ms.stage,
+      type: ms.score_type,
+      points: ms.total_points,
+    }))
+    .sort((a, b) => a.matchNumber - b.matchNumber)
 }
 
 export type StageAccuracy = {

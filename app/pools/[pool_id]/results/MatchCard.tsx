@@ -1,8 +1,9 @@
 'use client'
 
-import { calculatePoints, checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
+import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
+import type { MatchScoreData } from '../types'
 
 // =============================================
 // TYPES
@@ -95,11 +96,13 @@ export function MatchCard({
   poolSettings,
   predictionMode,
   index = 0,
+  storedScore,
 }: {
   match: ResultMatch
   poolSettings: PoolSettings
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   index?: number
+  storedScore?: MatchScoreData | null
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
@@ -128,33 +131,17 @@ export function MatchCard({
       )
     : null // null = can't determine yet (upcoming / TBD teams)
 
-  // Calculate points for completed and live matches with actual scores and a prediction
+  // Read points from stored match_scores (single source of truth)
   let pointsResult: PointsResult | null = null
-  if ((isCompleted || isLive) && hasActualScores && hasPrediction) {
-    const teamsMatch = checkKnockoutTeamsMatch(
-      match.stage,
-      match.home_team_id,
-      match.away_team_id,
-      match.predicted_home_team_id,
-      match.predicted_away_team_id,
-    )
-    pointsResult = calculatePoints(
-      match.prediction!.predicted_home_score,
-      match.prediction!.predicted_away_score,
-      match.home_score_ft!,
-      match.away_score_ft!,
-      match.stage,
-      poolSettings,
-      hasPsoScores
-        ? {
-            actualHomePso: match.home_score_pso!,
-            actualAwayPso: match.away_score_pso!,
-            predictedHomePso: match.prediction!.predicted_home_pso,
-            predictedAwayPso: match.prediction!.predicted_away_pso,
-          }
-        : undefined,
-      teamsMatch,
-    )
+  if (storedScore) {
+    pointsResult = {
+      points: storedScore.total_points,
+      basePoints: storedScore.base_points,
+      multiplier: storedScore.multiplier,
+      label: storedScore.score_type,
+      type: storedScore.score_type,
+      pso: storedScore.pso_points > 0 ? { psoPoints: storedScore.pso_points, psoType: storedScore.score_type } : undefined,
+    }
   }
 
   const homeName =

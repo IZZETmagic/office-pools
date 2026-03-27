@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { computePredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
+import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, LEVELS, BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -229,7 +229,13 @@ async function handleGET(
 
   // 7. Compute analytics (wrapped in try/catch so basic data still returns if helpers fail)
   try {
-    const predictionResults = computePredictionResults(matchesData, entryPredsData, settings, teamsData, conduct)
+    // Fetch stored match_scores for this entry
+    const { data: entryMatchScores } = await supabase
+      .from('match_scores')
+      .select('entry_id, match_id, match_number, stage, score_type, total_points')
+      .eq('entry_id', entry_id)
+
+    const predictionResults = matchScoresToPredictionResults(entryMatchScores || [])
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)

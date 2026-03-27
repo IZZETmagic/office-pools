@@ -1,10 +1,8 @@
 'use client'
 
 import { useMemo, useCallback } from 'react'
-import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, TeamData, PredictionData } from './types'
-import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings } from './results/points'
-import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { MatchConductData } from '@/lib/tournament'
+import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData } from './types'
+import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
 
 // =============================================
@@ -19,9 +17,7 @@ type PointsBreakdownModalProps = {
   isMultiEntry?: boolean
   poolSettings: PoolSettings
   matches: MatchData[]
-  entryPredictions: PredictionData[]
-  teams: TeamData[]
-  conductData: MatchConductData[]
+  entryMatchScores: MatchScoreData[]
   predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
 }
 
@@ -132,132 +128,46 @@ export function PointsBreakdownModal({
   isMultiEntry = false,
   poolSettings,
   matches,
-  entryPredictions,
-  teams,
-  conductData,
+  entryMatchScores,
   predictionMode = 'full_tournament',
 }: PointsBreakdownModalProps) {
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
   const totalPoints = playerScore?.total_points ?? entry.total_points ?? 0
 
-  // Build prediction lookup
-  const predictionMap = useMemo(() => {
-    const map = new Map<string, PredictionData>()
-    for (const p of entryPredictions) {
-      map.set(p.match_id, p)
-    }
+  // Build match lookup for team names
+  const matchLookup = useMemo(() => {
+    const map = new Map<string, MatchData>()
+    for (const m of matches) map.set(m.match_id, m)
     return map
-  }, [entryPredictions])
+  }, [matches])
 
-  // Resolve bracket for knockout team matching
-  const knockoutTeamMap = useMemo(() => {
-    const bracketMatches = matches.map(m => ({
-      match_id: m.match_id,
-      match_number: m.match_number,
-      stage: m.stage,
-      group_letter: m.group_letter,
-      match_date: m.match_date,
-      venue: m.venue,
-      status: m.status,
-      home_team_id: m.home_team_id,
-      away_team_id: m.away_team_id,
-      home_team_placeholder: m.home_team_placeholder,
-      away_team_placeholder: m.away_team_placeholder,
-      home_team: m.home_team ? { country_name: m.home_team.country_name, flag_url: null } : null,
-      away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: null } : null,
-      is_completed: m.is_completed,
-      home_score_ft: m.home_score_ft,
-      away_score_ft: m.away_score_ft,
-      home_score_pso: m.home_score_pso,
-      away_score_pso: m.away_score_pso,
-      winner_team_id: m.winner_team_id,
-      tournament_id: m.tournament_id,
-    }))
-    const bracketPredMap = new Map(
-      entryPredictions.map(p => [p.match_id, {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        homePso: p.predicted_home_pso ?? null,
-        awayPso: p.predicted_away_pso ?? null,
-        winnerTeamId: p.predicted_winner_team_id ?? null,
-      }])
-    )
-    const tournamentTeams = teams.map(t => ({
-      team_id: t.team_id,
-      country_name: t.country_name,
-      country_code: t.country_code,
-      group_letter: t.group_letter,
-      fifa_ranking_points: t.fifa_ranking_points,
-      flag_url: t.flag_url,
-    }))
-    const bracket = resolveFullBracket({
-      matches: bracketMatches,
-      predictionMap: bracketPredMap,
-      teams: tournamentTeams,
-      conductData,
-    })
-    return bracket.knockoutTeamMap
-  }, [matches, entryPredictions, teams, conductData])
-
-  // Compute per-match point details
+  // Build per-match point details from stored match_scores
   const matchDetails = useMemo(() => {
     const details: MatchPointDetail[] = []
 
-    for (const m of matches) {
-      if (!(m.is_completed || m.status === 'live') || m.home_score_ft === null || m.away_score_ft === null) continue
-
-      const pred = predictionMap.get(m.match_id)
-      if (!pred) continue
-
-      const resolved = knockoutTeamMap.get(m.match_number)
-      const teamsMatch = checkKnockoutTeamsMatch(
-        m.stage,
-        m.home_team_id,
-        m.away_team_id,
-        resolved?.home?.team_id ?? null,
-        resolved?.away?.team_id ?? null,
-      )
-
-      const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-      const result = calculatePoints(
-        pred.predicted_home_score,
-        pred.predicted_away_score,
-        m.home_score_ft,
-        m.away_score_ft,
-        m.stage,
-        poolSettings,
-        hasPso
-          ? {
-              actualHomePso: m.home_score_pso!,
-              actualAwayPso: m.away_score_pso!,
-              predictedHomePso: pred.predicted_home_pso,
-              predictedAwayPso: pred.predicted_away_pso,
-            }
-          : undefined,
-        teamsMatch,
-      )
-
+    for (const ms of entryMatchScores) {
+      const m = matchLookup.get(ms.match_id)
       details.push({
-        matchNumber: m.match_number,
-        homeTeam: m.home_team?.country_name ?? m.home_team_placeholder ?? '?',
-        awayTeam: m.away_team?.country_name ?? m.away_team_placeholder ?? '?',
-        actualHome: m.home_score_ft,
-        actualAway: m.away_score_ft,
-        predictedHome: pred.predicted_home_score,
-        predictedAway: pred.predicted_away_score,
-        points: result.points,
-        type: result.type,
-        basePoints: result.basePoints,
-        multiplier: result.multiplier,
-        psoPoints: result.pso?.psoPoints ?? 0,
-        stage: m.stage,
+        matchNumber: ms.match_number,
+        homeTeam: m?.home_team?.country_name ?? m?.home_team_placeholder ?? '?',
+        awayTeam: m?.away_team?.country_name ?? m?.away_team_placeholder ?? '?',
+        actualHome: ms.actual_home_score,
+        actualAway: ms.actual_away_score,
+        predictedHome: ms.predicted_home_score,
+        predictedAway: ms.predicted_away_score,
+        points: ms.total_points,
+        type: ms.score_type,
+        basePoints: ms.base_points,
+        multiplier: ms.multiplier,
+        psoPoints: ms.pso_points,
+        stage: ms.stage,
       })
     }
 
     details.sort((a, b) => a.matchNumber - b.matchNumber)
     return details
-  }, [matches, predictionMap, poolSettings])
+  }, [entryMatchScores, matchLookup])
 
   // Group match details by stage
   const matchesByStage = useMemo(() => {

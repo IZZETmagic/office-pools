@@ -13,7 +13,6 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { useTheme } from '@/components/ThemeProvider'
-import { calculatePoints, DEFAULT_POOL_SETTINGS, type PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { formatNumber } from '@/lib/format'
 
 // =====================
@@ -83,6 +82,7 @@ type ProfilePageProps = {
   totalMatchCount: number
   poolSettingsMap: Record<string, any>
   playerScoresMap: Record<string, PlayerScoreEntry>
+  matchScoresMap: Record<string, { score_type: string; total_points: number }>
 }
 
 // =====================
@@ -184,6 +184,7 @@ export default function ProfilePage({
   totalMatchCount,
   poolSettingsMap,
   playerScoresMap,
+  matchScoresMap,
 }: ProfilePageProps) {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -304,7 +305,7 @@ export default function ProfilePage({
               <PredictionHistoryTab
                 predictions={predictions}
                 poolMemberships={poolMemberships}
-                poolSettingsMap={poolSettingsMap}
+                matchScoresMap={matchScoresMap}
               />
             )}
             {activeTab === 'account' && (
@@ -750,11 +751,11 @@ function AccuracyRow({ label, color, count, total }: { label: string; color: str
 function PredictionHistoryTab({
   predictions,
   poolMemberships,
-  poolSettingsMap,
+  matchScoresMap,
 }: {
   predictions: Prediction[]
   poolMemberships: PoolMembership[]
-  poolSettingsMap: Record<string, any>
+  matchScoresMap: Record<string, { score_type: string; total_points: number }>
 }) {
   const [poolFilter, setPoolFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -770,19 +771,6 @@ function PredictionHistoryTab({
     return map
   }, [poolMemberships])
 
-  const entryToSettings = useMemo(() => {
-    const map: Record<string, PoolSettings> = {}
-    for (const pm of poolMemberships) {
-      if (pm.entry_id) {
-        const raw = poolSettingsMap[pm.pool_id]
-        map[pm.entry_id] = raw
-          ? { ...DEFAULT_POOL_SETTINGS, ...raw }
-          : DEFAULT_POOL_SETTINGS
-      }
-    }
-    return map
-  }, [poolMemberships, poolSettingsMap])
-
   const stages = useMemo(() => {
     const set = new Set<string>()
     for (const p of predictions) {
@@ -797,35 +785,33 @@ function PredictionHistoryTab({
       let classification: 'exact' | 'winner_gd' | 'winner' | 'incorrect' | 'pending' = 'pending'
       let pointsDisplay = 'Pending'
 
-      if ((m.status === 'completed' || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
-        const settings = entryToSettings[pred.entry_id] ?? DEFAULT_POOL_SETTINGS
-        const result = calculatePoints(
-          pred.predicted_home_score,
-          pred.predicted_away_score,
-          m.home_score_ft,
-          m.away_score_ft,
-          m.stage,
-          settings
-        )
+      // Look up stored match_score for this entry+match
+      const storedScore = matchScoresMap[`${pred.entry_id}:${pred.match_id}`]
 
-        if (result.type === 'exact') {
+      if (storedScore) {
+        const scoreType = storedScore.score_type as 'exact' | 'winner_gd' | 'winner' | 'miss'
+        if (scoreType === 'exact') {
           classification = 'exact'
-          pointsDisplay = `+${formatNumber(result.points)}`
-        } else if (result.type === 'winner_gd') {
+          pointsDisplay = `+${formatNumber(storedScore.total_points)}`
+        } else if (scoreType === 'winner_gd') {
           classification = 'winner_gd'
-          pointsDisplay = `+${formatNumber(result.points)}`
-        } else if (result.type === 'winner') {
+          pointsDisplay = `+${formatNumber(storedScore.total_points)}`
+        } else if (scoreType === 'winner') {
           classification = 'winner'
-          pointsDisplay = `+${formatNumber(result.points)}`
+          pointsDisplay = `+${formatNumber(storedScore.total_points)}`
         } else {
           classification = 'incorrect'
           pointsDisplay = '+0'
         }
+      } else if ((m.status === 'completed' || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
+        // No stored score but match is completed — show as incorrect (scoring not yet run)
+        classification = 'incorrect'
+        pointsDisplay = '+0'
       }
 
       return { ...pred, classification, pointsDisplay }
     })
-  }, [predictions, entryToSettings])
+  }, [predictions, matchScoresMap])
 
   const filtered = useMemo(() => {
     let result = classified
