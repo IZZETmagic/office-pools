@@ -250,14 +250,27 @@ export default async function PoolPage({
   }
 
   // Fetch all predictions (needed for admin tabs + leaderboard bonus computation)
+  // Paginate to avoid Supabase's default 1000-row limit
   let allPredictions: PredictionData[] = []
   if (allEntryIds.length > 0) {
-    const { data: predData } = await supabase
-      .from('predictions')
-      .select('*')
-      .in('entry_id', allEntryIds)
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('predictions')
+        .select('*')
+        .in('entry_id', allEntryIds)
+        .range(offset, offset + pageSize - 1)
 
-    allPredictions = (predData || []) as PredictionData[]
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        allPredictions.push(...(page as PredictionData[]))
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
   }
 
   // Check deadline
