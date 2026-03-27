@@ -152,20 +152,25 @@ export default async function PoolPage({
 
   const bonusScores = (bonusScoresRes || []) as BonusScoreData[]
 
-  // Fetch stored match_scores for all entries (paginated to avoid 1000-row limit)
+  // Fetch stored match_scores for all entries in this pool (admin client bypasses RLS
+  // so we can read scores for ALL entries, not just the current user's)
+  const adminClient = createAdminClient()
   let allMatchScores: MatchScoreData[] = []
-  if (allEntryIds.length > 0) {
+  {
     const pageSize = 1000
     let offset = 0
     let hasMore = true
     while (hasMore) {
-      const { data: page } = await supabase
+      const { data: page, error: msError } = await adminClient
         .from('match_scores')
         .select('*')
-        .in('entry_id', allEntryIds)
+        .eq('pool_id', pool_id)
         .range(offset, offset + pageSize - 1)
 
-      if (!page || page.length === 0) {
+      if (msError) {
+        console.error('[PoolPage] Error fetching match_scores:', msError.message)
+        hasMore = false
+      } else if (!page || page.length === 0) {
         hasMore = false
       } else {
         allMatchScores.push(...(page as MatchScoreData[]))
@@ -206,7 +211,6 @@ export default async function PoolPage({
 
     // Auto-seed missing round states (handles pools created before feature deploy or RLS insert failures)
     if (roundStates.length === 0) {
-      const adminClient = createAdminClient()
       const roundKeys = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
       const now = new Date().toISOString()
       const seedRows = roundKeys.map(key => ({
