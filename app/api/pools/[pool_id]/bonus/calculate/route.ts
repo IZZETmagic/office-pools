@@ -126,20 +126,33 @@ async function handlePOST(
     country_code: t.country_code?.trim() || '',
   }))
 
-  // 5. Batch-fetch ALL predictions for all entries in one query (eliminates N+1)
+  // 5. Batch-fetch ALL predictions — paginate to avoid Supabase's 1000-row limit
   const entryIds = entries.map(e => e.entry_id)
 
-  const { data: allPredictions } = await supabase
-    .from('predictions')
-    .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-    .in('entry_id', entryIds)
-
-  // Group predictions by entry_id in memory
   const predictionsByEntry = new Map<string, any[]>()
-  for (const p of (allPredictions || [])) {
-    const list = predictionsByEntry.get(p.entry_id) || []
-    list.push(p)
-    predictionsByEntry.set(p.entry_id, list)
+  {
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('predictions')
+        .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+        .in('entry_id', entryIds)
+        .range(offset, offset + pageSize - 1)
+
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        for (const p of page) {
+          const list = predictionsByEntry.get(p.entry_id) || []
+          list.push(p)
+          predictionsByEntry.set(p.entry_id, list)
+        }
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
   }
 
   // Bulk delete ALL existing bonus_scores for these entries in one query
