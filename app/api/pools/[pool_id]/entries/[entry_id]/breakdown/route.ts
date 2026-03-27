@@ -1,11 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
-import type { PoolSettings, PointsResult } from '@/app/pools/[pool_id]/results/points'
-import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
-import type { MatchWithResult } from '@/lib/bonusCalculation'
+import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
+import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -85,29 +82,6 @@ type BreakdownResponse = {
     pso_correct_result: number | null
   }
   prediction_mode: string
-}
-
-/**
- * Get the stage multiplier for knockout matches.
- * Mirrors the private function in points.ts.
- */
-function getStageMultiplier(stage: string, settings: PoolSettings): number {
-  switch (stage) {
-    case 'round_32':
-      return settings.round_32_multiplier || 1
-    case 'round_16':
-      return settings.round_16_multiplier || 1
-    case 'quarter_final':
-      return settings.quarter_final_multiplier || 1
-    case 'semi_final':
-      return settings.semi_final_multiplier || 1
-    case 'third_place':
-      return settings.third_place_multiplier || 1
-    case 'final':
-      return settings.final_multiplier || 1
-    default:
-      return 1
-  }
 }
 
 async function handleGET(
@@ -192,154 +166,87 @@ async function handleGET(
   // 6. Entry owner's user profile
   const entryOwner = (entryMember as any).users
 
-  // 7. Fetch all needed data in parallel
+  // 7. Fetch stored v2 scores, matches (for display names), settings, and bonus scores in parallel
   const [
+    { data: matchScoresV2 },
     { data: matches },
-    { data: teams },
-    { data: conductData },
     { data: settingsRow },
-    { data: predictions },
     { data: bonusScores },
+    { data: teams },
   ] = await Promise.all([
     supabase
-      .from('matches')
-      .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
-      .eq('tournament_id', pool.tournament_id)
+      .from('match_scores_v2')
+      .select('*')
+      .eq('entry_id', entry_id)
       .order('match_number', { ascending: true }),
     supabase
-      .from('teams')
-      .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
+      .from('matches')
+      .select('match_id, match_number, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
       .eq('tournament_id', pool.tournament_id),
-    supabase
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
     supabase
       .from('pool_settings')
       .select('*')
       .eq('pool_id', pool_id)
       .single(),
     supabase
-      .from('predictions')
-      .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-      .eq('entry_id', entry_id),
-    supabase
       .from('bonus_scores')
       .select('bonus_category, bonus_type, description, points_earned')
       .eq('entry_id', entry_id),
+    supabase
+      .from('teams')
+      .select('team_id, country_name')
+      .eq('tournament_id', pool.tournament_id),
   ])
 
-  if (!matches || !teams) {
-    return NextResponse.json({ error: 'Failed to fetch pool data' }, { status: 500 })
-  }
-
-  // Normalize match data
-  const normalizedMatches: MatchWithResult[] = matches.map((m: any) => ({
-    ...m,
-    home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
-    away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-  }))
-
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
-  const conduct: MatchConductData[] = conductData || []
-  const teamsData: Team[] = (teams as any[]).map(t => ({
-    ...t,
-    group_letter: t.group_letter?.trim() || '',
-    country_code: t.country_code?.trim() || '',
-  }))
 
-  // Build prediction lookup
-  const predMap = new Map<string, any>()
-  const predictionMap: PredictionMap = new Map()
-  for (const p of (predictions || [])) {
-    predMap.set(p.match_id, p)
-    predictionMap.set(p.match_id, {
-      home: p.predicted_home_score,
-      away: p.predicted_away_score,
-      homePso: p.predicted_home_pso ?? null,
-      awayPso: p.predicted_away_pso ?? null,
-      winnerTeamId: p.predicted_winner_team_id ?? null,
-    })
+  // Build lookups for display names
+  const matchDisplayMap = new Map<string, any>()
+  for (const m of (matches || [])) {
+    const normalized = {
+      ...m,
+      home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
+      away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
+    }
+    matchDisplayMap.set(m.match_id, normalized)
   }
 
-  // Resolve bracket for knockout team matching
-  const bracket = resolveFullBracket({
-    matches: normalizedMatches,
-    predictionMap,
-    teams: teamsData,
-    conductData: conduct,
-  })
+  const teamNameMap = new Map<string, string>()
+  for (const t of (teams || [])) {
+    teamNameMap.set(t.team_id, t.country_name)
+  }
 
-  // 8. Compute match point results
+  // 8. Build match results from stored v2 scores
   const matchResults: MatchResultRow[] = []
   let matchPoints = 0
 
-  for (const m of normalizedMatches) {
-    if (!(m.is_completed || m.status === 'live') || m.home_score_ft === null || m.away_score_ft === null) {
-      continue
-    }
-
-    const pred = predMap.get(m.match_id)
-    if (!pred) continue
-
-    // Knockout team matching
-    const resolved = bracket.knockoutTeamMap.get(m.match_number)
-    const teamsMatch = checkKnockoutTeamsMatch(
-      m.stage,
-      m.home_team_id,
-      m.away_team_id,
-      resolved?.home?.team_id ?? null,
-      resolved?.away?.team_id ?? null,
-    )
-
-    const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-    const result: PointsResult = calculatePoints(
-      pred.predicted_home_score,
-      pred.predicted_away_score,
-      m.home_score_ft,
-      m.away_score_ft,
-      m.stage,
-      settings,
-      hasPso
-        ? {
-            actualHomePso: m.home_score_pso!,
-            actualAwayPso: m.away_score_pso!,
-            predictedHomePso: pred.predicted_home_pso,
-            predictedAwayPso: pred.predicted_away_pso,
-          }
-        : undefined,
-      teamsMatch,
-    )
-
-    matchPoints += result.points
-
-    // Compute PSO points: difference between total and (base * multiplier)
-    const multiplier = getStageMultiplier(m.stage, settings)
-    const ftPoints = Math.floor(result.basePoints * multiplier)
-    const psoPoints = result.pso ? result.pso.psoPoints : 0
+  for (const score of (matchScoresV2 || [])) {
+    const matchDisplay = matchDisplayMap.get(score.match_id)
+    matchPoints += score.total_points
 
     matchResults.push({
-      match_number: m.match_number,
-      stage: m.stage,
-      home_team: m.home_team?.country_name ?? 'TBD',
-      away_team: m.away_team?.country_name ?? 'TBD',
-      home_flag_url: m.home_team?.flag_url ?? null,
-      away_flag_url: m.away_team?.flag_url ?? null,
-      actual_home: m.home_score_ft,
-      actual_away: m.away_score_ft,
-      predicted_home: pred.predicted_home_score,
-      predicted_away: pred.predicted_away_score,
-      actual_home_pso: m.home_score_pso ?? null,
-      actual_away_pso: m.away_score_pso ?? null,
-      predicted_home_pso: pred.predicted_home_pso ?? null,
-      predicted_away_pso: pred.predicted_away_pso ?? null,
-      predicted_home_team: m.stage !== 'group' ? (resolved?.home?.country_name ?? null) : null,
-      predicted_away_team: m.stage !== 'group' ? (resolved?.away?.country_name ?? null) : null,
-      teams_match: teamsMatch,
-      type: result.type,
-      base_points: result.basePoints,
-      multiplier: result.multiplier,
-      pso_points: psoPoints,
-      total_points: result.points,
+      match_number: score.match_number,
+      stage: score.stage,
+      home_team: matchDisplay?.home_team?.country_name ?? 'TBD',
+      away_team: matchDisplay?.away_team?.country_name ?? 'TBD',
+      home_flag_url: matchDisplay?.home_team?.flag_url ?? null,
+      away_flag_url: matchDisplay?.away_team?.flag_url ?? null,
+      actual_home: score.actual_home_score,
+      actual_away: score.actual_away_score,
+      predicted_home: score.predicted_home_score,
+      predicted_away: score.predicted_away_score,
+      actual_home_pso: score.actual_home_pso ?? null,
+      actual_away_pso: score.actual_away_pso ?? null,
+      predicted_home_pso: score.predicted_home_pso ?? null,
+      predicted_away_pso: score.predicted_away_pso ?? null,
+      predicted_home_team: score.stage !== 'group' ? (teamNameMap.get(score.predicted_home_team_id) ?? null) : null,
+      predicted_away_team: score.stage !== 'group' ? (teamNameMap.get(score.predicted_away_team_id) ?? null) : null,
+      teams_match: score.teams_match,
+      type: score.score_type,
+      base_points: score.base_points,
+      multiplier: score.multiplier,
+      pso_points: score.pso_points,
+      total_points: score.total_points,
     })
   }
 

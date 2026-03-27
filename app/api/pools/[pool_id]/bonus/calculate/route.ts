@@ -7,6 +7,7 @@ import { GROUP_LETTERS } from '@/lib/tournament'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
+import { recalculatePool } from '@/lib/scoring'
 
 // =============================================================
 // POST /api/pools/:poolId/bonus/calculate
@@ -267,13 +268,11 @@ async function handlePOST(
 
   await Promise.all(bulkOps)
 
-  // 8. Recalculate leaderboard (use admin client to bypass RLS)
-  const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
-    p_pool_id: pool_id,
-  })
+  // 8. Recalculate v2 scores (match scores + entry totals)
+  const recalcResult = await recalculatePool({ poolId: pool_id })
 
-  if (leaderboardError) {
-    console.error('Leaderboard recalculation error:', leaderboardError)
+  if (!recalcResult.success) {
+    console.error('v2 recalculation error:', recalcResult.error)
   }
 
   return NextResponse.json({
