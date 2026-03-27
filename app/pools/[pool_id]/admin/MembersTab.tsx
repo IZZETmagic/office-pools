@@ -200,10 +200,8 @@ export function MembersTab({
       return
     }
 
-    // Recalculate leaderboard ranks to close any gaps
-    await supabase.rpc('recalculate_pool_leaderboard', {
-      p_pool_id: pool.pool_id,
-    })
+    // Recalculate v2 scores and ranks
+    await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
 
     // Notify removed member (fire-and-forget)
     fetch('/api/notifications/member-removed', {

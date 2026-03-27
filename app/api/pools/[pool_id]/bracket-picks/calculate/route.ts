@@ -7,6 +7,7 @@ import {
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, SettingsData } from '@/app/pools/[pool_id]/types'
+import { recalculatePool } from '@/lib/scoring'
 
 // Allow up to 60s on Vercel Hobby plan (default is 10s, too short for this route)
 export const maxDuration = 60
@@ -227,8 +228,8 @@ export async function POST(
     const submittedEntries = entries.filter((e: any) => e.has_submitted_predictions)
 
     if (submittedEntries.length === 0) {
-      // Still recalculate leaderboard to clear any stale scores
-      await adminClient.rpc('recalculate_pool_leaderboard', { p_pool_id: pool_id })
+      // Still recalculate v2 scores to clear any stale data
+      await recalculatePool({ poolId: pool_id })
 
       return NextResponse.json({
         success: true,
@@ -440,12 +441,10 @@ export async function POST(
     // RECALCULATE LEADERBOARD
     // =========================================================================
 
-    const { error: leaderboardError } = await adminClient.rpc('recalculate_pool_leaderboard', {
-      p_pool_id: pool_id,
-    })
+    const recalcResult = await recalculatePool({ poolId: pool_id })
 
-    if (leaderboardError) {
-      console.error('Leaderboard recalculation error:', leaderboardError)
+    if (!recalcResult.success) {
+      console.error('v2 recalculation error:', recalcResult.error)
     }
 
     return NextResponse.json({

@@ -570,9 +570,7 @@ export function PoolDetail({
       return
     }
 
-    await supabase.rpc('recalculate_pool_leaderboard', {
-      p_pool_id: pool.pool_id,
-    })
+    await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
 
     router.push('/pools')
   }

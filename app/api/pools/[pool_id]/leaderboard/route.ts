@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { calculatePoints, checkKnockoutTeamsMatch, DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
+import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
-import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
-import { resolveFullBracket } from '@/lib/bracketResolver'
-import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
+import type { MatchWithResult } from '@/lib/bonusCalculation'
+import type { Team, MatchConductData } from '@/lib/tournament'
 import { withPerfLogging } from '@/lib/api-perf'
 import { computePredictionResults, computeStreaks, computeCrowdPredictions } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
@@ -110,7 +109,7 @@ async function handleGET(
     { data: teams },
     { data: conductData },
     { data: settingsRow },
-    { data: tournamentAwardsRow },
+    { data: _tournamentAwardsRow },
     { data: poolMembers },
   ] = await Promise.all([
     supabase
@@ -149,7 +148,7 @@ async function handleGET(
   const memberIds = poolMembers.map((m: any) => m.member_id)
   const { data: entries } = await supabase
     .from('pool_entries')
-    .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank')
+    .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank, v2_match_points, v2_bonus_points, v2_total_points')
     .in('member_id', memberIds)
 
   if (!entries) {
@@ -171,7 +170,6 @@ async function handleGET(
   }))
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
-  const tournamentAwards: TournamentAwards | null = tournamentAwardsRow || null
   const conduct: MatchConductData[] = conductData || []
   const teamsData: Team[] = (teams as any[]).map(t => ({
     ...t,
@@ -265,77 +263,9 @@ async function handleGET(
     let total_completed = 0
 
     if (predictions.length > 0) {
-      // Build PredictionMap for bonus calculation
-      const predictionMap: PredictionMap = new Map()
-      const predMap = new Map<string, any>()
-      for (const p of predictions) {
-        predMap.set(p.match_id, p)
-        predictionMap.set(p.match_id, {
-          home: p.predicted_home_score,
-          away: p.predicted_away_score,
-          homePso: p.predicted_home_pso ?? null,
-          awayPso: p.predicted_away_pso ?? null,
-          winnerTeamId: p.predicted_winner_team_id ?? null,
-        })
-      }
-
-      // Resolve bracket for knockout team matching
-      const bracket = resolveFullBracket({
-        matches: normalizedMatches,
-        predictionMap,
-        teams: teamsData,
-        conductData: conduct,
-      })
-
-      // Calculate match points
-      for (const m of normalizedMatches) {
-        if ((m.is_completed || m.status === 'live') && m.home_score_ft !== null && m.away_score_ft !== null) {
-          const pred = predMap.get(m.match_id)
-          if (!pred) continue
-
-          // For knockout: check if predicted teams match actual teams
-          const resolved = bracket.knockoutTeamMap.get(m.match_number)
-          const teamsMatch = checkKnockoutTeamsMatch(
-            m.stage,
-            m.home_team_id,
-            m.away_team_id,
-            resolved?.home?.team_id ?? null,
-            resolved?.away?.team_id ?? null,
-          )
-
-          const hasPso = m.home_score_pso !== null && m.away_score_pso !== null
-          const result = calculatePoints(
-            pred.predicted_home_score,
-            pred.predicted_away_score,
-            m.home_score_ft,
-            m.away_score_ft,
-            m.stage,
-            settings,
-            hasPso
-              ? {
-                  actualHomePso: m.home_score_pso!,
-                  actualAwayPso: m.away_score_pso!,
-                  predictedHomePso: pred.predicted_home_pso,
-                  predictedAwayPso: pred.predicted_away_pso,
-                }
-              : undefined,
-            teamsMatch,
-          )
-          matchPoints += result.points
-        }
-      }
-
-      // Calculate bonus points
-      const bonusEntries = calculateAllBonusPoints({
-        memberId: entry.entry_id,
-        memberPredictions: predictionMap,
-        matches: normalizedMatches,
-        teams: teamsData,
-        conductData: conduct,
-        settings,
-        tournamentAwards,
-      })
-      bonusPoints = bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
+      // Read stored v2 scores (authoritative, computed by scoring engine)
+      matchPoints = entry.v2_match_points ?? 0
+      bonusPoints = entry.v2_bonus_points ?? 0
 
       // --- Analytics computation ---
       try {
@@ -428,7 +358,7 @@ async function handleGET(
       match_points: matchPoints,
       bonus_points: bonusPoints,
       point_adjustment: adjustment,
-      total_points: matchPoints + bonusPoints + adjustment,
+      total_points: entry.v2_total_points ?? (matchPoints + bonusPoints + adjustment),
       current_rank: entry.current_rank,
       previous_rank: entry.previous_rank,
       has_submitted_predictions: entry.has_submitted_predictions,
