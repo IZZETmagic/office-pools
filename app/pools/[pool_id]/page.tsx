@@ -128,18 +128,10 @@ export default async function PoolPage({
   const userEntries = currentMember?.entries || []
   const userEntryIds = userEntries.map((e) => e.entry_id)
 
-  // Fetch conduct data and bonus scores (by entry_id)
-  const [{ data: conductRes }, { data: bonusScoresRes }] = await Promise.all([
-    supabase
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-    allEntryIds.length > 0
-      ? supabase
-          .from('bonus_scores')
-          .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
-          .in('entry_id', allEntryIds)
-      : Promise.resolve({ data: [] }),
-  ])
+  // Fetch conduct data
+  const { data: conductRes } = await supabase
+    .from('match_conduct')
+    .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
 
   const conductData = (conductRes || []) as {
     match_id: string
@@ -150,7 +142,28 @@ export default async function PoolPage({
     yellow_direct_red_cards: number
   }[]
 
-  const bonusScores = (bonusScoresRes || []) as BonusScoreData[]
+  // Fetch bonus scores — paginate to avoid Supabase's 1000-row silent truncation
+  let bonusScores: BonusScoreData[] = []
+  if (allEntryIds.length > 0) {
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page } = await supabase
+        .from('bonus_scores')
+        .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
+        .in('entry_id', allEntryIds)
+        .range(offset, offset + pageSize - 1)
+
+      if (!page || page.length === 0) {
+        hasMore = false
+      } else {
+        bonusScores.push(...(page as BonusScoreData[]))
+        offset += page.length
+        if (page.length < pageSize) hasMore = false
+      }
+    }
+  }
 
   // Fetch stored match_scores for all entries in this pool (admin client bypasses RLS
   // so we can read scores for ALL entries, not just the current user's)
