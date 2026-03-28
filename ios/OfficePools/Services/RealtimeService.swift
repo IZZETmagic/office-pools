@@ -322,6 +322,7 @@ final class RealtimeService {
             schema: "public",
             table: "pool_entries"
         ) { [weak self] _ in
+            print("[Realtime] Score change detected!")
             Task { @MainActor in
                 guard let self else { return }
                 // Debounce: cancel previous, wait 1s for batch updates to settle
@@ -329,12 +330,18 @@ final class RealtimeService {
                 self.scoresDebounceTask = Task {
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                     guard !Task.isCancelled else { return }
+                    print("[Realtime] Refreshing leaderboard after score update")
                     self.onScoresUpdated?()
                 }
             }
         }
 
-        try? await channel.subscribeWithError()
+        do {
+            try await channel.subscribeWithError()
+            print("[Realtime] Subscribed to score updates for pool \(poolId)")
+        } catch {
+            print("[Realtime] ERROR subscribing to scores: \(error)")
+        }
         scoresChannel = channel
     }
 

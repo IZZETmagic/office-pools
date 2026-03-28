@@ -287,18 +287,16 @@ struct PoolDetailView: View {
                     if predictionsViewModel == nil {
                         predictionsViewModel = PredictionsViewModel(poolId: viewModel.poolId)
                     }
-                    // Start real-time score updates
-                    await viewModel.startScoresSubscription()
                 } else {
                     viewModel.errorMessage = "Not signed in"
                     viewModel.isLoading = false
                 }
             }
         }
-        .onDisappear {
-            Task {
-                await viewModel.stopScoresSubscription()
-            }
+        .task {
+            // Real-time score subscription — .task ties to view lifecycle automatically
+            // (cancelled when view is removed from hierarchy, not on tab switches)
+            await viewModel.startScoresSubscription()
         }
     }
 
