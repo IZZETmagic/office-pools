@@ -110,7 +110,7 @@ struct PredictionWizardView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Read-Only Summary
@@ -338,7 +338,7 @@ struct PredictionWizardView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Navigation Bar
@@ -362,8 +362,7 @@ struct PredictionWizardView: View {
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color(.systemGray5))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
             }
 
@@ -384,9 +383,7 @@ struct PredictionWizardView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.accentColor)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
             } else if currentStage == .summary {
@@ -423,16 +420,14 @@ struct PredictionWizardView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(viewModel.isStageComplete(currentStage) ? Color.accentColor : Color.gray.opacity(0.5))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
                 .disabled(!viewModel.isStageComplete(currentStage))
             }
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(.bar)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Navigation Helpers

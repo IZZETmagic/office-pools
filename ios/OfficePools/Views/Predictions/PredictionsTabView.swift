@@ -455,16 +455,19 @@ struct PredictionFullScreenView: View {
     let onSubmitSuccess: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Compact header with entry name and close button
+        ZStack(alignment: .top) {
+            // Prediction content fills full screen — extends behind header
+            predictionContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 52) // Reserve space for the glass header
+
+            // Floating liquid glass header
             HStack {
                 Button(action: onClose) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                        Text("Entries")
-                            .font(.body)
-                    }
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
                 }
 
                 Spacer()
@@ -474,24 +477,13 @@ struct PredictionFullScreenView: View {
 
                 Spacer()
 
-                // Invisible spacer to balance the back button
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
-                    Text("Entries")
-                        .font(.body)
-                }
-                .hidden()
+                // Invisible balance element
+                Color.clear
+                    .frame(width: 36, height: 36)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color(.systemBackground))
-
-            Divider()
-
-            // Prediction content fills remaining space
-            predictionContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
         }
         .background(Color(.systemGroupedBackground))
     }
