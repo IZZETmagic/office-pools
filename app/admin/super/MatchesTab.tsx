@@ -458,20 +458,30 @@ export function MatchesTab({
     setSaving(true)
     setError(null)
 
-    // Use the enter_match_result RPC function for proper point calculation
-    const { data: rpcResult, error: rpcError } = await supabase.rpc(
-      'enter_match_result',
-      {
-        p_match_id: match.match_id,
-        p_home_score: hScore,
-        p_away_score: aScore,
-        p_home_pso: psoH,
-        p_away_pso: psoA,
-      }
-    )
+    // Determine winner (for knockout matches with PSO, PSO winner; otherwise FT result)
+    let winnerTeamId: string | null = null
+    if (psoH !== null && psoA !== null) {
+      winnerTeamId = psoH > psoA ? match.home_team_id : match.away_team_id
+    } else if (hScore !== aScore && match.stage !== 'group') {
+      winnerTeamId = hScore > aScore ? match.home_team_id : match.away_team_id
+    }
 
-    if (rpcError) {
-      setError(rpcError.message)
+    // Update match with result
+    const { error: matchError } = await supabase
+      .from('matches')
+      .update({
+        home_score_ft: hScore,
+        away_score_ft: aScore,
+        home_score_pso: psoH,
+        away_score_pso: psoA,
+        is_completed: true,
+        status: 'completed',
+        winner_team_id: winnerTeamId,
+      })
+      .eq('match_id', match.match_id)
+
+    if (matchError) {
+      setError('Failed to save match result: ' + matchError.message)
       setSaving(false)
       return
     }
@@ -575,12 +585,10 @@ export function MatchesTab({
     await Promise.all(parallelTasks)
     await refreshMatches()
 
-    const result = rpcResult as { predictions_processed?: number } | null
-    const processed = result?.predictions_processed ?? 0
     setSaving(false)
     setModal({ type: 'none' })
     showToast(
-      `Match result saved. Points calculated for ${processed} predictions across all pools.${bonusInfo}${advanceInfo}`,
+      `Match result saved. Leaderboards recalculated.${bonusInfo}${advanceInfo}`,
       'success'
     )
     logAuditEvent({
@@ -592,7 +600,6 @@ export function MatchesTab({
         away_score: aScore,
         home_pso: psoH,
         away_pso: psoA,
-        predictions_processed: processed,
       },
       summary: `Entered result for #${match.match_number}: ${hScore}-${aScore}${psoH !== null ? ` (PSO ${psoH}-${psoA})` : ''}`,
     })
