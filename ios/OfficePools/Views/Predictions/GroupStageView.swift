@@ -8,6 +8,7 @@ struct GroupStageView: View {
 
     @State private var expandedGroups: Set<String> = []
     @State private var didSetDefaults = false
+    @FocusState private var focusedField: ScoreFieldID?
 
     var body: some View {
         LazyVStack(spacing: 12) {
@@ -102,9 +103,10 @@ struct GroupStageView: View {
             if isExpanded {
                 VStack(spacing: 8) {
                     // Match prediction rows — each in its own card
-                    ForEach(matches) { match in
+                    ForEach(Array(matches.enumerated()), id: \.element.id) { index, match in
                         let pred = viewModel.predictions[match.matchId]
                         let isMatchComplete = pred?.homeScore != nil && pred?.awayScore != nil
+                        let nextMatchId = index + 1 < matches.count ? matches[index + 1].matchId : nil
 
                         MatchPredictionRow(
                             match: match,
@@ -115,7 +117,15 @@ struct GroupStageView: View {
                                 viewModel.updateScore(matchId: match.matchId, homeScore: home, awayScore: away)
                             },
                             onPsoUpdate: { _, _ in },
-                            readOnly: readOnly
+                            readOnly: readOnly,
+                            focusedField: readOnly ? nil : $focusedField,
+                            onAwayScoreEntered: {
+                                if let nextMatchId {
+                                    focusedField = .home(nextMatchId)
+                                } else {
+                                    focusedField = nil // last match in group — dismiss keyboard
+                                }
+                            }
                         )
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)

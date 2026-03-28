@@ -3,6 +3,12 @@ import SwiftUI
 /// An editable row for predicting a single match score.
 /// Shows team names with score inputs and PSO fields for knockout draws.
 /// When `readOnly` is true, scores are shown as static text labels.
+/// Identifies which score field is focused for auto-advance.
+enum ScoreFieldID: Hashable {
+    case home(String)  // matchId
+    case away(String)  // matchId
+}
+
 struct MatchPredictionRow: View {
     let match: Match
     let isKnockout: Bool
@@ -18,6 +24,10 @@ struct MatchPredictionRow: View {
     var awaySubtitle: String? = nil
     var homeFlagOverride: String? = nil
     var awayFlagOverride: String? = nil
+    /// Binding for auto-advance focus. Nil if not using auto-advance.
+    var focusedField: FocusState<ScoreFieldID?>.Binding?
+    /// Called after away score is entered, to advance focus to next match.
+    var onAwayScoreEntered: (() -> Void)? = nil
 
     @State private var homeText: String = ""
     @State private var awayText: String = ""
@@ -61,11 +71,11 @@ struct MatchPredictionRow: View {
                         .padding(.horizontal, 8)
                 } else {
                     HStack(spacing: 6) {
-                        scoreField(text: $homeText, onChange: handleScoreChange)
+                        scoreField(text: $homeText, fieldId: .home(match.matchId), onChange: handleScoreChange, autoAdvanceTo: .away(match.matchId))
                         Text("-")
                             .font(.headline)
                             .foregroundStyle(.secondary)
-                        scoreField(text: $awayText, onChange: handleScoreChange)
+                        scoreField(text: $awayText, fieldId: .away(match.matchId), onChange: handleScoreChange, autoAdvanceTo: nil)
                     }
                     .padding(.horizontal, 8)
                 }
@@ -171,8 +181,8 @@ struct MatchPredictionRow: View {
 
     // MARK: - Score Field
 
-    private func scoreField(text: Binding<String>, onChange: @escaping () -> Void) -> some View {
-        TextField("", text: text)
+    private func scoreField(text: Binding<String>, fieldId: ScoreFieldID, onChange: @escaping () -> Void, autoAdvanceTo nextField: ScoreFieldID?) -> some View {
+        let field = TextField("", text: text)
             .keyboardType(.numberPad)
             .multilineTextAlignment(.center)
             .font(.title3.weight(.semibold).monospacedDigit())
@@ -190,7 +200,25 @@ struct MatchPredictionRow: View {
                     text.wrappedValue = ""
                 }
                 onChange()
+
+                // Auto-advance when a digit is entered
+                if !text.wrappedValue.isEmpty, let focus = focusedField {
+                    if let nextField {
+                        focus.wrappedValue = nextField
+                    } else {
+                        // Away score entered — advance to next match
+                        onAwayScoreEntered?()
+                    }
+                }
             }
+
+        return Group {
+            if let focus = focusedField {
+                field.focused(focus, equals: fieldId)
+            } else {
+                field
+            }
+        }
     }
 
     // MARK: - PSO Row
