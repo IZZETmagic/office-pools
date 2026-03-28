@@ -121,18 +121,18 @@ struct MatchPredictionRow: View {
     private var readOnlyScoreDisplay: some View {
         HStack(spacing: 6) {
             Text(homeText.isEmpty ? "-" : homeText)
-                .font(.headline.monospacedDigit())
-                .frame(width: 38, height: 36)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .font(.title3.weight(.semibold).monospacedDigit())
+                .frame(width: 48, height: 44)
+                .background(Color(.systemGray5))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             Text("-")
                 .font(.headline)
                 .foregroundStyle(.secondary)
             Text(awayText.isEmpty ? "-" : awayText)
-                .font(.headline.monospacedDigit())
-                .frame(width: 38, height: 36)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .font(.title3.weight(.semibold).monospacedDigit())
+                .frame(width: 48, height: 44)
+                .background(Color(.systemGray5))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -175,10 +175,10 @@ struct MatchPredictionRow: View {
         TextField("", text: text)
             .keyboardType(.numberPad)
             .multilineTextAlignment(.center)
-            .font(.headline.monospacedDigit())
-            .frame(width: 38, height: 36)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .font(.title3.weight(.semibold).monospacedDigit())
+            .frame(width: 48, height: 44)
+            .background(Color(.systemGray5))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .onChange(of: text.wrappedValue) {
                 // Clamp to 0-20 range
                 if let val = Int(text.wrappedValue) {
