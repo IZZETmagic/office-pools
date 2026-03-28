@@ -572,12 +572,54 @@ export function PoolDetail({
     router.push('/pools')
   }
 
-  // Auto-refresh data on leaderboard, results, and standings tabs
+  // Real-time leaderboard updates via Supabase Realtime
+  // Subscribe to pool_entries changes — when recalculatePool() updates scores,
+  // all connected clients get an instant refresh. Debounced so batch updates
+  // (e.g., 12 entries updating) only trigger one refresh.
+  useEffect(() => {
+    const supabase = createClient()
+    const entryIds = new Set(
+      members.flatMap(m => (m.entries ?? []).map(e => e.entry_id))
+    )
+    if (entryIds.size === 0) return
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+    const channel = supabase
+      .channel(`pool-scores-${pool.pool_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pool_entries',
+        },
+        (payload) => {
+          // Only refresh if the updated entry belongs to this pool
+          const updatedEntryId = (payload.new as any)?.entry_id
+          if (!updatedEntryId || !entryIds.has(updatedEntryId)) return
+
+          // Debounce: wait 1s after last update before refreshing
+          if (debounceTimer) clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => {
+            router.refresh()
+          }, 1000)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [pool.pool_id, members, router])
+
+  // Fallback: auto-refresh every 60s on active tabs in case Realtime misses an event
   useEffect(() => {
     const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'my_bracket', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
 
-    const interval = setInterval(() => router.refresh(), 30000)
+    const interval = setInterval(() => router.refresh(), 60000)
     return () => clearInterval(interval)
   }, [activeTab, router])
 
