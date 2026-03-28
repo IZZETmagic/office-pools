@@ -320,13 +320,12 @@ async function writeScoresToDB(
   poolId: string,
   result: ScoringResult,
 ): Promise<{ matchScoresWritten: number; bonusScoresWritten: number }> {
-  const { matchScores, entryTotals } = result
+  const { matchScores, bonusScores, entryTotals } = result
 
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
 
   // Write match_scores (upsert by entry_id + match_id)
-  // Phase 1: Shadow table — does NOT touch the existing match_scores table
   if (matchScores.length > 0) {
     // Process in batches of 500 to avoid payload limits
     const batchSize = 500
@@ -344,9 +343,41 @@ async function writeScoresToDB(
     }
   }
 
+  // Write bonus_scores — delete existing rows for affected entries, then bulk insert
+  if (bonusScores.length > 0) {
+    const affectedEntryIds = [...new Set(bonusScores.map(bs => bs.entry_id))]
+
+    // Delete existing bonus_scores for these entries (in batches to handle large sets)
+    const deleteBatchSize = 100
+    for (let i = 0; i < affectedEntryIds.length; i += deleteBatchSize) {
+      const batch = affectedEntryIds.slice(i, i + deleteBatchSize)
+      const { error } = await adminClient
+        .from('bonus_scores')
+        .delete()
+        .in('entry_id', batch)
+
+      if (error) {
+        console.error(`[scoring] Failed to delete bonus_scores batch ${i / deleteBatchSize}:`, error)
+      }
+    }
+
+    // Insert new bonus_scores in batches
+    const batchSize = 500
+    for (let i = 0; i < bonusScores.length; i += batchSize) {
+      const batch = bonusScores.slice(i, i + batchSize)
+      const { error } = await adminClient
+        .from('bonus_scores')
+        .insert(batch)
+
+      if (error) {
+        console.error(`[scoring] Failed to insert bonus_scores batch ${i / batchSize}:`, error)
+      } else {
+        bonusScoresWritten += batch.length
+      }
+    }
+  }
+
   // Update entry totals on pool_entries
-  // Phase 1: Write to a new column (scored_total_points) for comparison,
-  // NOT overwriting the existing total_points yet.
   for (const totals of entryTotals) {
     const { error } = await adminClient
       .from('pool_entries')
@@ -358,8 +389,6 @@ async function writeScoresToDB(
       .eq('entry_id', totals.entry_id)
 
     if (error) {
-      // v2 columns may not exist yet — this is expected until migration runs.
-      // Log at debug level, not error.
       if (!error.message?.includes('v2_')) {
         console.error(`[scoring] Failed to update entry totals for ${totals.entry_id}:`, error)
       }
