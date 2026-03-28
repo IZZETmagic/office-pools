@@ -282,10 +282,13 @@ async function handlePOST(
   await Promise.all(bulkOps)
 
   // 8. Recalculate v2 scores (match scores + entry totals)
-  const recalcResult = await recalculatePool({ poolId: pool_id })
-
-  if (!recalcResult.success) {
-    console.error('v2 recalculation error:', recalcResult.error)
+  // Skip if caller will handle recalculation separately (performance optimization)
+  const skipRecalc = request.nextUrl.searchParams.get('skipRecalc') === 'true'
+  if (!skipRecalc) {
+    const recalcResult = await recalculatePool({ poolId: pool_id })
+    if (!recalcResult.success) {
+      console.error('v2 recalculation error:', recalcResult.error)
+    }
   }
 
   return NextResponse.json({

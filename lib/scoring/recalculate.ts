@@ -325,73 +325,83 @@ async function writeScoresToDB(
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
 
-  // Write match_scores (upsert by entry_id + match_id)
+  // Write match_scores (upsert by entry_id + match_id) — parallel batches
   if (matchScores.length > 0) {
-    // Process in batches of 500 to avoid payload limits
     const batchSize = 500
+    const matchBatches: MatchScoreRow[][] = []
     for (let i = 0; i < matchScores.length; i += batchSize) {
-      const batch = matchScores.slice(i, i + batchSize)
-      const { error } = await adminClient
-        .from('match_scores')
-        .upsert(batch, { onConflict: 'entry_id,match_id' })
-
-      if (error) {
-        console.error(`[scoring] Failed to upsert match_scores batch ${i / batchSize}:`, error)
-      } else {
-        matchScoresWritten += batch.length
-      }
+      matchBatches.push(matchScores.slice(i, i + batchSize))
     }
+    const matchResults = await Promise.all(
+      matchBatches.map(batch =>
+        adminClient
+          .from('match_scores')
+          .upsert(batch, { onConflict: 'entry_id,match_id' })
+          .then(({ error }: { error: any }) => {
+            if (error) { console.error(`[scoring] Failed to upsert match_scores batch:`, error); return 0 }
+            return batch.length
+          })
+      )
+    )
+    matchScoresWritten = matchResults.reduce((sum, n) => sum + n, 0)
   }
 
-  // Write bonus_scores — delete existing rows for affected entries, then bulk insert
+  // Write bonus_scores — delete existing then bulk insert (in parallel batches)
   if (bonusScores.length > 0) {
     const affectedEntryIds = [...new Set(bonusScores.map(bs => bs.entry_id))]
 
-    // Delete existing bonus_scores for these entries (in batches to handle large sets)
+    // Delete all existing bonus_scores for affected entries in parallel
     const deleteBatchSize = 100
+    const deleteBatches: string[][] = []
     for (let i = 0; i < affectedEntryIds.length; i += deleteBatchSize) {
-      const batch = affectedEntryIds.slice(i, i + deleteBatchSize)
-      const { error } = await adminClient
-        .from('bonus_scores')
-        .delete()
-        .in('entry_id', batch)
-
-      if (error) {
-        console.error(`[scoring] Failed to delete bonus_scores batch ${i / deleteBatchSize}:`, error)
-      }
+      deleteBatches.push(affectedEntryIds.slice(i, i + deleteBatchSize))
     }
+    await Promise.all(
+      deleteBatches.map(batch =>
+        adminClient.from('bonus_scores').delete().in('entry_id', batch)
+          .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete bonus_scores batch:`, error) })
+      )
+    )
 
-    // Insert new bonus_scores in batches
-    const batchSize = 500
-    for (let i = 0; i < bonusScores.length; i += batchSize) {
-      const batch = bonusScores.slice(i, i + batchSize)
-      const { error } = await adminClient
-        .from('bonus_scores')
-        .insert(batch)
-
-      if (error) {
-        console.error(`[scoring] Failed to insert bonus_scores batch ${i / batchSize}:`, error)
-      } else {
-        bonusScoresWritten += batch.length
-      }
+    // Insert new bonus_scores in parallel batches
+    const insertBatchSize = 500
+    const insertBatches: BonusScoreRow[][] = []
+    for (let i = 0; i < bonusScores.length; i += insertBatchSize) {
+      insertBatches.push(bonusScores.slice(i, i + insertBatchSize))
     }
+    const bonusResults = await Promise.all(
+      insertBatches.map(batch =>
+        adminClient.from('bonus_scores').insert(batch)
+          .then(({ error }: { error: any }) => {
+            if (error) { console.error(`[scoring] Failed to insert bonus_scores batch:`, error); return 0 }
+            return batch.length
+          })
+      )
+    )
+    bonusScoresWritten = bonusResults.reduce((sum, n) => sum + n, 0)
   }
 
-  // Update entry totals on pool_entries
-  for (const totals of entryTotals) {
-    const { error } = await adminClient
-      .from('pool_entries')
-      .update({
-        match_points: totals.match_points,
-        bonus_points: totals.bonus_points,
-        scored_total_points: totals.total_points,
-      })
-      .eq('entry_id', totals.entry_id)
-
-    if (error) {
-      if (!error.message?.includes('v2_')) {
-        console.error(`[scoring] Failed to update entry totals for ${totals.entry_id}:`, error)
-      }
+  // Update entry totals on pool_entries — batch in groups of 50 using Promise.all
+  if (entryTotals.length > 0) {
+    const batchSize = 50
+    for (let i = 0; i < entryTotals.length; i += batchSize) {
+      const batch = entryTotals.slice(i, i + batchSize)
+      const updatePromises = batch.map(totals =>
+        adminClient
+          .from('pool_entries')
+          .update({
+            match_points: totals.match_points,
+            bonus_points: totals.bonus_points,
+            scored_total_points: totals.total_points,
+          })
+          .eq('entry_id', totals.entry_id)
+          .then(({ error }: { error: any }) => {
+            if (error && !error.message?.includes('v2_')) {
+              console.error(`[scoring] Failed to update entry totals for ${totals.entry_id}:`, error)
+            }
+          })
+      )
+      await Promise.all(updatePromises)
     }
   }
 

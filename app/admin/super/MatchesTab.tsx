@@ -331,33 +331,21 @@ export function MatchesTab({
       return
     }
 
-    // Step 2: Recalculate points for all pools (now supports live matches with scores)
+    // Step 2: Recalculate points for ALL pools in parallel (single v2 engine pass)
     const { data: pools } = await supabase
       .from('pools')
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
-    if (pools) {
-      for (const pool of pools) {
-        if (pool.prediction_mode === 'bracket_picker') {
-          // Bracket picker pools use the BP calculate endpoint
-          try {
-            await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
-          } catch (e) {
-            console.error('Failed to recalculate bracket picker points for pool', pool.pool_id, e)
-          }
-        } else {
-          await supabase.rpc('recalculate_all_pool_points', {
-            pool_id_param: pool.pool_id,
-          })
-          // Also recalculate bonus points
-          try {
-            await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
-          } catch (e) {
-            console.error('Failed to recalculate bonus points for pool', pool.pool_id, e)
-          }
+    if (pools && pools.length > 0) {
+      await Promise.all(pools.map(async (pool) => {
+        try {
+          // v2 recalculate handles match_scores + bonus_scores + entry totals in one pass
+          await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+        } catch (e) {
+          console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
-      }
+      }))
     }
 
     await refreshMatches()
@@ -485,70 +473,81 @@ export function MatchesTab({
       return
     }
 
-    // Save conduct data for group stage matches
-    if (match.stage === 'group' && match.home_team_id && match.away_team_id) {
-      const conductRows = [
-        {
-          match_id: match.match_id,
-          team_id: match.home_team_id,
-          yellow_cards: parseInt(homeYellowCards) || 0,
-          indirect_red_cards: parseInt(homeIndirectReds) || 0,
-          direct_red_cards: parseInt(homeDirectReds) || 0,
-          yellow_direct_red_cards: parseInt(homeYellowDirectReds) || 0,
-        },
-        {
-          match_id: match.match_id,
-          team_id: match.away_team_id,
-          yellow_cards: parseInt(awayYellowCards) || 0,
-          indirect_red_cards: parseInt(awayIndirectReds) || 0,
-          direct_red_cards: parseInt(awayDirectReds) || 0,
-          yellow_direct_red_cards: parseInt(awayYellowDirectReds) || 0,
-        },
-      ]
-
-      const { error: conductError } = await supabase
-        .from('match_conduct')
-        .upsert(conductRows, { onConflict: 'match_id,team_id' })
-
-      if (conductError) {
-        console.error('Failed to save conduct data:', conductError)
-      }
-    }
-
-    // Recalculate bonus/bracket points for all pools linked to this tournament
+    // Run conduct save, pool recalculation, and team advancement in parallel
+    // (conduct and advancement don't depend on recalculation)
     const { data: pools } = await supabase
       .from('pools')
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
+    // Build parallel tasks
+    const parallelTasks: Promise<any>[] = []
+
+    // Task 1: Save conduct data (group stage only)
+    if (match.stage === 'group' && match.home_team_id && match.away_team_id) {
+      parallelTasks.push(
+        (async () => {
+          const { error } = await supabase
+            .from('match_conduct')
+            .upsert([
+              {
+                match_id: match.match_id,
+                team_id: match.home_team_id,
+                yellow_cards: parseInt(homeYellowCards) || 0,
+                indirect_red_cards: parseInt(homeIndirectReds) || 0,
+                direct_red_cards: parseInt(homeDirectReds) || 0,
+                yellow_direct_red_cards: parseInt(homeYellowDirectReds) || 0,
+              },
+              {
+                match_id: match.match_id,
+                team_id: match.away_team_id,
+                yellow_cards: parseInt(awayYellowCards) || 0,
+                indirect_red_cards: parseInt(awayIndirectReds) || 0,
+                direct_red_cards: parseInt(awayDirectReds) || 0,
+                yellow_direct_red_cards: parseInt(awayYellowDirectReds) || 0,
+              },
+            ], { onConflict: 'match_id,team_id' })
+          if (error) console.error('Failed to save conduct data:', error)
+        })()
+      )
+    }
+
+    // Task 2: Recalculate scores for ALL pools in parallel
+    // Call recalculate directly (computes match_scores + bonus_scores + entry totals in one pass)
+    // Also fire bonus/calculate with skipRecalc for group_predictions/special_predictions (non-blocking)
     let bonusInfo = ''
     if (pools && pools.length > 0) {
-      const results = await Promise.all(pools.map(async (pool) => {
+      const recalcPromise = Promise.all(pools.map(async (pool) => {
         try {
-          const endpoint = pool.prediction_mode === 'bracket_picker'
+          // Primary: v2 recalculate (computes everything needed for leaderboard)
+          const recalcRes = await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+
+          // Secondary: bonus/calculate for group/special predictions only (skip the redundant recalc)
+          const bonusEndpoint = pool.prediction_mode === 'bracket_picker'
             ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
-            : `/api/pools/${pool.pool_id}/bonus/calculate`
-          const res = await fetch(endpoint, { method: 'POST' })
-          if (res.ok) return await res.json()
+            : `/api/pools/${pool.pool_id}/bonus/calculate?skipRecalc=true`
+          fetch(bonusEndpoint, { method: 'POST' }).catch(() => {}) // fire-and-forget
+
+          if (recalcRes.ok) return await recalcRes.json()
         } catch (e) {
           console.error('Failed to recalculate points for pool', pool.pool_id, e)
         }
         return null
       }))
-      const totals = results.filter(Boolean)
-      if (totals.length > 0) {
-        const totalEntries = totals.reduce((sum, d) => sum + (d.totalBonusEntries || 0), 0)
-        const totalPoints = totals.reduce((sum, d) => sum + (d.totalBonusPoints || 0), 0)
-        bonusInfo = ` Bonus: ${totalEntries} entries (${totalPoints} pts).`
-      }
+      parallelTasks.push(recalcPromise.then(results => {
+        const totals = results.filter(Boolean)
+        if (totals.length > 0) {
+          const totalEntries = totals.reduce((sum: number, d: any) => sum + (d.entriesProcessed || 0), 0)
+          const totalWritten = totals.reduce((sum: number, d: any) => sum + (d.matchScoresWritten || 0), 0)
+          bonusInfo = ` Scored ${totalEntries} entries (${totalWritten} match scores).`
+        }
+      }))
     }
 
-    await refreshMatches()
-
-    // Trigger team advancement for knockout matches
+    // Task 3: Trigger team advancement
     let advanceInfo = ''
-    try {
-      const advanceRes = await fetch('/api/admin/advance-teams', {
+    parallelTasks.push(
+      fetch('/api/admin/advance-teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -556,18 +555,22 @@ export function MatchesTab({
           match_id: match.match_id,
         }),
       })
-      if (advanceRes.ok) {
-        const advanceData = await advanceRes.json()
-        if (advanceData.advanced.length > 0) {
-          advanceInfo = ` Teams advanced: ${advanceData.advanced.map(
-            (a: any) => `#${a.match_number} ${a.side}: ${a.country_name}`
-          ).join(', ')}.`
-          await refreshMatches()
-        }
-      }
-    } catch (e) {
-      console.error('Failed to advance teams:', e)
-    }
+        .then(async (res) => {
+          if (res.ok) {
+            const advanceData = await res.json()
+            if (advanceData.advanced.length > 0) {
+              advanceInfo = ` Teams advanced: ${advanceData.advanced.map(
+                (a: any) => `#${a.match_number} ${a.side}: ${a.country_name}`
+              ).join(', ')}.`
+            }
+          }
+        })
+        .catch((e) => console.error('Failed to advance teams:', e))
+    )
+
+    // Wait for all parallel tasks to complete, then refresh once
+    await Promise.all(parallelTasks)
+    await refreshMatches()
 
     const result = rpcResult as { predictions_processed?: number } | null
     const processed = result?.predictions_processed ?? 0
@@ -615,31 +618,36 @@ export function MatchesTab({
       return
     }
 
-    // Recalculate bonus/bracket points for all pools after reset
+    // Recalculate scores + clear advanced teams in parallel
     const { data: resetPools } = await supabase
       .from('pools')
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
+    let clearInfo = ''
+    const resetTasks: Promise<any>[] = []
+
+    // Task 1: Recalculate all pools in parallel using v2 engine
     if (resetPools) {
-      await Promise.all(resetPools.map(async (pool) => {
-        try {
-          const endpoint = pool.prediction_mode === 'bracket_picker'
-            ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
-            : `/api/pools/${pool.pool_id}/bonus/calculate`
-          await fetch(endpoint, { method: 'POST' })
-        } catch (e) {
-          console.error('Failed to recalculate points for pool', pool.pool_id, e)
-        }
-      }))
+      resetTasks.push(
+        Promise.all(resetPools.map(async (pool) => {
+          try {
+            await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+            // Fire-and-forget bonus/calculate for group/special predictions only
+            const bonusEndpoint = pool.prediction_mode === 'bracket_picker'
+              ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
+              : `/api/pools/${pool.pool_id}/bonus/calculate?skipRecalc=true`
+            fetch(bonusEndpoint, { method: 'POST' }).catch(() => {})
+          } catch (e) {
+            console.error('Failed to recalculate points for pool', pool.pool_id, e)
+          }
+        }))
+      )
     }
 
-    await Promise.all([refreshMatches(), refreshAuditLogs()])
-
-    // Clear advanced teams from downstream matches
-    let clearInfo = ''
-    try {
-      const advanceRes = await fetch('/api/admin/advance-teams', {
+    // Task 2: Clear advanced teams from downstream matches
+    resetTasks.push(
+      fetch('/api/admin/advance-teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -647,16 +655,19 @@ export function MatchesTab({
           match_id: match.match_id,
         }),
       })
-      if (advanceRes.ok) {
-        const advanceData = await advanceRes.json()
-        if (advanceData.cleared.length > 0) {
-          clearInfo = ` Cleared ${advanceData.cleared.length} team advancement(s).`
-          await refreshMatches()
-        }
-      }
-    } catch (e) {
-      console.error('Failed to clear advanced teams:', e)
-    }
+        .then(async (res) => {
+          if (res.ok) {
+            const advanceData = await res.json()
+            if (advanceData.cleared.length > 0) {
+              clearInfo = ` Cleared ${advanceData.cleared.length} team advancement(s).`
+            }
+          }
+        })
+        .catch((e) => console.error('Failed to clear advanced teams:', e))
+    )
+
+    await Promise.all(resetTasks)
+    await Promise.all([refreshMatches(), refreshAuditLogs()])
 
     setResetting(false)
     setModal({ type: 'none' })
