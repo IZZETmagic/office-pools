@@ -400,18 +400,59 @@ async function writeScoresToDB(
     bonusScoresWritten = bonusResults.reduce((sum, n) => sum + n, 0)
   }
 
-  // Update entry totals on pool_entries — batch in groups of 50 using Promise.all
+  // Update entry totals + ranks on pool_entries
   if (entryTotals.length > 0) {
+    // Compute new ranks: sort by total_points descending, assign rank with ties
+    const sorted = [...entryTotals].sort((a, b) => b.total_points - a.total_points)
+    const rankMap = new Map<string, number>()
+    let rank = 1
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].total_points < sorted[i - 1].total_points) {
+        rank = i + 1
+      }
+      rankMap.set(sorted[i].entry_id, rank)
+    }
+
+    // Phase 1: Snapshot current_rank → previous_rank for all entries (before we overwrite current_rank)
+    // Read current ranks, then write them as previous_rank
+    const allEntryIdsForRank = entryTotals.map(t => t.entry_id)
+    const { data: currentRanks } = await adminClient
+      .from('pool_entries')
+      .select('entry_id, current_rank')
+      .in('entry_id', allEntryIdsForRank)
+
+    if (currentRanks && currentRanks.length > 0) {
+      const snapshotBatchSize = 50
+      for (let i = 0; i < currentRanks.length; i += snapshotBatchSize) {
+        const batch = currentRanks.slice(i, i + snapshotBatchSize)
+        await Promise.all(
+          batch.map((row: { entry_id: string; current_rank: number | null }) =>
+            adminClient
+              .from('pool_entries')
+              .update({ previous_rank: row.current_rank })
+              .eq('entry_id', row.entry_id)
+              .then(({ error }: { error: any }) => {
+                if (error) console.error(`[scoring] Failed to snapshot rank for ${row.entry_id}:`, error)
+              })
+          )
+        )
+      }
+    }
+
+    // Phase 2: Write new totals + new current_rank
     const batchSize = 50
     for (let i = 0; i < entryTotals.length; i += batchSize) {
       const batch = entryTotals.slice(i, i + batchSize)
-      const updatePromises = batch.map(totals =>
-        adminClient
+      const updatePromises = batch.map(totals => {
+        const newRank = rankMap.get(totals.entry_id) ?? null
+        return adminClient
           .from('pool_entries')
           .update({
             match_points: totals.match_points,
             bonus_points: totals.bonus_points,
             scored_total_points: totals.total_points,
+            current_rank: newRank,
+            last_rank_update: new Date().toISOString(),
           })
           .eq('entry_id', totals.entry_id)
           .then(({ error }: { error: any }) => {
@@ -419,7 +460,7 @@ async function writeScoresToDB(
               console.error(`[scoring] Failed to update entry totals for ${totals.entry_id}:`, error)
             }
           })
-      )
+      })
       await Promise.all(updatePromises)
     }
   }
