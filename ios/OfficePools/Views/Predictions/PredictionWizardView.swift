@@ -44,6 +44,24 @@ extension View {
     }
 }
 
+/// Toggles between solid accent fill (complete) and dimmed glass (incomplete).
+private struct NextRoundButtonStyle: ViewModifier {
+    let isComplete: Bool
+
+    func body(content: Content) -> some View {
+        if isComplete {
+            content
+                .foregroundStyle(.white)
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
+        } else {
+            content
+                .glassButton()
+                .opacity(0.5)
+        }
+    }
+}
+
 /// Main wizard container that orchestrates the 7-stage prediction flow.
 /// Provides stage navigation via pills, stage content, and bottom navigation with save/submit actions.
 /// When `readOnly` is true, hides save status bar and submit button, shows only navigation.
@@ -479,8 +497,7 @@ struct PredictionWizardView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .glassButton(tint: viewModel.isStageComplete(currentStage) ? .accentColor : nil)
-                    .opacity(viewModel.isStageComplete(currentStage) ? 1.0 : 0.5)
+                    .modifier(NextRoundButtonStyle(isComplete: viewModel.isStageComplete(currentStage)))
                 }
                 .disabled(!viewModel.isStageComplete(currentStage))
             }
