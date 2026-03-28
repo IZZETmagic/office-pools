@@ -74,11 +74,12 @@ struct PointsBreakdownView: View {
             HStack(spacing: 12) {
                 // Rank badge
                 Text("#\(rank)")
-                    .font(.title3.weight(.black).monospacedDigit())
+                    .font(rank >= 10 ? .callout.weight(.black).monospacedDigit() : .title3.weight(.black).monospacedDigit())
                     .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
+                    .frame(minWidth: 40, minHeight: 40)
+                    .frame(width: rank >= 100 ? 50 : 40, height: 40)
                     .background(rankColor)
-                    .clipShape(Circle())
+                    .clipShape(Capsule())
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(data.user.fullName)
