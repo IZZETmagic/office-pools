@@ -12,29 +12,28 @@ private struct GlassButtonModifier: ViewModifier {
         } else {
             content
                 .background {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(.ultraThinMaterial)
-                }
-                .overlay {
-                    if let tint {
+                    ZStack {
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(tint.opacity(0.45))
+                            .fill(.ultraThinMaterial)
+
+                        if let tint {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(tint.opacity(0.12))
+                        }
+
+                        // Top-edge highlight for glass refraction
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.5), .white.opacity(0.1), .clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.5
+                            )
                     }
                 }
-                .overlay {
-                    // Top-edge highlight for glass refraction
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.5), .white.opacity(0.1), .clear],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 0.5
-                        )
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: (tint ?? .black).opacity(tint != nil ? 0.25 : 0.08), radius: 6, y: 3)
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
         }
     }
 }
@@ -52,9 +51,9 @@ private struct NextRoundButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         if isComplete {
             content
-                .tint(.white)
-                .foregroundColor(.white)
-                .glassButton(tint: .accentColor)
+                .foregroundStyle(.white)
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
         } else {
             content
                 .glassButton()
