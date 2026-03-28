@@ -30,14 +30,14 @@ struct LeaderboardTabView: View {
                     // Remaining entries (rank 4+)
                     let startIndex = min(3, leaderboardData.count)
                     if startIndex < leaderboardData.count {
-                        ForEach(Array(leaderboardData[startIndex...].enumerated()), id: \.element.id) { index, entry in
+                        ForEach(Array(leaderboardData[startIndex...].enumerated()), id: \.element.entryId) { index, entry in
                             leaderboardRow(entry: entry, rank: startIndex + index + 1)
                         }
                     }
 
                     // If fewer than 3, show all as rows
                     if leaderboardData.count < 3 {
-                        ForEach(Array(leaderboardData.enumerated()), id: \.element.id) { index, entry in
+                        ForEach(Array(leaderboardData.enumerated()), id: \.element.entryId) { index, entry in
                             leaderboardRow(entry: entry, rank: index + 1)
                         }
                     }
@@ -54,6 +54,7 @@ struct LeaderboardTabView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: leaderboardData.map(\.entryId))
             }
             .background(Color(.systemGroupedBackground))
         }
@@ -183,6 +184,8 @@ struct LeaderboardTabView: View {
                 Text("\(entry.totalPoints)")
                     .font(.title3.weight(.black).monospacedDigit())
                     .foregroundStyle(.blue)
+                    .contentTransition(.numericText(value: Double(entry.totalPoints)))
+                    .animation(.easeOut(duration: 0.8), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
                     .font(.caption2)
@@ -348,6 +351,8 @@ struct LeaderboardTabView: View {
                 Text("\(entry.totalPoints)")
                     .font(.headline.weight(.black).monospacedDigit())
                     .foregroundStyle(.blue)
+                    .contentTransition(.numericText(value: Double(entry.totalPoints)))
+                    .animation(.easeOut(duration: 0.8), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
                     .font(.caption2)
@@ -499,13 +504,21 @@ struct LeaderboardTabView: View {
 struct FormDotsView: View {
     let results: [String]
     let streak: StreakInfo?
+    @State private var visibleCount: Int = 0
 
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(Array(results.enumerated()), id: \.offset) { _, result in
+            ForEach(Array(results.enumerated()), id: \.offset) { index, result in
                 Circle()
                     .fill(dotColor(for: result))
                     .frame(width: 8, height: 8)
+                    .scaleEffect(index < visibleCount ? 1 : 0)
+                    .opacity(index < visibleCount ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.3, dampingFraction: 0.6)
+                            .delay(Double(index) * 0.08),
+                        value: visibleCount
+                    )
             }
 
             if let streak = streak, streak.length >= 3 {
@@ -517,7 +530,12 @@ struct FormDotsView: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(streak.type == "hot" ? .red : .blue)
                 }
+                .opacity(visibleCount >= results.count ? 1 : 0)
+                .animation(.easeIn(duration: 0.2).delay(Double(results.count) * 0.08), value: visibleCount)
             }
+        }
+        .onAppear {
+            visibleCount = results.count
         }
     }
 

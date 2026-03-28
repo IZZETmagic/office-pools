@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
@@ -920,6 +920,98 @@ export function LeaderboardTab({
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
 
+  // === ANIMATION: Rank Shuffle (FLIP) ===
+  const prevSortOrderRef = useRef<Map<string, number>>(new Map())
+  const [shuffleOffsets, setShuffleOffsets] = useState<Map<string, number>>(new Map())
+  const [isShuffling, setIsShuffling] = useState(false)
+  const ROW_HEIGHT = 52
+
+  useEffect(() => {
+    const prevOrder = prevSortOrderRef.current
+    // Update stored order
+    const newOrder = new Map<string, number>()
+    sorted.forEach((e, i) => newOrder.set(e.entry_id, i))
+
+    if (prevOrder.size > 0) {
+      const offsets = new Map<string, number>()
+      let hasChanges = false
+      sorted.forEach((entry, newIndex) => {
+        const oldIndex = prevOrder.get(entry.entry_id)
+        if (oldIndex !== undefined && oldIndex !== newIndex) {
+          offsets.set(entry.entry_id, (oldIndex - newIndex) * ROW_HEIGHT)
+          hasChanges = true
+        }
+      })
+
+      if (hasChanges) {
+        setIsShuffling(false)
+        setShuffleOffsets(offsets)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setIsShuffling(true)
+            setShuffleOffsets(new Map())
+            // Clear shuffling state after animation completes
+            setTimeout(() => setIsShuffling(false), 700)
+          })
+        })
+      }
+    }
+
+    prevSortOrderRef.current = newOrder
+  }, [sorted])
+
+  // === ANIMATION: Points Counter Roll-Up ===
+  const prevPointsRef = useRef<Map<string, number>>(new Map())
+  const [animatingPoints, setAnimatingPoints] = useState<Map<string, { from: number; to: number; current: number }>>(new Map())
+  const animFrameRef = useRef<number>(0)
+
+  useEffect(() => {
+    const prev = prevPointsRef.current
+    const newAnimations = new Map<string, { from: number; to: number; current: number }>()
+    let hasNew = false
+
+    for (const entry of sorted) {
+      const newPts = getPlayerScore(entry.entry_id).total_points
+      const oldPts = prev.get(entry.entry_id)
+      if (oldPts !== undefined && oldPts !== newPts) {
+        newAnimations.set(entry.entry_id, { from: oldPts, to: newPts, current: oldPts })
+        hasNew = true
+      }
+      prev.set(entry.entry_id, newPts)
+    }
+
+    if (hasNew) {
+      const startTime = performance.now()
+      const duration = 800 // ms
+
+      const animate = (now: number) => {
+        const elapsed = now - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        // Ease out cubic
+        const eased = 1 - Math.pow(1 - progress, 3)
+
+        const updated = new Map<string, { from: number; to: number; current: number }>()
+        for (const [id, anim] of newAnimations) {
+          const current = Math.round(anim.from + (anim.to - anim.from) * eased)
+          updated.set(id, { ...anim, current })
+        }
+        setAnimatingPoints(updated)
+
+        if (progress < 1) {
+          animFrameRef.current = requestAnimationFrame(animate)
+        } else {
+          setAnimatingPoints(new Map())
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate)
+    }
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    }
+  }, [sorted])
+
   // Find current user rank
   const currentUserRank = useMemo(() => {
     const idx = sorted.findIndex(e => e.users?.user_id === currentUserId)
@@ -1035,6 +1127,13 @@ export function LeaderboardTab({
 
   return (
     <div className="max-w-[480px] sm:max-w-none mx-auto px-1 sm:px-0 space-y-3 sm:space-y-4">
+      <style>{`
+        @keyframes dotReveal {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.3); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
       {/* Matchday MVP Banner */}
       {matchdayMVP && (
         <div
@@ -1121,7 +1220,11 @@ export function LeaderboardTab({
                       {!isBracketPicker && stats && stats.last5.length > 0 && (
                         <div className="flex items-center gap-[3px] sm:gap-1 mt-1.5">
                           {stats.last5.map((type, di) => (
-                            <div key={di} className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${getFormDotClass(type)}`} />
+                            <div
+                              key={di}
+                              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${getFormDotClass(type)}`}
+                              style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                            />
                           ))}
                         </div>
                       )}
@@ -1131,7 +1234,7 @@ export function LeaderboardTab({
                       className={`w-full rounded-t-xl bg-gradient-to-b ${gradientClass} flex flex-col items-center justify-start pt-3 sm:pt-4 ${pedestalClass}`}
                     >
                       <div className="text-xl sm:text-2xl font-black text-primary-500">
-                        {formatNumber(ps.total_points)}
+                        {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                       </div>
                       <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                         {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
@@ -1221,6 +1324,12 @@ export function LeaderboardTab({
                   ? 'bg-primary-50 dark:bg-primary-500/[0.08] border-l-2 border-l-primary-500'
                   : 'hover:bg-surface-secondary'
               }`}
+              style={{
+                transform: shuffleOffsets.has(entry.entry_id)
+                  ? `translateY(${shuffleOffsets.get(entry.entry_id)}px)`
+                  : undefined,
+                transition: isShuffling ? 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+              }}
             >
               {/* Rank */}
               <div className="flex flex-col items-center">
@@ -1258,7 +1367,11 @@ export function LeaderboardTab({
                   {stats && stats.last5.length > 0 ? (
                     <>
                       {stats.last5.map((type, di) => (
-                        <div key={di} className={`w-2.5 h-2.5 rounded-full ${getFormDotClass(type)}`} />
+                        <div
+                          key={di}
+                          className={`w-2.5 h-2.5 rounded-full ${getFormDotClass(type)}`}
+                          style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                        />
                       ))}
                       {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
                         <span className="ml-1 text-xs">
@@ -1291,7 +1404,7 @@ export function LeaderboardTab({
 
               {/* Stats */}
               <div className="text-right">
-                <div className="text-base font-black text-primary-500">{formatNumber(ps.total_points)}</div>
+                <div className="text-base font-black text-primary-500">{formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}</div>
                 <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
                   {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                 </div>
@@ -1333,7 +1446,13 @@ export function LeaderboardTab({
                   ? 'bg-primary-50 dark:bg-primary-500/[0.08] border-l-2 border-l-primary-500 border-border-default'
                   : 'bg-surface border-border-default hover:bg-surface-secondary'
               }`}
-              style={{ animation: `fadeUp 0.3s ease ${delay}s both` }}
+              style={{
+                animation: `fadeUp 0.3s ease ${delay}s both`,
+                transform: shuffleOffsets.has(entry.entry_id)
+                  ? `translateY(${shuffleOffsets.get(entry.entry_id)}px)`
+                  : undefined,
+                transition: isShuffling ? 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+              }}
             >
               <div className="flex items-start gap-2.5">
                 {/* Rank column */}
@@ -1392,7 +1511,11 @@ export function LeaderboardTab({
                       <span className="text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wide">Form</span>
                       <div className="flex items-center gap-[3px]">
                         {stats.last5.map((type, di) => (
-                          <div key={di} className={`w-2 h-2 rounded-full ${getFormDotClass(type)}`} />
+                          <div
+                            key={di}
+                            className={`w-2 h-2 rounded-full ${getFormDotClass(type)}`}
+                            style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                          />
                         ))}
                       </div>
                       {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
@@ -1410,7 +1533,7 @@ export function LeaderboardTab({
                 {/* Right stats */}
                 <div className="flex-shrink-0 text-right pt-0.5">
                   <div className="text-base font-black text-primary-500">
-                    {formatNumber(ps.total_points)}
+                    {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                   </div>
                   <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
                     {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
