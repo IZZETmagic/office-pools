@@ -149,6 +149,39 @@ final class PoolDetailViewModel {
         }
     }
 
+    // MARK: - Real-time Leaderboard
+
+    private let realtimeService = RealtimeService()
+
+    /// Start listening for score changes and auto-refresh leaderboard
+    func startScoresSubscription() async {
+        realtimeService.onScoresUpdated = { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.refreshLeaderboard()
+            }
+        }
+        await realtimeService.subscribeToScores(poolId: poolId)
+    }
+
+    func stopScoresSubscription() async {
+        await realtimeService.unsubscribeFromScores()
+        realtimeService.onScoresUpdated = nil
+    }
+
+    /// Re-fetch just the leaderboard data without reloading everything
+    func refreshLeaderboard() async {
+        do {
+            let response = try await apiService.fetchLeaderboard(poolId: poolId)
+            leaderboardResponse = response
+            leaderboardData = response.entries
+            leaderboardMap = Dictionary(uniqueKeysWithValues: response.entries.map { ($0.entryId, $0) })
+            print("[PoolDetail] Leaderboard refreshed: \(response.entries.count) entries")
+        } catch {
+            print("[PoolDetail] Failed to refresh leaderboard: \(error)")
+        }
+    }
+
     // MARK: - Computed Properties
 
     /// Leaderboard built from server-computed data, already sorted by total_points.

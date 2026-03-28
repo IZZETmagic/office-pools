@@ -287,10 +287,17 @@ struct PoolDetailView: View {
                     if predictionsViewModel == nil {
                         predictionsViewModel = PredictionsViewModel(poolId: viewModel.poolId)
                     }
+                    // Start real-time score updates
+                    await viewModel.startScoresSubscription()
                 } else {
                     viewModel.errorMessage = "Not signed in"
                     viewModel.isLoading = false
                 }
+            }
+        }
+        .onDisappear {
+            Task {
+                await viewModel.stopScoresSubscription()
             }
         }
     }
