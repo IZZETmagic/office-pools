@@ -20,6 +20,10 @@ import type {
   BPKnockoutPick,
 } from './types'
 
+// Force dynamic rendering — leaderboard data must always be fresh
+// (router.refresh() re-runs this on every Realtime event)
+export const dynamic = 'force-dynamic'
+
 export default async function PoolPage({
   params,
 }: {

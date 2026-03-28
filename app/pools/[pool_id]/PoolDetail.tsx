@@ -599,14 +599,21 @@ export function PoolDetail({
           const updatedEntryId = (payload.new as any)?.entry_id
           if (!updatedEntryId || !entryIds.has(updatedEntryId)) return
 
-          // Debounce: wait 1s after last update before refreshing
+          // Debounce: wait 2s after last update before refreshing
+          // (gives time for all entries to finish writing)
           if (debounceTimer) clearTimeout(debounceTimer)
           debounceTimer = setTimeout(() => {
             router.refresh()
-          }, 1000)
+          }, 2000)
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[realtime] Subscribed to pool_entries changes')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[realtime] Channel error — falling back to polling')
+        }
+      })
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer)
@@ -614,12 +621,12 @@ export function PoolDetail({
     }
   }, [pool.pool_id, members, router])
 
-  // Fallback: auto-refresh every 60s on active tabs in case Realtime misses an event
+  // Fallback: auto-refresh every 30s on active tabs in case Realtime misses an event
   useEffect(() => {
     const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'my_bracket', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
 
-    const interval = setInterval(() => router.refresh(), 60000)
+    const interval = setInterval(() => router.refresh(), 30000)
     return () => clearInterval(interval)
   }, [activeTab, router])
 
