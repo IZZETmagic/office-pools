@@ -39,10 +39,6 @@ struct PoolDetailView: View {
     @State private var banterSquishY: CGFloat = 1.0
     @State private var banterSquishX: CGFloat = 1.0
 
-    private var isMultiEntry: Bool {
-        (viewModel.pool?.maxEntriesPerUser ?? 1) > 1
-    }
-
     private func triggerBanterJelly() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
@@ -199,7 +195,6 @@ struct PoolDetailView: View {
         mainContent
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isMultiEntry && showingEntryDetail)
         .navigationDestination(for: Member.self) { member in
             MemberDetailView(
                 member: member,
@@ -208,18 +203,6 @@ struct PoolDetailView: View {
                 poolService: PoolService(),
                 adminCount: viewModel.members.filter(\.isAdmin).count
             )
-        }
-        .toolbar {
-            if isMultiEntry && showingEntryDetail {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingEntryDetail = false
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                    }
-                }
-            }
         }
         .sheet(isPresented: $showingBanter) {
             if let banterVM = banterViewModel {
