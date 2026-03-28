@@ -122,13 +122,13 @@ struct GroupStageView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(isMatchComplete
-                                    ? Color.green.opacity(0.06)
+                                    ? Color.accentColor.opacity(0.06)
                                     : Color(.secondarySystemGroupedBackground))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
                                 .strokeBorder(isMatchComplete
-                                    ? Color.green.opacity(0.2)
+                                    ? Color.accentColor.opacity(0.2)
                                     : Color(.systemGray4).opacity(0.5),
                                     lineWidth: 0.5)
                         )
