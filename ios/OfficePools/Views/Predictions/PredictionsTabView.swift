@@ -40,24 +40,11 @@ struct PredictionsTabView: View {
 
     var body: some View {
         Group {
-            if isMultiEntry {
-                // Multi-entry: show entry list or entry detail
-                if showingEntryDetail, let entry = selectedEntry {
-                    predictionContent(entry: entry)
-                } else {
-                    entryListPage
-                }
-            } else if let entry = selectedEntry {
-                // Single-entry: go straight to predictions
+            // Always show entries list first, even for single-entry pools
+            if showingEntryDetail, let entry = selectedEntry {
                 predictionContent(entry: entry)
             } else {
-                ProgressView("Loading...")
-            }
-        }
-        .task {
-            // Single-entry: load predictions immediately
-            if !isMultiEntry, let entryId = selectedEntry?.entryId {
-                await loadPredictions(entryId: entryId)
+                entryListPage
             }
         }
         .alert("New Entry", isPresented: $isCreatingEntry) {
