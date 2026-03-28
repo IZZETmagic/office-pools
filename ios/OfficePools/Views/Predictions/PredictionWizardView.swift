@@ -504,7 +504,7 @@ struct PredictionWizardView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .padding(.bottom, 4)
+        .padding(.bottom, 16)
     }
 
     // MARK: - Navigation Helpers
