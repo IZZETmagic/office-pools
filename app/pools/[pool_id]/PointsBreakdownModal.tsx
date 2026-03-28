@@ -383,7 +383,7 @@ export function PointsBreakdownModal({
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {rank && (
-              <span className="text-2xl font-bold text-primary-600 flex-shrink-0 bg-primary-50 rounded-xl px-2.5 py-1">#{rank}</span>
+              <span className={`font-bold text-primary-600 dark:text-primary-400 flex-shrink-0 bg-primary-50 dark:bg-primary-500/10 rounded-xl py-1 ${rank >= 10 ? 'text-xl px-2' : 'text-2xl px-2.5'}`}>#{rank}</span>
             )}
             <div className="min-w-0">
               {isMultiEntry ? (
