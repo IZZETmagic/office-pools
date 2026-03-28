@@ -54,7 +54,7 @@ struct LeaderboardTabView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: leaderboardData.map(\.entryId))
+                .animation(.spring(response: 0.8, dampingFraction: 0.6, blendDuration: 0.3), value: leaderboardData.map(\.entryId))
             }
             .background(Color(.systemGroupedBackground))
         }
@@ -185,7 +185,7 @@ struct LeaderboardTabView: View {
                     .font(.title3.weight(.black).monospacedDigit())
                     .foregroundStyle(.blue)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
-                    .animation(.easeOut(duration: 0.8), value: entry.totalPoints)
+                    .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
                     .font(.caption2)
@@ -352,7 +352,7 @@ struct LeaderboardTabView: View {
                     .font(.headline.weight(.black).monospacedDigit())
                     .foregroundStyle(.blue)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
-                    .animation(.easeOut(duration: 0.8), value: entry.totalPoints)
+                    .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
                     .font(.caption2)
@@ -515,8 +515,8 @@ struct FormDotsView: View {
                     .scaleEffect(index < visibleCount ? 1 : 0)
                     .opacity(index < visibleCount ? 1 : 0)
                     .animation(
-                        .spring(response: 0.3, dampingFraction: 0.6)
-                            .delay(Double(index) * 0.08),
+                        .spring(response: 0.4, dampingFraction: 0.45, blendDuration: 0.1)
+                            .delay(0.15 + Double(index) * 0.12),
                         value: visibleCount
                     )
             }
@@ -531,7 +531,7 @@ struct FormDotsView: View {
                         .foregroundStyle(streak.type == "hot" ? .red : .blue)
                 }
                 .opacity(visibleCount >= results.count ? 1 : 0)
-                .animation(.easeIn(duration: 0.2).delay(Double(results.count) * 0.08), value: visibleCount)
+                .animation(.easeIn(duration: 0.3).delay(0.15 + Double(results.count) * 0.12), value: visibleCount)
             }
         }
         .onAppear {
