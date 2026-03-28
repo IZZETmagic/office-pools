@@ -11,7 +11,6 @@ private struct GlassButtonModifier: ViewModifier {
                 .glassEffect(.regular, in: .rect(cornerRadius: 14))
         } else {
             content
-                .foregroundStyle(tint != nil ? .white : .primary)
                 .background {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14)
@@ -52,6 +51,8 @@ private struct NextRoundButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         if isComplete {
             content
+                .tint(.white)
+                .foregroundColor(.white)
                 .glassButton(tint: .accentColor)
         } else {
             content
