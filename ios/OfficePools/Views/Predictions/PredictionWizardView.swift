@@ -11,6 +11,7 @@ private struct GlassButtonModifier: ViewModifier {
                 .glassEffect(.regular, in: .rect(cornerRadius: 14))
         } else {
             content
+                .foregroundStyle(tint != nil ? .white : .primary)
                 .background {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14)
@@ -18,7 +19,7 @@ private struct GlassButtonModifier: ViewModifier {
 
                         if let tint {
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(tint.opacity(0.12))
+                                .fill(tint.opacity(0.55))
                         }
 
                         // Top-edge highlight for glass refraction
@@ -33,7 +34,7 @@ private struct GlassButtonModifier: ViewModifier {
                             )
                     }
                 }
-                .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
+                .shadow(color: (tint ?? .black).opacity(tint != nil ? 0.25 : 0.08), radius: 6, y: 3)
         }
     }
 }
