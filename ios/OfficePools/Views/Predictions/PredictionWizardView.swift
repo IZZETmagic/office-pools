@@ -436,9 +436,10 @@ struct PredictionWizardView: View {
                         Text("Back")
                     }
                     .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .glassButton()
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
 
@@ -457,9 +458,10 @@ struct PredictionWizardView: View {
                                 .font(.caption.weight(.semibold))
                         }
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .glassButton()
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
             } else if currentStage == .summary {
