@@ -325,8 +325,27 @@ async function writeScoresToDB(
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
 
-  // Write match_scores (upsert by entry_id + match_id) — parallel batches
+  // Write match_scores — delete existing for all entries then bulk insert
+  // (mirrors bonus_scores pattern to ensure stale rows from reset/scheduled matches are removed)
+  const allEntryIds = [...new Set(entryTotals.map(t => t.entry_id))]
+
+  if (allEntryIds.length > 0) {
+    // Delete all existing match_scores for pool entries in parallel batches
+    const deleteMatchBatchSize = 100
+    const deleteMatchBatches: string[][] = []
+    for (let i = 0; i < allEntryIds.length; i += deleteMatchBatchSize) {
+      deleteMatchBatches.push(allEntryIds.slice(i, i + deleteMatchBatchSize))
+    }
+    await Promise.all(
+      deleteMatchBatches.map(batch =>
+        adminClient.from('match_scores').delete().in('entry_id', batch)
+          .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete match_scores batch:`, error) })
+      )
+    )
+  }
+
   if (matchScores.length > 0) {
+    // Insert fresh match_scores in parallel batches
     const batchSize = 500
     const matchBatches: MatchScoreRow[][] = []
     for (let i = 0; i < matchScores.length; i += batchSize) {
@@ -336,9 +355,9 @@ async function writeScoresToDB(
       matchBatches.map(batch =>
         adminClient
           .from('match_scores')
-          .upsert(batch, { onConflict: 'entry_id,match_id' })
+          .insert(batch)
           .then(({ error }: { error: any }) => {
-            if (error) { console.error(`[scoring] Failed to upsert match_scores batch:`, error); return 0 }
+            if (error) { console.error(`[scoring] Failed to insert match_scores batch:`, error); return 0 }
             return batch.length
           })
       )

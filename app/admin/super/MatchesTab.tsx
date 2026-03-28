@@ -259,18 +259,6 @@ export function MatchesTab({
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
-    // When reverting to scheduled, delete stale match_scores for this match
-    if (newStatus === 'scheduled') {
-      const { error: deleteError } = await supabase
-        .from('match_scores')
-        .delete()
-        .eq('match_id', match.match_id)
-
-      if (deleteError) {
-        console.error('Failed to delete match_scores for reset match:', deleteError)
-      }
-    }
-
     if (pools) {
       await Promise.all(pools.map(async (pool) => {
         try {
