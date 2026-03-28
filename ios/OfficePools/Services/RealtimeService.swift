@@ -38,7 +38,7 @@ final class RealtimeService {
     var typingUsers: [String] = []
     var newMessage: PoolMessage?
     /// Fires when pool_entries scores are updated (debounced)
-    var onScoresUpdated: (() -> Void)?
+    var onScoresUpdated: (@Sendable () -> Void)?
 
     // MARK: - Presence
 
@@ -322,13 +322,15 @@ final class RealtimeService {
             schema: "public",
             table: "pool_entries"
         ) { [weak self] _ in
-            guard let self else { return }
-            // Debounce: cancel previous, wait 1s for batch updates to settle
-            self.scoresDebounceTask?.cancel()
-            self.scoresDebounceTask = Task {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                guard !Task.isCancelled else { return }
-                self.onScoresUpdated?()
+            Task { @MainActor in
+                guard let self else { return }
+                // Debounce: cancel previous, wait 1s for batch updates to settle
+                self.scoresDebounceTask?.cancel()
+                self.scoresDebounceTask = Task {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    self.onScoresUpdated?()
+                }
             }
         }
 
