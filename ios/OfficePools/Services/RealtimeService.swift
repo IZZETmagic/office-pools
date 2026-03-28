@@ -26,12 +26,17 @@ final class RealtimeService {
     private let supabase = SupabaseService.shared.client
     private var presenceChannel: RealtimeChannelV2?
     private var messagesChannel: RealtimeChannelV2?
+    private var scoresChannel: RealtimeChannelV2?
     private var presenceSubscription: RealtimeSubscription?
     private var messagesSubscription: RealtimeSubscription?
+    private var scoresSubscription: RealtimeSubscription?
+    private var scoresDebounceTask: Task<Void, Never>?
 
     var onlineMembers: [PresenceState] = []
     var typingUsers: [String] = []
     var newMessage: PoolMessage?
+    /// Fires when pool_entries scores are updated (debounced)
+    var onScoresUpdated: (() -> Void)?
 
     // MARK: - Presence
 
@@ -200,6 +205,42 @@ final class RealtimeService {
                 .from("message_reactions")
                 .insert(NewReaction(messageId: messageId, userId: userId, emoji: emoji))
                 .execute()
+        }
+    }
+
+    // MARK: - Scores (Leaderboard Real-time)
+
+    /// Subscribe to pool_entries UPDATE events for live leaderboard updates.
+    /// Calls `onScoresUpdated` (debounced 1s) when scores change.
+    func subscribeToScores(poolId: String) async {
+        let channel = supabase.channel("pool-scores-\(poolId)")
+
+        scoresSubscription = channel.onPostgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "pool_entries"
+        ) { [weak self] _ in
+            guard let self else { return }
+            // Debounce: cancel previous, wait 1s for batch updates to settle
+            self.scoresDebounceTask?.cancel()
+            self.scoresDebounceTask = Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                self.onScoresUpdated?()
+            }
+        }
+
+        try? await channel.subscribeWithError()
+        scoresChannel = channel
+    }
+
+    func unsubscribeFromScores() async {
+        scoresDebounceTask?.cancel()
+        scoresDebounceTask = nil
+        if let channel = scoresChannel {
+            await channel.unsubscribe()
+            scoresSubscription = nil
+            scoresChannel = nil
         }
     }
 
