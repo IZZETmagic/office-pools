@@ -95,6 +95,8 @@ export function calculateFullTournament(input: ScoringInput): ScoringResult {
         bonus_points: 0,
         point_adjustment: entry.point_adjustment,
         total_points: entry.point_adjustment,
+        exact_count: 0,
+        correct_count: 0,
       })
       continue
     }
@@ -170,12 +172,19 @@ export function calculateFullTournament(input: ScoringInput): ScoringResult {
       bonusPoints += b.points_earned
     }
 
+    // Count tiebreaker stats from this entry's match scores
+    const entryScores = allMatchScores.filter(ms => ms.entry_id === entry.entry_id)
+    const exactCount = entryScores.filter(ms => ms.score_type === 'exact').length
+    const correctCount = entryScores.filter(ms => ms.score_type !== 'miss').length
+
     allEntryTotals.push({
       entry_id: entry.entry_id,
       match_points: matchPoints,
       bonus_points: bonusPoints,
       point_adjustment: entry.point_adjustment,
       total_points: matchPoints + bonusPoints + entry.point_adjustment,
+      exact_count: exactCount,
+      correct_count: correctCount,
     })
   }
 

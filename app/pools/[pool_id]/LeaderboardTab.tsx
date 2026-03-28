@@ -457,13 +457,21 @@ export function LeaderboardTab({
     }
   }
 
-  // Sort entries by stored total points (descending), then by rank as tiebreaker
+  // Sort entries by server-computed current_rank (which includes all tiebreakers:
+  // total points → exact scores → correct results → bonus points → submission time)
+  // Falls back to total points if rank is not yet computed
   const sorted = useMemo(() => {
     return [...leaderboardEntries].sort((a, b) => {
+      const aRank = a.current_rank
+      const bRank = b.current_rank
+      // If both have ranks, use them (server already applied tiebreakers)
+      if (aRank != null && bRank != null) {
+        if (aRank !== bRank) return aRank - bRank
+      }
+      // Fallback: sort by total points
       const aScore = getPlayerScore(a.entry_id).total_points
       const bScore = getPlayerScore(b.entry_id).total_points
-      if (bScore !== aScore) return bScore - aScore
-      return (a.current_rank ?? 999) - (b.current_rank ?? 999)
+      return bScore - aScore
     })
   }, [leaderboardEntries, storedMatchPointsMap, computedBPBonusMap, bonusScores, predictionMode])
 

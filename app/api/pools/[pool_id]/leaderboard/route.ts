@@ -424,10 +424,13 @@ async function handleGET(
     })
   }
 
-  // 6. Sort by total_points descending, then current_rank as tiebreaker
+  // 6. Sort by server-computed current_rank (includes all tiebreakers),
+  // falling back to total_points if ranks are not yet computed
   leaderboard.sort((a, b) => {
-    if (b.total_points !== a.total_points) return b.total_points - a.total_points
-    return (a.current_rank ?? 999) - (b.current_rank ?? 999)
+    if (a.current_rank != null && b.current_rank != null) {
+      if (a.current_rank !== b.current_rank) return a.current_rank - b.current_rank
+    }
+    return b.total_points - a.total_points
   })
 
   // 7. Compute pool-wide analytics data

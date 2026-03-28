@@ -59,6 +59,9 @@ export type EntryTotals = {
   bonus_points: number
   point_adjustment: number
   total_points: number
+  // Tiebreaker stats (computed by each mode calculator)
+  exact_count: number
+  correct_count: number  // exact + winner_gd + winner (i.e. non-miss)
 }
 
 // ----- Recalculation result returned by each mode calculator -----

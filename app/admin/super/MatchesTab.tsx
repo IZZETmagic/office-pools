@@ -259,6 +259,22 @@ export function MatchesTab({
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
+    // When setting to live, snapshot ranks if no other match is currently live
+    // (preserves the pre-matchday baseline when multiple matches kick off together)
+    if (newStatus === 'live') {
+      const otherLiveMatches = matches.filter(
+        m => m.match_id !== match.match_id && m.status === 'live'
+      )
+      if (otherLiveMatches.length === 0 && pools) {
+        // No other match is live — this is a new matchday, snapshot ranks
+        await fetch(`/api/pools/snapshot-ranks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pool_ids: pools.map(p => p.pool_id) }),
+        }).catch(e => console.error('Failed to snapshot ranks:', e))
+      }
+    }
+
     if (pools) {
       await Promise.all(pools.map(async (pool) => {
         try {

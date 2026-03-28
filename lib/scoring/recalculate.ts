@@ -135,7 +135,7 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     const memberIds = poolMembers.map((m: any) => m.member_id)
     const { data: entries } = await adminClient
       .from('pool_entries')
-      .select('entry_id, member_id, has_submitted_predictions, point_adjustment')
+      .select('entry_id, member_id, has_submitted_predictions, point_adjustment, predictions_submitted_at')
       .in('member_id', memberIds)
 
     if (!entries) {
@@ -212,8 +212,14 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       }
     }
 
-    // 5. Write results to database (shadow-write for Phase 1)
-    const writeResult = await writeScoresToDB(adminClient, poolId, result)
+    // 5. Build submission time lookup for rank tiebreaker
+    const submissionTimeMap = new Map<string, string | null>()
+    for (const e of entries as any[]) {
+      submissionTimeMap.set(e.entry_id, e.predictions_submitted_at ?? null)
+    }
+
+    // 6. Write results to database (shadow-write for Phase 1)
+    const writeResult = await writeScoresToDB(adminClient, poolId, result, submissionTimeMap)
 
     return {
       success: true,
@@ -319,6 +325,7 @@ async function writeScoresToDB(
   adminClient: any,
   poolId: string,
   result: ScoringResult,
+  submissionTimeMap: Map<string, string | null>,
 ): Promise<{ matchScoresWritten: number; bonusScoresWritten: number }> {
   const { matchScores, bonusScores, entryTotals } = result
 
@@ -400,46 +407,55 @@ async function writeScoresToDB(
     bonusScoresWritten = bonusResults.reduce((sum, n) => sum + n, 0)
   }
 
-  // Update entry totals + ranks on pool_entries
+  // Update entry totals + current_rank on pool_entries
+  // NOTE: previous_rank is NOT updated here — it is only snapshotted when a match
+  // is set to live (via /api/pools/snapshot-ranks), so rank deltas show movement
+  // since the start of the current matchday, not since the last recalculation.
   if (entryTotals.length > 0) {
-    // Compute new ranks: sort by total_points descending, assign rank with ties
-    const sorted = [...entryTotals].sort((a, b) => b.total_points - a.total_points)
+    // Compute new ranks with tiebreakers:
+    // 1. Total points (descending)
+    // 2. Most exact scores (descending)
+    // 3. Most correct results (descending)
+    // 4. Bonus points (descending)
+    // 5. Earlier submission time (ascending — earlier is better)
+    const sorted = [...entryTotals].sort((a, b) => {
+      // Primary: total points
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points
+      // Tiebreaker 1: most exact scores
+      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count
+      // Tiebreaker 2: most correct results
+      if (b.correct_count !== a.correct_count) return b.correct_count - a.correct_count
+      // Tiebreaker 3: bonus points
+      if (b.bonus_points !== a.bonus_points) return b.bonus_points - a.bonus_points
+      // Tiebreaker 4: earlier submission time
+      const aTime = submissionTimeMap.get(a.entry_id)
+      const bTime = submissionTimeMap.get(b.entry_id)
+      if (aTime && bTime) return new Date(aTime).getTime() - new Date(bTime).getTime()
+      if (aTime && !bTime) return -1 // submitted beats not submitted
+      if (!aTime && bTime) return 1
+      return 0
+    })
+
+    // Assign ranks — only entries with identical values across ALL tiebreakers share a rank
     const rankMap = new Map<string, number>()
-    let rank = 1
     for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && sorted[i].total_points < sorted[i - 1].total_points) {
-        rank = i + 1
+      if (i === 0) {
+        rankMap.set(sorted[i].entry_id, 1)
+        continue
       }
-      rankMap.set(sorted[i].entry_id, rank)
+      const prev = sorted[i - 1]
+      const curr = sorted[i]
+      const isTied =
+        curr.total_points === prev.total_points &&
+        curr.exact_count === prev.exact_count &&
+        curr.correct_count === prev.correct_count &&
+        curr.bonus_points === prev.bonus_points &&
+        submissionTimeMap.get(curr.entry_id) === submissionTimeMap.get(prev.entry_id)
+
+      rankMap.set(curr.entry_id, isTied ? rankMap.get(prev.entry_id)! : i + 1)
     }
 
-    // Phase 1: Snapshot current_rank → previous_rank for all entries (before we overwrite current_rank)
-    // Read current ranks, then write them as previous_rank
-    const allEntryIdsForRank = entryTotals.map(t => t.entry_id)
-    const { data: currentRanks } = await adminClient
-      .from('pool_entries')
-      .select('entry_id, current_rank')
-      .in('entry_id', allEntryIdsForRank)
-
-    if (currentRanks && currentRanks.length > 0) {
-      const snapshotBatchSize = 50
-      for (let i = 0; i < currentRanks.length; i += snapshotBatchSize) {
-        const batch = currentRanks.slice(i, i + snapshotBatchSize)
-        await Promise.all(
-          batch.map((row: { entry_id: string; current_rank: number | null }) =>
-            adminClient
-              .from('pool_entries')
-              .update({ previous_rank: row.current_rank })
-              .eq('entry_id', row.entry_id)
-              .then(({ error }: { error: any }) => {
-                if (error) console.error(`[scoring] Failed to snapshot rank for ${row.entry_id}:`, error)
-              })
-          )
-        )
-      }
-    }
-
-    // Phase 2: Write new totals + new current_rank
+    // Write new totals + new current_rank
     const batchSize = 50
     for (let i = 0; i < entryTotals.length; i += batchSize) {
       const batch = entryTotals.slice(i, i + batchSize)

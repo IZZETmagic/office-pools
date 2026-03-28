@@ -165,6 +165,8 @@ export function calculateBracketPicker(input: BracketPickerInput): ScoringResult
         bonus_points: 0,
         point_adjustment: entry.point_adjustment,
         total_points: entry.point_adjustment,
+        exact_count: 0,
+        correct_count: 0,
       })
       continue
     }
@@ -273,12 +275,19 @@ export function calculateBracketPicker(input: BracketPickerInput): ScoringResult
     }
 
     // Bracket picker has no match_points — everything is bonus
+    // correct_count = number of correct picks across all categories
+    const bpCorrectCount = breakdown.groupDetails.filter(d => d.correct).length
+      + breakdown.thirdPlaceDetails.filter(d => d.correct).length
+      + breakdown.knockoutDetails.filter(d => d.correct).length
+
     allEntryTotals.push({
       entry_id: entry.entry_id,
       match_points: 0,
       bonus_points: breakdown.total,
       point_adjustment: entry.point_adjustment,
       total_points: breakdown.total + entry.point_adjustment,
+      exact_count: 0, // Not applicable for bracket picker
+      correct_count: bpCorrectCount,
     })
   }
 
