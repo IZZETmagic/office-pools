@@ -610,13 +610,34 @@ export function MatchesTab({
     setResetting(true)
     setError(null)
 
-    const { error: rpcError } = await supabase.rpc('reset_match_scores', {
-      match_id_param: match.match_id,
-      reset_reason: resetReason || 'Manual reset by super admin',
-    })
+    // Step 1: Reset match fields back to scheduled state
+    const { error: matchError } = await supabase
+      .from('matches')
+      .update({
+        status: 'scheduled',
+        home_score_ft: null,
+        away_score_ft: null,
+        home_score_pso: null,
+        away_score_pso: null,
+        is_completed: false,
+        winner_team_id: null,
+      })
+      .eq('match_id', match.match_id)
 
-    if (rpcError) {
-      setError(rpcError.message)
+    if (matchError) {
+      setError('Failed to reset match: ' + matchError.message)
+      setResetting(false)
+      return
+    }
+
+    // Step 2: Delete match_scores rows for this match (recalculate will rebuild if needed)
+    const { error: scoresError } = await supabase
+      .from('match_scores')
+      .delete()
+      .eq('match_id', match.match_id)
+
+    if (scoresError) {
+      setError('Failed to clear match scores: ' + scoresError.message)
       setResetting(false)
       return
     }
