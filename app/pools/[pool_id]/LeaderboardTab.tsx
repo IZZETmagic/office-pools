@@ -868,15 +868,15 @@ export function LeaderboardTab({
       })
     }
 
-    // Biggest Climber — largest positive rank delta
+    // Biggest Climber — largest positive rank delta (using server-computed ranks for ties)
     let climberEntry: LeaderboardEntry | null = null
     let climberDelta = 0
     for (let i = 0; i < sorted.length; i++) {
       const entry = sorted[i]
-      const currentRank = i + 1
+      const curr = entry.current_rank
       const prev = entry.previous_rank
-      if (prev !== null && prev !== undefined) {
-        const delta = prev - currentRank
+      if (prev !== null && prev !== undefined && curr !== null && curr !== undefined) {
+        const delta = prev - curr
         if (delta > climberDelta) {
           climberDelta = delta
           climberEntry = entry
@@ -893,15 +893,15 @@ export function LeaderboardTab({
       })
     }
 
-    // Biggest Faller — largest negative rank delta
+    // Biggest Faller — largest negative rank delta (using server-computed ranks for ties)
     let fallerEntry: LeaderboardEntry | null = null
     let fallerDelta = 0
     for (let i = 0; i < sorted.length; i++) {
       const entry = sorted[i]
-      const currentRank = i + 1
+      const curr = entry.current_rank
       const prev = entry.previous_rank
-      if (prev !== null && prev !== undefined) {
-        const delta = prev - currentRank // negative means fell
+      if (prev !== null && prev !== undefined && curr !== null && curr !== undefined) {
+        const delta = prev - curr // negative means fell
         if (delta < fallerDelta) {
           fallerDelta = delta
           fallerEntry = entry
@@ -1098,11 +1098,13 @@ export function LeaderboardTab({
     return name.charAt(0).toUpperCase()
   }
 
-  // Rank delta helper
-  const getRankDelta = (entry: LeaderboardEntry, currentRank: number) => {
+  // Rank delta helper — uses server-computed current_rank (which handles ties)
+  // rather than display position (which is sequential)
+  const getRankDelta = (entry: LeaderboardEntry, _displayRank: number) => {
     const prev = entry.previous_rank
-    if (prev === null || prev === undefined) return null
-    return prev - currentRank // positive = moved up, negative = moved down
+    const curr = entry.current_rank
+    if (prev === null || prev === undefined || curr === null || curr === undefined) return null
+    return prev - curr // positive = moved up, negative = moved down
   }
 
   // =============================================
