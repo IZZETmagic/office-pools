@@ -1,5 +1,49 @@
 import SwiftUI
 
+// MARK: - Glass Button Modifier
+
+private struct GlassButtonModifier: ViewModifier {
+    var tint: Color?
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        } else {
+            content
+                .background {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(.ultraThinMaterial)
+
+                        if let tint {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(tint.opacity(0.12))
+                        }
+
+                        // Top-edge highlight for glass refraction
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.5), .white.opacity(0.1), .clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.5
+                            )
+                    }
+                }
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
+        }
+    }
+}
+
+extension View {
+    func glassButton(tint: Color? = nil) -> some View {
+        modifier(GlassButtonModifier(tint: tint))
+    }
+}
+
 /// Main wizard container that orchestrates the 7-stage prediction flow.
 /// Provides stage navigation via pills, stage content, and bottom navigation with save/submit actions.
 /// When `readOnly` is true, hides save status bar and submit button, shows only navigation.
@@ -376,7 +420,7 @@ struct PredictionWizardView: View {
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .glassButton()
                 }
             }
 
@@ -397,7 +441,7 @@ struct PredictionWizardView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .glassButton()
                     }
                 }
             } else if currentStage == .summary {
@@ -417,7 +461,8 @@ struct PredictionWizardView: View {
                     .padding(.vertical, 12)
                     .background(viewModel.isComplete ? Color.accentColor : Color.gray)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: viewModel.isComplete ? Color.accentColor.opacity(0.3) : .clear, radius: 8, y: 4)
                 }
                 .disabled(!viewModel.isComplete || viewModel.isSubmitting)
             } else if let next = nextStage {
@@ -434,7 +479,8 @@ struct PredictionWizardView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .glassButton(tint: viewModel.isStageComplete(currentStage) ? .accentColor : nil)
+                    .opacity(viewModel.isStageComplete(currentStage) ? 1.0 : 0.5)
                 }
                 .disabled(!viewModel.isStageComplete(currentStage))
             }
