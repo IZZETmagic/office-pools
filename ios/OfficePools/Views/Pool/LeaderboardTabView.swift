@@ -54,7 +54,7 @@ struct LeaderboardTabView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
-                .animation(.spring(response: 0.8, dampingFraction: 0.6, blendDuration: 0.3), value: leaderboardData.map(\.entryId))
+                .animation(.easeInOut(duration: 0.8), value: leaderboardData.map(\.entryId))
             }
             .background(Color(.systemGroupedBackground))
         }
