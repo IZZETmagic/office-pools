@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct BanterFullScreenView: View {
     @Bindable var viewModel: BanterViewModel
@@ -15,6 +16,9 @@ struct BanterFullScreenView: View {
     @State private var showingBadgePicker = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var showScrollToBottom = false
+    @State private var longPressedMessageId: String?
+    @State private var showFullEmojiPicker = false
+    @State private var emojiPickerMessageId: String?
     @Namespace private var quickActionAnimation
 
     private var memberLookup: [String: LeaderboardEntryData] {
@@ -96,14 +100,58 @@ struct BanterFullScreenView: View {
                                         .padding(.bottom, 4)
                                 }
 
+                                let isOwn = message.userId == authService.appUser?.userId
+                                let msgReactions = viewModel.reactionsForMessage(message.messageId)
+
                                 MessageBubble(
                                     message: message,
-                                    isOwnMessage: message.userId == authService.appUser?.userId,
+                                    isOwnMessage: isOwn,
                                     senderName: memberLookup[message.userId]?.fullName ?? "",
                                     senderInitials: senderInitials(for: message.userId),
                                     showSenderName: isFirstInGroup(at: index),
                                     showSenderAvatar: isLastInGroup(at: index)
                                 )
+                                .onLongPressGesture {
+                                    longPressedMessageId = message.messageId
+                                }
+                                .overlay(alignment: .top) {
+                                    if longPressedMessageId == message.messageId {
+                                        QuickReactionBar(
+                                            onSelect: { emoji in
+                                                if let userId = authService.appUser?.userId {
+                                                    viewModel.toggleReaction(messageId: message.messageId, userId: userId, emoji: emoji)
+                                                }
+                                                longPressedMessageId = nil
+                                            },
+                                            onExpand: {
+                                                longPressedMessageId = nil
+                                                emojiPickerMessageId = message.messageId
+                                                showFullEmojiPicker = true
+                                            }
+                                        )
+                                        .offset(y: -48)
+                                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                    }
+                                }
+
+                                // Reaction pills
+                                if !msgReactions.isEmpty {
+                                    ReactionPillsView(
+                                        reactions: msgReactions,
+                                        isOwnMessage: isOwn,
+                                        onTapReaction: { emoji in
+                                            if let userId = authService.appUser?.userId {
+                                                viewModel.toggleReaction(messageId: message.messageId, userId: userId, emoji: emoji)
+                                            }
+                                        },
+                                        onTapAdd: {
+                                            emojiPickerMessageId = message.messageId
+                                            showFullEmojiPicker = true
+                                        }
+                                    )
+                                    .padding(.leading, isOwn ? 60 : 36)
+                                    .padding(.trailing, isOwn ? 0 : 60)
+                                }
                             }
                             .id(message.messageId)
                         }
@@ -227,7 +275,14 @@ struct BanterFullScreenView: View {
         }
         .onAppear {
             Task {
+                // Set currentUserId before load() so reaction subscription callback works
+                if let userId = authService.appUser?.userId {
+                    viewModel.setCurrentUserId(userId)
+                }
                 await viewModel.load()
+                if let userId = authService.appUser?.userId {
+                    await viewModel.loadReactions(userId: userId)
+                }
                 // Scroll to bottom after messages load
                 if let lastId = viewModel.messages.last?.messageId {
                     try? await Task.sleep(for: .milliseconds(100))
@@ -239,18 +294,34 @@ struct BanterFullScreenView: View {
             SharePredictionSheet(
                 matches: matches,
                 entryId: entryId
-            ) { text in
-                sendQuickAction(text)
+            ) { content, messageType, metadata in
+                sendQuickAction(content, messageType: messageType, metadata: metadata)
             }
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingBadgePicker) {
             BadgePickerSheet(
                 analyticsData: analyticsData
-            ) { text in
-                sendQuickAction(text)
+            ) { content, messageType, metadata in
+                sendQuickAction(content, messageType: messageType, metadata: metadata)
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showFullEmojiPicker) {
+            EmojiPickerSheet { emoji in
+                if let msgId = emojiPickerMessageId, let userId = authService.appUser?.userId {
+                    viewModel.toggleReaction(messageId: msgId, userId: userId, emoji: emoji)
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .onTapGesture {
+            // Dismiss quick reaction bar on tap outside
+            if longPressedMessageId != nil {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    longPressedMessageId = nil
+                }
+            }
         }
         } // NavigationStack
     }
@@ -286,11 +357,11 @@ struct BanterFullScreenView: View {
 
     // MARK: - Quick Action Send
 
-    private func sendQuickAction(_ text: String) {
+    private func sendQuickAction(_ text: String, messageType: MessageType = .text, metadata: [String: AnyJSON]? = nil) {
         guard let userId = authService.appUser?.userId else { return }
         Task {
             viewModel.messageText = text
-            await viewModel.sendMessage(userId: userId)
+            await viewModel.sendMessage(userId: userId, messageType: messageType, metadata: metadata)
             if let lastId = viewModel.messages.last?.messageId {
                 withAnimation {
                     scrollProxy?.scrollTo(lastId, anchor: .bottom)
@@ -301,14 +372,36 @@ struct BanterFullScreenView: View {
 
     private func sendDropStandings() {
         guard !leaderboardEntries.isEmpty else { return }
-        let top5 = leaderboardEntries.prefix(5)
-        // Format: 📊 standings
-        // name|points|userId per line
-        var text = "📊 standings"
-        for entry in top5 {
-            text += "\n\(entry.fullName)|\(entry.totalPoints)|\(entry.userId)"
+        let top5 = Array(leaderboardEntries.prefix(5))
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        // Human-readable fallback
+        let leaderName = top5.first?.fullName ?? "Unknown"
+        let leaderPoints = top5.first?.totalPoints ?? 0
+        let content = "Standings — \(leaderName) leads with \(leaderPoints) pts"
+
+        // Structured metadata
+        let entriesArray: [AnyJSON] = top5.enumerated().map { idx, entry in
+            let previousRank = entry.previousRank ?? (idx + 1)
+            let currentRank = entry.currentRank ?? (idx + 1)
+            let delta = previousRank - currentRank
+            return .object([
+                "user_id": .string(entry.userId),
+                "full_name": .string(entry.fullName),
+                "rank": .integer(idx + 1),
+                "points": .integer(entry.totalPoints),
+                "delta": .integer(delta)
+            ])
         }
-        sendQuickAction(text)
+
+        let metadata: [String: AnyJSON] = [
+            "entries": .array(entriesArray),
+            "pool_name": .string(poolName),
+            "timestamp": .string(formatter.string(from: Date()))
+        ]
+
+        sendQuickAction(content, messageType: .standingsDrop, metadata: metadata)
     }
 
 

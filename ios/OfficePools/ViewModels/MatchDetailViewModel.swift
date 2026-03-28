@@ -98,7 +98,7 @@ final class MatchDetailViewModel {
             errorMessage = error.localizedDescription
         }
 
-        // Fetch breakdown API for all matches (server-computed points + knockout team names)
+        // Fetch breakdown from API for server-computed points and predicted teams
         for entryId in cachedEntryIds {
             guard let poolId = cachedEntryPoolId[entryId] else { continue }
             do {
@@ -115,7 +115,7 @@ final class MatchDetailViewModel {
                 print("[MatchDetail] Failed to fetch breakdown for entry \(entryId): \(error)")
             }
         }
-        // Rebuild with server-computed points and predicted teams
+        // Rebuild with breakdown data
         rebuildPredictionInfos()
 
         // Load match stats before finishing load
@@ -184,7 +184,7 @@ final class MatchDetailViewModel {
             var points: Int? = nil
 
             // Use server-computed points from breakdown API
-            if isCompleted, let breakdown = cachedBreakdownData[entryId] {
+            if let breakdown = cachedBreakdownData[entryId] {
                 points = breakdown.points
             }
 

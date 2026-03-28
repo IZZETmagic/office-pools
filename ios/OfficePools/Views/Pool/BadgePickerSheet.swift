@@ -1,8 +1,9 @@
 import SwiftUI
+import Supabase
 
 struct BadgePickerSheet: View {
     let analyticsData: AnalyticsResponse?
-    let onSelect: (String) -> Void
+    let onSelect: (String, MessageType, [String: AnyJSON]?) -> Void
     @Environment(\.dismiss) private var dismiss
 
     private var earnedBadges: [BadgeInfo] {
@@ -38,11 +39,27 @@ struct BadgePickerSheet: View {
                             Button {
                                 let badgeCount = earnedBadges.count
                                 let plural = badgeCount != 1 ? "s" : ""
-                                var text = "🏆 Flexing my badges — Level \(level) \(levelName) with \(badgeCount) badge\(plural)!"
-                                for badge in sortedBadges {
-                                    text += "\n\(badge.name)|\(badge.rarity)|\(badge.id)"
+                                let content = "Flexing my badges — Level \(level) \(levelName) with \(badgeCount) badge\(plural)!"
+
+                                let badgeItems: [AnyJSON] = sortedBadges.map { badge in
+                                    .object([
+                                        "id": .string(badge.id),
+                                        "emoji": .string(badgeEmoji(badge.id)),
+                                        "name": .string(badge.name),
+                                        "tier": .string(badge.rarity),
+                                        "rarity": .string(badge.rarity),
+                                        "xpBonus": .integer(badge.xpBonus)
+                                    ])
                                 }
-                                onSelect(text)
+
+                                let metadata: [String: AnyJSON] = [
+                                    "badges": .array(badgeItems),
+                                    "level": .integer(level),
+                                    "level_name": .string(levelName),
+                                    "total_xp": .integer(analyticsData?.xp.totalXp ?? 0)
+                                ]
+
+                                onSelect(content, .badgeFlex, metadata)
                                 dismiss()
                             } label: {
                                 HStack(spacing: 12) {
@@ -159,8 +176,25 @@ struct BadgePickerSheet: View {
     // MARK: - Actions
 
     private func selectBadge(_ badge: BadgeInfo) {
-        let text = "🏆 Flexing a badge — \(badge.name)|\(badge.rarity)|\(badge.condition)|\(badge.xpBonus)|\(badge.id)"
-        onSelect(text)
+        let content = "Flexing \(badge.name) badge — \(badge.rarity)"
+
+        let badgeItem: AnyJSON = .object([
+            "id": .string(badge.id),
+            "emoji": .string(badgeEmoji(badge.id)),
+            "name": .string(badge.name),
+            "tier": .string(badge.rarity),
+            "rarity": .string(badge.rarity),
+            "xpBonus": .integer(badge.xpBonus)
+        ])
+
+        let metadata: [String: AnyJSON] = [
+            "badges": .array([badgeItem]),
+            "level": .integer(level),
+            "level_name": .string(levelName),
+            "total_xp": .integer(analyticsData?.xp.totalXp ?? 0)
+        ]
+
+        onSelect(content, .badgeFlex, metadata)
         dismiss()
     }
 
@@ -202,6 +236,24 @@ struct BadgePickerSheet: View {
         case "grand_finale": return "trophy.fill"
         case "legend": return "star.fill"
         default: return "star.fill"
+        }
+    }
+
+    private func badgeEmoji(_ id: String) -> String {
+        switch id {
+        case "sharpshooter": return "🎯"
+        case "oracle": return "🔮"
+        case "dark_horse": return "🐴"
+        case "ice_breaker": return "🧊"
+        case "on_fire": return "🔥"
+        case "top_dog": return "👑"
+        case "globe_trotter": return "🌍"
+        case "lightning_rod": return "⚡"
+        case "stadium_regular": return "🏟️"
+        case "showtime": return "🎪"
+        case "grand_finale": return "🏆"
+        case "legend": return "⭐"
+        default: return "🏅"
         }
     }
 }

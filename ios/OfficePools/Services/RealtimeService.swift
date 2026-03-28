@@ -26,9 +26,11 @@ final class RealtimeService {
     private let supabase = SupabaseService.shared.client
     private var presenceChannel: RealtimeChannelV2?
     private var messagesChannel: RealtimeChannelV2?
+    private var reactionsChannel: RealtimeChannelV2?
     private var scoresChannel: RealtimeChannelV2?
     private var presenceSubscription: RealtimeSubscription?
     private var messagesSubscription: RealtimeSubscription?
+    private var reactionsSubscription: RealtimeSubscription?
     private var scoresSubscription: RealtimeSubscription?
     private var scoresDebounceTask: Task<Void, Never>?
 
@@ -89,6 +91,8 @@ final class RealtimeService {
     // MARK: - Messages
 
     func subscribeToMessages(poolId: String) async {
+        // Don't re-subscribe if already subscribed
+        if messagesChannel != nil { return }
         let channel = supabase.channel("pool-messages-\(poolId)")
 
         // Register postgres change listener BEFORE subscribing
@@ -106,7 +110,12 @@ final class RealtimeService {
             }
         }
 
-        try? await channel.subscribeWithError()
+        do {
+            try await channel.subscribeWithError()
+            print("[Realtime] Subscribed to messages for pool \(poolId)")
+        } catch {
+            print("[Realtime] ERROR subscribing to messages: \(error)")
+        }
         messagesChannel = channel
     }
 
@@ -120,13 +129,21 @@ final class RealtimeService {
 
     // MARK: - Send Message
 
-    func sendMessage(poolId: String, userId: String, content: String, mentions: [String] = []) async throws {
+    func sendMessage(
+        poolId: String,
+        userId: String,
+        content: String,
+        mentions: [String] = [],
+        messageType: String = "text",
+        metadata: [String: AnyJSON]? = nil
+    ) async throws {
         struct NewMessage: Codable {
             let poolId: String
             let userId: String
             let content: String
             let mentions: [String]
             let messageType: String
+            let metadata: [String: AnyJSON]?
 
             enum CodingKeys: String, CodingKey {
                 case poolId = "pool_id"
@@ -134,6 +151,7 @@ final class RealtimeService {
                 case content
                 case mentions
                 case messageType = "message_type"
+                case metadata
             }
         }
 
@@ -144,7 +162,8 @@ final class RealtimeService {
                 userId: userId,
                 content: content,
                 mentions: mentions,
-                messageType: "text"
+                messageType: messageType,
+                metadata: metadata
             ))
             .execute()
     }
@@ -175,7 +194,7 @@ final class RealtimeService {
         }
 
         let existing: [ReactionRow] = try await supabase
-            .from("message_reactions")
+            .from("pool_message_reactions")
             .select("reaction_id")
             .eq("message_id", value: messageId)
             .eq("user_id", value: userId)
@@ -185,7 +204,7 @@ final class RealtimeService {
 
         if let reaction = existing.first {
             try await supabase
-                .from("message_reactions")
+                .from("pool_message_reactions")
                 .delete()
                 .eq("reaction_id", value: reaction.reactionId)
                 .execute()
@@ -202,9 +221,92 @@ final class RealtimeService {
             }
 
             try await supabase
-                .from("message_reactions")
+                .from("pool_message_reactions")
                 .insert(NewReaction(messageId: messageId, userId: userId, emoji: emoji))
                 .execute()
+        }
+    }
+
+    // MARK: - Fetch Reactions
+
+    func fetchReactions(messageIds: [String], userId: String) async throws -> [String: [MessageReaction]] {
+        guard !messageIds.isEmpty else { return [:] }
+
+        struct RawReaction: Codable {
+            let messageId: String
+            let emoji: String
+            let userId: String
+            enum CodingKeys: String, CodingKey {
+                case messageId = "message_id"
+                case emoji
+                case userId = "user_id"
+            }
+        }
+
+        let rows: [RawReaction] = try await supabase
+            .from("pool_message_reactions")
+            .select("message_id, emoji, user_id")
+            .in("message_id", values: messageIds)
+            .execute()
+            .value
+
+        // Group by message_id, then by emoji
+        var result: [String: [MessageReaction]] = [:]
+        var grouped: [String: [String: (count: Int, reactedByMe: Bool)]] = [:]
+
+        for row in rows {
+            var emojiMap = grouped[row.messageId] ?? [:]
+            var entry = emojiMap[row.emoji] ?? (count: 0, reactedByMe: false)
+            entry.count += 1
+            if row.userId == userId {
+                entry.reactedByMe = true
+            }
+            emojiMap[row.emoji] = entry
+            grouped[row.messageId] = emojiMap
+        }
+
+        for (messageId, emojiMap) in grouped {
+            result[messageId] = emojiMap.map { emoji, data in
+                MessageReaction(emoji: emoji, count: data.count, reactedByMe: data.reactedByMe)
+            }.sorted { $0.count > $1.count }
+        }
+
+        return result
+    }
+
+    // MARK: - Reaction Realtime Subscription
+
+    func subscribeToReactions(poolId: String, onChange: @escaping @Sendable () -> Void) async {
+        // Don't re-subscribe if already subscribed
+        if reactionsChannel != nil { return }
+        // Use supabase.channel() — same pattern as messages subscription which works
+        let channel = supabase.channel("pool-reactions-\(poolId)")
+
+        reactionsSubscription = channel.onPostgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "pool_message_reactions"
+        ) { _ in
+            print("[Realtime] Reaction change detected!")
+            Task { @MainActor in
+                onChange()
+            }
+        }
+
+        do {
+            try await channel.subscribeWithError()
+            print("[Realtime] Subscribed to reactions for pool \(poolId)")
+        } catch {
+            print("[Realtime] ERROR subscribing to reactions: \(error)")
+        }
+        reactionsChannel = channel
+    }
+
+    func unsubscribeFromReactions() async {
+        if let channel = reactionsChannel {
+            await channel.unsubscribe()
+            reactionsSubscription = nil
+            reactionsChannel = nil
         }
     }
 

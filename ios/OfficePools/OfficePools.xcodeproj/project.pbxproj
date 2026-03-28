@@ -83,6 +83,7 @@
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* SharePredictionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SharePredictionSheet.swift */; };
 		E5F6A7B8C9D0E1F2A3B4C5D6 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A7B8C9D0E1F2A3B4C5D6E7 /* CachedAsyncImage.swift */; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* BadgePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* BadgePickerSheet.swift */; };
+		E6F7A8B9C0D1E2F3A4B5C6D7 /* EmojiPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E6F7A8B9C0D1E2F3A4B5C6 /* EmojiPickerView.swift */; };
 		F7E168AB4097AA16CF7FAA03 /* PredictionSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94EB25BFBD1DE6B504182AB9 /* PredictionSummaryView.swift */; };
 		F9013C454F921CBD480B12C4 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41712D32039A4640D93EF42 /* PlayerScore.swift */; };
 		F9392DDF248277B255B510AA /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C16D214CC5B59466B1F169 /* ActivityView.swift */; };
@@ -166,6 +167,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* SharePredictionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePredictionSheet.swift; sourceTree = "<group>"; };
 		F6A7B8C9D0E1F2A3B4C5D6E7 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* BadgePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgePickerSheet.swift; sourceTree = "<group>"; };
+		D5E6F7A8B9C0D1E2F3A4B5C6 /* EmojiPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPickerView.swift; sourceTree = "<group>"; };
 		F3009B629BA8F9FA7608EF3F /* PredictionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionsViewModel.swift; sourceTree = "<group>"; };
 		F7224E8F7FE060E8A2C09E0A /* AnnexCData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnexCData.swift; sourceTree = "<group>"; };
 		F81B7B2FDDA3FF45C8CFBFD5 /* MatchDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchDetailViewModel.swift; sourceTree = "<group>"; };
@@ -227,6 +229,7 @@
 				D25CE22E5D04AB3DA7BFBB6A /* ScoringRulesTabView.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* SharePredictionSheet.swift */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* BadgePickerSheet.swift */,
+				D5E6F7A8B9C0D1E2F3A4B5C6 /* EmojiPickerView.swift */,
 			);
 			path = Pool;
 			sourceTree = "<group>";
@@ -556,6 +559,7 @@
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* SharePredictionSheet.swift in Sources */,
 				E5F6A7B8C9D0E1F2A3B4C5D6 /* CachedAsyncImage.swift in Sources */,
 				D4E5F6A7B8C9D0E1F2A3B4C5 /* BadgePickerSheet.swift in Sources */,
+				E6F7A8B9C0D1E2F3A4B5C6D7 /* EmojiPickerView.swift in Sources */,
 				BBADB1C47AB38CC0C4413A1E /* SignUpView.swift in Sources */,
 				C8AB94B6A38B8CD46B3EBC06 /* StagePillsBar.swift in Sources */,
 				F04504652D307F377AE39838 /* StatCardView.swift in Sources */,

@@ -1,9 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct SharePredictionSheet: View {
     let matches: [Match]
     let entryId: String?
-    let onSelect: (String) -> Void
+    let onSelect: (String, MessageType, [String: AnyJSON]?) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var predictions: [Prediction] = []
@@ -154,13 +155,31 @@ struct SharePredictionSheet: View {
         let outcomeTag = result.outcome == .exact ? "exact" : (result.outcome == .correct ? "correct" : "miss")
         let homeCode = m.homeTeam?.countryCode ?? ""
         let awayCode = m.awayTeam?.countryCode ?? ""
-        let homeFlagUrl = m.homeTeam?.flagUrl ?? ""
-        let awayFlagUrl = m.awayTeam?.flagUrl ?? ""
 
-        // Format: 🎯 match_number|stage|homeName|awayName|homeCode|awayCode|actualHome|actualAway|predHome|predAway|outcome|homeFlagUrl|awayFlagUrl
-        let text = "🎯 \(m.matchNumber)|\(m.stage)|\(m.homeDisplayName)|\(m.awayDisplayName)|\(homeCode)|\(awayCode)|\(m.homeScoreFt!)|\(m.awayScoreFt!)|\(p.predictedHomeScore)|\(p.predictedAwayScore)|\(outcomeTag)|\(homeFlagUrl)|\(awayFlagUrl)"
+        // Human-readable fallback content
+        let outcomeLabel = result.outcome == .exact ? "EXACT" : (result.outcome == .correct ? "CORRECT" : "MISS")
+        let content = "Match \(m.matchNumber): \(m.homeDisplayName) \(m.homeScoreFt!)-\(m.awayScoreFt!) \(m.awayDisplayName) (Predicted \(p.predictedHomeScore)-\(p.predictedAwayScore)) — \(outcomeLabel)"
 
-        onSelect(text)
+        // Structured metadata matching web types.ts
+        let metadata: [String: AnyJSON] = [
+            "entry_id": .string(entryId ?? ""),
+            "match_id": .string(m.matchId),
+            "match_number": .integer(m.matchNumber),
+            "stage": .string(m.stage),
+            "predicted_home": .integer(p.predictedHomeScore),
+            "predicted_away": .integer(p.predictedAwayScore),
+            "actual_home": .integer(m.homeScoreFt!),
+            "actual_away": .integer(m.awayScoreFt!),
+            "outcome": .string(outcomeTag),
+            "home_team_name": .string(m.homeDisplayName),
+            "away_team_name": .string(m.awayDisplayName),
+            "home_team_code": .string(homeCode),
+            "away_team_code": .string(awayCode),
+            "home_flag_url": m.homeTeam?.flagUrl.map { .string($0) } ?? .null,
+            "away_flag_url": m.awayTeam?.flagUrl.map { .string($0) } ?? .null
+        ]
+
+        onSelect(content, .predictionShare, metadata)
         dismiss()
     }
 

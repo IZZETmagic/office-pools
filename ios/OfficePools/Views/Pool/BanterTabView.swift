@@ -165,6 +165,14 @@ struct MessageBubble: View {
     var showSenderAvatar: Bool = true
 
     private var quickActionType: QuickActionType? {
+        // Primary: check messageType from database
+        switch message.messageType {
+        case .predictionShare: return .prediction
+        case .badgeFlex: return .badges
+        case .standingsDrop: return .standings
+        default: break
+        }
+        // Fallback: check content prefix for old messages stored as type "text"
         let content = message.content
         if content.hasPrefix("🎯") { return .prediction }
         if content.hasPrefix("🏆") { return .badges }
@@ -301,41 +309,24 @@ struct MessageBubble: View {
     // MARK: - Prediction Card Body
 
     private var predictionCardBody: some View {
-        // Format: 🎯 matchNum|stage|homeName|awayName|homeCode|awayCode|actualHome|actualAway|predHome|predAway|outcome|homeFlagUrl|awayFlagUrl
-        let content = message.content
-        let stripped = content.hasPrefix("🎯 ") ? String(content.dropFirst(2)) : content
-        let parts = stripped.components(separatedBy: "|")
-
-        let matchNum = parts.count > 0 ? parts[0].trimmingCharacters(in: .whitespaces) : ""
-        let stage = parts.count > 1 ? parts[1] : ""
-        let homeName = parts.count > 2 ? parts[2] : "Home"
-        let awayName = parts.count > 3 ? parts[3] : "Away"
-        let homeCode = parts.count > 4 ? parts[4] : ""
-        let awayCode = parts.count > 5 ? parts[5] : ""
-        let actualHome = parts.count > 6 ? parts[6] : "0"
-        let actualAway = parts.count > 7 ? parts[7] : "0"
-        let predHome = parts.count > 8 ? parts[8] : "0"
-        let predAway = parts.count > 9 ? parts[9] : "0"
-        let outcome = parts.count > 10 ? parts[10] : "miss"
-        let homeFlagUrl = parts.count > 11 ? parts[11] : ""
-        let awayFlagUrl = parts.count > 12 ? parts[12] : ""
+        let data = parsePredictionData()
 
         return VStack(spacing: 10) {
             // Match info header
             HStack {
-                Text("Match \(matchNum) · \(stage)")
+                Text("Match \(data.matchNum) · \(data.stage)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                predictionOutcomeBadge(outcome)
+                predictionOutcomeBadge(data.outcome)
             }
 
             // Teams + scores
             HStack(spacing: 0) {
                 // Home team
                 VStack(spacing: 4) {
-                    predictionFlagView(url: homeFlagUrl, size: 36)
-                    Text(homeName)
+                    predictionFlagView(url: data.homeFlagUrl, size: 36)
+                    Text(data.homeName)
                         .font(.caption.weight(.semibold))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -345,11 +336,11 @@ struct MessageBubble: View {
                 // Scores column
                 VStack(spacing: 4) {
                     // Actual score (larger)
-                    Text("\(actualHome) - \(actualAway)")
+                    Text("\(data.actualHome) - \(data.actualAway)")
                         .font(.title2.weight(.bold).monospacedDigit())
 
                     // Predicted score (smaller, below)
-                    Text("\(predHome) - \(predAway)")
+                    Text("\(data.predHome) - \(data.predAway)")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -357,8 +348,8 @@ struct MessageBubble: View {
 
                 // Away team
                 VStack(spacing: 4) {
-                    predictionFlagView(url: awayFlagUrl, size: 36)
-                    Text(awayName)
+                    predictionFlagView(url: data.awayFlagUrl, size: 36)
+                    Text(data.awayName)
                         .font(.caption.weight(.semibold))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -366,6 +357,58 @@ struct MessageBubble: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    // MARK: - Prediction Data Parser
+
+    private struct PredictionCardData {
+        let matchNum: String
+        let stage: String
+        let homeName: String
+        let awayName: String
+        let actualHome: String
+        let actualAway: String
+        let predHome: String
+        let predAway: String
+        let outcome: String
+        let homeFlagUrl: String
+        let awayFlagUrl: String
+    }
+
+    private func parsePredictionData() -> PredictionCardData {
+        // Primary: from metadata
+        if case .predictionShare(let meta) = message.parsedMetadata {
+            return PredictionCardData(
+                matchNum: "\(meta.matchNumber)",
+                stage: meta.stage,
+                homeName: meta.homeTeamName,
+                awayName: meta.awayTeamName,
+                actualHome: "\(meta.actualHome)",
+                actualAway: "\(meta.actualAway)",
+                predHome: "\(meta.predictedHome)",
+                predAway: "\(meta.predictedAway)",
+                outcome: meta.outcome,
+                homeFlagUrl: meta.homeFlagUrl ?? "",
+                awayFlagUrl: meta.awayFlagUrl ?? ""
+            )
+        }
+        // Fallback: parse from content string
+        let content = message.content
+        let stripped = content.hasPrefix("🎯 ") ? String(content.dropFirst(2)) : content
+        let parts = stripped.components(separatedBy: "|")
+        return PredictionCardData(
+            matchNum: parts.count > 0 ? parts[0].trimmingCharacters(in: .whitespaces) : "",
+            stage: parts.count > 1 ? parts[1] : "",
+            homeName: parts.count > 2 ? parts[2] : "Home",
+            awayName: parts.count > 3 ? parts[3] : "Away",
+            actualHome: parts.count > 6 ? parts[6] : "0",
+            actualAway: parts.count > 7 ? parts[7] : "0",
+            predHome: parts.count > 8 ? parts[8] : "0",
+            predAway: parts.count > 9 ? parts[9] : "0",
+            outcome: parts.count > 10 ? parts[10] : "miss",
+            homeFlagUrl: parts.count > 11 ? parts[11] : "",
+            awayFlagUrl: parts.count > 12 ? parts[12] : ""
+        )
     }
 
     private func predictionOutcomeBadge(_ outcome: String) -> some View {
@@ -402,22 +445,108 @@ struct MessageBubble: View {
     // MARK: - Badges Card Body
 
     private var badgesCardBody: some View {
+        // Primary: from metadata
+        if case .badgeFlex(let meta) = message.parsedMetadata {
+            return AnyView(badgesFromMetadata(meta))
+        }
+        // Fallback: parse from content string
         let content = message.content
         let isIndividual = content.contains("Flexing a badge")
+        return AnyView(Group {
+            if isIndividual {
+                individualBadgeBodyLegacy(content)
+            } else {
+                allBadgesBodyLegacy(content)
+            }
+        })
+    }
+
+    // MARK: - Badges from Metadata
+
+    private func badgesFromMetadata(_ meta: BadgeFlexMetadata) -> some View {
+        let isIndividual = meta.badges.count == 1
 
         return Group {
-            if isIndividual {
-                individualBadgeBody(content)
+            if isIndividual, let badge = meta.badges.first {
+                VStack(spacing: 8) {
+                    Image(systemName: badgeIcon(badge.id))
+                        .font(.largeTitle)
+                        .foregroundStyle(badgeRarityColor(badge.rarity))
+                        .frame(width: 56, height: 56)
+                        .background(badgeRarityColor(badge.rarity).opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    Text(badge.name)
+                        .font(.subheadline.weight(.bold))
+
+                    Text(badge.rarity.uppercased())
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(badgeRarityColor(badge.rarity))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(badgeRarityColor(badge.rarity).opacity(0.12))
+                        .clipShape(Capsule())
+
+                    Text("+\(badge.xpBonus) XP")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
             } else {
-                allBadgesBody(content)
+                VStack(spacing: 10) {
+                    HStack(spacing: 12) {
+                        Text("\(meta.level)")
+                            .font(.title.weight(.bold))
+                            .foregroundStyle(.purple)
+                            .frame(width: 44, height: 44)
+                            .background(Color.purple.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(meta.levelName)
+                                .font(.subheadline.weight(.bold))
+                            Text("\(meta.badges.count) badge\(meta.badges.count != 1 ? "s" : "") earned")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+
+                    Divider()
+
+                    VStack(spacing: 6) {
+                        ForEach(Array(meta.badges.enumerated()), id: \.offset) { _, badge in
+                            HStack(spacing: 8) {
+                                Image(systemName: badgeIcon(badge.id))
+                                    .font(.caption)
+                                    .foregroundStyle(badgeRarityColor(badge.rarity))
+                                    .frame(width: 22, height: 22)
+                                    .background(badgeRarityColor(badge.rarity).opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+
+                                Text(badge.name)
+                                    .font(.caption.weight(.medium))
+
+                                Spacer()
+
+                                Text(badge.rarity.uppercased())
+                                    .font(.system(size: 8, weight: .heavy))
+                                    .foregroundStyle(badgeRarityColor(badge.rarity))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(badgeRarityColor(badge.rarity).opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    // MARK: - Individual Badge Card
-    // Format: "🏆 Flexing a badge — Name|rarity|condition|xpBonus"
+    // MARK: - Legacy Badge Parsing (for old messages without metadata)
 
-    private func individualBadgeBody(_ content: String) -> some View {
+    private func individualBadgeBodyLegacy(_ content: String) -> some View {
         let afterDash = content.components(separatedBy: " — ").dropFirst().joined(separator: " — ")
         let parts = afterDash.components(separatedBy: "|")
         let name = parts.count > 0 ? parts[0] : "Badge"
@@ -459,13 +588,10 @@ struct MessageBubble: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - All Badges Card
-    // Format: "🏆 Flexing my badges — Level 7 Scout with 6 badges!\nName|rarity\n..."
-
-    private func allBadgesBody(_ content: String) -> some View {
+    private func allBadgesBodyLegacy(_ content: String) -> some View {
         let lines = content.components(separatedBy: "\n")
         let mainLine = lines.first ?? content
-        let parsed = parseBadgeContent(mainLine)
+        let parsed = parseBadgeContentLegacy(mainLine)
 
         let badgeLines = lines.dropFirst().compactMap { line -> (name: String, rarity: String, id: String)? in
             let parts = line.components(separatedBy: "|")
@@ -490,7 +616,6 @@ struct MessageBubble: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
                 Spacer()
             }
 
@@ -526,7 +651,7 @@ struct MessageBubble: View {
         }
     }
 
-    private func parseBadgeContent(_ content: String) -> (level: Int, levelName: String, badgeCount: Int) {
+    private func parseBadgeContentLegacy(_ content: String) -> (level: Int, levelName: String, badgeCount: Int) {
         let pattern = #"Level (\d+) (.+?) with (\d+) badge"#
         if let regex = try? NSRegularExpression(pattern: pattern),
            let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)) {
@@ -541,17 +666,23 @@ struct MessageBubble: View {
     // MARK: - Standings Card Body
 
     private var standingsCardBody: some View {
-        // Format: 📊 standings\nname|points|userId per line
-        let lines = message.content.components(separatedBy: "\n")
         let senderUserId = message.userId
+        let entries: [(name: String, points: Int, userId: String, rank: Int)]
 
-        let entries: [(name: String, points: Int, userId: String)] = lines.dropFirst().compactMap { line in
-            let parts = line.components(separatedBy: "|")
-            guard parts.count >= 2 else { return nil }
-            let name = parts[0]
-            let points = Int(parts[1]) ?? 0
-            let userId = parts.count >= 3 ? parts[2] : ""
-            return (name, points, userId)
+        // Primary: from metadata
+        if case .standingsDrop(let meta) = message.parsedMetadata {
+            entries = meta.entries.map { ($0.fullName, $0.points, $0.userId, $0.rank) }
+        } else {
+            // Fallback: parse from content string
+            let lines = message.content.components(separatedBy: "\n")
+            entries = lines.dropFirst().enumerated().compactMap { idx, line in
+                let parts = line.components(separatedBy: "|")
+                guard parts.count >= 2 else { return nil }
+                let name = parts[0]
+                let points = Int(parts[1]) ?? 0
+                let userId = parts.count >= 3 ? parts[2] : ""
+                return (name, points, userId, idx + 1)
+            }
         }
 
         return VStack(alignment: .leading, spacing: 6) {
@@ -560,7 +691,7 @@ struct MessageBubble: View {
                 let isLeader = idx == 0
 
                 HStack(spacing: 10) {
-                    Text("\(idx + 1)")
+                    Text("\(entry.rank)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(isLeader ? .white : .secondary)
                         .frame(width: 24, height: 24)
