@@ -100,13 +100,16 @@ struct GroupStageView: View {
 
             // Expanded content
             if isExpanded {
-                VStack(spacing: 0) {
-                    // Match prediction rows
+                VStack(spacing: 8) {
+                    // Match prediction rows — each in its own card
                     ForEach(matches) { match in
+                        let pred = viewModel.predictions[match.matchId]
+                        let isMatchComplete = pred?.homeScore != nil && pred?.awayScore != nil
+
                         MatchPredictionRow(
                             match: match,
                             isKnockout: false,
-                            prediction: viewModel.predictions[match.matchId],
+                            prediction: pred,
                             saveStatus: viewModel.saveStatus,
                             onScoreUpdate: { home, away in
                                 viewModel.updateScore(matchId: match.matchId, homeScore: home, awayScore: away)
@@ -114,11 +117,22 @@ struct GroupStageView: View {
                             onPsoUpdate: { _, _ in },
                             readOnly: readOnly
                         )
-                        .padding(.horizontal)
-
-                        if match.id != matches.last?.id {
-                            Divider().padding(.horizontal)
-                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isMatchComplete
+                                    ? Color.green.opacity(0.06)
+                                    : Color(.secondarySystemGroupedBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(isMatchComplete
+                                    ? Color.green.opacity(0.2)
+                                    : Color(.systemGray4).opacity(0.5),
+                                    lineWidth: 0.5)
+                        )
+                        .padding(.horizontal, 10)
                     }
 
                     // Group standings table
@@ -129,6 +143,7 @@ struct GroupStageView: View {
                             .padding(.vertical, 8)
                     }
                 }
+                .padding(.vertical, 8)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
