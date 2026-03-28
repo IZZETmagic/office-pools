@@ -15,32 +15,46 @@ struct PredictionWizardView: View {
     @State private var showSubmitConfirmation = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Save status bar (hidden in read-only mode)
-            if !readOnly {
-                saveStatusBar
-            } else {
-                readOnlyStatusBar
-            }
-
-            // Stage title
-            if currentStage != .summary || readOnly {
-                Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
-                    .font(.title2.weight(.bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.top, 10)
-                    .padding(.bottom, 4)
-            }
-
-            // Stage content
+        ZStack {
+            // Scrollable content — extends behind top and bottom glass bars
             ScrollView {
-                stageContent
+                VStack(spacing: 0) {
+                    // Top inset so content starts below the glass status bar
+                    Spacer().frame(height: 44)
+
+                    // Stage title
+                    if currentStage != .summary || readOnly {
+                        Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
+                            .font(.title2.weight(.bold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .padding(.top, 10)
+                            .padding(.bottom, 4)
+                    }
+
+                    stageContent
+
+                    // Bottom inset so content can scroll above the glass nav bar
+                    Spacer().frame(height: 80)
+                }
             }
             .scrollDismissesKeyboard(.interactively)
 
-            // Bottom navigation
-            navigationBar
+            // Floating glass status bar — pinned to top
+            VStack {
+                if !readOnly {
+                    saveStatusBar
+                } else {
+                    readOnlyStatusBar
+                }
+                Spacer()
+            }
+
+            // Floating glass navigation bar — pinned to bottom
+            VStack {
+                Spacer()
+                navigationBar
+            }
         }
         .onAppear {
             currentStage = initialStage

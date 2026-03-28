@@ -455,35 +455,39 @@ struct PredictionFullScreenView: View {
     let onSubmitSuccess: () -> Void
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // Prediction content fills full screen — extends behind header
+        ZStack {
+            // Content fills full screen — scrolls behind header and footer
             predictionContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 52) // Reserve space for the glass header
+                .ignoresSafeArea(edges: .bottom)
 
-            // Floating liquid glass header
-            HStack {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
+            // Floating liquid glass header — pinned to top
+            VStack {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+
+                    Spacer()
+
+                    Text(entryName)
+                        .font(.headline)
+
+                    Spacer()
+
+                    // Invisible balance element
+                    Color.clear
                         .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial, in: Circle())
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
 
                 Spacer()
-
-                Text(entryName)
-                    .font(.headline)
-
-                Spacer()
-
-                // Invisible balance element
-                Color.clear
-                    .frame(width: 36, height: 36)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
         }
         .background(Color(.systemGroupedBackground))
     }
