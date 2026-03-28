@@ -630,48 +630,35 @@ export function MatchesTab({
       return
     }
 
-    // Step 2: Delete match_scores rows for this match (recalculate will rebuild if needed)
-    const { error: scoresError } = await supabase
-      .from('match_scores')
-      .delete()
-      .eq('match_id', match.match_id)
-
-    if (scoresError) {
-      setError('Failed to clear match scores: ' + scoresError.message)
-      setResetting(false)
-      return
-    }
-
-    // Recalculate scores + clear advanced teams in parallel
+    // Step 2: Recalculate all pools — bonus/calculate first (updates bonus_scores,
+    // group_predictions, special_predictions), then recalculate (rebuilds match_scores,
+    // recomputes bonus_scores from calculator, and updates pool_entries totals).
+    // Both must complete before we clear team advancements or refresh the UI.
     const { data: resetPools } = await supabase
       .from('pools')
       .select('pool_id, prediction_mode')
       .eq('tournament_id', match.tournament_id)
 
     let clearInfo = ''
-    const resetTasks: Promise<any>[] = []
 
-    // Task 1: Recalculate all pools in parallel using v2 engine
     if (resetPools) {
-      resetTasks.push(
-        Promise.all(resetPools.map(async (pool) => {
-          try {
+      await Promise.all(resetPools.map(async (pool) => {
+        try {
+          if (pool.prediction_mode === 'bracket_picker') {
+            await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+          } else {
+            await fetch(`/api/pools/${pool.pool_id}/bonus/calculate?skipRecalc=true`, { method: 'POST' })
             await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
-            // Fire-and-forget bonus/calculate for group/special predictions only
-            const bonusEndpoint = pool.prediction_mode === 'bracket_picker'
-              ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
-              : `/api/pools/${pool.pool_id}/bonus/calculate?skipRecalc=true`
-            fetch(bonusEndpoint, { method: 'POST' }).catch(() => {})
-          } catch (e) {
-            console.error('Failed to recalculate points for pool', pool.pool_id, e)
           }
-        }))
-      )
+        } catch (e) {
+          console.error('Failed to recalculate points for pool', pool.pool_id, e)
+        }
+      }))
     }
 
-    // Task 2: Clear advanced teams from downstream matches
-    resetTasks.push(
-      fetch('/api/admin/advance-teams', {
+    // Step 3: Clear advanced teams from downstream matches (after recalculation settles)
+    try {
+      const advRes = await fetch('/api/admin/advance-teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -679,18 +666,15 @@ export function MatchesTab({
           match_id: match.match_id,
         }),
       })
-        .then(async (res) => {
-          if (res.ok) {
-            const advanceData = await res.json()
-            if (advanceData.cleared.length > 0) {
-              clearInfo = ` Cleared ${advanceData.cleared.length} team advancement(s).`
-            }
-          }
-        })
-        .catch((e) => console.error('Failed to clear advanced teams:', e))
-    )
-
-    await Promise.all(resetTasks)
+      if (advRes.ok) {
+        const advanceData = await advRes.json()
+        if (advanceData.cleared.length > 0) {
+          clearInfo = ` Cleared ${advanceData.cleared.length} team advancement(s).`
+        }
+      }
+    } catch (e) {
+      console.error('Failed to clear advanced teams:', e)
+    }
     await Promise.all([refreshMatches(), refreshAuditLogs()])
 
     setResetting(false)
