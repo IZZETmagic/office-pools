@@ -230,7 +230,15 @@ export function MatchesTab({
     // When setting to live, also initialize scores to 0-0
     const updatePayload = newStatus === 'live'
       ? { status: newStatus, home_score_ft: 0, away_score_ft: 0 }
-      : { status: newStatus }
+      : {
+          status: newStatus,
+          home_score_ft: null,
+          away_score_ft: null,
+          home_score_pso: null,
+          away_score_pso: null,
+          is_completed: false,
+          winner_team_id: null,
+        }
 
     const { error: updateError } = await supabase
       .from('matches')
@@ -243,55 +251,62 @@ export function MatchesTab({
       return
     }
 
-    // When setting to live, recalculate leaderboards for all pools
-    if (newStatus === 'live') {
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('pool_id, prediction_mode')
-        .eq('tournament_id', match.tournament_id)
+    // Both directions need pool recalculation:
+    // - live: scores initialized to 0-0, leaderboards need update
+    // - scheduled: scores cleared, stale match_scores must be removed and totals recalculated
+    const { data: pools } = await supabase
+      .from('pools')
+      .select('pool_id, prediction_mode')
+      .eq('tournament_id', match.tournament_id)
 
-      if (pools) {
-        await Promise.all(pools.map(async (pool) => {
-          try {
-            if (pool.prediction_mode === 'bracket_picker') {
-              await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
-            } else {
-              await supabase.rpc('recalculate_all_pool_points', {
-                pool_id_param: pool.pool_id,
-              })
-              await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
-            }
-          } catch (e) {
-            console.error('Failed to recalculate points for pool', pool.pool_id, e)
-          }
-        }))
+    // When reverting to scheduled, delete stale match_scores for this match
+    if (newStatus === 'scheduled') {
+      const { error: deleteError } = await supabase
+        .from('match_scores')
+        .delete()
+        .eq('match_id', match.match_id)
+
+      if (deleteError) {
+        console.error('Failed to delete match_scores for reset match:', deleteError)
       }
+    }
 
-      await refreshMatches()
-      setSaving(false)
-      setModal({ type: 'none' })
+    if (pools) {
+      await Promise.all(pools.map(async (pool) => {
+        try {
+          if (pool.prediction_mode === 'bracket_picker') {
+            await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
+          } else {
+            await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+            await fetch(`/api/pools/${pool.pool_id}/bonus/calculate`, { method: 'POST' })
+          }
+        } catch (e) {
+          console.error('Failed to recalculate points for pool', pool.pool_id, e)
+        }
+      }))
+    }
+
+    await refreshMatches()
+    setSaving(false)
+    setModal({ type: 'none' })
+
+    if (newStatus === 'live') {
       showToast(
         `Match #${match.match_number} is now live (0-0). Leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
         'success'
       )
-      logAuditEvent({
-        action: 'set_status',
-        match_id: match.match_id,
-        details: { new_status: 'live', match_number: match.match_number },
-        summary: `Set match #${match.match_number} to live`,
-      })
     } else {
-      await refreshMatches()
-      setSaving(false)
-      setModal({ type: 'none' })
-      showToast(`Match #${match.match_number} set to "${label}".`, 'success')
-      logAuditEvent({
-        action: 'set_status',
-        match_id: match.match_id,
-        details: { new_status: newStatus, match_number: match.match_number },
-        summary: `Set match #${match.match_number} to ${label}`,
-      })
+      showToast(
+        `Match #${match.match_number} set to "${label}". Scores cleared and leaderboards recalculated for ${pools?.length ?? 0} pool(s).`,
+        'success'
+      )
     }
+    logAuditEvent({
+      action: 'set_status',
+      match_id: match.match_id,
+      details: { new_status: newStatus, match_number: match.match_number },
+      summary: `Set match #${match.match_number} to ${newStatus === 'live' ? 'live' : label}`,
+    })
   }
 
   function openLiveScoreModal(match: SuperMatchData) {
