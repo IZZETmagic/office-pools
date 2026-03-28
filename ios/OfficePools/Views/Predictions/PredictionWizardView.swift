@@ -51,9 +51,7 @@ private struct NextRoundButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         if isComplete {
             content
-                .foregroundStyle(.white)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
+                .glassButton(tint: .accentColor)
         } else {
             content
                 .glassButton()
