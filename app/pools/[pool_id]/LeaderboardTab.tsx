@@ -951,7 +951,7 @@ export function LeaderboardTab({
             setIsShuffling(true)
             setShuffleOffsets(new Map())
             // Clear shuffling state after animation completes
-            setTimeout(() => setIsShuffling(false), 700)
+            setTimeout(() => setIsShuffling(false), 1200)
           })
         })
       }
@@ -982,7 +982,7 @@ export function LeaderboardTab({
 
     if (hasNew) {
       const startTime = performance.now()
-      const duration = 800 // ms
+      const duration = 1800 // ms
 
       const animate = (now: number) => {
         const elapsed = now - startTime
@@ -1130,8 +1130,21 @@ export function LeaderboardTab({
       <style>{`
         @keyframes dotReveal {
           0% { transform: scale(0); opacity: 0; }
-          50% { transform: scale(1.3); }
+          40% { transform: scale(1.6); opacity: 1; }
+          60% { transform: scale(0.85); }
+          80% { transform: scale(1.15); }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pointsPulse {
+          0% { transform: scale(1); }
+          25% { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6)); }
+          50% { transform: scale(1.05); }
+          75% { transform: scale(1.1); filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.3)); }
+          100% { transform: scale(1); filter: none; }
+        }
+        @keyframes shuffleHighlight {
+          0% { background-color: rgba(59, 130, 246, 0.15); }
+          100% { background-color: transparent; }
         }
       `}</style>
       {/* Matchday MVP Banner */}
@@ -1223,7 +1236,7 @@ export function LeaderboardTab({
                             <div
                               key={di}
                               className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${getFormDotClass(type)}`}
-                              style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                              style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                             />
                           ))}
                         </div>
@@ -1233,7 +1246,10 @@ export function LeaderboardTab({
                     <div
                       className={`w-full rounded-t-xl bg-gradient-to-b ${gradientClass} flex flex-col items-center justify-start pt-3 sm:pt-4 ${pedestalClass}`}
                     >
-                      <div className="text-xl sm:text-2xl font-black text-primary-500">
+                      <div
+                        className="text-xl sm:text-2xl font-black text-primary-500"
+                        style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
+                      >
                         {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                       </div>
                       <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -1328,7 +1344,9 @@ export function LeaderboardTab({
                 transform: shuffleOffsets.has(entry.entry_id)
                   ? `translateY(${shuffleOffsets.get(entry.entry_id)}px)`
                   : undefined,
-                transition: isShuffling ? 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+                transition: isShuffling ? 'transform 1s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+                animation: isShuffling && !shuffleOffsets.has(entry.entry_id) && prevSortOrderRef.current.get(entry.entry_id) !== sorted.indexOf(entry)
+                  ? 'shuffleHighlight 1.2s ease-out' : undefined,
               }}
             >
               {/* Rank */}
@@ -1370,7 +1388,7 @@ export function LeaderboardTab({
                         <div
                           key={di}
                           className={`w-2.5 h-2.5 rounded-full ${getFormDotClass(type)}`}
-                          style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                          style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                         />
                       ))}
                       {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
@@ -1404,7 +1422,12 @@ export function LeaderboardTab({
 
               {/* Stats */}
               <div className="text-right">
-                <div className="text-base font-black text-primary-500">{formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}</div>
+                <div
+                  className="text-base font-black text-primary-500"
+                  style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
+                >
+                  {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
+                </div>
                 <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
                   {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                 </div>
@@ -1451,7 +1474,7 @@ export function LeaderboardTab({
                 transform: shuffleOffsets.has(entry.entry_id)
                   ? `translateY(${shuffleOffsets.get(entry.entry_id)}px)`
                   : undefined,
-                transition: isShuffling ? 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+                transition: isShuffling ? 'transform 1s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
               }}
             >
               <div className="flex items-start gap-2.5">
@@ -1514,7 +1537,7 @@ export function LeaderboardTab({
                           <div
                             key={di}
                             className={`w-2 h-2 rounded-full ${getFormDotClass(type)}`}
-                            style={{ animation: 'dotReveal 0.3s ease both', animationDelay: `${di * 0.08}s` }}
+                            style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                           />
                         ))}
                       </div>
@@ -1532,7 +1555,10 @@ export function LeaderboardTab({
 
                 {/* Right stats */}
                 <div className="flex-shrink-0 text-right pt-0.5">
-                  <div className="text-base font-black text-primary-500">
+                  <div
+                    className="text-base font-black text-primary-500"
+                    style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
+                  >
                     {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                   </div>
                   <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
