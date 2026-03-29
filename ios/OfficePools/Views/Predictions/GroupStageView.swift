@@ -11,21 +11,34 @@ struct GroupStageView: View {
     @FocusState private var focusedField: ScoreFieldID?
 
     var body: some View {
-        LazyVStack(spacing: 12) {
-            ForEach(GROUP_LETTERS, id: \.self) { letter in
-                groupSection(letter: letter)
-            }
+        ScrollViewReader { proxy in
+            LazyVStack(spacing: 12) {
+                ForEach(GROUP_LETTERS, id: \.self) { letter in
+                    groupSection(letter: letter)
+                }
 
-            // Third-place rankings at the bottom
-            ThirdPlaceTableView(
-                rankedThirds: viewModel.rankedThirds,
-                qualifiedThirds: viewModel.qualifiedThirds
-            )
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
+                // Third-place rankings at the bottom
+                ThirdPlaceTableView(
+                    rankedThirds: viewModel.rankedThirds,
+                    qualifiedThirds: viewModel.qualifiedThirds
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+            }
+            .padding(.vertical, 8)
+            .onChange(of: focusedField) { _, newField in
+                guard let newField else { return }
+                let matchId: String
+                switch newField {
+                case .home(let id): matchId = id
+                case .away(let id): matchId = id
+                }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    proxy.scrollTo("match_\(matchId)", anchor: .center)
+                }
+            }
         }
-        .padding(.vertical, 8)
         .onAppear {
             guard !didSetDefaults else { return }
             didSetDefaults = true
@@ -143,6 +156,7 @@ struct GroupStageView: View {
                                     lineWidth: 0.5)
                         )
                         .padding(.horizontal, 10)
+                        .id("match_\(match.matchId)")
                     }
 
                     // Group standings table
