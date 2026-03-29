@@ -119,7 +119,7 @@ struct GroupStageView: View {
                     ForEach(Array(matches.enumerated()), id: \.element.id) { index, match in
                         let nextMatchId = index + 1 < matches.count ? matches[index + 1].matchId : nil
 
-                        MatchCardView(
+                        PredictionMatchCard(
                             match: match,
                             viewModel: viewModel,
                             readOnly: readOnly,
@@ -160,7 +160,7 @@ struct GroupStageView: View {
 // MARK: - Match Card with Pulse Animation
 
 /// Wraps a MatchPredictionRow in a card that pulses blue when completed.
-private struct MatchCardView: View {
+private struct PredictionMatchCard: View {
     let match: Match
     @Bindable var viewModel: PredictionEditViewModel
     var readOnly: Bool
