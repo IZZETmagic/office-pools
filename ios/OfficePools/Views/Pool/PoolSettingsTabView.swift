@@ -33,8 +33,7 @@ struct PoolSettingsTabView: View {
                 Spacer().frame(height: 4)
 
                 poolCodeCard
-                poolNameCard
-                descriptionCard
+                poolInfoCard
                 statusCard
                 visibilityCard
                 maxMembersCard
@@ -48,45 +47,32 @@ struct PoolSettingsTabView: View {
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) {
             if hasChanges {
-                HStack {
-                    Text("Unsaved changes")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button {
-                        saveSettings()
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isSaving {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .tint(.white)
-                            }
-                            Text("Save Changes")
-                                .fontWeight(.semibold)
+                Button {
+                    saveSettings()
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .tint(.white)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.accentColor)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Text("Save Changes")
+                            .fontWeight(.semibold)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isSaving)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background {
+                        AppColors.primary500.opacity(0.2)
+                    }
+                    .background(.ultraThinMaterial)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: AppColors.primary500.opacity(0.3), radius: 8, y: 4)
                 }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-
-                if let msg = saveMessage {
-                    HStack(spacing: 6) {
-                        Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                        Text(msg.text)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
-                    .padding(.bottom, 4)
-                }
+                .padding(.vertical, 10)
             }
         }
         .onAppear { initEditState() }
@@ -180,12 +166,12 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Pool Name
+    // MARK: - Pool Info (Name + Description)
 
-    private var poolNameCard: some View {
+    private var poolInfoCard: some View {
         card {
             HStack {
-                sectionHeader("Pool Name")
+                sectionHeader("Pool Info")
                 if let pool {
                     Text(modeLabel(pool.predictionMode))
                         .font(.caption.weight(.semibold))
@@ -196,21 +182,26 @@ struct PoolSettingsTabView: View {
                         .clipShape(Capsule())
                 }
             }
-            TextField("Pool Name", text: $editName)
-                .textFieldStyle(.plain)
-                .font(.body)
-        }
-    }
 
-    // MARK: - Description
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pool Name")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Pool Name", text: $editName)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                Divider()
+            }
 
-    private var descriptionCard: some View {
-        card {
-            sectionHeader("Description")
-            TextField("Description (optional)", text: $editDescription, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .lineLimit(2...4)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Description")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Description (optional)", text: $editDescription, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .lineLimit(2...4)
+            }
         }
     }
 
@@ -254,12 +245,15 @@ struct PoolSettingsTabView: View {
     private var maxMembersCard: some View {
         card {
             settingsRow("Max Members", value:
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     TextField("0", value: $editMaxParticipants, format: .number)
                         .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
+                        .multilineTextAlignment(.center)
                         .font(.subheadline.weight(.bold))
-                        .frame(width: 50)
+                        .frame(width: 56)
+                        .padding(.vertical, 6)
+                        .background(Color(.tertiarySystemFill))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     Text(editMaxParticipants == 0 ? "(unlimited)" : "")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -304,15 +298,11 @@ struct PoolSettingsTabView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Quick Set")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    quickDeadlineButton("Tournament Start", date: tournamentStartDate)
-                    quickDeadlineButton("1 Day Before", date: tournamentStartDate?.addingTimeInterval(-86400))
-                    quickDeadlineButton("1 Week Before", date: tournamentStartDate?.addingTimeInterval(-604800))
-                }
+            HStack {
+                Spacer()
+                quickDeadlineButton("Tournament Start", date: tournamentStartDate)
+                quickDeadlineButton("1 Day Before", date: tournamentStartDate?.addingTimeInterval(-86400))
+                quickDeadlineButton("1 Week Before", date: tournamentStartDate?.addingTimeInterval(-604800))
             }
         }
     }
@@ -453,14 +443,26 @@ struct PoolSettingsTabView: View {
 
     // MARK: - Computed
 
+    private var initialDeadline: Date? {
+        guard let pool, let deadline = pool.predictionDeadline else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: deadline)
+    }
+
     private var hasChanges: Bool {
         guard let pool else { return false }
+        let deadlineChanged: Bool = {
+            guard let initial = initialDeadline else { return false }
+            return abs(editDeadline.timeIntervalSince(initial)) > 60
+        }()
         return editName != pool.poolName
             || editDescription != (pool.description ?? "")
             || editStatus != pool.status
             || editIsPrivate != pool.isPrivate
             || editMaxEntries != pool.maxEntriesPerUser
             || editMaxParticipants != (pool.maxParticipants ?? 0)
+            || deadlineChanged
     }
 
     private var statusDescription: String {
@@ -547,10 +549,11 @@ struct PoolSettingsTabView: View {
             if let date { editDeadline = date }
         } label: {
             Text(label)
-                .font(.caption2.weight(.medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color(.tertiarySystemFill))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.quaternarySystemFill))
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
