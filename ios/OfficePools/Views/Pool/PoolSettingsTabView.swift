@@ -14,6 +14,7 @@ struct PoolSettingsTabView: View {
     @State private var editMaxEntries = 1
     @State private var editMaxParticipants = 0
     @State private var editDeadline = Date()
+    @State private var initialDeadline: Date?
     @State private var isSaving = false
     @State private var saveMessage: (text: String, isError: Bool)?
 
@@ -65,7 +66,7 @@ struct PoolSettingsTabView: View {
                         AppColors.primary500.opacity(0.2)
                     }
                     .background(.ultraThinMaterial)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.primary700)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .shadow(color: AppColors.primary500.opacity(0.3), radius: 8, y: 4)
                 }
@@ -437,24 +438,24 @@ struct PoolSettingsTabView: View {
         if let deadline = pool.predictionDeadline {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            editDeadline = formatter.date(from: deadline) ?? Date()
+            let parsed = formatter.date(from: deadline) ?? Date()
+            editDeadline = parsed
+            initialDeadline = parsed
+        } else {
+            initialDeadline = nil
         }
     }
 
     // MARK: - Computed
 
-    private var initialDeadline: Date? {
-        guard let pool, let deadline = pool.predictionDeadline else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: deadline)
-    }
-
     private var hasChanges: Bool {
         guard let pool else { return false }
         let deadlineChanged: Bool = {
-            guard let initial = initialDeadline else { return false }
-            return abs(editDeadline.timeIntervalSince(initial)) > 60
+            if let initial = initialDeadline {
+                return abs(editDeadline.timeIntervalSince(initial)) > 60
+            }
+            // No initial deadline — any change from the default means a change
+            return pool.predictionDeadline == nil && abs(editDeadline.timeIntervalSince(Date())) > 120
         }()
         return editName != pool.poolName
             || editDescription != (pool.description ?? "")
