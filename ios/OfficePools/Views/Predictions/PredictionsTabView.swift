@@ -455,61 +455,83 @@ struct PredictionFullScreenView: View {
     let onSubmitSuccess: () -> Void
 
     @State private var dragOffset: CGFloat = 0
+    @GestureState private var isDragging = false
 
     var body: some View {
         ZStack {
-            // Content fills full screen — scrolls behind header and footer
-            predictionContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea(edges: .bottom)
-
-            // Floating liquid glass header — pinned to top
-            VStack {
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "chevron.left")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-
-                    Spacer()
-
-                    Text(entryName)
-                        .font(.headline)
-
-                    Spacer()
-
-                    // Invisible balance element
-                    Color.clear
-                        .frame(width: 32, height: 32)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-
-                Spacer()
+            // Dimmed background that appears as you swipe
+            if dragOffset > 0 {
+                Color.black
+                    .opacity(0.3 * (1 - dragOffset / UIScreen.main.bounds.width))
+                    .ignoresSafeArea()
             }
+
+            ZStack {
+                // Content fills full screen — scrolls behind header and footer
+                predictionContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea(edges: .bottom)
+
+                // Floating liquid glass header — pinned to top
+                VStack {
+                    HStack {
+                        Button(action: onClose) {
+                            Image(systemName: "chevron.left")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 32, height: 32)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+
+                        Spacer()
+
+                        Text(entryName)
+                            .font(.headline)
+
+                        Spacer()
+
+                        // Invisible balance element
+                        Color.clear
+                            .frame(width: 32, height: 32)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+
+                    Spacer()
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .offset(x: dragOffset)
+            .gesture(
+                DragGesture()
+                    .updating($isDragging) { _, state, _ in state = true }
+                    .onChanged { value in
+                        // Only allow swipe from the left 40pt edge
+                        guard value.startLocation.x < 40 else { return }
+                        if value.translation.width > 0 {
+                            dragOffset = value.translation.width
+                        }
+                    }
+                    .onEnded { value in
+                        guard value.startLocation.x < 40 else { return }
+                        let velocity = value.predictedEndTranslation.width
+                        if value.translation.width > 120 || velocity > 500 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                dragOffset = UIScreen.main.bounds.width
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                onClose()
+                                dragOffset = 0
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                dragOffset = 0
+                            }
+                        }
+                    }
+            )
         }
-        .background(Color(.systemGroupedBackground))
-        .offset(x: dragOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    if value.translation.width > 0 {
-                        dragOffset = value.translation.width
-                    }
-                }
-                .onEnded { value in
-                    if value.translation.width > 100 {
-                        onClose()
-                    }
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        dragOffset = 0
-                    }
-                }
-        )
     }
 
     @ViewBuilder
