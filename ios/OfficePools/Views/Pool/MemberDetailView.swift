@@ -6,6 +6,7 @@ struct MemberDetailView: View {
     let currentUserId: String
     let poolService: PoolService
     let adminCount: Int
+    let currentUserIsAdmin: Bool
 
     @State private var showAdjustSheet = false
     @State private var adjustEntry: Entry?
@@ -14,6 +15,8 @@ struct MemberDetailView: View {
     @State private var isProcessing = false
     @State private var actionError: String?
     @State private var showRemoveAlert = false
+    @State private var showUnlockAlert = false
+    @State private var entryToUnlock: Entry?
     @Environment(\.dismiss) private var dismiss
 
     @State private var headerHeight: CGFloat = 80
@@ -35,7 +38,9 @@ struct MemberDetailView: View {
                     }
 
                     // MARK: - Admin Actions
-                    adminActionsCard
+                    if currentUserIsAdmin {
+                        adminActionsCard
+                    }
                 }
                 .padding(.top, headerHeight + 16)
                 .padding(.horizontal, 16)
@@ -57,6 +62,18 @@ struct MemberDetailView: View {
             }
         } message: {
             Text("Remove \(member.users.fullName) from the pool? Their predictions will be deleted.")
+        }
+        .alert("Unlock Entry", isPresented: $showUnlockAlert) {
+            Button("Cancel", role: .cancel) {
+                entryToUnlock = nil
+            }
+            Button("Unlock", role: .destructive) {
+                unlockEntryAction()
+            }
+        } message: {
+            if let entry = entryToUnlock {
+                Text("Unlock \(entry.entryName) so \(member.users.fullName) can edit their predictions again?")
+            }
         }
         .alert("Error", isPresented: .init(
             get: { actionError != nil },
@@ -168,6 +185,19 @@ struct MemberDetailView: View {
                             entry.hasSubmittedPredictions ? "Submitted" : "Pending",
                             color: entry.hasSubmittedPredictions ? .green : .gray
                         )
+                        if entry.hasSubmittedPredictions && currentUserIsAdmin {
+                            Button {
+                                entryToUnlock = entry
+                                showUnlockAlert = true
+                            } label: {
+                                Image(systemName: "lock.open")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 36, height: 36)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     if entry.hasSubmittedPredictions, let submittedAt = entry.predictionsSubmittedAt {
                         HStack {
@@ -372,6 +402,22 @@ struct MemberDetailView: View {
             } catch {
                 actionError = "Failed to remove member: \(error.localizedDescription)"
                 isProcessing = false
+            }
+        }
+    }
+
+    private func unlockEntryAction() {
+        guard let entry = entryToUnlock else { return }
+        isProcessing = true
+        Task {
+            do {
+                try await poolService.unlockEntry(entryId: entry.entryId)
+                isProcessing = false
+                entryToUnlock = nil
+            } catch {
+                actionError = "Failed to unlock entry: \(error.localizedDescription)"
+                isProcessing = false
+                entryToUnlock = nil
             }
         }
     }

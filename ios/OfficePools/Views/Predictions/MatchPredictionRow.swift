@@ -45,27 +45,24 @@ struct MatchPredictionRow: View {
         VStack(spacing: 6) {
             // Main score row
             HStack(spacing: 0) {
-                // Home team
-                VStack(alignment: .trailing, spacing: 2) {
-                    HStack(spacing: 6) {
-                        if let flagStr = homeFlagOverride ?? match.homeTeam?.flagUrl,
-                           let url = URL(string: flagStr) {
-                            CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
-                        }
+                // Home team name + flag
+                HStack(spacing: 6) {
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text(homeTeamOverride ?? match.homeDisplayName)
                             .font(.subheadline)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
+                        if let subtitle = homeSubtitle {
+                            Text(subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    if let subtitle = homeSubtitle {
-                        Text(subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    homeFlag
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
-                // Score display
+                // Score display (centered)
                 if readOnly {
                     readOnlyScoreDisplay
                         .padding(.horizontal, 8)
@@ -80,22 +77,19 @@ struct MatchPredictionRow: View {
                     .padding(.horizontal, 8)
                 }
 
-                // Away team
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                // Flag + away team name
+                HStack(spacing: 6) {
+                    awayFlag
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(awayTeamOverride ?? match.awayDisplayName)
                             .font(.subheadline)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                        if let flagStr = awayFlagOverride ?? match.awayTeam?.flagUrl,
-                           let url = URL(string: flagStr) {
-                            CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
+                        if let subtitle = awaySubtitle {
+                            Text(subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
-                    }
-                    if let subtitle = awaySubtitle {
-                        Text(subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,46 +173,45 @@ struct MatchPredictionRow: View {
         }
     }
 
+    // MARK: - Flag Views
+
+    @ViewBuilder
+    private var homeFlag: some View {
+        if let flagStr = homeFlagOverride ?? match.homeTeam?.flagUrl,
+           let url = URL(string: flagStr) {
+            CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
+        }
+    }
+
+    @ViewBuilder
+    private var awayFlag: some View {
+        if let flagStr = awayFlagOverride ?? match.awayTeam?.flagUrl,
+           let url = URL(string: flagStr) {
+            CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
+        }
+    }
+
     // MARK: - Score Field
 
     private func scoreField(text: Binding<String>, fieldId: ScoreFieldID, onChange: @escaping () -> Void, autoAdvanceTo nextField: ScoreFieldID?) -> some View {
-        let field = TextField("", text: text)
-            .keyboardType(.numberPad)
-            .multilineTextAlignment(.center)
-            .font(.title3.weight(.semibold).monospacedDigit())
-            .frame(width: 48, height: 44)
-            .background(Color(.systemGray5))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .onChange(of: text.wrappedValue) {
-                // Clamp to 0-20 range
-                if let val = Int(text.wrappedValue) {
-                    let clamped = min(max(val, 0), 20)
-                    if clamped != val {
-                        text.wrappedValue = String(clamped)
-                    }
-                } else if !text.wrappedValue.isEmpty {
-                    text.wrappedValue = ""
-                }
+        TapScoreField(
+            text: text,
+            onChange: {
                 onChange()
-
-                // Auto-advance when a digit is entered
+                // Auto-advance after tap
                 if !text.wrappedValue.isEmpty, let focus = focusedField {
                     if let nextField {
-                        focus.wrappedValue = nextField
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            focus.wrappedValue = nextField
+                        }
                     } else {
-                        // Away score entered — advance to next match
-                        onAwayScoreEntered?()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            onAwayScoreEntered?()
+                        }
                     }
                 }
             }
-
-        return Group {
-            if let focus = focusedField {
-                field.focused(focus, equals: fieldId)
-            } else {
-                field
-            }
-        }
+        )
     }
 
     // MARK: - PSO Row
@@ -258,5 +251,127 @@ struct MatchPredictionRow: View {
         let homePso = Int(homePsoText)
         let awayPso = Int(awayPsoText)
         onPsoUpdate(homePso, awayPso)
+    }
+}
+
+// MARK: - Tap-to-Increment Score Field
+
+private struct TapScoreField: View {
+    @Binding var text: String
+    let onChange: () -> Void
+
+    @State private var scale: CGFloat = 1.0
+    @State private var showKeyboard = false
+    @State private var isPressed = false
+    @State private var dotOpacity: Double = 0.4
+    @FocusState private var keyboardFocused: Bool
+
+    private var currentValue: Int? {
+        Int(text)
+    }
+
+    var body: some View {
+        ZStack {
+            if showKeyboard {
+                // Keyboard mode
+                TextField("", text: $text)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.center)
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                    .frame(width: 48, height: 44)
+                    .background(Color.accentColor.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    )
+                    .focused($keyboardFocused)
+                    .onChange(of: text) {
+                        if let val = Int(text) {
+                            let clamped = min(max(val, 0), 15)
+                            if clamped != val { text = String(clamped) }
+                        } else if !text.isEmpty {
+                            text = ""
+                        }
+                        onChange()
+                    }
+                    .onChange(of: keyboardFocused) { _, focused in
+                        if !focused {
+                            showKeyboard = false
+                        }
+                    }
+                    .onAppear {
+                        keyboardFocused = true
+                    }
+            } else {
+                // Tap mode
+                Group {
+                    if text.isEmpty {
+                        Circle()
+                            .fill(Color(.systemGray3))
+                            .frame(width: 8, height: 8)
+                            .opacity(dotOpacity)
+                            .onAppear {
+                                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                                    dotOpacity = 0.85
+                                }
+                            }
+                    } else {
+                        Text(text)
+                            .font(.title3.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(.primary)
+                    }
+                }
+                    .frame(width: 48, height: 44)
+                    .background(Color(.systemGray5))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .scaleEffect(scale)
+                    .opacity(isPressed ? 0.7 : 1.0)
+                    .onTapGesture {
+                        increment()
+                    }
+                    .onLongPressGesture(minimumDuration: 0.35, pressing: { pressing in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isPressed = pressing
+                        }
+                        if pressing {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.prepare()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                if isPressed {
+                                    generator.impactOccurred()
+                                }
+                            }
+                        }
+                    }, perform: {
+                        let generator = UIImpactFeedbackGenerator(style: .heavy)
+                        generator.impactOccurred()
+                        showKeyboard = true
+                    })
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: showKeyboard)
+    }
+
+    private func increment() {
+        // Dismiss any open keyboard first
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+
+        if text.isEmpty {
+            text = "0"
+        } else if let val = currentValue {
+            text = String(val >= 15 ? 0 : val + 1)
+        }
+
+        // Subtle scale pulse
+        withAnimation(.easeOut(duration: 0.1)) { scale = 1.12 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeIn(duration: 0.1)) { scale = 1.0 }
+        }
+
+        onChange()
     }
 }

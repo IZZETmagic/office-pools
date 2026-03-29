@@ -201,7 +201,8 @@ struct PoolDetailView: View {
                 leaderboardData: viewModel.leaderboardData,
                 currentUserId: viewModel.currentUserId ?? "",
                 poolService: PoolService(),
-                adminCount: viewModel.members.filter(\.isAdmin).count
+                adminCount: viewModel.members.filter(\.isAdmin).count,
+                currentUserIsAdmin: viewModel.isAdmin
             )
         }
         .sheet(isPresented: $showingBanter) {

@@ -10,6 +10,7 @@ struct GroupStandingsTable: View {
     var body: some View {
         VStack(spacing: 0) {
             headerRow
+            Divider()
             ForEach(Array(standings.enumerated()), id: \.element.id) { index, standing in
                 standingRow(position: index + 1, standing: standing)
                 if index < standings.count - 1 {
@@ -19,10 +20,6 @@ struct GroupStandingsTable: View {
         }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
-        )
     }
 
     // MARK: - Header Row
@@ -42,13 +39,12 @@ struct GroupStandingsTable: View {
             }
             Text("P").frame(width: 24, alignment: .center)
             Text("GD").frame(width: 32, alignment: .center)
-            Text("Pts").frame(width: 30, alignment: .center)
+            Text("Pts").frame(width: 32, alignment: .center)
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color(.systemGray6))
     }
 
     // MARK: - Standing Row
@@ -70,11 +66,13 @@ struct GroupStandingsTable: View {
             }
             Text("\(standing.played)").frame(width: 24, alignment: .center)
             Text(gdString(standing.goalDifference)).frame(width: 32, alignment: .center)
-            Text("\(standing.points)").frame(width: 30, alignment: .center)
+            Text("\(standing.points)")
+                .fontWeight(.semibold)
+                .frame(width: 32, alignment: .center)
         }
         .font(.caption.monospacedDigit())
         .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.vertical, 8)
         .background(rowBackground(for: position))
     }
 

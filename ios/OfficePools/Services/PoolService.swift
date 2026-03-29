@@ -532,6 +532,23 @@ final class PoolService {
             .execute()
     }
 
+    /// Unlock a submitted entry so the user can edit predictions again
+    func unlockEntry(entryId: String) async throws {
+        struct UnlockPayload: Codable {
+            let hasSubmittedPredictions: Bool
+            let predictionsSubmittedAt: String?
+            enum CodingKeys: String, CodingKey {
+                case hasSubmittedPredictions = "has_submitted_predictions"
+                case predictionsSubmittedAt = "predictions_submitted_at"
+            }
+        }
+        try await supabase
+            .from("pool_entries")
+            .update(UnlockPayload(hasSubmittedPredictions: false, predictionsSubmittedAt: nil))
+            .eq("entry_id", value: entryId)
+            .execute()
+    }
+
     /// Delete a pool and all related data (cascade)
     func deletePool(poolId: String) async throws {
         let members = try await fetchMembers(poolId: poolId)
