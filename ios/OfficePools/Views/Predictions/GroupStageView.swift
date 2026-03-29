@@ -211,7 +211,7 @@ private struct PredictionMatchCard: View {
         isPulsing = true
 
         withAnimation(.easeOut(duration: 0.25)) {
-            blueOpacity = 0.18
+            blueOpacity = 0.11
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             withAnimation(.easeIn(duration: 0.4)) {
