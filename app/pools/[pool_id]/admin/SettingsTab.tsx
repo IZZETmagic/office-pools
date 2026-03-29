@@ -314,8 +314,19 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     setDeadlineTime(d.toTimeString().slice(0, 5))
   }
 
+  const statusOptions = [
+    { value: 'open' as const, label: 'Open', desc: 'Accepting new members' },
+    { value: 'closed' as const, label: 'Closed', desc: 'No new members' },
+    { value: 'completed' as const, label: 'Completed', desc: 'Tournament finished' },
+  ]
+
+  const visibilityOptions = [
+    { value: false as const, label: 'Public', desc: 'Anyone with code can join' },
+    { value: true as const, label: 'Private', desc: 'Requires pool code to join' },
+  ]
+
   return (
-    <div>
+    <div className="relative pb-20">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-neutral-900">Pool Settings</h2>
         <div className="flex items-center gap-1.5 mt-1">
@@ -348,295 +359,294 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
         </Alert>
       )}
 
-      <Card className="mb-6">
-        {/* Pool Information */}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Pool Information
-        </h3>
+      <div className="space-y-4">
+        {/* ── Pool Information ── */}
+        <Card>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">
+            Pool Information
+          </h3>
 
-        <div className="space-y-4">
-          <FormField label="Pool Name *">
-            <Input
-              type="text"
-              value={poolName}
-              onChange={(e) => setPoolName(e.target.value)}
-              placeholder="Enter pool name"
-            />
-          </FormField>
-
-          <FormField label="Description">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your pool..."
-              rows={3}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
-            />
-          </FormField>
-
-          <FormField label="Pool Status">
-            <div className="inline-grid grid-cols-3 gap-2">
-              {([
-                { value: 'open', label: 'Open', desc: 'Accepting new members' },
-                { value: 'closed', label: 'Closed', desc: 'No new members' },
-                { value: 'completed', label: 'Completed', desc: 'Tournament finished' },
-              ] as const).map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setStatus(s.value)}
-                  className={`p-3 rounded-xl border cursor-pointer transition text-left ${
-                    status === s.value
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-neutral-200 hover:border-neutral-300'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-neutral-900">{s.label}</p>
-                  <p className="text-xs text-neutral-500">{s.desc}</p>
-                </button>
-              ))}
-            </div>
-          </FormField>
-        </div>
-
-        {/* Divider */}
-        <hr className="my-6 border-neutral-200" />
-
-        {/* Prediction Mode badge */}
-        {pool.prediction_mode === 'progressive' && (
-          <div className="mb-4 flex items-center gap-2">
-            <span className="text-sm font-medium text-neutral-700">Prediction Mode:</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-              Progressive
-            </span>
-          </div>
-        )}
-
-        {/* Prediction Deadline */}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
-        </h3>
-
-        {pool.prediction_mode === 'progressive' && (
-          <div className="mb-4 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl dark:bg-blue-900/20 dark:border-blue-800">
-            <svg className="w-5 h-5 text-blue-800 dark:text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-            </svg>
-            <p className="text-xs text-blue-800 dark:text-blue-600 leading-5">
-              This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
-            </p>
-          </div>
-        )}
-
-        {currentDeadline && (
-          <div className="mb-4">
-            <p className="text-sm text-neutral-600">
-              Current Deadline:{' '}
-              <span className="font-medium">
-                {currentDeadline.toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}{' '}
-                {currentDeadline.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
-              </span>
-            </p>
-            {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
-              <p className="text-sm text-neutral-600">
-                Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
-              </p>
-            )}
-            {timeUntilDeadline !== null && timeUntilDeadline <= 0 && (
-              <p className="text-sm text-danger-500 font-medium">
-                Deadline has passed
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={deadlineDate}
-              onChange={(e) => setDeadlineDate(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Time
-            </label>
-            <input
-              type="time"
-              value={deadlineTime}
-              onChange={(e) => setDeadlineTime(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setQuickDeadline('tournament_start')}
-            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-          >
-            Tournament Start (Jun 11)
-          </button>
-          <button
-            onClick={() => setQuickDeadline('one_day_before')}
-            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-          >
-            1 Day Before Start
-          </button>
-          <button
-            onClick={() => setQuickDeadline('one_week_before')}
-            className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-          >
-            1 Week Before Start
-          </button>
-        </div>
-
-        {/* Divider */}
-        <hr className="my-6 border-neutral-200" />
-
-        {/* Privacy Settings */}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Privacy Settings
-        </h3>
-
-        <div className="space-y-4">
-          <FormField label="Pool Visibility">
-            <div className="inline-grid grid-cols-2 gap-2">
-              {([
-                { value: false, label: 'Public', desc: 'Anyone with code can join' },
-                { value: true, label: 'Private', desc: 'Requires pool code to join' },
-              ] as const).map((opt) => (
-                <button
-                  key={String(opt.value)}
-                  type="button"
-                  onClick={() => setIsPrivate(opt.value)}
-                  className={`p-3 rounded-xl border cursor-pointer transition text-left ${
-                    isPrivate === opt.value
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-neutral-200 hover:border-neutral-300'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
-                  <p className="text-xs text-neutral-500">{opt.desc}</p>
-                </button>
-              ))}
-            </div>
-          </FormField>
-
-          <FormField
-            label="Maximum Members"
-            helperText="Set to 0 for unlimited"
-          >
-            <div className="w-[10.3125rem]">
+          <div className="space-y-4">
+            <FormField label="Pool Name *">
               <Input
-                type="number"
-                min="0"
-                value={maxParticipants}
-                onChange={(e) => setMaxParticipants(e.target.value)}
+                type="text"
+                value={poolName}
+                onChange={(e) => setPoolName(e.target.value)}
+                placeholder="Enter pool name"
               />
-            </div>
-          </FormField>
-        </div>
+            </FormField>
 
-        {/* Divider */}
-        <hr className="my-6 border-neutral-200" />
+            <FormField label="Description">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe your pool..."
+                rows={3}
+                className="w-full px-4 py-2 border border-neutral-300 rounded-xl bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
+              />
+            </FormField>
 
-        {/* Prediction Entries */}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Prediction Entries
-        </h3>
+            <FormField label="Pool Status">
+              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+                {statusOptions.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setStatus(s.value)}
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                      status === s.value
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-neutral-500 mt-1.5">
+                {statusOptions.find(s => s.value === status)?.desc}
+              </p>
+            </FormField>
+          </div>
+        </Card>
 
-        <p className="text-sm text-neutral-600 mb-4">
-          Allow members to submit multiple sets of predictions. Each entry is scored and ranked independently on the leaderboard.
-        </p>
+        {/* ── Prediction Deadline ── */}
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
+            </h3>
+            {pool.prediction_mode === 'progressive' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                Progressive
+              </span>
+            )}
+          </div>
 
-        <div className="space-y-4">
-          <FormField label="Max Entries Per Member">
-            <div className="flex">
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setMaxEntries(String(n))}
-                  className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
-                    parseInt(maxEntries) === n
-                      ? 'bg-primary-500 text-white border-primary-500 z-10'
-                      : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </FormField>
-
-          {parseInt(maxEntries) > 1 && (
-            <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
-              <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          {pool.prediction_mode === 'progressive' && (
+            <div className="mb-4 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl dark:bg-blue-900/20 dark:border-blue-800">
+              <svg className="w-5 h-5 text-blue-800 dark:text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
-              <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
-                Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
+              <p className="text-xs text-blue-800 dark:text-blue-600 leading-5">
+                This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
               </p>
             </div>
           )}
-        </div>
 
-        {/* Save button */}
-        <div className="mt-8 pt-6 border-t border-neutral-200 flex justify-end">
-          <Button
-            onClick={handleSaveAll}
-            loading={saving}
-            loadingText="Saving..."
-            disabled={!hasChanges}
-          >
-            Save Changes
-          </Button>
-        </div>
-      </Card>
-
-      {/* Danger Zone */}
-      <Card className="mb-6 border border-danger-200">
-
-        <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
-          {/* Archive */}
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-neutral-900">Archive Pool</h4>
-              <p className="text-sm text-neutral-500">Preserve data but prevent new activity.</p>
+          {currentDeadline && (
+            <div className="mb-4">
+              <p className="text-sm text-neutral-600">
+                Current Deadline:{' '}
+                <span className="font-medium">
+                  {currentDeadline.toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}{' '}
+                  {currentDeadline.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </p>
+              {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
+                <p className="text-sm text-neutral-600">
+                  Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
+                </p>
+              )}
+              {timeUntilDeadline !== null && timeUntilDeadline <= 0 && (
+                <p className="text-sm text-danger-500 font-medium">
+                  Deadline has passed
+                </p>
+              )}
             </div>
-            <Button variant="warning" size="sm" className="shrink-0 w-20" onClick={() => setShowArchiveModal(true)}>
-              Archive
-            </Button>
+          )}
+
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Date
+              </label>
+              <input
+                type="date"
+                value={deadlineDate}
+                onChange={(e) => setDeadlineDate(e.target.value)}
+                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Time
+              </label>
+              <input
+                type="time"
+                value={deadlineTime}
+                onChange={(e) => setDeadlineTime(e.target.value)}
+                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
           </div>
 
-          {/* Divider - desktop only */}
-          <div className="hidden sm:block absolute inset-y-0 left-1/2 w-px bg-neutral-200" />
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setQuickDeadline('tournament_start')}
+              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+            >
+              Tournament Start (Jun 11)
+            </button>
+            <button
+              onClick={() => setQuickDeadline('one_day_before')}
+              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+            >
+              1 Day Before Start
+            </button>
+            <button
+              onClick={() => setQuickDeadline('one_week_before')}
+              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+            >
+              1 Week Before Start
+            </button>
+          </div>
+        </Card>
 
-          {/* Delete */}
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-neutral-900">Delete Pool</h4>
-              <p className="text-sm text-neutral-500">Permanently delete this pool and all data.</p>
+        {/* ── Access & Limits ── */}
+        <Card>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">
+            Access & Limits
+          </h3>
+
+          <div className="space-y-4">
+            <FormField label="Pool Visibility">
+              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+                {visibilityOptions.map((opt) => (
+                  <button
+                    key={String(opt.value)}
+                    type="button"
+                    onClick={() => setIsPrivate(opt.value)}
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                      isPrivate === opt.value
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-neutral-500 mt-1.5">
+                {visibilityOptions.find(o => o.value === isPrivate)?.desc}
+              </p>
+            </FormField>
+
+            <FormField
+              label="Maximum Members"
+              helperText="Set to 0 for unlimited"
+            >
+              <div className="w-[10.3125rem]">
+                <Input
+                  type="number"
+                  min="0"
+                  value={maxParticipants}
+                  onChange={(e) => setMaxParticipants(e.target.value)}
+                />
+              </div>
+            </FormField>
+          </div>
+        </Card>
+
+        {/* ── Prediction Entries ── */}
+        <Card>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1">
+            Prediction Entries
+          </h3>
+          <p className="text-sm text-neutral-500 mb-4">
+            Allow members to submit multiple sets of predictions. Each entry is scored independently.
+          </p>
+
+          <div className="space-y-4">
+            <FormField label="Max Entries Per Member">
+              <div className="flex">
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setMaxEntries(String(n))}
+                    className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
+                      parseInt(maxEntries) === n
+                        ? 'bg-primary-500 text-white border-primary-500 z-10'
+                        : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </FormField>
+
+            {parseInt(maxEntries) > 1 && (
+              <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
+                <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                </svg>
+                <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
+                  Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Danger Zone ── */}
+        <Card className="border border-danger-200">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-danger-500 mb-4">
+            Danger Zone
+          </h3>
+
+          <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
+            {/* Archive */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-semibold text-neutral-900">Archive Pool</h4>
+                <p className="text-sm text-neutral-500">Preserve data but prevent new activity.</p>
+              </div>
+              <Button variant="warning" size="sm" className="shrink-0 w-20" onClick={() => setShowArchiveModal(true)}>
+                Archive
+              </Button>
             </div>
-            <Button variant="danger" size="sm" className="shrink-0 w-20" onClick={() => setShowDeleteModal(true)}>
-              Delete
+
+            {/* Divider - desktop only */}
+            <div className="hidden sm:block absolute inset-y-0 left-1/2 w-px bg-neutral-200" />
+
+            {/* Delete */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-semibold text-neutral-900">Delete Pool</h4>
+                <p className="text-sm text-neutral-500">Permanently delete this pool and all data.</p>
+              </div>
+              <Button variant="danger" size="sm" className="shrink-0 w-20" onClick={() => setShowDeleteModal(true)}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ── Sticky save bar ── */}
+      {hasChanges && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+          <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
+            <p className="text-sm text-neutral-600">You have unsaved changes</p>
+            <Button
+              onClick={handleSaveAll}
+              loading={saving}
+              loadingText="Saving..."
+            >
+              Save Changes
             </Button>
           </div>
         </div>
-      </Card>
+      )}
 
       {/* Archive Confirmation Modal */}
       {showArchiveModal && (
