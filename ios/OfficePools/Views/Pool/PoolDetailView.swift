@@ -163,8 +163,8 @@ struct PoolDetailView: View {
                         .frame(width: 60, height: 60)
                         .background(
                             Circle()
-                                .fill(Color.accentColor)
-                                .shadow(color: Color.accentColor.opacity(banterPulse ? 0.8 : 0.4), radius: banterGlowRadius, y: 6)
+                                .fill(AppColors.primary500)
+                                .shadow(color: AppColors.primary500.opacity(banterPulse ? 0.8 : 0.4), radius: banterGlowRadius, y: 6)
                         )
                         .overlay(
                             Circle()
@@ -180,7 +180,7 @@ struct PoolDetailView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.red, in: Capsule())
+                            .background(AppColors.error500, in: Capsule())
                             .offset(x: 4, y: -4)
                             .transition(.scale.combined(with: .opacity))
                     }
