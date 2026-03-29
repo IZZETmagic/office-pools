@@ -117,38 +117,21 @@ struct GroupStageView: View {
                 VStack(spacing: 8) {
                     // Match prediction rows — each in its own card
                     ForEach(Array(matches.enumerated()), id: \.element.id) { index, match in
-                        let pred = viewModel.predictions[match.matchId]
-                        let isMatchComplete = pred?.homeScore != nil && pred?.awayScore != nil
                         let nextMatchId = index + 1 < matches.count ? matches[index + 1].matchId : nil
 
-                        MatchPredictionRow(
+                        MatchCardView(
                             match: match,
-                            isKnockout: false,
-                            prediction: pred,
-                            saveStatus: viewModel.saveStatus,
-                            onScoreUpdate: { home, away in
-                                viewModel.updateScore(matchId: match.matchId, homeScore: home, awayScore: away)
-                            },
-                            onPsoUpdate: { _, _ in },
+                            viewModel: viewModel,
                             readOnly: readOnly,
                             focusedField: readOnly ? nil : $focusedField,
                             onAwayScoreEntered: {
                                 if let nextMatchId {
                                     focusedField = .home(nextMatchId)
                                 } else {
-                                    focusedField = nil // last match in group — dismiss keyboard
+                                    focusedField = nil
                                 }
                             }
                         )
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(isMatchComplete
-                                    ? Color.accentColor.opacity(0.06)
-                                    : Color(.secondarySystemGroupedBackground))
-                        )
-                        .padding(.horizontal, 10)
                         .id("match_\(match.matchId)")
                     }
 
@@ -171,5 +154,66 @@ struct GroupStageView: View {
                 .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
         )
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Match Card with Pulse Animation
+
+/// Wraps a MatchPredictionRow in a card that pulses blue when completed.
+private struct MatchCardView: View {
+    let match: Match
+    @Bindable var viewModel: PredictionEditViewModel
+    var readOnly: Bool
+    var focusedField: FocusState<ScoreFieldID?>.Binding?
+    var onAwayScoreEntered: (() -> Void)?
+
+    @State private var pulseOpacity: Double = 0.06
+    @State private var wasComplete = false
+
+    private var isMatchComplete: Bool {
+        guard let pred = viewModel.predictions[match.matchId] else { return false }
+        return pred.homeScore != nil && pred.awayScore != nil
+    }
+
+    var body: some View {
+        MatchPredictionRow(
+            match: match,
+            isKnockout: false,
+            prediction: viewModel.predictions[match.matchId],
+            saveStatus: viewModel.saveStatus,
+            onScoreUpdate: { home, away in
+                viewModel.updateScore(matchId: match.matchId, homeScore: home, awayScore: away)
+            },
+            onPsoUpdate: { _, _ in },
+            readOnly: readOnly,
+            focusedField: focusedField,
+            onAwayScoreEntered: onAwayScoreEntered
+        )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isMatchComplete
+                    ? Color.accentColor.opacity(pulseOpacity)
+                    : Color(.secondarySystemGroupedBackground))
+        )
+        .padding(.horizontal, 10)
+        .onChange(of: isMatchComplete) { oldVal, newVal in
+            if newVal && !oldVal {
+                // Just became complete — single pulse
+                withAnimation(.easeIn(duration: 0.2)) {
+                    pulseOpacity = 0.18
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        pulseOpacity = 0.06
+                    }
+                }
+                wasComplete = true
+            } else if !newVal {
+                pulseOpacity = 0.06
+                wasComplete = false
+            }
+        }
     }
 }
