@@ -21,7 +21,6 @@ struct MembersTabView: View {
                         }
                     }
                 }
-                .padding(.top, 8)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
