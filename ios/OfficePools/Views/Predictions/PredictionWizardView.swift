@@ -110,8 +110,8 @@ struct PredictionWizardView: View {
                             }
                         }
                         .padding(.horizontal)
-                        .padding(.top, 14)
-                        .padding(.bottom, 10)
+                        .padding(.top, 18)
+                        .padding(.bottom, 16)
                     }
 
                     stageContent
