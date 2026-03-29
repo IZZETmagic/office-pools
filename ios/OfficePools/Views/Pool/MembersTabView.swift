@@ -5,6 +5,7 @@ struct MembersTabView: View {
     let leaderboardData: [LeaderboardEntryData]
     let currentUserId: String
     let poolService: PoolService
+    @Binding var showingSearch: Bool
 
     @State private var searchText = ""
 
@@ -28,29 +29,37 @@ struct MembersTabView: View {
             }
             .background(Color(.systemGroupedBackground))
             .safeAreaInset(edge: .top, spacing: 0) {
-                // Sticky search pill
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("Search members...", text: $searchText)
-                        .font(.caption)
-                        .textFieldStyle(.plain)
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
+                if showingSearch {
+                    // Sticky search pill
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("Search members...", text: $searchText)
+                            .font(.caption)
+                            .textFieldStyle(.plain)
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .modifier(LiquidGlassCapsule())
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
-                .modifier(LiquidGlassCapsule())
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+            }
+            .onChange(of: showingSearch) { _, showing in
+                if !showing {
+                    searchText = ""
+                }
             }
     }
 
