@@ -210,27 +210,14 @@ private struct PredictionMatchCard: View {
     private func triggerHeartbeatPulse() {
         isPulsing = true
 
-        // Beat 1 — lub
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(.easeOut(duration: 0.25)) {
             blueOpacity = 0.18
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(.easeIn(duration: 0.15)) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeIn(duration: 0.4)) {
                 blueOpacity = 0.06
             }
-        }
-
-        // Beat 2 — dub (softer)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation(.easeOut(duration: 0.2)) {
-                blueOpacity = 0.13
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
-            withAnimation(.easeIn(duration: 0.35)) {
-                blueOpacity = 0.06
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                 isPulsing = false
             }
         }
