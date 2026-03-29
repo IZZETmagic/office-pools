@@ -249,16 +249,20 @@ struct ResultsTabView<HeaderContent: View>: View {
 
                 // Sticky header + filter bar floating on top with glass
                 VStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        if hasHeader {
-                            VStack(spacing: 0) {
-                                headerContent
-                            }
-                            .frame(maxWidth: .infinity)
-                            .background(.ultraThinMaterial)
+                    // Title row with glass background
+                    if hasHeader {
+                        VStack(spacing: 0) {
+                            headerContent
                         }
-                        filterBar
+                        .frame(maxWidth: .infinity)
+                        .background(.ultraThinMaterial)
                     }
+
+                    // Filter pills (transparent, below glass)
+                    filterBar
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+
                     Spacer()
                 }
                 .allowsHitTesting(true)
@@ -356,10 +360,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
         }
-        .background(.ultraThinMaterial)
     }
 
     private func pillLabel(for mode: FilterMode) -> String {
