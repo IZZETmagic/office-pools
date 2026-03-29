@@ -211,7 +211,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                                     .padding(.horizontal)
                                 }
                             }
-                            .padding(.top, hasHeader ? 100 : 44)
+                            .padding(.top, hasHeader ? 100 : 52)
                             .padding(.bottom, 16)
                         }
                         .background(Color(.systemGroupedBackground))
