@@ -7,8 +7,6 @@ struct ScoringRulesTabView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                Spacer().frame(height: 4)
-
                 if let settings {
                     groupStageCard(settings)
                     knockoutStageCard(settings)
@@ -29,6 +27,7 @@ struct ScoringRulesTabView: View {
                     )
                 }
             }
+            .padding(.top, 8)
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
