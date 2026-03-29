@@ -29,6 +29,7 @@ struct PoolDetailView: View {
     let authService: AuthService
     var onPoolDeleted: ((String) -> Void)?  // poolId
     @State private var selectedTab: PoolTab? = .leaderboard
+    @State private var showingEntryDetail = false
     @State private var predictionsViewModel: PredictionsViewModel?
     @State private var tabBarHeight: CGFloat = 40
     @State private var showingBanter = false
@@ -203,17 +204,6 @@ struct PoolDetailView: View {
                 adminCount: viewModel.members.filter(\.isAdmin).count
             )
         }
-        .navigationDestination(for: Entry.self) { entry in
-            EntryPredictionView(
-                entry: entry,
-                poolId: viewModel.poolId,
-                matches: viewModel.matches,
-                teams: viewModel.teams,
-                pool: viewModel.pool,
-                computedPoints: viewModel.displayPoints(for: entry.entryId),
-                selectedEntry: Bindable(viewModel).selectedEntry
-            )
-        }
         .sheet(isPresented: $showingBanter) {
             if let banterVM = banterViewModel {
                 BanterFullScreenView(
@@ -351,7 +341,8 @@ struct PoolDetailView: View {
                             if let userId = authService.appUser?.userId {
                                 await viewModel.load(userId: userId)
                             }
-                        }
+                        },
+                        showingEntryDetail: $showingEntryDetail
                     )
                 } else {
                     ProgressView("Loading...")
