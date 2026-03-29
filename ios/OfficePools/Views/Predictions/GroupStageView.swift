@@ -167,7 +167,9 @@ private struct PredictionMatchCard: View {
     var focusedField: FocusState<ScoreFieldID?>.Binding?
     var onAwayScoreEntered: (() -> Void)?
 
-    @State private var showPulse = false
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var pulseGlow: Double = 0.0
+    @State private var isPulsing = false
 
     private var isMatchComplete: Bool {
         guard let pred = viewModel.predictions[match.matchId] else { return false }
@@ -198,18 +200,50 @@ private struct PredictionMatchCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.white.opacity(showPulse ? 0.3 : 0))
+                .fill(Color.accentColor.opacity(pulseGlow))
                 .allowsHitTesting(false)
         )
+        .scaleEffect(pulseScale)
+        .shadow(color: Color.accentColor.opacity(pulseGlow * 3), radius: pulseGlow > 0 ? 8 : 0)
         .padding(.horizontal, 10)
         .onChange(of: isMatchComplete) { oldVal, newVal in
-            if newVal && !oldVal {
-                // Flash white overlay then fade out
-                showPulse = true
-                withAnimation(.easeOut(duration: 0.6)) {
-                    showPulse = false
-                }
+            if newVal && !oldVal && !isPulsing {
+                triggerHeartbeatPulse()
             }
         }
+    }
+
+    private func triggerHeartbeatPulse() {
+        isPulsing = true
+
+        // Beat 1 — quick thump
+        withAnimation(.easeOut(duration: 0.15)) {
+            pulseScale = 1.03
+            pulseGlow = 0.04
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeIn(duration: 0.12)) {
+                pulseScale = 1.0
+                pulseGlow = 0.0
+            }
+        }
+
+        // Beat 2 — slightly softer echo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
+            withAnimation(.easeOut(duration: 0.18)) {
+                pulseScale = 1.02
+                pulseGlow = 0.03
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.56) {
+            withAnimation(.easeIn(duration: 0.25)) {
+                pulseScale = 1.0
+                pulseGlow = 0.0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isPulsing = false
+            }
+        }
+    }
     }
 }
