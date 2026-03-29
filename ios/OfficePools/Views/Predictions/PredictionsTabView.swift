@@ -466,8 +466,8 @@ struct PredictionFullScreenView: View {
                 HStack {
                     Button(action: onClose) {
                         Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                            .frame(width: 36, height: 36)
+                            .font(.caption.weight(.bold))
+                            .frame(width: 32, height: 32)
                             .background(.ultraThinMaterial, in: Circle())
                     }
 
@@ -480,7 +480,7 @@ struct PredictionFullScreenView: View {
 
                     // Invisible balance element
                     Color.clear
-                        .frame(width: 36, height: 36)
+                        .frame(width: 32, height: 32)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
