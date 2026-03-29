@@ -453,10 +453,8 @@ struct PoolSettingsTabView: View {
         editMaxEntries = pool.maxEntriesPerUser
         editMaxParticipants = pool.maxParticipants ?? 0
         if let deadline = pool.predictionDeadline {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let parsed = formatter.date(from: deadline) ?? Date()
-            editDeadline = parsed
+            let parsed = parseISO8601(deadline)
+            editDeadline = parsed ?? Date()
             savedDeadline = parsed
         } else {
             savedDeadline = nil
@@ -597,10 +595,16 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    private func deadlineCountdown(_ iso: String) -> String {
+    private func parseISO8601(_ string: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = formatter.date(from: iso) else { return "" }
+        if let date = formatter.date(from: string) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+
+    private func deadlineCountdown(_ iso: String) -> String {
+        guard let date = parseISO8601(iso) else { return "" }
         let now = Date()
         if date < now { return "Deadline passed" }
         let diff = Calendar.current.dateComponents([.day, .hour], from: now, to: date)
