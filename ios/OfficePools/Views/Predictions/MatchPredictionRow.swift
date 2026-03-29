@@ -231,11 +231,11 @@ struct MatchPredictionRow: View {
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    scoreField(text: $homePsoText, onChange: handlePsoChange)
+                    scoreField(text: $homePsoText, fieldId: .home("\(match.matchId)_pso"), onChange: handlePsoChange, autoAdvanceTo: .away("\(match.matchId)_pso"))
                     Text("-")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    scoreField(text: $awayPsoText, onChange: handlePsoChange)
+                    scoreField(text: $awayPsoText, fieldId: .away("\(match.matchId)_pso"), onChange: handlePsoChange, autoAdvanceTo: nil)
                 }
             }
             .padding(.horizontal, 12)
