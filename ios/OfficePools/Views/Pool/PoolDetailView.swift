@@ -38,7 +38,6 @@ struct PoolDetailView: View {
     @State private var banterGlowRadius: CGFloat = 12
     @State private var banterSquishY: CGFloat = 1.0
     @State private var banterSquishX: CGFloat = 1.0
-    @State private var showingMemberSearch = false
 
     private func triggerBanterJelly() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -196,25 +195,6 @@ struct PoolDetailView: View {
         mainContent
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if selectedTab == .members {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showingMemberSearch.toggle()
-                        }
-                    } label: {
-                        Image(systemName: showingMemberSearch ? "xmark" : "magnifyingglass")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                }
-            }
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            if newTab != .members {
-                showingMemberSearch = false
-            }
-        }
         .navigationDestination(for: Member.self) { member in
             MemberDetailView(
                 member: member,
@@ -407,8 +387,7 @@ struct PoolDetailView: View {
                     members: viewModel.members,
                     leaderboardData: viewModel.leaderboardData,
                     currentUserId: viewModel.currentUserId ?? "",
-                    poolService: PoolService(),
-                    showingSearch: $showingMemberSearch
+                    poolService: PoolService()
                 )
 
             case .settings:

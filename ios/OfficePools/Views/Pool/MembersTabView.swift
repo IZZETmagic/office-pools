@@ -5,9 +5,6 @@ struct MembersTabView: View {
     let leaderboardData: [LeaderboardEntryData]
     let currentUserId: String
     let poolService: PoolService
-    @Binding var showingSearch: Bool
-
-    @State private var searchText = ""
 
     var body: some View {
         ScrollView {
@@ -16,7 +13,7 @@ struct MembersTabView: View {
                     card {
                         sectionHeader("\(members.count) Members")
 
-                        ForEach(Array(filteredMembers.enumerated()), id: \.element.id) { index, member in
+                        ForEach(Array(sortedMembers.enumerated()), id: \.element.id) { index, member in
                             NavigationLink(value: member) {
                                 memberRow(member)
                             }
@@ -28,55 +25,16 @@ struct MembersTabView: View {
                 .padding(.bottom, 24)
             }
             .background(Color(.systemGroupedBackground))
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if showingSearch {
-                    // Sticky search pill
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("Search members...", text: $searchText)
-                            .font(.caption)
-                            .textFieldStyle(.plain)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 12)
-                    .modifier(LiquidGlassCapsule())
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .onChange(of: showingSearch) { _, showing in
-                if !showing {
-                    searchText = ""
-                }
-            }
     }
 
     // MARK: - Filtered Members
 
-    private var filteredMembers: [Member] {
-        let sorted = members.sorted { a, b in
+    private var sortedMembers: [Member] {
+        members.sorted { a, b in
             let aPoints = memberBestPoints(a)
             let bPoints = memberBestPoints(b)
             if aPoints != bPoints { return aPoints > bPoints }
             return a.users.fullName < b.users.fullName
-        }
-        if searchText.isEmpty { return sorted }
-        let query = searchText.lowercased()
-        return sorted.filter {
-            $0.users.username.lowercased().contains(query)
-            || $0.users.fullName.lowercased().contains(query)
         }
     }
 
@@ -159,19 +117,5 @@ struct MembersTabView: View {
             .filter { entryIds.contains($0.entryId) }
             .map(\.totalPoints)
             .max() ?? 0
-    }
-}
-
-// MARK: - Liquid Glass Modifier
-
-private struct LiquidGlassCapsule: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-        }
     }
 }
