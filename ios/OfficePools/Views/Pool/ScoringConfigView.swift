@@ -243,12 +243,16 @@ struct ScoringConfigView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 TextField("0", value: value, format: .number)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .font(.subheadline.weight(.bold))
-                    .frame(width: 60)
+                    .frame(width: 64)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 Text("pts")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -262,7 +266,7 @@ struct ScoringConfigView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text("×")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
@@ -270,7 +274,11 @@ struct ScoringConfigView: View {
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .font(.subheadline.weight(.bold))
-                    .frame(width: 50)
+                    .frame(width: 54)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }
