@@ -118,10 +118,10 @@ struct PointsBreakdownView: View {
 
     private var rankColor: Color {
         switch rank {
-        case 1: return .yellow
-        case 2: return .gray
-        case 3: return .orange
-        default: return .blue
+        case 1: return AppColors.accent300
+        case 2: return AppColors.neutral400
+        case 3: return AppColors.bronze
+        default: return AppColors.primary500
         }
     }
 
@@ -130,12 +130,12 @@ struct PointsBreakdownView: View {
     private func summaryCards(_ summary: BreakdownSummary, adjustment: Int) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                summaryCell(title: "Match", value: "\(summary.matchPoints)", color: .blue)
+                summaryCell(title: "Match", value: "\(summary.matchPoints)", color: AppColors.xpMatch)
                 verticalDivider
-                summaryCell(title: "Bonus", value: "\(summary.bonusPoints)", color: .green)
+                summaryCell(title: "Bonus", value: "\(summary.bonusPoints)", color: AppColors.xpBonus)
                 if adjustment != 0 {
                     verticalDivider
-                    summaryCell(title: "Adj.", value: "\(adjustment)", color: .orange)
+                    summaryCell(title: "Adj.", value: "\(adjustment)", color: AppColors.warning600)
                 }
                 verticalDivider
                 summaryCell(title: "Total", value: "\(summary.totalPoints)", color: .primary, bold: true)
@@ -200,8 +200,8 @@ struct PointsBreakdownView: View {
                         .font(.caption2.weight(.bold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.blue.opacity(0.12))
-                        .foregroundStyle(.blue)
+                        .background(AppColors.primary500.opacity(0.12))
+                        .foregroundStyle(AppColors.primary600)
                         .clipShape(Capsule())
                 }
 
@@ -209,17 +209,17 @@ struct PointsBreakdownView: View {
 
                 Text("\(stageTotal) pts")
                     .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppColors.primary500)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
             // Summary pills
             HStack(spacing: 6) {
-                if exactCount > 0 { countPill("\(exactCount) Exact", color: .green) }
-                if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: .blue) }
-                if winnerCount > 0 { countPill("\(winnerCount) Winner", color: .orange) }
-                if missCount > 0 { countPill("\(missCount) Miss", color: Color(.systemGray3)) }
+                if exactCount > 0 { countPill("\(exactCount) Exact", color: AppColors.tierExact) }
+                if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: AppColors.tierWinnerGd) }
+                if winnerCount > 0 { countPill("\(winnerCount) Winner", color: AppColors.tierWinner) }
+                if missCount > 0 { countPill("\(missCount) Miss", color: AppColors.neutral400) }
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -296,7 +296,7 @@ struct PointsBreakdownView: View {
                 // Points
                 Text(result.totalPoints > 0 ? "+\(result.totalPoints)" : "0")
                     .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundStyle(result.totalPoints > 0 ? .green : Color(.systemGray4))
+                    .foregroundStyle(result.totalPoints > 0 ? AppColors.success600 : AppColors.neutral300)
             }
 
             // Second line: predicted teams (only when they differ)
@@ -304,11 +304,11 @@ struct PointsBreakdownView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 8))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppColors.warning600)
 
                     Text("You predicted: \(result.predictedHomeTeam!) v \(result.predictedAwayTeam!)")
                         .font(.system(size: 10))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppColors.warning600)
                 }
                 .padding(.leading, 60)
             }
@@ -350,7 +350,7 @@ struct PointsBreakdownView: View {
                 Spacer()
                 Text("\(subtotal) pts")
                     .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.green)
+                    .foregroundStyle(AppColors.xpBonus)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -364,7 +364,7 @@ struct PointsBreakdownView: View {
                     Spacer()
                     Text("+\(entry.pointsEarned)")
                         .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.xpBonus)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
@@ -461,7 +461,7 @@ struct PointsBreakdownView: View {
             Spacer()
             Text("\(String(format: "%.1f", multiplier))x")
                 .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppColors.primary600)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -517,11 +517,11 @@ struct PointsBreakdownView: View {
 
     private func typeColor(_ type: String) -> Color {
         switch type {
-        case "exact": return .green
-        case "winner_gd": return .blue
-        case "winner": return .orange
-        case "miss": return Color(.systemGray3)
-        default: return .gray
+        case "exact": return AppColors.tierExact
+        case "winner_gd": return AppColors.tierWinnerGd
+        case "winner": return AppColors.tierWinner
+        case "miss": return AppColors.neutral400
+        default: return AppColors.neutral400
         }
     }
 
