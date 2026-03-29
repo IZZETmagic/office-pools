@@ -66,7 +66,7 @@ struct LeaderboardTabView: View {
         HStack(spacing: 8) {
             Image(systemName: "star.fill")
                 .font(.title3)
-                .foregroundStyle(.yellow)
+                .foregroundStyle(AppColors.accent400)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Matchday MVP")
                     .font(.caption.weight(.semibold))
@@ -86,13 +86,13 @@ struct LeaderboardTabView: View {
     private var podiumView: some View {
         HStack(alignment: .bottom, spacing: 8) {
             // 2nd place
-            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: .gray)
+            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: AppColors.neutral400)
 
             // 1st place
-            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: .yellow)
+            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: AppColors.accent300)
 
             // 3rd place
-            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: .orange)
+            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: AppColors.bronze)
         }
         .padding(.top, 8)
     }
@@ -130,7 +130,7 @@ struct LeaderboardTabView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(delta > 0 ? Color.green : Color.red)
+                    .background(delta > 0 ? AppColors.success500 : AppColors.error500)
                     .clipShape(Capsule())
                     .offset(x: 22, y: 20)
                 }
@@ -146,7 +146,7 @@ struct LeaderboardTabView: View {
                                 .font(.system(size: 9))
                                 .foregroundStyle(.white)
                                 .padding(5)
-                                .background(podiumAwardColor(for: award.type))
+                                .background(awardColor(for: award.type))
                                 .clipShape(Circle())
                                 .rotationEffect(.degrees(fanAngle))
                                 .offset(x: xOffset - Double(entryAwards.count - 1) * 3)
@@ -183,7 +183,7 @@ struct LeaderboardTabView: View {
             VStack(spacing: 4) {
                 Text("\(entry.totalPoints)")
                     .font(.title3.weight(.black).monospacedDigit())
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppColors.primary500)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
                     .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
@@ -224,22 +224,22 @@ struct LeaderboardTabView: View {
         }
     }
 
-    private func podiumAwardColor(for type: String) -> Color {
+    private func awardColor(for type: String) -> Color {
         switch type {
-        case "mvp": return .orange
-        case "contrarian": return .purple
-        case "crowd": return .blue
-        case "hot": return .red
-        case "cold": return .cyan
-        default: return .gray
+        case "mvp": return AppColors.accent500
+        case "contrarian": return AppColors.primary700
+        case "crowd": return AppColors.primary500
+        case "hot": return AppColors.error500
+        case "cold": return AppColors.primary300
+        default: return AppColors.neutral500
         }
     }
 
     private func pedestalColors(for rank: Int) -> [Color] {
         switch rank {
-        case 1: return [.yellow.opacity(0.3), .yellow.opacity(0.1), .yellow.opacity(0.05)]
-        case 2: return [.gray.opacity(0.25), .gray.opacity(0.1), .gray.opacity(0.05)]
-        case 3: return [.orange.opacity(0.25), .orange.opacity(0.1), .orange.opacity(0.05)]
+        case 1: return [AppColors.accent300.opacity(0.3), AppColors.accent300.opacity(0.1), AppColors.accent300.opacity(0.05)]
+        case 2: return [AppColors.neutral400.opacity(0.25), AppColors.neutral400.opacity(0.1), AppColors.neutral400.opacity(0.05)]
+        case 3: return [AppColors.bronze.opacity(0.25), AppColors.bronze.opacity(0.1), AppColors.bronze.opacity(0.05)]
         default: return [.clear]
         }
     }
@@ -248,10 +248,10 @@ struct LeaderboardTabView: View {
 
     private var legendView: some View {
         HStack(spacing: 12) {
-            legendDot(color: .yellow, label: "Exact")
-            legendDot(color: .green, label: "W+GD")
-            legendDot(color: .blue, label: "Winner")
-            legendDot(color: .red, label: "Miss")
+            legendDot(color: AppColors.tierExact, label: "Exact")
+            legendDot(color: AppColors.tierWinnerGd, label: "W+GD")
+            legendDot(color: AppColors.tierWinner, label: "Winner")
+            legendDot(color: AppColors.error500, label: "Miss")
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
@@ -294,7 +294,7 @@ struct LeaderboardTabView: View {
                         Text("\(abs(delta))")
                             .font(.system(size: 9, weight: .bold).monospacedDigit())
                     }
-                    .foregroundStyle(delta > 0 ? .green : .red)
+                    .foregroundStyle(delta > 0 ? AppColors.success500 : AppColors.error500)
                 }
             }
             .frame(width: 36)
@@ -312,8 +312,8 @@ struct LeaderboardTabView: View {
                             .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.blue.opacity(0.15))
-                            .foregroundStyle(.blue)
+                            .background(AppColors.primary500.opacity(0.15))
+                            .foregroundStyle(AppColors.primary600)
                             .clipShape(Capsule())
                     }
                 }
@@ -350,7 +350,7 @@ struct LeaderboardTabView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(entry.totalPoints)")
                     .font(.headline.weight(.black).monospacedDigit())
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppColors.primary500)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
                     .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
@@ -372,11 +372,11 @@ struct LeaderboardTabView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isCurrent ? Color.blue.opacity(0.06) : Color(.systemBackground))
+                .fill(isCurrent ? AppColors.primary500.opacity(0.06) : Color(.systemBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isCurrent ? Color.blue.opacity(0.3) : Color(.separator).opacity(0.3), lineWidth: isCurrent ? 1.5 : 0.5)
+                .stroke(isCurrent ? AppColors.primary500.opacity(0.3) : Color(.separator).opacity(0.3), lineWidth: isCurrent ? 1.5 : 0.5)
         )
         }
         .buttonStyle(.plain)
@@ -384,9 +384,9 @@ struct LeaderboardTabView: View {
 
     private func rankColor(_ rank: Int) -> Color {
         switch rank {
-        case 1: return .yellow
-        case 2: return .gray
-        case 3: return .orange
+        case 1: return AppColors.accent300
+        case 2: return AppColors.neutral400
+        case 3: return AppColors.bronze
         default: return .primary
         }
     }
@@ -410,7 +410,7 @@ struct LeaderboardTabView: View {
                             .multilineTextAlignment(.center)
                         Text(superlative.name)
                             .font(.caption2.weight(.medium))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(AppColors.primary600)
                             .lineLimit(1)
                         Text(superlative.detail)
                             .font(.caption2)
@@ -441,14 +441,14 @@ struct LeaderboardTabView: View {
 
     private func superlativeColor(for type: String) -> Color {
         switch type {
-        case "hot": return .red
-        case "cold": return .blue
-        case "contrarian": return .purple
-        case "crowd": return .blue
-        case "sharpshooter": return .orange
-        case "climber": return .green
-        case "faller": return .red
-        default: return .yellow
+        case "hot": return AppColors.error500
+        case "cold": return AppColors.primary400
+        case "contrarian": return AppColors.primary700
+        case "crowd": return AppColors.primary500
+        case "sharpshooter": return AppColors.accent500
+        case "climber": return AppColors.success500
+        case "faller": return AppColors.error500
+        default: return AppColors.accent400
         }
     }
 
@@ -525,10 +525,10 @@ struct FormDotsView: View {
                 HStack(spacing: 1) {
                     Image(systemName: streak.type == "hot" ? "flame.fill" : "snowflake")
                         .font(.system(size: 9))
-                        .foregroundStyle(streak.type == "hot" ? .red : .blue)
+                        .foregroundStyle(streak.type == "hot" ? AppColors.hotStreak : AppColors.coldStreak)
                     Text("\(streak.length)")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(streak.type == "hot" ? .red : .blue)
+                        .foregroundStyle(streak.type == "hot" ? AppColors.hotStreak : AppColors.coldStreak)
                 }
                 .opacity(visibleCount >= results.count ? 1 : 0)
                 .animation(.easeIn(duration: 0.3).delay(0.15 + Double(results.count) * 0.12), value: visibleCount)
@@ -541,12 +541,12 @@ struct FormDotsView: View {
 
     private func dotColor(for result: String) -> Color {
         switch result {
-        case "exact": return .yellow
-        case "winner_gd": return .green
-        case "winner": return .blue
-        case "miss": return .red
-        case "no_pick": return Color(.systemGray4)
-        default: return Color(.systemGray4)
+        case "exact": return AppColors.tierExact
+        case "winner_gd": return AppColors.tierWinnerGd
+        case "winner": return AppColors.tierWinner
+        case "miss": return AppColors.error500
+        case "no_pick": return AppColors.neutral300
+        default: return AppColors.neutral300
         }
     }
 }
@@ -567,20 +567,20 @@ struct LevelPillView: View {
 
     private var pillBackground: Color {
         switch level {
-        case 10: return .yellow
-        case 8...9: return .orange.opacity(0.15)
-        case 6...7: return .yellow.opacity(0.15)
-        case 4...5: return .blue.opacity(0.15)
-        default: return Color(.systemGray5)
+        case 10: return AppColors.accent400
+        case 8...9: return AppColors.warning500.opacity(0.15)
+        case 6...7: return AppColors.primary600.opacity(0.15)
+        case 4...5: return AppColors.primary400.opacity(0.15)
+        default: return AppColors.neutral200
         }
     }
 
     private var pillForeground: Color {
         switch level {
         case 10: return .white
-        case 8...9: return .orange
-        case 6...7: return .orange
-        case 4...5: return .blue
+        case 8...9: return AppColors.warning600
+        case 6...7: return AppColors.primary600
+        case 4...5: return AppColors.primary500
         default: return .secondary
         }
     }
@@ -616,22 +616,22 @@ struct AwardBadgeView: View {
 
     private var badgeBackground: Color {
         switch award.type {
-        case "mvp": return .yellow.opacity(0.15)
-        case "contrarian": return .purple.opacity(0.15)
-        case "crowd": return .blue.opacity(0.15)
-        case "hot": return .red.opacity(0.15)
-        case "cold": return .cyan.opacity(0.15)
-        default: return Color(.systemGray5)
+        case "mvp": return AppColors.accent400.opacity(0.15)
+        case "contrarian": return AppColors.primary700.opacity(0.15)
+        case "crowd": return AppColors.primary500.opacity(0.15)
+        case "hot": return AppColors.error500.opacity(0.15)
+        case "cold": return AppColors.primary300.opacity(0.15)
+        default: return AppColors.neutral200
         }
     }
 
     private var badgeForeground: Color {
         switch award.type {
-        case "mvp": return .orange
-        case "contrarian": return .purple
-        case "crowd": return .blue
-        case "hot": return .red
-        case "cold": return .cyan
+        case "mvp": return AppColors.accent600
+        case "contrarian": return AppColors.primary700
+        case "crowd": return AppColors.primary600
+        case "hot": return AppColors.error600
+        case "cold": return AppColors.primary400
         default: return .secondary
         }
     }
