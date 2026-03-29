@@ -130,6 +130,8 @@ struct GroupStageView: View {
 
             // Expanded content
             if isExpanded {
+                Divider().padding(.horizontal)
+
                 VStack(spacing: 8) {
                     // Match prediction rows — each in its own card
                     ForEach(Array(matches.enumerated()), id: \.element.id) { index, match in
