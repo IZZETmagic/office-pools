@@ -9,7 +9,7 @@ enum PoolSortOption: String, CaseIterable {
 
 enum PoolStatusFilter: String, CaseIterable {
     case all = "All"
-    case active = "Active"
+    case open = "Open"
     case archived = "Archived"
     case completed = "Completed"
 }
@@ -53,8 +53,8 @@ final class DashboardViewModel {
         // Status filter
         switch statusFilter {
         case .all: break
-        case .active:
-            result = result.filter { $0.pool.status != "archived" && $0.pool.status != "completed" }
+        case .open:
+            result = result.filter { $0.pool.status == "open" }
         case .archived:
             result = result.filter { $0.pool.status == "archived" }
         case .completed:
