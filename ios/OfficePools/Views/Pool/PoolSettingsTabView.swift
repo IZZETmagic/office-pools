@@ -33,7 +33,11 @@ struct PoolSettingsTabView: View {
                 Spacer().frame(height: 4)
 
                 poolCodeCard
-                poolDetailsCard
+                poolNameCard
+                descriptionCard
+                statusCard
+                visibilityCard
+                maxMembersCard
                 deadlineCard
                 entriesCard
                 dangerZoneCard
@@ -176,12 +180,12 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Pool Details (Info + Privacy merged)
+    // MARK: - Pool Name
 
-    private var poolDetailsCard: some View {
+    private var poolNameCard: some View {
         card {
             HStack {
-                sectionHeader("Pool Details")
+                sectionHeader("Pool Name")
                 if let pool {
                     Text(modeLabel(pool.predictionMode))
                         .font(.caption.weight(.semibold))
@@ -192,59 +196,63 @@ struct PoolSettingsTabView: View {
                         .clipShape(Capsule())
                 }
             }
+            TextField("Pool Name", text: $editName)
+                .textFieldStyle(.plain)
+                .font(.body)
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Pool Name")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Pool Name", text: $editName)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                Divider()
+    // MARK: - Description
+
+    private var descriptionCard: some View {
+        card {
+            sectionHeader("Description")
+            TextField("Description (optional)", text: $editDescription, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .lineLimit(2...4)
+        }
+    }
+
+    // MARK: - Status
+
+    private var statusCard: some View {
+        card {
+            sectionHeader("Status")
+            Picker("Status", selection: $editStatus) {
+                Text("Active").tag("active")
+                Text("Closed").tag("closed")
+                Text("Completed").tag("completed")
             }
+            .pickerStyle(.segmented)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Description")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Description (optional)", text: $editDescription, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                    .lineLimit(2...4)
-                Divider()
+            Text(statusDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Visibility
+
+    private var visibilityCard: some View {
+        card {
+            sectionHeader("Visibility")
+            Picker("Visibility", selection: $editIsPrivate) {
+                Text("Public").tag(false)
+                Text("Private").tag(true)
             }
+            .pickerStyle(.segmented)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Status")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("Status", selection: $editStatus) {
-                    Text("Active").tag("active")
-                    Text("Closed").tag("closed")
-                    Text("Completed").tag("completed")
-                }
-                .pickerStyle(.segmented)
+            Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 
-                Text(statusDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+    // MARK: - Max Members
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Pool Visibility")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("Visibility", selection: $editIsPrivate) {
-                    Text("Public").tag(false)
-                    Text("Private").tag(true)
-                }
-                .pickerStyle(.segmented)
-
-                Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
+    private var maxMembersCard: some View {
+        card {
             settingsRow("Max Members", value:
                 HStack(spacing: 4) {
                     TextField("0", value: $editMaxParticipants, format: .number)
