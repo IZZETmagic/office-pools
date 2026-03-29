@@ -167,8 +167,7 @@ private struct PredictionMatchCard: View {
     var focusedField: FocusState<ScoreFieldID?>.Binding?
     var onAwayScoreEntered: (() -> Void)?
 
-    @State private var pulseOpacity: Double = 0.06
-    @State private var wasComplete = false
+    @State private var showPulse = false
 
     private var isMatchComplete: Bool {
         guard let pred = viewModel.predictions[match.matchId] else { return false }
@@ -194,25 +193,22 @@ private struct PredictionMatchCard: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(isMatchComplete
-                    ? Color.accentColor.opacity(pulseOpacity)
+                    ? Color.accentColor.opacity(0.06)
                     : Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(showPulse ? 0.3 : 0))
+                .allowsHitTesting(false)
         )
         .padding(.horizontal, 10)
         .onChange(of: isMatchComplete) { oldVal, newVal in
             if newVal && !oldVal {
-                // Just became complete — single pulse
-                withAnimation(.easeIn(duration: 0.2)) {
-                    pulseOpacity = 0.18
+                // Flash white overlay then fade out
+                showPulse = true
+                withAnimation(.easeOut(duration: 0.6)) {
+                    showPulse = false
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    withAnimation(.easeOut(duration: 0.4)) {
-                        pulseOpacity = 0.06
-                    }
-                }
-                wasComplete = true
-            } else if !newVal {
-                pulseOpacity = 0.06
-                wasComplete = false
             }
         }
     }
