@@ -13,25 +13,24 @@ struct GroupStageView: View {
     var body: some View {
         ScrollViewReader { proxy in
             LazyVStack(spacing: 12) {
-                // Expand All / Collapse All toggle
+                // Expand All / Collapse All — compact, right-aligned
                 if !readOnly {
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                if expandedGroups.count == GROUP_LETTERS.count {
-                                    expandedGroups.removeAll()
-                                } else {
-                                    expandedGroups = Set(GROUP_LETTERS)
-                                }
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            if expandedGroups.count == GROUP_LETTERS.count {
+                                expandedGroups.removeAll()
+                            } else {
+                                expandedGroups = Set(GROUP_LETTERS)
                             }
-                        } label: {
-                            Text(expandedGroups.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(Color.accentColor)
                         }
+                    } label: {
+                        Text(expandedGroups.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.accentColor)
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.horizontal, 20)
+                    .padding(.top, -4)
                 }
 
                 ForEach(GROUP_LETTERS, id: \.self) { letter in
@@ -47,7 +46,8 @@ struct GroupStageView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            .padding(.vertical, 8)
+            .padding(.top, 2)
+            .padding(.bottom, 8)
             .onChange(of: focusedField) { _, newField in
                 guard let newField else { return }
                 let matchId: String
