@@ -67,7 +67,7 @@ struct GroupStageView: View {
                 // In read-only mode, start with all groups collapsed
                 return
             }
-            // Expand first incomplete group by default
+            // Expand first incomplete group and focus first empty field
             for letter in GROUP_LETTERS {
                 let matches = viewModel.matchesForGroup(letter)
                 let allComplete = matches.allSatisfy { match in
@@ -76,10 +76,24 @@ struct GroupStageView: View {
                 }
                 if !allComplete {
                     expandedGroups.insert(letter)
+                    // Find first empty field in this group
+                    for match in matches {
+                        let pred = viewModel.predictions[match.matchId]
+                        if pred?.homeScore == nil {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                focusedField = .home(match.matchId)
+                            }
+                            break
+                        } else if pred?.awayScore == nil {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                focusedField = .away(match.matchId)
+                            }
+                            break
+                        }
+                    }
                     break
                 }
             }
-            // If all groups complete, expand none (user can tap to open)
         }
     }
 
