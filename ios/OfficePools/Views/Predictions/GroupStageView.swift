@@ -167,8 +167,7 @@ private struct PredictionMatchCard: View {
     var focusedField: FocusState<ScoreFieldID?>.Binding?
     var onAwayScoreEntered: (() -> Void)?
 
-    @State private var pulseScale: CGFloat = 1.0
-    @State private var pulseGlow: Double = 0.0
+    @State private var blueOpacity: Double = 0.06
     @State private var isPulsing = false
 
     private var isMatchComplete: Bool {
@@ -195,20 +194,15 @@ private struct PredictionMatchCard: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(isMatchComplete
-                    ? Color.accentColor.opacity(0.06)
+                    ? Color.accentColor.opacity(blueOpacity)
                     : Color(.secondarySystemGroupedBackground))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.accentColor.opacity(pulseGlow))
-                .allowsHitTesting(false)
-        )
-        .scaleEffect(pulseScale)
-        .shadow(color: Color.accentColor.opacity(pulseGlow * 3), radius: pulseGlow > 0 ? 8 : 0)
         .padding(.horizontal, 10)
         .onChange(of: isMatchComplete) { oldVal, newVal in
             if newVal && !oldVal && !isPulsing {
                 triggerHeartbeatPulse()
+            } else if !newVal {
+                blueOpacity = 0.06
             }
         }
     }
@@ -216,31 +210,27 @@ private struct PredictionMatchCard: View {
     private func triggerHeartbeatPulse() {
         isPulsing = true
 
-        // Beat 1 — quick thump
-        withAnimation(.easeOut(duration: 0.15)) {
-            pulseScale = 1.03
-            pulseGlow = 0.04
+        // Beat 1 — lub
+        withAnimation(.easeOut(duration: 0.2)) {
+            blueOpacity = 0.18
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.easeIn(duration: 0.12)) {
-                pulseScale = 1.0
-                pulseGlow = 0.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeIn(duration: 0.15)) {
+                blueOpacity = 0.06
             }
         }
 
-        // Beat 2 — slightly softer echo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-            withAnimation(.easeOut(duration: 0.18)) {
-                pulseScale = 1.02
-                pulseGlow = 0.03
+        // Beat 2 — dub (softer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                blueOpacity = 0.13
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.56) {
-            withAnimation(.easeIn(duration: 0.25)) {
-                pulseScale = 1.0
-                pulseGlow = 0.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
+            withAnimation(.easeIn(duration: 0.35)) {
+                blueOpacity = 0.06
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 isPulsing = false
             }
         }
