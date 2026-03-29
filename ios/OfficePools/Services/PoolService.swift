@@ -467,6 +467,17 @@ final class PoolService {
         return settings.first
     }
 
+    /// Update pool scoring settings
+    func updateSettings(poolId: String, updates: [String: AnyJSON]) async throws {
+        try await supabase
+            .from("pool_settings")
+            .update(updates)
+            .eq("pool_id", value: poolId)
+            .execute()
+        // Invalidate cache so next fetch gets fresh data
+        PoolService.settingsCache.removeValue(forKey: poolId)
+    }
+
     /// Clear the settings cache (e.g. on logout or pull-to-refresh)
     static func clearSettingsCache() {
         settingsCache.removeAll()
