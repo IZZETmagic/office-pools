@@ -454,6 +454,8 @@ struct PredictionFullScreenView: View {
     let onSetupReadOnly: () -> Void
     let onSubmitSuccess: () -> Void
 
+    @State private var dragOffset: CGFloat = 0
+
     var body: some View {
         ZStack {
             // Content fills full screen — scrolls behind header and footer
@@ -467,6 +469,7 @@ struct PredictionFullScreenView: View {
                     Button(action: onClose) {
                         Image(systemName: "chevron.left")
                             .font(.caption.weight(.bold))
+                            .foregroundStyle(.primary)
                             .frame(width: 32, height: 32)
                             .background(.ultraThinMaterial, in: Circle())
                     }
@@ -490,6 +493,23 @@ struct PredictionFullScreenView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
+        .offset(x: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if value.translation.width > 0 {
+                        dragOffset = value.translation.width
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.width > 100 {
+                        onClose()
+                    }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        dragOffset = 0
+                    }
+                }
+        )
     }
 
     @ViewBuilder
