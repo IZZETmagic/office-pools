@@ -28,7 +28,7 @@ struct GroupStageView: View {
                         } label: {
                             Text(expandedGroups.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -93,8 +93,6 @@ struct GroupStageView: View {
             return pred.homeScore != nil && pred.awayScore != nil
         }.count
         let totalCount = matches.count
-        let isGroupComplete = completedCount == totalCount && totalCount > 0
-
         return VStack(spacing: 0) {
             // Header
             Button {
