@@ -213,7 +213,6 @@ struct ResultsTabView<HeaderContent: View>: View {
                                     filterBar
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(.ultraThinMaterial)
                                 }
                             }
                             .padding(.bottom, 16)
