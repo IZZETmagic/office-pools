@@ -142,6 +142,10 @@ final class APIService {
         try await requestVoid("POST", path: "/api/pools/\(poolId)/bracket-picks/calculate")
     }
 
+    func recalculatePool(poolId: String) async throws {
+        try await requestVoid("POST", path: "/api/pools/\(poolId)/recalculate")
+    }
+
     // MARK: - Predictions
 
     struct SaveDraftResponse: Decodable {

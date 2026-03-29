@@ -53,10 +53,46 @@ struct ScoringConfigView: View {
     @State private var bonusBestPlayer = 100
     @State private var bonusTopScorer = 100
 
+    // MARK: - Saved State Snapshot (for change detection after save)
+    @State private var savedGroupExact = 5
+    @State private var savedGroupDiff = 3
+    @State private var savedGroupResult = 1
+    @State private var savedKoExact = 5
+    @State private var savedKoDiff = 3
+    @State private var savedKoResult = 1
+    @State private var savedR32Mult = 1.0
+    @State private var savedR16Mult = 1.0
+    @State private var savedQfMult = 1.5
+    @State private var savedSfMult = 2.0
+    @State private var savedTpMult = 1.5
+    @State private var savedFinalMult = 3.0
+    @State private var savedPsoEnabled = true
+    @State private var savedPsoExact = 100
+    @State private var savedPsoDiff = 75
+    @State private var savedPsoResult = 50
+    @State private var savedBonusWinnerAndRunnerup = 150
+    @State private var savedBonusWinnerOnly = 100
+    @State private var savedBonusRunnerupOnly = 50
+    @State private var savedBonusBothSwapped = 75
+    @State private var savedBonusOneWrongPos = 25
+    @State private var savedBonusAll16 = 75
+    @State private var savedBonus12_15 = 50
+    @State private var savedBonus8_11 = 25
+    @State private var savedBonusBracketPairing = 25
+    @State private var savedBonusMatchWinner = 50
+    @State private var savedBonusChampion = 1000
+    @State private var savedBonusSecondPlace = 25
+    @State private var savedBonusThirdPlace = 25
+    @State private var savedBonusBestPlayer = 100
+    @State private var savedBonusTopScorer = 100
+
     // MARK: - UI State
     @State private var isSaving = false
     @State private var saveMessage: (text: String, isError: Bool)?
     @State private var showResetAlert = false
+    @State private var showSaveSuccess = false
+
+    private let apiService = APIService()
 
     var body: some View {
         ScrollView {
@@ -77,7 +113,7 @@ struct ScoringConfigView: View {
         .navigationTitle("Scoring Configuration")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            if hasChanges {
+            if hasChanges || showSaveSuccess {
                 saveBar
             }
         }
@@ -334,43 +370,77 @@ struct ScoringConfigView: View {
         bonusThirdPlace = s.bonusThirdPlaceCorrect ?? 25
         bonusBestPlayer = s.bonusBestPlayerCorrect ?? 100
         bonusTopScorer = s.bonusTopScorerCorrect ?? 100
+        snapshotSavedState()
+    }
+
+    private func snapshotSavedState() {
+        savedGroupExact = groupExact
+        savedGroupDiff = groupDiff
+        savedGroupResult = groupResult
+        savedKoExact = koExact
+        savedKoDiff = koDiff
+        savedKoResult = koResult
+        savedR32Mult = r32Mult
+        savedR16Mult = r16Mult
+        savedQfMult = qfMult
+        savedSfMult = sfMult
+        savedTpMult = tpMult
+        savedFinalMult = finalMult
+        savedPsoEnabled = psoEnabled
+        savedPsoExact = psoExact
+        savedPsoDiff = psoDiff
+        savedPsoResult = psoResult
+        savedBonusWinnerAndRunnerup = bonusWinnerAndRunnerup
+        savedBonusWinnerOnly = bonusWinnerOnly
+        savedBonusRunnerupOnly = bonusRunnerupOnly
+        savedBonusBothSwapped = bonusBothSwapped
+        savedBonusOneWrongPos = bonusOneWrongPos
+        savedBonusAll16 = bonusAll16
+        savedBonus12_15 = bonus12_15
+        savedBonus8_11 = bonus8_11
+        savedBonusBracketPairing = bonusBracketPairing
+        savedBonusMatchWinner = bonusMatchWinner
+        savedBonusChampion = bonusChampion
+        savedBonusSecondPlace = bonusSecondPlace
+        savedBonusThirdPlace = bonusThirdPlace
+        savedBonusBestPlayer = bonusBestPlayer
+        savedBonusTopScorer = bonusTopScorer
     }
 
     // MARK: - Has Changes
 
     private var hasChanges: Bool {
-        guard let s = settings else { return false }
-        return groupExact != s.groupExactScore
-            || groupDiff != s.groupCorrectDifference
-            || groupResult != s.groupCorrectResult
-            || koExact != s.knockoutExactScore
-            || koDiff != s.knockoutCorrectDifference
-            || koResult != s.knockoutCorrectResult
-            || r32Mult != s.round32Multiplier
-            || r16Mult != s.round16Multiplier
-            || qfMult != s.quarterFinalMultiplier
-            || sfMult != s.semiFinalMultiplier
-            || tpMult != s.thirdPlaceMultiplier
-            || finalMult != s.finalMultiplier
-            || psoEnabled != s.psoEnabled
-            || psoExact != (s.psoExactScore ?? 100)
-            || psoDiff != (s.psoCorrectDifference ?? 75)
-            || psoResult != (s.psoCorrectResult ?? 50)
-            || bonusWinnerAndRunnerup != (s.bonusGroupWinnerAndRunnerup ?? 150)
-            || bonusWinnerOnly != (s.bonusGroupWinnerOnly ?? 100)
-            || bonusRunnerupOnly != (s.bonusGroupRunnerupOnly ?? 50)
-            || bonusBothSwapped != (s.bonusBothQualifySwapped ?? 75)
-            || bonusOneWrongPos != (s.bonusOneQualifiesWrongPosition ?? 25)
-            || bonusAll16 != (s.bonusAll16Qualified ?? 75)
-            || bonus12_15 != (s.bonus12_15Qualified ?? 50)
-            || bonus8_11 != (s.bonus8_11Qualified ?? 25)
-            || bonusBracketPairing != (s.bonusCorrectBracketPairing ?? 25)
-            || bonusMatchWinner != (s.bonusMatchWinnerCorrect ?? 50)
-            || bonusChampion != (s.bonusChampionCorrect ?? 1000)
-            || bonusSecondPlace != (s.bonusSecondPlaceCorrect ?? 25)
-            || bonusThirdPlace != (s.bonusThirdPlaceCorrect ?? 25)
-            || bonusBestPlayer != (s.bonusBestPlayerCorrect ?? 100)
-            || bonusTopScorer != (s.bonusTopScorerCorrect ?? 100)
+        return groupExact != savedGroupExact
+            || groupDiff != savedGroupDiff
+            || groupResult != savedGroupResult
+            || koExact != savedKoExact
+            || koDiff != savedKoDiff
+            || koResult != savedKoResult
+            || r32Mult != savedR32Mult
+            || r16Mult != savedR16Mult
+            || qfMult != savedQfMult
+            || sfMult != savedSfMult
+            || tpMult != savedTpMult
+            || finalMult != savedFinalMult
+            || psoEnabled != savedPsoEnabled
+            || psoExact != savedPsoExact
+            || psoDiff != savedPsoDiff
+            || psoResult != savedPsoResult
+            || bonusWinnerAndRunnerup != savedBonusWinnerAndRunnerup
+            || bonusWinnerOnly != savedBonusWinnerOnly
+            || bonusRunnerupOnly != savedBonusRunnerupOnly
+            || bonusBothSwapped != savedBonusBothSwapped
+            || bonusOneWrongPos != savedBonusOneWrongPos
+            || bonusAll16 != savedBonusAll16
+            || bonus12_15 != savedBonus12_15
+            || bonus8_11 != savedBonus8_11
+            || bonusBracketPairing != savedBonusBracketPairing
+            || bonusMatchWinner != savedBonusMatchWinner
+            || bonusChampion != savedBonusChampion
+            || bonusSecondPlace != savedBonusSecondPlace
+            || bonusThirdPlace != savedBonusThirdPlace
+            || bonusBestPlayer != savedBonusBestPlayer
+            || bonusTopScorer != savedBonusTopScorer
     }
 
     // MARK: - Reset to Defaults
@@ -453,8 +523,18 @@ struct ScoringConfigView: View {
         Task {
             do {
                 try await poolService.updateSettings(poolId: poolId, updates: updates)
-                saveMessage = (text: "Scoring saved", isError: false)
+                snapshotSavedState()
+
+                // Trigger v2 scoring recalculation
+                saveMessage = (text: "Scoring saved. Recalculating points…", isError: false)
+                try await apiService.recalculatePool(poolId: poolId)
+
+                saveMessage = (text: "Scoring saved. Points recalculated.", isError: false)
                 isSaving = false
+                showSaveSuccess = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    showSaveSuccess = false
+                }
             } catch {
                 saveMessage = (text: error.localizedDescription, isError: true)
                 isSaving = false
