@@ -19,12 +19,16 @@ struct ResultsContainerView: View {
                         description: Text(error)
                     )
                 } else {
-                    ResultsTabView(matches: viewModel.matches, headerContent: {
-                        headerBar
-                    })
+                    ResultsTabView(matches: viewModel.matches)
                 }
             }
-            .navigationBarHidden(true)
+            .navigationTitle("Results")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    profileMenu
+                }
+            }
             .task {
                 if let userId = authService.appUser?.userId {
                     await viewModel.loadMatches(userId: userId)
@@ -48,20 +52,6 @@ struct ResultsContainerView: View {
         }
     }
 
-    // MARK: - Header Bar
-
-    private var headerBar: some View {
-        HStack {
-            Text("Results")
-                .font(.title3.bold())
-            Spacer()
-            profileMenu
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-    }
-
     // MARK: - Profile Menu
 
     private var profileMenu: some View {
@@ -82,8 +72,6 @@ struct ResultsContainerView: View {
         } label: {
             Image(systemName: "person.circle")
                 .font(.title3)
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
         }
     }
 }

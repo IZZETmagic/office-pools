@@ -211,7 +211,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                                     .padding(.horizontal)
                                 }
                             }
-                            .padding(.top, hasHeader ? 100 : 52)
+                            .padding(.top, hasHeader ? 100 : 44)
                             .padding(.bottom, 16)
                         }
                         .background(Color(.systemGroupedBackground))
@@ -351,7 +351,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(.ultraThinMaterial, in: Capsule())
-                        .foregroundStyle(filterMode == mode ? Color.accentColor : .primary)
+                        .foregroundStyle(filterMode == mode ? AppColors.primary500 : .primary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -359,16 +359,7 @@ struct ResultsTabView<HeaderContent: View>: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(.systemBackground).opacity(0.7),
-                    Color(.systemBackground).opacity(0.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(.ultraThinMaterial)
     }
 
     private func pillLabel(for mode: FilterMode) -> String {
@@ -565,13 +556,13 @@ struct MatchResultRow: View {
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(.red)
+                        .fill(AppColors.error500)
                         .frame(width: 5, height: 5)
                         .modifier(PulsingModifier())
 
                     Text("LIVE")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error500)
                 }
             }
         } else if isFinished {
@@ -589,7 +580,7 @@ struct MatchResultRow: View {
                 if let homePso = match.homeScorePso, let awayPso = match.awayScorePso {
                     Text("(\(homePso)-\(awayPso) PSO)")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(AppColors.primary600)
                 }
             }
         } else {
