@@ -20,7 +20,6 @@ struct MembersTabView: View {
                                 memberRow(member)
                             }
                             .buttonStyle(.plain)
-
                         }
                     }
                 }
@@ -114,6 +113,7 @@ struct MembersTabView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
     }
 
