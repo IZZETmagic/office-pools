@@ -124,7 +124,7 @@ struct GroupStageView: View {
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
-                .background(Color(.systemGray6))
+                .background(Color(.systemGray5).opacity(0.6))
             }
             .buttonStyle(.plain)
 
