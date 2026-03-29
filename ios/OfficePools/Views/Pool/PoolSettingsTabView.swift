@@ -130,7 +130,7 @@ struct PoolSettingsTabView: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
                 .controlSize(.small)
-                .tint(copiedCode ? .green : .blue)
+                .tint(copiedCode ? AppColors.success500 : AppColors.primary500)
             }
         }
     }
@@ -149,8 +149,8 @@ struct PoolSettingsTabView: View {
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundStyle(.blue)
+                            .background(AppColors.primary500.opacity(0.1))
+                            .foregroundStyle(AppColors.primary600)
                             .clipShape(Capsule())
                     }
                 }
@@ -204,14 +204,14 @@ struct PoolSettingsTabView: View {
             if let pool, pool.predictionMode == .progressive {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary500)
                         .font(.subheadline)
                     Text("Round deadlines are managed separately. This deadline applies to the initial group stage.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(10)
-                .background(Color.blue.opacity(0.06))
+                .background(AppColors.primary500.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
@@ -227,7 +227,7 @@ struct PoolSettingsTabView: View {
                         Text(countdown)
                             .font(.caption)
                     }
-                    .foregroundStyle(countdown.contains("passed") ? .red : .green)
+                    .foregroundStyle(countdown.contains("passed") ? AppColors.error600 : AppColors.success600)
                 }
             }
 
@@ -320,14 +320,14 @@ struct PoolSettingsTabView: View {
             if editMaxEntries > 1 {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary500)
                         .font(.subheadline)
                     Text("Members can create up to \(editMaxEntries) entries (e.g. \"Serious\", \"Fun\"). Each appears as its own row on the leaderboard.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(10)
-                .background(Color.blue.opacity(0.06))
+                .background(AppColors.primary500.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -366,7 +366,7 @@ struct PoolSettingsTabView: View {
                     Text(msg.text)
                 }
                 .font(.caption)
-                .foregroundStyle(msg.isError ? .red : .green)
+                .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
             }
         }
     }
@@ -396,7 +396,7 @@ struct PoolSettingsTabView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.vertical, 4)
-                .foregroundStyle(.orange)
+                .foregroundStyle(AppColors.warning600)
             }
             .buttonStyle(.plain)
 
@@ -426,7 +426,7 @@ struct PoolSettingsTabView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.vertical, 4)
-                .foregroundStyle(.red)
+                .foregroundStyle(AppColors.error600)
             }
             .buttonStyle(.plain)
             .disabled(isDeleting)
@@ -436,7 +436,7 @@ struct PoolSettingsTabView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.red.opacity(0.15), lineWidth: 1)
+                .strokeBorder(AppColors.error500.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
