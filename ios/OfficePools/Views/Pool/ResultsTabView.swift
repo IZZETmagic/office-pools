@@ -169,7 +169,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                 description: Text("Match results will appear here.")
             )
         } else {
-            ZStack(alignment: .top) {
+            Group {
                 if sections.isEmpty {
                     ContentUnavailableView(
                         "No Matches",
@@ -179,47 +179,49 @@ struct ResultsTabView<HeaderContent: View>: View {
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
-                            LazyVStack(spacing: 16) {
-                                ForEach(sections) { section in
-                                    VStack(spacing: 0) {
-                                        // Section header inside card
-                                        Text(section.label)
-                                            .id(section.id)
-                                            .font(.subheadline.weight(.semibold))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 10)
+                            LazyVStack(spacing: 16, pinnedViews: [.sectionHeaders]) {
+                                Section {
+                                    ForEach(sections) { section in
+                                        VStack(spacing: 0) {
+                                            Text(section.label)
+                                                .id(section.id)
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 10)
 
-                                        Divider()
-                                            .padding(.horizontal, 12)
+                                            Divider()
+                                                .padding(.horizontal, 12)
 
-                                        // Matches (with date sub-headers in round mode)
-                                        if filterMode == .round {
-                                            roundMatchesWithDateHeaders(section.matches)
-                                        } else {
-                                            ForEach(section.matches) { match in
-                                                NavigationLink(value: match) {
-                                                    MatchResultRow(match: match)
+                                            if filterMode == .round {
+                                                roundMatchesWithDateHeaders(section.matches)
+                                            } else {
+                                                ForEach(section.matches) { match in
+                                                    NavigationLink(value: match) {
+                                                        MatchResultRow(match: match)
+                                                    }
+                                                    .buttonStyle(.plain)
                                                 }
-                                                .buttonStyle(.plain)
                                             }
                                         }
+                                        .background(Color(.systemBackground))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                                        .padding(.horizontal)
                                     }
-                                    .background(Color(.systemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-                                    .padding(.horizontal)
+                                } header: {
+                                    filterBar
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(.ultraThinMaterial)
                                 }
                             }
-                            .padding(.top, hasHeader ? 100 : 52)
                             .padding(.bottom, 16)
                         }
                         .background(Color(.systemGroupedBackground))
                         .onAppear {
-                            // Delay to let LazyVStack layout complete before scrolling
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                                 if filterMode == .date {
-                                    // Priority 1: Scroll to section containing a live match
                                     if let liveSection = sections.first(where: { section in
                                         section.matches.contains { $0.status == "live" }
                                     }) {
@@ -227,7 +229,6 @@ struct ResultsTabView<HeaderContent: View>: View {
                                             proxy.scrollTo(liveSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
                                         }
                                     }
-                                    // Priority 2: Scroll to section with next scheduled match
                                     else if let nextSection = sections.first(where: { section in
                                         section.matches.contains { $0.status == "scheduled" }
                                     }) {
@@ -235,7 +236,6 @@ struct ResultsTabView<HeaderContent: View>: View {
                                             proxy.scrollTo(nextSection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
                                         }
                                     }
-                                    // Priority 3: Scroll to today
                                     else if let todaySection = sections.first(where: { $0.label == "Today" }) {
                                         withAnimation(.easeOut(duration: 0.3)) {
                                             proxy.scrollTo(todaySection.id, anchor: UnitPoint(x: 0.5, y: 0.18))
@@ -246,26 +246,6 @@ struct ResultsTabView<HeaderContent: View>: View {
                         }
                     }
                 }
-
-                // Sticky header + filter bar floating on top with glass
-                VStack(spacing: 0) {
-                    // Title row with glass background
-                    if hasHeader {
-                        VStack(spacing: 0) {
-                            headerContent
-                        }
-                        .frame(maxWidth: .infinity)
-                        .background(.ultraThinMaterial)
-                    }
-
-                    // Filter pills (transparent, below glass)
-                    filterBar
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-
-                    Spacer()
-                }
-                .allowsHitTesting(true)
             }
             .sheet(isPresented: $showingTeamPicker) {
                 TeamPickerSheet(
