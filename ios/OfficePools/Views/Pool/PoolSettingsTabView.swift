@@ -33,17 +33,58 @@ struct PoolSettingsTabView: View {
                 Spacer().frame(height: 4)
 
                 poolCodeCard
-                poolInfoCard
+                poolDetailsCard
                 deadlineCard
-                privacyCard
                 entriesCard
-                saveCard
                 dangerZoneCard
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.bottom, hasChanges ? 80 : 24)
         }
         .background(Color(.systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+            if hasChanges {
+                HStack {
+                    Text("Unsaved changes")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        saveSettings()
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isSaving {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .tint(.white)
+                            }
+                            Text("Save Changes")
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+
+                if let msg = saveMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                        Text(msg.text)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
+                    .padding(.bottom, 4)
+                }
+            }
+        }
         .onAppear { initEditState() }
         .alert("Archive Pool", isPresented: $showArchiveAlert) {
             Button("Cancel", role: .cancel) {}
@@ -82,13 +123,13 @@ struct PoolSettingsTabView: View {
     }
 
     private func sectionHeader(_ title: String) -> some View {
-        VStack(spacing: 10) {
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-            }
-            Divider()
+        HStack {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
     }
 
@@ -135,26 +176,21 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Pool Information
+    // MARK: - Pool Details (Info + Privacy merged)
 
-    private var poolInfoCard: some View {
+    private var poolDetailsCard: some View {
         card {
-            VStack(spacing: 10) {
-                HStack {
-                    Text("Pool Information")
-                        .font(.headline)
-                    Spacer()
-                    if let pool {
-                        Text(modeLabel(pool.predictionMode))
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(AppColors.primary500.opacity(0.1))
-                            .foregroundStyle(AppColors.primary600)
-                            .clipShape(Capsule())
-                    }
+            HStack {
+                sectionHeader("Pool Details")
+                if let pool {
+                    Text(modeLabel(pool.predictionMode))
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(AppColors.primary500.opacity(0.1))
+                        .foregroundStyle(AppColors.primary600)
+                        .clipShape(Capsule())
                 }
-                Divider()
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -162,7 +198,9 @@ struct PoolSettingsTabView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextField("Pool Name", text: $editName)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                Divider()
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -170,11 +208,11 @@ struct PoolSettingsTabView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextField("Description (optional)", text: $editDescription, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .font(.body)
                     .lineLimit(2...4)
+                Divider()
             }
-
-            Divider().padding(.vertical, 2)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Status")
@@ -192,6 +230,33 @@ struct PoolSettingsTabView: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pool Visibility")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Visibility", selection: $editIsPrivate) {
+                    Text("Public").tag(false)
+                    Text("Private").tag(true)
+                }
+                .pickerStyle(.segmented)
+
+                Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            settingsRow("Max Members", value:
+                HStack(spacing: 4) {
+                    TextField("0", value: $editMaxParticipants, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .font(.subheadline.weight(.bold))
+                        .frame(width: 50)
+                    Text(editMaxParticipants == 0 ? "(unlimited)" : "")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            )
         }
     }
 
@@ -231,8 +296,6 @@ struct PoolSettingsTabView: View {
                 }
             }
 
-            Divider().padding(.vertical, 2)
-
             VStack(alignment: .leading, spacing: 8) {
                 Text("Quick Set")
                     .font(.caption)
@@ -243,44 +306,6 @@ struct PoolSettingsTabView: View {
                     quickDeadlineButton("1 Week Before", date: tournamentStartDate?.addingTimeInterval(-604800))
                 }
             }
-        }
-    }
-
-    // MARK: - Privacy & Capacity
-
-    private var privacyCard: some View {
-        card {
-            sectionHeader("Privacy & Capacity")
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Pool Visibility")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("Visibility", selection: $editIsPrivate) {
-                    Text("Public").tag(false)
-                    Text("Private").tag(true)
-                }
-                .pickerStyle(.segmented)
-
-                Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider().padding(.vertical, 2)
-
-            settingsRow("Max Members", value:
-                HStack(spacing: 4) {
-                    TextField("0", value: $editMaxParticipants, format: .number)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.weight(.bold))
-                        .frame(width: 50)
-                    Text(editMaxParticipants == 0 ? "(unlimited)" : "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            )
         }
     }
 
@@ -333,44 +358,6 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Save
-
-    private var saveCard: some View {
-        card {
-            Button {
-                saveSettings()
-            } label: {
-                HStack {
-                    Spacer()
-                    if isSaving {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .padding(.trailing, 4)
-                            .tint(.white)
-                    }
-                    Text("Save Changes")
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
-                .padding(.vertical, 10)
-                .background(hasChanges ? Color.accentColor : Color(.tertiarySystemFill))
-                .foregroundStyle(hasChanges ? .white : .secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-            .disabled(!hasChanges || isSaving)
-
-            if let msg = saveMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                    Text(msg.text)
-                }
-                .font(.caption)
-                .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
-            }
-        }
-    }
-
     // MARK: - Danger Zone
 
     private var dangerZoneCard: some View {
@@ -399,8 +386,6 @@ struct PoolSettingsTabView: View {
                 .foregroundStyle(AppColors.warning600)
             }
             .buttonStyle(.plain)
-
-            Divider()
 
             Button {
                 showDeleteAlert = true
