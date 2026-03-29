@@ -303,24 +303,27 @@ struct PoolSettingsTabView: View {
             DatePicker("Deadline", selection: $editDeadline, displayedComponents: [.date, .hourAndMinute])
                 .font(.subheadline)
 
-            if let pool, let deadline = pool.predictionDeadline {
-                let countdown = deadlineCountdown(deadline)
-                if !countdown.isEmpty {
-                    HStack(spacing: 6) {
-                        Image(systemName: countdown.contains("passed") ? "exclamationmark.circle.fill" : "clock.fill")
-                            .font(.caption)
-                        Text(countdown)
-                            .font(.caption)
-                    }
-                    .foregroundStyle(countdown.contains("passed") ? AppColors.error600 : AppColors.success600)
-                }
-            }
-
             HStack {
                 Spacer()
                 quickDeadlineButton("Tournament Start", date: tournamentStartDate)
                 quickDeadlineButton("1 Day Before", date: tournamentStartDate?.addingTimeInterval(-86400))
                 quickDeadlineButton("1 Week Before", date: tournamentStartDate?.addingTimeInterval(-604800))
+            }
+
+            if let pool, let deadline = pool.predictionDeadline {
+                let countdown = deadlineCountdown(deadline)
+                if !countdown.isEmpty {
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: countdown.contains("passed") ? "exclamationmark.circle.fill" : "clock.fill")
+                                .font(.caption2)
+                            Text(countdown)
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(countdown.contains("passed") ? AppColors.error600 : AppColors.success600)
+                    }
+                }
             }
         }
     }
