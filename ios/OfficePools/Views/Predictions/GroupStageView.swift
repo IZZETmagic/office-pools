@@ -6,33 +6,13 @@ struct GroupStageView: View {
     @Bindable var viewModel: PredictionEditViewModel
     var readOnly: Bool = false
 
-    @State private var expandedGroups: Set<String> = []
+    @Binding var expandedGroups: Set<String>
     @State private var didSetDefaults = false
     @FocusState private var focusedField: ScoreFieldID?
 
     var body: some View {
         ScrollViewReader { proxy in
             LazyVStack(spacing: 12) {
-                // Expand All / Collapse All — compact, right-aligned
-                if !readOnly {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            if expandedGroups.count == GROUP_LETTERS.count {
-                                expandedGroups.removeAll()
-                            } else {
-                                expandedGroups = Set(GROUP_LETTERS)
-                            }
-                        }
-                    } label: {
-                        Text(expandedGroups.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.horizontal, 20)
-                    .padding(.top, -4)
-                }
-
                 ForEach(GROUP_LETTERS, id: \.self) { letter in
                     groupSection(letter: letter)
                 }

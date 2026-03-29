@@ -75,6 +75,7 @@ struct PredictionWizardView: View {
 
     @State private var currentStage: WizardStage = .groupStage
     @State private var showSubmitConfirmation = false
+    @State private var groupsExpanded: Set<String> = []
 
     var body: some View {
         ZStack {
@@ -86,12 +87,31 @@ struct PredictionWizardView: View {
 
                     // Stage title
                     if currentStage != .summary || readOnly {
-                        Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
-                            .font(.title2.weight(.bold))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal)
-                            .padding(.top, 10)
-                            .padding(.bottom, 4)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
+                                .font(.title2.weight(.bold))
+
+                            Spacer()
+
+                            if currentStage == .groupStage && !readOnly {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        if groupsExpanded.count == GROUP_LETTERS.count {
+                                            groupsExpanded.removeAll()
+                                        } else {
+                                            groupsExpanded = Set(GROUP_LETTERS)
+                                        }
+                                    }
+                                } label: {
+                                    Text(groupsExpanded.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                        .padding(.bottom, 4)
                     }
 
                     stageContent
@@ -142,7 +162,7 @@ struct PredictionWizardView: View {
     private var stageContent: some View {
         switch currentStage {
         case .groupStage:
-            GroupStageView(viewModel: viewModel, readOnly: readOnly)
+            GroupStageView(viewModel: viewModel, readOnly: readOnly, expandedGroups: $groupsExpanded)
         case .roundOf32, .roundOf16, .quarterFinals, .semiFinals, .finals:
             KnockoutStageView(stage: currentStage, viewModel: viewModel, readOnly: readOnly)
         case .summary:
