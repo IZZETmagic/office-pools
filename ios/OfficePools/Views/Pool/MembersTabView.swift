@@ -79,11 +79,11 @@ struct MembersTabView: View {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(member.isAdmin ? Color.purple.opacity(0.15) : Color.blue.opacity(0.1))
+                    .fill(member.isAdmin ? AppColors.neutral600.opacity(0.15) : AppColors.primary500.opacity(0.1))
                     .frame(width: 36, height: 36)
                 Text(String(member.users.fullName.prefix(1)).uppercased())
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(member.isAdmin ? .purple : .blue)
+                    .foregroundStyle(member.isAdmin ? AppColors.neutral600 : AppColors.primary500)
             }
 
             // Name + username + entry count

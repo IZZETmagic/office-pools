@@ -108,12 +108,12 @@ struct MemberDetailView: View {
                         .clipShape(Circle())
                 } else {
                     Circle()
-                        .fill(member.isAdmin ? Color.purple.opacity(0.15) : Color.blue.opacity(0.1))
+                        .fill(member.isAdmin ? AppColors.neutral600.opacity(0.15) : AppColors.primary500.opacity(0.1))
                         .frame(width: 40, height: 40)
                         .overlay(
                             Text(String(member.users.fullName.prefix(1)).uppercased())
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(member.isAdmin ? .purple : .blue)
+                                .foregroundStyle(member.isAdmin ? AppColors.neutral600 : AppColors.primary500)
                         )
                 }
 
@@ -126,8 +126,8 @@ struct MemberDetailView: View {
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
-                                .background(Color.purple.opacity(0.15))
-                                .foregroundStyle(.purple)
+                                .background(AppColors.neutral600.opacity(0.15))
+                                .foregroundStyle(AppColors.neutral600)
                                 .clipShape(Capsule())
                         }
                     }
@@ -157,10 +157,10 @@ struct MemberDetailView: View {
 
     private func rankColor(_ rank: Int) -> Color {
         switch rank {
-        case 1: return .orange
-        case 2: return .gray
-        case 3: return .brown
-        default: return .blue
+        case 1: return AppColors.accent300
+        case 2: return AppColors.neutral400
+        case 3: return AppColors.bronze
+        default: return AppColors.primary500
         }
     }
 
@@ -183,7 +183,7 @@ struct MemberDetailView: View {
                             .font(.subheadline.weight(.bold))
                         statusPill(
                             entry.hasSubmittedPredictions ? "Submitted" : "Pending",
-                            color: entry.hasSubmittedPredictions ? .green : .gray
+                            color: entry.hasSubmittedPredictions ? AppColors.success600 : AppColors.neutral400
                         )
                         if entry.hasSubmittedPredictions && currentUserIsAdmin {
                             Button {
@@ -192,7 +192,7 @@ struct MemberDetailView: View {
                             } label: {
                                 Image(systemName: "lock.open")
                                     .font(.caption)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(AppColors.warning600)
                                     .frame(width: 36, height: 36)
                                     .contentShape(Rectangle())
                             }
@@ -241,10 +241,10 @@ struct MemberDetailView: View {
             } label: {
                 HStack {
                     Image(systemName: member.isAdmin ? "arrow.down.circle" : "arrow.up.circle")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary600)
                     Text(member.isAdmin ? "Demote to Player" : "Promote to Admin")
                         .font(.subheadline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary600)
                     Spacer()
                 }
             }
@@ -263,10 +263,10 @@ struct MemberDetailView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plusminus")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AppColors.warning600)
                         Text("Adjust Points")
                             .font(.subheadline)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AppColors.warning600)
                         Spacer()
                     }
                 }
