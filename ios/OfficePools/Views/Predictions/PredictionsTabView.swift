@@ -462,7 +462,7 @@ struct PredictionFullScreenView: View {
             // Dimmed background that appears as you swipe
             if dragOffset > 0 {
                 Color.black
-                    .opacity(0.3 * (1 - dragOffset / UIScreen.main.bounds.width))
+                    .opacity(Double(0.3 * (1.0 - dragOffset / UIScreen.main.bounds.width)))
                     .ignoresSafeArea()
             }
 
