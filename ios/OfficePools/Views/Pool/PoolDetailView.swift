@@ -29,7 +29,6 @@ struct PoolDetailView: View {
     let authService: AuthService
     var onPoolDeleted: ((String) -> Void)?  // poolId
     @State private var selectedTab: PoolTab? = .leaderboard
-    @State private var showingEntryDetail = false
     @State private var predictionsViewModel: PredictionsViewModel?
     @State private var tabBarHeight: CGFloat = 40
     @State private var showingBanter = false
@@ -38,10 +37,6 @@ struct PoolDetailView: View {
     @State private var banterGlowRadius: CGFloat = 12
     @State private var banterSquishY: CGFloat = 1.0
     @State private var banterSquishX: CGFloat = 1.0
-
-    private var isMultiEntry: Bool {
-        (viewModel.pool?.maxEntriesPerUser ?? 1) > 1
-    }
 
     private func triggerBanterJelly() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -199,7 +194,6 @@ struct PoolDetailView: View {
         mainContent
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isMultiEntry && showingEntryDetail)
         .navigationDestination(for: Member.self) { member in
             MemberDetailView(
                 member: member,
@@ -209,17 +203,16 @@ struct PoolDetailView: View {
                 adminCount: viewModel.members.filter(\.isAdmin).count
             )
         }
-        .toolbar {
-            if isMultiEntry && showingEntryDetail {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingEntryDetail = false
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                    }
-                }
-            }
+        .navigationDestination(for: Entry.self) { entry in
+            EntryPredictionView(
+                entry: entry,
+                poolId: viewModel.poolId,
+                matches: viewModel.matches,
+                teams: viewModel.teams,
+                pool: viewModel.pool,
+                computedPoints: viewModel.displayPoints(for: entry.entryId),
+                selectedEntry: Bindable(viewModel).selectedEntry
+            )
         }
         .sheet(isPresented: $showingBanter) {
             if let banterVM = banterViewModel {
@@ -358,8 +351,7 @@ struct PoolDetailView: View {
                             if let userId = authService.appUser?.userId {
                                 await viewModel.load(userId: userId)
                             }
-                        },
-                        showingEntryDetail: $showingEntryDetail
+                        }
                     )
                 } else {
                     ProgressView("Loading...")

@@ -11,8 +11,6 @@ struct PredictionsTabView: View {
     var computedPoints: Int?
     var pointsForEntry: (String) -> Int = { _ in 0 }
     var onEntryCreated: (() async -> Void)?
-    @Binding var showingEntryDetail: Bool
-
     @State private var isEditing = false
     @State private var editViewModel: PredictionEditViewModel?
     @State private var resumeStage: WizardStage = .groupStage
@@ -41,12 +39,7 @@ struct PredictionsTabView: View {
     var body: some View {
         Group {
             if isMultiEntry {
-                // Multi-entry: show entry list or entry detail
-                if showingEntryDetail, let entry = selectedEntry {
-                    predictionContent(entry: entry)
-                } else {
-                    entryListPage
-                }
+                entryListPage
             } else if let entry = selectedEntry {
                 // Single-entry: go straight to predictions
                 predictionContent(entry: entry)
@@ -104,7 +97,7 @@ struct PredictionsTabView: View {
 
     private func predictionContent(entry: Entry) -> some View {
         Group {
-            if entry.hasSubmittedPredictions || !canEdit {
+            if entry.hasSubmittedPredictions || !canEdit(entry: entry) {
                 submittedView(entry: entry)
             } else if isEditing, let editVM = editViewModel {
                 editView(entry: entry, editVM: editVM)
@@ -157,13 +150,7 @@ struct PredictionsTabView: View {
 
                     // Entry rows
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        Button {
-                            selectedEntry = entry
-                            Task {
-                                await loadPredictions(entryId: entry.entryId)
-                                showingEntryDetail = true
-                            }
-                        } label: {
+                        NavigationLink(value: entry) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 6) {
@@ -274,8 +261,7 @@ struct PredictionsTabView: View {
 
     // MARK: - Can Edit Check
 
-    private var canEdit: Bool {
-        guard let entry = selectedEntry else { return false }
+    private func canEdit(entry: Entry) -> Bool {
         if entry.hasSubmittedPredictions { return false }
         if entry.predictionsLocked { return false }
         if isPastDeadline { return false }
@@ -452,6 +438,171 @@ struct PredictionsTabView: View {
         editVM.setEntryId(entry.entryId)
 
         for pred in viewModel.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        resumeStage = .groupStage
+        for stage in WizardStage.allCases where stage != .summary {
+            if !editVM.isStageComplete(stage) {
+                resumeStage = stage
+                break
+            }
+        }
+        if editVM.isComplete {
+            resumeStage = .summary
+        }
+
+        editViewModel = editVM
+        isEditing = true
+    }
+}
+
+// MARK: - Entry Prediction View (full-screen, pushed onto NavigationStack)
+
+struct EntryPredictionView: View {
+    @Environment(\.dismiss) private var dismiss
+    let entry: Entry
+    let poolId: String
+    let matches: [Match]
+    let teams: [Team]
+    let pool: Pool?
+    var computedPoints: Int?
+    @Binding var selectedEntry: Entry?
+
+    @State private var predictionsVM: PredictionsViewModel?
+    @State private var isEditing = false
+    @State private var editViewModel: PredictionEditViewModel?
+    @State private var readOnlyEditVM: PredictionEditViewModel?
+    @State private var resumeStage: WizardStage = .groupStage
+    @State private var hasLoadedPredictions = false
+
+    private var canEdit: Bool {
+        if entry.hasSubmittedPredictions { return false }
+        if entry.predictionsLocked { return false }
+        if isPastDeadline { return false }
+        return true
+    }
+
+    private var isPastDeadline: Bool {
+        guard let deadline = pool?.predictionDeadline else { return false }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: deadline) {
+            return date < Date()
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: deadline) {
+            return date < Date()
+        }
+        return false
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            // Content
+            Group {
+                if entry.hasSubmittedPredictions || !canEdit {
+                    submittedView
+                } else if isEditing, let editVM = editViewModel {
+                    PredictionWizardView(
+                        viewModel: editVM,
+                        entry: entry,
+                        initialStage: resumeStage,
+                        onSubmitSuccess: {
+                            dismiss()
+                        }
+                    )
+                } else if !hasLoadedPredictions {
+                    ProgressView("Loading predictions...")
+                } else {
+                    Color.clear.onAppear {
+                        if !isEditing {
+                            startEditing()
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Back button
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 32, height: 32)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .padding(.leading, 16)
+            .padding(.top, 6)
+        }
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .tabBar)
+        .task {
+            selectedEntry = entry
+            let vm = PredictionsViewModel(poolId: poolId)
+            predictionsVM = vm
+            await vm.loadPredictions(entryId: entry.entryId)
+            hasLoadedPredictions = true
+        }
+    }
+
+    // MARK: - Submitted View
+
+    private var submittedView: some View {
+        Group {
+            if let editVM = readOnlyEditVM {
+                PredictionWizardView(
+                    viewModel: editVM,
+                    entry: entry,
+                    initialStage: .summary,
+                    readOnly: true,
+                    readOnlyPoints: computedPoints ?? entry.totalPoints
+                )
+            } else {
+                ProgressView("Loading predictions...")
+            }
+        }
+        .onAppear { setupReadOnlyViewModel() }
+    }
+
+    private func setupReadOnlyViewModel() {
+        guard readOnlyEditVM == nil, let vm = predictionsVM else { return }
+
+        let editVM = PredictionEditViewModel(poolId: poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in vm.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        readOnlyEditVM = editVM
+    }
+
+    // MARK: - Start Editing
+
+    private func startEditing() {
+        guard let vm = predictionsVM else { return }
+
+        let editVM = PredictionEditViewModel(poolId: poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in vm.existingPredictions {
             editVM.predictions[pred.matchId] = PredictionInput(
                 matchId: pred.matchId,
                 homeScore: pred.predictedHomeScore,
