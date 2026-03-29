@@ -372,7 +372,8 @@ export function computeEarnedBadges(
   entryPredictions: PredictionData[],
   entryRank: number | null,
   totalXPBeforeBadges: number,
-  totalMatchCount: number
+  totalMatchCount: number,
+  totalEntries: number = 1
 ): EarnedBadge[] {
   const earned: EarnedBadge[] = []
   const sorted = [...predictionResults].sort((a, b) => a.matchNumber - b.matchNumber)
@@ -441,8 +442,8 @@ export function computeEarnedBadges(
     earned.push({ ...badge })
   }
 
-  // 👑 Top Dog — reach #1 on the leaderboard
-  if (entryRank === 1) {
+  // 👑 Top Dog — reach #1 on the leaderboard (requires 2+ entries and at least 1 scored match)
+  if (entryRank === 1 && totalEntries >= 2 && sorted.length > 0) {
     const badge = BADGE_DEFINITIONS.find(b => b.id === 'top_dog')!
     earned.push({ ...badge })
   }
@@ -556,8 +557,9 @@ export function computeFullXPBreakdown(params: {
   entryPredictions: PredictionData[]
   entryRank: number | null
   totalMatches: number
+  totalEntries?: number
 }): XPBreakdown {
-  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches } = params
+  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches, totalEntries = 1 } = params
 
   // 1. Base XP from match predictions
   const matchXP = computeMatchXP(predictionResults, matches)
@@ -577,7 +579,8 @@ export function computeFullXPBreakdown(params: {
     entryPredictions,
     entryRank,
     xpBeforeBadges,
-    totalMatches
+    totalMatches,
+    totalEntries
   )
   const totalBadgeXP = earnedBadges.reduce((sum, b) => sum + b.xpBonus, 0)
 

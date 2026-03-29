@@ -248,6 +248,7 @@ async function handleGET(
     const streaks = computeStreaks(predictionResults)
     const crowdData = computeCrowdPredictions(matchesData, allPredsData, entryPredsData, membersData)
     const poolStats = computePoolWideStats(matchesData, allPredsData, membersData, settings)
+    const totalEntries = membersData.reduce((sum, m) => sum + (m.entries?.length || 0), 0)
     const xpBreakdown = computeFullXPBreakdown({
       predictionResults,
       matches: matchesData,
@@ -256,6 +257,7 @@ async function handleGET(
       entryPredictions: entryPredsData,
       entryRank: entry.current_rank,
       totalMatches: matchesData.length,
+      totalEntries,
     })
 
     // 8. Build response in snake_case format
