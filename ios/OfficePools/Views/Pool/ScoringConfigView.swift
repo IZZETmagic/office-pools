@@ -148,29 +148,31 @@ struct ScoringConfigView: View {
                 .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
             }
 
-            Button {
-                saveSettings()
-            } label: {
-                HStack {
-                    Spacer()
-                    if isSaving {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .padding(.trailing, 4)
-                            .tint(AppColors.primary700)
+            if hasChanges {
+                Button {
+                    saveSettings()
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isSaving {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .padding(.trailing, 4)
+                                .tint(AppColors.primary700)
+                        }
+                        Text("Save Changes")
+                            .fontWeight(.semibold)
+                        Spacer()
                     }
-                    Text("Save Changes")
-                        .fontWeight(.semibold)
-                    Spacer()
+                    .padding(.vertical, 12)
+                    .background { AppColors.primary500.opacity(0.2) }
+                    .background(.ultraThinMaterial)
+                    .foregroundStyle(AppColors.primary700)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .padding(.vertical, 12)
-                .background { AppColors.primary500.opacity(0.2) }
-                .background(.ultraThinMaterial)
-                .foregroundStyle(AppColors.primary700)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .buttonStyle(.plain)
+                .disabled(isSaving)
             }
-            .buttonStyle(.plain)
-            .disabled(isSaving)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
