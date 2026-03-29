@@ -245,5 +245,4 @@ private struct PredictionMatchCard: View {
             }
         }
     }
-    }
 }
