@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PoolSettingsTabView: View {
     let pool: Pool?
+    let settings: PoolSettings?
     let currentUserId: String
     let poolService: PoolService
     var onPoolDeleted: (() -> Void)?
@@ -49,6 +50,7 @@ struct PoolSettingsTabView: View {
                 maxMembersCard
                 deadlineCard
                 entriesCard
+                scoringConfigCard
                 dangerZoneCard
             }
             .padding(.horizontal, 16)
@@ -375,6 +377,39 @@ struct PoolSettingsTabView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
+    }
+
+    // MARK: - Scoring Configuration
+
+    private var scoringConfigCard: some View {
+        NavigationLink {
+            ScoringConfigView(
+                poolId: pool?.poolId ?? "",
+                settings: settings,
+                poolService: poolService
+            )
+        } label: {
+            card {
+                HStack(spacing: 12) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.body)
+                        .foregroundStyle(AppColors.primary500)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Scoring Configuration")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        Text("Customize point values for matches and bonuses")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Danger Zone

@@ -393,6 +393,7 @@ struct PoolDetailView: View {
             case .settings:
                 PoolSettingsTabView(
                     pool: viewModel.pool,
+                    settings: viewModel.settings,
                     currentUserId: viewModel.currentUserId ?? "",
                     poolService: PoolService(),
                     onPoolDeleted: {

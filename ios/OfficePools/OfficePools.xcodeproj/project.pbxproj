@@ -58,6 +58,7 @@
 		77A335CAD99A3E14E8ABBB89 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA589A5883F2F54179C208 /* Config.swift */; };
 		7BD51B0CB44B50B217A0E053 /* Member.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D94D34573055E47A4D0395C /* Member.swift */; };
 		8278B0743F6661A7F901AC77 /* ScoringRulesTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25CE22E5D04AB3DA7BFBB6A /* ScoringRulesTabView.swift */; };
+		8278B074AA0001A7F901AC77 /* ScoringConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25CE22EAA0001B3DA7BFBB6 /* ScoringConfigView.swift */; };
 		89D8B4049A47886F16D3B54E /* PredictionWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19D16679B4852D57AE4C6CA /* PredictionWizardView.swift */; };
 		95D504B2386007B314AB7311 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5452CCCAC8BE1784E0E05082 /* SupabaseService.swift */; };
 		95DEF52A21B6B21820A344C3 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF913EFCAE9281DEC4211660 /* Settings.swift */; };
@@ -160,6 +161,7 @@
 		CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolDetailView.swift; sourceTree = "<group>"; };
 		D0C16D214CC5B59466B1F169 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
 		D25CE22E5D04AB3DA7BFBB6A /* ScoringRulesTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringRulesTabView.swift; sourceTree = "<group>"; };
+		D25CE22EAA0001B3DA7BFBB6 /* ScoringConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringConfigView.swift; sourceTree = "<group>"; };
 		D35511BB8A2EE69E5F20ABCA /* BanterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BanterViewModel.swift; sourceTree = "<group>"; };
 		D86C50E486C26FD94CD5E97D /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		D87171D9DF9E0E74148D8876 /* BanterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BanterTabView.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */,
 				551964F18F8EB5D7CC4D2537 /* PoolSettingsTabView.swift */,
 				C47B7E2E0B2B95292A9A6EF4 /* ResultsTabView.swift */,
+				D25CE22EAA0001B3DA7BFBB6 /* ScoringConfigView.swift */,
 				D25CE22E5D04AB3DA7BFBB6A /* ScoringRulesTabView.swift */,
 				19545767F93AFDC941495A00 /* SharePredictionSheet.swift */,
 			);
@@ -566,6 +569,7 @@
 				2D070CCDB5068866F3D8AD2A /* ResultsTabView.swift in Sources */,
 				59062F8D03F0017B50530381 /* ResultsViewModel.swift in Sources */,
 				45BB521FE38873BF1FC64DF3 /* ScoringDefaults.swift in Sources */,
+				8278B074AA0001A7F901AC77 /* ScoringConfigView.swift in Sources */,
 				8278B0743F6661A7F901AC77 /* ScoringRulesTabView.swift in Sources */,
 				95DEF52A21B6B21820A344C3 /* Settings.swift in Sources */,
 				35920949B17FEFA657C8C27B /* SharePredictionSheet.swift in Sources */,
