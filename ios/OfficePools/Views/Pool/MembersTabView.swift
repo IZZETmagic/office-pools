@@ -9,6 +9,8 @@ struct MembersTabView: View {
     var body: some View {
         ScrollView {
                 LazyVStack(spacing: 16) {
+                    Spacer().frame(height: 4)
+
                     // Members card
                     card {
                         sectionHeader("\(members.count) Members")
