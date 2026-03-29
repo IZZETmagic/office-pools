@@ -14,11 +14,20 @@ struct PoolSettingsTabView: View {
     @State private var editMaxEntries = 1
     @State private var editMaxParticipants = 0
     @State private var editDeadline = Date()
-    @State private var initialDeadline: Date?
-    @State private var isSaving = false
-    @State private var saveMessage: (text: String, isError: Bool)?
 
-    // Danger zone
+    // Snapshot of last-saved values (used for hasChanges comparison)
+    @State private var savedName = ""
+    @State private var savedDescription = ""
+    @State private var savedStatus = "active"
+    @State private var savedIsPrivate = false
+    @State private var savedMaxEntries = 1
+    @State private var savedMaxParticipants = 0
+    @State private var savedDeadline: Date?
+
+    @State private var isSaving = false
+    @State private var showSaveSuccess = false
+
+    // Danger zone & errors
     @State private var showArchiveAlert = false
     @State private var showDeleteAlert = false
     @State private var deleteConfirmText = ""
@@ -47,7 +56,7 @@ struct PoolSettingsTabView: View {
         }
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) {
-            if hasChanges {
+            if hasChanges || showSaveSuccess {
                 Button {
                     saveSettings()
                 } label: {
@@ -55,25 +64,33 @@ struct PoolSettingsTabView: View {
                         if isSaving {
                             ProgressView()
                                 .scaleEffect(0.7)
-                                .tint(.white)
+                                .tint(AppColors.primary700)
                         }
-                        Text("Save Changes")
-                            .fontWeight(.semibold)
+                        if showSaveSuccess {
+                            Image(systemName: "checkmark")
+                                .fontWeight(.bold)
+                            Text("Saved")
+                                .fontWeight(.semibold)
+                        } else {
+                            Text("Save Changes")
+                                .fontWeight(.semibold)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background {
-                        AppColors.primary500.opacity(0.2)
+                        (showSaveSuccess ? AppColors.success500 : AppColors.primary500).opacity(0.2)
                     }
                     .background(.ultraThinMaterial)
-                    .foregroundStyle(AppColors.primary700)
+                    .foregroundStyle(showSaveSuccess ? AppColors.success600 : AppColors.primary700)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: AppColors.primary500.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: (showSaveSuccess ? AppColors.success500 : AppColors.primary500).opacity(0.3), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
-                .disabled(isSaving)
+                .disabled(isSaving || showSaveSuccess)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+                .animation(.easeInOut(duration: 0.2), value: showSaveSuccess)
             }
         }
         .onAppear { initEditState() }
@@ -440,29 +457,39 @@ struct PoolSettingsTabView: View {
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let parsed = formatter.date(from: deadline) ?? Date()
             editDeadline = parsed
-            initialDeadline = parsed
+            savedDeadline = parsed
         } else {
-            initialDeadline = nil
+            savedDeadline = nil
         }
+        snapshotSavedState()
+    }
+
+    private func snapshotSavedState() {
+        savedName = editName
+        savedDescription = editDescription
+        savedStatus = editStatus
+        savedIsPrivate = editIsPrivate
+        savedMaxEntries = editMaxEntries
+        savedMaxParticipants = editMaxParticipants
+        savedDeadline = editDeadline
     }
 
     // MARK: - Computed
 
     private var hasChanges: Bool {
-        guard let pool else { return false }
+        guard pool != nil else { return false }
         let deadlineChanged: Bool = {
-            if let initial = initialDeadline {
-                return abs(editDeadline.timeIntervalSince(initial)) > 60
+            if let saved = savedDeadline {
+                return abs(editDeadline.timeIntervalSince(saved)) > 60
             }
-            // No initial deadline — any change from the default means a change
-            return pool.predictionDeadline == nil && abs(editDeadline.timeIntervalSince(Date())) > 120
+            return false
         }()
-        return editName != pool.poolName
-            || editDescription != (pool.description ?? "")
-            || editStatus != pool.status
-            || editIsPrivate != pool.isPrivate
-            || editMaxEntries != pool.maxEntriesPerUser
-            || editMaxParticipants != (pool.maxParticipants ?? 0)
+        return editName != savedName
+            || editDescription != savedDescription
+            || editStatus != savedStatus
+            || editIsPrivate != savedIsPrivate
+            || editMaxEntries != savedMaxEntries
+            || editMaxParticipants != savedMaxParticipants
             || deadlineChanged
     }
 
@@ -490,27 +517,29 @@ struct PoolSettingsTabView: View {
     private func saveSettings() {
         guard let pool else { return }
         isSaving = true
-        saveMessage = nil
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
 
         let payload = PoolUpdatePayload(
-            poolName: editName != pool.poolName ? editName : nil,
-            description: editDescription != (pool.description ?? "") ? editDescription : nil,
-            status: editStatus != pool.status ? editStatus : nil,
-            isPrivate: editIsPrivate != pool.isPrivate ? editIsPrivate : nil,
-            maxEntriesPerUser: editMaxEntries != pool.maxEntriesPerUser ? editMaxEntries : nil,
+            poolName: editName,
+            description: editDescription,
+            status: editStatus,
+            isPrivate: editIsPrivate,
+            maxEntriesPerUser: editMaxEntries,
             predictionDeadline: formatter.string(from: editDeadline)
         )
 
         Task {
             do {
                 try await poolService.updatePool(poolId: pool.poolId, updates: payload)
-                saveMessage = (text: "Settings saved", isError: false)
                 isSaving = false
+                snapshotSavedState()
+                showSaveSuccess = true
+                try? await Task.sleep(for: .seconds(1.5))
+                showSaveSuccess = false
             } catch {
-                saveMessage = (text: error.localizedDescription, isError: true)
+                actionError = "Failed to save: \(error.localizedDescription)"
                 isSaving = false
             }
         }
