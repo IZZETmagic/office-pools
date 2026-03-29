@@ -148,12 +148,6 @@ struct GroupStageView: View {
                                     ? Color.accentColor.opacity(0.06)
                                     : Color(.secondarySystemGroupedBackground))
                         )
-                        .overlay {
-                            if isMatchComplete {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 0.5)
-                            }
-                        }
                         .padding(.horizontal, 10)
                         .id("match_\(match.matchId)")
                     }
