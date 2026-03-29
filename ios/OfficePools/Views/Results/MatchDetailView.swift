@@ -81,12 +81,12 @@ struct MatchDetailView: View {
                         }
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(.red)
+                                .fill(AppColors.error500)
                                 .frame(width: 6, height: 6)
                                 .modifier(PulsingModifier())
                             Text("LIVE")
                                 .font(.caption.bold())
-                                .foregroundStyle(.red)
+                                .foregroundStyle(AppColors.error500)
                         }
                     } else if isFinished {
                         HStack(spacing: 6) {
@@ -101,7 +101,7 @@ struct MatchDetailView: View {
                         if let homePso = match.homeScorePso, let awayPso = match.awayScorePso {
                             Text("(\(homePso)-\(awayPso) PSO)")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(AppColors.primary600)
                         }
                         Text("Full Time")
                             .font(.caption2)
@@ -217,15 +217,15 @@ struct MatchDetailView: View {
                 resultLabel(
                     match.homeTeam?.countryName ?? stats.homeTeam ?? "Home",
                     pct: stats.homeWinPct,
-                    color: .blue
+                    color: AppColors.primary500
                 )
                 Spacer()
-                resultLabel("Draw", pct: stats.drawPct, color: .gray)
+                resultLabel("Draw", pct: stats.drawPct, color: AppColors.neutral500)
                 Spacer()
                 resultLabel(
                     match.awayTeam?.countryName ?? stats.awayTeam ?? "Away",
                     pct: stats.awayWinPct,
-                    color: .red
+                    color: AppColors.error500
                 )
             }
         }
@@ -246,17 +246,17 @@ struct MatchDetailView: View {
             HStack(spacing: 2) {
                 if stats.homeWinPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.blue)
+                        .fill(AppColors.primary500)
                         .frame(width: max(homeW, 4))
                 }
                 if stats.drawPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.5))
+                        .fill(AppColors.neutral400)
                         .frame(width: max(drawW, 4))
                 }
                 if stats.awayWinPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.red)
+                        .fill(AppColors.error500)
                         .frame(width: max(awayW, 4))
                 }
             }
@@ -288,7 +288,7 @@ struct MatchDetailView: View {
 
                     GeometryReader { geo in
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.blue.opacity(0.2))
+                            .fill(AppColors.primary500.opacity(0.2))
                             .frame(width: geo.size.width * score.pct)
                     }
                     .frame(height: 6)
@@ -315,10 +315,10 @@ struct MatchDetailView: View {
     private func accuracyCard(_ stats: MatchStatsResponse) -> some View {
         HStack(spacing: 16) {
             if let exactPct = stats.exactCorrectPct {
-                accuracyStat("Exact Score", pct: exactPct, color: .green)
+                accuracyStat("Exact Score", pct: exactPct, color: AppColors.tierExact)
             }
             if let resultPct = stats.resultCorrectPct {
-                accuracyStat("Correct Result", pct: resultPct, color: .blue)
+                accuracyStat("Correct Result", pct: resultPct, color: AppColors.primary500)
             }
         }
         .padding(16)
@@ -435,7 +435,7 @@ struct MatchDetailView: View {
                     if let pts = pts {
                         Text("+\(pts) pts")
                             .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(pts > 0 ? .green : .secondary)
+                            .foregroundStyle(pts > 0 ? AppColors.success600 : .secondary)
                     }
                 }
             }
@@ -473,7 +473,7 @@ struct MatchDetailView: View {
                     if let homePso = pred.predictedHomePso, let awayPso = pred.predictedAwayPso {
                         Text("(\(homePso)-\(awayPso) PSO)")
                             .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(AppColors.primary600)
                     }
                 }
             } else {
@@ -511,7 +511,7 @@ struct MatchDetailView: View {
         if let breakdownType = info.breakdownResultType, isKnockout {
             // If teams don't match, override to "Wrong Teams" regardless of score result
             if let teamsMatch = info.teamsMatch, !teamsMatch {
-                return ("Wrong Teams", .orange)
+                return ("Wrong Teams", AppColors.warning600)
             }
             return breakdownResultLabel(breakdownType)
         }
@@ -520,14 +520,14 @@ struct MatchDetailView: View {
         guard let pred = info.prediction,
               let homeActual = match.homeScoreFt,
               let awayActual = match.awayScoreFt else {
-            return ("Pending", .orange)
+            return ("Pending", AppColors.warning600)
         }
 
         let predHome = pred.predictedHomeScore
         let predAway = pred.predictedAwayScore
 
         if predHome == homeActual && predAway == awayActual {
-            return ("Exact", .green)
+            return ("Exact", AppColors.tierExact)
         }
 
         let actualOutcome = homeActual == awayActual ? 0 : (homeActual > awayActual ? 1 : -1)
@@ -537,21 +537,21 @@ struct MatchDetailView: View {
             let actualGD = homeActual - awayActual
             let predGD = predHome - predAway
             if actualGD == predGD {
-                return ("Winner+GD", .blue)
+                return ("Winner+GD", AppColors.tierWinnerGd)
             }
-            return ("Winner", .blue)
+            return ("Winner", AppColors.tierWinner)
         }
 
-        return ("Miss", .red)
+        return ("Miss", AppColors.error600)
     }
 
     private func breakdownResultLabel(_ type: String) -> (label: String, color: Color) {
         switch type {
-        case "exact": return ("Exact", .green)
-        case "winner_gd": return ("Winner+GD", .blue)
-        case "winner": return ("Winner", .blue)
-        case "miss": return ("Miss", .red)
-        case "wrong_teams": return ("Wrong Teams", .orange)
+        case "exact": return ("Exact", AppColors.tierExact)
+        case "winner_gd": return ("Winner+GD", AppColors.tierWinnerGd)
+        case "winner": return ("Winner", AppColors.tierWinner)
+        case "miss": return ("Miss", AppColors.error600)
+        case "wrong_teams": return ("Wrong Teams", AppColors.warning600)
         default: return (type.capitalized, .secondary)
         }
     }
