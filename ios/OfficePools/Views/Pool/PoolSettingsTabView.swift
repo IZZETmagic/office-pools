@@ -9,7 +9,7 @@ struct PoolSettingsTabView: View {
     // Editing state
     @State private var editName = ""
     @State private var editDescription = ""
-    @State private var editStatus = "active"
+    @State private var editStatus = "open"
     @State private var editIsPrivate = false
     @State private var editMaxEntries = 1
     @State private var editMaxParticipants = 0
@@ -18,7 +18,7 @@ struct PoolSettingsTabView: View {
     // Snapshot of last-saved values (used for hasChanges comparison)
     @State private var savedName = ""
     @State private var savedDescription = ""
-    @State private var savedStatus = "active"
+    @State private var savedStatus = "open"
     @State private var savedIsPrivate = false
     @State private var savedMaxEntries = 1
     @State private var savedMaxParticipants = 0
@@ -229,7 +229,7 @@ struct PoolSettingsTabView: View {
         card {
             sectionHeader("Status")
             Picker("Status", selection: $editStatus) {
-                Text("Active").tag("active")
+                Text("Open").tag("open")
                 Text("Closed").tag("closed")
                 Text("Completed").tag("completed")
             }
@@ -496,7 +496,7 @@ struct PoolSettingsTabView: View {
 
     private var statusDescription: String {
         switch editStatus {
-        case "active": return "Pool is open and accepting new members."
+        case "open": return "Pool is open and accepting new members."
         case "closed": return "Pool is closed to new members."
         case "completed": return "Tournament is over. No new activity allowed."
         default: return ""

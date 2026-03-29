@@ -337,7 +337,7 @@ final class PoolService {
             .from("pools")
             .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
             .eq("is_private", value: false)
-            .eq("status", value: "active")
+            .eq("status", value: "open")
             .ilike("pool_name", pattern: "%\(query)%")
             .execute()
             .value

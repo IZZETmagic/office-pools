@@ -129,7 +129,7 @@ struct PoolCardView: View {
             PoolCardView(data: PoolCardData(
                 pool: Pool(
                     poolId: "1", poolName: "World Cup 2026 Office Pool",
-                    poolCode: "ABC", description: nil, status: "active",
+                    poolCode: "ABC", description: nil, status: "open",
                     isPrivate: false, maxParticipants: nil, maxEntriesPerUser: 1,
                     tournamentId: "t1", predictionDeadline: nil,
                     predictionMode: .fullTournament,
