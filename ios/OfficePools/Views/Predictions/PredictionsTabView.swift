@@ -11,8 +11,6 @@ struct PredictionsTabView: View {
     var computedPoints: Int?
     var pointsForEntry: (String) -> Int = { _ in 0 }
     var onEntryCreated: (() async -> Void)?
-    @Binding var showingEntryDetail: Bool
-
     @State private var isEditing = false
     @State private var editViewModel: PredictionEditViewModel?
     @State private var resumeStage: WizardStage = .groupStage
@@ -39,77 +37,82 @@ struct PredictionsTabView: View {
     // MARK: - Body
 
     var body: some View {
-        // Always show entry list — tapping an entry opens full-screen prediction flow
-        entryListPage
-            .fullScreenCover(isPresented: $showingEntryDetail) {
-                if let entry = selectedEntry {
-                    PredictionFullScreenView(
-                        entry: entry,
-                        entryName: entry.entryName,
-                        isEditing: $isEditing,
-                        editViewModel: $editViewModel,
-                        resumeStage: $resumeStage,
-                        hasLoadedPredictions: hasLoadedPredictions,
-                        canEdit: canEdit,
-                        computedPoints: computedPoints,
-                        readOnlyEditVM: $readOnlyEditVM,
-                        onClose: {
-                            showingEntryDetail = false
-                            // Reset state for next open
-                            isEditing = false
-                            editViewModel = nil
-                            readOnlyEditVM = nil
-                        },
-                        onStartEditing: { startEditing(entry: entry) },
-                        onSetupReadOnly: { setupReadOnlyViewModel(entry: entry) },
-                        onSubmitSuccess: {
-                            isEditing = false
-                            editViewModel = nil
-                            Task {
-                                await viewModel.loadPredictions(entryId: entry.entryId)
-                            }
-                        }
-                    )
+        Group {
+            if isMultiEntry {
+                entryListPage
+            } else if let entry = selectedEntry {
+                // Single-entry: go straight to predictions
+                predictionContent(entry: entry)
+            } else {
+                ProgressView("Loading...")
+            }
+        }
+        .task {
+            // Single-entry: load predictions immediately
+            if !isMultiEntry, let entryId = selectedEntry?.entryId {
+                await loadPredictions(entryId: entryId)
+            }
+        }
+        .alert("New Entry", isPresented: $isCreatingEntry) {
+            TextField("Entry Name", text: $newEntryName)
+            Button("Cancel", role: .cancel) { newEntryName = "" }
+            Button("Create") {
+                Task { await createNewEntry() }
+            }
+        } message: {
+            Text("Enter a name for your new entry")
+        }
+        .alert("Rename Entry", isPresented: $isRenamingEntry) {
+            TextField("Entry Name", text: $renameEntryName)
+            Button("Cancel", role: .cancel) {
+                renameEntryName = ""
+                entryToRename = nil
+            }
+            Button("Save") {
+                Task { await renameEntry() }
+            }
+        } message: {
+            Text("Enter a new name for this entry")
+        }
+        .alert("Delete Entry", isPresented: $isDeletingEntry) {
+            Button("Cancel", role: .cancel) {
+                entryToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                Task { await deleteEntry() }
+            }
+        } message: {
+            if let entry = entryToDelete {
+                Text("All predictions for \"\(entry.entryName)\" will be permanently deleted. This cannot be undone.")
+            }
+        }
+        .alert("Unable to Delete", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteError ?? "Something went wrong.")
+        }
+    }
+
+    // MARK: - Prediction Content (shared by single & multi entry)
+
+    private func predictionContent(entry: Entry) -> some View {
+        Group {
+            if entry.hasSubmittedPredictions || !canEdit(entry: entry) {
+                submittedView(entry: entry)
+            } else if isEditing, let editVM = editViewModel {
+                editView(entry: entry, editVM: editVM)
+            } else if !hasLoadedPredictions {
+                ProgressView("Loading predictions...")
+            } else {
+                // Predictions loaded — auto-launch wizard
+                Color.clear.onAppear {
+                    if !isEditing {
+                        startEditing(entry: entry)
+                    }
                 }
             }
-            .alert("New Entry", isPresented: $isCreatingEntry) {
-                TextField("Entry Name", text: $newEntryName)
-                Button("Cancel", role: .cancel) { newEntryName = "" }
-                Button("Create") {
-                    Task { await createNewEntry() }
-                }
-            } message: {
-                Text("Enter a name for your new entry")
-            }
-            .alert("Rename Entry", isPresented: $isRenamingEntry) {
-                TextField("Entry Name", text: $renameEntryName)
-                Button("Cancel", role: .cancel) {
-                    renameEntryName = ""
-                    entryToRename = nil
-                }
-                Button("Save") {
-                    Task { await renameEntry() }
-                }
-            } message: {
-                Text("Enter a new name for this entry")
-            }
-            .alert("Delete Entry", isPresented: $isDeletingEntry) {
-                Button("Cancel", role: .cancel) {
-                    entryToDelete = nil
-                }
-                Button("Delete", role: .destructive) {
-                    Task { await deleteEntry() }
-                }
-            } message: {
-                if let entry = entryToDelete {
-                    Text("All predictions for \"\(entry.entryName)\" will be permanently deleted. This cannot be undone.")
-                }
-            }
-            .alert("Unable to Delete", isPresented: $showDeleteError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(deleteError ?? "Something went wrong.")
-            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Load Predictions
@@ -123,7 +126,7 @@ struct PredictionsTabView: View {
         hasLoadedPredictions = true
     }
 
-    // MARK: - Entry List Page
+    // MARK: - Entry List Page (multi-entry pools)
 
     private var entryListPage: some View {
         ScrollView {
@@ -147,13 +150,7 @@ struct PredictionsTabView: View {
 
                     // Entry rows
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        Button {
-                            selectedEntry = entry
-                            Task {
-                                await loadPredictions(entryId: entry.entryId)
-                                showingEntryDetail = true
-                            }
-                        } label: {
+                        NavigationLink(value: entry) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 6) {
@@ -264,8 +261,7 @@ struct PredictionsTabView: View {
 
     // MARK: - Can Edit Check
 
-    private var canEdit: Bool {
-        guard let entry = selectedEntry else { return false }
+    private func canEdit(entry: Entry) -> Bool {
         if entry.hasSubmittedPredictions { return false }
         if entry.predictionsLocked { return false }
         if isPastDeadline { return false }
@@ -286,9 +282,28 @@ struct PredictionsTabView: View {
         return false
     }
 
-    // MARK: - Read-Only View Model
+    // MARK: - Submitted View (read-only wizard)
 
     @State private var readOnlyEditVM: PredictionEditViewModel?
+
+    private func submittedView(entry: Entry) -> some View {
+        Group {
+            if let editVM = readOnlyEditVM {
+                PredictionWizardView(
+                    viewModel: editVM,
+                    entry: entry,
+                    initialStage: .summary,
+                    readOnly: true,
+                    readOnlyPoints: computedPoints ?? entry.totalPoints
+                )
+            } else {
+                ProgressView("Loading predictions...")
+            }
+        }
+        .onAppear {
+            setupReadOnlyViewModel(entry: entry)
+        }
+    }
 
     private func setupReadOnlyViewModel(entry: Entry) {
         guard readOnlyEditVM == nil else { return }
@@ -310,36 +325,21 @@ struct PredictionsTabView: View {
         readOnlyEditVM = editVM
     }
 
-    // MARK: - Start Editing
+    // MARK: - Edit View (Wizard)
 
-    private func startEditing(entry: Entry) {
-        let editVM = PredictionEditViewModel(poolId: viewModel.poolId, matches: matches, teams: teams)
-        editVM.setEntryId(entry.entryId)
-
-        for pred in viewModel.existingPredictions {
-            editVM.predictions[pred.matchId] = PredictionInput(
-                matchId: pred.matchId,
-                homeScore: pred.predictedHomeScore,
-                awayScore: pred.predictedAwayScore,
-                homePso: pred.predictedHomePso,
-                awayPso: pred.predictedAwayPso,
-                winnerTeamId: pred.predictedWinnerTeamId
-            )
-        }
-
-        resumeStage = .groupStage
-        for stage in WizardStage.allCases where stage != .summary {
-            if !editVM.isStageComplete(stage) {
-                resumeStage = stage
-                break
+    private func editView(entry: Entry, editVM: PredictionEditViewModel) -> some View {
+        PredictionWizardView(
+            viewModel: editVM,
+            entry: entry,
+            initialStage: resumeStage,
+            onSubmitSuccess: {
+                isEditing = false
+                editViewModel = nil
+                Task {
+                    await viewModel.loadPredictions(entryId: entry.entryId)
+                }
             }
-        }
-        if editVM.isComplete {
-            resumeStage = .summary
-        }
-
-        editViewModel = editVM
-        isEditing = true
+        )
     }
 
     // MARK: - Create New Entry
@@ -365,7 +365,7 @@ struct PredictionsTabView: View {
         }
     }
 
-    // MARK: - Delete Entry
+    // MARK: - Rename Entry
 
     private func deleteEntry() async {
         guard let entry = entryToDelete else { return }
@@ -406,8 +406,6 @@ struct PredictionsTabView: View {
         }
     }
 
-    // MARK: - Rename Entry
-
     private func renameEntry() async {
         guard let entry = entryToRename else { return }
         let name = renameEntryName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -432,112 +430,135 @@ struct PredictionsTabView: View {
             print("[PredictionsTab] Failed to rename entry: \(error)")
         }
     }
+
+    // MARK: - Start Editing
+
+    private func startEditing(entry: Entry) {
+        let editVM = PredictionEditViewModel(poolId: viewModel.poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in viewModel.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        resumeStage = .groupStage
+        for stage in WizardStage.allCases where stage != .summary {
+            if !editVM.isStageComplete(stage) {
+                resumeStage = stage
+                break
+            }
+        }
+        if editVM.isComplete {
+            resumeStage = .summary
+        }
+
+        editViewModel = editVM
+        isEditing = true
+    }
 }
 
-// MARK: - Full-Screen Prediction View
+// MARK: - Entry Prediction View (full-screen, pushed onto NavigationStack)
 
-/// Dedicated full-screen view for the prediction wizard flow.
-/// Hides the tab bar and navigation bar to maximize vertical space
-/// and keep the user focused on entering predictions.
-struct PredictionFullScreenView: View {
+struct EntryPredictionView: View {
+    @Environment(\.dismiss) private var dismiss
     let entry: Entry
-    let entryName: String
-    @Binding var isEditing: Bool
-    @Binding var editViewModel: PredictionEditViewModel?
-    @Binding var resumeStage: WizardStage
-    let hasLoadedPredictions: Bool
-    let canEdit: Bool
-    let computedPoints: Int?
-    @Binding var readOnlyEditVM: PredictionEditViewModel?
-    let onClose: () -> Void
-    let onStartEditing: () -> Void
-    let onSetupReadOnly: () -> Void
-    let onSubmitSuccess: () -> Void
+    let poolId: String
+    let matches: [Match]
+    let teams: [Team]
+    let pool: Pool?
+    var computedPoints: Int?
+    @Binding var selectedEntry: Entry?
 
-    @State private var dragOffset: CGFloat = 0
-    @GestureState private var isDragging = false
+    @State private var predictionsVM: PredictionsViewModel?
+    @State private var isEditing = false
+    @State private var editViewModel: PredictionEditViewModel?
+    @State private var readOnlyEditVM: PredictionEditViewModel?
+    @State private var resumeStage: WizardStage = .groupStage
+    @State private var hasLoadedPredictions = false
+
+    private var canEdit: Bool {
+        if entry.hasSubmittedPredictions { return false }
+        if entry.predictionsLocked { return false }
+        if isPastDeadline { return false }
+        return true
+    }
+
+    private var isPastDeadline: Bool {
+        guard let deadline = pool?.predictionDeadline else { return false }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: deadline) {
+            return date < Date()
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: deadline) {
+            return date < Date()
+        }
+        return false
+    }
 
     var body: some View {
-        ZStack {
-            // Dimmed background that appears as you swipe
-            if dragOffset > 0 {
-                Color.black
-                    .opacity(Double(0.3 * (1.0 - dragOffset / UIScreen.main.bounds.width)))
-                    .ignoresSafeArea()
-            }
-
-            ZStack {
-                // Content fills full screen — scrolls behind header and footer
-                predictionContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea(edges: .bottom)
-
-                // Floating liquid glass header — pinned to top
-                VStack {
-                    HStack {
-                        Button(action: onClose) {
-                            Image(systemName: "chevron.left")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 32, height: 32)
-                                .background(.ultraThinMaterial, in: Circle())
+        ZStack(alignment: .topLeading) {
+            // Content
+            Group {
+                if entry.hasSubmittedPredictions || !canEdit {
+                    submittedView
+                } else if isEditing, let editVM = editViewModel {
+                    PredictionWizardView(
+                        viewModel: editVM,
+                        entry: entry,
+                        initialStage: resumeStage,
+                        onSubmitSuccess: {
+                            dismiss()
                         }
-
-                        Spacer()
-
-                        Text(entryName)
-                            .font(.headline)
-
-                        Spacer()
-
-                        // Invisible balance element
-                        Color.clear
-                            .frame(width: 32, height: 32)
+                    )
+                } else if !hasLoadedPredictions {
+                    ProgressView("Loading predictions...")
+                } else {
+                    Color.clear.onAppear {
+                        if !isEditing {
+                            startEditing()
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
-
-                    Spacer()
                 }
             }
-            .background(Color(.systemGroupedBackground))
-            .offset(x: dragOffset)
-            .gesture(
-                DragGesture()
-                    .updating($isDragging) { _, state, _ in state = true }
-                    .onChanged { value in
-                        // Only allow swipe from the left 40pt edge
-                        guard value.startLocation.x < 40 else { return }
-                        if value.translation.width > 0 {
-                            dragOffset = value.translation.width
-                        }
-                    }
-                    .onEnded { value in
-                        guard value.startLocation.x < 40 else { return }
-                        let velocity = value.predictedEndTranslation.width
-                        if value.translation.width > 120 || velocity > 500 {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                dragOffset = UIScreen.main.bounds.width
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                onClose()
-                                dragOffset = 0
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                dragOffset = 0
-                            }
-                        }
-                    }
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Back button
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 32, height: 32)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .padding(.leading, 16)
+            .padding(.top, 6)
+        }
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .tabBar)
+        .task {
+            selectedEntry = entry
+            let vm = PredictionsViewModel(poolId: poolId)
+            predictionsVM = vm
+            await vm.loadPredictions(entryId: entry.entryId)
+            hasLoadedPredictions = true
         }
     }
 
-    @ViewBuilder
-    private var predictionContent: some View {
-        if entry.hasSubmittedPredictions || !canEdit {
-            // Read-only: show submitted predictions
+    // MARK: - Submitted View
+
+    private var submittedView: some View {
+        Group {
             if let editVM = readOnlyEditVM {
                 PredictionWizardView(
                     viewModel: editVM,
@@ -548,25 +569,63 @@ struct PredictionFullScreenView: View {
                 )
             } else {
                 ProgressView("Loading predictions...")
-                    .onAppear { onSetupReadOnly() }
-            }
-        } else if isEditing, let editVM = editViewModel {
-            // Editing: show wizard
-            PredictionWizardView(
-                viewModel: editVM,
-                entry: entry,
-                initialStage: resumeStage,
-                onSubmitSuccess: onSubmitSuccess
-            )
-        } else if !hasLoadedPredictions {
-            ProgressView("Loading predictions...")
-        } else {
-            // Predictions loaded — auto-launch wizard
-            Color.clear.onAppear {
-                if !isEditing {
-                    onStartEditing()
-                }
             }
         }
+        .onAppear { setupReadOnlyViewModel() }
+    }
+
+    private func setupReadOnlyViewModel() {
+        guard readOnlyEditVM == nil, let vm = predictionsVM else { return }
+
+        let editVM = PredictionEditViewModel(poolId: poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in vm.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        readOnlyEditVM = editVM
+    }
+
+    // MARK: - Start Editing
+
+    private func startEditing() {
+        guard let vm = predictionsVM else { return }
+
+        let editVM = PredictionEditViewModel(poolId: poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in vm.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        resumeStage = .groupStage
+        for stage in WizardStage.allCases where stage != .summary {
+            if !editVM.isStageComplete(stage) {
+                resumeStage = stage
+                break
+            }
+        }
+        if editVM.isComplete {
+            resumeStage = .summary
+        }
+
+        editViewModel = editVM
+        isEditing = true
     }
 }
+
