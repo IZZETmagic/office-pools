@@ -13,6 +13,27 @@ struct GroupStageView: View {
     var body: some View {
         ScrollViewReader { proxy in
             LazyVStack(spacing: 12) {
+                // Expand All / Collapse All toggle
+                if !readOnly {
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                if expandedGroups.count == GROUP_LETTERS.count {
+                                    expandedGroups.removeAll()
+                                } else {
+                                    expandedGroups = Set(GROUP_LETTERS)
+                                }
+                            }
+                        } label: {
+                            Text(expandedGroups.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.accentColor)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
                 ForEach(GROUP_LETTERS, id: \.self) { letter in
                     groupSection(letter: letter)
                 }
@@ -97,13 +118,10 @@ struct GroupStageView: View {
                     Spacer()
 
                     if !readOnly {
-                        Text("\(completedCount)/\(totalCount)")
-                            .font(.caption.weight(.medium).monospacedDigit())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(isGroupComplete ? Color.green.opacity(0.15) : (completedCount > 0 ? Color.yellow.opacity(0.15) : Color(.systemGray5)))
-                            .foregroundStyle(isGroupComplete ? .green : (completedCount > 0 ? .orange : .secondary))
-                            .clipShape(Capsule())
+                        GroupProgressRing(
+                            completed: completedCount,
+                            total: totalCount
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -154,6 +172,40 @@ struct GroupStageView: View {
                 .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
         )
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Group Progress Ring
+
+private struct GroupProgressRing: View {
+    let completed: Int
+    let total: Int
+
+    private var progress: Double {
+        total > 0 ? Double(completed) / Double(total) : 0
+    }
+
+    private var ringColor: Color {
+        if completed == total && total > 0 { return .green }
+        if completed > 0 { return .orange }
+        return Color(.systemGray3)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color(.systemGray4), lineWidth: 2.5)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(ringColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            Text("\(completed)")
+                .font(.system(size: 10, weight: .bold).monospacedDigit())
+                .foregroundStyle(ringColor)
+        }
+        .frame(width: 26, height: 26)
     }
 }
 
