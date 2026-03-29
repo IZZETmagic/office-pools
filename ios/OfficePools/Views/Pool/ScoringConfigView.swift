@@ -56,6 +56,7 @@ struct ScoringConfigView: View {
     // MARK: - UI State
     @State private var isSaving = false
     @State private var saveMessage: (text: String, isError: Bool)?
+    @State private var showResetAlert = false
 
     var body: some View {
         ScrollView {
@@ -81,6 +82,21 @@ struct ScoringConfigView: View {
             }
         }
         .onAppear { initState() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Reset") {
+                    showResetAlert = true
+                }
+                .font(.subheadline)
+                .foregroundStyle(AppColors.error600)
+            }
+        }
+        .alert("Reset to Defaults", isPresented: $showResetAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) { resetToDefaults() }
+        } message: {
+            Text("This will reset all scoring values to their defaults. You'll still need to save to apply changes.")
+        }
     }
 
     // MARK: - Save Bar
@@ -355,6 +371,43 @@ struct ScoringConfigView: View {
             || bonusThirdPlace != (s.bonusThirdPlaceCorrect ?? 25)
             || bonusBestPlayer != (s.bonusBestPlayerCorrect ?? 100)
             || bonusTopScorer != (s.bonusTopScorerCorrect ?? 100)
+    }
+
+    // MARK: - Reset to Defaults
+
+    private func resetToDefaults() {
+        let d = ScoringDefaultsPayload.defaults
+        groupExact = d.groupExactScore
+        groupDiff = d.groupCorrectDifference
+        groupResult = d.groupCorrectResult
+        koExact = d.knockoutExactScore
+        koDiff = d.knockoutCorrectDifference
+        koResult = d.knockoutCorrectResult
+        r32Mult = 1.0
+        r16Mult = d.round16Multiplier
+        qfMult = d.quarterFinalMultiplier
+        sfMult = d.semiFinalMultiplier
+        tpMult = d.thirdPlaceMultiplier
+        finalMult = d.finalMultiplier
+        psoEnabled = d.psoEnabled
+        psoExact = d.psoExactScore
+        psoDiff = d.psoCorrectDifference
+        psoResult = d.psoCorrectResult
+        bonusWinnerAndRunnerup = d.bonusGroupWinnerAndRunnerup
+        bonusWinnerOnly = d.bonusGroupWinnerOnly
+        bonusRunnerupOnly = d.bonusGroupRunnerupOnly
+        bonusBothSwapped = d.bonusBothQualifySwapped
+        bonusOneWrongPos = d.bonusOneQualifiesWrongPosition
+        bonusAll16 = d.bonusAll16Qualified
+        bonus12_15 = d.bonus1215Qualified
+        bonus8_11 = d.bonus811Qualified
+        bonusBracketPairing = d.bonusCorrectBracketPairing
+        bonusMatchWinner = d.bonusMatchWinnerCorrect
+        bonusChampion = d.bonusChampionCorrect
+        bonusSecondPlace = d.bonusSecondPlaceCorrect
+        bonusThirdPlace = d.bonusThirdPlaceCorrect
+        bonusBestPlayer = d.bonusBestPlayerCorrect
+        bonusTopScorer = d.bonusTopScorerCorrect
     }
 
     // MARK: - Save
