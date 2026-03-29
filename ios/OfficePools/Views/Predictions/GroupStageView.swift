@@ -180,8 +180,8 @@ private struct GroupProgressRing: View {
     }
 
     private var ringColor: Color {
-        if completed == total && total > 0 { return .green }
-        if completed > 0 { return .orange }
+        if completed == total && total > 0 { return AppColors.success500 }
+        if completed > 0 { return AppColors.warning500 }
         return Color(.systemGray3)
     }
 

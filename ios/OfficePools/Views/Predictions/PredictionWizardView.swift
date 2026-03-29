@@ -181,17 +181,17 @@ struct PredictionWizardView: View {
             HStack(spacing: 6) {
                 if entry.hasSubmittedPredictions {
                     Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.success500)
                     Text("Submitted")
                         .font(.caption.weight(.medium))
                 } else if entry.predictionsLocked {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppColors.warning500)
                     Text("Locked")
                         .font(.caption.weight(.medium))
                 } else {
                     Image(systemName: "clock.badge.exclamationmark")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error500)
                     Text("Deadline Passed")
                         .font(.caption.weight(.medium))
                 }
@@ -218,7 +218,7 @@ struct PredictionWizardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(AppColors.accent400)
                     Text(champion.teamName)
                         .font(.title2.weight(.bold))
                     Text("Your predicted champion")
@@ -227,11 +227,11 @@ struct PredictionWizardView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
-                .background(Color.yellow.opacity(0.08))
+                .background(AppColors.accent400.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.yellow.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(AppColors.accent400.opacity(0.3), lineWidth: 1)
                 )
                 .padding(.horizontal)
             }
@@ -264,7 +264,7 @@ struct PredictionWizardView: View {
         return HStack {
             Image(systemName: "checkmark.circle.fill")
                 .font(.subheadline)
-                .foregroundStyle(.green)
+                .foregroundStyle(AppColors.success500)
 
             Text(stage.label)
                 .font(.subheadline)
@@ -295,7 +295,7 @@ struct PredictionWizardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(AppColors.accent400)
                     Text(champion.teamName)
                         .font(.title2.weight(.bold))
                     Text("Your predicted champion")
@@ -304,11 +304,11 @@ struct PredictionWizardView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
-                .background(Color.yellow.opacity(0.08))
+                .background(AppColors.accent400.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.yellow.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(AppColors.accent400.opacity(0.3), lineWidth: 1)
                 )
                 .padding(.horizontal)
             }
@@ -316,7 +316,7 @@ struct PredictionWizardView: View {
             // Overall progress
             HStack {
                 Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                    .foregroundStyle(viewModel.isComplete ? .green : .orange)
+                    .foregroundStyle(viewModel.isComplete ? AppColors.success500 : AppColors.warning500)
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(viewModel.progressText)
@@ -355,7 +355,7 @@ struct PredictionWizardView: View {
             if let error = viewModel.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AppColors.error600)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -372,7 +372,7 @@ struct PredictionWizardView: View {
         return HStack {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .font(.subheadline)
-                .foregroundStyle(isComplete ? .green : .secondary)
+                .foregroundStyle(isComplete ? AppColors.success500 : .secondary)
 
             Text(stage.label)
                 .font(.subheadline)
@@ -413,15 +413,15 @@ struct PredictionWizardView: View {
                 } else if case .error(let msg) = viewModel.saveStatus {
                     Image(systemName: "exclamationmark.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error500)
                     Text(msg)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error500)
                         .lineLimit(1)
                 } else if let lastSaved = viewModel.lastSavedAt {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.success500)
                     Text("Saved \(lastSaved.formatted(date: .omitted, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(.secondary)

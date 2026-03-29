@@ -16,7 +16,7 @@ struct PredictionSummaryView: View {
                     Section {
                         HStack {
                             Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                                .foregroundStyle(viewModel.isComplete ? .green : .orange)
+                                .foregroundStyle(viewModel.isComplete ? AppColors.success500 : AppColors.warning500)
                                 .font(.title3)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(viewModel.progressText)
@@ -47,7 +47,7 @@ struct PredictionSummaryView: View {
                     if let error = viewModel.errorMessage {
                         Text(error)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(AppColors.error600)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
@@ -135,7 +135,7 @@ struct PredictionSummaryView: View {
             } else {
                 Text("? - ?")
                     .font(.headline.monospacedDigit())
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AppColors.error500)
                     .padding(.horizontal, 8)
             }
 
@@ -147,7 +147,7 @@ struct PredictionSummaryView: View {
 
             Image(systemName: isIncomplete ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundStyle(isIncomplete ? .red : .green)
+                .foregroundStyle(isIncomplete ? AppColors.error500 : AppColors.success500)
                 .frame(width: 20)
         }
         .padding(.vertical, 2)

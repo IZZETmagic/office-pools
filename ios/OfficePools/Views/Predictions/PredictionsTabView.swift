@@ -164,7 +164,7 @@ struct PredictionsTabView: View {
                                         if entry.hasSubmittedPredictions {
                                             Image(systemName: "checkmark.seal.fill")
                                                 .font(.caption)
-                                                .foregroundStyle(.green)
+                                                .foregroundStyle(AppColors.success500)
                                         }
                                     }
 

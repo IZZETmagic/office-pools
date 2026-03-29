@@ -103,7 +103,7 @@ struct KnockoutStageView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(
-                    isFinal ? Color.yellow.opacity(0.6) : Color(.systemGray4),
+                    isFinal ? AppColors.accent400.opacity(0.6) : Color(.systemGray4),
                     lineWidth: isFinal ? 2 : 0.5
                 )
         )

@@ -86,13 +86,13 @@ struct ThirdPlaceTableView: View {
                 .frame(width: 28, alignment: .center)
             Text(advances ? "Advance" : "Eliminated")
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(advances ? .green : .red)
+                .foregroundStyle(advances ? AppColors.success600 : AppColors.error600)
                 .frame(width: 60, alignment: .center)
         }
         .font(.caption.monospacedDigit())
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(advances ? Color.green.opacity(0.06) : Color.red.opacity(0.06))
+        .background(advances ? AppColors.success500.opacity(0.06) : AppColors.error500.opacity(0.06))
     }
 
     // MARK: - Helpers

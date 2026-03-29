@@ -81,9 +81,9 @@ struct GroupStandingsTable: View {
     private func rowBackground(for position: Int) -> Color {
         switch position {
         case 1, 2:
-            return .green.opacity(0.06)
+            return AppColors.success500.opacity(0.06)
         case 3:
-            return .yellow.opacity(0.06)
+            return AppColors.warning400.opacity(0.06)
         default:
             return .clear
         }

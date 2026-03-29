@@ -76,16 +76,16 @@ struct StagePillsBar: View {
 
     private func pillColor(for stage: WizardStage) -> Color {
         if stage == currentStage {
-            return .blue
+            return AppColors.primary500
         }
         if stage == .summary {
-            return viewModel.isComplete ? .green.opacity(0.2) : Color(.systemGray5)
+            return viewModel.isComplete ? AppColors.success500.opacity(0.2) : Color(.systemGray5)
         }
         let counts = viewModel.stageCompletionCount(stage)
         if counts.completed == counts.total && counts.total > 0 {
-            return .green.opacity(0.2)
+            return AppColors.success500.opacity(0.2)
         } else if counts.completed > 0 {
-            return .yellow.opacity(0.2)
+            return AppColors.warning400.opacity(0.2)
         } else {
             return Color(.systemGray5)
         }
