@@ -233,16 +233,47 @@ export function MembersTab({
     }
 
     setLoading(true)
-    const newAdjustment = (entry.point_adjustment ?? 0) + pointAdjustment
     const newTotal = getEntryTotalPoints(entry) + pointAdjustment
 
-    const { error } = await supabase
-      .from('pool_entries')
-      .update({ point_adjustment: newAdjustment, adjustment_reason: adjustReason.trim() })
+    // 1. Insert into point_adjustments history
+    const { error: insertError } = await supabase
+      .from('point_adjustments')
+      .insert({
+        entry_id: entry.entry_id,
+        pool_id: pool.pool_id,
+        amount: pointAdjustment,
+        reason: adjustReason.trim(),
+        created_by: currentUserId,
+      })
+
+    if (insertError) {
+      setError(insertError.message)
+      setLoading(false)
+      return
+    }
+
+    // 2. Fetch sum of all adjustments for this entry
+    const { data: adjustments, error: fetchError } = await supabase
+      .from('point_adjustments')
+      .select('amount')
       .eq('entry_id', entry.entry_id)
 
-    if (error) {
-      setError(error.message)
+    if (fetchError) {
+      setError(fetchError.message)
+      setLoading(false)
+      return
+    }
+
+    const totalAdjustment = (adjustments || []).reduce((sum, a) => sum + a.amount, 0)
+
+    // 3. Update pool_entries with the running total
+    const { error: updateError } = await supabase
+      .from('pool_entries')
+      .update({ point_adjustment: totalAdjustment, adjustment_reason: adjustReason.trim() })
+      .eq('entry_id', entry.entry_id)
+
+    if (updateError) {
+      setError(updateError.message)
     } else {
       showToast(
         `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`,

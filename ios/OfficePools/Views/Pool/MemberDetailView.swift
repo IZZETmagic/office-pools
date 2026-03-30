@@ -53,7 +53,11 @@ struct MemberDetailView: View {
             memberHeader
         }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showAdjustSheet) {
+        .sheet(isPresented: $showAdjustSheet, onDismiss: {
+            adjustAmount = ""
+            adjustReason = ""
+            isProcessing = false
+        }) {
             adjustPointsSheet
         }
         .alert("Remove Member", isPresented: $showRemoveAlert) {
