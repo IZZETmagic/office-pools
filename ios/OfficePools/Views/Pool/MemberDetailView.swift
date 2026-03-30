@@ -8,6 +8,7 @@ struct MemberDetailView: View {
     let poolService: PoolService
     let adminCount: Int
     let currentUserIsAdmin: Bool
+    var onAdjustmentChanged: (() -> Void)?
 
     @State private var showAdjustSheet = false
     @State private var adjustEntry: Entry?
@@ -549,8 +550,9 @@ struct MemberDetailView: View {
                 )
                 isProcessing = false
                 showAdjustSheet = false
-                // Refresh adjustment history
+                // Refresh adjustment history and leaderboard
                 loadAdjustments()
+                onAdjustmentChanged?()
             } catch {
                 actionError = "Failed to adjust points: \(error.localizedDescription)"
                 isProcessing = false
@@ -566,8 +568,9 @@ struct MemberDetailView: View {
                 try await poolService.deleteAdjustment(adjustmentId: adj.id, entryId: adj.entryId, poolId: poolId)
                 isProcessing = false
                 adjustmentToDelete = nil
-                // Refresh adjustment history
+                // Refresh adjustment history and leaderboard
                 loadAdjustments()
+                onAdjustmentChanged?()
             } catch {
                 actionError = "Failed to delete adjustment: \(error.localizedDescription)"
                 isProcessing = false
