@@ -275,6 +275,9 @@ export function MembersTab({
     if (updateError) {
       setError(updateError.message)
     } else {
+      // 4. Lite recalc: update scored_total_points and re-rank the pool
+      await supabase.rpc('lite_recalc_entry', { p_entry_id: entry.entry_id, p_pool_id: pool.pool_id })
+
       showToast(
         `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`,
         'success'

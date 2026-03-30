@@ -563,7 +563,7 @@ struct MemberDetailView: View {
         isProcessing = true
         Task {
             do {
-                try await poolService.deleteAdjustment(adjustmentId: adj.id, entryId: adj.entryId)
+                try await poolService.deleteAdjustment(adjustmentId: adj.id, entryId: adj.entryId, poolId: poolId)
                 isProcessing = false
                 adjustmentToDelete = nil
                 // Refresh adjustment history
