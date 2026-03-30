@@ -399,6 +399,9 @@ struct PoolDetailView: View {
                     onPoolDeleted: {
                         onPoolDeleted?(viewModel.poolId)
                         dismiss()
+                    },
+                    onScoringSettingsSaved: {
+                        await viewModel.refreshLeaderboard()
                     }
                 )
             }

@@ -5,6 +5,7 @@ struct ScoringConfigView: View {
     let poolId: String
     let settings: PoolSettings?
     let poolService: PoolService
+    var onSettingsSaved: (() async -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -544,6 +545,9 @@ struct ScoringConfigView: View {
                 // Trigger v2 scoring recalculation
                 saveMessage = (text: "Scoring saved. Recalculating points…", isError: false)
                 try await apiService.recalculatePool(poolId: poolId)
+
+                // Refresh leaderboard in parent view
+                await onSettingsSaved?()
 
                 saveMessage = (text: "Scoring saved. Points recalculated.", isError: false)
                 isSaving = false

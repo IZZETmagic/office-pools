@@ -6,6 +6,7 @@ struct PoolSettingsTabView: View {
     let currentUserId: String
     let poolService: PoolService
     var onPoolDeleted: (() -> Void)?
+    var onScoringSettingsSaved: (() async -> Void)?
 
     // Editing state
     @State private var editName = ""
@@ -342,7 +343,8 @@ struct PoolSettingsTabView: View {
             ScoringConfigView(
                 poolId: pool?.poolId ?? "",
                 settings: settings,
-                poolService: poolService
+                poolService: poolService,
+                onSettingsSaved: onScoringSettingsSaved
             )
         } label: {
             card {
