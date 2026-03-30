@@ -571,6 +571,10 @@ final class PoolService {
             .update(UpdatePayload(pointAdjustment: totalAdjustment, adjustmentReason: latestReason))
             .eq("entry_id", value: entryId)
             .execute()
+
+        // 4. Lite recalc: update scored_total_points and re-rank the pool
+        try await supabase.rpc("lite_recalc_entry", params: ["p_entry_id": entryId, "p_pool_id": poolId])
+            .execute()
     }
 
     /// Fetch adjustment history for an entry
@@ -585,7 +589,7 @@ final class PoolService {
     }
 
     /// Delete a single adjustment and recalculate the entry's running total
-    func deleteAdjustment(adjustmentId: String, entryId: String) async throws {
+    func deleteAdjustment(adjustmentId: String, entryId: String, poolId: String) async throws {
         // 1. Delete the adjustment record
         try await supabase
             .from("point_adjustments")
@@ -617,6 +621,10 @@ final class PoolService {
             .from("pool_entries")
             .update(UpdatePayload(pointAdjustment: totalAdjustment, adjustmentReason: latestReason))
             .eq("entry_id", value: entryId)
+            .execute()
+
+        // 4. Lite recalc: update scored_total_points and re-rank the pool
+        try await supabase.rpc("lite_recalc_entry", params: ["p_entry_id": entryId, "p_pool_id": poolId])
             .execute()
     }
 
