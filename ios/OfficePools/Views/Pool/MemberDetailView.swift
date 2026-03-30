@@ -4,6 +4,7 @@ struct MemberDetailView: View {
     let member: Member
     let leaderboardData: [LeaderboardEntryData]
     let currentUserId: String
+    let poolId: String
     let poolService: PoolService
     let adminCount: Int
     let currentUserIsAdmin: Bool
@@ -257,8 +258,8 @@ struct MemberDetailView: View {
             if let firstEntry = entries.first {
                 Button {
                     adjustEntry = firstEntry
-                    adjustAmount = "\(firstEntry.pointAdjustment)"
-                    adjustReason = firstEntry.adjustmentReason ?? ""
+                    adjustAmount = ""
+                    adjustReason = ""
                     showAdjustSheet = true
                 } label: {
                     HStack {
@@ -427,7 +428,13 @@ struct MemberDetailView: View {
         isProcessing = true
         Task {
             do {
-                try await poolService.adjustEntryPoints(entryId: entry.entryId, adjustment: amount, reason: adjustReason)
+                try await poolService.adjustEntryPoints(
+                    entryId: entry.entryId,
+                    poolId: poolId,
+                    adjustment: amount,
+                    reason: adjustReason,
+                    createdBy: currentUserId
+                )
                 isProcessing = false
                 showAdjustSheet = false
             } catch {
@@ -465,10 +472,14 @@ struct MemberDetailView: View {
 
                 if let entry = adjustEntry {
                     let currentPoints = leaderboardData.first(where: { $0.entryId == entry.entryId })?.totalPoints ?? 0
-                    let adj = Int(adjustAmount) ?? 0
+                    let currentAdj = entry.pointAdjustment
+                    let newAdj = Int(adjustAmount) ?? 0
                     Section("Preview") {
-                        LabeledContent("Current Points", value: "\(currentPoints)")
-                        LabeledContent("Adjustment", value: adj >= 0 ? "+\(adj)" : "\(adj)")
+                        LabeledContent("Current Total", value: "\(currentPoints) pts")
+                        LabeledContent("Existing Adjustments", value: currentAdj >= 0 ? "+\(currentAdj)" : "\(currentAdj)")
+                        LabeledContent("This Adjustment", value: newAdj >= 0 ? "+\(newAdj)" : "\(newAdj)")
+                        LabeledContent("New Total", value: "\(currentPoints + newAdj) pts")
+                            .fontWeight(.semibold)
                     }
                 }
             }
