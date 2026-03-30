@@ -169,6 +169,16 @@ final class PoolDetailViewModel {
         realtimeService.onScoresUpdated = nil
     }
 
+    /// Re-fetch pool settings (e.g. after scoring config change)
+    func refreshSettings() async {
+        do {
+            settings = try await poolService.fetchSettings(poolId: poolId)
+            print("[PoolDetail] Settings refreshed")
+        } catch {
+            print("[PoolDetail] Failed to refresh settings: \(error)")
+        }
+    }
+
     /// Re-fetch just the leaderboard data without reloading everything
     func refreshLeaderboard() async {
         do {

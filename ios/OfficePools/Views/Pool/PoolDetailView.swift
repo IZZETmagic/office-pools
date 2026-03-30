@@ -401,6 +401,7 @@ struct PoolDetailView: View {
                         dismiss()
                     },
                     onScoringSettingsSaved: {
+                        await viewModel.refreshSettings()
                         await viewModel.refreshLeaderboard()
                     }
                 )
