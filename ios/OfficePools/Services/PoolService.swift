@@ -584,6 +584,42 @@ final class PoolService {
             .value
     }
 
+    /// Delete a single adjustment and recalculate the entry's running total
+    func deleteAdjustment(adjustmentId: String, entryId: String) async throws {
+        // 1. Delete the adjustment record
+        try await supabase
+            .from("point_adjustments")
+            .delete()
+            .eq("id", value: adjustmentId)
+            .execute()
+
+        // 2. Re-sum remaining adjustments
+        let remaining: [PointAdjustment] = try await supabase
+            .from("point_adjustments")
+            .select()
+            .eq("entry_id", value: entryId)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        let totalAdjustment = remaining.reduce(0) { $0 + $1.amount }
+        let latestReason = remaining.first?.reason ?? ""
+
+        // 3. Update pool_entries with recalculated total
+        struct UpdatePayload: Codable {
+            let pointAdjustment: Int
+            let adjustmentReason: String
+            enum CodingKeys: String, CodingKey {
+                case pointAdjustment = "point_adjustment"
+                case adjustmentReason = "adjustment_reason"
+            }
+        }
+        try await supabase
+            .from("pool_entries")
+            .update(UpdatePayload(pointAdjustment: totalAdjustment, adjustmentReason: latestReason))
+            .eq("entry_id", value: entryId)
+            .execute()
+    }
+
     /// Unlock a submitted entry so the user can edit predictions again
     func unlockEntry(entryId: String) async throws {
         struct UnlockPayload: Codable {
