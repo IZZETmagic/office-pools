@@ -43,6 +43,11 @@ struct PointsBreakdownView: View {
                     // Summary Cards
                     summaryCards(data.summary, adjustment: data.entry.pointAdjustment)
 
+                    // Adjustment Reason
+                    if data.entry.pointAdjustment != 0 {
+                        adjustmentSection(data.entry)
+                    }
+
                     // Match Points Breakdown
                     if !data.matchResults.isEmpty {
                         matchPointsSection(data.matchResults)
@@ -163,6 +168,45 @@ struct PointsBreakdownView: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Adjustment Section
+
+    private func adjustmentSection(_ entry: BreakdownEntry) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Point Adjustment")
+                    .font(.headline)
+                Spacer()
+                Text(entry.pointAdjustment > 0 ? "+\(entry.pointAdjustment)" : "\(entry.pointAdjustment)")
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(entry.pointAdjustment > 0 ? AppColors.success600 : AppColors.error600)
+            }
+            Divider()
+
+            if let reason = entry.adjustmentReason, !reason.isEmpty {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(AppColors.warning600)
+                        .font(.subheadline)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Reason")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(reason)
+                            .font(.subheadline)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppColors.warning600.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     // MARK: - Match Points Section
