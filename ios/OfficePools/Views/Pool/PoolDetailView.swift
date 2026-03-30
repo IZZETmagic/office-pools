@@ -200,6 +200,7 @@ struct PoolDetailView: View {
                 member: member,
                 leaderboardData: viewModel.leaderboardData,
                 currentUserId: viewModel.currentUserId ?? "",
+                poolId: viewModel.poolId,
                 poolService: PoolService(),
                 adminCount: viewModel.members.filter(\.isAdmin).count,
                 currentUserIsAdmin: viewModel.isAdmin

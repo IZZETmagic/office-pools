@@ -526,9 +526,39 @@ final class PoolService {
         try await supabase.from("pool_members").delete().eq("member_id", value: memberId).execute()
     }
 
-    /// Adjust points for a specific entry
-    func adjustEntryPoints(entryId: String, adjustment: Int, reason: String) async throws {
-        struct AdjustPayload: Codable {
+    /// Add a point adjustment to the history and update the entry's running total
+    func adjustEntryPoints(entryId: String, poolId: String, adjustment: Int, reason: String, createdBy: String) async throws {
+        // 1. Insert into point_adjustments history
+        struct InsertPayload: Codable {
+            let entryId: String
+            let poolId: String
+            let amount: Int
+            let reason: String
+            let createdBy: String
+            enum CodingKeys: String, CodingKey {
+                case entryId = "entry_id"
+                case poolId = "pool_id"
+                case amount, reason
+                case createdBy = "created_by"
+            }
+        }
+        try await supabase
+            .from("point_adjustments")
+            .insert(InsertPayload(entryId: entryId, poolId: poolId, amount: adjustment, reason: reason, createdBy: createdBy))
+            .execute()
+
+        // 2. Fetch sum of all adjustments for this entry
+        let adjustments: [PointAdjustment] = try await supabase
+            .from("point_adjustments")
+            .select()
+            .eq("entry_id", value: entryId)
+            .execute()
+            .value
+        let totalAdjustment = adjustments.reduce(0) { $0 + $1.amount }
+        let latestReason = adjustments.sorted(by: { $0.createdAt > $1.createdAt }).first?.reason ?? reason
+
+        // 3. Update pool_entries with the new total
+        struct UpdatePayload: Codable {
             let pointAdjustment: Int
             let adjustmentReason: String
             enum CodingKeys: String, CodingKey {
@@ -538,7 +568,54 @@ final class PoolService {
         }
         try await supabase
             .from("pool_entries")
-            .update(AdjustPayload(pointAdjustment: adjustment, adjustmentReason: reason))
+            .update(UpdatePayload(pointAdjustment: totalAdjustment, adjustmentReason: latestReason))
+            .eq("entry_id", value: entryId)
+            .execute()
+    }
+
+    /// Fetch adjustment history for an entry
+    func fetchAdjustments(entryId: String) async throws -> [PointAdjustment] {
+        try await supabase
+            .from("point_adjustments")
+            .select()
+            .eq("entry_id", value: entryId)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Delete a single adjustment and recalculate the entry's running total
+    func deleteAdjustment(adjustmentId: String, entryId: String) async throws {
+        // 1. Delete the adjustment record
+        try await supabase
+            .from("point_adjustments")
+            .delete()
+            .eq("id", value: adjustmentId)
+            .execute()
+
+        // 2. Re-sum remaining adjustments
+        let remaining: [PointAdjustment] = try await supabase
+            .from("point_adjustments")
+            .select()
+            .eq("entry_id", value: entryId)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        let totalAdjustment = remaining.reduce(0) { $0 + $1.amount }
+        let latestReason = remaining.first?.reason ?? ""
+
+        // 3. Update pool_entries with recalculated total
+        struct UpdatePayload: Codable {
+            let pointAdjustment: Int
+            let adjustmentReason: String
+            enum CodingKeys: String, CodingKey {
+                case pointAdjustment = "point_adjustment"
+                case adjustmentReason = "adjustment_reason"
+            }
+        }
+        try await supabase
+            .from("pool_entries")
+            .update(UpdatePayload(pointAdjustment: totalAdjustment, adjustmentReason: latestReason))
             .eq("entry_id", value: entryId)
             .execute()
     }

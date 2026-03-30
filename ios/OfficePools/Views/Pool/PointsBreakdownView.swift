@@ -8,11 +8,13 @@ struct PointsBreakdownView: View {
     let rank: Int
 
     @State private var breakdown: PointsBreakdownResponse?
+    @State private var adjustments: [PointAdjustment] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var headerHeight: CGFloat = 120
 
     private let apiService = APIService()
+    private let poolService = PoolService()
 
     private let stageOrder = ["group", "round_32", "round_16", "quarter_final", "semi_final", "third_place", "final"]
     private let bonusCategoryOrder = ["group_standings", "qualification", "bracket", "tournament"]
@@ -175,7 +177,7 @@ struct PointsBreakdownView: View {
     private func adjustmentSection(_ entry: BreakdownEntry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Point Adjustment")
+                Text("Point Adjustments")
                     .font(.headline)
                 Spacer()
                 Text(entry.pointAdjustment > 0 ? "+\(entry.pointAdjustment)" : "\(entry.pointAdjustment)")
@@ -184,7 +186,30 @@ struct PointsBreakdownView: View {
             }
             Divider()
 
-            if let reason = entry.adjustmentReason, !reason.isEmpty {
+            if !adjustments.isEmpty {
+                ForEach(adjustments) { adj in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(adj.amount > 0 ? "+\(adj.amount)" : "\(adj.amount)")
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(adj.amount > 0 ? AppColors.success600 : AppColors.error600)
+                            .frame(width: 44, alignment: .trailing)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(adj.reason)
+                                .font(.subheadline)
+                            Text(formattedAdjustmentDate(adj.createdAt))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(AppColors.warning600.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            } else if let reason = entry.adjustmentReason, !reason.isEmpty {
+                // Fallback for legacy single-reason display
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
                         .foregroundStyle(AppColors.warning600)
@@ -207,6 +232,19 @@ struct PointsBreakdownView: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+
+    private func formattedAdjustmentDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: dateString) ?? {
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: dateString)
+        }()
+        guard let date else { return dateString }
+        let display = DateFormatter()
+        display.dateFormat = "MMM d, yyyy 'at' h:mm a"
+        return display.string(from: date)
     }
 
     // MARK: - Match Points Section
@@ -574,7 +612,11 @@ struct PointsBreakdownView: View {
     private func loadBreakdown() async {
         isLoading = true
         do {
-            breakdown = try await apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
+            async let breakdownTask = apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
+            async let adjustmentsTask = poolService.fetchAdjustments(entryId: entryId)
+
+            breakdown = try await breakdownTask
+            adjustments = (try? await adjustmentsTask) ?? []
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription

@@ -4,6 +4,7 @@ struct MemberDetailView: View {
     let member: Member
     let leaderboardData: [LeaderboardEntryData]
     let currentUserId: String
+    let poolId: String
     let poolService: PoolService
     let adminCount: Int
     let currentUserIsAdmin: Bool
@@ -17,9 +18,14 @@ struct MemberDetailView: View {
     @State private var showRemoveAlert = false
     @State private var showUnlockAlert = false
     @State private var entryToUnlock: Entry?
+    @State private var showDeleteAdjustmentAlert = false
+    @State private var adjustmentToDelete: PointAdjustment?
     @Environment(\.dismiss) private var dismiss
 
     @State private var headerHeight: CGFloat = 80
+
+    /// Adjustment history keyed by entryId
+    @State private var adjustmentsByEntry: [String: [PointAdjustment]] = [:]
 
     private var isCurrentUser: Bool { member.userId == currentUserId }
     private var entries: [Entry] { member.entries ?? [] }
@@ -32,9 +38,19 @@ struct MemberDetailView: View {
                     // MARK: - Info
                     infoCard
 
-                    // MARK: - Entries
+                    // MARK: - Entries with adjustments
                     if !entries.isEmpty {
                         entriesCard
+                    }
+
+                    // MARK: - Point Adjustments History (per entry)
+                    if currentUserIsAdmin {
+                        ForEach(entries) { entry in
+                            let adjustments = adjustmentsByEntry[entry.entryId] ?? []
+                            if !adjustments.isEmpty {
+                                adjustmentsCard(entry: entry, adjustments: adjustments)
+                            }
+                        }
                     }
 
                     // MARK: - Admin Actions
@@ -52,7 +68,11 @@ struct MemberDetailView: View {
             memberHeader
         }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showAdjustSheet) {
+        .sheet(isPresented: $showAdjustSheet, onDismiss: {
+            adjustAmount = ""
+            adjustReason = ""
+            isProcessing = false
+        }) {
             adjustPointsSheet
         }
         .alert("Remove Member", isPresented: $showRemoveAlert) {
@@ -75,6 +95,18 @@ struct MemberDetailView: View {
                 Text("Unlock \(entry.entryName) so \(member.users.fullName) can edit their predictions again?")
             }
         }
+        .alert("Delete Adjustment", isPresented: $showDeleteAdjustmentAlert) {
+            Button("Cancel", role: .cancel) {
+                adjustmentToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                deleteAdjustmentAction()
+            }
+        } message: {
+            if let adj = adjustmentToDelete {
+                Text("Delete this \(adj.amount > 0 ? "+\(adj.amount)" : "\(adj.amount)") adjustment (\(adj.reason))?")
+            }
+        }
         .alert("Error", isPresented: .init(
             get: { actionError != nil },
             set: { if !$0 { actionError = nil } }
@@ -82,6 +114,9 @@ struct MemberDetailView: View {
             Button("OK") { actionError = nil }
         } message: {
             Text(actionError ?? "")
+        }
+        .onAppear {
+            loadAdjustments()
         }
     }
 
@@ -199,6 +234,31 @@ struct MemberDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
+
+                    // Adjust points button per entry (admin only)
+                    if currentUserIsAdmin {
+                        Button {
+                            adjustEntry = entry
+                            adjustAmount = ""
+                            adjustReason = ""
+                            showAdjustSheet = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plusminus")
+                                    .font(.caption2)
+                                Text("Adjust Points")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(AppColors.warning600)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(AppColors.warning600.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+
                     if entry.hasSubmittedPredictions, let submittedAt = entry.predictionsSubmittedAt {
                         HStack {
                             Spacer()
@@ -212,6 +272,66 @@ struct MemberDetailView: View {
                 if index < entries.count - 1 {
                     Divider()
                 }
+            }
+        }
+    }
+
+    // MARK: - Adjustments History Card
+
+    private func adjustmentsCard(entry: Entry, adjustments: [PointAdjustment]) -> some View {
+        let total = adjustments.reduce(0) { $0 + $1.amount }
+        return card {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Adjustments")
+                        .font(.headline)
+                    if entries.count > 1 {
+                        Text(entry.entryName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Text(total > 0 ? "+\(total)" : "\(total)")
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(total > 0 ? AppColors.success600 : AppColors.error600)
+            }
+
+            Divider()
+
+            ForEach(adjustments) { adj in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(adj.amount > 0 ? "+\(adj.amount)" : "\(adj.amount)")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(adj.amount > 0 ? AppColors.success600 : AppColors.error600)
+                        .frame(width: 44, alignment: .trailing)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(adj.reason)
+                            .font(.subheadline)
+                        Text(formattedDateTime(adj.createdAt))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Spacer()
+
+                    // Delete button
+                    Button {
+                        adjustmentToDelete = adj
+                        showDeleteAdjustmentAlert = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.error600)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(10)
+                .background(AppColors.warning600.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }
@@ -252,28 +372,6 @@ struct MemberDetailView: View {
             .disabled(isCurrentUser || (member.isAdmin && adminCount <= 1))
 
             Divider()
-
-            // Adjust Points
-            if let firstEntry = entries.first {
-                Button {
-                    adjustEntry = firstEntry
-                    adjustAmount = "\(firstEntry.pointAdjustment)"
-                    adjustReason = firstEntry.adjustmentReason ?? ""
-                    showAdjustSheet = true
-                } label: {
-                    HStack {
-                        Image(systemName: "plusminus")
-                            .foregroundStyle(AppColors.warning600)
-                        Text("Adjust Points")
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.warning600)
-                        Spacer()
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Divider()
-            }
 
             // Remove
             Button(role: .destructive) {
@@ -376,6 +474,21 @@ struct MemberDetailView: View {
         return display.string(from: date)
     }
 
+    // MARK: - Data Loading
+
+    private func loadAdjustments() {
+        Task {
+            for entry in entries {
+                do {
+                    let adjustments = try await poolService.fetchAdjustments(entryId: entry.entryId)
+                    adjustmentsByEntry[entry.entryId] = adjustments
+                } catch {
+                    print("[MemberDetail] Failed to load adjustments for \(entry.entryName): \(error)")
+                }
+            }
+        }
+    }
+
     // MARK: - Actions
 
     private func toggleRole() {
@@ -427,12 +540,38 @@ struct MemberDetailView: View {
         isProcessing = true
         Task {
             do {
-                try await poolService.adjustEntryPoints(entryId: entry.entryId, adjustment: amount, reason: adjustReason)
+                try await poolService.adjustEntryPoints(
+                    entryId: entry.entryId,
+                    poolId: poolId,
+                    adjustment: amount,
+                    reason: adjustReason,
+                    createdBy: currentUserId
+                )
                 isProcessing = false
                 showAdjustSheet = false
+                // Refresh adjustment history
+                loadAdjustments()
             } catch {
                 actionError = "Failed to adjust points: \(error.localizedDescription)"
                 isProcessing = false
+            }
+        }
+    }
+
+    private func deleteAdjustmentAction() {
+        guard let adj = adjustmentToDelete else { return }
+        isProcessing = true
+        Task {
+            do {
+                try await poolService.deleteAdjustment(adjustmentId: adj.id, entryId: adj.entryId)
+                isProcessing = false
+                adjustmentToDelete = nil
+                // Refresh adjustment history
+                loadAdjustments()
+            } catch {
+                actionError = "Failed to delete adjustment: \(error.localizedDescription)"
+                isProcessing = false
+                adjustmentToDelete = nil
             }
         }
     }
@@ -456,7 +595,7 @@ struct MemberDetailView: View {
                     }
                 }
 
-                Section("Adjustment") {
+                Section("New Adjustment") {
                     TextField("Points (e.g. 5 or -3)", text: $adjustAmount)
                         .keyboardType(.numbersAndPunctuation)
                     TextField("Reason (required)", text: $adjustReason, axis: .vertical)
@@ -465,10 +604,12 @@ struct MemberDetailView: View {
 
                 if let entry = adjustEntry {
                     let currentPoints = leaderboardData.first(where: { $0.entryId == entry.entryId })?.totalPoints ?? 0
-                    let adj = Int(adjustAmount) ?? 0
+                    let newAdj = Int(adjustAmount) ?? 0
                     Section("Preview") {
-                        LabeledContent("Current Points", value: "\(currentPoints)")
-                        LabeledContent("Adjustment", value: adj >= 0 ? "+\(adj)" : "\(adj)")
+                        LabeledContent("Current Total", value: "\(currentPoints) pts")
+                        LabeledContent("This Adjustment", value: newAdj >= 0 ? "+\(newAdj)" : "\(newAdj)")
+                        LabeledContent("New Total", value: "\(currentPoints + newAdj) pts")
+                            .fontWeight(.semibold)
                     }
                 }
             }
@@ -480,7 +621,7 @@ struct MemberDetailView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveAdjustment() }
-                        .disabled(adjustReason.isEmpty || Int(adjustAmount) == nil || isProcessing)
+                        .disabled(adjustReason.isEmpty || Int(adjustAmount) == nil || Int(adjustAmount) == 0 || isProcessing)
                 }
             }
         }

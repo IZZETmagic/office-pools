@@ -1,9 +1,17 @@
 'use client'
 
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData } from './types'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
+
+type PointAdjustmentRecord = {
+  id: string
+  amount: number
+  reason: string
+  created_at: string
+}
 
 // =============================================
 // TYPES & CONSTANTS
@@ -134,6 +142,21 @@ export function PointsBreakdownModal({
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
   const totalPoints = playerScore?.total_points ?? entry.total_points ?? 0
+
+  // Fetch adjustment history
+  const [adjustmentHistory, setAdjustmentHistory] = useState<PointAdjustmentRecord[]>([])
+  useEffect(() => {
+    if ((entry.point_adjustment ?? 0) === 0) return
+    const supabase = createClient()
+    supabase
+      .from('point_adjustments')
+      .select('id, amount, reason, created_at')
+      .eq('entry_id', entry.entry_id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setAdjustmentHistory(data)
+      })
+  }, [entry.entry_id, entry.point_adjustment])
 
   // Build match lookup for team names
   const matchLookup = useMemo(() => {
@@ -458,23 +481,46 @@ export function PointsBreakdownModal({
           </div>
 
           {/* ========================================== */}
-          {/* POINT ADJUSTMENT (only if non-zero)        */}
+          {/* POINT ADJUSTMENTS (only if non-zero)       */}
           {/* ========================================== */}
           {(entry.point_adjustment ?? 0) !== 0 && (
             <div>
               <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
-                Point Adjustment
+                Point Adjustments
+                <span className={`ml-2 text-sm font-bold ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-error-600'}`}>
+                  {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)}
+                </span>
               </h3>
-              <div className="border border-warning-200 dark:border-warning-700 rounded-xl overflow-hidden bg-warning-50/50">
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs font-medium text-warning-800">Manual Adjustment</span>
-                  <span className={`text-xs font-bold ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-error-600'}`}>
-                    {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)} pts
-                  </span>
-                </div>
-                {entry.adjustment_reason && (
-                  <div className="px-3 pb-2.5 -mt-1">
-                    <span className="text-xs text-warning-700 italic">{entry.adjustment_reason}</span>
+              <div className="space-y-2">
+                {adjustmentHistory.length > 0 ? (
+                  adjustmentHistory.map((adj) => (
+                    <div key={adj.id} className="border border-warning-200 dark:border-warning-700 rounded-xl overflow-hidden bg-warning-50/50">
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <span className="text-xs font-medium text-warning-800">{adj.reason}</span>
+                        <span className={`text-xs font-bold ${adj.amount > 0 ? 'text-success-600' : 'text-error-600'}`}>
+                          {adj.amount > 0 ? '+' : ''}{formatNumber(adj.amount)} pts
+                        </span>
+                      </div>
+                      <div className="px-3 pb-2 -mt-1">
+                        <span className="text-[10px] text-warning-600">
+                          {new Date(adj.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="border border-warning-200 dark:border-warning-700 rounded-xl overflow-hidden bg-warning-50/50">
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs font-medium text-warning-800">Manual Adjustment</span>
+                      <span className={`text-xs font-bold ${(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-error-600'}`}>
+                        {(entry.point_adjustment ?? 0) > 0 ? '+' : ''}{formatNumber(entry.point_adjustment ?? 0)} pts
+                      </span>
+                    </div>
+                    {entry.adjustment_reason && (
+                      <div className="px-3 pb-2.5 -mt-1">
+                        <span className="text-xs text-warning-700 italic">{entry.adjustment_reason}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
