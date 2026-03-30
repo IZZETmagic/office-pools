@@ -203,7 +203,10 @@ struct PoolDetailView: View {
                 poolId: viewModel.poolId,
                 poolService: PoolService(),
                 adminCount: viewModel.members.filter(\.isAdmin).count,
-                currentUserIsAdmin: viewModel.isAdmin
+                currentUserIsAdmin: viewModel.isAdmin,
+                onAdjustmentChanged: {
+                    Task { await viewModel.refreshLeaderboard() }
+                }
             )
         }
         .sheet(isPresented: $showingBanter) {
