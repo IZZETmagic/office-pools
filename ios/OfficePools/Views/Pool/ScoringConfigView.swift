@@ -109,6 +109,14 @@ struct ScoringConfigView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 100)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { notification in
+            if let textField = notification.object as? UITextField {
+                DispatchQueue.main.async {
+                    textField.selectAll(nil)
+                }
+            }
+        }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Scoring Configuration")
         .navigationBarTitleDisplayMode(.inline)
@@ -140,12 +148,18 @@ struct ScoringConfigView: View {
     private var saveBar: some View {
         VStack(spacing: 8) {
             if let msg = saveMessage {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                        .font(.subheadline)
                     Text(msg.text)
+                        .font(.subheadline.weight(.medium))
                 }
-                .font(.caption)
                 .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background((msg.isError ? AppColors.error600 : AppColors.success600).opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
             if hasChanges {
