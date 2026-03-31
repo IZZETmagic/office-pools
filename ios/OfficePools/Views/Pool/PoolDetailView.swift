@@ -6,6 +6,7 @@ enum PoolTab: String, CaseIterable {
     case form = "Form"
     case banter = "Banter"
     case rules = "Rules"
+    case rounds = "Rounds"
     case members = "Members"
     case settings = "Settings"
 
@@ -16,6 +17,7 @@ enum PoolTab: String, CaseIterable {
         case .form: return "chart.bar.xaxis"
         case .banter: return "bubble.left.and.bubble.right"
         case .rules: return "list.number"
+        case .rounds: return "calendar.badge.clock"
         case .members: return "person.3"
         case .settings: return "gearshape"
         }
@@ -347,7 +349,12 @@ struct PoolDetailView: View {
                                 await viewModel.load(userId: userId)
                             }
                         },
-                        showingEntryDetail: $showingEntryDetail
+                        showingEntryDetail: $showingEntryDetail,
+                        roundStates: viewModel.roundStates,
+                        roundSubmissions: viewModel.roundSubmissions,
+                        onRoundStatesRefresh: { entryId in
+                            await viewModel.refreshRoundStates(entryId: entryId)
+                        }
                     )
                 } else {
                     ProgressView("Loading...")
@@ -386,6 +393,16 @@ struct PoolDetailView: View {
                     settings: viewModel.settings
                 )
 
+            case .rounds:
+                RoundsAdminView(
+                    poolId: viewModel.poolId,
+                    roundStates: viewModel.roundStates,
+                    roundsResponse: viewModel.roundsResponse,
+                    onRefresh: {
+                        await viewModel.refreshRoundStates(entryId: viewModel.selectedEntry?.entryId)
+                    }
+                )
+
             case .members:
                 MembersTabView(
                     members: viewModel.members,
@@ -415,6 +432,10 @@ struct PoolDetailView: View {
     private var visibleTabs: [PoolTab] {
         var tabs: [PoolTab] = [.leaderboard, .predictions, .form, .rules]
         if viewModel.isAdmin {
+            // Show Rounds tab for progressive pool admins
+            if viewModel.pool?.predictionMode == .progressive {
+                tabs.append(.rounds)
+            }
             tabs.append(contentsOf: [.members, .settings])
         }
         return tabs

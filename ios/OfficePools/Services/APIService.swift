@@ -185,6 +185,120 @@ final class APIService {
         let _: SubmitResponse = try await request("PUT", path: "/api/pools/\(poolId)/predictions", body: Body(entryId: entryId))
     }
 
+    // MARK: - Progressive Round Predictions
+
+    struct RoundSubmitResponse: Decodable {
+        let submitted: Bool
+        let roundKey: String
+        let submittedAt: String?
+        let predictedCount: Int?
+    }
+
+    /// Submit predictions for a specific round (progressive mode)
+    func submitRoundPredictions(poolId: String, entryId: String, roundKey: String) async throws -> RoundSubmitResponse {
+        struct Body: Encodable {
+            let entryId: String
+            let roundKey: String
+        }
+        return try await request("PUT", path: "/api/pools/\(poolId)/predictions/round", body: Body(
+            entryId: entryId,
+            roundKey: roundKey
+        ))
+    }
+
+    struct RoundsResponse: Decodable {
+        let mode: String
+        let rounds: [RoundData]
+
+        struct RoundData: Decodable {
+            let id: String
+            let poolId: String
+            let roundKey: String
+            let state: String
+            let deadline: String?
+            let openedAt: String?
+            let openedBy: String?
+            let closedAt: String?
+            let completedAt: String?
+            let matchCount: Int?
+            let completedMatchCount: Int?
+            let entrySubmission: EntrySubmissionData?
+            let adminStats: AdminStatsData?
+
+            enum CodingKeys: String, CodingKey {
+                case id
+                case poolId = "pool_id"
+                case roundKey = "round_key"
+                case state, deadline
+                case openedAt = "opened_at"
+                case openedBy = "opened_by"
+                case closedAt = "closed_at"
+                case completedAt = "completed_at"
+                case matchCount = "match_count"
+                case completedMatchCount = "completed_match_count"
+                case entrySubmission = "entry_submission"
+                case adminStats = "admin_stats"
+            }
+
+            struct EntrySubmissionData: Decodable {
+                let hasSubmitted: Bool
+                let submittedAt: String?
+                let autoSubmitted: Bool
+                let predictionCount: Int
+
+                enum CodingKeys: String, CodingKey {
+                    case hasSubmitted = "has_submitted"
+                    case submittedAt = "submitted_at"
+                    case autoSubmitted = "auto_submitted"
+                    case predictionCount = "prediction_count"
+                }
+            }
+
+            struct AdminStatsData: Decodable {
+                let totalEntries: Int
+                let submittedEntries: Int
+
+                enum CodingKeys: String, CodingKey {
+                    case totalEntries = "total_entries"
+                    case submittedEntries = "submitted_entries"
+                }
+            }
+        }
+    }
+
+    /// Fetch rounds with state, match counts, and entry submission status
+    func fetchRounds(poolId: String, entryId: String? = nil) async throws -> RoundsResponse {
+        var path = "/api/pools/\(poolId)/rounds"
+        if let entryId {
+            path += "?entryId=\(entryId)"
+        }
+        return try await request("GET", path: path)
+    }
+
+    struct RoundStateChangeResponse: Decodable {
+        let success: Bool
+        let roundKey: String
+        let newState: String
+
+        enum CodingKeys: String, CodingKey {
+            case success
+            case roundKey = "round_key"
+            case newState = "new_state"
+        }
+    }
+
+    /// Admin: change round state (open, close, complete, extend_deadline)
+    func changeRoundState(poolId: String, roundKey: String, action: String, deadline: String? = nil) async throws -> RoundStateChangeResponse {
+        struct Body: Encodable {
+            let action: String
+            let deadline: String?
+        }
+        return try await request("POST", path: "/api/pools/\(poolId)/rounds/\(roundKey)/state", body: Body(
+            action: action,
+            deadline: deadline
+        ))
+    }
+
     // MARK: - Contact
 
     func sendContactForm(name: String, email: String, message: String) async throws {

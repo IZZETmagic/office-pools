@@ -20,6 +20,11 @@ final class PoolDetailViewModel {
     var leaderboardData: [LeaderboardEntryData] = []
     var leaderboardResponse: LeaderboardResponse?
 
+    /// Progressive round states
+    var roundStates: [PoolRoundState] = []
+    var roundSubmissions: [String: EntryRoundSubmission] = [:]  // roundKey → submission
+    var roundsResponse: APIService.RoundsResponse?
+
     /// Analytics data (pre-loaded)
     var analyticsData: [String: AnalyticsResponse] = [:]  // entryId → response
     var currentUserId: String?
@@ -131,6 +136,11 @@ final class PoolDetailViewModel {
         // Select first entry by default
         selectedEntry = currentMember?.entries?.first
 
+        // Fetch progressive round states if applicable
+        if pool?.predictionMode == .progressive {
+            await loadRoundStates(entryId: selectedEntry?.entryId)
+        }
+
         isLoading = false
 
         // Pre-load analytics for all entries concurrently (non-blocking)
@@ -162,11 +172,74 @@ final class PoolDetailViewModel {
             }
         }
         await realtimeService.subscribeToScores(poolId: poolId)
+
+        // For progressive pools, also subscribe to round state changes
+        if pool?.predictionMode == .progressive {
+            realtimeService.onRoundStatesChanged = { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    print("[PoolDetail] Round state changed via Realtime — refreshing")
+                    await self.refreshRoundStates(entryId: self.selectedEntry?.entryId)
+                }
+            }
+            await realtimeService.subscribeToRoundStates(poolId: poolId)
+        }
     }
 
     func stopScoresSubscription() async {
         await realtimeService.unsubscribeFromScores()
+        await realtimeService.unsubscribeFromRoundStates()
         realtimeService.onScoresUpdated = nil
+        realtimeService.onRoundStatesChanged = nil
+    }
+
+    /// Load progressive round states from the API
+    func loadRoundStates(entryId: String? = nil) async {
+        do {
+            let response = try await apiService.fetchRounds(poolId: poolId, entryId: entryId)
+            roundsResponse = response
+            // Convert API response to PoolRoundState models
+            roundStates = response.rounds.compactMap { rd -> PoolRoundState? in
+                guard let state = RoundStateValue(rawValue: rd.state) else { return nil }
+                guard let roundKey = RoundKey(rawValue: rd.roundKey) else { return nil }
+                return PoolRoundState(
+                    id: rd.id,
+                    poolId: rd.poolId,
+                    roundKey: roundKey,
+                    state: state,
+                    deadline: rd.deadline,
+                    openedAt: rd.openedAt,
+                    closedAt: rd.closedAt,
+                    completedAt: rd.completedAt,
+                    openedBy: rd.openedBy,
+                    createdAt: "",
+                    updatedAt: ""
+                )
+            }
+            // Build submission map
+            roundSubmissions = [:]
+            for rd in response.rounds {
+                if let sub = rd.entrySubmission {
+                    roundSubmissions[rd.roundKey] = EntryRoundSubmission(
+                        id: rd.id,
+                        entryId: entryId ?? "",
+                        roundKey: RoundKey(rawValue: rd.roundKey) ?? .group,
+                        hasSubmitted: sub.hasSubmitted,
+                        submittedAt: sub.submittedAt,
+                        autoSubmitted: sub.autoSubmitted,
+                        predictionCount: sub.predictionCount
+                    )
+                }
+            }
+            print("[PoolDetail] Round states loaded: \(roundStates.count)")
+        } catch {
+            print("[PoolDetail] Failed to load round states: \(error)")
+        }
+    }
+
+    /// Refresh round states (e.g. after submission)
+    func refreshRoundStates(entryId: String? = nil) async {
+        await loadRoundStates(entryId: entryId)
     }
 
     /// Re-fetch pool settings (e.g. after scoring config change)

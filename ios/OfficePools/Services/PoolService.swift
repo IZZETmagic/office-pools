@@ -645,6 +645,30 @@ final class PoolService {
             .execute()
     }
 
+    // MARK: - Progressive Round States
+
+    /// Fetch all round states for a progressive pool
+    func fetchRoundStates(poolId: String) async throws -> [PoolRoundState] {
+        let states: [PoolRoundState] = try await supabase
+            .from("pool_round_states")
+            .select()
+            .eq("pool_id", value: poolId)
+            .execute()
+            .value
+        return states
+    }
+
+    /// Fetch round submissions for a specific entry
+    func fetchRoundSubmissions(entryId: String) async throws -> [EntryRoundSubmission] {
+        let submissions: [EntryRoundSubmission] = try await supabase
+            .from("entry_round_submissions")
+            .select()
+            .eq("entry_id", value: entryId)
+            .execute()
+            .value
+        return submissions
+    }
+
     /// Delete a pool and all related data (cascade)
     func deletePool(poolId: String) async throws {
         let members = try await fetchMembers(poolId: poolId)

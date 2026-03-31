@@ -28,10 +28,12 @@ final class RealtimeService {
     private var messagesChannel: RealtimeChannelV2?
     private var reactionsChannel: RealtimeChannelV2?
     private var scoresChannel: RealtimeChannelV2?
+    private var roundStatesChannel: RealtimeChannelV2?
     private var presenceSubscription: RealtimeSubscription?
     private var messagesSubscription: RealtimeSubscription?
     private var reactionsSubscription: RealtimeSubscription?
     private var scoresSubscription: RealtimeSubscription?
+    private var roundStatesSubscription: RealtimeSubscription?
     private var scoresDebounceTask: Task<Void, Never>?
 
     var onlineMembers: [PresenceState] = []
@@ -39,6 +41,8 @@ final class RealtimeService {
     var newMessage: PoolMessage?
     /// Fires when pool_entries scores are updated (debounced)
     var onScoresUpdated: (@Sendable () -> Void)?
+    /// Fires when pool_round_states change (e.g. auto-complete opens a new round)
+    var onRoundStatesChanged: (@Sendable () -> Void)?
 
     // MARK: - Presence
 
@@ -352,6 +356,43 @@ final class RealtimeService {
             await channel.unsubscribe()
             scoresSubscription = nil
             scoresChannel = nil
+        }
+    }
+
+    // MARK: - Round States (Progressive auto-complete/auto-open)
+
+    /// Subscribe to pool_round_states changes for a pool.
+    /// Fires `onRoundStatesChanged` when round states are updated (e.g. cron auto-completes a round).
+    func subscribeToRoundStates(poolId: String) async {
+        if roundStatesChannel != nil { return }
+        let channel = supabase.channel("pool-round-states-\(poolId)")
+
+        roundStatesSubscription = channel.onPostgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "pool_round_states",
+            filter: "pool_id=eq.\(poolId)"
+        ) { [weak self] _ in
+            print("[Realtime] Round state change detected for pool \(poolId)")
+            Task { @MainActor in
+                self?.onRoundStatesChanged?()
+            }
+        }
+
+        do {
+            try await channel.subscribeWithError()
+            print("[Realtime] Subscribed to round state updates for pool \(poolId)")
+        } catch {
+            print("[Realtime] ERROR subscribing to round states: \(error)")
+        }
+        roundStatesChannel = channel
+    }
+
+    func unsubscribeFromRoundStates() async {
+        if let channel = roundStatesChannel {
+            await channel.unsubscribe()
+            roundStatesSubscription = nil
+            roundStatesChannel = nil
         }
     }
 

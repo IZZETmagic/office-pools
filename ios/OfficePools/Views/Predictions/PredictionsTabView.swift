@@ -13,8 +13,14 @@ struct PredictionsTabView: View {
     var onEntryCreated: (() async -> Void)?
     @Binding var showingEntryDetail: Bool
 
+    /// Progressive mode round state data
+    var roundStates: [PoolRoundState] = []
+    var roundSubmissions: [String: EntryRoundSubmission] = [:]
+    var onRoundStatesRefresh: ((String?) async -> Void)?
+
     @State private var isEditing = false
     @State private var editViewModel: PredictionEditViewModel?
+    @State private var progressiveEditViewModel: ProgressivePredictionEditViewModel?
     @State private var resumeStage: WizardStage = .groupStage
     @State private var hasLoadedPredictions = false
     @State private var newEntryName = ""
@@ -26,6 +32,10 @@ struct PredictionsTabView: View {
     @State private var entryToDelete: Entry?
     @State private var deleteError: String?
     @State private var showDeleteError = false
+
+    private var isProgressive: Bool {
+        pool?.predictionMode == .progressive
+    }
 
     private var isMultiEntry: Bool {
         (pool?.maxEntriesPerUser ?? 1) > 1
@@ -43,33 +53,52 @@ struct PredictionsTabView: View {
         entryListPage
             .fullScreenCover(isPresented: $showingEntryDetail) {
                 if let entry = selectedEntry {
-                    PredictionFullScreenView(
-                        entry: entry,
-                        entryName: entry.entryName,
-                        isEditing: $isEditing,
-                        editViewModel: $editViewModel,
-                        resumeStage: $resumeStage,
-                        hasLoadedPredictions: hasLoadedPredictions,
-                        canEdit: canEdit,
-                        computedPoints: computedPoints,
-                        readOnlyEditVM: $readOnlyEditVM,
-                        onClose: {
-                            showingEntryDetail = false
-                            // Reset state for next open
-                            isEditing = false
-                            editViewModel = nil
-                            readOnlyEditVM = nil
-                        },
-                        onStartEditing: { startEditing(entry: entry) },
-                        onSetupReadOnly: { setupReadOnlyViewModel(entry: entry) },
-                        onSubmitSuccess: {
-                            isEditing = false
-                            editViewModel = nil
-                            Task {
-                                await viewModel.loadPredictions(entryId: entry.entryId)
+                    if isProgressive {
+                        ProgressiveFullScreenView(
+                            entry: entry,
+                            entryName: entry.entryName,
+                            progressiveEditViewModel: $progressiveEditViewModel,
+                            hasLoadedPredictions: hasLoadedPredictions,
+                            onClose: {
+                                showingEntryDetail = false
+                                progressiveEditViewModel = nil
+                            },
+                            onSetup: { setupProgressiveViewModel(entry: entry) },
+                            onSubmitSuccess: {
+                                Task {
+                                    await viewModel.loadPredictions(entryId: entry.entryId)
+                                    await onRoundStatesRefresh?(entry.entryId)
+                                }
                             }
-                        }
-                    )
+                        )
+                    } else {
+                        PredictionFullScreenView(
+                            entry: entry,
+                            entryName: entry.entryName,
+                            isEditing: $isEditing,
+                            editViewModel: $editViewModel,
+                            resumeStage: $resumeStage,
+                            hasLoadedPredictions: hasLoadedPredictions,
+                            canEdit: canEdit,
+                            computedPoints: computedPoints,
+                            readOnlyEditVM: $readOnlyEditVM,
+                            onClose: {
+                                showingEntryDetail = false
+                                isEditing = false
+                                editViewModel = nil
+                                readOnlyEditVM = nil
+                            },
+                            onStartEditing: { startEditing(entry: entry) },
+                            onSetupReadOnly: { setupReadOnlyViewModel(entry: entry) },
+                            onSubmitSuccess: {
+                                isEditing = false
+                                editViewModel = nil
+                                Task {
+                                    await viewModel.loadPredictions(entryId: entry.entryId)
+                                }
+                            }
+                        )
+                    }
                 }
             }
             .alert("New Entry", isPresented: $isCreatingEntry) {
@@ -253,6 +282,18 @@ struct PredictionsTabView: View {
     }
 
     private func entryStatusText(_ entry: Entry) -> String {
+        if isProgressive {
+            let submittedCount = roundSubmissions.values.filter(\.hasSubmitted).count
+            let totalRounds = roundStates.filter { $0.state != .locked }.count
+            if submittedCount > 0 {
+                return "\(submittedCount)/\(totalRounds) rounds submitted"
+            }
+            // Find the current open round
+            if let openRound = roundStates.first(where: { $0.state == .open }) {
+                return "\(openRound.roundKey.displayName) open"
+            }
+            return "Draft"
+        }
         if entry.hasSubmittedPredictions {
             return "Submitted"
         } else if entry.predictionsLocked {
@@ -308,6 +349,34 @@ struct PredictionsTabView: View {
         }
 
         readOnlyEditVM = editVM
+    }
+
+    // MARK: - Progressive Mode Setup
+
+    private func setupProgressiveViewModel(entry: Entry) {
+        guard progressiveEditViewModel == nil else { return }
+
+        let editVM = ProgressivePredictionEditViewModel(
+            poolId: viewModel.poolId,
+            matches: matches,
+            teams: teams,
+            roundStates: roundStates,
+            roundSubmissions: roundSubmissions
+        )
+        editVM.setEntryId(entry.entryId)
+
+        for pred in viewModel.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        progressiveEditViewModel = editVM
     }
 
     // MARK: - Start Editing
@@ -431,6 +500,67 @@ struct PredictionsTabView: View {
         } catch {
             print("[PredictionsTab] Failed to rename entry: \(error)")
         }
+    }
+}
+
+// MARK: - Progressive Full-Screen View
+
+/// Full-screen view for progressive tournament predictions.
+/// Shows round tabs and per-round prediction/submission flow.
+struct ProgressiveFullScreenView: View {
+    let entry: Entry
+    let entryName: String
+    @Binding var progressiveEditViewModel: ProgressivePredictionEditViewModel?
+    let hasLoadedPredictions: Bool
+    let onClose: () -> Void
+    let onSetup: () -> Void
+    let onSubmitSuccess: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Content
+            if let editVM = progressiveEditViewModel {
+                ProgressivePredictionWizardView(
+                    viewModel: editVM,
+                    entry: entry,
+                    onSubmitSuccess: onSubmitSuccess
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: .bottom)
+            } else if !hasLoadedPredictions {
+                ProgressView("Loading predictions...")
+            } else {
+                Color.clear.onAppear { onSetup() }
+            }
+
+            // Floating header
+            VStack {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+
+                    Spacer()
+
+                    Text(entryName)
+                        .font(.headline)
+
+                    Spacer()
+
+                    Color.clear
+                        .frame(width: 36, height: 36)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+
+                Spacer()
+            }
+        }
+        .background(Color(.systemGroupedBackground))
     }
 }
 

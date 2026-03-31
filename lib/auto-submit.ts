@@ -1,8 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
-import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate } from '@/lib/email/templates'
+import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate, roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
-import { ROUND_LABELS, ROUND_MATCH_STAGES, type RoundKey } from '@/lib/tournament'
+import { ROUND_LABELS, ROUND_MATCH_STAGES, ROUND_ORDER, type RoundKey } from '@/lib/tournament'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
@@ -330,4 +330,203 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
   }
 
   return result
+}
+
+type AutoCompleteResult = {
+  roundsChecked: number
+  completed: number
+  nextRoundsOpened: number
+  errors: string[]
+}
+
+/**
+ * Auto-complete progressive rounds where all matches have finished.
+ * When a round is in 'in_progress' state and every match in that round
+ * has is_completed=true, transition to 'completed' and auto-open the
+ * next round if teams are assigned.
+ */
+export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResult> {
+  const supabase = createAdminClient()
+  const result: AutoCompleteResult = { roundsChecked: 0, completed: 0, nextRoundsOpened: 0, errors: [] }
+
+  try {
+    // 1. Find all rounds in 'in_progress' state
+    const { data: inProgressRounds, error: roundsError } = await supabase
+      .from('pool_round_states')
+      .select('id, pool_id, round_key')
+      .eq('state', 'in_progress')
+
+    if (roundsError) {
+      result.errors.push(`Failed to fetch in_progress rounds: ${roundsError.message}`)
+      return result
+    }
+
+    if (!inProgressRounds || inProgressRounds.length === 0) return result
+    result.roundsChecked = inProgressRounds.length
+
+    for (const round of inProgressRounds) {
+      const roundKey = round.round_key as RoundKey
+      const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+
+      // 2. Get pool's tournament_id
+      const { data: pool } = await supabase
+        .from('pools')
+        .select('tournament_id, pool_name')
+        .eq('pool_id', round.pool_id)
+        .single()
+
+      if (!pool) continue
+
+      // 3. Check if ALL matches in this round are completed
+      const { data: roundMatches } = await supabase
+        .from('matches')
+        .select('match_id, is_completed')
+        .eq('tournament_id', pool.tournament_id)
+        .in('stage', stages)
+
+      if (!roundMatches || roundMatches.length === 0) continue
+
+      const allCompleted = roundMatches.every(m => m.is_completed)
+      if (!allCompleted) continue
+
+      // 4. Transition round to 'completed'
+      const now = new Date().toISOString()
+      const { error: updateError } = await supabase
+        .from('pool_round_states')
+        .update({
+          state: 'completed',
+          completed_at: now,
+          updated_at: now,
+        })
+        .eq('id', round.id)
+
+      if (updateError) {
+        result.errors.push(`Pool ${round.pool_id} round ${roundKey}: ${updateError.message}`)
+        continue
+      }
+
+      result.completed++
+      console.log(`[AutoComplete] Completed ${roundKey} for pool ${round.pool_id}`)
+
+      // 5. Auto-open next round if teams are assigned
+      const nextRound = ROUND_ORDER[roundKey]
+      if (!nextRound) continue
+
+      // Check current state of next round (must be locked)
+      const { data: nextRoundState } = await supabase
+        .from('pool_round_states')
+        .select('id, state')
+        .eq('pool_id', round.pool_id)
+        .eq('round_key', nextRound)
+        .single()
+
+      if (!nextRoundState || nextRoundState.state !== 'locked') continue
+
+      const nextStages = ROUND_MATCH_STAGES[nextRound] ?? []
+      const { data: nextMatches } = await supabase
+        .from('matches')
+        .select('match_id, home_team_id, away_team_id, match_date')
+        .eq('tournament_id', pool.tournament_id)
+        .in('stage', nextStages)
+        .order('match_date', { ascending: true })
+
+      if (!nextMatches || nextMatches.length === 0) continue
+
+      const allTeamsAssigned = nextMatches.every(m => m.home_team_id && m.away_team_id)
+      if (!allTeamsAssigned) continue
+
+      // Default deadline: 2 hours before first match of next round
+      const firstMatchDate = new Date(nextMatches[0].match_date)
+      const defaultDeadline = new Date(firstMatchDate.getTime() - 2 * 60 * 60 * 1000).toISOString()
+
+      const { error: openError } = await supabase
+        .from('pool_round_states')
+        .update({
+          state: 'open',
+          deadline: defaultDeadline,
+          opened_at: now,
+          updated_at: now,
+        })
+        .eq('id', nextRoundState.id)
+
+      if (openError) {
+        result.errors.push(`Pool ${round.pool_id} auto-open ${nextRound}: ${openError.message}`)
+        continue
+      }
+
+      result.nextRoundsOpened++
+      console.log(`[AutoComplete] Auto-opened ${nextRound} for pool ${round.pool_id} (deadline: ${defaultDeadline})`)
+
+      // Send round open notifications
+      sendAutoRoundOpenNotifications(round.pool_id, pool.pool_name, nextRound, defaultDeadline).catch(console.error)
+    }
+  } catch (err) {
+    result.errors.push(`Unexpected error: ${err}`)
+  }
+
+  if (result.completed > 0) {
+    console.log(`[AutoComplete] Completed ${result.completed} rounds, opened ${result.nextRoundsOpened} next rounds`)
+  }
+
+  return result
+}
+
+/**
+ * Send round open notification emails (used by auto-complete flow).
+ * Same logic as the admin route's sendRoundOpenNotifications but usable from cron context.
+ */
+async function sendAutoRoundOpenNotifications(
+  poolId: string,
+  poolName: string,
+  roundKey: RoundKey,
+  deadline: string
+) {
+  const supabase = createAdminClient()
+
+  const { data: members } = await supabase
+    .from('pool_members')
+    .select('users(email, full_name, username)')
+    .eq('pool_id', poolId)
+
+  if (!members || members.length === 0) return
+
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('tournament_id')
+    .eq('pool_id', poolId)
+    .single()
+
+  const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+  const { count: matchCount } = await supabase
+    .from('matches')
+    .select('*', { count: 'exact', head: true })
+    .eq('tournament_id', pool?.tournament_id)
+    .in('stage', stages)
+
+  const roundName = ROUND_LABELS[roundKey]
+  const poolUrl = `${APP_URL}/pools/${poolId}?tab=predictions`
+
+  const emails = members
+    .filter((m: any) => m.users?.email)
+    .map((m: any) => {
+      const { subject, html } = roundOpenTemplate({
+        userName: m.users.full_name || m.users.username || 'there',
+        poolName,
+        roundName,
+        deadline,
+        matchCount: matchCount ?? 0,
+        poolUrl,
+      })
+      return {
+        to: m.users.email,
+        subject,
+        html,
+        topicId: TOPICS.POOL_ACTIVITY,
+        tags: [{ name: 'category', value: 'round_open' }],
+      }
+    })
+
+  if (emails.length > 0) {
+    await sendBatchEmails(emails)
+  }
 }

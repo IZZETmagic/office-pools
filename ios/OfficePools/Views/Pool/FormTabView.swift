@@ -143,9 +143,9 @@ struct FormTabView: View {
             }
 
             HStack(spacing: 0) {
-                xpStat("Match", value: xp.totalBaseXp, color: .blue)
-                xpStat("Bonus", value: xp.totalBonusXp, color: .orange)
-                xpStat("Badges", value: xp.totalBadgeXp, color: .purple)
+                xpStat("Match", value: xp.totalBaseXp, color: AppColors.xpMatch)
+                xpStat("Bonus", value: xp.totalBonusXp, color: AppColors.xpBonus)
+                xpStat("Badges", value: xp.totalBadgeXp, color: AppColors.xpBadge)
             }
         }
         .padding(16)
@@ -218,13 +218,7 @@ struct FormTabView: View {
     }
 
     private func levelColor(_ level: Int) -> Color {
-        switch level {
-        case 10: return .yellow
-        case 8...9: return .orange
-        case 6...7: return .purple
-        case 4...5: return .blue
-        default: return .green
-        }
+        AppColors.levelColor(level)
     }
 
     // MARK: - Badges
@@ -305,14 +299,7 @@ struct FormTabView: View {
     }
 
     private func rarityColor(_ rarity: String) -> Color {
-        switch rarity {
-        case "Common": return .gray
-        case "Uncommon": return .green
-        case "Rare": return .blue
-        case "Very Rare": return .purple
-        case "Legendary": return .yellow
-        default: return .gray
-        }
+        AppColors.rarityColor(rarity)
     }
 
     // MARK: - Hot & Cold Streak KPIs
@@ -326,7 +313,7 @@ struct FormTabView: View {
             VStack(spacing: 6) {
                 Image(systemName: "flame.fill")
                     .font(.title2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppColors.hotStreak)
 
                 Text("Current Hot Streak")
                     .font(.system(size: 9, weight: .semibold))
@@ -336,14 +323,14 @@ struct FormTabView: View {
 
                 Text("\(currentHot)")
                     .font(.system(size: 36, weight: .heavy).monospacedDigit())
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppColors.hotStreak)
 
                 // Progress pips
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         Capsule()
                             .fill(i < min(currentHot, 5)
-                                ? Color.orange
+                                ? AppColors.hotStreak
                                 : Color(.systemGray5))
                             .frame(width: 20, height: 5)
                     }
@@ -361,7 +348,7 @@ struct FormTabView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(AppColors.hotStreak.opacity(0.2), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
 
@@ -369,7 +356,7 @@ struct FormTabView: View {
             VStack(spacing: 6) {
                 Image(systemName: "snowflake")
                     .font(.title2)
-                    .foregroundStyle(.cyan)
+                    .foregroundStyle(AppColors.coldStreak)
 
                 Text("Worst Cold Streak")
                     .font(.system(size: 9, weight: .semibold))
@@ -379,7 +366,7 @@ struct FormTabView: View {
 
                 Text("\(coldStreak)")
                     .font(.system(size: 36, weight: .heavy).monospacedDigit())
-                    .foregroundStyle(.cyan)
+                    .foregroundStyle(AppColors.coldStreak)
 
                 // Progress pips (cold intensifying)
                 HStack(spacing: 3) {
@@ -387,7 +374,7 @@ struct FormTabView: View {
                         let filled = i < min(coldStreak, 5)
                         let opacity: Double = 0.15 + 0.17 * Double(i + 1)
                         Capsule()
-                            .fill(filled ? Color.cyan.opacity(opacity) : Color(.systemGray5))
+                            .fill(filled ? AppColors.coldStreak.opacity(opacity) : Color(.systemGray5))
                             .frame(width: 20, height: 5)
                     }
                 }
@@ -443,10 +430,10 @@ struct FormTabView: View {
 
             // Legend
             HStack(spacing: 14) {
-                runLegendItem(color: .yellow, label: "Exact Score")
-                runLegendItem(color: .green, label: "Winner + GD")
-                runLegendItem(color: .blue, label: "Correct Result")
-                runLegendItem(color: Color(.systemGray4), label: "Miss")
+                runLegendItem(color: AppColors.tierExact, label: "Exact Score")
+                runLegendItem(color: AppColors.tierWinnerGd, label: "Winner + GD")
+                runLegendItem(color: AppColors.tierWinner, label: "Correct Result")
+                runLegendItem(color: AppColors.tierMiss, label: "Miss")
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -528,10 +515,10 @@ struct FormTabView: View {
 
     private func tierColor(_ tier: String) -> Color {
         switch tier {
-        case "exact": return .yellow
-        case "winner_gd": return .green
-        case "winner": return .blue
-        default: return Color(.systemGray4)
+        case "exact": return AppColors.tierExact
+        case "winner_gd": return AppColors.tierWinnerGd
+        case "winner": return AppColors.tierWinner
+        default: return AppColors.tierMiss
         }
     }
 
@@ -634,10 +621,10 @@ struct FormTabView: View {
                     Text("YOU")
                         .font(.system(size: 10, weight: .bold))
                         .tracking(0.8)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary600)
                     Text("\(userAccuracy)%")
                         .font(.system(size: 32, weight: .heavy).monospacedDigit())
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(AppColors.primary500)
                 }
 
                 Spacer()
@@ -646,7 +633,7 @@ struct FormTabView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.blue.opacity(0.12), Color.purple.opacity(0.2)],
+                                colors: [AppColors.primary500.opacity(0.12), AppColors.neutral400.opacity(0.2)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -667,7 +654,7 @@ struct FormTabView: View {
                     Text("POOL AVG")
                         .font(.system(size: 10, weight: .bold))
                         .tracking(0.8)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(AppColors.neutral500)
                     Text("\(crowdAccuracy)%")
                         .font(.system(size: 32, weight: .heavy).monospacedDigit())
                         .foregroundStyle(Color(.systemGray3))
@@ -699,22 +686,22 @@ struct FormTabView: View {
 
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    // You fill (blue, left)
+                    // You fill (primary, left)
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [Color.blue, Color.blue.opacity(0.8)],
+                                colors: [AppColors.primary500, AppColors.primary400],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .frame(width: max(geo.size.width * youPct / 100 - 1, 2))
 
-                    // Crowd fill (purple, right)
+                    // Crowd fill (neutral, right)
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [Color.purple.opacity(0.67), Color.purple],
+                                colors: [AppColors.neutral400, AppColors.neutral500],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -727,7 +714,7 @@ struct FormTabView: View {
     }
 
     private func performanceCallout(isOutperforming: Bool, accuracyDiff: Int, contrarianAdv: Int, showContrarian: Bool) -> some View {
-        let accentColor: Color = isOutperforming ? .green : .blue
+        let accentColor: Color = isOutperforming ? AppColors.outperforming : AppColors.primary500
         let iconName = isOutperforming ? "chart.line.uptrend.xyaxis" : "target"
         let message = isOutperforming
             ? "Outperforming the crowd by \(accuracyDiff)%"
@@ -817,17 +804,17 @@ struct FormTabView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.success400)
                     Text("Most Predictable")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppColors.success600)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 8)
 
                 VStack(spacing: 0) {
                     ForEach(Array(topPredictable.enumerated()), id: \.element.id) { idx, match in
-                        predictableMatchRow(index: idx, match: match, color: .green, isLast: idx == topPredictable.count - 1)
+                        predictableMatchRow(index: idx, match: match, color: AppColors.success500, isLast: idx == topPredictable.count - 1)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -839,17 +826,17 @@ struct FormTabView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error400)
                     Text("Biggest Upsets")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.error600)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 8)
 
                 VStack(spacing: 0) {
                     ForEach(Array(topUpsets.enumerated()), id: \.element.id) { idx, match in
-                        predictableMatchRow(index: idx, match: match, color: .red, isLast: idx == topUpsets.count - 1)
+                        predictableMatchRow(index: idx, match: match, color: AppColors.error500, isLast: idx == topUpsets.count - 1)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -1024,10 +1011,10 @@ struct LevelRoadmapView: View {
         let isReached = xp.totalXp >= level.xpRequired
         let isCurrent = level.level == xp.currentLevel.level
         let lvlColor = levelColor(level.level)
-        let circleFill: Color = isReached ? .green : Color(.systemGray4)
+        let circleFill: Color = isReached ? AppColors.success500 : Color(.systemGray4)
         let nameColor: Color = isCurrent ? lvlColor : (isReached ? .primary : .secondary)
-        let xpColor: Color = isCurrent ? lvlColor : (isReached ? .green : Color(.systemGray3))
-        let bgColor: Color = isCurrent ? lvlColor.opacity(0.08) : (isReached ? Color.green.opacity(0.04) : Color(.systemGray6))
+        let xpColor: Color = isCurrent ? lvlColor : (isReached ? AppColors.success500 : Color(.systemGray3))
+        let bgColor: Color = isCurrent ? lvlColor.opacity(0.08) : (isReached ? AppColors.success500.opacity(0.04) : Color(.systemGray6))
 
         return HStack(spacing: 12) {
             ZStack {
@@ -1091,9 +1078,9 @@ struct LevelRoadmapView: View {
             }
 
             HStack(spacing: 8) {
-                xpPill("Match XP", value: xp.totalBaseXp, color: .blue)
-                xpPill("Bonus XP", value: xp.totalBonusXp, color: .green)
-                xpPill("Badge XP", value: xp.totalBadgeXp, color: .orange)
+                xpPill("Match XP", value: xp.totalBaseXp, color: AppColors.xpMatch)
+                xpPill("Bonus XP", value: xp.totalBonusXp, color: AppColors.xpBonus)
+                xpPill("Badge XP", value: xp.totalBadgeXp, color: AppColors.xpBadge)
             }
             .padding(.top, 4)
         }
@@ -1120,12 +1107,6 @@ struct LevelRoadmapView: View {
     }
 
     private func levelColor(_ level: Int) -> Color {
-        switch level {
-        case 10: return .yellow
-        case 8...9: return .orange
-        case 6...7: return .purple
-        case 4...5: return .blue
-        default: return .green
-        }
+        AppColors.levelColor(level)
     }
 }

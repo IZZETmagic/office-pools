@@ -13,13 +13,32 @@ struct PoolsView: View {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading pools...")
-                } else if viewModel.poolCards.isEmpty && viewModel.searchText.isEmpty {
+                } else if viewModel.poolCards.isEmpty {
                     emptyState
                 } else {
                     mainContent
                 }
             }
-            .navigationBarHidden(true)
+            .navigationTitle("Pools")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            viewModel.showJoinSheet = true
+                        } label: {
+                            Label("Join Pool", systemImage: "person.badge.plus")
+                        }
+                        Button {
+                            viewModel.showCreateSheet = true
+                        } label: {
+                            Label("Create Pool", systemImage: "square.and.pencil")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
             .navigationDestination(for: Pool.self) { pool in
                 PoolDetailView(
                     viewModel: PoolDetailViewModel(poolId: pool.poolId),
@@ -80,13 +99,12 @@ struct PoolsView: View {
         }
     }
 
-    // MARK: - Main Content (ZStack glass header)
+    // MARK: - Main Content
 
     private var mainContent: some View {
-        ZStack(alignment: .top) {
-            // Scrollable content behind header
-            ScrollView {
-                LazyVStack(spacing: 12) {
+        ScrollView {
+            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                Section {
                     if viewModel.filteredPools.isEmpty {
                         emptyFilterState
                     } else {
@@ -97,74 +115,16 @@ struct PoolsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                } header: {
+                    filterBar
+                        .padding(.vertical, 8)
+                        .background(.clear)
                 }
-                .padding(.top, 140)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 20)
             }
-            .background(Color(.systemGroupedBackground))
-
-            // Sticky glass header
-            VStack(spacing: 0) {
-                // Title + search with glass background
-                VStack(spacing: 0) {
-                    // Title row: "Pools" + menu button
-                    HStack {
-                        Text("Pools")
-                            .font(.title3.bold())
-                        Spacer()
-                        Menu {
-                            Button {
-                                viewModel.showJoinSheet = true
-                            } label: {
-                                Label("Join Pool", systemImage: "person.badge.plus")
-                            }
-                            Button {
-                                viewModel.showCreateSheet = true
-                            } label: {
-                                Label("Create Pool", systemImage: "square.and.pencil")
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title3)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    .padding(.bottom, 8)
-
-                    // Search bar
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        TextField("Search pools...", text: $viewModel.searchText)
-                            .font(.subheadline)
-                        if !viewModel.searchText.isEmpty {
-                            Button {
-                                viewModel.searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                }
-                .frame(maxWidth: .infinity)
-                .background(.ultraThinMaterial)
-
-                // Filter pills + sort icon (transparent background)
-                filterBar
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
         }
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - Filter Bar
@@ -240,14 +200,13 @@ struct PoolsView: View {
 
     private var emptyFilterState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
+            Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text("No pools match your search")
+            Text("No pools match this filter")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Button("Clear Filters") {
-                viewModel.searchText = ""
+            Button("Clear Filter") {
                 viewModel.statusFilter = .all
             }
             .font(.subheadline)

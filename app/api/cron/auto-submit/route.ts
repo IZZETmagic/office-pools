@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { autoSubmitDraftEntries, autoSubmitProgressiveRounds } from '@/lib/auto-submit'
+import { autoSubmitDraftEntries, autoSubmitProgressiveRounds, autoCompleteProgressiveRounds } from '@/lib/auto-submit'
 import { autoArchivePools } from '@/lib/auto-archive'
 
 export const dynamic = 'force-dynamic'
@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
 
   try {
     // Run all tasks in parallel
-    const [submitResult, progressiveResult, archiveResult] = await Promise.all([
+    const [submitResult, progressiveResult, autoCompleteResult, archiveResult] = await Promise.all([
       autoSubmitDraftEntries(),
       autoSubmitProgressiveRounds(),
+      autoCompleteProgressiveRounds(),
       autoArchivePools(),
     ])
 
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       autoSubmit: submitResult,
       progressiveAutoSubmit: progressiveResult,
+      progressiveAutoComplete: autoCompleteResult,
       autoArchive: archiveResult,
     })
   } catch (err) {
