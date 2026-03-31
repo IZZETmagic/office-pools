@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { ROUND_LABELS, type RoundKey } from '@/lib/tournament'
+import { ROUND_LABELS, ROUND_KEYS, type RoundKey } from '@/lib/tournament'
 import type { PoolRoundState, RoundStateValue } from '../types'
 
 type RoundRow = PoolRoundState & {
@@ -67,7 +67,12 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       const res = await fetch(`/api/pools/${poolId}/rounds`)
       if (!res.ok) throw new Error('Failed to fetch rounds')
       const data = await res.json()
-      setRounds(data.rounds ?? [])
+      // Sort by canonical round order (group first)
+      const orderMap = new Map(ROUND_KEYS.map((k, i) => [k, i]))
+      const sorted = [...(data.rounds ?? [])].sort(
+        (a: RoundRow, b: RoundRow) => (orderMap.get(a.round_key) ?? 99) - (orderMap.get(b.round_key) ?? 99)
+      )
+      setRounds(sorted)
     } catch {
       showToast('Failed to load rounds data', 'error')
     } finally {
