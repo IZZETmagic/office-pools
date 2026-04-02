@@ -95,7 +95,15 @@ function formatDeadline(deadline: string | null) {
     className: 'text-warning-600 font-semibold',
   }
   return {
-    text: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    text: (() => {
+      const month = d.toLocaleString('en-US', { month: 'short' })
+      const day = d.getDate()
+      const hour = d.getHours()
+      const minute = d.getMinutes().toString().padStart(2, '0')
+      const period = hour >= 12 ? 'PM' : 'AM'
+      const h = hour % 12 || 12
+      return `${month} ${day}, ${h}:${minute} ${period}`
+    })(),
     className: 'text-neutral-700',
   }
 }

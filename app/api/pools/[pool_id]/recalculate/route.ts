@@ -1,6 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { recalculatePool } from '@/lib/scoring'
 
 // =============================================================
@@ -14,27 +13,8 @@ export async function POST(
 ) {
   const { pool_id } = await params
 
-  // Authenticate — supports both cookie auth (web) and Bearer token auth (iOS)
-  let supabase: any
-  let user: any = null
-
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.replace('Bearer ', '')
-    supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    )
-    const { data } = await supabase.auth.getUser(token)
-    user = data?.user
-  } else {
-    supabase = await createClient()
-    const { data } = await supabase.auth.getUser()
-    user = data?.user
-  }
-
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
 
   const result = await recalculatePool({ poolId: pool_id })
 

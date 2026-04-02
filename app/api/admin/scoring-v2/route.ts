@@ -1,5 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin } from '@/lib/auth'
 import { recalculatePool } from '@/lib/scoring'
 
 // Allow up to 120s for processing all pools
@@ -14,22 +15,11 @@ export const maxDuration = 120
 // Super admin only. No side effects on existing scores.
 // =============================================================
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
+  const { supabase } = auth.data
+
   const adminClient = createAdminClient()
-
-  // 1. Authenticate — super admin only
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData?.is_super_admin) {
-    return NextResponse.json({ error: 'Super admin only' }, { status: 403 })
-  }
 
   // 2. Find all pools with submitted entries
   const { data: pools } = await adminClient
@@ -109,21 +99,10 @@ export async function POST(request: NextRequest) {
 // Returns the current comparison state without recalculating.
 // =============================================================
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
+
   const adminClient = createAdminClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData?.is_super_admin) {
-    return NextResponse.json({ error: 'Super admin only' }, { status: 403 })
-  }
 
   // Comparison: v2 totals vs existing totals
   const { data: comparison } = await adminClient

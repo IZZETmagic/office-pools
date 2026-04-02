@@ -52,12 +52,13 @@ function getStageLabel(stage: string, groupLetter: string | null): string {
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  const month = d.toLocaleString('en-US', { month: 'short' })
+  const day = d.getDate()
+  const hour = d.getHours()
+  const minute = d.getMinutes().toString().padStart(2, '0')
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const h = hour % 12 || 12
+  return `${month} ${day}, ${h}:${minute} ${period}`
 }
 
 function countryCodeToEmoji(code: string): string {
@@ -293,7 +294,7 @@ export function MatchCard({
             <span className="italic">No prediction</span>
           ) : null}
         </div>
-        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2">
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2" suppressHydrationWarning>
           {formatDate(match.match_date)}
         </span>
       </div>

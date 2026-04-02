@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
-import FeedbackButton from "@/components/ui/FeedbackButton";
 import Footer from "@/components/ui/Footer";
 
 import { ToastProvider } from "@/components/ui/Toast";
@@ -69,7 +68,6 @@ export default function RootLayout({
           <ToastProvider>
             {children}
             <Footer />
-            <FeedbackButton />
           </ToastProvider>
         </ThemeProvider>
       </body>

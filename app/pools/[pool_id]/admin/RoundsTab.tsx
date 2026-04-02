@@ -38,13 +38,13 @@ function getStateBadge(state: RoundStateValue) {
 function formatDeadline(deadline: string | null) {
   if (!deadline) return '—'
   const d = new Date(deadline)
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
+  const month = d.toLocaleString('en-US', { month: 'short' })
+  const day = d.getDate()
+  const hour = d.getHours()
+  const minute = d.getMinutes().toString().padStart(2, '0')
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const h = hour % 12 || 12
+  return `${month} ${day}, ${h}:${minute} ${period}`
 }
 
 export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTabProps) {

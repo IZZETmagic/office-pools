@@ -1,24 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { withPerfLogging } from '@/lib/api-perf'
 
 async function handleGET(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const url = new URL(request.url)
   const q = url.searchParams.get('q') ?? ''
@@ -54,20 +41,30 @@ async function handleGET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Filter out pools the user is already in and get member counts
+  // Filter out pools the user is already in
   const availablePools = (pools ?? []).filter((p: any) => !userPoolIds.has(p.pool_id))
 
-  // Fetch member counts for the available pools
-  const poolsWithCounts = await Promise.all(
-    availablePools.map(async (pool: any) => {
-      const { count } = await supabase
-        .from('pool_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('pool_id', pool.pool_id)
+  if (availablePools.length === 0) {
+    return NextResponse.json({ pools: [] })
+  }
 
-      return { ...pool, memberCount: count ?? 0 }
-    })
-  )
+  // Fetch member counts in a single query instead of N+1
+  const poolIds = availablePools.map((p: any) => p.pool_id)
+  const { data: memberCounts } = await supabase
+    .from('pool_members')
+    .select('pool_id')
+    .in('pool_id', poolIds)
+
+  // Build a count map
+  const countMap = new Map<string, number>()
+  for (const row of memberCounts ?? []) {
+    countMap.set(row.pool_id, (countMap.get(row.pool_id) ?? 0) + 1)
+  }
+
+  const poolsWithCounts = availablePools.map((pool: any) => ({
+    ...pool,
+    memberCount: countMap.get(pool.pool_id) ?? 0,
+  }))
 
   return NextResponse.json({ pools: poolsWithCounts })
 }

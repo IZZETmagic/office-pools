@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 
@@ -17,31 +17,31 @@ function buildTopicIdToKeyMap(): Map<string, TopicKey> {
 
 // GET - Fetch user's real notification preferences from Resend
 export async function GET() {
-  const supabase = await createClient()
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
+  // Fetch additional user fields needed for Resend contact sync
+  const { data: userProfile } = await supabase
     .from('users')
     .select('email, username, full_name')
-    .eq('auth_user_id', user.id)
+    .eq('user_id', userData.user_id)
     .single()
 
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!userProfile) return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
 
   // Ensure contact exists in Resend
-  const nameParts = (userData.full_name || '').split(' ')
+  const nameParts = (userProfile.full_name || '').split(' ')
   await syncContactToResend({
-    email: userData.email,
-    firstName: nameParts[0] || userData.username,
+    email: userProfile.email,
+    firstName: nameParts[0] || userProfile.username,
     lastName: nameParts.slice(1).join(' ') || undefined,
   })
 
   try {
     // Fetch real topic subscriptions from Resend REST API
     const res = await fetch(
-      `https://api.resend.com/contacts/${encodeURIComponent(userData.email)}/topics?limit=100`,
+      `https://api.resend.com/contacts/${encodeURIComponent(userProfile.email)}/topics?limit=100`,
       {
         headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
       }
@@ -80,18 +80,18 @@ export async function GET() {
 
 // PATCH - Update a notification preference in Resend
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData: authUserData } = auth.data
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
+  // Fetch email needed for Resend API
+  const { data: userEmail } = await supabase
     .from('users')
     .select('email')
-    .eq('auth_user_id', user.id)
+    .eq('user_id', authUserData.user_id)
     .single()
 
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!userEmail) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { topicKey, enabled } = await request.json() as {
     topicKey: TopicKey
@@ -110,7 +110,7 @@ export async function PATCH(request: NextRequest) {
   try {
     // Update topic subscription via Resend REST API
     const res = await fetch(
-      `https://api.resend.com/contacts/${encodeURIComponent(userData.email)}/topics`,
+      `https://api.resend.com/contacts/${encodeURIComponent(userEmail.email)}/topics`,
       {
         method: 'PATCH',
         headers: {

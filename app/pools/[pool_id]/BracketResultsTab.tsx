@@ -21,6 +21,16 @@ import {
 import { calculateBracketPickerPoints, type MatchWithResult } from '@/lib/bracketPickerScoring'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import {
+  LEFT_R32,
+  RIGHT_R32,
+  LEFT_R16,
+  RIGHT_R16,
+  LEFT_QF,
+  RIGHT_QF,
+  LEFT_SF,
+  RIGHT_SF,
+} from '@/lib/bracketConstants'
 import type {
   MatchData,
   TeamData,
@@ -64,16 +74,6 @@ const COL_GAP = 24
 const ROUND_W = CELL_W + COL_GAP
 const HEADER_H = 24
 const R32_TOTAL_H = 8 * CELL_H + 7 * PAIR_GAP
-
-// Knockout match numbers
-const LEFT_R32 = [73, 74, 75, 76, 77, 78, 79, 80]
-const RIGHT_R32 = [81, 82, 83, 84, 85, 86, 87, 88]
-const LEFT_R16 = [89, 90, 91, 92]
-const RIGHT_R16 = [93, 94, 95, 96]
-const LEFT_QF = [97, 98]
-const RIGHT_QF = [99, 100]
-const LEFT_SF = [101]
-const RIGHT_SF = [102]
 
 // =============================================
 // HELPERS

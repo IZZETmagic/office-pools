@@ -1,5 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { ROUND_ORDER, ROUND_LABELS, ROUND_MATCH_STAGES } from '@/lib/tournament'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
@@ -15,18 +16,10 @@ export async function POST(
   { params }: { params: Promise<{ pool_id: string; round_key: string }> }
 ) {
   const { pool_id, round_key } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   // Verify admin role
   const { data: membership } = await supabase

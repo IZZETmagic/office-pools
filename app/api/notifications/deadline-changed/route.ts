@@ -1,34 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { sendBatchEmails } from '@/lib/email/send'
 import { deadlineChangedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { pool_id, new_deadline } = await request.json()
   if (!pool_id || !new_deadline) {
     return NextResponse.json({ error: 'pool_id and new_deadline are required' }, { status: 400 })
   }
 
-  // Verify caller is admin
-  const { data: callerData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!callerData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
   const { data: adminMembership } = await supabase
     .from('pool_members')
     .select('role')
     .eq('pool_id', pool_id)
-    .eq('user_id', callerData.user_id)
+    .eq('user_id', userData.user_id)
     .single()
 
   if (!adminMembership || adminMembership.role !== 'admin') {
@@ -49,7 +39,7 @@ export async function POST(request: NextRequest) {
     .from('pool_members')
     .select('user_id, users!inner(email, username, full_name)')
     .eq('pool_id', pool_id)
-    .neq('user_id', callerData.user_id)
+    .neq('user_id', userData.user_id)
 
   if (!members || members.length === 0) {
     return NextResponse.json({ sent: true, count: 0 })
@@ -68,7 +58,7 @@ export async function POST(request: NextRequest) {
   const emails = members.map((member) => {
     const u = member.users as any
     const { subject, html } = deadlineChangedTemplate({
-      userName: u.full_name || u.username,
+      userName: u.full_name || u.username || 'there',
       poolName: pool.pool_name,
       newDeadline: formattedDeadline,
       poolUrl: `${appUrl}/pools/${pool_id}`,

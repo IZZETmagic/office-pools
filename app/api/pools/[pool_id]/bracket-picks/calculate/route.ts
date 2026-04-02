@@ -1,5 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import {
   calculateBracketPickerPoints,
   type MatchWithResult as BPMatchWithResult,
@@ -24,19 +25,9 @@ export async function POST(
   const { pool_id } = await params
 
   try {
-    const supabase = await createClient()
-
-    // 1. Authenticate
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_id, is_super_admin')
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const auth = await requireAuth()
+    if (auth.error) return auth.error
+    const { supabase, userData } = auth.data
 
     // 2. Check authorization (pool admin or super admin)
     const isSuperAdmin = userData.is_super_admin === true

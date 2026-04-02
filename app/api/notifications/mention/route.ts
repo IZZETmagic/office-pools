@@ -1,18 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { sendEmail, sendBatchEmails } from '@/lib/email/send'
 import { mentionNotificationTemplate } from '@/lib/email/templates'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS } from '@/lib/email/topics'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    console.error('[Mention] Unauthorized — no auth user from cookies')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   let body: { pool_id?: string; message_content?: string; mentioned_user_ids?: string[] }
   try {
@@ -31,11 +27,11 @@ export async function POST(request: NextRequest) {
 
   console.log(`[Mention] Processing mention notification for ${mentioned_user_ids.length} user(s) in pool ${pool_id}`)
 
-  // Get sender info
+  // Get sender display info
   const { data: senderData, error: senderError } = await supabase
     .from('users')
-    .select('user_id, username, full_name')
-    .eq('auth_user_id', user.id)
+    .select('username, full_name')
+    .eq('user_id', userData.user_id)
     .single()
 
   if (senderError || !senderData) {
@@ -56,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Get mentioned users' emails (excluding the sender)
-  const mentionedIds = (mentioned_user_ids as string[]).filter(id => id !== senderData.user_id)
+  const mentionedIds = (mentioned_user_ids as string[]).filter(id => id !== userData.user_id)
 
   if (mentionedIds.length === 0) {
     console.log('[Mention] Sender mentioned themselves only, skipping')

@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Modal } from '@/components/ui/Modal'
 import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData } from './types'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
@@ -392,16 +393,13 @@ export function PointsBreakdownModal({
   }, [playerName, entryName, isMultiEntry, rank, matchPoints, bonusPoints, totalPoints, matchDetails, stageStats, bonusScores, groupedBonuses, predictionMode, bpCategoryStats, categorySubtotals, entry])
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="points-breakdown-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <Modal
+      isOpen
+      onClose={onClose}
+      titleId="points-breakdown-title"
+      size="md"
+      className="sm:mx-4"
     >
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -854,8 +852,7 @@ export function PointsBreakdownModal({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 
   // =============================================

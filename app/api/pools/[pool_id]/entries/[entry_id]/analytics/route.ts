@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, LEVELS, BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
@@ -21,36 +21,10 @@ async function handleGET(
 ) {
   const { pool_id, entry_id } = await params
 
-  // 1. Authenticate — supports both cookie auth (web) and Bearer token auth (iOS)
-  let supabase: any
-  let user: any = null
-
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.replace('Bearer ', '')
-    supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    )
-    const { data } = await supabase.auth.getUser(token)
-    user = data?.user
-  } else {
-    supabase = await createClient()
-    const { data } = await supabase.auth.getUser()
-    user = data?.user
-  }
-
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  // 2. Get user from users table
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  // 1. Authenticate (cookie or Bearer — handled by createClient)
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   // 3. Verify pool membership
   const { data: membership } = await supabase

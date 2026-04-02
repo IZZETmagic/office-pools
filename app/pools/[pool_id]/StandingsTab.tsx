@@ -16,6 +16,16 @@ import { StandingsTable } from '@/components/predictions/StandingsTable'
 import { ThirdPlaceTable } from '@/components/predictions/ThirdPlaceTable'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import {
+  LEFT_R32,
+  RIGHT_R32,
+  LEFT_R16,
+  RIGHT_R16,
+  LEFT_QF,
+  RIGHT_QF,
+  LEFT_SF,
+  RIGHT_SF,
+} from '@/lib/bracketConstants'
 import type { MatchData, TeamData } from './types'
 
 // =============================================
@@ -42,23 +52,6 @@ type BracketMatch = {
   isLive: boolean
   winnerSide: 'home' | 'away' | null
 }
-
-// =============================================
-// BRACKET STRUCTURE
-// =============================================
-
-// Left half of the bracket: R32 (73-80) → R16 (89-92) → QF (97-98) → SF (101)
-// Right half of the bracket: R32 (81-88) → R16 (93-96) → QF (99-100) → SF (102)
-// Center: 3rd Place (103), Final (104)
-
-const LEFT_R32 = [73, 74, 75, 76, 77, 78, 79, 80]
-const RIGHT_R32 = [81, 82, 83, 84, 85, 86, 87, 88]
-const LEFT_R16 = [89, 90, 91, 92]
-const RIGHT_R16 = [93, 94, 95, 96]
-const LEFT_QF = [97, 98]
-const RIGHT_QF = [99, 100]
-const LEFT_SF = [101]
-const RIGHT_SF = [102]
 
 // =============================================
 // BRACKET LAYOUT CONSTANTS

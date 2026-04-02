@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Modal } from '@/components/ui/Modal'
 import type { PinnedMessage } from './types'
 
 type PinMessageModalProps = {
@@ -87,32 +88,15 @@ export function PinMessageModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="pin-message-title"
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={isEditing ? 'Edit Pinned Message' : 'Pin a Message'}
+      titleId="pin-message-title"
+      size="sm"
     >
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default shrink-0">
-          <h2 id="pin-message-title" className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
-            {isEditing ? 'Edit Pinned Message' : 'Pin a Message'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
           <div>
             <label htmlFor="pin-title" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
               Title
@@ -163,8 +147,7 @@ export function PinMessageModal({
               {saving ? 'Saving...' : isEditing ? 'Update' : 'Pin Message'}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   )
 }

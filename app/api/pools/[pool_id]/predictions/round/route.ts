@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { ROUND_MATCH_STAGES, ROUND_LABELS } from '@/lib/tournament'
 import { sendEmail } from '@/lib/email/send'
 import { roundSubmittedTemplate } from '@/lib/email/templates'
@@ -14,18 +14,17 @@ export async function PUT(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
-  const { data: userData } = await supabase
+  // Fetch additional user fields needed for confirmation email
+  const { data: userProfile } = await supabase
     .from('users')
-    .select('user_id, email, username, full_name')
-    .eq('auth_user_id', user.id)
+    .select('email, username, full_name')
+    .eq('user_id', userData.user_id)
     .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -156,7 +155,7 @@ export async function PUT(
   const roundName = ROUND_LABELS[roundKey as RoundKey] ?? roundKey
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
   const { subject, html } = roundSubmittedTemplate({
-    userName: userData.full_name || userData.username,
+    userName: userProfile?.full_name || userProfile?.username,
     poolName: pool.pool_name,
     roundName,
     entryName: entry.entry_name || 'Entry',
@@ -164,7 +163,7 @@ export async function PUT(
     poolUrl: `${appUrl}/pools/${pool_id}?tab=predictions`,
   })
   sendEmail({
-    to: userData.email,
+    to: userProfile?.email,
     subject,
     html,
     topicId: TOPICS.PREDICTIONS,

@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin } from '@/lib/auth'
 import { resolveFullBracket, buildActualResultsMap } from '@/lib/bracketResolver'
 import { resolveAllR32Matches, GROUP_LETTERS, calculateGroupStandings, ROUND_MATCH_STAGES, ROUND_ORDER, ROUND_LABELS } from '@/lib/tournament'
 import type { Team, MatchConductData, RoundKey } from '@/lib/tournament'
@@ -20,21 +20,9 @@ import { TOPICS } from '@/lib/email/topics'
 // Super admin only.
 // =============================================================
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
-  // 1. Authenticate — super admin only
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData?.is_super_admin) {
-    return NextResponse.json({ error: 'Super admin required' }, { status: 403 })
-  }
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   // 2. Parse request
   const { trigger, match_id } = await request.json()

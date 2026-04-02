@@ -212,12 +212,13 @@ function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): strin
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  const month = d.toLocaleString('en-US', { month: 'short' })
+  const day = d.getDate()
+  const hour = d.getHours()
+  const minute = d.getMinutes().toString().padStart(2, '0')
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const h = hour % 12 || 12
+  return `${month} ${day}, ${h}:${minute} ${period}`
 }
 
 function formatStage(stage: string) {
@@ -979,7 +980,7 @@ export function DashboardClient({
                             </div>
                           </div>
                           <div className="text-right shrink-0 ml-3">
-                            <p className="text-xs font-medium text-neutral-600">
+                            <p className="text-xs font-medium text-neutral-600" suppressHydrationWarning>
                               {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                             </p>
                             {match.venue && (
@@ -1003,7 +1004,7 @@ export function DashboardClient({
                                   <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
                                   <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
                                 </div>
-                                <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                                <span className="text-xs text-neutral-400 shrink-0 ml-3" suppressHydrationWarning>
                                   {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                                 </span>
                               </li>
@@ -1123,7 +1124,7 @@ export function DashboardClient({
                           </p>
                         </div>
                         <div className="text-right shrink-0 ml-4">
-                          <p className="text-sm font-medium text-neutral-700">
+                          <p className="text-sm font-medium text-neutral-700" suppressHydrationWarning>
                             {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                           </p>
                           {match.venue && (
@@ -1147,7 +1148,7 @@ export function DashboardClient({
                                 <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
                                 <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
                               </div>
-                              <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                              <span className="text-xs text-neutral-400 shrink-0 ml-3" suppressHydrationWarning>
                                 {match.match_date ? formatDateTime(match.match_date) : 'TBD'}
                               </span>
                             </li>

@@ -1,25 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-
-  // 1. Authenticate
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  // 2. Verify super admin
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData?.is_super_admin) {
-    return NextResponse.json({ error: 'Super admin required' }, { status: 403 })
-  }
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
+  const { supabase } = auth.data
 
   // 3. Run all aggregate queries in parallel
   const [
@@ -87,22 +72,9 @@ export async function GET(request: NextRequest) {
 
 // DELETE — Purge old perf logs (older than 7 days)
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData?.is_super_admin) {
-    return NextResponse.json({ error: 'Super admin required' }, { status: 403 })
-  }
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
+  const { supabase } = auth.data
 
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 

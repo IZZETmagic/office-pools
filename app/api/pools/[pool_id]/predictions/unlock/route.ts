@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsUnlockedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -10,18 +10,10 @@ export async function POST(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   // Verify admin role
   const { data: adminMembership } = await supabase

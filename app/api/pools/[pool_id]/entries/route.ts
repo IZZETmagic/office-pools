@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -10,18 +10,10 @@ async function handleGET(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -51,18 +43,10 @@ async function handlePOST(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -129,18 +113,10 @@ async function handlePATCH(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const body = await request.json()
   const { entryId, entryName } = body as { entryId: string; entryName: string }
@@ -179,18 +155,10 @@ async function handleDELETE(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { searchParams } = new URL(request.url)
   const entryId = searchParams.get('entryId')

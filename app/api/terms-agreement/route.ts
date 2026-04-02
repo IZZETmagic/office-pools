@@ -1,31 +1,15 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Verify authentication
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if (auth.error) return auth.error
+    const { supabase, userData } = auth.data
 
     const { terms_version } = await request.json()
     if (!terms_version) {
       return NextResponse.json({ error: 'terms_version is required' }, { status: 400 })
-    }
-
-    // Look up the user_id from the users table
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (userError || !userData) {
-      console.error('[Terms] Failed to find user:', userError)
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Capture IP address and user agent for audit trail

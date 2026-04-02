@@ -1,24 +1,11 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 
 export async function DELETE() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Look up internal user record
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, user, userData } = auth.data
 
   // Collect all member_ids for this user across all pools
   const { data: members } = await supabase

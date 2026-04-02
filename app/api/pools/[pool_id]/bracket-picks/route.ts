@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -13,17 +13,10 @@ async function handleGET(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -77,17 +70,10 @@ async function handlePOST(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -220,17 +206,17 @@ async function handlePUT(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
 
-  const { data: userData } = await supabase
+  // Fetch additional user fields needed for confirmation email
+  const { data: userProfile } = await supabase
     .from('users')
-    .select('user_id, email, full_name, username')
-    .eq('auth_user_id', user.id)
+    .select('email, full_name, username')
+    .eq('user_id', userData.user_id)
     .single()
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { data: membership } = await supabase
     .from('pool_members')
@@ -305,17 +291,17 @@ async function handlePUT(
 
   // Send confirmation email
   try {
-    if (userData.email) {
+    if (userProfile?.email) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
       const { subject, html } = predictionsSubmittedTemplate({
-        userName: userData.full_name || userData.username || 'there',
+        userName: userProfile.full_name || userProfile.username || 'there',
         poolName: pool.pool_name,
         entryName: 'Bracket Picks',
         matchCount: groupCount + thirdCount + knockoutCount,
         poolUrl: `${appUrl}/pools/${pool_id}`,
       })
       await sendEmail({
-        to: userData.email,
+        to: userProfile.email,
         subject,
         html,
         topicId: TOPICS.PREDICTIONS,

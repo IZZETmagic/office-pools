@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin } from '@/lib/auth'
 
 // =============================================================
 // POST /api/pools/snapshot-ranks
@@ -9,20 +9,8 @@ import { NextRequest, NextResponse } from 'next/server'
 // match is currently live (new matchday baseline).
 // =============================================================
 export async function POST(request: NextRequest) {
-  // Authenticate — must be a super admin
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('is_super_admin')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile?.is_super_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const auth = await requireSuperAdmin()
+  if (auth.error) return auth.error
 
   const body = await request.json()
   const poolIds: string[] = body.pool_ids

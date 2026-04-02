@@ -483,6 +483,57 @@ export function roundDeadlineReminderTemplate(params: {
   }
 }
 
+// --- Announcement Templates ---
+
+export function allTeamsAnnouncementTemplate(params: {
+  userName: string
+  groups: { letter: string; teams: string[] }[]
+  daysUntilKickoff: number
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { userName, groups, daysUntilKickoff, dashboardUrl } = params
+
+  // Build 3 rows × 4 columns grid
+  const groupRows: string[] = []
+  for (let row = 0; row < 3; row++) {
+    const cols = groups.slice(row * 4, row * 4 + 4)
+    const cellsHtml = cols
+      .map(
+        (g) => `
+        <td width="25%" style="padding:8px;vertical-align:top;">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+            <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;">Group ${g.letter}</p>
+            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.4;">${t}</p>`).join('')}
+          </div>
+        </td>`
+      )
+      .join('')
+    groupRows.push(`<tr>${cellsHtml}</tr>`)
+  }
+
+  return {
+    subject: `The field is set — World Cup 2026 kicks off in ${daysUntilKickoff} days!`,
+    html: baseTemplate({
+      preheader: `All 48 teams confirmed for FIFA World Cup 2026. ${daysUntilKickoff} days to go!`,
+      heading: `All 48 Teams Are Confirmed!`,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The wait is over — all <strong>48 teams</strong> for the FIFA World Cup 2026 have been decided. Here's the full draw:</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
+          ${groupRows.join('')}
+        </table>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0;font-size:14px;color:#166534;">Kickoff: <strong>June 11, 2026</strong></p>
+          <p style="margin:4px 0 0;font-size:24px;font-weight:700;color:#166534;">${daysUntilKickoff} days to go</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now is the time to create or join a pool and start thinking about your predictions. Invite your friends, family, and coworkers — the more the merrier!</p>
+      `,
+      ctaText: 'Get Started',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
 // --- Community Templates ---
 
 export function mentionNotificationTemplate(params: {

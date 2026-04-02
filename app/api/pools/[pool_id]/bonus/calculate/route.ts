@@ -1,5 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
@@ -19,20 +20,12 @@ async function handlePOST(
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
   const { pool_id } = await params
-  const supabase = await createClient()
+
+  const auth = await requireAuth()
+  if (auth.error) return auth.error
+  const { supabase, userData } = auth.data
+
   const adminClient = createAdminClient()
-
-  // 1. Authenticate
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('user_id, is_super_admin')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   // 2. Check authorization (pool admin or super admin)
   const isSuperAdmin = userData.is_super_admin === true
