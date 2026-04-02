@@ -487,23 +487,23 @@ export function roundDeadlineReminderTemplate(params: {
 
 export function allTeamsAnnouncementTemplate(params: {
   userName: string
-  groups: { letter: string; teams: string[] }[]
+  groups: { letter: string; teams: { name: string; flagUrl: string }[] }[]
   daysUntilKickoff: number
   dashboardUrl: string
 }): { subject: string; html: string } {
   const { userName, groups, daysUntilKickoff, dashboardUrl } = params
 
-  // Build 3 rows × 4 columns grid
+  // Build 4 rows × 3 columns grid
   const groupRows: string[] = []
-  for (let row = 0; row < 3; row++) {
-    const cols = groups.slice(row * 4, row * 4 + 4)
+  for (let row = 0; row < 4; row++) {
+    const cols = groups.slice(row * 3, row * 3 + 3)
     const cellsHtml = cols
       .map(
         (g) => `
-        <td width="25%" style="padding:8px;vertical-align:top;">
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+        <td width="33%" style="padding:6px;vertical-align:top;">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">
             <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;">Group ${g.letter}</p>
-            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.4;">${t}</p>`).join('')}
+            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.5;"><img src="${t.flagUrl}" width="16" height="11" alt="" style="vertical-align:middle;margin-right:5px;border-radius:1px;" />${t.name}</p>`).join('')}
           </div>
         </td>`
       )
@@ -526,7 +526,12 @@ export function allTeamsAnnouncementTemplate(params: {
           <p style="margin:0;font-size:14px;color:#166534;">Kickoff: <strong>June 11, 2026</strong></p>
           <p style="margin:4px 0 0;font-size:24px;font-weight:700;color:#166534;">${daysUntilKickoff} days to go</p>
         </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now is the time to create or join a pool and start thinking about your predictions. Invite your friends, family, and coworkers — the more the merrier!</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now is the perfect time to get ready. Whether you need to create a new pool, join one, or spread the word about yours — here's what to do:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>New here?</strong> Create a pool and invite your group.</li>
+          <li><strong>Looking to join?</strong> Ask a friend for their pool code and jump in.</li>
+          <li><strong>Already in a pool?</strong> Share your pool code with friends, family, and coworkers — the more people, the more fun!</li>
+        </ul>
       `,
       ctaText: 'Get Started',
       ctaUrl: dashboardUrl,

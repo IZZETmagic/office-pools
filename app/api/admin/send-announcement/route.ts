@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   // 2. Fetch all teams grouped by group_letter
   const { data: teams, error: teamsError } = await supabase
     .from('teams')
-    .select('country_name, group_letter')
+    .select('country_name, group_letter, flag_url')
     .eq('tournament_id', '00000000-0000-0000-0000-000000000001')
     .order('group_letter')
     .order('country_name')
@@ -68,16 +68,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch teams' }, { status: 500 })
   }
 
-  // Build groups array
-  const groupMap = new Map<string, string[]>()
+  // Build groups array — rewrite flag URLs to our domain for email deliverability
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+  const groupMap = new Map<string, { name: string; flagUrl: string }[]>()
   for (const t of teams) {
+    // Convert https://flagcdn.com/w80/us.png → https://sportpool.io/flags/us.png
+    const flagFile = t.flag_url?.match(/\/([a-z-]+\.png)$/)?.[1] || ''
+    const flagUrl = flagFile ? `${appUrl}/flags/${flagFile}` : ''
     const existing = groupMap.get(t.group_letter) || []
-    existing.push(t.country_name)
+    existing.push({ name: t.country_name, flagUrl })
     groupMap.set(t.group_letter, existing)
   }
   const groups = Array.from(groupMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([letter, teamNames]) => ({ letter, teams: teamNames }))
+    .map(([letter, teamList]) => ({ letter, teams: teamList }))
 
   // 3. Calculate days until kickoff (June 11, 2026)
   const kickoff = new Date('2026-06-11T00:00:00Z')
