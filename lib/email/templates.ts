@@ -487,7 +487,7 @@ export function roundDeadlineReminderTemplate(params: {
 
 export function allTeamsAnnouncementTemplate(params: {
   userName: string
-  groups: { letter: string; teams: { name: string; flagUrl: string }[] }[]
+  groups: { letter: string; teams: { name: string; code: string; flagUrl: string }[] }[]
   daysUntilKickoff: number
   dashboardUrl: string
 }): { subject: string; html: string } {
@@ -502,8 +502,8 @@ export function allTeamsAnnouncementTemplate(params: {
         (g) => `
         <td width="33%" style="padding:6px;vertical-align:top;">
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">
-            <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;">Group ${g.letter}</p>
-            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.5;"><img src="${t.flagUrl}" width="16" height="11" alt="" style="vertical-align:middle;margin-right:5px;border-radius:1px;" />${t.name}</p>`).join('')}
+            <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Group ${g.letter}</p>
+            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.5;white-space:nowrap;"><img src="${t.flagUrl}" width="16" height="11" alt="" style="vertical-align:middle;margin-right:5px;border-radius:1px;" />${t.code}</p>`).join('')}
           </div>
         </td>`
       )
