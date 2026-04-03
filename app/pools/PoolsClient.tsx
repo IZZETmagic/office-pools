@@ -34,6 +34,11 @@ type PoolData = {
   joined_at: string
   memberCount: number
   form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
+  brand_name?: string | null
+  brand_emoji?: string | null
+  brand_color?: string | null
+  brand_accent?: string | null
+  brand_landing_url?: string | null
 }
 
 type PublicPool = {
@@ -284,10 +289,15 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       result = result.filter((p) => p.status === statusFilter)
     }
 
-    // Sort: open pools first, then upcoming, then closed/completed
+    // Sort: branded pools first, then open pools, then upcoming, then closed/completed
     // Within each tier, pools with unread banter float to top
     const statusOrder: Record<string, number> = { open: 0, active: 0, upcoming: 1, closed: 2, completed: 3 }
     result.sort((a, b) => {
+      // Branded pools always first
+      const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
+      const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+      if (aBrand !== bBrand) return aBrand - bBrand
+
       const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
       if (statusDiff !== 0) return statusDiff
 
@@ -604,13 +614,24 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                     const isLinkCopied = linkCopiedPoolId === pool.pool_id
                     const statusText = getPoolStatusText(pool)
 
+                    const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+
                     return (
                       <Link
                         key={pool.pool_id}
                         href={`/pools/${pool.pool_id}`}
-                        className={`block rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
-                        style={{ animationDelay: `${i * 0.06}s` }}
+                        className={`block rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        style={{ animationDelay: `${i * 0.06}s`, ...(hasBranding ? { borderColor: pool.brand_color! } : {}) }}
                       >
+                        {/* Branded accent strip */}
+                        {hasBranding && (
+                          <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
+                            <span className="text-base">{pool.brand_emoji}</span>
+                            <span className="text-xs font-bold">{pool.brand_name}</span>
+                            <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
+                          </div>
+                        )}
+
                         {/* ========== MOBILE CARD ========== */}
                         <div className="md:hidden flex">
                           <div className="flex-1 px-4 py-3.5">

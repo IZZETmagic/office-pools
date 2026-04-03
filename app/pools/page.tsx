@@ -34,7 +34,12 @@ export default async function PoolsPage() {
         prediction_deadline,
         prediction_mode,
         tournament_id,
-        created_at
+        created_at,
+        brand_name,
+        brand_emoji,
+        brand_color,
+        brand_accent,
+        brand_landing_url
       ),
       pool_entries(
         entry_id,

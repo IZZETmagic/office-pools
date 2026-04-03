@@ -14,6 +14,12 @@ export type PoolData = {
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string
   updated_at: string
+  // Optional bar/partner branding (NULL for standard pools)
+  brand_name: string | null
+  brand_emoji: string | null
+  brand_color: string | null
+  brand_accent: string | null
+  brand_landing_url: string | null
 }
 
 export type MemberData = {

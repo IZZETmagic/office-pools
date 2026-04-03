@@ -35,7 +35,11 @@ export default async function DashboardPage() {
         status,
         prediction_deadline,
         tournament_id,
-        prediction_mode
+        prediction_mode,
+        brand_name,
+        brand_emoji,
+        brand_color,
+        brand_accent
       ),
       pool_entries(
         entry_id,

@@ -89,28 +89,6 @@ final class PredictionService {
             .execute()
     }
 
-    // MARK: - Submit Predictions
-
-    func submitPredictions(entryId: String) async throws {
-        struct EntrySubmit: Codable {
-            let hasSubmittedPredictions: Bool
-            let predictionsSubmittedAt: String
-            enum CodingKeys: String, CodingKey {
-                case hasSubmittedPredictions = "has_submitted_predictions"
-                case predictionsSubmittedAt = "predictions_submitted_at"
-            }
-        }
-
-        try await supabase
-            .from("pool_entries")
-            .update(EntrySubmit(
-                hasSubmittedPredictions: true,
-                predictionsSubmittedAt: ISO8601DateFormatter().string(from: Date())
-            ))
-            .eq("entry_id", value: entryId)
-            .execute()
-    }
-
     // MARK: - Manage Entries
 
     func createEntry(memberId: String, entryName: String, entryNumber: Int) async throws -> Entry {

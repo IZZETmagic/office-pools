@@ -46,6 +46,10 @@ type PoolCardData = {
   predictedMatches: number
   entries: EntryProgress[]
   form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
+  brand_name?: string | null
+  brand_emoji?: string | null
+  brand_color?: string | null
+  brand_accent?: string | null
 }
 
 type ActivityItemBase = {
@@ -380,12 +384,22 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
   const level = getLevel(pool.total_points ?? 0)
+  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
 
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`w-56 h-full min-h-[9rem] rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface p-3 flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200`}
+      className={`w-56 h-full min-h-[9rem] rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
+      style={hasBranding ? { borderColor: pool.brand_color! } : undefined}
     >
+      {hasBranding && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
+          <span className="text-xs">{pool.brand_emoji}</span>
+          <span className="text-[10px] font-bold">{pool.brand_name}</span>
+          <span className="text-[8px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
+        </div>
+      )}
+      <div className="p-3 flex flex-col flex-1">
       <div className="flex items-center gap-1.5">
         <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
         {unreadCount > 0 && (
@@ -433,6 +447,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
           }
         </div>
       </div>
+      </div>
     </Link>
   )
 }
@@ -444,13 +459,21 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
   const deadline = formatDeadline(pool.prediction_deadline)
   const statusText = getPoolStatusText(pool)
   const level = getLevel(pool.total_points ?? 0)
+  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
 
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`block rounded-xl border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
-      style={{ animationDelay: `${index * 0.06}s` }}
+      className={`block rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
+      style={{ animationDelay: `${index * 0.06}s`, ...(hasBranding ? { borderColor: pool.brand_color! } : {}) }}
     >
+      {hasBranding && (
+        <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
+          <span className="text-base">{pool.brand_emoji}</span>
+          <span className="text-xs font-bold">{pool.brand_name}</span>
+          <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
+        </div>
+      )}
       <div className="flex">
         <div className="flex-1 p-4">
           {/* Header row */}
@@ -787,6 +810,10 @@ export function DashboardClient({
                 <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface-secondary to-transparent z-10 pointer-events-none" />
                 <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {[...pools].sort((a, b) => {
+                    // Branded pools always first
+                    const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
+                    const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+                    if (aBrand !== bBrand) return aBrand - bBrand
                     // Pools with unread banter first
                     const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
                     const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
@@ -820,6 +847,10 @@ export function DashboardClient({
               {/* Desktop: full card grid */}
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...pools].sort((a, b) => {
+                  // Branded pools always first
+                  const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
+                  const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+                  if (aBrand !== bBrand) return aBrand - bBrand
                   // Pools with unread banter first
                   const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
                   const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1

@@ -31,7 +31,7 @@ export default async function JoinPage({
   // Look up pool by code
   const { data: pool } = await supabase
     .from('pools')
-    .select('pool_id, pool_name, pool_code, description, status, prediction_mode')
+    .select('pool_id, pool_name, pool_code, description, status, prediction_mode, brand_name, brand_emoji, brand_color, brand_accent')
     .eq('pool_code', pool_code.toUpperCase())
     .single()
 
@@ -78,6 +78,10 @@ export default async function JoinPage({
         description: pool.description,
         status: pool.status,
         prediction_mode: pool.prediction_mode,
+        brand_name: pool.brand_name ?? null,
+        brand_emoji: pool.brand_emoji ?? null,
+        brand_color: pool.brand_color ?? null,
+        brand_accent: pool.brand_accent ?? null,
       }}
       memberCount={memberCount ?? 0}
       isAlreadyMember={!!existingMembership}

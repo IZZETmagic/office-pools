@@ -14,6 +14,10 @@ type PoolInfo = {
   description: string | null
   status: string
   prediction_mode: string
+  brand_name: string | null
+  brand_emoji: string | null
+  brand_color: string | null
+  brand_accent: string | null
 }
 
 type JoinPoolClientProps = {
@@ -95,9 +99,12 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember, username, u
       <div className="max-w-md w-full">
         <div className="bg-surface rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-br from-primary-600 to-primary-700 px-6 py-8 text-center text-white">
-            <div className="text-4xl mb-3">&#9917;</div>
-            <p className="text-primary-200 text-sm font-medium mb-1">You&apos;ve been invited to join</p>
+          <div
+            className={`px-6 py-8 text-center text-white ${!pool.brand_color ? 'bg-gradient-to-br from-primary-600 to-primary-700' : ''}`}
+            style={pool.brand_color ? { background: `linear-gradient(135deg, ${pool.brand_color} 0%, ${pool.brand_color}dd 100%)` } : undefined}
+          >
+            <div className="text-4xl mb-3">{pool.brand_emoji || '\u26BD'}</div>
+            <p className="text-white/60 text-sm font-medium mb-1">You&apos;ve been invited to join</p>
             <h1 className="text-2xl font-bold">{pool.pool_name}</h1>
           </div>
 

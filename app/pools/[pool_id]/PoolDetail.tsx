@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { AppHeader } from '@/components/ui/AppHeader'
@@ -162,7 +163,8 @@ export function PoolDetail({
     if (urlTab) return urlTab
     return 'leaderboard'
   })
-  const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay)
+  const isDemoPool = initialPool.pool_id === '66b67286-e36e-40fd-8893-2a1fde0d018b'
+  const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay || isDemoPool)
 
   // Unread banter badge (must be above useSlideIndicator so we can pass banterUnreadCount as a layout dep)
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
@@ -185,7 +187,7 @@ export function PoolDetail({
 
   // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
   useEffect(() => {
-    if (!hasSeenHowToPlay && memberId) {
+    if (!hasSeenHowToPlay && memberId && !isDemoPool) {
       const supabase = createClient()
       supabase
         .from('pool_members')
@@ -884,30 +886,84 @@ export function PoolDetail({
     }
   }, [activeTab, mobilePrimaryKeys, handleTabSwitch])
 
+  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+
   return (
     <div className="min-h-screen bg-surface-secondary">
+
       {/* Sticky header + tab bar wrapper */}
-      <div className="sticky top-0 z-40 bg-surface shadow-sm dark:shadow-none border-b border-neutral-200 dark:border-border-default [transform:translateZ(0)]">
-        <AppHeader
-          sticky={false}
-          breadcrumbs={[
-            { label: pool.pool_name },
-          ]}
-          badges={
-            <>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${
-                pool.status === 'open' || pool.status === 'active' ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
-                  : pool.status === 'upcoming' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                  : pool.status === 'closed' ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-              }`}>
+      <div
+        className={`sticky top-0 z-40 [transform:translateZ(0)] ${
+          hasBranding
+            ? 'shadow-md'
+            : 'bg-surface shadow-sm dark:shadow-none border-b border-neutral-200 dark:border-border-default'
+        }`}
+        style={hasBranding ? { backgroundColor: pool.brand_color! } : undefined}
+      >
+        {hasBranding ? (
+          /* ── Branded header for partner pools ── */
+          <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {pool.brand_landing_url ? (
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-2xl shrink-0">{pool.brand_emoji}</span>
+                  <div className="min-w-0">
+                    <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
+                    <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-2xl">{pool.brand_emoji}</span>
+                  <div className="min-w-0">
+                    <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
+                    <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
+                  </div>
+                </>
+              )}
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/15 text-white/80 ml-1">
                 {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status}
               </span>
-              {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
-            </>
-          }
-          isSuperAdmin={isSuperAdmin}
-        />
+              {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-white/20 text-white/60">Admin</span>}
+            </div>
+            <div className="hidden sm:flex items-center gap-4 shrink-0">
+              {[
+                { href: '/dashboard', label: 'Dashboard' },
+                { href: '/pools', label: 'Pools' },
+                { href: '/profile', label: 'Profile' },
+              ].map((link) => (
+                <Link key={link.href} href={link.href} className="text-sm font-medium text-white/50 hover:text-white/80 transition">
+                  {link.label}
+                </Link>
+              ))}
+              <form action="/auth/signout" method="post">
+                <button type="submit" className="text-sm text-white/50 hover:text-white/80 font-medium">Sign Out</button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          /* ── Standard Sport Pool header ── */
+          <AppHeader
+            sticky={false}
+            breadcrumbs={[
+              { label: pool.pool_name },
+            ]}
+            badges={
+              <>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${
+                  pool.status === 'open' || pool.status === 'active' ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
+                    : pool.status === 'upcoming' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                    : pool.status === 'closed' ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                }`}>
+                  {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status}
+                </span>
+                {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+              </>
+            }
+            isSuperAdmin={isSuperAdmin}
+          />
+        )}
 
         {/* Super Admin viewing banner */}
         {isSuperAdminViewing && (
@@ -931,8 +987,8 @@ export function PoolDetail({
             {/* ===== MOBILE tab bar ===== */}
             <div ref={mobileTabRef} className="sm:hidden relative flex items-center gap-0.5 py-2">
               <div
-                className={`absolute top-2 bottom-2 ${isAdminTab ? 'bg-warning-600' : 'bg-primary-600'} rounded-xl shadow-sm pointer-events-none ${mobileTabReady ? 'transition-all duration-300 ease-out' : ''}`}
-                style={{ left: mobileIndicator.left, width: mobileIndicator.width }}
+                className={`absolute top-2 bottom-2 ${!hasBranding ? (isAdminTab ? 'bg-warning-600' : 'bg-primary-600') : ''} rounded-xl shadow-sm pointer-events-none ${mobileTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                style={{ left: mobileIndicator.left, width: mobileIndicator.width, ...(hasBranding && !isAdminTab ? { backgroundColor: pool.brand_accent! } : {}) }}
               />
               {mobilePrimaryTabs.map((tab) => (
                 <button
@@ -942,7 +998,7 @@ export function PoolDetail({
                   className={`relative z-10 flex-1 px-2 py-2 rounded-xl text-xs font-medium whitespace-nowrap text-center transition-colors ${
                     activeTab === tab.key
                       ? 'text-white'
-                      : 'text-neutral-700 hover:bg-neutral-100'
+                      : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -955,6 +1011,21 @@ export function PoolDetail({
                   </span>
                 </button>
               ))}
+
+              {/* Bar landing page link tab */}
+              {hasBranding && pool.brand_landing_url && (
+                <Link
+                  href={pool.brand_landing_url}
+                  className="relative z-10 flex-1 px-2 py-2 rounded-xl text-xs font-medium whitespace-nowrap text-center transition-colors text-white/50 hover:text-white/70"
+                >
+                  <span className="inline-flex items-center justify-center gap-0.5">
+                    {pool.brand_name}
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                    </svg>
+                  </span>
+                </Link>
+              )}
 
               {/* More button + dropdown */}
               {mobileOverflowTabs.length > 0 && (
@@ -1021,8 +1092,8 @@ export function PoolDetail({
             {/* ===== DESKTOP tab bar ===== */}
             <div ref={poolDetailTabRef} className="hidden sm:flex relative items-center gap-1 overflow-x-auto scrollbar-hide py-2">
               <div
-                className={`absolute top-2 bottom-2 ${isAdminTab ? 'bg-warning-600' : 'bg-primary-600'} rounded-xl shadow-sm pointer-events-none ${poolDetailTabReady ? 'transition-all duration-300 ease-out' : ''}`}
-                style={{ left: poolDetailIndicator.left, width: poolDetailIndicator.width }}
+                className={`absolute top-2 bottom-2 ${!hasBranding ? (isAdminTab ? 'bg-warning-600' : 'bg-primary-600') : ''} rounded-xl shadow-sm pointer-events-none ${poolDetailTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                style={{ left: poolDetailIndicator.left, width: poolDetailIndicator.width, ...(hasBranding && !isAdminTab ? { backgroundColor: pool.brand_accent! } : {}) }}
               />
               {USER_TABS.map((tab) => (
                 <button
@@ -1032,7 +1103,7 @@ export function PoolDetail({
                   className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.key
                       ? 'text-white'
-                      : 'text-neutral-700 hover:bg-neutral-100'
+                      : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
@@ -1046,10 +1117,25 @@ export function PoolDetail({
                 </button>
               ))}
 
+              {/* Bar landing page link tab */}
+              {hasBranding && pool.brand_landing_url && (
+                <Link
+                  href={pool.brand_landing_url}
+                  className="relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors text-white/50 hover:text-white/70 hover:bg-white/10"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    {pool.brand_name}
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                    </svg>
+                  </span>
+                </Link>
+              )}
+
               {isAdmin && (
                 <>
                   <div className="flex items-center px-2">
-                    <div className="h-5 w-px bg-neutral-300" />
+                    <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
                   </div>
 
                   {adminTabs.map((tab) => (
@@ -1060,7 +1146,7 @@ export function PoolDetail({
                       className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                         activeTab === tab.key
                           ? 'text-white'
-                          : 'text-neutral-700 hover:bg-neutral-100'
+                          : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
                       }`}
                     >
                       {tab.label}
@@ -1073,11 +1159,11 @@ export function PoolDetail({
               {!isSoleAdmin && !isSuperAdminViewing && (
                 <>
                   <div className="flex items-center px-2">
-                    <div className="h-5 w-px bg-neutral-300" />
+                    <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
                   </div>
                   <button
                     onClick={() => setShowLeaveModal(true)}
-                    className="px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors text-danger-600 hover:bg-danger-50"
+                    className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${hasBranding ? 'text-red-300 hover:bg-white/10' : 'text-danger-600 hover:bg-danger-50'}`}
                   >
                     Leave Pool
                   </button>

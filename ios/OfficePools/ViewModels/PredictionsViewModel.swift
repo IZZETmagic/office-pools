@@ -15,6 +15,7 @@ final class PredictionsViewModel {
     var lastSaved: Date?
 
     private let predictionService = PredictionService()
+    private let apiService = APIService()
 
     init(poolId: String) {
         self.poolId = poolId
@@ -65,10 +66,10 @@ final class PredictionsViewModel {
         errorMessage = nil
 
         do {
-            // Save first, then submit
+            // Save first, then submit via API (validates completeness, deadline, sends confirmation email)
             let inputs = Array(predictions.values)
             try await predictionService.saveDraft(entryId: entryId, predictions: inputs)
-            try await predictionService.submitPredictions(entryId: entryId)
+            try await apiService.submitPredictions(poolId: poolId, entryId: entryId)
         } catch {
             errorMessage = error.localizedDescription
         }

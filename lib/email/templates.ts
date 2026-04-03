@@ -539,6 +539,177 @@ export function allTeamsAnnouncementTemplate(params: {
   }
 }
 
+// --- Countdown Reminder Templates ---
+
+export type CountdownMilestone = '60days' | '30days' | '14days' | '7days' | '1day'
+
+const COUNTDOWN_CONFIG: Record<
+  CountdownMilestone,
+  {
+    subject: (days: number) => string
+    preheader: (days: number) => string
+    heading: string
+    emoji: string
+    accentBg: string
+    accentBorder: string
+    accentText: string
+  }
+> = {
+  '60days': {
+    subject: (d) => `${d} days until the World Cup — time to get your pool ready!`,
+    preheader: (d) => `FIFA World Cup 2026 kicks off in ${d} days. Create or join a pool now!`,
+    heading: 'Two Months to Go!',
+    emoji: '&#x1F3C6;',
+    accentBg: '#f0fdf4',
+    accentBorder: '#bbf7d0',
+    accentText: '#166534',
+  },
+  '30days': {
+    subject: (d) => `One month to go — World Cup 2026 is almost here!`,
+    preheader: (d) => `Just ${d} days until kickoff. Make sure your pool is ready!`,
+    heading: 'One Month to Go!',
+    emoji: '&#x26BD;',
+    accentBg: '#f0fdf4',
+    accentBorder: '#bbf7d0',
+    accentText: '#166534',
+  },
+  '14days': {
+    subject: (d) => `Two weeks until kickoff — is your pool ready?`,
+    preheader: (d) => `${d} days to go. Invite your friends before it's too late!`,
+    heading: 'Two Weeks to Go!',
+    emoji: '&#x1F525;',
+    accentBg: '#fffbeb',
+    accentBorder: '#fde68a',
+    accentText: '#92400e',
+  },
+  '7days': {
+    subject: (d) => `One week until the World Cup — predictions open soon!`,
+    preheader: (d) => `Just ${d} days left. Get your pool and predictions ready!`,
+    heading: 'One Week to Go!',
+    emoji: '&#x1F6A8;',
+    accentBg: '#fffbeb',
+    accentBorder: '#fde68a',
+    accentText: '#92400e',
+  },
+  '1day': {
+    subject: () => `TOMORROW — FIFA World Cup 2026 kicks off!`,
+    preheader: () => `It's almost here! Make sure your predictions are locked in.`,
+    heading: "It's Tomorrow!",
+    emoji: '&#x1F389;',
+    accentBg: '#fef2f2',
+    accentBorder: '#fecaca',
+    accentText: '#991b1b',
+  },
+}
+
+const COUNTDOWN_BODY: Record<CountdownMilestone, (params: { userName: string; daysUntilKickoff: number; poolCount: number; dashboardUrl: string }) => string> = {
+  '60days': ({ userName, daysUntilKickoff, poolCount, dashboardUrl }) => `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 is just <strong>${daysUntilKickoff} days away</strong> and the excitement is building! All 48 teams have been confirmed and the group stage draw is set.</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now's the time to rally your friends, family, and coworkers:</p>
+    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+      <li><strong>Create a pool</strong> and share the code with your group</li>
+      <li><strong>Join a pool</strong> if someone's already sent you a code</li>
+      <li><strong>Spread the word</strong> — the more people, the better the competition</li>
+    </ul>
+    ${poolCount > 0 ? `<p style="color:#525252;line-height:1.6;margin:0;">You're in <strong>${poolCount} pool${poolCount > 1 ? 's' : ''}</strong> so far. Keep inviting!</p>` : `<p style="color:#525252;line-height:1.6;margin:0;">You haven't joined a pool yet — get started now!</p>`}
+  `,
+
+  '30days': ({ userName, daysUntilKickoff, poolCount }) => `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Can you believe it? The World Cup is just <strong>${daysUntilKickoff} days away</strong>. We're counting down and we hope you are too!</p>
+    ${poolCount > 0 ? `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${poolCount > 1 ? 's' : ''}</strong>. Here's what to do:</p>
+    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+      <li><strong>Share your pool code</strong> with anyone who hasn't joined yet</li>
+      <li><strong>Check the groups</strong> — start thinking about your predictions</li>
+      <li><strong>Create another pool</strong> for a different friend group or office</li>
+    </ul>
+    ` : `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">There's still time to get in on the action:</p>
+    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+      <li><strong>Create a pool</strong> and become the organizer</li>
+      <li><strong>Join a pool</strong> using a friend's code</li>
+    </ul>
+    `}
+    <p style="color:#525252;line-height:1.6;margin:0;">Don't wait — the best pools are the ones that start early!</p>
+  `,
+
+  '14days': ({ userName, daysUntilKickoff, poolCount }) => `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">We're just <strong>${daysUntilKickoff} days</strong> from the biggest World Cup in history. 48 teams. 3 host nations. This is going to be special.</p>
+    ${poolCount > 0 ? `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${poolCount > 1 ? 's' : ''}</strong> — nice! Here's your checklist:</p>
+    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+      <li>Last call to <strong>invite friends</strong> to your pools</li>
+      <li>Group Stage predictions will <strong>open soon</strong></li>
+      <li>Start doing your <strong>homework on the groups</strong></li>
+    </ul>
+    ` : `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">It's not too late! Create or join a pool and be part of the action.</p>
+    `}
+  `,
+
+  '7days': ({ userName, daysUntilKickoff, poolCount }) => `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 16px;"><strong>${daysUntilKickoff} days.</strong> That's it. The World Cup is almost here.</p>
+    ${poolCount > 0 ? `
+    <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 16px;">
+      <p style="color:#171717;margin:0 0 8px;font-weight:600;">Your pre-kickoff checklist:</p>
+      <p style="color:#525252;margin:0;font-size:14px;line-height:1.8;">&#9745; Joined ${poolCount} pool${poolCount > 1 ? 's' : ''}<br/>&#9744; Invite any last friends<br/>&#9744; Make your Group Stage predictions when they open<br/>&#9744; Clear your schedule for June 11!</p>
+    </div>
+    ` : `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're not in a pool yet! There's still time — create one or ask a friend for their pool code.</p>
+    `}
+  `,
+
+  '1day': ({ userName, poolCount }) => `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;font-size:16px;"><strong>IT'S ALMOST HERE.</strong></p>
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 kicks off <strong>tomorrow, June 11th</strong>. 48 teams. 104 matches. One champion.</p>
+    ${poolCount > 0 ? `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${poolCount > 1 ? 's' : ''}</strong>. Make sure your predictions are in!</p>
+    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+      <li>Double-check your <strong>Group Stage predictions</strong></li>
+      <li>Share your pool code one last time — the more the merrier</li>
+      <li>Get ready for the beautiful game</li>
+    </ul>
+    ` : `
+    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Last chance to join a pool before kickoff! Ask a friend for their code or create your own.</p>
+    `}
+    <p style="color:#525252;line-height:1.6;margin:0;">See you on the pitch. &#x26BD;</p>
+  `,
+}
+
+export function countdownReminderTemplate(params: {
+  userName: string
+  milestone: CountdownMilestone
+  daysUntilKickoff: number
+  poolCount: number
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { userName, milestone, daysUntilKickoff, poolCount, dashboardUrl } = params
+  const config = COUNTDOWN_CONFIG[milestone]
+  const bodyFn = COUNTDOWN_BODY[milestone]
+
+  return {
+    subject: config.subject(daysUntilKickoff),
+    html: baseTemplate({
+      preheader: config.preheader(daysUntilKickoff),
+      heading: `${config.emoji} ${config.heading}`,
+      body: `
+        ${bodyFn({ userName, daysUntilKickoff, poolCount, dashboardUrl })}
+        <div style="background:${config.accentBg};border:1px solid ${config.accentBorder};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0;font-size:14px;color:${config.accentText};">Kickoff: <strong>June 11, 2026</strong></p>
+          <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:${config.accentText};">${daysUntilKickoff} days</p>
+        </div>
+      `,
+      ctaText: poolCount > 0 ? 'Go to Dashboard' : 'Create or Join a Pool',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
 // --- Community Templates ---
 
 export function mentionNotificationTemplate(params: {
