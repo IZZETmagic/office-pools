@@ -265,6 +265,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
   // Card interaction state
   const [copiedPoolId, setCopiedPoolId] = useState<string | null>(null)
+  const [linkCopiedPoolId, setLinkCopiedPoolId] = useState<string | null>(null)
 
   // Client-side filtering for My Pools
   const filteredPools = useMemo(() => {
@@ -376,6 +377,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     navigator.clipboard.writeText(code)
     setCopiedPoolId(poolId)
     setTimeout(() => setCopiedPoolId(null), 1500)
+  }
+
+  const handleCopyInviteLink = (e: React.MouseEvent, poolId: string, code: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    navigator.clipboard.writeText(`${window.location.origin}/join/${code}`)
+    setLinkCopiedPoolId(poolId)
+    setTimeout(() => setLinkCopiedPoolId(null), 1500)
   }
 
   // Unique statuses for filter dropdown
@@ -592,6 +601,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                     const deadline = formatDeadline(pool.prediction_deadline)
                     const poolAction = getPoolAction(pool)
                     const isCopied = copiedPoolId === pool.pool_id
+                    const isLinkCopied = linkCopiedPoolId === pool.pool_id
                     const statusText = getPoolStatusText(pool)
 
                     return (
@@ -720,12 +730,21 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more
                                 </span>
-                                <button
-                                  onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
-                                  className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline shrink-0 ml-2"
-                                >
-                                  {isCopied ? 'Copied!' : 'Copy Code'}
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <button
+                                    onClick={(e) => handleCopyInviteLink(e, pool.pool_id, pool.pool_code)}
+                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                  >
+                                    {isLinkCopied ? 'Copied!' : 'Copy Link'}
+                                  </button>
+                                  <span className="text-neutral-300 dark:text-neutral-600">|</span>
+                                  <button
+                                    onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
+                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                  >
+                                    {isCopied ? 'Copied!' : 'Copy Code'}
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -846,12 +865,21 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more to make it interesting
                                 </span>
-                                <button
-                                  onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
-                                  className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline shrink-0 ml-2"
-                                >
-                                  {isCopied ? 'Copied!' : 'Copy Code'}
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <button
+                                    onClick={(e) => handleCopyInviteLink(e, pool.pool_id, pool.pool_code)}
+                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                  >
+                                    {isLinkCopied ? 'Copied!' : 'Copy Link'}
+                                  </button>
+                                  <span className="text-neutral-300 dark:text-neutral-600">|</span>
+                                  <button
+                                    onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
+                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                  >
+                                    {isCopied ? 'Copied!' : 'Copy Code'}
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>

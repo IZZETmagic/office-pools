@@ -68,6 +68,9 @@ export function MembersTab({
 
   // Pool code copy state
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   const adminCount = members.filter((m) => m.role === 'admin').length
   const isProgressive = pool.prediction_mode === 'progressive'
@@ -336,11 +339,34 @@ export function MembersTab({
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function getInviteLink() {
+    return `${window.location.origin}/join/${pool.pool_code}`
+  }
+
+  function copyInviteLink() {
+    navigator.clipboard.writeText(getInviteLink())
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  async function toggleQRCode() {
+    if (showQR) {
+      setShowQR(false)
+      return
+    }
+    if (!qrDataUrl) {
+      const QRCode = (await import('qrcode')).default
+      const url = await QRCode.toDataURL(getInviteLink(), { width: 200, margin: 2 })
+      setQrDataUrl(url)
+    }
+    setShowQR(true)
+  }
+
   return (
     <div>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-neutral-900">Pool Members</h2>
-        <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
           <span className="text-sm text-neutral-500">Code:</span>
           <button
             onClick={copyPoolCode}
@@ -354,7 +380,34 @@ export function MembersTab({
               <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
             )}
           </button>
+          <span className="text-neutral-300">|</span>
+          <button
+            onClick={copyInviteLink}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-800 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            title="Copy invite link"
+          >
+            {linkCopied ? 'Copied!' : 'Copy Invite Link'}
+            {linkCopied ? (
+              <svg className="w-3.5 h-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.061a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
+            )}
+          </button>
+          <button
+            onClick={toggleQRCode}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-800 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            title="Show QR code"
+          >
+            QR
+            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
+          </button>
         </div>
+        {showQR && qrDataUrl && (
+          <div className="mt-3 p-3 bg-white rounded-lg border border-neutral-200 inline-block">
+            <img src={qrDataUrl} alt={`QR code for joining ${pool.pool_name}`} width={200} height={200} />
+            <p className="text-xs text-neutral-400 text-center mt-1">Scan to join this pool</p>
+          </div>
+        )}
       </div>
 
       {error && (

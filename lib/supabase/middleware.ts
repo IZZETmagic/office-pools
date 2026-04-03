@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require authentication
-const protectedRoutes = ['/dashboard', '/pools', '/profile']
+const protectedRoutes = ['/dashboard', '/pools', '/profile', '/join']
 
 // Routes that authenticated users should be redirected away from
 const authRoutes = ['/', '/login', '/signup', '/forgot-password']
@@ -46,6 +46,9 @@ export async function updateSession(request: NextRequest) {
   if (!user && protectedRoutes.some((route) => pathname.startsWith(route))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // Preserve the intended destination so we can redirect back after login
+    const redirectTo = pathname + request.nextUrl.search
+    url.searchParams.set('redirectTo', redirectTo)
     return NextResponse.redirect(url)
   }
 
