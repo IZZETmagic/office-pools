@@ -921,10 +921,6 @@ export function PoolDetail({
                   </div>
                 </>
               )}
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/15 text-white/80 ml-1">
-                {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status}
-              </span>
-              {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-white/20 text-white/60">Admin</span>}
             </div>
             <div className="hidden sm:flex items-center gap-4 shrink-0">
               {[
