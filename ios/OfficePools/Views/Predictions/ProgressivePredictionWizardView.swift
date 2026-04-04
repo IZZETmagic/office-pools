@@ -26,12 +26,21 @@ struct ProgressivePredictionWizardView: View {
 
                     // Round tab selector
                     roundTabSelector
-                        .padding(.top, 8)
+                        .padding(.top, 16)
 
                     // Round info banner
                     roundInfoBanner
                         .padding(.horizontal)
                         .padding(.top, 12)
+
+                    // Referee tip
+                    if viewModel.currentRoundKey == .group && canEditCurrentRound {
+                        RefereeTipCard(
+                            key: "score_input",
+                            message: "Tap a score to cycle through values. Long press to type a specific number."
+                        )
+                        .padding(.top, 12)
+                    }
 
                     // Stage title
                     HStack(alignment: .firstTextBaseline) {

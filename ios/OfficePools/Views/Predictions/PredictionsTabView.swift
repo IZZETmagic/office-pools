@@ -21,6 +21,7 @@ struct PredictionsTabView: View {
     @State private var isEditing = false
     @State private var editViewModel: PredictionEditViewModel?
     @State private var progressiveEditViewModel: ProgressivePredictionEditViewModel?
+    @State private var bracketPickerViewModel: BracketPickerViewModel?
     @State private var resumeStage: WizardStage = .groupStage
     @State private var hasLoadedPredictions = false
     @State private var newEntryName = ""
@@ -35,6 +36,10 @@ struct PredictionsTabView: View {
 
     private var isProgressive: Bool {
         pool?.predictionMode == .progressive
+    }
+
+    private var isBracketPicker: Bool {
+        pool?.predictionMode == .bracketPicker
     }
 
     private var isMultiEntry: Bool {
@@ -53,7 +58,28 @@ struct PredictionsTabView: View {
         entryListPage
             .fullScreenCover(isPresented: $showingEntryDetail) {
                 if let entry = selectedEntry {
-                    if isProgressive {
+                    if isBracketPicker {
+                        BracketPickerFullScreenView(
+                            entry: entry,
+                            entryName: entry.entryName,
+                            bracketPickerViewModel: $bracketPickerViewModel,
+                            hasLoadedPredictions: hasLoadedPredictions,
+                            canEdit: canEdit,
+                            computedPoints: computedPoints,
+                            onClose: {
+                                showingEntryDetail = false
+                                bracketPickerViewModel = nil
+                            },
+                            onSetup: { setupBracketPickerViewModel(entry: entry) },
+                            onSubmitSuccess: {
+                                showingEntryDetail = false
+                                bracketPickerViewModel = nil
+                                Task {
+                                    await viewModel.loadPredictions(entryId: entry.entryId)
+                                }
+                            }
+                        )
+                    } else if isProgressive {
                         ProgressiveFullScreenView(
                             entry: entry,
                             entryName: entry.entryName,
@@ -351,6 +377,27 @@ struct PredictionsTabView: View {
         readOnlyEditVM = editVM
     }
 
+    // MARK: - Bracket Picker Mode Setup
+
+    private func setupBracketPickerViewModel(entry: Entry) {
+        guard bracketPickerViewModel == nil else { return }
+
+        let bpVM = BracketPickerViewModel(poolId: viewModel.poolId, matches: matches, teams: teams)
+        bpVM.setEntryId(entry.entryId)
+
+        // If already submitted, open straight to the review/summary step
+        if entry.hasSubmittedPredictions {
+            bpVM.currentStep = .review
+        }
+
+        // Load existing bracket picks
+        Task {
+            await bpVM.loadExisting(entryId: entry.entryId)
+        }
+
+        bracketPickerViewModel = bpVM
+    }
+
     // MARK: - Progressive Mode Setup
 
     private func setupProgressiveViewModel(entry: Entry) {
@@ -500,6 +547,73 @@ struct PredictionsTabView: View {
         } catch {
             print("[PredictionsTab] Failed to rename entry: \(error)")
         }
+    }
+}
+
+// MARK: - Bracket Picker Full-Screen View
+
+/// Full-screen view for bracket picker predictions.
+/// Shows the 8-step wizard with group rankings, third-place rankings,
+/// knockout picks, and review/submit.
+struct BracketPickerFullScreenView: View {
+    let entry: Entry
+    let entryName: String
+    @Binding var bracketPickerViewModel: BracketPickerViewModel?
+    let hasLoadedPredictions: Bool
+    let canEdit: Bool
+    let computedPoints: Int?
+    let onClose: () -> Void
+    let onSetup: () -> Void
+    let onSubmitSuccess: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Content
+            if let bpVM = bracketPickerViewModel {
+                let isReadOnly = entry.hasSubmittedPredictions || !canEdit
+                BracketPickerWizardView(
+                    viewModel: bpVM,
+                    entry: entry,
+                    readOnly: isReadOnly,
+                    readOnlyPoints: isReadOnly ? (computedPoints ?? entry.totalPoints) : nil,
+                    onSubmitSuccess: onSubmitSuccess
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: .bottom)
+            } else if !hasLoadedPredictions {
+                ProgressView("Loading predictions...")
+            } else {
+                Color.clear.onAppear { onSetup() }
+            }
+
+            // Floating header
+            VStack {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+
+                    Spacer()
+
+                    Text(entryName)
+                        .font(.headline)
+
+                    Spacer()
+
+                    Color.clear
+                        .frame(width: 36, height: 36)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+
+                Spacer()
+            }
+        }
+        .background(Color(.systemGroupedBackground))
     }
 }
 

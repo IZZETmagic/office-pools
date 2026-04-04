@@ -71,8 +71,11 @@ final class DashboardViewModel {
             result.sort { $0.totalPoints > $1.totalPoints }
         }
 
-        // Always float pools needing predictions to the top
+        // Branded pools first, then pools needing predictions
         result.sort { a, b in
+            let aBrand = a.pool.hasBranding ? 0 : 1
+            let bBrand = b.pool.hasBranding ? 0 : 1
+            if aBrand != bBrand { return aBrand < bBrand }
             if a.needsPredictions != b.needsPredictions {
                 return a.needsPredictions
             }

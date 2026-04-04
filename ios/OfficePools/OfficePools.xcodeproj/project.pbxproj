@@ -27,6 +27,7 @@
 		152C8DBA7D0AB8DF38BFA458 /* MembersTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8228971FC843C564FF31C856 /* MembersTabView.swift */; };
 		179F9DD2404E36628A609F30 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1013EFC18558A172E27B74A /* AuthService.swift */; };
 		197DADE2A5B21801388EA323 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0EB89A56E3EE86CA69912A /* CachedAsyncImage.swift */; };
+		1A7BEEF0C3D4A901DEAF1234 /* RefereeTipCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7BEEF0C3D4A901DEAF5678 /* RefereeTipCard.swift */; };
 		1A05E72F4B7707ACB952429A /* ResultsContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D57307369400AA064152AB5 /* ResultsContainerView.swift */; };
 		1F63EC7693FB7C2E158D0AE6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AF9C41CE321A3703211DF2 /* DashboardView.swift */; };
 		25639A0849BCECB0F39565C1 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1E3DC453A9D1AAA7B2E83A /* HomeView.swift */; };
@@ -95,6 +96,13 @@
 		F9013C454F921CBD480B12C4 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41712D32039A4640D93EF42 /* PlayerScore.swift */; };
 		F9392DDF248277B255B510AA /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C16D214CC5B59466B1F169 /* ActivityView.swift */; };
 		FDC4401E215A19D28D757595 /* Pool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142DD2B3B8F225FCA31FB190 /* Pool.swift */; };
+		BB1111111111111111111111 /* BracketPickerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1111111111111111111111 /* BracketPickerModels.swift */; };
+		BB2222222222222222222222 /* BracketPickerResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222222222222222222222 /* BracketPickerResolver.swift */; };
+		BB3333333333333333333333 /* BracketPickerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3333333333333333333333 /* BracketPickerViewModel.swift */; };
+		BB4444444444444444444444 /* BPGroupRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4444444444444444444444 /* BPGroupRankingView.swift */; };
+		BB5555555555555555555555 /* BPThirdPlaceRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5555555555555555555555 /* BPThirdPlaceRankingView.swift */; };
+		BB6666666666666666666666 /* BPKnockoutPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6666666666666666666666 /* BPKnockoutPickerView.swift */; };
+		BB7777777777777777777777 /* BracketPickerWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7777777777777777777777 /* BracketPickerWizardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -185,8 +193,16 @@
 		F7224E8F7FE060E8A2C09E0A /* AnnexCData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnexCData.swift; sourceTree = "<group>"; };
 		F81B7B2FDDA3FF45C8CFBFD5 /* MatchDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchDetailViewModel.swift; sourceTree = "<group>"; };
 		FA0EB89A56E3EE86CA69912A /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
+		1A7BEEF0C3D4A901DEAF5678 /* RefereeTipCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefereeTipCard.swift; sourceTree = "<group>"; };
 		FE44E4BA5CDE340C74DE7C07 /* OfficePoolsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfficePoolsApp.swift; sourceTree = "<group>"; };
 		FECC450BDF13DF1A8A18E9C3 /* StagePillsBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StagePillsBar.swift; sourceTree = "<group>"; };
+		AA1111111111111111111111 /* BracketPickerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerModels.swift; sourceTree = "<group>"; };
+		AA2222222222222222222222 /* BracketPickerResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerResolver.swift; sourceTree = "<group>"; };
+		AA3333333333333333333333 /* BracketPickerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerViewModel.swift; sourceTree = "<group>"; };
+		AA4444444444444444444444 /* BPGroupRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BPGroupRankingView.swift; sourceTree = "<group>"; };
+		AA5555555555555555555555 /* BPThirdPlaceRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BPThirdPlaceRankingView.swift; sourceTree = "<group>"; };
+		AA6666666666666666666666 /* BPKnockoutPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BPKnockoutPickerView.swift; sourceTree = "<group>"; };
+		AA7777777777777777777777 /* BracketPickerWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerWizardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -262,6 +278,10 @@
 		517E0BA3F569E52E07FD73D8 /* Predictions */ = {
 			isa = PBXGroup;
 			children = (
+				AA4444444444444444444444 /* BPGroupRankingView.swift */,
+				AA6666666666666666666666 /* BPKnockoutPickerView.swift */,
+				AA5555555555555555555555 /* BPThirdPlaceRankingView.swift */,
+				AA7777777777777777777777 /* BracketPickerWizardView.swift */,
 				2CE89DF7095D83F2A823580E /* GroupStageView.swift */,
 				DCE44D4FDFA148E5BE567659 /* ProgressiveGroupStageView.swift */,
 				997FFC1B206938C1A4315AA1 /* GroupStandingsTable.swift */,
@@ -281,6 +301,7 @@
 			isa = PBXGroup;
 			children = (
 				D9D2C8067FC482F4D849B454 /* AnalyticsResponse.swift */,
+				AA1111111111111111111111 /* BracketPickerModels.swift */,
 				ADC5B571B2AC59945F099757 /* Entry.swift */,
 				24C429A14C2CC2A93864565A /* LeaderboardResponse.swift */,
 				9559CE0A33901D69C80F97D5 /* Match.swift */,
@@ -305,6 +326,7 @@
 			children = (
 				F7224E8F7FE060E8A2C09E0A /* AnnexCData.swift */,
 				392CF4F951C4254AE102FCBE /* AppColors.swift */,
+				AA2222222222222222222222 /* BracketPickerResolver.swift */,
 				D963D2BE777C4AD6927F154E /* BracketResolver.swift */,
 				5CDA539E7B61229279894F0D /* GroupStandingsCalculator.swift */,
 				B7448132784B9FF633558D0C /* ScoringDefaults.swift */,
@@ -317,6 +339,7 @@
 			isa = PBXGroup;
 			children = (
 				FA0EB89A56E3EE86CA69912A /* CachedAsyncImage.swift */,
+				1A7BEEF0C3D4A901DEAF5678 /* RefereeTipCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -410,6 +433,7 @@
 			children = (
 				D86C50E486C26FD94CD5E97D /* AuthViewModel.swift */,
 				D35511BB8A2EE69E5F20ABCA /* BanterViewModel.swift */,
+				AA3333333333333333333333 /* BracketPickerViewModel.swift */,
 				66335E28D461FC2F5581330C /* CreatePoolViewModel.swift */,
 				3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */,
 				BCCCC11265EC117D2A645EB5 /* HomeViewModel.swift */,
@@ -521,8 +545,16 @@
 				355B1D89F1269E9E422AA73E /* BanterFullScreenView.swift in Sources */,
 				B211C310503272864637A329 /* BanterTabView.swift in Sources */,
 				66B22084A8ECA49AF39B552B /* BanterViewModel.swift in Sources */,
+				BB4444444444444444444444 /* BPGroupRankingView.swift in Sources */,
+				BB6666666666666666666666 /* BPKnockoutPickerView.swift in Sources */,
+				BB5555555555555555555555 /* BPThirdPlaceRankingView.swift in Sources */,
+				BB1111111111111111111111 /* BracketPickerModels.swift in Sources */,
+				BB2222222222222222222222 /* BracketPickerResolver.swift in Sources */,
+				BB3333333333333333333333 /* BracketPickerViewModel.swift in Sources */,
+				BB7777777777777777777777 /* BracketPickerWizardView.swift in Sources */,
 				2758E4ACD3B58AD60996D7F7 /* BracketResolver.swift in Sources */,
 				197DADE2A5B21801388EA323 /* CachedAsyncImage.swift in Sources */,
+				1A7BEEF0C3D4A901DEAF1234 /* RefereeTipCard.swift in Sources */,
 				77A335CAD99A3E14E8ABBB89 /* Config.swift in Sources */,
 				599329A21AF4C321A9E5ED4C /* ContentView.swift in Sources */,
 				BB0DF11A826CD7CF62182DE6 /* CreatePoolView.swift in Sources */,

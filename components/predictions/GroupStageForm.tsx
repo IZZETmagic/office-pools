@@ -13,6 +13,7 @@ import {
   rankThirdPlaceTeams,
   getAnnexCInfo,
   isPredictionComplete,
+  shortTeamName,
 } from '@/lib/tournament'
 import { StandingsTable } from './StandingsTable'
 import { ThirdPlaceTable } from './ThirdPlaceTable'
@@ -166,8 +167,10 @@ function MatchRow({
   onUpdate?: (matchId: string, score: ScoreEntry) => void
   readOnly?: boolean
 }) {
-  const homeTeam = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
-  const awayTeam = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+  const homeTeam = shortTeamName(match.home_team?.country_name || match.home_team_placeholder || 'TBD')
+  const awayTeam = shortTeamName(match.away_team?.country_name || match.away_team_placeholder || 'TBD')
+  const homeFlagUrl = match.home_team?.flag_url ?? null
+  const awayFlagUrl = match.away_team?.flag_url ?? null
 
   const handleScoreChange = (team: 'home' | 'away', value: string) => {
     if (readOnly || !onUpdate) return
@@ -211,8 +214,11 @@ function MatchRow({
       </div>
 
       {/* Home team */}
-      <div className="flex-1 basis-0 text-right min-w-0">
-        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate block">{homeTeam}</span>
+      <div className="flex-1 basis-0 text-right min-w-0 flex items-center justify-end gap-1.5">
+        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate">{homeTeam}</span>
+        {homeFlagUrl && (
+          <img src={homeFlagUrl} alt={homeTeam} className="hidden sm:block w-6 h-4 rounded-[2px] object-cover shrink-0" />
+        )}
       </div>
 
       {/* Score inputs */}
@@ -241,8 +247,11 @@ function MatchRow({
       </div>
 
       {/* Away team */}
-      <div className="flex-1 basis-0 text-left min-w-0">
-        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate block">{awayTeam}</span>
+      <div className="flex-1 basis-0 text-left min-w-0 flex items-center gap-1.5">
+        {awayFlagUrl && (
+          <img src={awayFlagUrl} alt={awayTeam} className="hidden sm:block w-6 h-4 rounded-[2px] object-cover shrink-0" />
+        )}
+        <span className="text-[11px] sm:text-sm font-medium text-neutral-900 truncate">{awayTeam}</span>
       </div>
 
       <div className="hidden sm:block shrink-0 w-[100px] text-xs text-neutral-500 text-right leading-tight">

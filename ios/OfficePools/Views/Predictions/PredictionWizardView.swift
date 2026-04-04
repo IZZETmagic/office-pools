@@ -85,6 +85,15 @@ struct PredictionWizardView: View {
                     // Top inset so content starts below the glass status bar
                     Spacer().frame(height: 44)
 
+                    // Referee tip
+                    if !readOnly {
+                        RefereeTipCard(
+                            key: "score_input",
+                            message: "Tap a score to cycle through values. Long press to type a specific number."
+                        )
+                        .padding(.top, 12)
+                    }
+
                     // Stage title
                     if currentStage != .summary || readOnly {
                         HStack(alignment: .firstTextBaseline) {

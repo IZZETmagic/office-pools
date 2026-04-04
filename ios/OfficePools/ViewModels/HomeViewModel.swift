@@ -117,8 +117,11 @@ final class HomeViewModel {
                 aggregateTotalPoints += cardData.totalPoints
             }
 
-            // Sort cards: needs predictions first, then by deadline
+            // Sort cards: branded first, then needs predictions, then by deadline
             cards.sort { a, b in
+                let aBrand = a.pool.hasBranding ? 0 : 1
+                let bBrand = b.pool.hasBranding ? 0 : 1
+                if aBrand != bBrand { return aBrand < bBrand }
                 if a.needsPredictions != b.needsPredictions {
                     return a.needsPredictions
                 }

@@ -146,6 +146,44 @@ final class APIService {
         try await requestVoid("POST", path: "/api/pools/\(poolId)/recalculate")
     }
 
+    // MARK: - Bracket Picks
+
+    /// Fetch existing bracket picks for an entry
+    func fetchBracketPicks(poolId: String, entryId: String) async throws -> BracketPicksResponse {
+        try await request("GET", path: "/api/pools/\(poolId)/bracket-picks?entry_id=\(entryId)")
+    }
+
+    struct BracketPicksSaveResponse: Decodable {
+        let saved: Bool
+        let lastSaved: String?
+    }
+
+    /// Auto-save bracket picks (group rankings, third-place rankings, knockout picks)
+    func saveBracketPicks(poolId: String, payload: BracketPicksSavePayload) async throws -> BracketPicksSaveResponse {
+        try await request("POST", path: "/api/pools/\(poolId)/bracket-picks", body: payload)
+    }
+
+    struct BracketPicksSubmitResponse: Decodable {
+        let submitted: Bool
+        let submittedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case submitted
+            case submittedAt = "submitted_at"
+        }
+    }
+
+    /// Submit/lock bracket picks
+    func submitBracketPicks(poolId: String, entryId: String) async throws -> BracketPicksSubmitResponse {
+        struct Body: Encodable {
+            let entryId: String
+            enum CodingKeys: String, CodingKey {
+                case entryId = "entry_id"
+            }
+        }
+        return try await request("PUT", path: "/api/pools/\(poolId)/bracket-picks", body: Body(entryId: entryId))
+    }
+
     // MARK: - Predictions
 
     struct SaveDraftResponse: Decodable {

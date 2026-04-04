@@ -6,6 +6,7 @@ import {
   ScoreEntry,
   GroupStanding,
   STAGE_LABELS,
+  shortTeamName,
 } from '@/lib/tournament'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
@@ -120,8 +121,8 @@ function KnockoutMatchCard({
   readOnly?: boolean
   highlight?: boolean
 }) {
-  const homeName = homeTeam?.country_name || match.home_team_placeholder || 'TBD'
-  const awayName = awayTeam?.country_name || match.away_team_placeholder || 'TBD'
+  const homeName = shortTeamName(homeTeam?.country_name || match.home_team_placeholder || 'TBD')
+  const awayName = shortTeamName(awayTeam?.country_name || match.away_team_placeholder || 'TBD')
   const bothResolved = homeTeam !== null && awayTeam !== null
 
   const isDraw = prediction != null && prediction.home != null && prediction.away != null && prediction.home === prediction.away
@@ -215,11 +216,16 @@ function KnockoutMatchCard({
         </div>
 
         {/* Home team */}
-        <div className="flex-1 basis-0 text-right min-w-0">
-          <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
-            {homeName}
-          </p>
-          {homeTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {homeTeam.group_letter}</p>}
+        <div className="flex-1 basis-0 text-right min-w-0 flex items-center justify-end gap-1.5">
+          <div className="min-w-0">
+            <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
+              {homeName}
+            </p>
+            {homeTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {homeTeam.group_letter}</p>}
+          </div>
+          {homeTeam?.flag_url && (
+            <img src={homeTeam.flag_url} alt={homeName} className="hidden sm:block w-6 h-4 rounded-[2px] object-cover shrink-0" />
+          )}
         </div>
 
         {/* Score inputs */}
@@ -248,11 +254,16 @@ function KnockoutMatchCard({
         </div>
 
         {/* Away team */}
-        <div className="flex-1 basis-0 text-left min-w-0">
-          <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
-            {awayName}
-          </p>
-          {awayTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {awayTeam.group_letter}</p>}
+        <div className="flex-1 basis-0 text-left min-w-0 flex items-center gap-1.5">
+          {awayTeam?.flag_url && (
+            <img src={awayTeam.flag_url} alt={awayName} className="hidden sm:block w-6 h-4 rounded-[2px] object-cover shrink-0" />
+          )}
+          <div className="min-w-0">
+            <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
+              {awayName}
+            </p>
+            {awayTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {awayTeam.group_letter}</p>}
+          </div>
         </div>
 
         <div className="hidden sm:block shrink-0 w-[100px] text-xs text-neutral-500 text-right leading-tight">

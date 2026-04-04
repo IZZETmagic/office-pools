@@ -550,6 +550,7 @@ export function PoolDetail({
 
   // Leave pool state
   const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [brandedNavOpen, setBrandedNavOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const adminCount = members.filter((m) => m.role === 'admin').length
   const isSoleAdmin = isAdmin && adminCount <= 1
@@ -803,8 +804,8 @@ export function PoolDetail({
   // Transform matches for predictions flow (needs home_team/away_team with flag_url)
   const predictionsMatches = matches.map((m) => ({
     ...m,
-    home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: null } : null,
-    away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: null } : null,
+    home_team: m.home_team ? { country_name: m.home_team.country_name, country_code: m.home_team.country_code, flag_url: m.home_team.flag_url ?? null } : null,
+    away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
   }))
 
   const adminTabs = isProgressive
@@ -922,6 +923,7 @@ export function PoolDetail({
                 </>
               )}
             </div>
+            {/* Desktop nav links */}
             <div className="hidden sm:flex items-center gap-4 shrink-0">
               {[
                 { href: '/dashboard', label: 'Dashboard' },
@@ -935,6 +937,53 @@ export function PoolDetail({
               <form action="/auth/signout" method="post">
                 <button type="submit" className="text-sm text-white/50 hover:text-white/80 font-medium">Sign Out</button>
               </form>
+            </div>
+
+            {/* Mobile hamburger menu */}
+            <div className="sm:hidden relative">
+              <button
+                onClick={() => setBrandedNavOpen(prev => !prev)}
+                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Navigation menu"
+              >
+                {brandedNavOpen ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                  </svg>
+                )}
+              </button>
+
+              {brandedNavOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 rounded-xl shadow-lg border border-white/10 py-1 z-50 overflow-hidden" style={{ backgroundColor: pool.brand_color! }}>
+                  {[
+                    { href: '/dashboard', label: 'Dashboard' },
+                    { href: '/pools', label: 'Pools' },
+                    { href: '/profile', label: 'Profile' },
+                  ].map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="block px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                      onClick={() => setBrandedNavOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                  <div className="my-1 border-t border-white/10" />
+                  <form action="/auth/signout" method="post">
+                    <button
+                      type="submit"
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         ) : (

@@ -4,7 +4,28 @@ import SwiftUI
 struct PoolCardView: View {
     let data: PoolCardData
 
+    private var brandColorValue: Color? {
+        guard let hex = data.pool.brandColor else { return nil }
+        return Color(hex: UInt(hex.dropFirst(), radix: 16) ?? 0)
+    }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Branded accent strip
+            if data.pool.hasBranding, let brandColor = brandColorValue {
+                HStack(spacing: 4) {
+                    Text(data.pool.brandEmoji ?? "")
+                        .font(.caption)
+                    Text(data.pool.brandName ?? "")
+                        .font(.caption2.weight(.bold))
+                    Spacer()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(brandColor)
+            }
+
         VStack(alignment: .leading, spacing: 12) {
             // Pool name + unread badge
             HStack {
@@ -80,16 +101,28 @@ struct PoolCardView: View {
             }
         }
         .padding(16)
+
+        } // end outer VStack
         .frame(width: 220)
         .background {
             RoundedRectangle(cornerRadius: 16)
                 .fill(.background)
                 .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.quaternary, lineWidth: 1)
+                .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
         }
+    }
+
+    private var cardBorderColor: Color {
+        if data.pool.hasBranding, let c = brandColorValue { return c }
+        return Color(.quaternaryLabel)
+    }
+
+    private var cardBorderWidth: CGFloat {
+        data.pool.hasBranding ? 1.5 : 1
     }
 
     // MARK: - Helpers
@@ -133,7 +166,8 @@ struct PoolCardView: View {
                     isPrivate: false, maxParticipants: nil, maxEntriesPerUser: 1,
                     tournamentId: "t1", predictionDeadline: nil,
                     predictionMode: .fullTournament,
-                    createdAt: "", updatedAt: ""
+                    createdAt: "", updatedAt: "",
+                    brandName: nil, brandEmoji: nil, brandColor: nil, brandAccent: nil
                 ),
                 userRank: 2, totalEntries: 13, totalPoints: 87,
                 formResults: [.exact, .winnerGd, .miss, .exact, .winner],

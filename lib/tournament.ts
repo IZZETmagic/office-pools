@@ -53,6 +53,14 @@ export function isPredictionComplete(pred: ScoreEntry | undefined): pred is Scor
   return pred != null && pred.home != null && pred.away != null
 }
 
+const SHORT_NAMES: Record<string, string> = {
+  'Bosnia and Herzegovina': 'Bosnia & Herz.',
+}
+
+export function shortTeamName(name: string): string {
+  return SHORT_NAMES[name] ?? name
+}
+
 export type GroupStanding = {
   team_id: string
   country_name: string

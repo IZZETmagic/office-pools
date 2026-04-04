@@ -85,7 +85,7 @@ final class PoolService {
                 maxParticipants: maxP,
                 maxEntriesPerUser: maxE
             ))
-            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
             .single()
             .execute()
             .value
@@ -232,7 +232,7 @@ final class PoolService {
             do {
                 let pool: Pool = try await supabase
                     .from("pools")
-                    .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+                    .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
                     .eq("pool_id", value: poolId)
                     .single()
                     .execute()
@@ -251,7 +251,7 @@ final class PoolService {
     func fetchPool(poolId: String) async throws -> Pool {
         let pool: Pool = try await supabase
             .from("pools")
-            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
             .eq("pool_id", value: poolId)
             .single()
             .execute()
@@ -265,7 +265,7 @@ final class PoolService {
     func joinPool(poolCode: String, userId: String, username: String = "Entry 1") async throws -> Pool {
         let pools: [Pool] = try await supabase
             .from("pools")
-            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
             .eq("pool_code", value: poolCode.uppercased())
             .limit(1)
             .execute()
@@ -335,7 +335,7 @@ final class PoolService {
     func searchPools(query: String) async throws -> [Pool] {
         let pools: [Pool] = try await supabase
             .from("pools")
-            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
             .eq("is_private", value: false)
             .eq("status", value: "open")
             .ilike("pool_name", pattern: "%\(query)%")

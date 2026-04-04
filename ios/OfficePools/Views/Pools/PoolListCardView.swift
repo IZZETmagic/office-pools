@@ -4,11 +4,34 @@ import SwiftUI
 struct PoolListCardView: View {
     let data: PoolCardData
 
+    private var brandColorValue: Color? {
+        guard let hex = data.pool.brandColor else { return nil }
+        return Color(hex: UInt(hex.dropFirst(), radix: 16) ?? 0)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Gradient accent strip across the top
-            modeGradient
-                .frame(height: 4)
+            if data.pool.hasBranding, let brandColor = brandColorValue {
+                // Branded accent strip
+                HStack(spacing: 6) {
+                    Text(data.pool.brandEmoji ?? "")
+                        .font(.subheadline)
+                    Text(data.pool.brandName ?? "")
+                        .font(.caption.weight(.bold))
+                    Spacer()
+                    Text("Powered by Sport Pool")
+                        .font(.caption2.weight(.semibold))
+                        .opacity(0.85)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(brandColor)
+            } else {
+                // Default gradient accent strip
+                modeGradient
+                    .frame(height: 4)
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 // Row 1: Pool name + unread banter badge
@@ -109,6 +132,13 @@ struct PoolListCardView: View {
         .background(Color(.systemBackground))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    data.pool.hasBranding ? (brandColorValue ?? .clear) : .clear,
+                    lineWidth: data.pool.hasBranding ? 1.5 : 0
+                )
+        )
         .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
         .compositingGroup()
     }
