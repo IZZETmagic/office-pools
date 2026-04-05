@@ -138,7 +138,7 @@ async function handleGET(
   // Check if any matches are completed
   const completedMatches = matches.filter((m: any) => m.is_completed)
   if (completedMatches.length === 0) {
-    return NextResponse.json({ error: 'No completed matches yet' }, { status: 200 })
+    return NextResponse.json({ error: 'No completed matches yet' }, { status: 404 })
   }
 
   // 6. Compute actual group standings from real match results
