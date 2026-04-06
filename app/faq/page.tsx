@@ -1,17 +1,35 @@
 import type { Metadata } from 'next'
 import { PublicNav } from '@/components/PublicNav'
 import { Button } from '@/components/ui/Button'
+import { JsonLd } from '@/components/JsonLd'
 import { FAQPageContent } from './FAQPageContent'
+import { faqCategories } from './faqData'
 
 export const metadata: Metadata = {
-  title: 'FAQ - Sport Pool',
+  title: 'FAQ',
   description:
     'Frequently asked questions about Sport Pool — the free FIFA World Cup 2026 prediction pool platform. Learn about pools, predictions, scoring, and more.',
 }
 
 export default function FAQPage() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqCategories.flatMap((category) =>
+      category.items.map((item) => ({
+        "@type": "Question",
+        "name": item.question,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": item.answer,
+        },
+      }))
+    ),
+  }
+
   return (
     <div className="min-h-screen bg-surface">
+      <JsonLd data={faqJsonLd} />
       {/* Navigation */}
       <PublicNav />
 

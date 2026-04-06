@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
+import { JsonLd } from '@/components/JsonLd'
 import { FAQAccordion } from './FAQAccordion'
 
 const features = [
@@ -53,6 +54,17 @@ const steps = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-surface">
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Sport Pool",
+        "url": "https://sportpool.io",
+        "description": "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+        "applicationCategory": "SportsApplication",
+        "operatingSystem": "Web",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Organization", "name": "Sport Pool", "url": "https://sportpool.io" },
+      }} />
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-neutral-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

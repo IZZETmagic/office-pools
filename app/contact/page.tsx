@@ -3,7 +3,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { ContactForm } from './ContactForm'
 
 export const metadata: Metadata = {
-  title: 'Contact Us - Sport Pool',
+  title: 'Contact Us',
   description:
     'Get in touch with the Sport Pool team. Have a question, feedback, or need help? Send us a message.',
 }

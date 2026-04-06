@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { PublicNav } from '@/components/PublicNav'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - Sport Pool',
+  title: 'Privacy Policy',
   description:
     'Privacy Policy for Sport Pool — learn how we collect, use, and protect your personal information.',
 }

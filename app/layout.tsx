@@ -23,7 +23,11 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+  metadataBase: new URL("https://sportpool.io"),
+  title: {
+    default: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+    template: "%s | Sport Pool",
+  },
   description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
   manifest: "/manifest.json",
   icons: {
@@ -35,6 +39,25 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Sport Pool",
   },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://sportpool.io",
+    siteName: "Sport Pool",
+    title: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+    description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Sport Pool - FIFA World Cup 2026 Prediction Pool" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+    description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+    images: ["/og-image.png"],
+  },
+  verification: {
+    google: "googlebbdfb25f2108115e",
+  },
+  keywords: ["FIFA World Cup 2026", "prediction pool", "World Cup pool", "soccer predictions", "football predictions", "World Cup 2026 bracket", "free prediction pool"],
 };
 
 export default function RootLayout({

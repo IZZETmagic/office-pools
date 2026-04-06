@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { PublicNav } from '@/components/PublicNav'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - Sport Pool',
+  title: 'Terms of Service',
   description:
     'Terms of Service for Sport Pool — the free FIFA World Cup 2026 prediction pool platform.',
 }
