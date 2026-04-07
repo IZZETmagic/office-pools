@@ -29,8 +29,9 @@ struct PoolDetailView: View {
     @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @State var viewModel: PoolDetailViewModel
     let authService: AuthService
+    var initialTab: PoolTab = .leaderboard
     var onPoolDeleted: ((String) -> Void)?  // poolId
-    @State private var selectedTab: PoolTab? = .leaderboard
+    @State private var selectedTab: PoolTab? = nil
     @State private var showingEntryDetail = false
     @State private var predictionsViewModel: PredictionsViewModel?
     @State private var tabBarHeight: CGFloat = 40
@@ -260,6 +261,9 @@ struct PoolDetailView: View {
             }
         }
         .onAppear {
+            if selectedTab == nil {
+                selectedTab = initialTab
+            }
             if banterViewModel == nil {
                 banterViewModel = BanterViewModel(poolId: viewModel.poolId)
             }

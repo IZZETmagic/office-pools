@@ -86,6 +86,13 @@ struct HomeView: View {
                     authService: authService
                 )
             }
+            .navigationDestination(for: PoolDeepLink.self) { link in
+                PoolDetailView(
+                    viewModel: PoolDetailViewModel(poolId: link.pool.poolId),
+                    authService: authService,
+                    initialTab: link.tab
+                )
+            }
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(
                     match: match,
@@ -457,9 +464,57 @@ struct HomeView: View {
                                 DashboardPoolCard(data: card)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                poolCardContextMenu(for: card)
+                            }
                         }
                     }
                     .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+
+    // MARK: - Pool Card Context Menu
+
+    @ViewBuilder
+    private func poolCardContextMenu(for card: PoolCardData) -> some View {
+        let inviteLink = "https://sportpool.io/join/\(card.pool.poolCode)"
+
+        // Sharing actions
+        Section {
+            Button {
+                UIPasteboard.general.string = card.pool.poolCode
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } label: {
+                Label("Copy Pool Code", systemImage: "doc.on.clipboard")
+            }
+
+            Button {
+                UIPasteboard.general.string = inviteLink
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } label: {
+                Label("Copy Invite Link", systemImage: "link")
+            }
+
+            ShareLink(item: "Join my World Cup prediction pool on SportPool!\n\n\(inviteLink)") {
+                Label("Share Invite", systemImage: "square.and.arrow.up")
+            }
+        }
+
+        // Quick actions
+        Section {
+            Button {
+                navigationPath.append(PoolDeepLink(pool: card.pool, tab: .leaderboard))
+            } label: {
+                Label("View Leaderboard", systemImage: "list.number")
+            }
+
+            if card.needsPredictions {
+                Button {
+                    navigationPath.append(PoolDeepLink(pool: card.pool, tab: .predictions))
+                } label: {
+                    Label("Make Predictions", systemImage: "pencil.line")
                 }
             }
         }
@@ -612,6 +667,13 @@ struct HomeView: View {
         }
         .presentationDetents([.medium])
     }
+}
+
+// MARK: - Pool Deep Link
+
+struct PoolDeepLink: Hashable {
+    let pool: Pool
+    let tab: PoolTab
 }
 
 // MARK: - Scroll Offset Tracking
