@@ -1,44 +1,63 @@
 import SwiftUI
 
-/// Native iOS-style stat card for the hero section.
+/// Stat card for the Home dashboard — compact, SP-styled.
 struct StatCardView: View {
     let title: String
     let value: String
     let systemImage: String
-    let iconColor: Color
+    let gradient: [Color]
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Image(systemName: systemImage)
-                .font(.title2)
-                .foregroundStyle(iconColor)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: gradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
             Text(value)
-                .font(.title3.bold().monospacedDigit())
-                .foregroundStyle(.primary)
+                .font(SPTypography.mono(size: 20, weight: .heavy))
+                .foregroundStyle(Color.sp.ink)
 
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
                 .textCase(.uppercase)
-                .tracking(0.5)
+                .tracking(1)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                .fill(Color.white)
         }
     }
 }
 
 #Preview {
     HStack(spacing: 10) {
-        StatCardView(title: "Streak", value: "7", systemImage: "flame.fill", iconColor: .orange)
-        StatCardView(title: "Best Rank", value: "#2", systemImage: "trophy.fill", iconColor: .yellow)
-        StatCardView(title: "Points", value: "2,425", systemImage: "bolt.fill", iconColor: .blue)
+        StatCardView(
+            title: "Streak", value: "7",
+            systemImage: "flame.fill",
+            gradient: [Color(hex: 0xF97316), Color(hex: 0xEF4444)]
+        )
+        StatCardView(
+            title: "Best Rank", value: "#2",
+            systemImage: "trophy.fill",
+            gradient: [Color(hex: 0xFBBF24), Color(hex: 0xD97706)]
+        )
+        StatCardView(
+            title: "Points", value: "2,425",
+            systemImage: "bolt.fill",
+            gradient: [Color(hex: 0x667EEA), Color(hex: 0x3B6EFF)]
+        )
     }
-    .padding()
-    .background(Color(.systemGroupedBackground))
+    .padding(.horizontal, 20)
+    .padding(.vertical, 20)
+    .background(Color.sp.snow)
 }

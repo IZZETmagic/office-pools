@@ -15,6 +15,9 @@ struct PoolCardData: Identifiable {
     let isAdmin: Bool
     let levelNumber: Int
     let levelName: String
+    let predictionsCompleted: Int
+    let predictionsTotal: Int
+    let memberInitials: [String] // first 3 members' two-letter initials
 
     var id: String { pool.poolId }
 
@@ -164,6 +167,9 @@ final class HomeViewModel {
         var isAdmin = false
         var levelNumber = 1
         var levelName = "Rookie"
+        var predictionsCompleted = 0
+        var predictionsTotal = 0
+        var bestEntryId: String?
 
         do {
             let leaderboard = try await apiService.fetchLeaderboard(poolId: pool.poolId)
@@ -175,6 +181,7 @@ final class HomeViewModel {
                 userRank = bestEntry.currentRank
                 userPoints = bestEntry.totalPoints
                 needsPredictions = !bestEntry.hasSubmittedPredictions
+                bestEntryId = bestEntry.entryId
 
                 // Use lastFive from API if available (already computed server-side)
                 if let lastFive = bestEntry.lastFive {
@@ -196,11 +203,24 @@ final class HomeViewModel {
             print("[HomeViewModel] Failed to fetch leaderboard for pool \(pool.poolId): \(error)")
         }
 
+        // Fetch prediction progress
+        if let entryId = bestEntryId {
+            let progress = await fetchPredictionProgress(
+                entryId: entryId,
+                poolId: pool.poolId,
+                predictionMode: pool.predictionMode,
+                tournamentId: pool.tournamentId
+            )
+            predictionsCompleted = progress.completed
+            predictionsTotal = progress.total
+        }
+
         // Fetch member info and unread banter concurrently
         let memberInfoTask = Task { await self.fetchMemberInfo(poolId: pool.poolId, userId: userId) }
         let unreadBanterTask = Task { await self.fetchUnreadBanterCount(poolId: pool.poolId, userId: userId) }
 
-        (memberCount, isAdmin) = await memberInfoTask.value
+        var memberInitials: [String] = []
+        (memberCount, isAdmin, memberInitials) = await memberInfoTask.value
         unreadBanter = await unreadBanterTask.value
 
         // Parse deadline
@@ -225,7 +245,10 @@ final class HomeViewModel {
             memberCount: memberCount,
             isAdmin: isAdmin,
             levelNumber: levelNumber,
-            levelName: levelName
+            levelName: levelName,
+            predictionsCompleted: predictionsCompleted,
+            predictionsTotal: predictionsTotal,
+            memberInitials: memberInitials
         )
     }
 
@@ -356,29 +379,134 @@ final class HomeViewModel {
 
     // MARK: - Fetch Member Info (count + admin status)
 
-    func fetchMemberInfo(poolId: String, userId: String) async -> (memberCount: Int, isAdmin: Bool) {
+    func fetchMemberInfo(poolId: String, userId: String) async -> (memberCount: Int, isAdmin: Bool, initials: [String]) {
         do {
             struct MemberRow: Codable {
                 let userId: String
                 let role: String
+                let users: MemberUser
+
+                struct MemberUser: Codable {
+                    let fullName: String
+                    enum CodingKeys: String, CodingKey {
+                        case fullName = "full_name"
+                    }
+                }
+
                 enum CodingKeys: String, CodingKey {
                     case userId = "user_id"
                     case role
+                    case users
                 }
             }
 
             let members: [MemberRow] = try await supabase
                 .from("pool_members")
-                .select("user_id, role")
+                .select("user_id, role, users(full_name)")
                 .eq("pool_id", value: poolId)
                 .execute()
                 .value
 
             let isAdmin = members.first(where: { $0.userId == userId })?.role == "admin"
-            return (members.count, isAdmin)
+
+            let initials = Array(members.prefix(3).map { member in
+                let parts = member.users.fullName.split(separator: " ")
+                if parts.count >= 2 {
+                    return "\(parts[0].prefix(1))\(parts[1].prefix(1))".uppercased()
+                } else if let first = parts.first {
+                    return String(first.prefix(2)).uppercased()
+                }
+                return "??"
+            })
+
+            return (members.count, isAdmin, initials)
         } catch {
             print("[HomeViewModel] Failed to fetch member info for pool \(poolId): \(error)")
-            return (0, false)
+            return (0, false, [])
+        }
+    }
+
+    // MARK: - Fetch Prediction Progress
+
+    private func fetchPredictionProgress(
+        entryId: String,
+        poolId: String,
+        predictionMode: PredictionMode,
+        tournamentId: String
+    ) async -> (completed: Int, total: Int) {
+        do {
+            switch predictionMode {
+            case .fullTournament, .progressive:
+                // Count predictions made
+                struct PredictionId: Codable {
+                    let predictionId: String
+                    enum CodingKeys: String, CodingKey { case predictionId = "prediction_id" }
+                }
+                let predictions: [PredictionId] = try await supabase
+                    .from("predictions")
+                    .select("prediction_id")
+                    .eq("entry_id", value: entryId)
+                    .execute()
+                    .value
+
+                // Count total matches in tournament
+                struct MatchId: Codable {
+                    let matchId: String
+                    enum CodingKeys: String, CodingKey { case matchId = "match_id" }
+                }
+
+                if predictionMode == .progressive {
+                    // For progressive, count only matches in open/completed rounds
+                    // Fetch rounds to determine which matches are available
+                    let roundsResponse = try await apiService.fetchRounds(poolId: poolId)
+                    let availableMatches = roundsResponse.rounds
+                        .filter { $0.state == "open" || $0.state == "completed" }
+                        .reduce(0) { $0 + ($1.matchCount ?? 0) }
+                    return (predictions.count, availableMatches)
+                } else {
+                    // Full tournament: all matches
+                    let allMatches: [MatchId] = try await supabase
+                        .from("matches")
+                        .select("match_id")
+                        .eq("tournament_id", value: tournamentId)
+                        .execute()
+                        .value
+                    return (predictions.count, allMatches.count)
+                }
+
+            case .bracketPicker:
+                // Groups: count groups with all 4 positions filled
+                struct GroupRanking: Codable {
+                    let groupLetter: String
+                    enum CodingKeys: String, CodingKey { case groupLetter = "group_letter" }
+                }
+                let groupRankings: [GroupRanking] = try await supabase
+                    .from("bracket_group_rankings")
+                    .select("group_letter")
+                    .eq("entry_id", value: entryId)
+                    .execute()
+                    .value
+
+                let groupCounts = Dictionary(grouping: groupRankings, by: \.groupLetter)
+                let completedGroups = groupCounts.filter { $0.value.count == 4 }.count
+
+                // Knockout picks
+                struct KnockoutPick: Codable {
+                    let id: String
+                }
+                let knockoutPicks: [KnockoutPick] = try await supabase
+                    .from("bracket_knockout_picks")
+                    .select("id")
+                    .eq("entry_id", value: entryId)
+                    .execute()
+                    .value
+
+                // Total: 12 groups + 32 knockout matches
+                return (completedGroups + knockoutPicks.count, 12 + 32)
+            }
+        } catch {
+            print("[HomeViewModel] Failed to fetch prediction progress: \(error)")
+            return (0, 0)
         }
     }
 
@@ -499,6 +627,22 @@ final class HomeViewModel {
 
         liveMatches = await liveTask.value
         upcomingMatches = await upcomingTask.value
+    }
+
+    // MARK: - Next Kickoff
+
+    /// The next upcoming match (soonest by date).
+    var nextUpcomingMatch: Match? {
+        upcomingMatches.first
+    }
+
+    /// Number of matches scheduled for today (used for "X more matches today" label).
+    var matchesToday: Int {
+        let calendar = Calendar.current
+        return upcomingMatches.filter { match in
+            guard let date = parseDate(match.matchDate) else { return false }
+            return calendar.isDateInToday(date)
+        }.count
     }
 
     // MARK: - Helpers

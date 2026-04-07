@@ -131,7 +131,7 @@ final class UnreadBadgeTracker {
 struct MainTabView: View {
     let authService: AuthService
 
-    @State private var selectedTab: AppTab = .home
+    @State var selectedTab: AppTab = .home
     @State private var badgeTracker = UnreadBadgeTracker()
 
     init(authService: AuthService) {
@@ -144,7 +144,7 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Home", systemImage: "house.fill", value: .home) {
-                HomeView(authService: authService)
+                HomeView(authService: authService, switchToPoolsTab: { selectedTab = .pools })
             }
 
             Tab("Pools", systemImage: "trophy.fill", value: .pools) {
