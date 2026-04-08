@@ -163,61 +163,90 @@ struct ResultsTabView<HeaderContent: View>: View {
 
     var body: some View {
         if matches.isEmpty {
-            ContentUnavailableView(
-                "No Matches",
-                systemImage: "sportscourt",
-                description: Text("Match results will appear here.")
-            )
+            VStack(spacing: 12) {
+                Image(systemName: "sportscourt")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Color.sp.mist)
+                Text("No Matches")
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
+                Text("Match results will appear here.")
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.sp.snow)
         } else {
             Group {
                 if sections.isEmpty {
-                    ContentUnavailableView(
-                        "No Matches",
-                        systemImage: "line.3.horizontal.decrease.circle",
-                        description: Text("No matches for this filter.")
-                    )
+                    VStack(spacing: 12) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 36))
+                            .foregroundStyle(Color.sp.mist)
+                        Text("No Matches")
+                            .font(SPTypography.cardTitle)
+                            .foregroundStyle(Color.sp.ink)
+                        Text("No matches for this filter.")
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.sp.snow)
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
-                            LazyVStack(spacing: 16, pinnedViews: [.sectionHeaders]) {
+                            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
                                 Section {
                                     ForEach(sections) { section in
                                         VStack(spacing: 0) {
                                             Text(section.label)
-                                                .id(section.id)
-                                                .font(.subheadline.weight(.semibold))
+                                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                                .foregroundStyle(Color.sp.ink)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 10)
+                                                .id(section.id)
+                                            .padding(.horizontal, 16)
+                                            .padding(.top, 14)
+                                            .padding(.bottom, 10)
 
-                                            Divider()
-                                                .padding(.horizontal, 12)
+                                            Rectangle()
+                                                .fill(Color.sp.mist)
+                                                .frame(height: 0.5)
+                                                .padding(.horizontal, 14)
 
                                             if filterMode == .round {
                                                 roundMatchesWithDateHeaders(section.matches)
                                             } else {
-                                                ForEach(section.matches) { match in
+                                                ForEach(Array(section.matches.enumerated()), id: \.element.id) { index, match in
                                                     NavigationLink(value: match) {
                                                         MatchResultRow(match: match)
                                                     }
                                                     .buttonStyle(.plain)
+
+                                                    if index < section.matches.count - 1 {
+                                                        Rectangle()
+                                                            .fill(Color.sp.mist.opacity(0.5))
+                                                            .frame(height: 0.5)
+                                                            .padding(.horizontal, 14)
+                                                    }
                                                 }
                                             }
+
+                                            Spacer().frame(height: 4)
                                         }
-                                        .background(Color(.systemBackground))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-                                        .padding(.horizontal)
+                                        .background(Color.white)
+                                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+                                        .padding(.horizontal, 20)
                                     }
                                 } header: {
                                     filterBar
-                                        .padding(.horizontal, 16)
+                                        .padding(.horizontal, 20)
                                         .padding(.vertical, 8)
+                                        .background(Color.sp.snow)
                                 }
                             }
                             .padding(.bottom, 16)
                         }
-                        .background(Color(.systemGroupedBackground))
+                        .background(Color.sp.snow)
                         .onAppear {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                                 if filterMode == .date {
@@ -286,8 +315,8 @@ struct ResultsTabView<HeaderContent: View>: View {
         ForEach(sortedDays, id: \.self) { day in
             // Subtle date sub-header
             Text(dayLabel(for: day))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
@@ -297,11 +326,18 @@ struct ResultsTabView<HeaderContent: View>: View {
             let dayMatches = grouped[day]!.sorted { a, b in
                 (a.parsedDate ?? .distantPast) < (b.parsedDate ?? .distantPast)
             }
-            ForEach(dayMatches) { match in
+            ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
                 NavigationLink(value: match) {
                     MatchResultRow(match: match)
                 }
                 .buttonStyle(.plain)
+
+                if index < dayMatches.count - 1 {
+                    Rectangle()
+                        .fill(Color.sp.mist.opacity(0.5))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 14)
+                }
             }
         }
     }
@@ -317,24 +353,29 @@ struct ResultsTabView<HeaderContent: View>: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(pillLabel(for: mode))
-                                .font(.subheadline.weight(filterMode == mode ? .semibold : .regular))
+                                .font(.system(size: 13, weight: filterMode == mode ? .semibold : .medium, design: .rounded))
 
                             // Show X to clear or chevron to open
                             if mode == .team && filterMode == .team && selectedTeamId != nil {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                             } else if mode == .group && filterMode == .group && selectedGroupLetter != nil {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                             } else if mode == .team || mode == .group {
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(.system(size: 8, weight: .semibold))
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .foregroundStyle(filterMode == mode ? AppColors.primary500 : .primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(
+                            filterMode == mode
+                                ? AnyShapeStyle(Color.sp.primary.opacity(0.1))
+                                : AnyShapeStyle(.ultraThinMaterial),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(filterMode == mode ? Color.sp.primary : Color.sp.ink)
                     }
                     .buttonStyle(.plain)
                 }
@@ -402,26 +443,54 @@ struct TeamPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            List(filteredTeams, id: \.id) { team in
-                Button {
-                    onSelect(team.id, team.name)
-                } label: {
-                    HStack(spacing: 10) {
-                        if let flagUrl = team.flagUrl, let url = URL(string: flagUrl) {
-                            CachedAsyncImage(url: url, width: 28, height: 18, cornerRadius: 2)
-                        }
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredTeams, id: \.id) { team in
+                        Button {
+                            onSelect(team.id, team.name)
+                        } label: {
+                            HStack(spacing: 12) {
+                                if let flagUrl = team.flagUrl, let url = URL(string: flagUrl) {
+                                    CachedAsyncImage(url: url, width: 30, height: 20, cornerRadius: 3)
+                                } else {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color.sp.mist)
+                                        .frame(width: 30, height: 20)
+                                }
 
-                        Text(team.name)
-                            .foregroundStyle(.primary)
+                                Text(team.name)
+                                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.sp.ink)
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.sp.mist)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.plain)
+
+                        Rectangle()
+                            .fill(Color.sp.mist.opacity(0.5))
+                            .frame(height: 0.5)
+                            .padding(.horizontal, 20)
                     }
                 }
             }
+            .background(Color.sp.snow)
             .searchable(text: $searchText, prompt: "Search teams")
             .navigationTitle("Select Team")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.sp.primary)
                 }
             }
         }
@@ -438,28 +507,49 @@ struct GroupPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            List(groups, id: \.letter) { group in
-                Button {
-                    onSelect(group.letter)
-                } label: {
-                    HStack {
-                        Text("Group \(group.letter)")
-                            .foregroundStyle(.primary)
-                            .font(.body.weight(.medium))
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(groups, id: \.letter) { group in
+                        Button {
+                            onSelect(group.letter)
+                        } label: {
+                            HStack {
+                                Text("Group \(group.letter)")
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.sp.ink)
 
-                        Spacer()
+                                Spacer()
 
-                        Text("\(group.matchCount) matches")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                                Text("\(group.matchCount) matches")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.sp.slate)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.sp.mist)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.plain)
+
+                        Rectangle()
+                            .fill(Color.sp.mist.opacity(0.5))
+                            .frame(height: 0.5)
+                            .padding(.horizontal, 20)
                     }
                 }
             }
+            .background(Color.sp.snow)
             .navigationTitle("Select Group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.sp.primary)
                 }
             }
         }
@@ -489,9 +579,10 @@ struct MatchResultRow: View {
     var body: some View {
         HStack(spacing: 0) {
             // Home team (right-aligned: name then flag)
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Text(match.homeDisplayName)
-                    .font(.subheadline)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.sp.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
@@ -504,17 +595,18 @@ struct MatchResultRow: View {
                 .frame(width: 74)
 
             // Away team (left-aligned: flag then name)
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 flagView(url: match.awayTeam?.flagUrl)
 
                 Text(match.awayDisplayName)
-                    .font(.subheadline)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.sp.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 12)
     }
 
@@ -526,47 +618,51 @@ struct MatchResultRow: View {
             VStack(spacing: 3) {
                 HStack(spacing: 3) {
                     Text("\(match.homeScoreFt ?? 0)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
                     Text("-")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.slate)
                     Text("\(match.awayScoreFt ?? 0)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
                 }
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(AppColors.error500)
+                        .fill(Color.sp.red)
                         .frame(width: 5, height: 5)
                         .modifier(PulsingModifier())
 
                     Text("LIVE")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(AppColors.error500)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.sp.red)
                 }
             }
         } else if isFinished {
             VStack(spacing: 2) {
                 HStack(spacing: 3) {
                     Text("\(match.homeScoreFt ?? 0)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
                     Text("-")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.slate)
                     Text("\(match.awayScoreFt ?? 0)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
                 }
 
                 if let homePso = match.homeScorePso, let awayPso = match.awayScorePso {
                     Text("(\(homePso)-\(awayPso) PSO)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(AppColors.primary600)
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.primary)
                 }
             }
         } else {
             Text(matchTime)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
         }
     }
 
@@ -575,11 +671,11 @@ struct MatchResultRow: View {
     @ViewBuilder
     private func flagView(url: String?) -> some View {
         if let flagUrl = url, let imageUrl = URL(string: flagUrl) {
-            CachedAsyncImage(url: imageUrl, width: 24, height: 16, cornerRadius: 2)
+            CachedAsyncImage(url: imageUrl, width: 26, height: 18, cornerRadius: 3)
         } else {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color(.systemGray5))
-                .frame(width: 24, height: 16)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.sp.mist)
+                .frame(width: 26, height: 18)
         }
     }
 }

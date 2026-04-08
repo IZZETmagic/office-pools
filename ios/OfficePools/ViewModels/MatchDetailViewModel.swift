@@ -25,6 +25,8 @@ final class MatchDetailViewModel {
 
     var predictionInfos: [MatchPredictionInfo] = []
     var matchStats: MatchStatsResponse?
+    var groupStandings: [GroupStanding] = []
+    var teamFlags: [String: String] = [:]  // teamId → flagUrl
     var isLoading = false
     var errorMessage: String?
 
@@ -118,12 +120,17 @@ final class MatchDetailViewModel {
         // Rebuild with breakdown data
         rebuildPredictionInfos()
 
-        // Load match stats before finishing load
+        // Load match stats
         do {
             matchStats = try await apiService.fetchMatchStats(matchId: match.matchId)
             print("[MatchDetail] Match stats loaded: \(matchStats?.totalPredictions ?? 0) predictions")
         } catch {
             print("[MatchDetail] Failed to load match stats: \(error)")
+        }
+
+        // Load group standings for group stage matches
+        if let groupLetter = match.groupLetter {
+            await loadGroupStandings(groupLetter: groupLetter)
         }
 
         isLoading = false
@@ -172,6 +179,92 @@ final class MatchDetailViewModel {
         match = updatedMatch.mergedWithTeamInfo(from: match)
         rebuildPredictionInfos()
         print("[MatchDetail] Match #\(updatedMatch.matchNumber) updated live: status=\(updatedMatch.status), score=\(updatedMatch.scoreDisplay ?? "nil")")
+    }
+
+    /// Load live group standings from actual match results for the given group.
+    private func loadGroupStandings(groupLetter: String) async {
+        do {
+            let allMatches = try await poolService.fetchMatches(tournamentId: match.tournamentId)
+            let groupMatches = allMatches.filter { $0.groupLetter == groupLetter && $0.stage == "group" }
+
+            // Build standings from actual results
+            var teamStats: [String: GroupStanding] = [:]
+
+            // Initialize all teams from group matches and collect flag URLs
+            var flags: [String: String] = [:]
+            for m in groupMatches {
+                if let id = m.homeTeamId, let team = m.homeTeam {
+                    if let url = team.flagUrl { flags[id] = url }
+                }
+                if let id = m.awayTeamId, let team = m.awayTeam {
+                    if let url = team.flagUrl { flags[id] = url }
+                }
+            }
+            teamFlags = flags
+
+            for m in groupMatches {
+                if let id = m.homeTeamId, let team = m.homeTeam, teamStats[id] == nil {
+                    teamStats[id] = GroupStanding(
+                        teamId: id, teamName: team.countryName, countryCode: team.countryCode,
+                        groupLetter: groupLetter, played: 0, won: 0, drawn: 0, lost: 0,
+                        goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0,
+                        conductScore: 0, fifaRankingPoints: 0
+                    )
+                }
+                if let id = m.awayTeamId, let team = m.awayTeam, teamStats[id] == nil {
+                    teamStats[id] = GroupStanding(
+                        teamId: id, teamName: team.countryName, countryCode: team.countryCode,
+                        groupLetter: groupLetter, played: 0, won: 0, drawn: 0, lost: 0,
+                        goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0,
+                        conductScore: 0, fifaRankingPoints: 0
+                    )
+                }
+            }
+
+            // Tally results from completed/live matches
+            for m in groupMatches where m.isCompleted || m.status == "completed" || m.status == "live" {
+                guard let homeId = m.homeTeamId, let awayId = m.awayTeamId,
+                      let hg = m.homeScoreFt, let ag = m.awayScoreFt else { continue }
+
+                teamStats[homeId]?.played += 1
+                teamStats[awayId]?.played += 1
+                teamStats[homeId]?.goalsFor += hg
+                teamStats[homeId]?.goalsAgainst += ag
+                teamStats[awayId]?.goalsFor += ag
+                teamStats[awayId]?.goalsAgainst += hg
+
+                if hg > ag {
+                    teamStats[homeId]?.won += 1
+                    teamStats[awayId]?.lost += 1
+                } else if hg < ag {
+                    teamStats[awayId]?.won += 1
+                    teamStats[homeId]?.lost += 1
+                } else {
+                    teamStats[homeId]?.drawn += 1
+                    teamStats[awayId]?.drawn += 1
+                }
+            }
+
+            // Compute derived fields and sort
+            var standings = teamStats.values.map { s -> GroupStanding in
+                var s = s
+                s.goalDifference = s.goalsFor - s.goalsAgainst
+                s.points = s.won * 3 + s.drawn
+                return s
+            }
+
+            standings.sort { a, b in
+                if a.points != b.points { return a.points > b.points }
+                if a.goalDifference != b.goalDifference { return a.goalDifference > b.goalDifference }
+                if a.goalsFor != b.goalsFor { return a.goalsFor > b.goalsFor }
+                return a.fifaRankingPoints > b.fifaRankingPoints
+            }
+
+            groupStandings = standings
+            print("[MatchDetail] Group \(groupLetter) standings loaded: \(standings.count) teams")
+        } catch {
+            print("[MatchDetail] Failed to load group standings: \(error)")
+        }
     }
 
     /// Rebuild the prediction infos using cached data and the current match state.

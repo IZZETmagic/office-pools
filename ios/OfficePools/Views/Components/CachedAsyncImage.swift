@@ -41,7 +41,7 @@ struct CachedAsyncImage: View {
             if let uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
             } else {
                 Color.clear
             }

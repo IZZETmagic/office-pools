@@ -23,17 +23,20 @@ struct MatchDetailView: View {
         ZStack(alignment: .top) {
             // MARK: - Scrollable Content (behind header)
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     matchInfo
+                    if !viewModel.groupStandings.isEmpty {
+                        groupStandingsSection
+                    }
                     if let stats = viewModel.matchStats, stats.totalPredictions > 0 {
                         predictionStatsSection(stats)
                     }
                     predictionsSection
                 }
-                .padding(.top, headerHeight + 20)
+                .padding(.top, headerHeight + 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
 
             // MARK: - Fixed Header (floats on top with glass)
             matchHeader
@@ -60,7 +63,8 @@ struct MatchDetailView: View {
                 VStack(spacing: 6) {
                     flagView(url: match.homeTeam?.flagUrl, size: 56)
                     Text(match.homeDisplayName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.sp.ink)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
@@ -72,46 +76,51 @@ struct MatchDetailView: View {
                     if isLive {
                         HStack(spacing: 6) {
                             Text("\(match.homeScoreFt ?? 0)")
-                                .font(.title.weight(.bold).monospacedDigit())
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.ink)
                             Text("-")
-                                .font(.title.weight(.bold))
-                                .foregroundStyle(.secondary)
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.slate)
                             Text("\(match.awayScoreFt ?? 0)")
-                                .font(.title.weight(.bold).monospacedDigit())
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.ink)
                         }
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(AppColors.error500)
+                                .fill(Color.sp.red)
                                 .frame(width: 6, height: 6)
                                 .modifier(PulsingModifier())
                             Text("LIVE")
-                                .font(.caption.bold())
-                                .foregroundStyle(AppColors.error500)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.sp.red)
                         }
                     } else if isFinished {
                         HStack(spacing: 6) {
                             Text("\(match.homeScoreFt ?? 0)")
-                                .font(.title.weight(.bold).monospacedDigit())
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.ink)
                             Text("-")
-                                .font(.title.weight(.bold))
-                                .foregroundStyle(.secondary)
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.slate)
                             Text("\(match.awayScoreFt ?? 0)")
-                                .font(.title.weight(.bold).monospacedDigit())
+                                .font(SPTypography.mono(size: 28, weight: .bold))
+                                .foregroundStyle(Color.sp.ink)
                         }
                         if let homePso = match.homeScorePso, let awayPso = match.awayScorePso {
                             Text("(\(homePso)-\(awayPso) PSO)")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(AppColors.primary600)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.primary)
                         }
                         Text("Full Time")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.slate)
                     } else {
                         Text(formattedTime)
-                            .font(.title2.weight(.semibold))
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.sp.ink)
                         Text(formattedShortDate)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
                 .frame(width: 100)
@@ -120,7 +129,8 @@ struct MatchDetailView: View {
                 VStack(spacing: 6) {
                     flagView(url: match.awayTeam?.flagUrl, size: 56)
                     Text(match.awayDisplayName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.sp.ink)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
@@ -131,8 +141,13 @@ struct MatchDetailView: View {
         }
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
-        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .background {
+            ZStack {
+                Color.sp.primary.opacity(0.08)
+                    .background(.ultraThinMaterial)
+            }
+            .ignoresSafeArea(edges: .top)
+        }
         .overlay(
             GeometryReader { geo in
                 Color.clear
@@ -150,39 +165,157 @@ struct MatchDetailView: View {
         VStack(spacing: 0) {
             infoRow(icon: "sportscourt", label: stageLabel)
 
+            Rectangle()
+                .fill(Color.sp.mist.opacity(0.5))
+                .frame(height: 0.5)
+                .padding(.horizontal, 14)
+
             infoRow(icon: "calendar", label: formattedDate)
 
             if let venue = match.venue, !venue.isEmpty {
+                Rectangle()
+                    .fill(Color.sp.mist.opacity(0.5))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 14)
+
                 infoRow(icon: "mappin.and.ellipse", label: venue)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .padding(.horizontal)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .padding(.horizontal, 20)
     }
 
     private func infoRow(icon: String, label: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.sp.slate)
                 .frame(width: 24)
             Text(label)
-                .font(.subheadline)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.ink)
             Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
+    // MARK: - Group Standings
+
+    private var groupStandingsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Group \(match.groupLetter ?? "") Standings")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.sp.ink)
+                .padding(.horizontal, 20)
+
+            VStack(spacing: 0) {
+                // Header row
+                HStack(spacing: 0) {
+                    Text("#")
+                        .frame(width: 24, alignment: .center)
+                    Text("Team")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("P")
+                        .frame(width: 28, alignment: .center)
+                    Text("GD")
+                        .frame(width: 34, alignment: .center)
+                    Text("Pts")
+                        .frame(width: 34, alignment: .center)
+                }
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+
+                Rectangle()
+                    .fill(Color.sp.mist)
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 12)
+
+                // Team rows
+                ForEach(Array(viewModel.groupStandings.enumerated()), id: \.element.id) { index, standing in
+                    HStack(spacing: 0) {
+                        Text("\(index + 1)")
+                            .font(SPTypography.mono(size: 12, weight: .bold))
+                            .foregroundStyle(standingPositionColor(index + 1))
+                            .frame(width: 24, alignment: .center)
+
+                        if let flagUrl = viewModel.teamFlags[standing.teamId] {
+                            CachedAsyncImage(url: URL(string: flagUrl), width: 22, height: 15, cornerRadius: 3)
+                                .padding(.trailing, 8)
+                        }
+
+                        Text(standing.teamName)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Text("\(standing.played)")
+                            .font(SPTypography.mono(size: 12, weight: .medium))
+                            .foregroundStyle(Color.sp.slate)
+                            .frame(width: 28, alignment: .center)
+
+                        Text(gdString(standing.goalDifference))
+                            .font(SPTypography.mono(size: 12, weight: .medium))
+                            .foregroundStyle(standing.goalDifference > 0 ? Color.sp.green : standing.goalDifference < 0 ? Color.sp.red : Color.sp.slate)
+                            .frame(width: 34, alignment: .center)
+
+                        Text("\(standing.points)")
+                            .font(SPTypography.mono(size: 13, weight: .bold))
+                            .foregroundStyle(Color.sp.ink)
+                            .frame(width: 34, alignment: .center)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(standingRowBackground(index + 1))
+
+                    if index < viewModel.groupStandings.count - 1 {
+                        Rectangle()
+                            .fill(Color.sp.mist.opacity(0.5))
+                            .frame(height: 0.5)
+                            .padding(.horizontal, 12)
+                    }
+                }
+            }
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private func standingPositionColor(_ position: Int) -> Color {
+        switch position {
+        case 1, 2: return Color.sp.green
+        case 3: return Color.sp.amber
+        default: return Color.sp.slate
+        }
+    }
+
+    private func standingRowBackground(_ position: Int) -> Color {
+        switch position {
+        case 1, 2: return Color.sp.green.opacity(0.04)
+        case 3: return Color.sp.amber.opacity(0.04)
+        default: return .clear
+        }
+    }
+
+    private func gdString(_ gd: Int) -> String {
+        if gd > 0 { return "+\(gd)" }
+        return "\(gd)"
+    }
+
     // MARK: - Prediction Stats Section
 
     private func predictionStatsSection(_ stats: MatchStatsResponse) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("How Others Predicted")
-                .font(.headline)
-                .padding(.horizontal)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.sp.ink)
+                .padding(.horizontal, 20)
 
             // Result distribution bar
             resultDistributionCard(stats)
@@ -204,8 +337,8 @@ struct MatchDetailView: View {
             // Total predictions count
             HStack {
                 Text("\(stats.totalPredictions) predictions")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.sp.slate)
                 Spacer()
             }
 
@@ -217,23 +350,22 @@ struct MatchDetailView: View {
                 resultLabel(
                     match.homeTeam?.countryName ?? stats.homeTeam ?? "Home",
                     pct: stats.homeWinPct,
-                    color: AppColors.primary500
+                    color: Color.sp.primary
                 )
                 Spacer()
-                resultLabel("Draw", pct: stats.drawPct, color: AppColors.neutral500)
+                resultLabel("Draw", pct: stats.drawPct, color: Color.sp.slate)
                 Spacer()
                 resultLabel(
                     match.awayTeam?.countryName ?? stats.awayTeam ?? "Away",
                     pct: stats.awayWinPct,
-                    color: AppColors.error500
+                    color: Color.sp.red
                 )
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .padding(.horizontal, 16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .padding(.horizontal, 20)
     }
 
     private func resultBar(_ stats: MatchStatsResponse) -> some View {
@@ -246,17 +378,17 @@ struct MatchDetailView: View {
             HStack(spacing: 2) {
                 if stats.homeWinPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(AppColors.primary500)
+                        .fill(Color.sp.primary)
                         .frame(width: max(homeW, 4))
                 }
                 if stats.drawPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(AppColors.neutral400)
+                        .fill(Color.sp.slate.opacity(0.4))
                         .frame(width: max(drawW, 4))
                 }
                 if stats.awayWinPct > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(AppColors.error500)
+                        .fill(Color.sp.red)
                         .frame(width: max(awayW, 4))
                 }
             }
@@ -267,75 +399,75 @@ struct MatchDetailView: View {
     private func resultLabel(_ team: String, pct: Double, color: Color) -> some View {
         VStack(spacing: 2) {
             Text("\(Int(pct * 100))%")
-                .font(.system(.title3, design: .rounded, weight: .bold))
+                .font(SPTypography.mono(size: 20, weight: .bold))
                 .foregroundStyle(color)
             Text(team)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
                 .lineLimit(1)
         }
     }
 
     private func topScoresCard(_ stats: MatchStatsResponse) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Most Predicted Scores")
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.sp.ink)
 
             ForEach(stats.topScores.prefix(5)) { score in
                 HStack {
                     Text("\(score.home) - \(score.away)")
-                        .font(.subheadline.weight(.medium).monospacedDigit())
+                        .font(SPTypography.mono(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.sp.ink)
 
                     GeometryReader { geo in
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(AppColors.primary500.opacity(0.2))
+                            .fill(Color.sp.primary.opacity(0.15))
                             .frame(width: geo.size.width * score.pct)
                     }
                     .frame(height: 6)
 
                     Text("\(score.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, alignment: .trailing)
+                        .font(SPTypography.mono(size: 11, weight: .medium))
+                        .foregroundStyle(Color.sp.slate)
+                        .frame(width: 28, alignment: .trailing)
 
                     Text("(\(Int(score.pct * 100))%)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.slate)
                         .frame(width: 36, alignment: .trailing)
                 }
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .padding(.horizontal, 16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .padding(.horizontal, 20)
     }
 
     private func accuracyCard(_ stats: MatchStatsResponse) -> some View {
         HStack(spacing: 16) {
             if let exactPct = stats.exactCorrectPct {
-                accuracyStat("Exact Score", pct: exactPct, color: AppColors.tierExact)
+                accuracyStat("Exact Score", pct: exactPct, color: Color.sp.accent)
             }
             if let resultPct = stats.resultCorrectPct {
-                accuracyStat("Correct Result", pct: resultPct, color: AppColors.primary500)
+                accuracyStat("Correct Result", pct: resultPct, color: Color.sp.primary)
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-        .padding(.horizontal, 16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .padding(.horizontal, 20)
     }
 
     private func accuracyStat(_ label: String, pct: Double, color: Color) -> some View {
         VStack(spacing: 4) {
             Text("\(Int(pct * 100))%")
-                .font(.system(.title2, design: .rounded, weight: .bold))
+                .font(SPTypography.mono(size: 24, weight: .bold))
                 .foregroundStyle(color)
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
         }
         .frame(maxWidth: .infinity)
     }
@@ -358,57 +490,68 @@ struct MatchDetailView: View {
     private var predictionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Your Predictions")
-                .font(.headline)
-                .padding(.horizontal)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.sp.ink)
+                .padding(.horizontal, 20)
 
             if viewModel.isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
+                        .tint(Color.sp.primary)
                     Spacer()
                 }
                 .padding(.vertical, 20)
             } else if viewModel.predictionInfos.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "questionmark.circle")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.sp.mist)
                     Text("No predictions found")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
+                .padding(.vertical, 24)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+                .padding(.horizontal, 20)
             } else {
                 ForEach(groupedPredictions, id: \.poolName) { group in
                     VStack(spacing: 0) {
                         // Pool name header
                         HStack {
                             Text(group.poolName)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.sp.ink)
                             Spacer()
                         }
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
 
-                        Divider().padding(.horizontal, 16)
+                        Rectangle()
+                            .fill(Color.sp.mist)
+                            .frame(height: 0.5)
+                            .padding(.horizontal, 14)
 
                         // Entry rows
                         ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, info in
                             predictionRow(info: info)
 
                             if index < group.entries.count - 1 {
-                                Divider().padding(.horizontal, 16)
+                                Rectangle()
+                                    .fill(Color.sp.mist.opacity(0.5))
+                                    .frame(height: 0.5)
+                                    .padding(.horizontal, 14)
                             }
                         }
+
+                        Spacer().frame(height: 4)
                     }
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-                    .padding(.horizontal)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+                    .padding(.horizontal, 20)
                 }
             }
         }
@@ -423,7 +566,8 @@ struct MatchDetailView: View {
             // Top line: entry name, then badge + points right-aligned
             HStack {
                 Text(info.entryName)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.sp.ink)
 
                 Spacer()
 
@@ -434,8 +578,8 @@ struct MatchDetailView: View {
                     let pts = info.breakdownPoints ?? info.matchPoints
                     if let pts = pts {
                         Text("+\(pts) pts")
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(pts > 0 ? AppColors.success600 : .secondary)
+                            .font(SPTypography.mono(size: 12, weight: .bold))
+                            .foregroundStyle(pts > 0 ? Color.sp.green : Color.sp.slate)
                     }
                 }
             }
@@ -446,43 +590,44 @@ struct MatchDetailView: View {
                     Spacer()
 
                     if isKnockout {
-                        // Show predicted teams (resolved from bracket), fallback to actual teams
                         Text(info.predictedHomeTeam ?? match.homeDisplayName)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.slate)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
 
                     Text("\(pred.predictedHomeScore)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
                     Text("-")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
+                        .font(SPTypography.mono(size: 13, weight: .bold))
+                        .foregroundStyle(Color.sp.mist)
                     Text("\(pred.predictedAwayScore)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
 
                     if isKnockout {
                         Text(info.predictedAwayTeam ?? match.awayDisplayName)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.slate)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
 
                     if let homePso = pred.predictedHomePso, let awayPso = pred.predictedAwayPso {
                         Text("(\(homePso)-\(awayPso) PSO)")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(AppColors.primary600)
+                            .font(SPTypography.mono(size: 10, weight: .medium))
+                            .foregroundStyle(Color.sp.primary)
                     }
                 }
             } else {
                 HStack {
                     Spacer()
                     Text("No prediction")
-                        .font(.caption)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
                         .italic()
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
         }
@@ -497,37 +642,34 @@ struct MatchDetailView: View {
     private func resultBadge(for info: MatchPredictionInfo) -> some View {
         let type = resultType(for: info)
         Text(type.label)
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(type.color.opacity(0.12))
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(type.color.opacity(0.12), in: Capsule())
             .foregroundStyle(type.color)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private func resultType(for info: MatchPredictionInfo) -> (label: String, color: Color) {
         // For knockout matches with breakdown data, use the server's result type
-        // This accounts for team mismatch in full bracket tournament style
         if let breakdownType = info.breakdownResultType, isKnockout {
-            // If teams don't match, override to "Wrong Teams" regardless of score result
             if let teamsMatch = info.teamsMatch, !teamsMatch {
-                return ("Wrong Teams", AppColors.warning600)
+                return ("Wrong Teams", Color.sp.amber)
             }
             return breakdownResultLabel(breakdownType)
         }
 
-        // Fallback: client-side calculation (group matches or when breakdown unavailable)
+        // Fallback: client-side calculation
         guard let pred = info.prediction,
               let homeActual = match.homeScoreFt,
               let awayActual = match.awayScoreFt else {
-            return ("Pending", AppColors.warning600)
+            return ("Pending", Color.sp.amber)
         }
 
         let predHome = pred.predictedHomeScore
         let predAway = pred.predictedAwayScore
 
         if predHome == homeActual && predAway == awayActual {
-            return ("Exact", AppColors.tierExact)
+            return ("Exact", Color.sp.accent)
         }
 
         let actualOutcome = homeActual == awayActual ? 0 : (homeActual > awayActual ? 1 : -1)
@@ -537,22 +679,22 @@ struct MatchDetailView: View {
             let actualGD = homeActual - awayActual
             let predGD = predHome - predAway
             if actualGD == predGD {
-                return ("Winner+GD", AppColors.tierWinnerGd)
+                return ("Winner+GD", Color.sp.green)
             }
-            return ("Winner", AppColors.tierWinner)
+            return ("Winner", Color.sp.primary)
         }
 
-        return ("Miss", AppColors.error600)
+        return ("Miss", Color.sp.red)
     }
 
     private func breakdownResultLabel(_ type: String) -> (label: String, color: Color) {
         switch type {
-        case "exact": return ("Exact", AppColors.tierExact)
-        case "winner_gd": return ("Winner+GD", AppColors.tierWinnerGd)
-        case "winner": return ("Winner", AppColors.tierWinner)
-        case "miss": return ("Miss", AppColors.error600)
-        case "wrong_teams": return ("Wrong Teams", AppColors.warning600)
-        default: return (type.capitalized, .secondary)
+        case "exact": return ("Exact", Color.sp.accent)
+        case "winner_gd": return ("Winner+GD", Color.sp.green)
+        case "winner": return ("Winner", Color.sp.primary)
+        case "miss": return ("Miss", Color.sp.red)
+        case "wrong_teams": return ("Wrong Teams", Color.sp.amber)
+        default: return (type.capitalized, Color.sp.slate)
         }
     }
 
@@ -605,7 +747,7 @@ struct MatchDetailView: View {
             CachedAsyncImage(url: imageUrl, width: width, height: height, cornerRadius: 4)
         } else {
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color(.systemGray5))
+                .fill(Color.sp.mist)
                 .frame(width: width, height: height)
         }
     }

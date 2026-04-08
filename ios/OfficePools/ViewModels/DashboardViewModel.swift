@@ -10,8 +10,21 @@ enum PoolSortOption: String, CaseIterable {
 enum PoolStatusFilter: String, CaseIterable {
     case all = "All"
     case open = "Open"
-    case archived = "Archived"
     case completed = "Completed"
+    case archived = "Archived"
+}
+
+enum PoolTypeFilter: String, CaseIterable {
+    case all = "All"
+    case fullTournament = "Full"
+    case progressive = "Progressive"
+    case bracketPicker = "Bracket"
+}
+
+enum PoolPredictionFilter: String, CaseIterable {
+    case all = "All"
+    case submitted = "Submitted"
+    case pending = "Pending"
 }
 
 /// View model for the Pools tab — shows user's pools with rich card data.
@@ -29,7 +42,20 @@ final class DashboardViewModel {
     // Search, filter, sort
     var searchText = ""
     var statusFilter: PoolStatusFilter = .all
+    var typeFilter: PoolTypeFilter = .all
+    var predictionFilter: PoolPredictionFilter = .all
     var sortBy: PoolSortOption = .newest
+
+    /// True when any filter is active (not all set to .all).
+    var hasActiveFilters: Bool {
+        statusFilter != .all || typeFilter != .all || predictionFilter != .all
+    }
+
+    func clearAllFilters() {
+        statusFilter = .all
+        typeFilter = .all
+        predictionFilter = .all
+    }
 
     private let poolService = PoolService()
     private let apiService = APIService()
@@ -54,11 +80,31 @@ final class DashboardViewModel {
         switch statusFilter {
         case .all: break
         case .open:
-            result = result.filter { $0.pool.status == "open" }
+            result = result.filter { $0.pool.status == "open" || $0.pool.status == "active" }
         case .archived:
             result = result.filter { $0.pool.status == "archived" }
         case .completed:
             result = result.filter { $0.pool.status == "completed" }
+        }
+
+        // Type filter
+        switch typeFilter {
+        case .all: break
+        case .fullTournament:
+            result = result.filter { $0.pool.predictionMode == .fullTournament }
+        case .progressive:
+            result = result.filter { $0.pool.predictionMode == .progressive }
+        case .bracketPicker:
+            result = result.filter { $0.pool.predictionMode == .bracketPicker }
+        }
+
+        // Prediction filter
+        switch predictionFilter {
+        case .all: break
+        case .submitted:
+            result = result.filter { !$0.needsPredictions }
+        case .pending:
+            result = result.filter { $0.needsPredictions }
         }
 
         // Sort

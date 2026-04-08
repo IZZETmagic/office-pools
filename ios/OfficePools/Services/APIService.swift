@@ -128,6 +128,10 @@ final class APIService {
         try await request("GET", path: "/api/pools/\(poolId)/entries/\(entryId)/analytics")
     }
 
+    func fetchBracketAnalytics(poolId: String, entryId: String) async throws -> BPAnalyticsResponse {
+        try await request("GET", path: "/api/pools/\(poolId)/entries/\(entryId)/bracket-analytics")
+    }
+
     func fetchMatchStats(matchId: String) async throws -> MatchStatsResponse {
         try await request("GET", path: "/api/matches/\(matchId)/stats")
     }

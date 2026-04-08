@@ -686,8 +686,9 @@ private struct ScrollOffsetKey: PreferenceKey {
 }
 
 // MARK: - Entrance Animation Modifier
+// Shared — used by HomeView, PoolsView, and other SP tabs.
 
-private struct EntranceAnimationModifier: ViewModifier {
+struct EntranceAnimationModifier: ViewModifier {
     let appeared: Bool
     let delay: Double
 

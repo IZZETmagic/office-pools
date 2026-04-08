@@ -177,7 +177,10 @@ struct PoolCardView: View {
                 memberCount: 13,
                 isAdmin: true,
                 levelNumber: 2,
-                levelName: "Beginner"
+                levelName: "Beginner",
+                predictionsCompleted: 72,
+                predictionsTotal: 104,
+                memberInitials: ["RS", "JD", "MK"]
             ))
         }
         .padding()

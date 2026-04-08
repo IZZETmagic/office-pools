@@ -133,6 +133,7 @@ struct MainTabView: View {
 
     @State var selectedTab: AppTab = .home
     @State private var badgeTracker = UnreadBadgeTracker()
+    @State private var poolsPendingFilter = false
 
     init(authService: AuthService) {
         self.authService = authService
@@ -144,11 +145,14 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Home", systemImage: "house.fill", value: .home) {
-                HomeView(authService: authService, switchToPoolsTab: { selectedTab = .pools })
+                HomeView(authService: authService, switchToPoolsTab: {
+                    poolsPendingFilter = true
+                    selectedTab = .pools
+                })
             }
 
             Tab("Pools", systemImage: "trophy.fill", value: .pools) {
-                PoolsView(authService: authService)
+                PoolsView(authService: authService, applyPendingFilter: $poolsPendingFilter)
             }
             .badge(badgeTracker.totalUnreadBanter)
 
