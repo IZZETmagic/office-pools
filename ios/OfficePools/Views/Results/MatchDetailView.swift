@@ -13,6 +13,7 @@ struct MatchDetailView: View {
     }
 
     @State private var headerHeight: CGFloat = 140
+    @State private var sectionsAppeared = false
 
     /// Use viewModel.match for live-updating data
     private var match: Match { viewModel.match }
@@ -22,41 +23,79 @@ struct MatchDetailView: View {
     var body: some View {
         ZStack(alignment: .top) {
             // MARK: - Scrollable Content (behind header)
-            ScrollView {
-                VStack(spacing: 16) {
-                    matchInfo
-                    if !viewModel.groupStandings.isEmpty {
-                        groupStandingsSection
-                    }
-                    if let stats = viewModel.matchStats, stats.totalPredictions > 0 {
-                        predictionStatsSection(stats)
-                    }
-                    predictionsSection
+            if viewModel.isLoading && viewModel.predictionInfos.isEmpty {
+                ScrollView {
+                    MatchDetailSkeletonView(isGroupMatch: match.groupLetter != nil)
+                        .padding(.top, headerHeight + 16)
+                        .padding(.bottom, 24)
                 }
-                .padding(.top, headerHeight + 16)
-                .padding(.bottom, 24)
+                .background(Color.sp.snow)
+                .transition(.opacity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        matchInfo
+                            .entranceAnimation(sectionsAppeared, delay: 0.0)
+                        if !viewModel.groupStandings.isEmpty {
+                            groupStandingsSection
+                                .entranceAnimation(sectionsAppeared, delay: 0.05)
+                        }
+                        if let stats = viewModel.matchStats, stats.totalPredictions > 0 {
+                            predictionStatsSection(stats)
+                                .entranceAnimation(sectionsAppeared, delay: 0.10)
+                        }
+                        predictionsSection
+                            .entranceAnimation(sectionsAppeared, delay: 0.15)
+                    }
+                    .padding(.top, headerHeight + 16)
+                    .padding(.bottom, 24)
+                }
+                .background(Color.sp.snow)
+                .transition(.opacity)
             }
-            .background(Color.sp.snow)
 
             // MARK: - Fixed Header (floats on top with glass)
             matchHeader
         }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if let userId = authService.appUser?.userId {
                 await viewModel.loadPredictions(userId: userId)
                 await viewModel.subscribeToMatchUpdates()
+                triggerEntranceAnimations()
             }
         }
         .onDisappear {
             Task { await viewModel.unsubscribeFromMatchUpdates() }
+        }
+        .refreshable {
+            if let userId = authService.appUser?.userId {
+                await viewModel.loadPredictions(userId: userId)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        }
+    }
+
+    private func triggerEntranceAnimations() {
+        guard !sectionsAppeared else { return }
+        withAnimation(.easeOut(duration: 0.45)) {
+            sectionsAppeared = true
         }
     }
 
     // MARK: - Match Header (Fixed)
 
     private var matchHeader: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
+            // Stage pill
+            Text(shortStageLabel)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.sp.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.sp.primary.opacity(0.1), in: Capsule())
+
             // Teams + Score/Time
             HStack(spacing: 0) {
                 // Home team
@@ -139,7 +178,8 @@ struct MatchDetailView: View {
             }
             .padding(.horizontal, 20)
         }
-        .padding(.vertical, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
         .background {
             ZStack {
@@ -494,29 +534,26 @@ struct MatchDetailView: View {
                 .foregroundStyle(Color.sp.ink)
                 .padding(.horizontal, 20)
 
-            if viewModel.isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(Color.sp.primary)
-                    Spacer()
-                }
-                .padding(.vertical, 20)
-            } else if viewModel.predictionInfos.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "questionmark.circle")
-                        .font(.system(size: 28))
-                        .foregroundStyle(Color.sp.mist)
-                    Text("No predictions found")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+            if viewModel.predictionInfos.isEmpty && !viewModel.isLoading {
+                VStack(spacing: 10) {
+                    Image(systemName: "sportscourt")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color.sp.silver)
+                    Text("No predictions yet")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.sp.ink)
+                    Text("Join a pool and make your prediction for this match")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.sp.slate)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+                .padding(.vertical, 28)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
                 .padding(.horizontal, 20)
-            } else {
+            } else if !viewModel.predictionInfos.isEmpty {
                 ForEach(groupedPredictions, id: \.poolName) { group in
                     VStack(spacing: 0) {
                         // Pool name header
@@ -624,10 +661,12 @@ struct MatchDetailView: View {
             } else {
                 HStack {
                     Spacer()
-                    Text("No prediction")
+                    Text("Not predicted")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .italic()
-                        .foregroundStyle(Color.sp.slate)
+                        .foregroundStyle(Color.sp.silver)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Color.sp.mist.opacity(0.5), in: Capsule())
                 }
             }
         }
@@ -699,6 +738,21 @@ struct MatchDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private var shortStageLabel: String {
+        if let group = match.groupLetter {
+            return "Group \(group) · #\(match.matchNumber)"
+        }
+        switch match.stage {
+        case "round_32", "round_of_32": return "R32 · #\(match.matchNumber)"
+        case "round_16", "round_of_16": return "R16 · #\(match.matchNumber)"
+        case "quarter_final": return "QF · #\(match.matchNumber)"
+        case "semi_final": return "SF · #\(match.matchNumber)"
+        case "third_place": return "3rd Place · #\(match.matchNumber)"
+        case "final": return "Final · #\(match.matchNumber)"
+        default: return "#\(match.matchNumber)"
+        }
+    }
 
     private var stageLabel: String {
         var label: String
