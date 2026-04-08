@@ -59,7 +59,7 @@ final class MatchDetailViewModel {
             // 1. Get user's pools
             let pools = try await poolService.fetchUserPools(userId: userId)
 
-            // 2. Fetch members + settings for all pools in parallel using async let pairs
+            // 2. For each pool, fetch members + settings (settings uses in-memory cache)
             cachedEntryIds = []
             cachedEntryPool = [:]
             cachedEntryPoolId = [:]
@@ -67,20 +67,11 @@ final class MatchDetailViewModel {
             cachedEntrySettings = [:]
 
             for pool in pools {
-                async let membersTask = poolService.fetchMembers(poolId: pool.poolId)
-                async let settingsTask = poolService.fetchSettings(poolId: pool.poolId)
-
-                let members: [Member]
-                let settings: PoolSettings?
-                do {
-                    members = try await membersTask
-                    settings = try await settingsTask
-                } catch {
-                    print("[MatchDetail] Failed to fetch pool data for \(pool.poolName): \(error)")
-                    continue
-                }
-
+                let members = try await poolService.fetchMembers(poolId: pool.poolId)
                 guard let myMember = members.first(where: { $0.userId == userId }) else { continue }
+
+                let settings = try await poolService.fetchSettings(poolId: pool.poolId)
+
                 for entry in myMember.entries ?? [] {
                     cachedEntryIds.append(entry.entryId)
                     cachedEntryPool[entry.entryId] = pool.poolName
@@ -108,15 +99,14 @@ final class MatchDetailViewModel {
             errorMessage = error.localizedDescription
         }
 
-        // 5. Run match scores, match stats, and group standings concurrently
-        async let scoresTask: Void = loadMatchScores()
-        async let statsTask: Void = loadMatchStatsData()
-        async let standingsTask: Void = loadGroupStandingsIfNeeded()
-
-        _ = await (scoresTask, statsTask, standingsTask)
-
-        // Final rebuild with all data
+        // 5. Batch fetch match scores (single call replaces N breakdown API calls)
+        await loadMatchScores()
         rebuildPredictionInfos()
+
+        // 6. Load match stats and group standings
+        await loadMatchStatsData()
+        await loadGroupStandingsIfNeeded()
+
         isLoading = false
     }
 
