@@ -390,6 +390,28 @@ final class PoolService {
         return matches
     }
 
+    /// Fetch only group-stage matches for a specific group (for standings calculation).
+    func fetchGroupMatches(tournamentId: String, groupLetter: String) async throws -> [Match] {
+        let matches: [Match] = try await supabase
+            .from("matches")
+            .select("""
+                match_id, tournament_id, match_number, stage, group_letter,
+                home_team_id, away_team_id, home_team_placeholder, away_team_placeholder,
+                match_date, venue, status, home_score_ft, away_score_ft,
+                home_score_pso, away_score_pso, winner_team_id, is_completed, completed_at,
+                home_team:teams!home_team_id(country_name, country_code, flag_url),
+                away_team:teams!away_team_id(country_name, country_code, flag_url)
+            """)
+            .eq("tournament_id", value: tournamentId)
+            .eq("group_letter", value: groupLetter)
+            .eq("stage", value: "group")
+            .order("match_number")
+            .execute()
+            .value
+
+        return matches
+    }
+
     // MARK: - Fetch All Predictions for a Pool
 
     func fetchAllPredictions(poolId: String, members: [Member]) async throws -> [Prediction] {

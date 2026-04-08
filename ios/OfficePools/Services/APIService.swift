@@ -136,6 +136,11 @@ final class APIService {
         try await request("GET", path: "/api/matches/\(matchId)/stats")
     }
 
+    func fetchMatchScores(matchId: String, entryIds: [String]) async throws -> MatchScoresResponse {
+        let ids = entryIds.joined(separator: ",")
+        return try await request("GET", path: "/api/matches/\(matchId)/scores?entry_ids=\(ids)")
+    }
+
     // MARK: - Admin Endpoints
 
     func calculateBonusPoints(poolId: String) async throws {

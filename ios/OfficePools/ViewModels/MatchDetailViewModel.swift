@@ -59,7 +59,7 @@ final class MatchDetailViewModel {
             // 1. Get user's pools
             let pools = try await poolService.fetchUserPools(userId: userId)
 
-            // 2. For each pool, get members to find user's entries + fetch pool settings
+            // 2. Fetch members + settings for all pools in parallel using async let pairs
             cachedEntryIds = []
             cachedEntryPool = [:]
             cachedEntryPoolId = [:]
@@ -67,12 +67,20 @@ final class MatchDetailViewModel {
             cachedEntrySettings = [:]
 
             for pool in pools {
-                let members = try await poolService.fetchMembers(poolId: pool.poolId)
+                async let membersTask = poolService.fetchMembers(poolId: pool.poolId)
+                async let settingsTask = poolService.fetchSettings(poolId: pool.poolId)
+
+                let members: [Member]
+                let settings: PoolSettings?
+                do {
+                    members = try await membersTask
+                    settings = try await settingsTask
+                } catch {
+                    print("[MatchDetail] Failed to fetch pool data for \(pool.poolName): \(error)")
+                    continue
+                }
+
                 guard let myMember = members.first(where: { $0.userId == userId }) else { continue }
-
-                // Fetch pool settings for points calculation
-                let settings = try await poolService.fetchSettings(poolId: pool.poolId)
-
                 for entry in myMember.entries ?? [] {
                     cachedEntryIds.append(entry.entryId)
                     cachedEntryPool[entry.entryId] = pool.poolName
@@ -91,7 +99,7 @@ final class MatchDetailViewModel {
             )
             cachedPredictions = Dictionary(uniqueKeysWithValues: predictions.map { ($0.entryId, $0) })
 
-            // 4. Build display list
+            // 4. Build initial display list (before scores/stats)
             rebuildPredictionInfos()
 
             print("[MatchDetail] Loaded \(predictions.count) predictions across \(cachedEntryIds.count) entries")
@@ -100,40 +108,45 @@ final class MatchDetailViewModel {
             errorMessage = error.localizedDescription
         }
 
-        // Fetch breakdown from API for server-computed points and predicted teams
-        for entryId in cachedEntryIds {
-            guard let poolId = cachedEntryPoolId[entryId] else { continue }
-            do {
-                let breakdown = try await apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
-                if let matchData = breakdown.matchResults.first(where: { $0.matchNumber == match.matchNumber }) {
-                    cachedPredictedTeams[entryId] = (home: matchData.predictedHomeTeam, away: matchData.predictedAwayTeam)
-                    cachedBreakdownData[entryId] = (
-                        teamsMatch: matchData.teamsMatch,
-                        resultType: matchData.type,
-                        points: matchData.totalPoints
-                    )
-                }
-            } catch {
-                print("[MatchDetail] Failed to fetch breakdown for entry \(entryId): \(error)")
-            }
-        }
-        // Rebuild with breakdown data
-        rebuildPredictionInfos()
+        // 5. Run match scores, match stats, and group standings concurrently
+        async let scoresTask: Void = loadMatchScores()
+        async let statsTask: Void = loadMatchStatsData()
+        async let standingsTask: Void = loadGroupStandingsIfNeeded()
 
-        // Load match stats
+        _ = await (scoresTask, statsTask, standingsTask)
+
+        // Final rebuild with all data
+        rebuildPredictionInfos()
+        isLoading = false
+    }
+
+    /// Batch fetch match-specific scores for all entries in a single API call.
+    private func loadMatchScores() async {
+        guard !cachedEntryIds.isEmpty else { return }
+        do {
+            let scores = try await apiService.fetchMatchScores(matchId: match.matchId, entryIds: cachedEntryIds)
+            for entry in scores.entries {
+                cachedPredictedTeams[entry.entryId] = (home: entry.predictedHomeTeam, away: entry.predictedAwayTeam)
+                cachedBreakdownData[entry.entryId] = (
+                    teamsMatch: entry.teamsMatch,
+                    resultType: entry.resultType,
+                    points: entry.totalPoints
+                )
+            }
+            print("[MatchDetail] Batch match scores loaded for \(scores.entries.count) entries")
+        } catch {
+            print("[MatchDetail] Failed to fetch match scores: \(error)")
+        }
+    }
+
+    /// Fetch prediction statistics for this match.
+    private func loadMatchStatsData() async {
         do {
             matchStats = try await apiService.fetchMatchStats(matchId: match.matchId)
             print("[MatchDetail] Match stats loaded: \(matchStats?.totalPredictions ?? 0) predictions")
         } catch {
             print("[MatchDetail] Failed to load match stats: \(error)")
         }
-
-        // Load group standings for group stage matches
-        if let groupLetter = match.groupLetter {
-            await loadGroupStandings(groupLetter: groupLetter)
-        }
-
-        isLoading = false
     }
 
     // MARK: - Realtime
@@ -181,11 +194,16 @@ final class MatchDetailViewModel {
         print("[MatchDetail] Match #\(updatedMatch.matchNumber) updated live: status=\(updatedMatch.status), score=\(updatedMatch.scoreDisplay ?? "nil")")
     }
 
+    /// Load group standings if this is a group-stage match.
+    private func loadGroupStandingsIfNeeded() async {
+        guard let groupLetter = match.groupLetter else { return }
+        await loadGroupStandings(groupLetter: groupLetter)
+    }
+
     /// Load live group standings from actual match results for the given group.
     private func loadGroupStandings(groupLetter: String) async {
         do {
-            let allMatches = try await poolService.fetchMatches(tournamentId: match.tournamentId)
-            let groupMatches = allMatches.filter { $0.groupLetter == groupLetter && $0.stage == "group" }
+            let groupMatches = try await poolService.fetchGroupMatches(tournamentId: match.tournamentId, groupLetter: groupLetter)
 
             // Build standings from actual results
             var teamStats: [String: GroupStanding] = [:]
