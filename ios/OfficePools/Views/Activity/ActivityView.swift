@@ -31,12 +31,8 @@ struct ActivityView: View {
             .task {
                 if let userId = authService.appUser?.userId {
                     await viewModel.load(userId: userId)
-                    await viewModel.startListening(userId: userId)
                     triggerEntranceAnimations()
                 }
-            }
-            .onDisappear {
-                Task { await viewModel.stopListening() }
             }
             .refreshable {
                 if let userId = authService.appUser?.userId {
@@ -83,43 +79,15 @@ struct ActivityView: View {
 
                 Spacer()
 
-                // Mark all read button
-                if viewModel.unreadCount > 0 {
-                    Button {
-                        Task {
-                            if let userId = authService.appUser?.userId {
-                                await viewModel.markAllAsRead(userId: userId)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.sp.ink)
-                            .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(alignment: .topTrailing) {
-                                Text("\(viewModel.unreadCount)")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.sp.red, in: Capsule())
-                                    .offset(x: 4, y: -4)
-                            }
-                    }
-                } else {
-                    Button {
-                        showingProfile = true
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.sp.ink)
-                            .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                    }
+                Button {
+                    showingProfile = true
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.sp.ink)
+                        .frame(width: 40, height: 40)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
                 }
             }
             .padding(.horizontal, 20)
@@ -143,18 +111,6 @@ struct ActivityView: View {
                             .padding(.horizontal, 20)
                     }
 
-                    // Pagination trigger
-                    if viewModel.hasMore {
-                        ProgressView()
-                            .padding(.vertical, 20)
-                            .onAppear {
-                                Task {
-                                    if let userId = authService.appUser?.userId {
-                                        await viewModel.loadMore(userId: userId)
-                                    }
-                                }
-                            }
-                    }
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 16)

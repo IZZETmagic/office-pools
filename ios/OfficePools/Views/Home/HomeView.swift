@@ -5,7 +5,7 @@ struct HomeView: View {
     let authService: AuthService
     var switchToPoolsTab: () -> Void = {}
     @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
-    @State private var viewModel = HomeViewModel()
+    @Environment(AppDataStore.self) private var dataStore
 
     // Join/Create pool state + scroll tracking
     @State private var showJoinSheet = false
@@ -25,10 +25,10 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-                if viewModel.isLoading && viewModel.poolCards.isEmpty {
+                if dataStore.isPreloading && dataStore.poolCards.isEmpty {
                     HomeSkeletonView()
                         .transition(.opacity)
-                } else if let error = viewModel.errorMessage, viewModel.poolCards.isEmpty {
+                } else if let error = dataStore.errorMessage, dataStore.poolCards.isEmpty {
                     errorState(error)
                         .transition(.opacity)
                 } else {
@@ -36,24 +36,22 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+            .animation(.easeInOut(duration: 0.3), value: dataStore.isPreloading)
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                if let userId = authService.appUser?.userId {
-                    await viewModel.loadHomeData(userId: userId)
-                    triggerEntranceAnimations()
-                }
+                // Data is already preloaded by AppDataStore; just trigger animations
+                triggerEntranceAnimations()
             }
             .refreshable {
                 if let userId = authService.appUser?.userId {
-                    await viewModel.loadHomeData(userId: userId)
+                    await dataStore.refresh(userId: userId)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             }
             .onChange(of: badgeTracker?.refreshTrigger) {
                 if let userId = authService.appUser?.userId {
                     Task {
-                        await viewModel.loadHomeData(userId: userId)
+                        await dataStore.refresh(userId: userId)
                     }
                 }
             }
@@ -75,7 +73,7 @@ struct HomeView: View {
                     pendingCreatedPool = pool
                     Task {
                         if let userId = authService.appUser?.userId {
-                            await viewModel.loadHomeData(userId: userId)
+                            await dataStore.refresh(userId: userId)
                         }
                     }
                 }
@@ -102,6 +100,17 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Greeting
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "Good Morning"
+        case 12..<17: return "Good Afternoon"
+        default: return "Good Evening"
+        }
+    }
+
     // MARK: - Main Content
 
     private var daysUntilKickoff: Int {
@@ -122,7 +131,7 @@ struct HomeView: View {
             headerSection
             ScrollView {
                 VStack(spacing: 24) {
-                    if viewModel.poolCards.isEmpty {
+                    if dataStore.poolCards.isEmpty {
                         emptyStateSection
                             .entranceAnimation(sectionsAppeared, delay: 0.05)
                     } else {
@@ -182,14 +191,14 @@ struct HomeView: View {
 
     @ViewBuilder
     private var liveMatchSection: some View {
-        if !viewModel.liveMatches.isEmpty {
+        if !dataStore.liveMatches.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Live Now")
                     .font(SPTypography.sectionHeader)
                     .foregroundStyle(Color.sp.ink)
                     .padding(.horizontal, 20)
 
-                ForEach(viewModel.liveMatches) { match in
+                ForEach(dataStore.liveMatches) { match in
                     NavigationLink(value: match) {
                         LiveMatchCard(match: match)
                     }
@@ -290,12 +299,12 @@ struct HomeView: View {
     @ViewBuilder
     private var nextKickoffSection: some View {
         if daysUntilKickoff == 0,
-           viewModel.liveMatches.isEmpty,
-           let nextMatch = viewModel.nextUpcomingMatch {
+           dataStore.liveMatches.isEmpty,
+           let nextMatch = dataStore.nextUpcomingMatch {
             NavigationLink(value: nextMatch) {
                 NextKickoffCard(
                     nextMatch: nextMatch,
-                    matchesToday: viewModel.matchesToday
+                    matchesToday: dataStore.matchesToday
                 )
             }
             .buttonStyle(.plain)
@@ -307,23 +316,23 @@ struct HomeView: View {
 
     @ViewBuilder
     private var quickStatsSection: some View {
-        if !viewModel.poolCards.isEmpty {
+        if !dataStore.poolCards.isEmpty {
             HStack(spacing: 10) {
                 StatCardView(
                     title: "Streak",
-                    value: "\(viewModel.bestStreak)",
+                    value: "\(dataStore.bestStreak)",
                     systemImage: "flame.fill",
                     gradient: [Color(hex: 0xF97316), Color(hex: 0xEF4444)]
                 )
                 StatCardView(
                     title: "Best Rank",
-                    value: viewModel.bestRank.map { "#\($0)" } ?? "--",
+                    value: dataStore.bestRank.map { "#\($0)" } ?? "--",
                     systemImage: "trophy.fill",
                     gradient: [Color(hex: 0xFBBF24), Color(hex: 0xD97706)]
                 )
                 StatCardView(
                     title: "Points",
-                    value: "\(viewModel.totalPoints)",
+                    value: "\(dataStore.totalPoints)",
                     systemImage: "bolt.fill",
                     gradient: [Color(hex: 0x667EEA), Color(hex: 0x3B6EFF)]
                 )
@@ -336,7 +345,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var predictionsAlertSection: some View {
-        let poolsNeedingPredictions = viewModel.poolCards.filter(\.needsPredictions)
+        let poolsNeedingPredictions = dataStore.poolCards.filter(\.needsPredictions)
         if !poolsNeedingPredictions.isEmpty {
             Button {
                 switchToPoolsTab()
@@ -374,7 +383,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var inviteFriendsSection: some View {
-        let smallPools = viewModel.poolCards.filter { $0.memberCount < 4 && $0.isAdmin }
+        let smallPools = dataStore.poolCards.filter { $0.memberCount < 4 && $0.isAdmin }
         if let pool = smallPools.first {
             let shareText = "Join my World Cup prediction pool on SportPool!\n\nhttps://sportpool.io/join/\(pool.pool.poolCode)"
 
@@ -420,7 +429,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var upcomingMatchesSection: some View {
-        if !viewModel.upcomingMatches.isEmpty {
+        if !dataStore.upcomingMatches.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Upcoming Matches")
                     .font(SPTypography.sectionHeader)
@@ -428,7 +437,7 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
 
                 VStack(spacing: 8) {
-                    ForEach(viewModel.upcomingMatches) { match in
+                    ForEach(dataStore.upcomingMatches) { match in
                         NavigationLink(value: match) {
                             DashboardMatchCard(match: match)
                         }
@@ -444,14 +453,14 @@ struct HomeView: View {
 
     @ViewBuilder
     private var yourPoolsSection: some View {
-        if !viewModel.poolCards.isEmpty {
+        if !dataStore.poolCards.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Your Pools")
                         .font(SPTypography.sectionHeader)
                         .foregroundStyle(Color.sp.ink)
                     Spacer()
-                    Text("\(viewModel.poolCards.count)")
+                    Text("\(dataStore.poolCards.count)")
                         .font(SPTypography.body)
                         .foregroundStyle(Color.sp.slate)
                 }
@@ -459,7 +468,7 @@ struct HomeView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(viewModel.poolCards) { card in
+                        ForEach(dataStore.poolCards) { card in
                             NavigationLink(value: card.pool) {
                                 DashboardPoolCard(data: card)
                             }
@@ -535,7 +544,7 @@ struct HomeView: View {
                             .foregroundStyle(Color.sp.primary)
                     }
 
-                    Text("\(viewModel.greeting), \(authService.appUser?.fullName ?? "friend")")
+                    Text("\(greeting), \(authService.appUser?.fullName ?? "friend")")
                         .font(SPTypography.body)
                         .foregroundStyle(Color.sp.slate)
                         .opacity(1 - collapseProgress)
@@ -589,7 +598,7 @@ struct HomeView: View {
             Button("Try Again") {
                 Task {
                     if let userId = authService.appUser?.userId {
-                        await viewModel.loadHomeData(userId: userId)
+                        await dataStore.refresh(userId: userId)
                     }
                 }
             }
@@ -630,8 +639,8 @@ struct HomeView: View {
                             _ = try await poolService.joinPool(poolCode: joinPoolCode, userId: userId, username: username)
                             joinPoolCode = ""
                             showJoinSheet = false
-                            // Reload home data to show new pool
-                            await viewModel.loadHomeData(userId: userId)
+                            // Reload data to show new pool
+                            await dataStore.refresh(userId: userId)
                         } catch {
                             joinError = error.localizedDescription
                         }

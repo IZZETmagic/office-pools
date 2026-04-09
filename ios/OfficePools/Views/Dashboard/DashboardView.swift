@@ -3,13 +3,14 @@ import SwiftUI
 struct DashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     let authService: AuthService
+    @Environment(AppDataStore.self) private var dataStore
 
     var body: some View {
         NavigationStack {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading pools...")
-                } else if viewModel.poolCards.isEmpty && viewModel.searchText.isEmpty {
+                } else if dataStore.poolCards.isEmpty && viewModel.searchText.isEmpty {
                     emptyState
                 } else {
                     poolList
@@ -43,14 +44,9 @@ struct DashboardView: View {
             .sheet(isPresented: $viewModel.showJoinSheet) {
                 joinPoolSheet
             }
-            .task {
-                if let userId = authService.appUser?.userId {
-                    await viewModel.loadPools(userId: userId)
-                }
-            }
             .refreshable {
                 if let userId = authService.appUser?.userId {
-                    await viewModel.loadPools(userId: userId)
+                    await dataStore.refresh(userId: userId)
                 }
             }
         }
@@ -66,10 +62,11 @@ struct DashboardView: View {
                     .padding(.bottom, 4)
 
                 // Pool cards
-                if viewModel.filteredPools.isEmpty {
+                let filtered = viewModel.filteredPools(from: dataStore.poolCards)
+                if filtered.isEmpty {
                     emptyFilterState
                 } else {
-                    ForEach(viewModel.filteredPools) { card in
+                    ForEach(filtered) { card in
                         NavigationLink(value: card.pool) {
                             PoolListCardView(data: card)
                         }
@@ -206,7 +203,7 @@ struct DashboardView: View {
                 Button {
                     Task {
                         if let userId = authService.appUser?.userId {
-                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1")
+                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1", dataStore: dataStore)
                         }
                     }
                 } label: {

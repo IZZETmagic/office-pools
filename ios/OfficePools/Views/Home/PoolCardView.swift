@@ -180,7 +180,8 @@ struct PoolCardView: View {
                 levelName: "Beginner",
                 predictionsCompleted: 72,
                 predictionsTotal: 104,
-                memberInitials: ["RS", "JD", "MK"]
+                memberInitials: ["RS", "JD", "MK"],
+                hitRate: 0.65, exactCount: 5, totalCompleted: 72
             ))
         }
         .padding()

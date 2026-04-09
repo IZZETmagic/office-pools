@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robin Hood — Live Leaderboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0f0a;
+    color: #fff;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 28px 40px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .bar-logo {
+    width: 56px;
+    height: 56px;
+    background: #1a3a1a;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .header-titles h1 {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  .header-titles p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  .header-right {
+    text-align: right;
+  }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .match-info {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .match-info strong {
+    color: rgba(255,255,255,0.8);
+  }
+
+  /* ─── Podium ─── */
+  .podium {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .podium-card {
+    text-align: center;
+    border-radius: 16px;
+    padding: 16px 24px 14px;
+    position: relative;
+    min-width: 180px;
+  }
+
+  .podium-card.first {
+    background: linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.05));
+    border: 1px solid rgba(234,179,8,0.2);
+    padding: 20px 32px 16px;
+    min-width: 220px;
+  }
+
+  .podium-card.second {
+    background: linear-gradient(135deg, rgba(156,163,175,0.12), rgba(156,163,175,0.04));
+    border: 1px solid rgba(156,163,175,0.15);
+  }
+
+  .podium-card.third {
+    background: linear-gradient(135deg, rgba(180,120,60,0.12), rgba(180,120,60,0.04));
+    border: 1px solid rgba(180,120,60,0.15);
+  }
+
+  .podium-rank {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+
+  .podium-name {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+
+  .first .podium-name { color: #eab308; }
+  .second .podium-name { color: #9ca3af; }
+  .third .podium-name { color: #b4783c; }
+
+  .podium-points {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -1px;
+  }
+
+  .first .podium-points { color: #facc15; }
+  .second .podium-points { color: #d1d5db; }
+  .third .podium-points { color: #d4956a; }
+
+  .podium-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ─── Page indicator ─── */
+  .page-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .page-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    transition: all 0.3s;
+  }
+
+  .page-dot.active {
+    background: rgba(255,255,255,0.6);
+    width: 24px;
+    border-radius: 4px;
+  }
+
+  /* ─── Table ─── */
+  .table-wrap {
+    flex: 1;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+    position: relative;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    padding: 10px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  thead th:first-child { width: 60px; text-align: center; }
+  thead th:last-child { text-align: right; }
+  thead th:nth-child(3),
+  thead th:nth-child(4),
+  thead th:nth-child(5) { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  tbody tr.fade-in {
+    animation: fadeSlideIn 0.4s ease-out both;
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  tbody tr.big-mover {
+    background: rgba(34, 197, 94, 0.05);
+  }
+
+  tbody td {
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+
+  tbody td:first-child {
+    text-align: center;
+    font-weight: 800;
+    color: rgba(255,255,255,0.3);
+    font-size: 14px;
+  }
+
+  .player-name {
+    font-weight: 700;
+    color: #fff;
+  }
+
+  td:nth-child(3),
+  td:nth-child(4),
+  td:nth-child(5) {
+    text-align: center;
+    color: rgba(255,255,255,0.5);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .points-cell {
+    text-align: right !important;
+    font-weight: 800;
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+  }
+
+  .movement {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 8px;
+  }
+
+  .movement.up { color: #22c55e; }
+  .movement.down { color: #ef4444; }
+
+  /* ─── Transition overlay ─── */
+  .table-wrap .transition-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,15,10,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 10;
+  }
+
+  .table-wrap .transition-overlay.active {
+    opacity: 1;
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  .footer-left .sport-pool {
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .qr-hint {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 16px;
+  }
+
+  .qr-placeholder {
+    width: 40px;
+    height: 40px;
+    background: #fff;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: #000;
+    font-weight: 700;
+  }
+
+  .qr-text {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+  }
+
+  .qr-text span {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    font-weight: 400;
+  }
+
+  .page-label {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="bar-logo">&#127866;</div>
+      <div class="header-titles">
+        <h1>Robin Hood's World Cup Pool</h1>
+        <p>25 Richmond Road, Pembroke &middot; 28 players</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        Match Day 12
+      </div>
+      <div class="match-info"><strong>USA 1 - 1 Mexico</strong> &middot; 67'</div>
+    </div>
+  </div>
+
+  <!-- Podium (always visible) -->
+  <div class="podium">
+    <div class="podium-card second">
+      <div class="podium-rank">&#129352;</div>
+      <div class="podium-name">JohnnyB</div>
+      <div class="podium-points">247</div>
+      <div class="podium-label">points</div>
+    </div>
+    <div class="podium-card first">
+      <div class="podium-rank">&#129351;</div>
+      <div class="podium-name">SkipperDan</div>
+      <div class="podium-points">312</div>
+      <div class="podium-label">points</div>
+    </div>
+    <div class="podium-card third">
+      <div class="podium-rank">&#129353;</div>
+      <div class="podium-name">BermudaBri</div>
+      <div class="podium-points">231</div>
+      <div class="podium-label">points</div>
+    </div>
+  </div>
+
+  <!-- Page dots -->
+  <div class="page-indicator" id="pageIndicator"></div>
+
+  <!-- Rotating table -->
+  <div class="table-wrap">
+    <div class="transition-overlay" id="overlay"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Exact</th>
+          <th>Correct</th>
+          <th>Bonus</th>
+          <th style="text-align:right">Points</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboardBody"></tbody>
+    </table>
+  </div>
+
+  <div class="page-label" id="pageLabel"></div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      &#9917; Powered by <span class="sport-pool">Sport Pool</span> &middot; sportpool.io
+    </div>
+    <div class="qr-hint">
+      <div class="qr-placeholder">QR</div>
+      <div class="qr-text">
+        Scan to join the pool
+        <span>sportpool.io/join/RNBHOOD1</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Mock data: all 28 players ──
+  const players = [
+    // Top 3 shown in podium, not in table
+    { rank: 4,  name: 'CedricTheGreat', exact: 8,  correct: 14, bonus: 75, points: 218, move: 2  },
+    { rank: 5,  name: 'DocksideDave',   exact: 7,  correct: 16, bonus: 50, points: 205, move: 0  },
+    { rank: 6,  name: 'IslandKing441',  exact: 6,  correct: 18, bonus: 50, points: 198, move: -1 },
+    { rank: 7,  name: 'LisaFromFlat',   exact: 7,  correct: 13, bonus: 50, points: 189, move: 0  },
+    { rank: 8,  name: 'GomboSmash',     exact: 5,  correct: 15, bonus: 75, points: 183, move: 5  },
+    { rank: 9,  name: 'DarkNStormy',    exact: 6,  correct: 12, bonus: 25, points: 176, move: 0  },
+    { rank: 10, name: 'SwizzleSam',     exact: 5,  correct: 14, bonus: 25, points: 171, move: -2 },
+    { rank: 11, name: 'TuckersPoint',   exact: 5,  correct: 13, bonus: 25, points: 164, move: 0  },
+    { rank: 12, name: 'HorseshoeKev',   exact: 4,  correct: 15, bonus: 50, points: 158, move: 3  },
+    { rank: 13, name: 'FlattsVillage',  exact: 5,  correct: 11, bonus: 25, points: 151, move: 0  },
+    { rank: 14, name: 'WahooWill',      exact: 4,  correct: 14, bonus: 25, points: 147, move: -1 },
+    { rank: 15, name: 'FrontStreetFin', exact: 4,  correct: 13, bonus: 25, points: 142, move: 0  },
+    { rank: 16, name: 'HamiltonHaze',   exact: 3,  correct: 16, bonus: 25, points: 138, move: 4  },
+    { rank: 17, name: 'SomersIsle99',   exact: 4,  correct: 12, bonus: 0,  points: 131, move: 0  },
+    { rank: 18, name: 'RumRunner',      exact: 3,  correct: 14, bonus: 25, points: 127, move: -3 },
+    { rank: 19, name: 'BermudaTriangl', exact: 3,  correct: 13, bonus: 25, points: 121, move: 0  },
+    { rank: 20, name: 'CoralCutCraig',  exact: 3,  correct: 12, bonus: 25, points: 115, move: 0  },
+    { rank: 21, name: 'WestEndWes',     exact: 2,  correct: 15, bonus: 25, points: 109, move: 0  },
+    { rank: 22, name: 'StGeorgesGary',  exact: 3,  correct: 11, bonus: 0,  points: 103, move: -2 },
+    { rank: 23, name: 'PinkSandPete',   exact: 2,  correct: 13, bonus: 25, points: 97,  move: 0  },
+    { rank: 24, name: 'DockYardDan',    exact: 2,  correct: 12, bonus: 0,  points: 88,  move: 0  },
+    { rank: 25, name: 'TabbyBayTom',    exact: 1,  correct: 14, bonus: 25, points: 82,  move: 3  },
+    { rank: 26, name: 'ElbowBeachEd',   exact: 2,  correct: 10, bonus: 0,  points: 74,  move: 0  },
+    { rank: 27, name: 'GibbsHillGil',   exact: 1,  correct: 11, bonus: 0,  points: 61,  move: -4 },
+    { rank: 28, name: 'WarwickWonder',  exact: 1,  correct: 9,  bonus: 0,  points: 48,  move: 0  },
+  ];
+
+  const ROWS_PER_PAGE = 8;
+  const FIRST_PAGE_DURATION = 12000;  // 12s for page 1 (top of board)
+  const OTHER_PAGE_DURATION = 7000;   // 7s for remaining pages
+
+  const totalPages = Math.ceil(players.length / ROWS_PER_PAGE);
+  let currentPage = 0;
+
+  const body = document.getElementById('leaderboardBody');
+  const overlay = document.getElementById('overlay');
+  const indicator = document.getElementById('pageIndicator');
+  const pageLabel = document.getElementById('pageLabel');
+
+  // Build page dots
+  for (let i = 0; i < totalPages; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'page-dot';
+    dot.dataset.page = i;
+    indicator.appendChild(dot);
+  }
+
+  function renderPage(pageIndex) {
+    const start = pageIndex * ROWS_PER_PAGE;
+    const end = Math.min(start + ROWS_PER_PAGE, players.length);
+    const pagePlayers = players.slice(start, end);
+
+    // Update dots
+    document.querySelectorAll('.page-dot').forEach((dot, i) => {
+      dot.classList.toggle('active', i === pageIndex);
+    });
+
+    // Update label
+    pageLabel.textContent = `Showing ${start + 4}\u2013${end + 3} of 28`;
+
+    // Fade out
+    overlay.classList.add('active');
+
+    setTimeout(() => {
+      body.innerHTML = '';
+
+      pagePlayers.forEach((p, i) => {
+        const tr = document.createElement('tr');
+        tr.className = 'fade-in';
+        tr.style.animationDelay = `${i * 50}ms`;
+
+        if (Math.abs(p.move) >= 3) tr.classList.add('big-mover');
+
+        let moveHtml = '';
+        if (p.move > 0)      moveHtml = `<span class="movement up">&#9650; ${p.move}</span>`;
+        else if (p.move < 0) moveHtml = `<span class="movement down">&#9660; ${Math.abs(p.move)}</span>`;
+
+        tr.innerHTML = `
+          <td>${p.rank}</td>
+          <td><div class="player-name">${p.name}</div></td>
+          <td>${p.exact}</td>
+          <td>${p.correct}</td>
+          <td>${p.bonus}</td>
+          <td class="points-cell">${p.points} ${moveHtml}</td>
+        `;
+        body.appendChild(tr);
+      });
+
+      // Fade in
+      overlay.classList.remove('active');
+    }, 350);
+  }
+
+  function nextPage() {
+    renderPage(currentPage);
+    const duration = currentPage === 0 ? FIRST_PAGE_DURATION : OTHER_PAGE_DURATION;
+    currentPage = (currentPage + 1) % totalPages;
+    setTimeout(nextPage, duration);
+  }
+
+  // Start
+  nextPage();
+</script>
+
+</body>
+</html>

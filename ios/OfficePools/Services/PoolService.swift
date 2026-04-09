@@ -226,22 +226,13 @@ final class PoolService {
         print("[PoolService] Found \(poolIds.count) memberships for userId \(userId): \(poolIds)")
         guard !poolIds.isEmpty else { return [] }
 
-        // Fetch each pool individually to avoid one bad decode killing all results
-        var pools: [Pool] = []
-        for poolId in poolIds {
-            do {
-                let pool: Pool = try await supabase
-                    .from("pools")
-                    .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
-                    .eq("pool_id", value: poolId)
-                    .single()
-                    .execute()
-                    .value
-                pools.append(pool)
-            } catch {
-                print("[PoolService] Failed to decode pool \(poolId): \(error)")
-            }
-        }
+        // Batch fetch all pools in a single query
+        let pools: [Pool] = try await supabase
+            .from("pools")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
+            .in("pool_id", values: poolIds)
+            .execute()
+            .value
 
         return pools.sorted { ($0.createdAt) > ($1.createdAt) }
     }

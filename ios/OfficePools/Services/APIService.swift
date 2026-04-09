@@ -81,6 +81,20 @@ final class APIService {
         }
     }
 
+    // MARK: - Notification Preferences
+
+    func fetchNotificationPrefs<T: Decodable>() async throws -> T {
+        try await request("GET", path: "/api/notifications/preferences")
+    }
+
+    func updateNotificationPref(topicKey: String, enabled: Bool) async throws {
+        struct Body: Encodable {
+            let topicKey: String
+            let enabled: Bool
+        }
+        try await requestVoid("PATCH", path: "/api/notifications/preferences", body: Body(topicKey: topicKey, enabled: enabled))
+    }
+
     // MARK: - Notification Endpoints
 
     func notifyPoolJoined(poolId: String, userId: String) async throws {

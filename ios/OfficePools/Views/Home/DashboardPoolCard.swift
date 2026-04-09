@@ -246,7 +246,8 @@ struct DashboardPoolCard: View {
                 levelName: "Beginner",
                 predictionsCompleted: 72,
                 predictionsTotal: 104,
-                memberInitials: ["RS", "JD", "MK"]
+                memberInitials: ["RS", "JD", "MK"],
+                hitRate: 0.65, exactCount: 5, totalCompleted: 72
             ))
             DashboardPoolCard(data: PoolCardData(
                 pool: Pool(
@@ -269,7 +270,8 @@ struct DashboardPoolCard: View {
                 levelName: "Rookie",
                 predictionsCompleted: 36,
                 predictionsTotal: 104,
-                memberInitials: ["AL", "TW", "SB"]
+                memberInitials: ["AL", "TW", "SB"],
+                hitRate: 0.45, exactCount: 2, totalCompleted: 36
             ))
         }
         .padding(.horizontal, 20)

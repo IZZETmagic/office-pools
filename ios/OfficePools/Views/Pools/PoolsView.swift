@@ -5,6 +5,7 @@ struct PoolsView: View {
     let authService: AuthService
     @Binding var applyPendingFilter: Bool
     @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
+    @Environment(AppDataStore.self) private var dataStore
     @State private var viewModel = DashboardViewModel()
     @State private var navigationPath = NavigationPath()
     @State private var pendingCreatedPool: Pool?
@@ -14,10 +15,10 @@ struct PoolsView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-                if viewModel.isLoading && viewModel.poolCards.isEmpty {
+                if dataStore.poolCards.isEmpty && dataStore.isPreloading {
                     poolsSkeletonView
                         .transition(.opacity)
-                } else if viewModel.poolCards.isEmpty {
+                } else if dataStore.poolCards.isEmpty {
                     emptyState
                         .transition(.opacity)
                 } else {
@@ -25,14 +26,14 @@ struct PoolsView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+            .animation(.easeInOut(duration: 0.3), value: dataStore.isPreloading)
             .navigationBarHidden(true)
             .navigationDestination(for: Pool.self) { pool in
                 PoolDetailView(
                     viewModel: PoolDetailViewModel(poolId: pool.poolId),
                     authService: authService,
                     onPoolDeleted: { poolId in
-                        viewModel.removePool(poolId: poolId)
+                        dataStore.removePool(poolId: poolId)
                     }
                 )
             }
@@ -61,32 +62,30 @@ struct PoolsView: View {
                     pendingCreatedPool = pool
                     Task {
                         if let userId = authService.appUser?.userId {
-                            await viewModel.addPool(pool, userId: userId)
+                            await viewModel.addPool(pool, userId: userId, dataStore: dataStore)
                         }
                     }
                 }
             }
             .task {
-                if let userId = authService.appUser?.userId {
-                    await viewModel.loadPools(userId: userId)
-                    badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
-                    triggerEntranceAnimations()
-                }
+                // Data is already preloaded; just update badge and animate
+                badgeTracker?.totalUnreadBanter = dataStore.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
+                triggerEntranceAnimations()
             }
             .refreshable {
                 if let userId = authService.appUser?.userId {
-                    await viewModel.loadPools(userId: userId, forceRefresh: true)
+                    await dataStore.refresh(userId: userId)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             }
-            .onChange(of: viewModel.poolCards.map(\.unreadBanterCount)) {
-                badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
+            .onChange(of: dataStore.poolCards.map(\.unreadBanterCount)) {
+                badgeTracker?.totalUnreadBanter = dataStore.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
             }
             .onChange(of: badgeTracker?.refreshTrigger) {
                 if let userId = authService.appUser?.userId {
                     Task {
-                        await viewModel.loadPools(userId: userId, forceRefresh: true)
-                        badgeTracker?.totalUnreadBanter = viewModel.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
+                        await dataStore.refresh(userId: userId)
+                        badgeTracker?.totalUnreadBanter = dataStore.poolCards.reduce(0) { $0 + $1.unreadBanterCount }
                     }
                 }
             }
@@ -294,10 +293,11 @@ struct PoolsView: View {
             ScrollView {
                 LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
                     Section {
-                        if viewModel.filteredPools.isEmpty {
+                        let filtered = viewModel.filteredPools(from: dataStore.poolCards)
+                        if filtered.isEmpty {
                             emptyFilterState
                         } else {
-                            ForEach(viewModel.filteredPools) { card in
+                            ForEach(filtered) { card in
                                 NavigationLink(value: card.pool) {
                                     PoolListCardView(data: card)
                                 }
@@ -574,7 +574,7 @@ struct PoolsView: View {
                 Button {
                     Task {
                         if let userId = authService.appUser?.userId {
-                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1")
+                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1", dataStore: dataStore)
                         }
                     }
                 } label: {

@@ -18,6 +18,9 @@ struct PoolCardData: Identifiable {
     let predictionsCompleted: Int
     let predictionsTotal: Int
     let memberInitials: [String] // first 3 members' two-letter initials
+    let hitRate: Double?         // prediction accuracy (0-1), from leaderboard
+    let exactCount: Int?         // exact score predictions, from leaderboard
+    let totalCompleted: Int?     // total scored predictions, from leaderboard
 
     var id: String { pool.poolId }
 
@@ -91,9 +94,9 @@ final class HomeViewModel {
             pools = try await poolService.fetchUserPools(userId: userId)
 
             // Collect unique tournament IDs for match queries
-            let tournamentIds = Set(pools.map(\.tournamentId))
+            let tournamentIds = Array(Set(pools.map(\.tournamentId)))
 
-            // 2. Kick off ALL pool card builds concurrently using Task (inherits @MainActor)
+            // 2. Kick off cards, streak, AND matches all concurrently
             let poolsSnapshot = pools
             var cardTasks: [Task<PoolCardData, Never>] = []
             for pool in poolsSnapshot {
@@ -103,8 +106,8 @@ final class HomeViewModel {
                 cardTasks.append(task)
             }
 
-            // Kick off streak fetch concurrently while cards build
             let streakTask = Task { await self.fetchBestStreak(userId: userId) }
+            let matchesTask = Task { await self.fetchMatches(tournamentIds: tournamentIds) }
 
             // Collect all card results
             var cards: [PoolCardData] = []
@@ -140,11 +143,9 @@ final class HomeViewModel {
             bestRank = allBestRanks.min()
             totalPoints = aggregateTotalPoints
 
-            // 3. Collect streak result (already running concurrently)
+            // 3. Collect streak and match results (already running concurrently)
             bestStreak = await streakTask.value
-
-            // 4. Fetch live and upcoming matches
-            await fetchMatches(tournamentIds: tournamentIds)
+            await matchesTask.value
 
         } catch {
             print("[HomeViewModel] Error loading home data: \(error)")
@@ -170,6 +171,9 @@ final class HomeViewModel {
         var predictionsCompleted = 0
         var predictionsTotal = 0
         var bestEntryId: String?
+        var hitRate: Double? = nil
+        var exactCount: Int? = nil
+        var totalCompleted: Int? = nil
 
         do {
             let leaderboard = try await apiService.fetchLeaderboard(poolId: pool.poolId)
@@ -182,6 +186,9 @@ final class HomeViewModel {
                 userPoints = bestEntry.totalPoints
                 needsPredictions = !bestEntry.hasSubmittedPredictions
                 bestEntryId = bestEntry.entryId
+                hitRate = bestEntry.hitRate
+                exactCount = bestEntry.exactCount
+                totalCompleted = bestEntry.totalCompleted
 
                 // Use lastFive from API if available (already computed server-side)
                 if let lastFive = bestEntry.lastFive {
@@ -248,7 +255,10 @@ final class HomeViewModel {
             levelName: levelName,
             predictionsCompleted: predictionsCompleted,
             predictionsTotal: predictionsTotal,
-            memberInitials: memberInitials
+            memberInitials: memberInitials,
+            hitRate: hitRate,
+            exactCount: exactCount,
+            totalCompleted: totalCompleted
         )
     }
 
@@ -310,7 +320,7 @@ final class HomeViewModel {
 
     // MARK: - Fetch Best Streak
 
-    private func fetchBestStreak(userId: String) async -> Int {
+    func fetchBestStreak(userId: String) async -> Int {
         do {
             struct MemberRow: Codable {
                 let memberId: String
@@ -572,7 +582,7 @@ final class HomeViewModel {
 
     // MARK: - Fetch Matches
 
-    private func fetchMatches(tournamentIds: Set<String>) async {
+    private func fetchMatches(tournamentIds: [String]) async {
         guard !tournamentIds.isEmpty else { return }
 
         let matchSelect = """
@@ -584,49 +594,94 @@ final class HomeViewModel {
             away_team:teams!away_team_id(country_name, country_code, flag_url)
         """
 
-        // Fetch live and upcoming matches concurrently
+        // Fetch live and upcoming matches concurrently with single queries each
         let liveTask = Task {
-            var allLive: [Match] = []
-            for tournamentId in tournamentIds {
-                do {
-                    let matches: [Match] = try await self.supabase
-                        .from("matches")
-                        .select(matchSelect)
-                        .eq("tournament_id", value: tournamentId)
-                        .eq("status", value: "live")
-                        .execute()
-                        .value
-                    allLive.append(contentsOf: matches)
-                } catch {
-                    print("[HomeViewModel] Failed to fetch live matches for \(tournamentId): \(error)")
-                }
+            do {
+                let matches: [Match] = try await self.supabase
+                    .from("matches")
+                    .select(matchSelect)
+                    .in("tournament_id", values: tournamentIds)
+                    .eq("status", value: "live")
+                    .execute()
+                    .value
+                return matches.sorted { $0.matchNumber < $1.matchNumber }
+            } catch {
+                print("[HomeViewModel] Failed to fetch live matches: \(error)")
+                return [Match]()
             }
-            return allLive.sorted { $0.matchNumber < $1.matchNumber }
         }
 
         let upcomingTask = Task {
-            var allUpcoming: [Match] = []
-            for tournamentId in tournamentIds {
-                do {
-                    let matches: [Match] = try await self.supabase
-                        .from("matches")
-                        .select(matchSelect)
-                        .eq("tournament_id", value: tournamentId)
-                        .in("status", values: ["scheduled", "upcoming"])
-                        .order("match_date")
-                        .limit(10)
-                        .execute()
-                        .value
-                    allUpcoming.append(contentsOf: matches)
-                } catch {
-                    print("[HomeViewModel] Failed to fetch upcoming matches for \(tournamentId): \(error)")
-                }
+            do {
+                let matches: [Match] = try await self.supabase
+                    .from("matches")
+                    .select(matchSelect)
+                    .in("tournament_id", values: tournamentIds)
+                    .in("status", values: ["scheduled", "upcoming"])
+                    .order("match_date")
+                    .limit(5)
+                    .execute()
+                    .value
+                return matches
+            } catch {
+                print("[HomeViewModel] Failed to fetch upcoming matches: \(error)")
+                return [Match]()
             }
-            return Array(allUpcoming.sorted { $0.matchDate < $1.matchDate }.prefix(5))
         }
 
         liveMatches = await liveTask.value
         upcomingMatches = await upcomingTask.value
+    }
+
+    // MARK: - Batch Match Fetch (returns data for AppDataStore)
+
+    func fetchMatchesBatch(tournamentIds: [String]) async -> (live: [Match], upcoming: [Match]) {
+        guard !tournamentIds.isEmpty else { return ([], []) }
+
+        let matchSelect = """
+            match_id, tournament_id, match_number, stage, group_letter,
+            home_team_id, away_team_id, home_team_placeholder, away_team_placeholder,
+            match_date, venue, status, home_score_ft, away_score_ft,
+            home_score_pso, away_score_pso, winner_team_id, is_completed, completed_at,
+            home_team:teams!home_team_id(country_name, country_code, flag_url),
+            away_team:teams!away_team_id(country_name, country_code, flag_url)
+        """
+
+        let liveTask = Task {
+            do {
+                let matches: [Match] = try await self.supabase
+                    .from("matches")
+                    .select(matchSelect)
+                    .in("tournament_id", values: tournamentIds)
+                    .eq("status", value: "live")
+                    .execute()
+                    .value
+                return matches.sorted { $0.matchNumber < $1.matchNumber }
+            } catch {
+                print("[HomeViewModel] Failed to fetch live matches: \(error)")
+                return [Match]()
+            }
+        }
+
+        let upcomingTask = Task {
+            do {
+                let matches: [Match] = try await self.supabase
+                    .from("matches")
+                    .select(matchSelect)
+                    .in("tournament_id", values: tournamentIds)
+                    .in("status", values: ["scheduled", "upcoming"])
+                    .order("match_date")
+                    .limit(5)
+                    .execute()
+                    .value
+                return matches
+            } catch {
+                print("[HomeViewModel] Failed to fetch upcoming matches: \(error)")
+                return [Match]()
+            }
+        }
+
+        return (await liveTask.value, await upcomingTask.value)
     }
 
     // MARK: - Next Kickoff

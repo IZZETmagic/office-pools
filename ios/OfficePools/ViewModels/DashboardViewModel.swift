@@ -27,11 +27,12 @@ enum PoolPredictionFilter: String, CaseIterable {
     case pending = "Pending"
 }
 
-/// View model for the Pools tab — shows user's pools with rich card data.
+/// View model for the Pools tab — provides filtering, sorting, and join/create UI state.
+/// Reads pool card data from the shared AppDataStore.
 @MainActor
 @Observable
 final class DashboardViewModel {
-    var poolCards: [PoolCardData] = []
+    // UI state
     var isLoading = false
     var errorMessage: String?
     var joinPoolCode = ""
@@ -58,13 +59,11 @@ final class DashboardViewModel {
     }
 
     private let poolService = PoolService()
-    private let apiService = APIService()
-    private let supabase = SupabaseService.shared.client
     private let homeViewModel = HomeViewModel()
 
     // MARK: - Filtered & Sorted Pools
 
-    var filteredPools: [PoolCardData] {
+    func filteredPools(from poolCards: [PoolCardData]) -> [PoolCardData] {
         var result = poolCards
 
         // Search filter
@@ -131,47 +130,9 @@ final class DashboardViewModel {
         return result
     }
 
-    // MARK: - Load Pools
-
-    private var hasLoadedOnce = false
-
-    func loadPools(userId: String, forceRefresh: Bool = false) async {
-        // Skip reload if we already have data (unless pull-to-refresh)
-        if hasLoadedOnce && !forceRefresh && !poolCards.isEmpty { return }
-
-        isLoading = poolCards.isEmpty
-        errorMessage = nil
-
-        do {
-            let pools = try await poolService.fetchUserPools(userId: userId)
-
-            // Build all pool cards concurrently
-            var cardTasks: [Task<PoolCardData, Never>] = []
-            for pool in pools {
-                let task = Task {
-                    await self.homeViewModel.buildPoolCard(pool: pool, userId: userId)
-                }
-                cardTasks.append(task)
-            }
-
-            var cards: [PoolCardData] = []
-            for task in cardTasks {
-                cards.append(await task.value)
-            }
-
-            poolCards = cards
-            hasLoadedOnce = true
-        } catch {
-            print("[DashboardVM] ERROR loading pools: \(error)")
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
-    }
-
     // MARK: - Join Pool
 
-    func joinPool(userId: String, username: String) async {
+    func joinPool(userId: String, username: String, dataStore: AppDataStore) async {
         guard !joinPoolCode.isEmpty else { return }
 
         isJoining = true
@@ -180,9 +141,9 @@ final class DashboardViewModel {
         do {
             let pool = try await poolService.joinPool(poolCode: joinPoolCode, userId: userId, username: username)
 
-            // Build enriched card for the new pool
+            // Build enriched card for the new pool and add to shared store
             let card = await homeViewModel.buildPoolCard(pool: pool, userId: userId)
-            poolCards.insert(card, at: 0)
+            dataStore.addPoolCard(card)
 
             joinPoolCode = ""
             showJoinSheet = false
@@ -195,19 +156,8 @@ final class DashboardViewModel {
 
     // MARK: - Add Pool (after creation)
 
-    func addPool(_ pool: Pool, userId: String) async {
+    func addPool(_ pool: Pool, userId: String, dataStore: AppDataStore) async {
         let card = await homeViewModel.buildPoolCard(pool: pool, userId: userId)
-        poolCards.insert(card, at: 0)
-    }
-
-    // MARK: - Remove Pool (after deletion)
-
-    func removePool(poolId: String) {
-        poolCards.removeAll { $0.pool.poolId == poolId }
-    }
-
-    /// Force next loadPools to re-fetch from server
-    func invalidateCache() {
-        hasLoadedOnce = false
+        dataStore.addPoolCard(card)
     }
 }
