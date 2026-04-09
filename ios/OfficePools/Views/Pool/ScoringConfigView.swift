@@ -324,7 +324,7 @@ struct ScoringConfigView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 Text("pts")
                     .font(SPTypography.detail)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
             }
         }
     }
@@ -338,7 +338,7 @@ struct ScoringConfigView: View {
             HStack(spacing: 6) {
                 Text("×")
                     .font(SPTypography.body)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                 TextField("1", value: value, format: .number)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)

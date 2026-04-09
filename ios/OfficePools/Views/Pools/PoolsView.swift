@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum PoolsSegment: String, CaseIterable {
+    case myPools = "My Pools"
+    case discover = "Discover"
+}
+
 /// Pools tab — lists all pools the user has joined, with rich card data.
 struct PoolsView: View {
     let authService: AuthService
@@ -7,15 +12,21 @@ struct PoolsView: View {
     @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @Environment(AppDataStore.self) private var dataStore
     @State private var viewModel = DashboardViewModel()
+    @State private var discoverVM = DiscoverViewModel()
     @State private var navigationPath = NavigationPath()
     @State private var pendingCreatedPool: Pool?
     @State private var scrollOffset: CGFloat = 0
     @State private var sectionsAppeared = false
+    @State private var selectedSegment: PoolsSegment = .myPools
+    @State private var selectedDiscoverPool: DiscoverPoolData?
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-                if dataStore.poolCards.isEmpty && dataStore.isPreloading {
+                if selectedSegment == .discover {
+                    discoverContent
+                        .transition(.opacity)
+                } else if dataStore.poolCards.isEmpty && dataStore.isPreloading {
                     poolsSkeletonView
                         .transition(.opacity)
                 } else if dataStore.poolCards.isEmpty {
@@ -27,6 +38,7 @@ struct PoolsView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: dataStore.isPreloading)
+            .animation(.easeInOut(duration: 0.25), value: selectedSegment)
             .navigationBarHidden(true)
             .navigationDestination(for: Pool.self) { pool in
                 PoolDetailView(
@@ -113,7 +125,7 @@ struct PoolsView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4 * (1 - collapseProgress)) {
                     HStack(spacing: 0) {
-                        Text("Your")
+                        Text(selectedSegment == .myPools ? "Your" : "Discover")
                             .font(SPTypography.pageTitle)
                             .foregroundStyle(Color.sp.ink)
                         Text("Pools")
@@ -121,7 +133,7 @@ struct PoolsView: View {
                             .foregroundStyle(Color.sp.primary)
                     }
 
-                    Text("Where the banter begins")
+                    Text(selectedSegment == .myPools ? "Where the banter begins" : "Find a pool to join")
                         .font(SPTypography.body)
                         .foregroundStyle(Color.sp.slate)
                         .opacity(1 - collapseProgress)
@@ -131,28 +143,66 @@ struct PoolsView: View {
 
                 Spacer()
 
-                Menu {
-                    Button { viewModel.showJoinSheet = true } label: {
-                        Label("Join Pool", systemImage: "person.badge.plus")
+                if selectedSegment == .myPools {
+                    Menu {
+                        Button { viewModel.showJoinSheet = true } label: {
+                            Label("Join Pool", systemImage: "person.badge.plus")
+                        }
+                        Button { viewModel.showCreateSheet = true } label: {
+                            Label("Create Pool", systemImage: "plus.rectangle.on.folder")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.sp.ink)
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
                     }
-                    Button { viewModel.showCreateSheet = true } label: {
-                        Label("Create Pool", systemImage: "plus.rectangle.on.folder")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.sp.ink)
-                        .frame(width: 40, height: 40)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 44 - (12 * collapseProgress))
-            .padding(.bottom, 12 - (4 * collapseProgress))
-            .background(Color.sp.snow)
+            .padding(.bottom, 8 - (4 * collapseProgress))
+
+            // Segment picker
+            segmentPicker
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
         }
+        .background(Color.sp.snow)
         .animation(.easeOut(duration: 0.15), value: collapseProgress)
+    }
+
+    // MARK: - Segment Picker
+
+    private var segmentPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(PoolsSegment.allCases, id: \.self) { segment in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedSegment = segment
+                    }
+                    if segment == .discover && !discoverVM.hasLoaded {
+                        Task {
+                            if let userId = authService.appUser?.userId {
+                                await discoverVM.loadPools(userId: userId)
+                            }
+                        }
+                    }
+                } label: {
+                    Text(segment.rawValue)
+                        .font(.system(size: 13, weight: selectedSegment == segment ? .bold : .medium, design: .rounded))
+                        .foregroundStyle(selectedSegment == segment ? Color.sp.primary : Color.sp.slate)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(selectedSegment == segment ? Color.sp.primary.opacity(0.12) : Color.clear)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
     }
 
     // MARK: - Filter Bar
@@ -251,7 +301,7 @@ struct PoolsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.sp.slate)
                     .frame(width: 32, height: 32)
-                    .background(Color.white)
+                    .background(Color.sp.surface)
                     .clipShape(Circle())
             }
         }
@@ -272,7 +322,7 @@ struct PoolsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(isActive ? Color.sp.primary.opacity(0.12) : Color.white)
+        .background(isActive ? Color.sp.primary.opacity(0.12) : Color.sp.surface)
         .foregroundStyle(isActive ? Color.sp.primary : Color.sp.slate)
         .clipShape(Capsule())
         .overlay {
@@ -543,8 +593,195 @@ struct PoolsView: View {
         .padding(16)
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
-                .fill(Color.white)
+                .fill(Color.sp.surface)
         }
+    }
+
+    // MARK: - Discover Content
+
+    private var discoverContent: some View {
+        VStack(spacing: 0) {
+            headerSection
+
+            // Search bar
+            HStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sp.slate)
+                    TextField("Search public pools...", text: $discoverVM.searchText)
+                        .font(.system(size: 14, design: .rounded))
+                        .submitLabel(.search)
+                        .onSubmit {
+                            Task {
+                                if let userId = authService.appUser?.userId {
+                                    await discoverVM.loadPools(userId: userId)
+                                }
+                            }
+                        }
+                    if !discoverVM.searchText.isEmpty {
+                        Button {
+                            discoverVM.searchText = ""
+                            Task {
+                                if let userId = authService.appUser?.userId {
+                                    await discoverVM.loadPools(userId: userId)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.sp.slate)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.sp.surface)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+
+            // Mode filter pills
+            discoverFilterBar
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+
+            // Results
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if discoverVM.isLoading && !discoverVM.hasLoaded {
+                        ForEach(0..<4, id: \.self) { _ in
+                            poolCardSkeleton
+                        }
+                        .shimmer()
+                    } else if let error = discoverVM.errorMessage {
+                        VStack(spacing: 12) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Color.sp.slate)
+                            Text(error)
+                                .font(SPTypography.body)
+                                .foregroundStyle(Color.sp.slate)
+                            Button("Try Again") {
+                                Task {
+                                    if let userId = authService.appUser?.userId {
+                                        await discoverVM.loadPools(userId: userId)
+                                    }
+                                }
+                            }
+                            .font(SPTypography.cardTitle)
+                            .foregroundStyle(Color.sp.primary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                    } else if discoverVM.pools.isEmpty && discoverVM.hasLoaded {
+                        discoverEmptyState
+                    } else {
+                        ForEach(discoverVM.pools) { item in
+                            Button {
+                                selectedDiscoverPool = item
+                            } label: {
+                                DiscoverPoolCardView(data: item)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
+            }
+            .refreshable {
+                if let userId = authService.appUser?.userId {
+                    await discoverVM.loadPools(userId: userId)
+                }
+            }
+        }
+        .background(Color.sp.snow)
+        .sheet(item: $selectedDiscoverPool) { item in
+            DiscoverPoolDetailSheet(
+                data: item,
+                isJoining: discoverVM.joiningPoolId == item.pool.poolId,
+                onJoin: {
+                    Task {
+                        if let userId = authService.appUser?.userId {
+                            await discoverVM.joinPool(
+                                item.pool,
+                                userId: userId,
+                                username: authService.appUser?.username ?? "Entry 1",
+                                dataStore: dataStore
+                            )
+                            // Refresh the selected item so the sheet updates
+                            if let updated = discoverVM.pools.first(where: { $0.pool.poolId == item.pool.poolId }) {
+                                selectedDiscoverPool = updated
+                            }
+                        }
+                    }
+                },
+                onNavigateToPool: {
+                    navigationPath.append(item.pool)
+                }
+            )
+        }
+    }
+
+    private var discoverFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                discoverModePill("All", mode: nil)
+                discoverModePill("Full Tournament", mode: .fullTournament)
+                discoverModePill("Progressive", mode: .progressive)
+                discoverModePill("Bracket Picker", mode: .bracketPicker)
+            }
+        }
+    }
+
+    private func discoverModePill(_ label: String, mode: PredictionMode?) -> some View {
+        let isActive = discoverVM.modeFilter == mode
+        return Button {
+            discoverVM.modeFilter = mode
+            Task {
+                if let userId = authService.appUser?.userId {
+                    await discoverVM.loadPools(userId: userId)
+                }
+            }
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: isActive ? .bold : .medium, design: .rounded))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isActive ? Color.sp.primary.opacity(0.12) : Color.sp.surface)
+                .foregroundStyle(isActive ? Color.sp.primary : Color.sp.slate)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var discoverEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.sp.slate)
+            Text(discoverVM.hasActiveFilters
+                ? "No pools match your search"
+                : "No public pools available yet")
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
+            if discoverVM.hasActiveFilters {
+                Button("Clear Filters") {
+                    discoverVM.clearFilters()
+                    Task {
+                        if let userId = authService.appUser?.userId {
+                            await discoverVM.loadPools(userId: userId)
+                        }
+                    }
+                }
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.primary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
 
     // MARK: - Join Pool Sheet

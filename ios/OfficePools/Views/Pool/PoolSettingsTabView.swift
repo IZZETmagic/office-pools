@@ -188,7 +188,7 @@ struct PoolSettingsTabView: View {
                             .scaledToFit()
                             .frame(height: 180)
                             .padding(12)
-                            .background(Color.white)
+                            .background(Color.sp.surface)
                             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
 
                         Text("Tap to enlarge")
@@ -274,7 +274,7 @@ struct PoolSettingsTabView: View {
                         .scaledToFit()
                         .frame(maxWidth: 300, maxHeight: 300)
                         .padding(20)
-                        .background(Color.white)
+                        .background(Color.sp.surface)
                         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
                         .spCardShadow()
                 }
@@ -548,7 +548,7 @@ struct PoolSettingsTabView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
         }
@@ -577,7 +577,7 @@ struct PoolSettingsTabView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(.vertical, 4)
                 .foregroundStyle(Color.sp.amber)
@@ -605,7 +605,7 @@ struct PoolSettingsTabView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(.vertical, 4)
                 .foregroundStyle(Color.sp.red)
@@ -614,7 +614,7 @@ struct PoolSettingsTabView: View {
             .disabled(isDeleting)
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)

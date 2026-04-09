@@ -47,7 +47,7 @@ struct BPThirdPlaceRankingView: View {
                     editableList
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
                 RoundedRectangle(cornerRadius: SPDesign.Radius.md)

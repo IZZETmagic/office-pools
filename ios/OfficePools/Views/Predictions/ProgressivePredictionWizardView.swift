@@ -139,7 +139,7 @@ struct ProgressivePredictionWizardView: View {
                 } else if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.caption2)
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 } else if state == .completed {
                     Image(systemName: "checkmark")
                         .font(.caption2)
@@ -239,10 +239,10 @@ struct ProgressivePredictionWizardView: View {
             } else if state == .locked {
                 HStack(spacing: 6) {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                     Text("Round Locked")
                         .font(SPTypography.detail)
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -411,7 +411,7 @@ struct ProgressiveKnockoutRoundView: View {
             }
         }
         .padding(.vertical, 4)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
@@ -435,16 +435,16 @@ struct ProgressiveKnockoutRoundView: View {
             HStack(spacing: 6) {
                 Text("?")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                     .frame(width: 38, height: 36)
                     .background(Color.sp.mist.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 Text("-")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                 Text("?")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                     .frame(width: 38, height: 36)
                     .background(Color.sp.mist.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))

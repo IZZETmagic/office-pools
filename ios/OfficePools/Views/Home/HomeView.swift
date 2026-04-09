@@ -289,7 +289,7 @@ struct HomeView: View {
             }
         }
         .padding(24)
-        .background(.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }

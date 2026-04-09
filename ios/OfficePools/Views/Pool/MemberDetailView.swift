@@ -293,7 +293,7 @@ struct MemberDetailView: View {
                             Spacer()
                             Text(SPDateFormatter.long(submittedAt))
                                 .font(SPTypography.detail)
-                                .foregroundStyle(Color.sp.silver)
+                                .foregroundStyle(Color.sp.slate)
                         }
                     }
                 }
@@ -342,7 +342,7 @@ struct MemberDetailView: View {
                             .foregroundStyle(Color.sp.ink)
                         Text(SPDateFormatter.long(adj.createdAt))
                             .font(SPTypography.detail)
-                            .foregroundStyle(Color.sp.silver)
+                            .foregroundStyle(Color.sp.slate)
                     }
 
                     Spacer()

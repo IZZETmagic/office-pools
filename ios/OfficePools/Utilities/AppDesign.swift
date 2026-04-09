@@ -38,12 +38,12 @@ enum AppDesign {
 
     enum Shadow {
         // Standard card elevation (pool cards, activity cards, match cards)
-        static let cardColor = Color.black.opacity(0.06)
+        static let cardColor = Color.adaptive(light: 0x000000, dark: 0x000000, opacity: 0.06)
         static let cardRadius: CGFloat = 6
         static let cardY: CGFloat = 3
 
         // Subtle / inner elevation (detail rows, filter pills)
-        static let subtleColor = Color.black.opacity(0.04)
+        static let subtleColor = Color.adaptive(light: 0x000000, dark: 0x000000, opacity: 0.04)
         static let subtleRadius: CGFloat = 4
         static let subtleY: CGFloat = 2
     }

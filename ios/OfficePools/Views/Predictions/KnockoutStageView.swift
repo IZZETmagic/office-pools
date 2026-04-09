@@ -98,7 +98,7 @@ struct KnockoutStageView: View {
             }
         }
         .padding(.vertical, 4)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
@@ -126,16 +126,16 @@ struct KnockoutStageView: View {
             HStack(spacing: 6) {
                 Text("?")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                     .frame(width: 38, height: 36)
                     .background(Color.sp.mist.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 Text("-")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                 Text("?")
                     .font(SPTypography.cardTitle)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                     .frame(width: 38, height: 36)
                     .background(Color.sp.mist.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
@@ -171,7 +171,7 @@ struct KnockoutStageView: View {
             if resolved.home == nil && resolved.away == nil {
                 Text("vs")
                     .font(.caption2)
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
             }
             if resolved.away == nil, let placeholder = match.awayTeamPlaceholder {
                 Text(placeholder)
@@ -183,7 +183,7 @@ struct KnockoutStageView: View {
 
             Text("Complete earlier rounds")
                 .font(.caption2)
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
         }
     }
 

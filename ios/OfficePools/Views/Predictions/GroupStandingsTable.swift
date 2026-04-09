@@ -18,7 +18,7 @@ struct GroupStandingsTable: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
     }
 

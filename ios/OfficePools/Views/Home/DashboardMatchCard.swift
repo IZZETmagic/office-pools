@@ -55,7 +55,7 @@ struct DashboardMatchCard: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
     }
 

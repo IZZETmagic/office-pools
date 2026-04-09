@@ -141,7 +141,7 @@ struct DashboardPoolCard: View {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                 .fill(data.pool.hasBranding && brandColorValue != nil
                     ? AnyShapeStyle(brandColorValue!.opacity(0.05))
-                    : AnyShapeStyle(Color.white))
+                    : AnyShapeStyle(Color.sp.surface))
         }
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
     }
@@ -173,7 +173,7 @@ struct DashboardPoolCard: View {
                     }
                     .overlay {
                         Circle()
-                            .strokeBorder(Color.white, lineWidth: 1.5)
+                            .strokeBorder(Color.sp.surface, lineWidth: 1.5)
                     }
             }
 

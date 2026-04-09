@@ -32,7 +32,7 @@ struct MatchDetailSkeletonView: View {
             divider
             skeletonInfoRow
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -94,7 +94,7 @@ struct MatchDetailSkeletonView: View {
                     }
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -136,7 +136,7 @@ struct MatchDetailSkeletonView: View {
                 }
             }
             .padding(16)
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
 
@@ -154,7 +154,7 @@ struct MatchDetailSkeletonView: View {
                 }
             }
             .padding(16)
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -205,7 +205,7 @@ struct MatchDetailSkeletonView: View {
 
             Spacer().frame(height: 4)
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }

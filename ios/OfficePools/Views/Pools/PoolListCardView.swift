@@ -213,7 +213,7 @@ struct PoolListCardView: View {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                 .fill(data.pool.hasBranding && brandColorValue != nil
                     ? AnyShapeStyle(brandColorValue!.opacity(0.03))
-                    : AnyShapeStyle(Color.white))
+                    : AnyShapeStyle(Color.sp.surface))
         }
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
     }

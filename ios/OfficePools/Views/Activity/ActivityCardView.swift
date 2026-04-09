@@ -47,7 +47,7 @@ struct ActivityCardView: View {
             }
         }
         .padding(14)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
     }
 

@@ -3,6 +3,7 @@ import SwiftUI
 /// A shimmer animation modifier that sweeps a highlight across the view.
 struct ShimmerModifier: ViewModifier {
     @State private var phase: CGFloat = -1
+    private let highlight = Color.adaptive(light: 0xFFFFFF, dark: 0xFFFFFF, opacity: 0.4)
 
     func body(content: Content) -> some View {
         content
@@ -10,7 +11,7 @@ struct ShimmerModifier: ViewModifier {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: max(0, phase - 0.3)),
-                        .init(color: .white.opacity(0.4), location: phase),
+                        .init(color: highlight, location: phase),
                         .init(color: .clear, location: min(1, phase + 0.3)),
                     ],
                     startPoint: .topLeading,
@@ -40,7 +41,7 @@ struct SkeletonBlock: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(Color(.systemGray5))
+            .fill(Color.sp.mist)
             .frame(width: width, height: height)
     }
 }

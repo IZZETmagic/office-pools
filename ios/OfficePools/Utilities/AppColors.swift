@@ -156,4 +156,17 @@ extension Color {
             opacity: opacity
         )
     }
+
+    /// Adaptive color that resolves to `light` or `dark` hex depending on the current color scheme.
+    static func adaptive(light: UInt, dark: UInt, opacity: Double = 1.0) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255.0,
+                green: CGFloat((hex >> 8) & 0xFF) / 255.0,
+                blue: CGFloat(hex & 0xFF) / 255.0,
+                alpha: opacity
+            )
+        })
+    }
 }

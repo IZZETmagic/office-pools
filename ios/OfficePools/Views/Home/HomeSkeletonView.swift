@@ -86,7 +86,7 @@ struct HomeSkeletonView: View {
         .padding(.vertical, 14)
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
-                .fill(Color.white)
+                .fill(Color.sp.surface)
         }
     }
 
@@ -101,7 +101,7 @@ struct HomeSkeletonView: View {
         .frame(width: 220, height: 180)
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
-                .fill(Color.white)
+                .fill(Color.sp.surface)
         }
     }
 
@@ -122,7 +122,7 @@ struct HomeSkeletonView: View {
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
-                .fill(Color.white)
+                .fill(Color.sp.surface)
         }
     }
 }

@@ -13,11 +13,15 @@ struct CountdownHero: View {
     private let wcTurquoise = Color(hex: 0x00A3AD)
     private let wcYellow    = Color(hex: 0xFFD100)
 
+    // Adaptive gradient: dark on light pages, slightly lifted on dark pages
+    private let gradientStart = Color.adaptive(light: 0x0A0A12, dark: 0x1E1C30)
+    private let gradientEnd   = Color.adaptive(light: 0x12101E, dark: 0x2A2840)
+
     var body: some View {
         ZStack {
             // Dark base
             LinearGradient(
-                colors: [Color(hex: 0x0A0A12), Color(hex: 0x12101E)],
+                colors: [gradientStart, gradientEnd],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -75,6 +79,10 @@ struct CountdownHero: View {
         .frame(maxWidth: .infinity)
         .frame(height: 180)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .overlay {
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .strokeBorder(Color.sp.silver.opacity(0.3), lineWidth: AppDesign.Border.thin)
+        }
     }
 }
 

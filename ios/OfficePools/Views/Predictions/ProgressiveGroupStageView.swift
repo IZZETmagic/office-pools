@@ -112,7 +112,7 @@ struct ProgressiveGroupStageView: View {
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 14)
-                .background(Color.white)
+                .background(Color.sp.surface)
             }
             .buttonStyle(.plain)
 
@@ -150,7 +150,7 @@ struct ProgressiveGroupStageView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)

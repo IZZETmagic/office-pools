@@ -113,9 +113,9 @@ extension View {
         self.shadow(color: Color.black.opacity(0.04), radius: 10, y: 2)
     }
 
-    /// Standard white card chrome: background, rounded corners, shadow, border.
+    /// Standard card chrome: adaptive background, rounded corners, shadow, border.
     func spCard(radius: CGFloat = SPDesign.Radius.lg) -> some View {
-        self.background(Color.white)
+        self.background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: radius))
             .spCardShadow()
             .overlay {

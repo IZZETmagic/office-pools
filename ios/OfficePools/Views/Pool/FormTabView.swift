@@ -136,7 +136,7 @@ struct FormTabView: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             if xp.nextLevel != nil {
@@ -261,7 +261,7 @@ struct FormTabView: View {
                 } else {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
@@ -337,7 +337,7 @@ struct FormTabView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .padding(.horizontal, 10)
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
@@ -459,7 +459,7 @@ struct FormTabView: View {
             // Match number label
             Text("#\(match.matchNumber)")
                 .font(SPTypography.mono(size: 8, weight: .medium))
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
         }
         .overlay(alignment: .top) {
             if tappedMatchNumber == match.matchNumber, let cm = crowdMatch {
@@ -634,7 +634,7 @@ struct FormTabView: View {
                         .foregroundStyle(Color.sp.slate)
                     Text("\(crowdAccuracy)%")
                         .font(SPTypography.mono(size: 32, weight: .heavy))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
@@ -658,7 +658,7 @@ struct FormTabView: View {
                 Spacer()
                 Text("\(you) vs \(crowd)")
                     .font(SPTypography.mono(size: 10))
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             GeometryReader { geo in
@@ -1000,7 +1000,7 @@ struct LevelRoadmapView: View {
                 if let badge = level.badge {
                     Text("Unlocks: \(badge)")
                         .font(SPTypography.detail)
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 

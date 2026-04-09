@@ -192,14 +192,14 @@ struct ProfileView: View {
                 if let createdAt = authService.appUser?.createdAt {
                     Text("Member since \(formatMemberSince(createdAt))")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
             Spacer()
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -246,7 +246,7 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
     }
 
@@ -271,7 +271,7 @@ struct ProfileView: View {
                     }
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -403,7 +403,7 @@ struct ProfileView: View {
                 .padding(.horizontal, 16)
             }
             .padding(.vertical, 16)
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -501,7 +501,7 @@ struct ProfileView: View {
                     readOnlyProfileContent
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -713,10 +713,10 @@ struct ProfileView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(14)
-                .background(Color.white)
+                .background(Color.sp.surface)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             }
             .padding(.horizontal, 20)
@@ -858,7 +858,7 @@ struct ProfileView: View {
             .foregroundStyle(colorScheme == value ? Color.sp.ink : Color.sp.slate)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(colorScheme == value ? Color.white : Color.clear)
+            .background(colorScheme == value ? Color.sp.surface : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         }
     }
@@ -896,7 +896,7 @@ struct ProfileView: View {
                     }
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -975,10 +975,10 @@ struct ProfileView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(14)
-                .background(Color.white)
+                .background(Color.sp.surface)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             }
             .padding(.horizontal, 20)
@@ -1008,10 +1008,10 @@ struct ProfileView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(14)
-                .background(Color.white)
+                .background(Color.sp.surface)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             }
             .padding(.horizontal, 20)
@@ -1062,7 +1062,7 @@ struct ProfileView: View {
                         .tracking(0.5)
                     Text("Must type: \(authService.appUser?.username ?? "")")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                     TextField(authService.appUser?.username ?? "", text: $viewModel.deleteConfirmText)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .padding(12)
@@ -1133,11 +1133,11 @@ struct ProfileView: View {
         HStack {
             Text("SportPool")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text("v1.0.0")
                 .font(SPTypography.mono(size: 11, weight: .medium))
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
         }
         .padding(.horizontal, 36)
     }
@@ -1166,7 +1166,7 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -1184,7 +1184,7 @@ struct ProfileView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.white)
+                    .background(Color.sp.surface)
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
                 }
             }
@@ -1206,7 +1206,7 @@ struct ProfileView: View {
                     }
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
             .modifier(ShimmerModifier())

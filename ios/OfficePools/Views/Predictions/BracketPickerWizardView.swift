@@ -300,7 +300,7 @@ struct BracketPickerWizardView: View {
             VStack(spacing: 8) {
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 24))
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
                 Text("No champion predicted yet")
                     .font(SPTypography.body)
                     .foregroundStyle(Color.sp.slate)
@@ -378,7 +378,7 @@ struct BracketPickerWizardView: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)

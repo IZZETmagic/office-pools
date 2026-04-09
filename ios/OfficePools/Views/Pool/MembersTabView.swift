@@ -86,7 +86,7 @@ struct MembersTabView: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())

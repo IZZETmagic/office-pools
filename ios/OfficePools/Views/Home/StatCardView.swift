@@ -34,7 +34,7 @@ struct StatCardView: View {
         .padding(.horizontal, 6)
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
-                .fill(Color.white)
+                .fill(Color.sp.surface)
         }
     }
 }

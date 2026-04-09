@@ -72,7 +72,7 @@ struct LeaderboardTabView: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .spCardShadow()
         .overlay {
@@ -343,12 +343,12 @@ struct LeaderboardTabView: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption2)
-                .foregroundStyle(Color.sp.silver)
+                .foregroundStyle(Color.sp.slate)
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
-                .fill(isCurrent ? Color.sp.primaryLight : Color.white)
+                .fill(isCurrent ? Color.sp.primaryLight : Color.sp.surface)
         )
         .spCardShadow()
         .overlay(

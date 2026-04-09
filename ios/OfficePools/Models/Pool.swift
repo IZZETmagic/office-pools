@@ -58,3 +58,12 @@ struct Pool: Codable, Identifiable, Hashable {
         case brandAccent = "brand_accent"
     }
 }
+
+/// Lightweight data for pool discovery — pool + metadata for browse/join UI.
+struct DiscoverPoolData: Identifiable {
+    let pool: Pool
+    let memberCount: Int
+    let isAlreadyJoined: Bool
+
+    var id: String { pool.poolId }
+}

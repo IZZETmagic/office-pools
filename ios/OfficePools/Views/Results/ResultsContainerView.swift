@@ -245,7 +245,7 @@ struct ResultsContainerView: View {
 
             Spacer().frame(height: 4)
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
     }
 }

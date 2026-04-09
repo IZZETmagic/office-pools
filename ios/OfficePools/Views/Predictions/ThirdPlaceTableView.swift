@@ -30,7 +30,7 @@ struct ThirdPlaceTableView: View {
                         }
                     }
                 }
-                .background(Color.white)
+                .background(Color.sp.surface)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 .overlay(
                     RoundedRectangle(cornerRadius: SPDesign.Radius.sm)

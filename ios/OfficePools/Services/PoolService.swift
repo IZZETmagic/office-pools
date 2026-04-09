@@ -321,7 +321,72 @@ final class PoolService {
         return pool
     }
 
-    // MARK: - Search Pools
+    // MARK: - Discover / Search Public Pools
+
+    /// Fetch all public, open pools. Optionally filter by name search and prediction mode.
+    func fetchPublicPools(
+        query: String = "",
+        mode: PredictionMode? = nil,
+        userId: String
+    ) async throws -> [DiscoverPoolData] {
+        // 1. Fetch public open pools
+        var request = supabase
+            .from("pools")
+            .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
+            .eq("is_private", value: false)
+            .eq("status", value: "open")
+
+        if !query.isEmpty {
+            request = request.ilike("pool_name", pattern: "%\(query)%")
+        }
+        if let mode {
+            request = request.eq("prediction_mode", value: mode.rawValue)
+        }
+
+        let pools: [Pool] = try await request
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        guard !pools.isEmpty else { return [] }
+
+        // 2. Batch-fetch member counts
+        struct MemberCountRow: Codable {
+            let poolId: String
+            let userId: String
+            enum CodingKeys: String, CodingKey {
+                case poolId = "pool_id"
+                case userId = "user_id"
+            }
+        }
+
+        let poolIds = pools.map(\.poolId)
+        let memberRows: [MemberCountRow] = try await supabase
+            .from("pool_members")
+            .select("pool_id, user_id")
+            .in("pool_id", values: poolIds)
+            .execute()
+            .value
+
+        // Count members per pool and check which ones the user already joined
+        var countByPool: [String: Int] = [:]
+        var joinedPoolIds: Set<String> = []
+        for row in memberRows {
+            countByPool[row.poolId, default: 0] += 1
+            if row.userId == userId {
+                joinedPoolIds.insert(row.poolId)
+            }
+        }
+
+        // 3. Assemble results
+        return pools.map { pool in
+            DiscoverPoolData(
+                pool: pool,
+                memberCount: countByPool[pool.poolId] ?? 0,
+                isAlreadyJoined: joinedPoolIds.contains(pool.poolId)
+            )
+        }
+    }
 
     func searchPools(query: String) async throws -> [Pool] {
         let pools: [Pool] = try await supabase

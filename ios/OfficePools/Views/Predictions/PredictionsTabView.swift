@@ -241,7 +241,7 @@ struct PredictionsTabView: View {
 
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color.sp.silver)
+                                    .foregroundStyle(Color.sp.slate)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)

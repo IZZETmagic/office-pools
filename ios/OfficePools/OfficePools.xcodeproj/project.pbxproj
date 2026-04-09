@@ -129,6 +129,9 @@
 		F90C1BDD8901D1D8F379FAE3 /* SportPoolPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6FE840DBB7B92EAEEA264A /* SportPoolPill.swift */; };
 		F9392DDF248277B255B510AA /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C16D214CC5B59466B1F169 /* ActivityView.swift */; };
 		FDC4401E215A19D28D757595 /* Pool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142DD2B3B8F225FCA31FB190 /* Pool.swift */; };
+		A1B2C3D4E5F60718DISC0001 /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */; };
+		A1B2C3D4E5F60718DISC0003 /* DiscoverPoolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */; };
+		A1B2C3D4E5F60718DISC0005 /* DiscoverPoolDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -165,6 +168,9 @@
 		3C7D1B6CE97DD805C0F80D4C /* BadgePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgePickerSheet.swift; sourceTree = "<group>"; };
 		3EA09C4D945E009F77CF091E /* ResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewModel.swift; sourceTree = "<group>"; };
 		3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolCardView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolDetailSheet.swift; sourceTree = "<group>"; };
 		40AA589A5883F2F54179C208 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		4220BE4126C3996E7164B4E7 /* DashboardMatchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMatchCard.swift; sourceTree = "<group>"; };
 		465265B9D4513B8F6BD66682 /* BracketPickerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerModels.swift; sourceTree = "<group>"; };
@@ -451,6 +457,8 @@
 		98D62BEF2D1093D10D632027 /* Pools */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */,
+				A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */,
 				04E7880B3E9CA3C5C10DF512 /* PoolListCardView.swift */,
 				9907BB195B1DB6F18645A751 /* PoolsView.swift */,
 			);
@@ -509,6 +517,7 @@
 				37E100279F2F6FECA8094A91 /* BracketPickerViewModel.swift */,
 				66335E28D461FC2F5581330C /* CreatePoolViewModel.swift */,
 				3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */,
+				A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */,
 				BCCCC11265EC117D2A645EB5 /* HomeViewModel.swift */,
 				F81B7B2FDDA3FF45C8CFBFD5 /* MatchDetailViewModel.swift */,
 				2EB43957E22AEFCF51890705 /* PoolDetailViewModel.swift */,
@@ -653,6 +662,9 @@
 				C4DD615749229C9D79BEEB13 /* DashboardPoolCard.swift in Sources */,
 				1F63EC7693FB7C2E158D0AE6 /* DashboardView.swift in Sources */,
 				71F1A46CAAA1B71B9EB590C6 /* DashboardViewModel.swift in Sources */,
+				A1B2C3D4E5F60718DISC0001 /* DiscoverViewModel.swift in Sources */,
+				A1B2C3D4E5F60718DISC0003 /* DiscoverPoolCardView.swift in Sources */,
+				A1B2C3D4E5F60718DISC0005 /* DiscoverPoolDetailSheet.swift in Sources */,
 				3FBEE0F62C12358EC7CE9DC4 /* EmojiPickerView.swift in Sources */,
 				AA77CD7D86D4890898920F97 /* Entry.swift in Sources */,
 				01B7EE4753E94620657C08FE /* ForgotPasswordView.swift in Sources */,

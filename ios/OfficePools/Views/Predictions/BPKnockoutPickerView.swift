@@ -134,7 +134,7 @@ private struct BPMatchCard: View {
 
                 Text("vs")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.sp.silver)
+                    .foregroundStyle(Color.sp.slate)
 
                 BPTeamButton(
                     team: awayTeam,
@@ -180,7 +180,7 @@ private struct BPMatchCard: View {
                 .padding(.vertical, 6)
             }
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)

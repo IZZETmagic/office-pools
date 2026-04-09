@@ -234,7 +234,7 @@ struct MatchDetailView: View {
                 infoRow(icon: "mappin.and.ellipse", label: venue)
             }
         }
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -334,7 +334,7 @@ struct MatchDetailView: View {
                     }
                 }
             }
-            .background(Color.white)
+            .background(Color.sp.surface)
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -416,7 +416,7 @@ struct MatchDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -493,7 +493,7 @@ struct MatchDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -508,7 +508,7 @@ struct MatchDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .padding(.horizontal, 20)
     }
@@ -551,7 +551,7 @@ struct MatchDetailView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "sportscourt")
                         .font(.system(size: 32))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                     Text("No predictions yet")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.sp.ink)
@@ -563,7 +563,7 @@ struct MatchDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 28)
-                .background(Color.white)
+                .background(Color.sp.surface)
                 .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
                 .padding(.horizontal, 20)
             } else if !viewModel.predictionInfos.isEmpty {
@@ -603,7 +603,7 @@ struct MatchDetailView: View {
 
                         Spacer().frame(height: 4)
                     }
-                    .background(Color.white)
+                    .background(Color.sp.surface)
                     .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
                     .padding(.horizontal, 20)
                 }
@@ -680,7 +680,7 @@ struct MatchDetailView: View {
                     Spacer()
                     Text("Not predicted")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3)
                         .background(Color.sp.mist.opacity(0.5), in: Capsule())
@@ -738,7 +738,7 @@ struct MatchDetailView: View {
                         } else {
                             Text("No pick")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.sp.silver)
+                                .foregroundStyle(Color.sp.slate)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 3)
                                 .background(Color.sp.mist.opacity(0.5), in: Capsule())
@@ -769,7 +769,7 @@ struct MatchDetailView: View {
                         if bp.homeTeamPosition == nil && bp.awayTeamPosition == nil {
                             Text("No picks")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.sp.silver)
+                                .foregroundStyle(Color.sp.slate)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 3)
                                 .background(Color.sp.mist.opacity(0.5), in: Capsule())
@@ -778,7 +778,7 @@ struct MatchDetailView: View {
                 } else {
                     Text("No picks")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.sp.silver)
+                        .foregroundStyle(Color.sp.slate)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3)
                         .background(Color.sp.mist.opacity(0.5), in: Capsule())

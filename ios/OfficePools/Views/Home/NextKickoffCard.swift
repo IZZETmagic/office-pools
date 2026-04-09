@@ -107,7 +107,10 @@ struct NextKickoffCard: View {
                 RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: 0x0F0F1A), Color(hex: 0x1A1830)],
+                            colors: [
+                                Color.adaptive(light: 0x0F0F1A, dark: 0x1E1C30),
+                                Color.adaptive(light: 0x1A1830, dark: 0x2A2840)
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -127,6 +130,10 @@ struct NextKickoffCard: View {
                     .offset(x: -90, y: 30)
             }
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .strokeBorder(Color.sp.silver.opacity(0.3), lineWidth: AppDesign.Border.thin)
         }
         .onAppear { updateCountdown() }
         .onReceive(timer) { _ in updateCountdown() }
