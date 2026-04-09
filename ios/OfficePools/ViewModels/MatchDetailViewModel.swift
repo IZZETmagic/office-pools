@@ -15,6 +15,21 @@ struct MatchPredictionInfo: Identifiable {
     var teamsMatch: Bool?  // Whether predicted teams match actual teams (knockout only)
     var breakdownResultType: String?  // "exact", "winner_gd", "winner", "miss", "wrong_teams" from breakdown API
     var breakdownPoints: Int?  // Points from breakdown API (accounts for team mismatch)
+    var isBracketPicker: Bool = false
+    var bracketPick: BracketPickInfo?
+}
+
+/// Bracket picker prediction info for a match.
+struct BracketPickInfo {
+    // Group match: predicted positions for both teams
+    var homeTeamPosition: Int?  // 1st, 2nd, 3rd, 4th
+    var awayTeamPosition: Int?
+    var homeTeamName: String?
+    var awayTeamName: String?
+    // Knockout match: predicted winner
+    var predictedWinnerName: String?
+    var predictedPenalty: Bool = false
+    var isCorrectWinner: Bool?  // nil if match not finished
 }
 
 /// View model for the match detail page — loads the user's predictions across all pools.
@@ -46,6 +61,9 @@ final class MatchDetailViewModel {
     private var cachedEntryIds: [String] = []
     private var cachedPredictedTeams: [String: (home: String?, away: String?)] = [:]  // entryId → predicted teams
     private var cachedBreakdownData: [String: (teamsMatch: Bool, resultType: String, points: Int)] = [:]  // entryId → breakdown results
+    private var cachedBracketPickerEntries: Set<String> = []  // entryIds that belong to bracket picker pools
+    private var cachedBracketPicks: [String: BracketPickInfo] = [:]  // entryId → bracket pick info
+    private var cachedTeamNames: [String: String] = [:]  // teamId → countryName
 
     init(match: Match) {
         self.match = match
@@ -65,6 +83,9 @@ final class MatchDetailViewModel {
             cachedEntryPoolId = [:]
             cachedEntryName = [:]
             cachedEntrySettings = [:]
+            cachedBracketPickerEntries = []
+
+            var bracketPickerPoolEntries: [(poolId: String, entryId: String)] = []
 
             for pool in pools {
                 let members = try await poolService.fetchMembers(poolId: pool.poolId)
@@ -80,20 +101,32 @@ final class MatchDetailViewModel {
                     if let settings = settings {
                         cachedEntrySettings[entry.entryId] = settings
                     }
+                    if pool.predictionMode == .bracketPicker {
+                        cachedBracketPickerEntries.insert(entry.entryId)
+                        bracketPickerPoolEntries.append((poolId: pool.poolId, entryId: entry.entryId))
+                    }
                 }
             }
 
-            // 3. Fetch predictions for this match across all entries
-            let predictions = try await predictionService.fetchPredictionsForMatch(
-                matchId: match.matchId,
-                entryIds: cachedEntryIds
-            )
-            cachedPredictions = Dictionary(uniqueKeysWithValues: predictions.map { ($0.entryId, $0) })
+            // 3. Fetch score-based predictions for non-bracket-picker entries
+            let nonBPEntryIds = cachedEntryIds.filter { !cachedBracketPickerEntries.contains($0) }
+            if !nonBPEntryIds.isEmpty {
+                let predictions = try await predictionService.fetchPredictionsForMatch(
+                    matchId: match.matchId,
+                    entryIds: nonBPEntryIds
+                )
+                cachedPredictions = Dictionary(uniqueKeysWithValues: predictions.map { ($0.entryId, $0) })
+            }
+
+            // 4. Fetch bracket picker data
+            if !bracketPickerPoolEntries.isEmpty {
+                await loadBracketPickerData(entries: bracketPickerPoolEntries)
+            }
 
             // 4. Build initial display list (before scores/stats)
             rebuildPredictionInfos()
 
-            print("[MatchDetail] Loaded \(predictions.count) predictions across \(cachedEntryIds.count) entries")
+            print("[MatchDetail] Loaded \(cachedPredictions.count) predictions, \(cachedBracketPicks.count) bracket picks across \(cachedEntryIds.count) entries")
         } catch {
             print("[MatchDetail] Error: \(error)")
             errorMessage = error.localizedDescription
@@ -108,6 +141,61 @@ final class MatchDetailViewModel {
         await loadGroupStandingsIfNeeded()
 
         isLoading = false
+    }
+
+    /// Load bracket picker predictions for the given entries.
+    private func loadBracketPickerData(entries: [(poolId: String, entryId: String)]) async {
+        // Fetch team names for resolving IDs
+        if cachedTeamNames.isEmpty {
+            do {
+                let teams = try await poolService.fetchTeams(tournamentId: match.tournamentId)
+                cachedTeamNames = Dictionary(uniqueKeysWithValues: teams.map { ($0.teamId, $0.countryName) })
+            } catch {
+                print("[MatchDetail] Failed to fetch teams: \(error)")
+            }
+        }
+
+        for (poolId, entryId) in entries {
+            do {
+                let picks = try await apiService.fetchBracketPicks(poolId: poolId, entryId: entryId)
+                let isGroupMatch = match.groupLetter != nil
+
+                if isGroupMatch, let groupLetter = match.groupLetter {
+                    // Find predicted positions for both teams in this group
+                    let groupRankings = picks.groupRankings.filter { $0.groupLetter == groupLetter }
+                    let homeRanking = match.homeTeamId.flatMap { homeId in
+                        groupRankings.first { $0.teamId == homeId }
+                    }
+                    let awayRanking = match.awayTeamId.flatMap { awayId in
+                        groupRankings.first { $0.teamId == awayId }
+                    }
+
+                    cachedBracketPicks[entryId] = BracketPickInfo(
+                        homeTeamPosition: homeRanking?.predictedPosition,
+                        awayTeamPosition: awayRanking?.predictedPosition,
+                        homeTeamName: match.homeTeam?.countryName,
+                        awayTeamName: match.awayTeam?.countryName
+                    )
+                } else {
+                    // Knockout: find winner pick for this match
+                    let knockoutPick = picks.knockoutPicks.first { $0.matchId == match.matchId }
+                    if let pick = knockoutPick {
+                        let winnerName = cachedTeamNames[pick.winnerTeamId]
+                        let isCorrect: Bool? = match.isCompleted ? (match.winnerTeamId == pick.winnerTeamId) : nil
+
+                        cachedBracketPicks[entryId] = BracketPickInfo(
+                            predictedWinnerName: winnerName,
+                            predictedPenalty: pick.predictedPenalty,
+                            isCorrectWinner: isCorrect
+                        )
+                    } else {
+                        cachedBracketPicks[entryId] = BracketPickInfo()
+                    }
+                }
+            } catch {
+                print("[MatchDetail] Failed to fetch bracket picks for entry \(entryId): \(error)")
+            }
+        }
     }
 
     /// Batch fetch match-specific scores for all entries in a single API call.
@@ -277,11 +365,11 @@ final class MatchDetailViewModel {
 
     /// Rebuild the prediction infos using cached data and the current match state.
     private func rebuildPredictionInfos() {
-        let isCompleted = match.isCompleted || match.status == "completed" || match.status == "live"
         var allInfos: [MatchPredictionInfo] = []
 
         for entryId in cachedEntryIds {
-            let pred = cachedPredictions[entryId]
+            let isBP = cachedBracketPickerEntries.contains(entryId)
+            let pred = isBP ? nil : cachedPredictions[entryId]
             var points: Int? = nil
 
             // Use server-computed points from breakdown API
@@ -302,7 +390,9 @@ final class MatchDetailViewModel {
                 predictedAwayTeam: teams?.away,
                 teamsMatch: breakdown?.teamsMatch,
                 breakdownResultType: breakdown?.resultType,
-                breakdownPoints: breakdown?.points
+                breakdownPoints: breakdown?.points,
+                isBracketPicker: isBP,
+                bracketPick: cachedBracketPicks[entryId]
             ))
         }
 

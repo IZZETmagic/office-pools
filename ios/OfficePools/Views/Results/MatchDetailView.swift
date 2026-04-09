@@ -35,29 +35,27 @@ struct MatchDetailView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         matchInfo
-                            .entranceAnimation(sectionsAppeared, delay: 0.0)
+                            .entranceAnimation(sectionsAppeared, delay: sectionDelay(for: 0))
                         if !viewModel.groupStandings.isEmpty {
                             groupStandingsSection
-                                .entranceAnimation(sectionsAppeared, delay: 0.05)
+                                .entranceAnimation(sectionsAppeared, delay: sectionDelay(for: 1))
                         }
                         if let stats = viewModel.matchStats, stats.totalPredictions > 0 {
                             predictionStatsSection(stats)
-                                .entranceAnimation(sectionsAppeared, delay: 0.10)
+                                .entranceAnimation(sectionsAppeared, delay: sectionDelay(for: 2))
                         }
                         predictionsSection
-                            .entranceAnimation(sectionsAppeared, delay: 0.15)
+                            .entranceAnimation(sectionsAppeared, delay: sectionDelay(for: 3))
                     }
                     .padding(.top, headerHeight + 16)
                     .padding(.bottom, 24)
                 }
                 .background(Color.sp.snow)
-                .transition(.opacity)
             }
 
             // MARK: - Fixed Header (floats on top with glass)
             matchHeader
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if let userId = authService.appUser?.userId {
@@ -79,23 +77,38 @@ struct MatchDetailView: View {
 
     private func triggerEntranceAnimations() {
         guard !sectionsAppeared else { return }
-        withAnimation(.easeOut(duration: 0.45)) {
-            sectionsAppeared = true
+        // Short delay lets the layout settle after skeleton→content swap
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeOut(duration: 0.45)) {
+                sectionsAppeared = true
+            }
         }
+    }
+
+    /// Sequential delay based on visible section index, skipping gaps from hidden sections.
+    private func sectionDelay(for visualIndex: Int) -> Double {
+        var idx = 0
+        // 0: matchInfo (always visible)
+        if visualIndex == 0 { return Double(idx) * 0.06 }
+        idx += 1
+        // 1: groupStandings (conditional)
+        if !viewModel.groupStandings.isEmpty {
+            if visualIndex == 1 { return Double(idx) * 0.06 }
+            idx += 1
+        }
+        // 2: predictionStats (conditional)
+        if viewModel.matchStats != nil && (viewModel.matchStats?.totalPredictions ?? 0) > 0 {
+            if visualIndex == 2 { return Double(idx) * 0.06 }
+            idx += 1
+        }
+        // 3: predictionsSection (always visible)
+        return Double(idx) * 0.06
     }
 
     // MARK: - Match Header (Fixed)
 
     private var matchHeader: some View {
         VStack(spacing: 10) {
-            // Stage pill
-            Text(shortStageLabel)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.sp.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.sp.primary.opacity(0.1), in: Capsule())
-
             // Teams + Score/Time
             HStack(spacing: 0) {
                 // Home team
@@ -574,7 +587,11 @@ struct MatchDetailView: View {
 
                         // Entry rows
                         ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, info in
-                            predictionRow(info: info)
+                            if info.isBracketPicker {
+                                bracketPickerRow(info: info)
+                            } else {
+                                predictionRow(info: info)
+                            }
 
                             if index < group.entries.count - 1 {
                                 Rectangle()
@@ -674,6 +691,114 @@ struct MatchDetailView: View {
         .padding(.vertical, 10)
     }
 
+
+    // MARK: - Bracket Picker Row
+
+    private func bracketPickerRow(info: MatchPredictionInfo) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Top line: entry name + result badge (knockout only, when match finished)
+            HStack {
+                Text(info.entryName)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.sp.ink)
+
+                Spacer()
+
+                if isKnockout, let bp = info.bracketPick, bp.predictedWinnerName != nil, (isFinished || isLive) {
+                    if let correct = bp.isCorrectWinner {
+                        Text(correct ? "Correct" : "Miss")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(correct ? Color.sp.green.opacity(0.12) : Color.sp.red.opacity(0.10), in: Capsule())
+                            .foregroundStyle(correct ? Color.sp.green : Color.sp.red)
+                    }
+                }
+            }
+
+            // Bottom line: bracket pick details
+            HStack(spacing: 4) {
+                Spacer()
+
+                if let bp = info.bracketPick {
+                    if isKnockout {
+                        // Knockout: show predicted winner
+                        if let winner = bp.predictedWinnerName {
+                            Text("Winner:")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.slate)
+                            Text(winner)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.sp.ink)
+                            if bp.predictedPenalty {
+                                Text("(PSO)")
+                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.sp.primary)
+                            }
+                        } else {
+                            Text("No pick")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.silver)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 3)
+                                .background(Color.sp.mist.opacity(0.5), in: Capsule())
+                        }
+                    } else {
+                        // Group: show predicted positions for both teams
+                        if let homeName = bp.homeTeamName, let homePos = bp.homeTeamPosition {
+                            Text(homeName)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.sp.ink)
+                            Text(ordinal(homePos))
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.slate)
+                        }
+                        if bp.homeTeamPosition != nil && bp.awayTeamPosition != nil {
+                            Text("·")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.sp.mist)
+                        }
+                        if let awayName = bp.awayTeamName, let awayPos = bp.awayTeamPosition {
+                            Text(awayName)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.sp.ink)
+                            Text(ordinal(awayPos))
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.slate)
+                        }
+                        if bp.homeTeamPosition == nil && bp.awayTeamPosition == nil {
+                            Text("No picks")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.sp.silver)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 3)
+                                .background(Color.sp.mist.opacity(0.5), in: Capsule())
+                        }
+                    }
+                } else {
+                    Text("No picks")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.silver)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Color.sp.mist.opacity(0.5), in: Capsule())
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private func ordinal(_ n: Int) -> String {
+        let suffix: String
+        switch n {
+        case 1: suffix = "st"
+        case 2: suffix = "nd"
+        case 3: suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(n)\(suffix)"
+    }
 
     // MARK: - Result Badge
 

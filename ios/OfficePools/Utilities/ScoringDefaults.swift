@@ -14,6 +14,7 @@ struct ScoringDefaultsPayload: Codable {
     let knockoutCorrectResult: Int
 
     // Round multipliers
+    let round32Multiplier: Double
     let round16Multiplier: Double
     let quarterFinalMultiplier: Double
     let semiFinalMultiplier: Double
@@ -54,6 +55,7 @@ struct ScoringDefaultsPayload: Codable {
         case knockoutExactScore = "knockout_exact_score"
         case knockoutCorrectDifference = "knockout_correct_difference"
         case knockoutCorrectResult = "knockout_correct_result"
+        case round32Multiplier = "round_32_multiplier"
         case round16Multiplier = "round_16_multiplier"
         case quarterFinalMultiplier = "quarter_final_multiplier"
         case semiFinalMultiplier = "semi_final_multiplier"
@@ -88,8 +90,9 @@ struct ScoringDefaultsPayload: Codable {
         knockoutExactScore: 200,
         knockoutCorrectDifference: 150,
         knockoutCorrectResult: 100,
-        round16Multiplier: 1,
-        quarterFinalMultiplier: 2,
+        round32Multiplier: 1,
+        round16Multiplier: 2,
+        quarterFinalMultiplier: 3,
         semiFinalMultiplier: 4,
         thirdPlaceMultiplier: 4,
         finalMultiplier: 8,

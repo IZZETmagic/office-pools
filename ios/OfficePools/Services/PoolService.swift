@@ -378,7 +378,39 @@ final class PoolService {
             .execute()
             .value
 
-        return matches
+        // Strip knockout team assignments until all group matches are complete
+        let allGroupsComplete = matches
+            .filter { $0.stage == "group" }
+            .allSatisfy { $0.isCompleted }
+
+        guard !allGroupsComplete else { return matches }
+
+        return matches.map { m in
+            guard m.stage != "group" else { return m }
+            return Match(
+                matchId: m.matchId,
+                tournamentId: m.tournamentId,
+                matchNumber: m.matchNumber,
+                stage: m.stage,
+                groupLetter: m.groupLetter,
+                homeTeamId: nil,
+                awayTeamId: nil,
+                homeTeamPlaceholder: m.homeTeamPlaceholder,
+                awayTeamPlaceholder: m.awayTeamPlaceholder,
+                matchDate: m.matchDate,
+                venue: m.venue,
+                status: m.status,
+                homeScoreFt: m.homeScoreFt,
+                awayScoreFt: m.awayScoreFt,
+                homeScorePso: m.homeScorePso,
+                awayScorePso: m.awayScorePso,
+                winnerTeamId: m.winnerTeamId,
+                isCompleted: m.isCompleted,
+                completedAt: m.completedAt,
+                homeTeam: nil,
+                awayTeam: nil
+            )
+        }
     }
 
     /// Fetch only group-stage matches for a specific group (for standings calculation).

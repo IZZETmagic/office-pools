@@ -7,6 +7,7 @@ struct SplashView: View {
     @State private var logoOpacity: CGFloat = 0
     @State private var bobOffset: CGFloat = 0
     @State private var dotPhase: Int = 0
+    @State private var dotDirection: Int = 1
 
     private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
 
@@ -75,7 +76,9 @@ struct SplashView: View {
             }
         }
         .onReceive(timer) { _ in
-            dotPhase = (dotPhase + 1) % 3
+            if dotPhase == 2 { dotDirection = -1 }
+            else if dotPhase == 0 { dotDirection = 1 }
+            dotPhase += dotDirection
         }
     }
 }

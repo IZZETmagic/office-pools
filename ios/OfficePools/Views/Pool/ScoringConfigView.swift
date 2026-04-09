@@ -470,7 +470,7 @@ struct ScoringConfigView: View {
         koExact = d.knockoutExactScore
         koDiff = d.knockoutCorrectDifference
         koResult = d.knockoutCorrectResult
-        r32Mult = 1.0
+        r32Mult = d.round32Multiplier
         r16Mult = d.round16Multiplier
         qfMult = d.quarterFinalMultiplier
         sfMult = d.semiFinalMultiplier

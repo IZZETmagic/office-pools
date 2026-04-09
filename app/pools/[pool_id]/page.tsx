@@ -100,12 +100,30 @@ export default async function PoolPage({
     .eq('tournament_id', pool.tournament_id)
     .order('match_number', { ascending: true })
 
+  // Check if all group stage matches are completed
+  const allGroupsComplete = (matchesRes.data || [])
+    .filter((m: any) => m.stage === 'group')
+    .every((m: any) => m.is_completed)
+
   // Normalize team data (Supabase sometimes returns arrays for joins)
-  const matches: MatchData[] = (matchesRes.data || []).map((m: any) => ({
-    ...m,
-    home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
-    away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-  }))
+  // Strip knockout team assignments until all groups are complete
+  const matches: MatchData[] = (matchesRes.data || []).map((m: any) => {
+    const homeTeam = Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team
+    const awayTeam = Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team
+    const isKnockout = m.stage !== 'group'
+
+    if (isKnockout && !allGroupsComplete) {
+      return {
+        ...m,
+        home_team_id: null,
+        away_team_id: null,
+        home_team: null,
+        away_team: null,
+      }
+    }
+
+    return { ...m, home_team: homeTeam, away_team: awayTeam }
+  })
 
   // Process members: attach entries array and sort entries by entry_number
   const members = (membersRes.data || []).map((m: any) => {
