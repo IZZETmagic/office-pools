@@ -44,7 +44,7 @@ struct BracketPickerWizardView: View {
                     // Step content
                     stepContent
 
-                    Spacer().frame(height: 80)
+                    Spacer().frame(height: 120)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -97,11 +97,13 @@ struct BracketPickerWizardView: View {
         VStack(spacing: 8) {
             HStack {
                 Text(viewModel.currentStep.label)
-                    .font(.caption.weight(.bold))
+                    .font(SPTypography.detail)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
                 Text("Step \(viewModel.currentStep.rawValue + 1) of \(BPWizardStep.allCases.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             // Progress dots
@@ -112,9 +114,9 @@ struct BracketPickerWizardView: View {
 
                     RoundedRectangle(cornerRadius: 2)
                         .fill(
-                            isActive ? AppColors.success500 :
-                            isCompleted ? AppColors.success300 :
-                            Color(.systemGray4)
+                            isActive ? Color.sp.green :
+                            isCompleted ? Color.sp.green.opacity(0.4) :
+                            Color.sp.silver
                         )
                         .frame(height: 4)
                 }
@@ -130,28 +132,31 @@ struct BracketPickerWizardView: View {
         case .groupRankings:
             VStack(alignment: .leading, spacing: 4) {
                 Text("Rank Each Group")
-                    .font(.title2.weight(.bold))
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Text("Drag teams to predict the finishing order. Top 2 from each group advance.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         case .thirdPlace:
             VStack(alignment: .leading, spacing: 4) {
                 Text("Rank Third-Place Teams")
-                    .font(.title2.weight(.bold))
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Text("Drag to rank all 12 third-place teams. Top 8 qualify for the Round of 32.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         case .roundOf32, .roundOf16, .quarterFinals, .semiFinals, .thirdFinal:
             VStack(alignment: .leading, spacing: 4) {
                 Text(viewModel.currentStep.label)
-                    .font(.title2.weight(.bold))
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Text(knockoutDescription)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         case .review:
@@ -195,7 +200,8 @@ struct BracketPickerWizardView: View {
     private var reviewContent: some View {
         LazyVStack(spacing: 16) {
             Text("Review Your Bracket")
-                .font(.title2.weight(.bold))
+                .font(SPTypography.sectionHeader)
+                .foregroundStyle(Color.sp.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
 
@@ -216,8 +222,8 @@ struct BracketPickerWizardView: View {
             // Error message
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.error600)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -235,7 +241,7 @@ struct BracketPickerWizardView: View {
             VStack(spacing: 8) {
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(AppColors.accent400)
+                    .foregroundStyle(Color.sp.accent)
 
                 HStack(spacing: 8) {
                     if let flagStr = viewModel.teamMap[champion.teamId]?.flagUrl,
@@ -243,12 +249,13 @@ struct BracketPickerWizardView: View {
                         CachedAsyncImage(url: url, width: 40, height: 28, cornerRadius: 4)
                     }
                     Text(champion.teamName)
-                        .font(.title2.weight(.bold))
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                 }
 
                 Text("Your predicted champion")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 // Runner-up and third place
                 HStack(spacing: 24) {
@@ -256,26 +263,26 @@ struct BracketPickerWizardView: View {
                         HStack(spacing: 4) {
                             Text("2nd")
                                 .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                             if let flagStr = viewModel.teamMap[runnerUp.teamId]?.flagUrl,
                                let url = URL(string: flagStr) {
                                 CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
                             }
                             Text(runnerUp.teamName)
-                                .font(.caption.weight(.medium))
+                                .font(SPTypography.detail)
                         }
                     }
                     if let third = viewModel.bracket.thirdPlace {
                         HStack(spacing: 4) {
                             Text("3rd")
                                 .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                             if let flagStr = viewModel.teamMap[third.teamId]?.flagUrl,
                                let url = URL(string: flagStr) {
                                 CachedAsyncImage(url: url, width: 20, height: 14, cornerRadius: 2)
                             }
                             Text(third.teamName)
-                                .font(.caption.weight(.medium))
+                                .font(SPTypography.detail)
                         }
                     }
                 }
@@ -283,31 +290,31 @@ struct BracketPickerWizardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
-            .background(AppColors.accent400.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.accentLight)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(AppColors.accent400.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .strokeBorder(Color.sp.accent.opacity(0.3), lineWidth: 1)
             )
         } else {
             VStack(spacing: 8) {
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 24))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.sp.silver)
                 Text("No champion predicted yet")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
                 if !readOnly {
                     Button("Complete knockout picks") {
                         withAnimation { viewModel.currentStep = .roundOf32 }
                     }
-                    .font(.caption.weight(.medium))
+                    .font(SPTypography.detail)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.mist)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         }
     }
 
@@ -316,23 +323,24 @@ struct BracketPickerWizardView: View {
     private var progressCard: some View {
         HStack {
             Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(viewModel.isComplete ? AppColors.success500 : AppColors.warning500)
+                .foregroundStyle(viewModel.isComplete ? Color.sp.green : Color.sp.amber)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.progressText)
-                    .font(.headline)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
                 if !viewModel.isComplete {
                     let stepsRemaining = BPWizardStep.allCases.filter({ $0 != .review && !viewModel.canProceedFromStep($0) }).count
                     Text("\(stepsRemaining) \(stepsRemaining == 1 ? "step" : "steps") remaining")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
             Spacer()
         }
         .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color.sp.mist)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
     }
 
     // MARK: - Step Completion List
@@ -344,11 +352,12 @@ struct BracketPickerWizardView: View {
 
                 HStack {
                     Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                        .font(.subheadline)
-                        .foregroundStyle(isComplete ? AppColors.success500 : .secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(isComplete ? Color.sp.green : Color.sp.slate)
 
                     Text(step.label)
-                        .font(.subheadline)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.ink)
 
                     Spacer()
 
@@ -357,7 +366,7 @@ struct BracketPickerWizardView: View {
                             viewModel.currentStep = step
                         }
                     }
-                    .font(.caption.weight(.medium))
+                    .font(SPTypography.detail)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
@@ -369,11 +378,11 @@ struct BracketPickerWizardView: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
         )
     }
 
@@ -385,24 +394,25 @@ struct BracketPickerWizardView: View {
                 HStack(spacing: 6) {
                     if entry.hasSubmittedPredictions {
                         Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(AppColors.success500)
+                            .foregroundStyle(Color.sp.green)
                         Text("Submitted")
-                            .font(.caption.weight(.medium))
+                            .font(SPTypography.detail)
                     } else if entry.predictionsLocked {
                         Image(systemName: "lock.fill")
-                            .foregroundStyle(AppColors.warning500)
+                            .foregroundStyle(Color.sp.amber)
                         Text("Locked")
-                            .font(.caption.weight(.medium))
+                            .font(SPTypography.detail)
                     }
                 }
                 Spacer()
                 if let pts = readOnlyPoints {
                     Text("\(pts) pts")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 14, weight: .bold))
                 }
             } else {
                 Text(viewModel.progressText)
-                    .font(.caption.weight(.medium))
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.ink)
 
                 Spacer()
 
@@ -411,27 +421,27 @@ struct BracketPickerWizardView: View {
                         ProgressView()
                             .controlSize(.mini)
                         Text("Saving...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     } else if case .error(let msg) = viewModel.saveStatus {
                         Image(systemName: "exclamationmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.error500)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.red)
                         Text(msg)
-                            .font(.caption)
-                            .foregroundStyle(AppColors.error500)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.red)
                             .lineLimit(1)
                     } else if let lastSaved = viewModel.lastSavedAt {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.success500)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.green)
                         Text("Saved \(lastSaved.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     } else {
                         Text("Not saved yet")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
             }
@@ -456,10 +466,10 @@ struct BracketPickerWizardView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                            .font(.caption.weight(.semibold))
+                            .font(SPTypography.detail)
                         Text("Back")
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.body)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .glassButton()
@@ -477,9 +487,9 @@ struct BracketPickerWizardView: View {
                         HStack(spacing: 4) {
                             Text(next == .review ? "Review" : "Next")
                             Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
+                                .font(SPTypography.detail)
                         }
-                        .font(.subheadline.weight(.semibold))
+                        .font(SPTypography.cardTitle)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .glassButton()
@@ -496,14 +506,14 @@ struct BracketPickerWizardView: View {
                                 .tint(.white)
                         }
                         Text("Submit Predictions")
-                            .font(.subheadline.weight(.semibold))
+                            .font(SPTypography.cardTitle)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(viewModel.isComplete ? Color.accentColor : Color.gray)
+                    .background(viewModel.isComplete ? Color.sp.primary : Color.sp.silver)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: viewModel.isComplete ? Color.accentColor.opacity(0.3) : .clear, radius: 8, y: 4)
+                    .shadow(color: viewModel.isComplete ? Color.sp.primary.opacity(0.3) : .clear, radius: 8, y: 4)
                 }
                 .disabled(!viewModel.isComplete || viewModel.isSubmitting)
             } else if let next = nextStep {
@@ -519,9 +529,9 @@ struct BracketPickerWizardView: View {
                     HStack(spacing: 4) {
                         Text(next == .review ? "Review" : "Next Round")
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(SPTypography.detail)
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .modifier(BPNextRoundButtonStyle(isComplete: viewModel.canProceedFromStep(viewModel.currentStep)))
@@ -558,8 +568,8 @@ private struct BPNextRoundButtonStyle: ViewModifier {
         if isComplete {
             content
                 .foregroundStyle(.white)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
+                .background(Color.sp.primary, in: RoundedRectangle(cornerRadius: 14))
+                .shadow(color: Color.sp.primary.opacity(0.3), radius: 8, y: 4)
         } else {
             content
                 .glassButton()

@@ -21,18 +21,20 @@ struct BPKnockoutPickerView: View {
             // Progress
             HStack {
                 Text("\(pickedCount)")
-                    .font(.subheadline.weight(.bold))
+                    .font(SPTypography.body)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.sp.ink)
                 +
                 Text(" / \(stageMatches.count) matches picked")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundColor(Color.sp.slate)
 
                 Spacer()
 
                 if pickedCount == stageMatches.count && !stageMatches.isEmpty {
                     Label("All picked", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(AppColors.success500)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.green)
                 }
             }
             .padding(.horizontal)
@@ -41,11 +43,11 @@ struct BPKnockoutPickerView: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.systemGray5))
+                        .fill(Color.sp.mist)
                         .frame(height: 6)
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(pickedCount == stageMatches.count ? AppColors.success500 : AppColors.primary600)
+                        .fill(pickedCount == stageMatches.count ? Color.sp.green : Color.sp.primary)
                         .frame(
                             width: stageMatches.isEmpty ? 0 : geometry.size.width * CGFloat(pickedCount) / CGFloat(stageMatches.count),
                             height: 6
@@ -96,18 +98,18 @@ private struct BPMatchCard: View {
             // Match header
             HStack {
                 Text("Match \(match.matchNumber)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 Spacer()
 
                 if pick != nil {
                     Text("Picked")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(AppColors.success600)
+                        .foregroundStyle(Color.sp.green)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(AppColors.success100)
+                        .background(Color.sp.greenLight)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
@@ -132,7 +134,7 @@ private struct BPMatchCard: View {
 
                 Text("vs")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.sp.silver)
 
                 BPTeamButton(
                     team: awayTeam,
@@ -160,8 +162,8 @@ private struct BPMatchCard: View {
                     set: { _ in viewModel.togglePenalty(matchId: match.matchId) }
                 )) {
                     Text("Goes to penalties?")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -172,19 +174,19 @@ private struct BPMatchCard: View {
                     Spacer()
                     Text("Predicted penalties")
                         .font(.caption2)
-                        .foregroundStyle(AppColors.primary600)
+                        .foregroundStyle(Color.sp.primary)
                     Spacer()
                 }
                 .padding(.vertical, 6)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
                 .strokeBorder(
-                    match.stage == "final" ? AppColors.accent400.opacity(0.5) : Color(.systemGray4),
-                    lineWidth: match.stage == "final" ? 1.5 : 0.5
+                    match.stage == "final" ? Color.sp.accent.opacity(0.5) : Color.sp.silver,
+                    lineWidth: match.stage == "final" ? 1.5 : AppDesign.Border.thin
                 )
         )
         .opacity(bothResolved ? 1.0 : 0.5)
@@ -220,19 +222,19 @@ private struct BPTeamButton: View {
                     CachedAsyncImage(url: url, width: 28, height: 20, cornerRadius: 3)
                 } else {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(.systemGray4))
+                        .fill(Color.sp.silver)
                         .frame(width: 28, height: 20)
                         .overlay {
                             Text("?")
                                 .font(.system(size: 8))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                         }
                 }
 
                 // Name
                 Text(displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(isTBD ? .secondary : .primary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(isTBD ? Color.sp.slate : Color.sp.ink)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
@@ -241,7 +243,7 @@ private struct BPTeamButton: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.body)
-                        .foregroundStyle(AppColors.success500)
+                        .foregroundStyle(Color.sp.green)
                 }
             }
             .padding(.horizontal, 10)
@@ -249,12 +251,12 @@ private struct BPTeamButton: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? AppColors.success100 : Color(.systemGray6))
+                    .fill(isSelected ? Color.sp.greenLight : Color.sp.mist)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(
-                        isSelected ? AppColors.success500 : Color.clear,
+                        isSelected ? Color.sp.green : Color.clear,
                         lineWidth: 2
                     )
             )

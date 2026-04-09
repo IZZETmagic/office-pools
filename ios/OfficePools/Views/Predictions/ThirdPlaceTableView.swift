@@ -12,12 +12,13 @@ struct ThirdPlaceTableView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Third-Place Rankings")
-                .font(.subheadline.weight(.semibold))
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
 
             if rankedThirds.isEmpty {
                 Text("Complete group predictions to see third-place rankings.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                     .padding(.vertical, 8)
             } else {
                 VStack(spacing: 0) {
@@ -29,11 +30,11 @@ struct ThirdPlaceTableView: View {
                         }
                     }
                 }
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                        .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
                 )
             }
         }
@@ -59,10 +60,10 @@ struct ThirdPlaceTableView: View {
                 .frame(width: 60, alignment: .center)
         }
         .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.sp.slate)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color(.systemGray6))
+        .background(Color.sp.mist)
     }
 
     // MARK: - Row
@@ -86,13 +87,13 @@ struct ThirdPlaceTableView: View {
                 .frame(width: 28, alignment: .center)
             Text(advances ? "Advance" : "Eliminated")
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(advances ? AppColors.success600 : AppColors.error600)
+                .foregroundStyle(advances ? Color.sp.green : Color.sp.red)
                 .frame(width: 60, alignment: .center)
         }
-        .font(.caption.monospacedDigit())
+        .font(SPTypography.mono(size: 12))
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(advances ? AppColors.success500.opacity(0.06) : AppColors.error500.opacity(0.06))
+        .background(advances ? Color.sp.greenLight : Color.sp.redLight)
     }
 
     // MARK: - Helpers

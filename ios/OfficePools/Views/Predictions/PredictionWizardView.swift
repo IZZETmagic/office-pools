@@ -52,8 +52,8 @@ private struct NextRoundButtonStyle: ViewModifier {
         if isComplete {
             content
                 .foregroundStyle(.white)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
+                .background(Color.sp.primary, in: RoundedRectangle(cornerRadius: 14))
+                .shadow(color: Color.sp.primary.opacity(0.3), radius: 8, y: 4)
         } else {
             content
                 .glassButton()
@@ -98,7 +98,8 @@ struct PredictionWizardView: View {
                     if currentStage != .summary || readOnly {
                         HStack(alignment: .firstTextBaseline) {
                             Text(currentStage == .summary && readOnly ? "Summary" : currentStage.label)
-                                .font(.title2.weight(.bold))
+                                .font(SPTypography.sectionHeader)
+                                .foregroundStyle(Color.sp.ink)
 
                             Spacer()
 
@@ -113,8 +114,8 @@ struct PredictionWizardView: View {
                                     }
                                 } label: {
                                     Text(groupsExpanded.count == GROUP_LETTERS.count ? "Collapse All" : "Expand All")
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(Color.accentColor)
+                                        .font(SPTypography.body)
+                                        .foregroundStyle(Color.sp.primary)
                                 }
                             }
                         }
@@ -126,7 +127,7 @@ struct PredictionWizardView: View {
                     stageContent
 
                     // Bottom inset so content can scroll above the glass nav bar
-                    Spacer().frame(height: 80)
+                    Spacer().frame(height: 120)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -190,19 +191,19 @@ struct PredictionWizardView: View {
             HStack(spacing: 6) {
                 if entry.hasSubmittedPredictions {
                     Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(AppColors.success500)
+                        .foregroundStyle(Color.sp.green)
                     Text("Submitted")
-                        .font(.caption.weight(.medium))
+                        .font(SPTypography.detail)
                 } else if entry.predictionsLocked {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(AppColors.warning500)
+                        .foregroundStyle(Color.sp.amber)
                     Text("Locked")
-                        .font(.caption.weight(.medium))
+                        .font(SPTypography.detail)
                 } else {
                     Image(systemName: "clock.badge.exclamationmark")
-                        .foregroundStyle(AppColors.error500)
+                        .foregroundStyle(Color.sp.red)
                     Text("Deadline Passed")
-                        .font(.caption.weight(.medium))
+                        .font(SPTypography.detail)
                 }
             }
 
@@ -210,7 +211,7 @@ struct PredictionWizardView: View {
 
             if let pts = readOnlyPoints {
                 Text("\(pts) pts")
-                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .font(SPTypography.mono(size: 14, weight: .bold))
             }
         }
         .padding(.horizontal)
@@ -227,20 +228,21 @@ struct PredictionWizardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(AppColors.accent400)
+                        .foregroundStyle(Color.sp.accent)
                     Text(champion.teamName)
-                        .font(.title2.weight(.bold))
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                     Text("Your predicted champion")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
-                .background(AppColors.accent400.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color.sp.accentLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(AppColors.accent400.opacity(0.3), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                        .strokeBorder(Color.sp.accent.opacity(0.3), lineWidth: 1)
                 )
                 .padding(.horizontal)
             }
@@ -254,11 +256,11 @@ struct PredictionWizardView: View {
                     }
                 }
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
             )
             .padding(.horizontal)
 
@@ -272,22 +274,23 @@ struct PredictionWizardView: View {
 
         return HStack {
             Image(systemName: "checkmark.circle.fill")
-                .font(.subheadline)
-                .foregroundStyle(AppColors.success500)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.green)
 
             Text(stage.label)
-                .font(.subheadline)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.ink)
 
             Spacer()
 
             Text("\(counts.completed)/\(counts.total)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(SPTypography.mono(size: 12))
+                .foregroundStyle(Color.sp.slate)
 
             Button("View") {
                 currentStage = stage
             }
-            .font(.caption.weight(.medium))
+            .font(SPTypography.detail)
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
@@ -304,20 +307,21 @@ struct PredictionWizardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(AppColors.accent400)
+                        .foregroundStyle(Color.sp.accent)
                     Text(champion.teamName)
-                        .font(.title2.weight(.bold))
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                     Text("Your predicted champion")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
-                .background(AppColors.accent400.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color.sp.accentLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(AppColors.accent400.opacity(0.3), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                        .strokeBorder(Color.sp.accent.opacity(0.3), lineWidth: 1)
                 )
                 .padding(.horizontal)
             }
@@ -325,22 +329,23 @@ struct PredictionWizardView: View {
             // Overall progress
             HStack {
                 Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                    .foregroundStyle(viewModel.isComplete ? AppColors.success500 : AppColors.warning500)
+                    .foregroundStyle(viewModel.isComplete ? Color.sp.green : Color.sp.amber)
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(viewModel.progressText)
-                        .font(.headline)
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
                     if !viewModel.isComplete {
                         Text("\(viewModel.totalCount - viewModel.completedCount) predictions remaining")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
                 Spacer()
             }
             .padding()
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.sp.mist)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .padding(.horizontal)
 
             // Stage completion list with edit buttons
@@ -352,19 +357,19 @@ struct PredictionWizardView: View {
                     }
                 }
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
             )
             .padding(.horizontal)
 
             // Error message
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.error600)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -380,22 +385,23 @@ struct PredictionWizardView: View {
 
         return HStack {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                .font(.subheadline)
-                .foregroundStyle(isComplete ? AppColors.success500 : .secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(isComplete ? Color.sp.green : Color.sp.slate)
 
             Text(stage.label)
-                .font(.subheadline)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.ink)
 
             Spacer()
 
             Text("\(counts.completed)/\(counts.total)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(SPTypography.mono(size: 12))
+                .foregroundStyle(Color.sp.slate)
 
             Button("Edit") {
                 currentStage = stage
             }
-            .font(.caption.weight(.medium))
+            .font(SPTypography.detail)
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
@@ -408,7 +414,8 @@ struct PredictionWizardView: View {
     private var saveStatusBar: some View {
         HStack {
             Text(viewModel.progressText)
-                .font(.caption.weight(.medium))
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.ink)
 
             Spacer()
 
@@ -417,27 +424,27 @@ struct PredictionWizardView: View {
                     ProgressView()
                         .controlSize(.mini)
                     Text("Saving...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 } else if case .error(let msg) = viewModel.saveStatus {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.error500)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.red)
                     Text(msg)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.error500)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.red)
                         .lineLimit(1)
                 } else if let lastSaved = viewModel.lastSavedAt {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.success500)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.green)
                     Text("Saved \(lastSaved.formatted(date: .omitted, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 } else {
                     Text("Not saved yet")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
         }
@@ -461,10 +468,10 @@ struct PredictionWizardView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                            .font(.caption.weight(.semibold))
+                            .font(SPTypography.detail)
                         Text("Back")
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.body)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .glassButton()
@@ -483,9 +490,9 @@ struct PredictionWizardView: View {
                         HStack(spacing: 4) {
                             Text(next == .summary ? "Summary" : "Next")
                             Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
+                                .font(SPTypography.detail)
                         }
-                        .font(.subheadline.weight(.semibold))
+                        .font(SPTypography.cardTitle)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .glassButton()
@@ -502,14 +509,14 @@ struct PredictionWizardView: View {
                                 .tint(.white)
                         }
                         Text("Submit Predictions")
-                            .font(.subheadline.weight(.semibold))
+                            .font(SPTypography.cardTitle)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(viewModel.isComplete ? Color.accentColor : Color.gray)
+                    .background(viewModel.isComplete ? Color.sp.primary : Color.sp.silver)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: viewModel.isComplete ? Color.accentColor.opacity(0.3) : .clear, radius: 8, y: 4)
+                    .shadow(color: viewModel.isComplete ? Color.sp.primary.opacity(0.3) : .clear, radius: 8, y: 4)
                 }
                 .disabled(!viewModel.isComplete || viewModel.isSubmitting)
             } else if let next = nextStage {
@@ -521,9 +528,9 @@ struct PredictionWizardView: View {
                     HStack(spacing: 4) {
                         Text(next == .summary ? "Summary" : "Next Round")
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(SPTypography.detail)
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .modifier(NextRoundButtonStyle(isComplete: viewModel.isStageComplete(currentStage)))

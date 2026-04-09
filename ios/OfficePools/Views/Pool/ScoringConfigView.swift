@@ -118,7 +118,7 @@ struct ScoringConfigView: View {
                 }
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
         .navigationTitle("Scoring Configuration")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
@@ -132,8 +132,8 @@ struct ScoringConfigView: View {
                 Button("Reset") {
                     showResetAlert = true
                 }
-                .font(.subheadline)
-                .foregroundStyle(AppColors.error600)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.red)
             }
         }
         .alert("Reset to Defaults", isPresented: $showResetAlert) {
@@ -151,16 +151,16 @@ struct ScoringConfigView: View {
             if let msg = saveMessage {
                 HStack(spacing: 8) {
                     Image(systemName: msg.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                     Text(msg.text)
-                        .font(.subheadline.weight(.medium))
+                        .font(SPTypography.body)
                 }
-                .foregroundStyle(msg.isError ? AppColors.error600 : AppColors.success600)
+                .foregroundStyle(msg.isError ? Color.sp.red : Color.sp.green)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
-                .background((msg.isError ? AppColors.error600 : AppColors.success600).opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .background((msg.isError ? Color.sp.redLight : Color.sp.greenLight))
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
 
             if hasChanges {
@@ -173,17 +173,17 @@ struct ScoringConfigView: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                                 .padding(.trailing, 4)
-                                .tint(AppColors.primary700)
+                                .tint(Color.sp.primary)
                         }
                         Text("Save Changes")
-                            .fontWeight(.semibold)
+                            .font(SPTypography.cardTitle)
                         Spacer()
                     }
                     .padding(.vertical, 12)
-                    .background { AppColors.primary500.opacity(0.2) }
+                    .background { Color.sp.primary.opacity(0.2) }
                     .background(.ultraThinMaterial)
-                    .foregroundStyle(AppColors.primary700)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(Color.sp.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 }
                 .buttonStyle(.plain)
                 .disabled(isSaving)
@@ -215,8 +215,8 @@ struct ScoringConfigView: View {
             Divider().padding(.vertical, 4)
 
             Text("Round Multipliers")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.slate)
 
             multiplierField("Round of 32", value: $r32Mult)
             multiplierField("Round of 16", value: $r16Mult)
@@ -231,7 +231,8 @@ struct ScoringConfigView: View {
         card {
             HStack {
                 Text("Penalty Shootout")
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
                 Toggle("", isOn: $psoEnabled)
                     .labelsHidden()
@@ -244,8 +245,8 @@ struct ScoringConfigView: View {
                 pointsField("Correct Result", value: $psoResult)
             } else {
                 Text("Penalty shootout scoring is disabled.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
         }
     }
@@ -290,16 +291,15 @@ struct ScoringConfigView: View {
             content()
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func sectionHeader(_ title: String) -> some View {
         VStack(spacing: 10) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             Divider()
@@ -309,22 +309,22 @@ struct ScoringConfigView: View {
     private func pointsField(_ label: String, value: Binding<Int>) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             HStack(spacing: 6) {
                 TextField("0", value: value, format: .number)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
-                    .font(.subheadline.weight(.bold))
+                    .font(SPTypography.mono(size: 14, weight: .bold))
                     .frame(width: 64)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 10)
-                    .background(Color(.tertiarySystemFill))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.mist)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 Text("pts")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.silver)
             }
         }
     }
@@ -332,22 +332,22 @@ struct ScoringConfigView: View {
     private func multiplierField(_ label: String, value: Binding<Double>) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             HStack(spacing: 6) {
                 Text("×")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.silver)
                 TextField("1", value: value, format: .number)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
-                    .font(.subheadline.weight(.bold))
+                    .font(SPTypography.mono(size: 14, weight: .bold))
                     .frame(width: 54)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 10)
-                    .background(Color(.tertiarySystemFill))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.mist)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
     }

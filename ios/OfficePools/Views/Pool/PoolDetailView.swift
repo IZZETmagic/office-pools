@@ -5,7 +5,7 @@ enum PoolTab: String, CaseIterable {
     case leaderboard = "Leaderboard"
     case form = "Form"
     case banter = "Banter"
-    case rules = "Rules"
+    case scoring = "Scoring"
     case rounds = "Rounds"
     case members = "Members"
     case settings = "Settings"
@@ -16,7 +16,7 @@ enum PoolTab: String, CaseIterable {
         case .leaderboard: return "trophy"
         case .form: return "chart.bar.xaxis"
         case .banter: return "bubble.left.and.bubble.right"
-        case .rules: return "list.number"
+        case .scoring: return "list.number"
         case .rounds: return "calendar.badge.clock"
         case .members: return "person.3"
         case .settings: return "gearshape"
@@ -166,8 +166,8 @@ struct PoolDetailView: View {
                         .frame(width: 60, height: 60)
                         .background(
                             Circle()
-                                .fill(AppColors.primary500)
-                                .shadow(color: AppColors.primary500.opacity(banterPulse ? 0.8 : 0.4), radius: banterGlowRadius, y: 6)
+                                .fill(Color.sp.primary)
+                                .shadow(color: Color.sp.primary.opacity(banterPulse ? 0.8 : 0.4), radius: banterGlowRadius, y: 6)
                         )
                         .overlay(
                             Circle()
@@ -183,7 +183,7 @@ struct PoolDetailView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(AppColors.error500, in: Capsule())
+                            .background(Color.sp.red, in: Capsule())
                             .offset(x: 4, y: -4)
                             .transition(.scale.combined(with: .opacity))
                     }
@@ -198,6 +198,18 @@ struct PoolDetailView: View {
         mainContent
         .navigationTitle(viewModel.pool?.poolName ?? "Pool")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let pool = viewModel.pool, pool.status == "open" {
+                    ShareLink(
+                        item: "Join my prediction pool \"\(pool.poolName)\" on SportPool!\n\nhttps://sportpool.io/join/\(pool.poolCode)"
+                    ) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+            }
+        }
         .navigationDestination(for: Member.self) { member in
             MemberDetailView(
                 member: member,
@@ -209,7 +221,10 @@ struct PoolDetailView: View {
                 currentUserIsAdmin: viewModel.isAdmin,
                 onAdjustmentChanged: {
                     Task { await viewModel.refreshLeaderboard() }
-                }
+                },
+                matches: viewModel.matches,
+                teams: viewModel.teams,
+                pool: viewModel.pool
             )
         }
         .sheet(isPresented: $showingBanter) {
@@ -305,8 +320,8 @@ struct PoolDetailView: View {
                             }
                         } label: {
                             Text(tab.rawValue)
-                                .font(.subheadline.weight(selectedTab == tab ? .bold : .regular))
-                                .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                                .font(SPTypography.cardTitle)
+                                .foregroundStyle(selectedTab == tab ? Color.sp.primary : Color.sp.slate)
                         }
                         .buttonStyle(.plain)
                         .id(tab)
@@ -391,7 +406,7 @@ struct PoolDetailView: View {
                     )
                 }
 
-            case .rules:
+            case .scoring:
                 ScoringRulesTabView(
                     pool: viewModel.pool,
                     settings: viewModel.settings
@@ -434,7 +449,7 @@ struct PoolDetailView: View {
     }
 
     private var visibleTabs: [PoolTab] {
-        var tabs: [PoolTab] = [.leaderboard, .predictions, .form, .rules]
+        var tabs: [PoolTab] = [.leaderboard, .predictions, .form, .scoring]
         if viewModel.isAdmin {
             // Show Rounds tab for progressive pool admins
             if viewModel.pool?.predictionMode == .progressive {

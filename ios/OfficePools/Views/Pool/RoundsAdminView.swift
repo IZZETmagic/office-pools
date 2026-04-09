@@ -17,7 +17,7 @@ struct RoundsAdminView: View {
     // Open round sheet
     @State private var showOpenSheet = false
     @State private var roundToOpen: PoolRoundState?
-    @State private var openDeadline = Date().addingTimeInterval(48 * 3600) // Default: 48 hours from now
+    @State private var openDeadline = Date().addingTimeInterval(48 * 3600)
 
     // Extend deadline sheet
     @State private var showExtendSheet = false
@@ -43,7 +43,7 @@ struct RoundsAdminView: View {
             }
             .padding(.horizontal, 16)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -71,7 +71,8 @@ struct RoundsAdminView: View {
             // Header
             HStack {
                 Text(round.roundKey.displayName)
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
 
                 Spacer()
 
@@ -82,11 +83,11 @@ struct RoundsAdminView: View {
             if let data = roundData {
                 HStack(spacing: 4) {
                     Image(systemName: "sportscourt")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.sp.slate)
                     Text("\(data.completedMatchCount ?? 0)/\(data.matchCount ?? 0) matches completed")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
@@ -94,11 +95,11 @@ struct RoundsAdminView: View {
             if let deadline = round.deadline {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Deadline: \(formatDate(deadline))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.sp.slate)
+                    Text("Deadline: \(SPDateFormatter.long(deadline))")
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
@@ -106,11 +107,11 @@ struct RoundsAdminView: View {
             if let stats = roundData?.adminStats {
                 HStack(spacing: 4) {
                     Image(systemName: "person.3")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.sp.slate)
                     Text("\(stats.submittedEntries)/\(stats.totalEntries) entries submitted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
@@ -125,62 +126,62 @@ struct RoundsAdminView: View {
                         showOpenSheet = true
                     } label: {
                         Label("Open Round", systemImage: "lock.open")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.body)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.accentColor)
+                    .tint(Color.sp.primary)
                     .disabled(isLoading)
 
                 case .open:
                     Button {
                         roundToExtend = round
-                        if let deadline = round.deadline, let d = parseISO(deadline) {
+                        if let deadline = round.deadline, let d = SPDateFormatter.parse(deadline) {
                             extendDeadline = d.addingTimeInterval(24 * 3600)
                         }
                         showExtendSheet = true
                     } label: {
                         Label("Extend", systemImage: "clock.arrow.circlepath")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.body)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.orange)
+                    .tint(Color.sp.amber)
 
                     Button {
                         Task { await closeRound(round) }
                     } label: {
                         Label("Close", systemImage: "lock")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.body)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.red)
+                    .tint(Color.sp.red)
 
                     Button {
                         Task { await completeRound(round) }
                     } label: {
                         Label("Complete", systemImage: "checkmark.circle")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.body)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.green)
+                    .tint(Color.sp.green)
 
                 case .inProgress:
                     Button {
                         Task { await completeRound(round) }
                     } label: {
                         Label("Complete Round", systemImage: "checkmark.circle")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.body)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.green)
+                    .tint(Color.sp.green)
                     .disabled(isLoading)
 
                 case .completed:
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(AppColors.success500)
+                            .foregroundStyle(Color.sp.green)
                         Text("Round completed")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
 
@@ -193,9 +194,7 @@ struct RoundsAdminView: View {
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     // MARK: - State Badge
@@ -203,15 +202,15 @@ struct RoundsAdminView: View {
     private func stateBadge(_ state: RoundStateValue) -> some View {
         let (text, color): (String, Color) = {
             switch state {
-            case .locked: return ("Locked", Color(.systemGray))
-            case .open: return ("Open", .green)
-            case .inProgress: return ("In Progress", .orange)
-            case .completed: return ("Completed", .blue)
+            case .locked: return ("Locked", Color.sp.silver)
+            case .open: return ("Open", Color.sp.green)
+            case .inProgress: return ("In Progress", Color.sp.amber)
+            case .completed: return ("Completed", Color.sp.primary)
             }
         }()
 
         return Text(text)
-            .font(.caption.weight(.semibold))
+            .font(SPTypography.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(color.opacity(0.12))
@@ -236,8 +235,8 @@ struct RoundsAdminView: View {
                 if let round = roundToOpen {
                     Section {
                         Text("Opening \(round.roundKey.displayName) will allow users to submit predictions until the deadline.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
             }
@@ -390,23 +389,5 @@ struct RoundsAdminView: View {
             showError = true
         }
         isLoading = false
-    }
-
-    // MARK: - Helpers
-
-    private func formatDate(_ iso: String) -> String {
-        guard let date = parseISO(iso) else { return iso }
-        let df = DateFormatter()
-        df.dateStyle = .medium
-        df.timeStyle = .short
-        return df.string(from: date)
-    }
-
-    private func parseISO(_ string: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
     }
 }

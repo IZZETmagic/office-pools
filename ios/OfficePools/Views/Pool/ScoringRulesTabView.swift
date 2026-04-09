@@ -32,7 +32,7 @@ struct ScoringRulesTabView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
     }
 
     // MARK: - Group Stage
@@ -58,8 +58,8 @@ struct ScoringRulesTabView: View {
             Divider().padding(.vertical, 4)
 
             Text("Round Multipliers")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.slate)
 
             multiplierRow("Round of 32", value: s.round32Multiplier)
             multiplierRow("Round of 16", value: s.round16Multiplier)
@@ -99,16 +99,15 @@ struct ScoringRulesTabView: View {
             content()
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func sectionHeader(_ title: String) -> some View {
         VStack(spacing: 10) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             Divider()
@@ -118,11 +117,12 @@ struct ScoringRulesTabView: View {
     private func scoreRow(_ label: String, pts: Int) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text("\(pts) pts")
-                .font(.subheadline.weight(.bold))
+                .font(SPTypography.mono(size: 14, weight: .bold))
+                .foregroundStyle(Color.sp.ink)
         }
     }
 
@@ -130,11 +130,12 @@ struct ScoringRulesTabView: View {
         let displayValue: String = value == Double(Int(value)) ? "×\(Int(value))" : String(format: "×%.1f", value)
         return HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text(displayValue)
-                .font(.subheadline.weight(.bold))
+                .font(SPTypography.mono(size: 14, weight: .bold))
+                .foregroundStyle(Color.sp.ink)
         }
     }
 

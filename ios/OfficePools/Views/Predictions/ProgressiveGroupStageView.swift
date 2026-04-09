@@ -12,7 +12,7 @@ struct ProgressiveGroupStageView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            LazyVStack(spacing: 12) {
+            VStack(spacing: 12) {
                 ForEach(GROUP_LETTERS, id: \.self) { letter in
                     groupSection(letter: letter)
                 }
@@ -93,12 +93,13 @@ struct ProgressiveGroupStageView: View {
             } label: {
                 HStack {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                         .frame(width: 16)
 
                     Text("Group \(letter)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
 
                     Spacer()
 
@@ -111,7 +112,7 @@ struct ProgressiveGroupStageView: View {
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 14)
-                .background(Color(.systemBackground))
+                .background(Color.white)
             }
             .buttonStyle(.plain)
 
@@ -149,11 +150,11 @@ struct ProgressiveGroupStageView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
         )
         .padding(.horizontal)
     }
@@ -170,15 +171,15 @@ private struct ProgressiveGroupProgressRing: View {
     }
 
     private var ringColor: Color {
-        if completed == total && total > 0 { return AppColors.success500 }
-        if completed > 0 { return AppColors.warning500 }
-        return Color(.systemGray3)
+        if completed == total && total > 0 { return Color.sp.green }
+        if completed > 0 { return Color.sp.amber }
+        return Color.sp.silver
     }
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color(.systemGray4), lineWidth: 2.5)
+                .stroke(Color.sp.silver, lineWidth: 2.5)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(ringColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
@@ -200,7 +201,7 @@ private struct ProgressivePredictionMatchCard: View {
     var focusedField: FocusState<ScoreFieldID?>.Binding?
     var onAwayScoreEntered: (() -> Void)?
 
-    @State private var blueOpacity: Double = 0.06
+    @State private var pulseScale: CGFloat = 1.0
     @State private var isPulsing = false
 
     private var isMatchComplete: Bool {
@@ -226,30 +227,27 @@ private struct ProgressivePredictionMatchCard: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isMatchComplete
-                    ? Color.accentColor.opacity(blueOpacity)
-                    : Color(.secondarySystemGroupedBackground))
+                .fill(isMatchComplete ? Color.sp.primaryLight : Color.clear)
         )
+        .scaleEffect(pulseScale)
         .padding(.horizontal, 10)
         .onChange(of: isMatchComplete) { oldVal, newVal in
             if newVal && !oldVal && !isPulsing {
                 triggerHeartbeatPulse()
-            } else if !newVal {
-                blueOpacity = 0.06
             }
         }
     }
 
     private func triggerHeartbeatPulse() {
         isPulsing = true
-        withAnimation(.easeOut(duration: 0.25)) {
-            blueOpacity = 0.11
+        withAnimation(.easeOut(duration: 0.15)) {
+            pulseScale = 1.03
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            withAnimation(.easeIn(duration: 0.4)) {
-                blueOpacity = 0.06
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                pulseScale = 1.0
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 isPulsing = false
             }
         }

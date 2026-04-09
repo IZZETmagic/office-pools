@@ -41,6 +41,7 @@
 		2758E4ACD3B58AD60996D7F7 /* BracketResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D963D2BE777C4AD6927F154E /* BracketResolver.swift */; };
 		28783A43DFFE4A309BBAA6F5 /* MemberDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740B5466C26BF065E7C8AC57 /* MemberDetailView.swift */; };
 		29214CE747D53385F76CC3B3 /* PoolService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC0D1E36A1D5C92393D86E9 /* PoolService.swift */; };
+		293B55DCA467BA132B30CA89 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6432B3A35CC67BF8B7420B0 /* ProfileViewModel.swift */; };
 		2D070CCDB5068866F3D8AD2A /* ResultsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C47B7E2E0B2B95292A9A6EF4 /* ResultsTabView.swift */; };
 		304BFDB53ABE1FC429D5F3C8 /* BPKnockoutPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BA3AF28B8FE0FF414D9414 /* BPKnockoutPickerView.swift */; };
 		33F8AEB03F70499F7A0FF753 /* LeaderboardTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BF321B5CEEE61D562773E8 /* LeaderboardTabView.swift */; };
@@ -72,7 +73,6 @@
 		6D4E7462137992438390181B /* RefereeTipCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CFFF6F05E1E75D5BDAB0BA /* RefereeTipCard.swift */; };
 		6F4E5FD8BA552BAF2420A07D /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B9C6A02689ACEEF59BB45E0 /* SplashView.swift */; };
 		71F1A46CAAA1B71B9EB590C6 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */; };
-		PROF1LEVM001B2C3D4E5F6A7 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = PROF1LEVM008A9B0C1D2E3F4 /* ProfileViewModel.swift */; };
 		7276281152317917EA129B7B /* ActionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DBB0558007ECEFBD484FD2 /* ActionBanner.swift */; };
 		7397C2661E5725B3D45E0D16 /* BracketPickerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465265B9D4513B8F6BD66682 /* BracketPickerModels.swift */; };
 		750F57AC9FC1B256C0BEDD22 /* ActivityItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E68AD5A025771F5F0F731A8 /* ActivityItem.swift */; };
@@ -156,7 +156,6 @@
 		2CE89DF7095D83F2A823580E /* GroupStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupStageView.swift; sourceTree = "<group>"; };
 		2E7FC8110DDBBC516AF45D02 /* KnockoutStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnockoutStageView.swift; sourceTree = "<group>"; };
 		2EB43957E22AEFCF51890705 /* PoolDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolDetailViewModel.swift; sourceTree = "<group>"; };
-		PROF1LEVM008A9B0C1D2E3F4 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		37E100279F2F6FECA8094A91 /* BracketPickerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerViewModel.swift; sourceTree = "<group>"; };
 		385F4D63EECE25D0D5D05FDE /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		392CF4F951C4254AE102FCBE /* AppColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppColors.swift; sourceTree = "<group>"; };
@@ -208,6 +207,7 @@
 		9CADCDFDB4455B5405418782 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A304B08578A079A4A78E83E2 /* ActivitySkeletonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySkeletonView.swift; sourceTree = "<group>"; };
 		A5BF321B5CEEE61D562773E8 /* LeaderboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardTabView.swift; sourceTree = "<group>"; };
+		A6432B3A35CC67BF8B7420B0 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		A874EBF6322D7B78AEDA563C /* RoundsAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundsAdminView.swift; sourceTree = "<group>"; };
 		A9D1CBD1E789FD6835F30ABE /* OfficePools.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OfficePools.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ADC5B571B2AC59945F099757 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
@@ -513,8 +513,8 @@
 				F81B7B2FDDA3FF45C8CFBFD5 /* MatchDetailViewModel.swift */,
 				2EB43957E22AEFCF51890705 /* PoolDetailViewModel.swift */,
 				65DB42B956F5E96A77FD2978 /* PredictionEditViewModel.swift */,
-				PROF1LEVM008A9B0C1D2E3F4 /* ProfileViewModel.swift */,
 				F3009B629BA8F9FA7608EF3F /* PredictionsViewModel.swift */,
+				A6432B3A35CC67BF8B7420B0 /* ProfileViewModel.swift */,
 				07630FC7110C6831BA805EB1 /* ProgressivePredictionEditViewModel.swift */,
 				3EA09C4D945E009F77CF091E /* ResultsViewModel.swift */,
 			);
@@ -697,13 +697,13 @@
 				089AD1C43301DCB4564653CD /* PoolsView.swift in Sources */,
 				EE1FF9B51C9A8C26241D9C9E /* Prediction.swift in Sources */,
 				D865931B0A51B6FA13C58991 /* PredictionEditViewModel.swift in Sources */,
-				PROF1LEVM001B2C3D4E5F6A7 /* ProfileViewModel.swift in Sources */,
 				57273C144ABCE86F15056557 /* PredictionService.swift in Sources */,
 				F7E168AB4097AA16CF7FAA03 /* PredictionSummaryView.swift in Sources */,
 				89D8B4049A47886F16D3B54E /* PredictionWizardView.swift in Sources */,
 				0F677B24FCD615DC31A0ECB7 /* PredictionsTabView.swift in Sources */,
 				45C3C7C8B58068A2CAA3430F /* PredictionsViewModel.swift in Sources */,
 				A3DD9C4000206052C3089EA0 /* ProfileView.swift in Sources */,
+				293B55DCA467BA132B30CA89 /* ProfileViewModel.swift in Sources */,
 				ACBCCF935A16BD5E924ADB5A /* ProgressiveGroupStageView.swift in Sources */,
 				7726A187BEFB0DAB812A688D /* ProgressivePredictionEditViewModel.swift in Sources */,
 				ECA8645DCBD5281A65788A04 /* ProgressivePredictionWizardView.swift in Sources */,

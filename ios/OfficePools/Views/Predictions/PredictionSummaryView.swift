@@ -16,15 +16,15 @@ struct PredictionSummaryView: View {
                     Section {
                         HStack {
                             Image(systemName: viewModel.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                                .foregroundStyle(viewModel.isComplete ? AppColors.success500 : AppColors.warning500)
+                                .foregroundStyle(viewModel.isComplete ? Color.sp.green : Color.sp.amber)
                                 .font(.title3)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(viewModel.progressText)
-                                    .font(.headline)
+                                    .font(SPTypography.cardTitle)
                                 if !viewModel.isComplete {
                                     Text("\(viewModel.incompletePredictions.count) predictions still needed")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(SPTypography.detail)
+                                        .foregroundStyle(Color.sp.slate)
                                 }
                             }
                             Spacer()
@@ -46,8 +46,8 @@ struct PredictionSummaryView: View {
                 VStack(spacing: 8) {
                     if let error = viewModel.errorMessage {
                         Text(error)
-                            .font(.caption)
-                            .foregroundStyle(AppColors.error600)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.red)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
@@ -62,21 +62,21 @@ struct PredictionSummaryView: View {
                                     .tint(.white)
                             }
                             Text("Submit Predictions")
-                                .font(.headline)
+                                .font(SPTypography.cardTitle)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(viewModel.isComplete ? Color.accentColor : Color.gray)
+                        .background(viewModel.isComplete ? Color.sp.primary : Color.sp.silver)
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                     }
                     .disabled(!viewModel.isComplete || viewModel.isSubmitting)
                     .padding(.horizontal)
 
                     if !viewModel.isComplete {
                         Text("Complete all predictions to submit")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
                 .padding(.vertical, 12)
@@ -116,7 +116,7 @@ struct PredictionSummaryView: View {
 
         return HStack {
             Text(match.homeDisplayName)
-                .font(.subheadline)
+                .font(SPTypography.body)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -124,30 +124,30 @@ struct PredictionSummaryView: View {
             if isFilled {
                 VStack(spacing: 1) {
                     Text("\(pred!.homeScore!) - \(pred!.awayScore!)")
-                        .font(.headline.monospacedDigit())
+                        .font(SPTypography.mono(size: 15, weight: .semibold))
                     if needsPso && hasPso {
                         Text("(\(pred!.homePso!)-\(pred!.awayPso!) PSO)")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
                 .padding(.horizontal, 8)
             } else {
                 Text("? - ?")
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(AppColors.error500)
+                    .font(SPTypography.mono(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.sp.red)
                     .padding(.horizontal, 8)
             }
 
             Text(match.awayDisplayName)
-                .font(.subheadline)
+                .font(SPTypography.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
             Image(systemName: isIncomplete ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundStyle(isIncomplete ? AppColors.error500 : AppColors.success500)
+                .foregroundStyle(isIncomplete ? Color.sp.red : Color.sp.green)
                 .frame(width: 20)
         }
         .padding(.vertical, 2)

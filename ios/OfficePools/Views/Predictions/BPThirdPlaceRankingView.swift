@@ -14,10 +14,11 @@ struct BPThirdPlaceRankingView: View {
             // Help text
             VStack(alignment: .leading, spacing: 4) {
                 Text("Rank the 12 third-place teams from strongest to weakest")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.ink)
                 Text("Top 8 teams advance to the Round of 32. The bottom 4 are eliminated.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
@@ -27,15 +28,16 @@ struct BPThirdPlaceRankingView: View {
                 // Header
                 HStack {
                     Text("Third-Place Rankings")
-                        .font(.subheadline.weight(.bold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
                     Spacer()
                     Text("\(localRanking.count) teams")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(Color(.systemGray6))
+                .background(Color.sp.mist)
 
                 Divider()
 
@@ -45,11 +47,11 @@ struct BPThirdPlaceRankingView: View {
                     editableList
                 }
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
             )
             .padding(.horizontal)
         }
@@ -123,16 +125,16 @@ struct BPThirdPlaceRankingView: View {
     private var qualificationLine: some View {
         HStack(spacing: 8) {
             Rectangle()
-                .fill(AppColors.error300)
+                .fill(Color.sp.red.opacity(0.4))
                 .frame(height: 1)
 
             Text("QUALIFICATION LINE")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(AppColors.error500)
+                .foregroundStyle(Color.sp.red)
                 .fixedSize()
 
             Rectangle()
-                .fill(AppColors.error300)
+                .fill(Color.sp.red.opacity(0.4))
                 .frame(height: 1)
         }
         .padding(.horizontal, 12)
@@ -152,10 +154,10 @@ private struct ThirdPlaceTeamRow: View {
             // Rank badge
             Text("\(rank)")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(qualifies ? AppColors.success600 : AppColors.error500)
+                .foregroundStyle(qualifies ? Color.sp.green : Color.sp.red)
                 .frame(width: 26)
                 .padding(.vertical, 3)
-                .background(qualifies ? AppColors.success100 : AppColors.error100)
+                .background(qualifies ? Color.sp.greenLight : Color.sp.redLight)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
             // Flag
@@ -163,18 +165,18 @@ private struct ThirdPlaceTeamRow: View {
                 CachedAsyncImage(url: url, width: 24, height: 16, cornerRadius: 2)
             } else {
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(.systemGray4))
+                    .fill(Color.sp.silver)
                     .frame(width: 24, height: 16)
             }
 
             // Team name + group
             VStack(alignment: .leading, spacing: 1) {
                 Text(team?.countryName ?? "Unknown")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.body)
                     .lineLimit(1)
                 Text("3rd in Group \(team?.groupLetter ?? "?")")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             Spacer()
@@ -182,10 +184,10 @@ private struct ThirdPlaceTeamRow: View {
             // Status badge
             Text(qualifies ? "QUALIFIED" : "ELIMINATED")
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(qualifies ? AppColors.success600 : AppColors.error500)
+                .foregroundStyle(qualifies ? Color.sp.green : Color.sp.red)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(qualifies ? AppColors.success100 : AppColors.error100)
+                .background(qualifies ? Color.sp.greenLight : Color.sp.redLight)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         }
         .padding(.horizontal, 6)

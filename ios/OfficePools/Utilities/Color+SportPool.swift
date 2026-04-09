@@ -34,7 +34,7 @@ extension Color {
         /// Primary actions, links, active tab
         static let primary      = Color(hex: 0x3B6EFF)
         /// Selected pill backgrounds, tab indicator
-        static let primaryLight = Color(hex: 0xEBF1FF)
+        static let primaryLight = Color(hex: 0xF7F9FF)
 
         // MARK: - Accent
 

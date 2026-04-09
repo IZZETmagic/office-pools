@@ -96,7 +96,7 @@ struct FormTabView: View {
             .padding(.horizontal)
             .padding(.bottom, 24)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
     }
 
     // MARK: - XP Hero Card
@@ -116,16 +116,17 @@ struct FormTabView: View {
                         .frame(width: 72, height: 72)
                         .rotationEffect(.degrees(-90))
                     Text("\(xp.currentLevel.level)")
-                        .font(.title2.weight(.black).monospacedDigit())
+                        .font(SPTypography.mono(size: 22, weight: .black))
                         .foregroundStyle(lvlColor)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(xp.currentLevel.name)
-                        .font(.title3.weight(.bold))
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                     Text("\(xp.totalXp) XP")
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.sp.slate)
                     if let next = xp.nextLevel {
                         xpToNextLabel(xp: xp, next: next)
                     }
@@ -134,8 +135,8 @@ struct FormTabView: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.sp.silver)
             }
 
             if xp.nextLevel != nil {
@@ -149,18 +150,16 @@ struct FormTabView: View {
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func xpToNextLabel(xp: XPData, next: LevelInfo) -> some View {
         HStack(spacing: 4) {
             Text("\(xp.xpToNextLevel) XP to")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
             Text(next.name)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(levelColor(next.level))
         }
     }
@@ -170,7 +169,7 @@ struct FormTabView: View {
         return GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color(.systemGray5))
+                    .fill(Color.sp.mist)
                     .frame(height: 8)
                 Capsule()
                     .fill(lvlColor)
@@ -183,11 +182,11 @@ struct FormTabView: View {
     private func xpStat(_ title: String, value: Int, color: Color) -> some View {
         VStack(spacing: 2) {
             Text("\(value)")
-                .font(.subheadline.weight(.bold).monospacedDigit())
+                .font(SPTypography.mono(size: 14, weight: .bold))
                 .foregroundStyle(color)
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
         }
         .frame(maxWidth: .infinity)
     }
@@ -197,7 +196,8 @@ struct FormTabView: View {
     private var entrySelector: some View {
         HStack {
             Text("Entry")
-                .font(.subheadline.weight(.semibold))
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
             Spacer()
             Picker("Entry", selection: Binding(
                 get: { activeEntryId ?? "" },
@@ -212,9 +212,7 @@ struct FormTabView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func levelColor(_ level: Int) -> Color {
@@ -246,16 +244,14 @@ struct FormTabView: View {
                 .padding(.vertical, 14)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func badgeCell(_ badge: BadgeInfo, earned: Bool) -> some View {
         VStack(spacing: 4) {
             ZStack {
                 Circle()
-                    .fill(earned ? rarityColor(badge.rarity).opacity(0.15) : Color(.systemGray5))
+                    .fill(earned ? rarityColor(badge.rarity).opacity(0.15) : Color.sp.mist)
                     .frame(width: 44, height: 44)
 
                 if earned {
@@ -265,18 +261,18 @@ struct FormTabView: View {
                 } else {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.sp.silver)
                 }
             }
 
             Text(badge.name)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(earned ? .primary : .tertiary)
+                .font(SPTypography.detail)
+                .foregroundStyle(earned ? Color.sp.ink : Color.sp.silver)
                 .lineLimit(1)
 
             Text("+\(badge.xpBonus) XP")
-                .font(.system(size: 8))
-                .foregroundStyle(earned ? rarityColor(badge.rarity) : Color(.systemGray4))
+                .font(.system(size: 8, weight: .medium, design: .rounded))
+                .foregroundStyle(earned ? rarityColor(badge.rarity) : Color.sp.silver)
         }
     }
 
@@ -316,41 +312,38 @@ struct FormTabView: View {
                     .foregroundStyle(AppColors.hotStreak)
 
                 Text("Current Hot Streak")
-                    .font(.system(size: 9, weight: .semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-                    .foregroundStyle(.secondary)
+                    .spCaption()
+                    .foregroundStyle(Color.sp.slate)
 
                 Text("\(currentHot)")
-                    .font(.system(size: 36, weight: .heavy).monospacedDigit())
+                    .font(SPTypography.mono(size: 36, weight: .heavy))
                     .foregroundStyle(AppColors.hotStreak)
 
-                // Progress pips
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         Capsule()
                             .fill(i < min(currentHot, 5)
                                 ? AppColors.hotStreak
-                                : Color(.systemGray5))
+                                : Color.sp.mist)
                             .frame(width: 20, height: 5)
                     }
                 }
                 .padding(.bottom, 2)
 
                 Text("Personal best: **\(streaks.longestHotStreak)**")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .padding(.horizontal, 10)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(AppColors.hotStreak.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                    .strokeBorder(AppColors.hotStreak.opacity(0.2), lineWidth: AppDesign.Border.thin)
             )
-            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+            .spCardShadow()
 
             // Cold Streak Card
             VStack(spacing: 6) {
@@ -359,37 +352,32 @@ struct FormTabView: View {
                     .foregroundStyle(AppColors.coldStreak)
 
                 Text("Worst Cold Streak")
-                    .font(.system(size: 9, weight: .semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-                    .foregroundStyle(.secondary)
+                    .spCaption()
+                    .foregroundStyle(Color.sp.slate)
 
                 Text("\(coldStreak)")
-                    .font(.system(size: 36, weight: .heavy).monospacedDigit())
+                    .font(SPTypography.mono(size: 36, weight: .heavy))
                     .foregroundStyle(AppColors.coldStreak)
 
-                // Progress pips (cold intensifying)
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         let filled = i < min(coldStreak, 5)
                         let opacity: Double = 0.15 + 0.17 * Double(i + 1)
                         Capsule()
-                            .fill(filled ? AppColors.coldStreak.opacity(opacity) : Color(.systemGray5))
+                            .fill(filled ? AppColors.coldStreak.opacity(opacity) : Color.sp.mist)
                             .frame(width: 20, height: 5)
                     }
                 }
                 .padding(.bottom, 2)
 
                 Text("Keep this one low!")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .padding(.horizontal, 10)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+            .spCard()
         }
     }
 
@@ -438,16 +426,14 @@ struct FormTabView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func tournamentNode(_ match: MatchXPItem, crowdMatch: CrowdMatchItem?) -> some View {
         let isMiss = match.tier == "submitted"
         let color: Color = tierColor(match.tier)
-        let fillColor: Color = isMiss ? Color(.systemGray6) : color.opacity(0.2)
-        let borderColor: Color = isMiss ? Color(.systemGray3) : color
+        let fillColor: Color = isMiss ? Color.sp.mist : color.opacity(0.2)
+        let borderColor: Color = isMiss ? Color.sp.silver : color
         let shadowColor: Color = isMiss ? .clear : color.opacity(0.25)
 
         return VStack(spacing: 4) {
@@ -472,8 +458,8 @@ struct FormTabView: View {
 
             // Match number label
             Text("#\(match.matchNumber)")
-                .font(.system(size: 8, weight: .medium).monospacedDigit())
-                .foregroundStyle(.tertiary)
+                .font(SPTypography.mono(size: 8, weight: .medium))
+                .foregroundStyle(Color.sp.silver)
         }
         .overlay(alignment: .top) {
             if tappedMatchNumber == match.matchNumber, let cm = crowdMatch {
@@ -485,11 +471,11 @@ struct FormTabView: View {
 
     private func tooltipBubble(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color(.darkGray), in: RoundedRectangle(cornerRadius: 6))
+            .background(Color.sp.ink, in: RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             .fixedSize()
             .zIndex(10)
             .transition(.scale.combined(with: .opacity))
@@ -528,8 +514,8 @@ struct FormTabView: View {
                 .fill(color)
                 .frame(width: 7, height: 7)
             Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
         }
     }
 
@@ -562,9 +548,7 @@ struct FormTabView: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private struct CrowdStats {
@@ -612,52 +596,45 @@ struct FormTabView: View {
     private func vsFaceoff(userAccuracy: Int, crowdAccuracy: Int) -> some View {
         VStack(spacing: 16) {
             Text("You vs The Crowd")
-                .font(.system(size: 15, weight: .bold))
+                .font(SPTypography.sectionHeader)
+                .foregroundStyle(Color.sp.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
                 Spacer()
                 VStack(spacing: 4) {
                     Text("YOU")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.8)
-                        .foregroundStyle(AppColors.primary600)
+                        .spCaption()
+                        .foregroundStyle(Color.sp.primary)
                     Text("\(userAccuracy)%")
-                        .font(.system(size: 32, weight: .heavy).monospacedDigit())
-                        .foregroundStyle(AppColors.primary500)
+                        .font(SPTypography.mono(size: 32, weight: .heavy))
+                        .foregroundStyle(Color.sp.primary)
                 }
 
                 Spacer()
 
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary500.opacity(0.12), AppColors.neutral400.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Color.sp.mist)
                         .frame(width: 36, height: 36)
                         .overlay(
                             Circle()
-                                .strokeBorder(Color(.systemGray4), lineWidth: 1)
+                                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
                         )
                     Text("VS")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
 
                 VStack(spacing: 4) {
                     Text("POOL AVG")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.8)
-                        .foregroundStyle(AppColors.neutral500)
+                        .spCaption()
+                        .foregroundStyle(Color.sp.slate)
                     Text("\(crowdAccuracy)%")
-                        .font(.system(size: 32, weight: .heavy).monospacedDigit())
-                        .foregroundStyle(Color(.systemGray3))
+                        .font(SPTypography.mono(size: 32, weight: .heavy))
+                        .foregroundStyle(Color.sp.silver)
                 }
 
                 Spacer()
@@ -676,36 +653,22 @@ struct FormTabView: View {
         return VStack(spacing: 5) {
             HStack {
                 Text(label)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
                 Spacer()
                 Text("\(you) vs \(crowd)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color(.systemGray3))
+                    .font(SPTypography.mono(size: 10))
+                    .foregroundStyle(Color.sp.silver)
             }
 
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    // You fill (primary, left)
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary500, AppColors.primary400],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(Color.sp.primary)
                         .frame(width: max(geo.size.width * youPct / 100 - 1, 2))
 
-                    // Crowd fill (neutral, right)
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.neutral400, AppColors.neutral500],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(Color.sp.silver)
                         .frame(width: max(geo.size.width * crowdPct / 100 - 1, 2))
                 }
             }
@@ -727,29 +690,23 @@ struct FormTabView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(message)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(SPTypography.cardTitle)
                     .foregroundStyle(accentColor)
 
                 if showContrarian {
                     Text("Your contrarian win rate is \(contrarianAdv)% higher than average")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(
-            LinearGradient(
-                colors: [accentColor.opacity(0.1), .clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(accentColor.opacity(0.13), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                .strokeBorder(accentColor.opacity(0.13), lineWidth: AppDesign.Border.thin)
         )
     }
 
@@ -762,7 +719,8 @@ struct FormTabView: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Header
             Text("Pool-Wide Stats")
-                .font(.system(size: 15, weight: .bold))
+                .font(SPTypography.sectionHeader)
+                .foregroundStyle(Color.sp.ink)
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
                 .padding(.bottom, 14)
@@ -771,28 +729,31 @@ struct FormTabView: View {
             HStack(spacing: 0) {
                 VStack(spacing: 2) {
                     Text("\(Int(round(stats.avgAccuracy * 100)))%")
-                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                        .font(SPTypography.mono(size: 24, weight: .heavy))
+                        .foregroundStyle(Color.sp.ink)
                     Text("Avg Pool Accuracy")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
 
                 VStack(spacing: 2) {
                     Text("\(stats.totalEntries)")
-                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                        .font(SPTypography.mono(size: 24, weight: .heavy))
+                        .foregroundStyle(Color.sp.ink)
                     Text("Competitors")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
 
                 VStack(spacing: 2) {
                     Text("\(stats.completedMatches)")
-                        .font(.system(size: 24, weight: .heavy).monospacedDigit())
+                        .font(SPTypography.mono(size: 24, weight: .heavy))
+                        .foregroundStyle(Color.sp.ink)
                     Text("Matches Scored")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -804,10 +765,10 @@ struct FormTabView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(AppColors.success400)
+                        .foregroundStyle(Color.sp.green)
                     Text("Most Predictable")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(AppColors.success600)
+                        .font(SPTypography.caption)
+                        .foregroundStyle(Color.sp.green)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 8)
@@ -826,10 +787,10 @@ struct FormTabView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(AppColors.error400)
+                        .foregroundStyle(Color.sp.red)
                     Text("Biggest Upsets")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(AppColors.error600)
+                        .font(SPTypography.caption)
+                        .foregroundStyle(Color.sp.red)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 8)
@@ -843,25 +804,22 @@ struct FormTabView: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func predictableMatchRow(index: Int, match: PredictableMatch, color: Color, isLast: Bool) -> some View {
         VStack(spacing: 0) {
             HStack {
                 Text("\(index + 1). \(match.homeTeam) vs \(match.awayTeam)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
                     .lineLimit(1)
 
                 Spacer()
 
-                // Mini progress bar
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color(.systemGray5))
+                        .fill(Color.sp.mist)
                         .frame(width: 40, height: 4)
                     Capsule()
                         .fill(color)
@@ -869,7 +827,7 @@ struct FormTabView: View {
                 }
 
                 Text("\(Int(round(match.hitRate * 100)))%")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(SPTypography.mono(size: 11, weight: .semibold))
                     .foregroundStyle(color)
                     .frame(width: 34, alignment: .trailing)
             }
@@ -877,7 +835,6 @@ struct FormTabView: View {
 
             if !isLast {
                 Divider()
-                    .foregroundStyle(Color(.systemGray5))
             }
         }
     }
@@ -887,12 +844,13 @@ struct FormTabView: View {
     private func sectionHeader(_ title: String, subtitle: String? = nil) -> some View {
         HStack {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
             Spacer()
             if let subtitle {
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
         }
         .padding(.horizontal, 16)
@@ -946,7 +904,7 @@ struct LevelRoadmapView: View {
                 }
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
 
             // Fixed glass header
             roadmapHeader
@@ -973,19 +931,20 @@ struct LevelRoadmapView: View {
                         .frame(width: 52, height: 52)
                         .rotationEffect(.degrees(-90))
                     Text("\(xp.currentLevel.level)")
-                        .font(.system(size: 18, weight: .black).monospacedDigit())
+                        .font(SPTypography.mono(size: 18, weight: .black))
                         .foregroundStyle(lvlColor)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(xp.currentLevel.name)
-                        .font(.headline.weight(.bold))
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                     Text("\(xp.totalXp.formatted()) XP")
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.sp.slate)
                     Text(progressText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
@@ -1011,10 +970,10 @@ struct LevelRoadmapView: View {
         let isReached = xp.totalXp >= level.xpRequired
         let isCurrent = level.level == xp.currentLevel.level
         let lvlColor = levelColor(level.level)
-        let circleFill: Color = isReached ? AppColors.success500 : Color(.systemGray4)
-        let nameColor: Color = isCurrent ? lvlColor : (isReached ? .primary : .secondary)
-        let xpColor: Color = isCurrent ? lvlColor : (isReached ? AppColors.success500 : Color(.systemGray3))
-        let bgColor: Color = isCurrent ? lvlColor.opacity(0.08) : (isReached ? AppColors.success500.opacity(0.04) : Color(.systemGray6))
+        let circleFill: Color = isReached ? Color.sp.green : Color.sp.silver
+        let nameColor: Color = isCurrent ? lvlColor : (isReached ? Color.sp.ink : Color.sp.slate)
+        let xpColor: Color = isCurrent ? lvlColor : (isReached ? Color.sp.green : Color.sp.silver)
+        let bgColor: Color = isCurrent ? lvlColor.opacity(0.08) : (isReached ? Color.sp.greenLight : Color.sp.mist)
 
         return HStack(spacing: 12) {
             ZStack {
@@ -1028,53 +987,53 @@ struct LevelRoadmapView: View {
                         .foregroundStyle(.white)
                 } else {
                     Text("\(level.level)")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 14, weight: .bold))
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(level.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(SPTypography.body)
                     .foregroundStyle(nameColor)
 
                 if let badge = level.badge {
                     Text("Unlocks: \(badge)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.silver)
                 }
             }
 
             Spacer()
 
             Text("\(level.xpRequired.formatted()) XP")
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .font(SPTypography.mono(size: 12, weight: .medium))
                 .foregroundStyle(xpColor)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(bgColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isCurrent ? lvlColor.opacity(0.3) : .clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                .strokeBorder(isCurrent ? lvlColor.opacity(0.3) : .clear, lineWidth: AppDesign.Border.thin)
         )
     }
 
     private var xpSummary: some View {
         VStack(spacing: 8) {
             Text("\(xp.totalXp.formatted()) XP")
-                .font(.system(size: 28, weight: .black).monospacedDigit())
+                .font(SPTypography.mono(size: 28, weight: .black))
                 .foregroundStyle(levelColor(xp.currentLevel.level))
 
             if let next = xp.nextLevel {
                 Text("\(xp.xpToNextLevel.formatted()) XP to \(next.name)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
             } else {
                 Text("Maximum level reached")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             HStack(spacing: 8) {
@@ -1090,19 +1049,19 @@ struct LevelRoadmapView: View {
     private func xpPill(_ label: String, value: Int, color: Color) -> some View {
         HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(SPTypography.caption)
                 .foregroundStyle(color)
             Text("\(value.formatted())")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(color)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(color.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(color.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                .strokeBorder(color.opacity(0.2), lineWidth: AppDesign.Border.thin)
         )
     }
 

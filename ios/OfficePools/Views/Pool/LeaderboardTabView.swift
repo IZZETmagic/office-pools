@@ -14,20 +14,16 @@ struct LeaderboardTabView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    // Matchday MVP Banner
                     if let mvp = response?.matchdayMvp {
                         matchdayMVPBanner(mvp)
                     }
 
-                    // Podium (top 3)
                     if leaderboardData.count >= 3 {
                         podiumView
                     }
 
-                    // Legend
                     legendView
 
-                    // Remaining entries (rank 4+)
                     let startIndex = min(3, leaderboardData.count)
                     if startIndex < leaderboardData.count {
                         ForEach(Array(leaderboardData[startIndex...].enumerated()), id: \.element.entryId) { index, entry in
@@ -35,19 +31,16 @@ struct LeaderboardTabView: View {
                         }
                     }
 
-                    // If fewer than 3, show all as rows
                     if leaderboardData.count < 3 {
                         ForEach(Array(leaderboardData.enumerated()), id: \.element.entryId) { index, entry in
                             leaderboardRow(entry: entry, rank: index + 1)
                         }
                     }
 
-                    // Superlatives
                     if let superlatives = response?.superlatives, !superlatives.isEmpty {
                         superlativesSection(superlatives)
                     }
 
-                    // Matchday Info
                     if let info = response?.matchdayInfo {
                         matchdayInfoBar(info)
                     }
@@ -56,42 +49,44 @@ struct LeaderboardTabView: View {
                 .padding(.bottom, 20)
                 .animation(.easeInOut(duration: 0.8), value: leaderboardData.map(\.entryId))
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
         }
     }
 
     // MARK: - Matchday MVP Banner
 
     private func matchdayMVPBanner(_ mvp: MatchdayMVP) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "star.fill")
                 .font(.title3)
-                .foregroundStyle(AppColors.accent400)
+                .foregroundStyle(Color.sp.accent)
+
             VStack(alignment: .leading, spacing: 2) {
-                Text("Matchday MVP")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text("MATCHDAY MVP")
+                    .spCaption()
+                    .foregroundStyle(Color.sp.slate)
                 Text("\(mvp.entryName.isEmpty ? mvp.fullName : mvp.entryName) scored \(mvp.matchPoints) pts on Match \(mvp.matchNumber)")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.ink)
             }
             Spacer()
         }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(14)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .spCardShadow()
+        .overlay {
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .strokeBorder(Color.sp.accent.opacity(0.3), lineWidth: AppDesign.Border.accent)
+        }
     }
 
     // MARK: - Podium
 
     private var podiumView: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            // 2nd place
-            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: AppColors.neutral400)
-
-            // 1st place
-            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: AppColors.accent300)
-
-            // 3rd place
+            podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: Color.sp.silver)
+            podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: Color.sp.accent)
             podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: AppColors.bronze)
         }
         .padding(.top, 8)
@@ -108,7 +103,6 @@ struct LeaderboardTabView: View {
             rank: rank
         )) {
         VStack(spacing: 6) {
-            // Medal + rank delta + awards
             ZStack {
                 Circle()
                     .stroke(ringColor, lineWidth: 3)
@@ -119,7 +113,6 @@ struct LeaderboardTabView: View {
                             .foregroundStyle(ringColor)
                     }
 
-                // Rank delta — bottom trailing
                 if let delta = entry.rankDelta(currentPosition: rank), delta != 0 {
                     HStack(spacing: 1) {
                         Image(systemName: delta > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
@@ -130,12 +123,11 @@ struct LeaderboardTabView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(delta > 0 ? AppColors.success500 : AppColors.error500)
+                    .background(delta > 0 ? Color.sp.green : Color.sp.red)
                     .clipShape(Capsule())
                     .offset(x: 22, y: 20)
                 }
 
-                // Award badges — bottom leading, fanned like cards
                 if !entryAwards.isEmpty {
                     ZStack {
                         ForEach(Array(entryAwards.enumerated()), id: \.element.id) { index, award in
@@ -157,56 +149,46 @@ struct LeaderboardTabView: View {
             }
             .frame(height: 60)
 
-            // Name
             Text(entry.entryName.isEmpty ? entry.fullName : entry.entryName)
-                .font(.caption.weight(.semibold))
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            // Username
             Text("@\(entry.username)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
                 .lineLimit(1)
 
-            // Level pill
             if let level = entry.level, let levelName = entry.levelName {
                 LevelPillView(level: level, name: levelName)
             }
 
-            // Form dots
             if let lastFive = entry.lastFive {
                 FormDotsView(results: lastFive, streak: entry.currentStreak)
             }
 
-            // Pedestal
             VStack(spacing: 4) {
                 Text("\(entry.totalPoints)")
-                    .font(.title3.weight(.black).monospacedDigit())
-                    .foregroundStyle(AppColors.primary500)
+                    .font(SPTypography.mono(size: 20, weight: .black))
+                    .foregroundStyle(Color.sp.primary)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
                     .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 if let hitRate = entry.hitRate, let exactCount = entry.exactCount {
                     Text("\(exactCount) exact · \(Int(hitRate))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
             .frame(maxWidth: .infinity)
             .frame(height: pedestalHeight)
-            .background(
-                LinearGradient(
-                    colors: pedestalColors(for: rank),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(pedestalFill(for: rank))
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md, style: .continuous))
         }
         .frame(maxWidth: .infinity)
         }
@@ -226,21 +208,21 @@ struct LeaderboardTabView: View {
 
     private func awardColor(for type: String) -> Color {
         switch type {
-        case "mvp": return AppColors.accent500
-        case "contrarian": return AppColors.primary700
-        case "crowd": return AppColors.primary500
-        case "hot": return AppColors.error500
-        case "cold": return AppColors.primary300
-        default: return AppColors.neutral500
+        case "mvp": return Color.sp.accent
+        case "contrarian": return Color.sp.primary
+        case "crowd": return Color.sp.primary.opacity(0.7)
+        case "hot": return Color.sp.red
+        case "cold": return Color.sp.primary.opacity(0.5)
+        default: return Color.sp.slate
         }
     }
 
-    private func pedestalColors(for rank: Int) -> [Color] {
+    private func pedestalFill(for rank: Int) -> some ShapeStyle {
         switch rank {
-        case 1: return [AppColors.accent300.opacity(0.3), AppColors.accent300.opacity(0.1), AppColors.accent300.opacity(0.05)]
-        case 2: return [AppColors.neutral400.opacity(0.25), AppColors.neutral400.opacity(0.1), AppColors.neutral400.opacity(0.05)]
-        case 3: return [AppColors.bronze.opacity(0.25), AppColors.bronze.opacity(0.1), AppColors.bronze.opacity(0.05)]
-        default: return [.clear]
+        case 1: return Color.sp.accent.opacity(0.08)
+        case 2: return Color.sp.silver.opacity(0.15)
+        case 3: return AppColors.bronze.opacity(0.1)
+        default: return Color.clear
         }
     }
 
@@ -251,10 +233,10 @@ struct LeaderboardTabView: View {
             legendDot(color: AppColors.tierExact, label: "Exact")
             legendDot(color: AppColors.tierWinnerGd, label: "W+GD")
             legendDot(color: AppColors.tierWinner, label: "Winner")
-            legendDot(color: AppColors.error500, label: "Miss")
+            legendDot(color: Color.sp.red, label: "Miss")
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+        .spCaption()
+        .foregroundStyle(Color.sp.slate)
         .padding(.vertical, 4)
     }
 
@@ -281,11 +263,10 @@ struct LeaderboardTabView: View {
             rank: rank
         )) {
         HStack(spacing: 12) {
-            // Rank + delta
             VStack(spacing: 2) {
                 Text("#\(rank)")
-                    .font(.subheadline.weight(.black).monospacedDigit())
-                    .foregroundStyle(rankColor(rank))
+                    .font(SPTypography.mono(size: 14, weight: .black))
+                    .foregroundStyle(SPTypography.rankColor(rank))
 
                 if let delta = entry.rankDelta(currentPosition: rank), delta != 0 {
                     HStack(spacing: 1) {
@@ -294,42 +275,39 @@ struct LeaderboardTabView: View {
                         Text("\(abs(delta))")
                             .font(.system(size: 9, weight: .bold).monospacedDigit())
                     }
-                    .foregroundStyle(delta > 0 ? AppColors.success500 : AppColors.error500)
+                    .foregroundStyle(delta > 0 ? Color.sp.green : Color.sp.red)
                 }
             }
             .frame(width: 36)
 
-            // Player info
             VStack(alignment: .leading, spacing: 3) {
-                // Name + YOU badge
                 HStack(spacing: 6) {
                     Text(entry.entryName.isEmpty ? entry.fullName : entry.entryName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
                         .lineLimit(1)
 
                     if isCurrent {
                         Text("YOU")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(AppColors.primary500.opacity(0.15))
-                            .foregroundStyle(AppColors.primary600)
+                            .background(Color.sp.primaryLight)
+                            .foregroundStyle(Color.sp.primary)
                             .clipShape(Capsule())
                     }
                 }
 
-                // Username + level
                 HStack(spacing: 6) {
                     Text("@\(entry.username)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
 
                     if let level = entry.level, let levelName = entry.levelName {
                         LevelPillView(level: level, name: levelName)
                     }
                 }
 
-                // Award badges
                 if !entryAwards.isEmpty {
                     HStack(spacing: 4) {
                         ForEach(entryAwards) { award in
@@ -338,7 +316,6 @@ struct LeaderboardTabView: View {
                     }
                 }
 
-                // Form dots
                 if let lastFive = entry.lastFive {
                     FormDotsView(results: lastFive, streak: entry.currentStreak)
                 }
@@ -346,49 +323,40 @@ struct LeaderboardTabView: View {
 
             Spacer()
 
-            // Points
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(entry.totalPoints)")
-                    .font(.headline.weight(.black).monospacedDigit())
-                    .foregroundStyle(AppColors.primary500)
+                    .font(SPTypography.mono(size: 17, weight: .black))
+                    .foregroundStyle(Color.sp.primary)
                     .contentTransition(.numericText(value: Double(entry.totalPoints)))
                     .animation(.spring(response: 1.2, dampingFraction: 0.6), value: entry.totalPoints)
 
                 Text("\(entry.matchPoints) + \(entry.bonusPoints)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 if let hitRate = entry.hitRate, let exactCount = entry.exactCount {
                     Text("\(exactCount) exact · \(Int(hitRate))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
 
             Image(systemName: "chevron.right")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.sp.silver)
         }
-        .padding(12)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isCurrent ? AppColors.primary500.opacity(0.06) : Color(.systemBackground))
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .fill(isCurrent ? Color.sp.primaryLight : Color.white)
         )
+        .spCardShadow()
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isCurrent ? AppColors.primary500.opacity(0.3) : Color(.separator).opacity(0.3), lineWidth: isCurrent ? 1.5 : 0.5)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .strokeBorder(isCurrent ? Color.sp.primary.opacity(0.25) : Color.sp.silver.opacity(0.5), lineWidth: isCurrent ? AppDesign.Border.accent : AppDesign.Border.thin)
         )
         }
         .buttonStyle(.plain)
-    }
-
-    private func rankColor(_ rank: Int) -> Color {
-        switch rank {
-        case 1: return AppColors.accent300
-        case 2: return AppColors.neutral400
-        case 3: return AppColors.bronze
-        default: return .primary
-        }
     }
 
     // MARK: - Superlatives
@@ -396,7 +364,8 @@ struct LeaderboardTabView: View {
     private func superlativesSection(_ superlatives: [Superlative]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Pool Superlatives")
-                .font(.headline)
+                .font(SPTypography.sectionHeader)
+                .foregroundStyle(Color.sp.ink)
                 .padding(.top, 8)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -406,21 +375,23 @@ struct LeaderboardTabView: View {
                             .font(.title2)
                             .foregroundStyle(superlativeColor(for: superlative.type))
                         Text(superlative.title)
-                            .font(.caption.weight(.semibold))
+                            .font(SPTypography.caption)
+                            .foregroundStyle(Color.sp.ink)
                             .multilineTextAlignment(.center)
+                            .textCase(.uppercase)
+                            .tracking(1)
                         Text(superlative.name)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(AppColors.primary600)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.primary)
                             .lineLimit(1)
                         Text(superlative.detail)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(10)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(12)
+                    .spCard()
                 }
             }
         }
@@ -441,14 +412,14 @@ struct LeaderboardTabView: View {
 
     private func superlativeColor(for type: String) -> Color {
         switch type {
-        case "hot": return AppColors.error500
-        case "cold": return AppColors.primary400
-        case "contrarian": return AppColors.primary700
-        case "crowd": return AppColors.primary500
-        case "sharpshooter": return AppColors.accent500
-        case "climber": return AppColors.success500
-        case "faller": return AppColors.error500
-        default: return AppColors.accent400
+        case "hot": return Color.sp.red
+        case "cold": return Color.sp.primary
+        case "contrarian": return Color.sp.primary
+        case "crowd": return Color.sp.primary.opacity(0.7)
+        case "sharpshooter": return Color.sp.accent
+        case "climber": return Color.sp.green
+        case "faller": return Color.sp.red
+        default: return Color.sp.accent
         }
     }
 
@@ -458,44 +429,26 @@ struct LeaderboardTabView: View {
         HStack {
             if let lastMatch = info.lastMatchNumber {
                 Text("Last: Match \(lastMatch)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             Spacer()
 
             Text("\(info.completedCount)/\(info.totalCount) played")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
 
             if let nextDate = info.nextMatchDate {
                 Spacer()
-                Text("Next: \(formatDate(nextDate))")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text("Next: \(SPDateFormatter.short(nextDate))")
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
         }
-        .padding(10)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func formatDate(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: dateString) {
-            let display = DateFormatter()
-            display.dateFormat = "MMM d"
-            return display.string(from: date)
-        }
-        // Try without fractional seconds
-        formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: dateString) {
-            let display = DateFormatter()
-            display.dateFormat = "MMM d"
-            return display.string(from: date)
-        }
-        return dateString
+        .padding(12)
+        .background(Color.sp.mist)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
     }
 }
 
@@ -525,10 +478,10 @@ struct FormDotsView: View {
                 HStack(spacing: 1) {
                     Image(systemName: streak.type == "hot" ? "flame.fill" : "snowflake")
                         .font(.system(size: 9))
-                        .foregroundStyle(streak.type == "hot" ? AppColors.hotStreak : AppColors.coldStreak)
+                        .foregroundStyle(streak.type == "hot" ? Color.sp.amber : Color.sp.primary)
                     Text("\(streak.length)")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(streak.type == "hot" ? AppColors.hotStreak : AppColors.coldStreak)
+                        .foregroundStyle(streak.type == "hot" ? Color.sp.amber : Color.sp.primary)
                 }
                 .opacity(visibleCount >= results.count ? 1 : 0)
                 .animation(.easeIn(duration: 0.3).delay(0.15 + Double(results.count) * 0.12), value: visibleCount)
@@ -544,9 +497,9 @@ struct FormDotsView: View {
         case "exact": return AppColors.tierExact
         case "winner_gd": return AppColors.tierWinnerGd
         case "winner": return AppColors.tierWinner
-        case "miss": return AppColors.error500
-        case "no_pick": return AppColors.neutral300
-        default: return AppColors.neutral300
+        case "miss": return Color.sp.red
+        case "no_pick": return Color.sp.mist
+        default: return Color.sp.mist
         }
     }
 }
@@ -557,7 +510,7 @@ struct LevelPillView: View {
 
     var body: some View {
         Text("Lv.\(level) \(name)")
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(pillBackground)
@@ -567,21 +520,21 @@ struct LevelPillView: View {
 
     private var pillBackground: Color {
         switch level {
-        case 10: return AppColors.accent400
-        case 8...9: return AppColors.warning500.opacity(0.15)
-        case 6...7: return AppColors.primary600.opacity(0.15)
-        case 4...5: return AppColors.primary400.opacity(0.15)
-        default: return AppColors.neutral200
+        case 10: return Color.sp.accent
+        case 8...9: return Color.sp.amber.opacity(0.15)
+        case 6...7: return Color.sp.primary.opacity(0.12)
+        case 4...5: return Color.sp.primary.opacity(0.08)
+        default: return Color.sp.mist
         }
     }
 
     private var pillForeground: Color {
         switch level {
         case 10: return .white
-        case 8...9: return AppColors.warning600
-        case 6...7: return AppColors.primary600
-        case 4...5: return AppColors.primary500
-        default: return .secondary
+        case 8...9: return Color.sp.amber
+        case 6...7: return Color.sp.primary
+        case 4...5: return Color.sp.primary
+        default: return Color.sp.slate
         }
     }
 }
@@ -594,7 +547,7 @@ struct AwardBadgeView: View {
             Image(systemName: awardIcon)
                 .font(.system(size: 9))
             Text(award.label)
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
@@ -616,23 +569,23 @@ struct AwardBadgeView: View {
 
     private var badgeBackground: Color {
         switch award.type {
-        case "mvp": return AppColors.accent400.opacity(0.15)
-        case "contrarian": return AppColors.primary700.opacity(0.15)
-        case "crowd": return AppColors.primary500.opacity(0.15)
-        case "hot": return AppColors.error500.opacity(0.15)
-        case "cold": return AppColors.primary300.opacity(0.15)
-        default: return AppColors.neutral200
+        case "mvp": return Color.sp.accent.opacity(0.15)
+        case "contrarian": return Color.sp.primary.opacity(0.12)
+        case "crowd": return Color.sp.primary.opacity(0.1)
+        case "hot": return Color.sp.red.opacity(0.12)
+        case "cold": return Color.sp.primary.opacity(0.08)
+        default: return Color.sp.mist
         }
     }
 
     private var badgeForeground: Color {
         switch award.type {
-        case "mvp": return AppColors.accent600
-        case "contrarian": return AppColors.primary700
-        case "crowd": return AppColors.primary600
-        case "hot": return AppColors.error600
-        case "cold": return AppColors.primary400
-        default: return .secondary
+        case "mvp": return Color.sp.accent
+        case "contrarian": return Color.sp.primary
+        case "crowd": return Color.sp.primary
+        case "hot": return Color.sp.red
+        case "cold": return Color.sp.primary
+        default: return Color.sp.slate
         }
     }
 }

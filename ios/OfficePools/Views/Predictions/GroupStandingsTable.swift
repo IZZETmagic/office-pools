@@ -18,8 +18,8 @@ struct GroupStandingsTable: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
     }
 
     // MARK: - Header Row
@@ -42,7 +42,7 @@ struct GroupStandingsTable: View {
             Text("Pts").frame(width: 32, alignment: .center)
         }
         .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.sp.slate)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
     }
@@ -70,7 +70,7 @@ struct GroupStandingsTable: View {
                 .fontWeight(.semibold)
                 .frame(width: 32, alignment: .center)
         }
-        .font(.caption.monospacedDigit())
+        .font(SPTypography.mono(size: 12))
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .background(rowBackground(for: position))
@@ -81,9 +81,9 @@ struct GroupStandingsTable: View {
     private func rowBackground(for position: Int) -> Color {
         switch position {
         case 1, 2:
-            return AppColors.success500.opacity(0.06)
+            return Color.sp.greenLight
         case 3:
-            return AppColors.warning400.opacity(0.06)
+            return Color.sp.amberLight
         default:
             return .clear
         }

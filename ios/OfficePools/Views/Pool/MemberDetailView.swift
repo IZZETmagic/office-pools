@@ -9,6 +9,9 @@ struct MemberDetailView: View {
     let adminCount: Int
     let currentUserIsAdmin: Bool
     var onAdjustmentChanged: (() -> Void)?
+    var matches: [Match] = []
+    var teams: [Team] = []
+    var pool: Pool?
 
     @State private var showAdjustSheet = false
     @State private var adjustEntry: Entry?
@@ -21,6 +24,7 @@ struct MemberDetailView: View {
     @State private var entryToUnlock: Entry?
     @State private var showDeleteAdjustmentAlert = false
     @State private var adjustmentToDelete: PointAdjustment?
+    @State private var unlockedEntryIds: Set<String> = []
     @Environment(\.dismiss) private var dismiss
 
     @State private var headerHeight: CGFloat = 80
@@ -28,23 +32,25 @@ struct MemberDetailView: View {
     /// Adjustment history keyed by entryId
     @State private var adjustmentsByEntry: [String: [PointAdjustment]] = [:]
 
+    // MARK: - Prediction Viewing State
+    @State private var presentedPredictionEntry: Entry?
+    @State private var memberPredictionVM: PredictionsViewModel?
+    @State private var readOnlyEditVM: PredictionEditViewModel?
+    @State private var bracketPickerVM: BracketPickerViewModel?
+
     private var isCurrentUser: Bool { member.userId == currentUserId }
     private var entries: [Entry] { member.entries ?? [] }
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Scrollable content
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    // MARK: - Info
                     infoCard
 
-                    // MARK: - Entries with adjustments
                     if !entries.isEmpty {
                         entriesCard
                     }
 
-                    // MARK: - Point Adjustments History (per entry)
                     if currentUserIsAdmin {
                         ForEach(entries) { entry in
                             let adjustments = adjustmentsByEntry[entry.entryId] ?? []
@@ -54,7 +60,6 @@ struct MemberDetailView: View {
                         }
                     }
 
-                    // MARK: - Admin Actions
                     if currentUserIsAdmin {
                         adminActionsCard
                     }
@@ -63,9 +68,8 @@ struct MemberDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
 
-            // Fixed header (glass)
             memberHeader
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -119,6 +123,12 @@ struct MemberDetailView: View {
         .onAppear {
             loadAdjustments()
         }
+        .fullScreenCover(item: $presentedPredictionEntry) { entry in
+            memberPredictionCover(entry: entry)
+                .task {
+                    await loadMemberPredictions(entry: entry)
+                }
+        }
     }
 
     // MARK: - Header
@@ -134,42 +144,42 @@ struct MemberDetailView: View {
     private var memberHeader: some View {
         VStack(spacing: 6) {
             HStack(spacing: 12) {
-                // Rank badge (like PointsBreakdownView)
                 if let rank = bestRank {
                     Text("#\(rank)")
-                        .font(.title3.weight(.black).monospacedDigit())
+                        .font(SPTypography.mono(size: 18, weight: .black))
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
-                        .background(rankColor(rank))
+                        .background(SPTypography.rankColor(rank))
                         .clipShape(Circle())
                 } else {
                     Circle()
-                        .fill(member.isAdmin ? AppColors.neutral600.opacity(0.15) : AppColors.primary500.opacity(0.1))
+                        .fill(member.isAdmin ? Color.sp.slate.opacity(0.15) : Color.sp.primaryLight)
                         .frame(width: 40, height: 40)
                         .overlay(
                             Text(String(member.users.fullName.prefix(1)).uppercased())
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(member.isAdmin ? AppColors.neutral600 : AppColors.primary500)
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundStyle(member.isAdmin ? Color.sp.slate : Color.sp.primary)
                         )
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(member.users.fullName)
-                            .font(.headline.weight(.bold))
+                            .font(SPTypography.sectionHeader)
+                            .foregroundStyle(Color.sp.ink)
                         if member.isAdmin {
                             Text("ADMIN")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(SPTypography.caption)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
-                                .background(AppColors.neutral600.opacity(0.15))
-                                .foregroundStyle(AppColors.neutral600)
+                                .background(Color.sp.slate.opacity(0.15))
+                                .foregroundStyle(Color.sp.slate)
                                 .clipShape(Capsule())
                         }
                     }
                     Text("@\(member.users.username)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
@@ -191,15 +201,6 @@ struct MemberDetailView: View {
         )
     }
 
-    private func rankColor(_ rank: Int) -> Color {
-        switch rank {
-        case 1: return AppColors.accent300
-        case 2: return AppColors.neutral400
-        case 3: return AppColors.bronze
-        default: return AppColors.primary500
-        }
-    }
-
     // MARK: - Entries Card
 
     private var entriesCard: some View {
@@ -212,60 +213,87 @@ struct MemberDetailView: View {
                 VStack(spacing: 4) {
                     HStack {
                         Text(entry.entryName)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
                         Spacer()
                         Text("\(points) pts")
-                            .font(.subheadline.weight(.bold))
+                            .font(SPTypography.mono(size: 14, weight: .bold))
+                            .foregroundStyle(Color.sp.ink)
                         statusPill(
-                            entry.hasSubmittedPredictions ? "Submitted" : "Pending",
-                            color: entry.hasSubmittedPredictions ? AppColors.success600 : AppColors.neutral400
+                            isSubmitted(entry) ? "Submitted" : "Pending",
+                            color: isSubmitted(entry) ? Color.sp.green : Color.sp.silver
                         )
-                        if entry.hasSubmittedPredictions && currentUserIsAdmin {
-                            Button {
-                                entryToUnlock = entry
-                                showUnlockAlert = true
-                            } label: {
-                                Image(systemName: "lock.open")
-                                    .font(.caption)
-                                    .foregroundStyle(AppColors.warning600)
-                                    .frame(width: 36, height: 36)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
                     }
 
-                    // Adjust points button per entry (admin only)
-                    if currentUserIsAdmin {
+                    HStack(spacing: 8) {
+                        Spacer()
+
                         Button {
-                            adjustEntry = entry
-                            adjustAmount = ""
-                            adjustReason = ""
-                            showAdjustSheet = true
+                            presentedPredictionEntry = entry
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: "plusminus")
-                                    .font(.caption2)
-                                Text("Adjust Points")
-                                    .font(.caption)
+                                Image(systemName: "eye")
+                                    .font(.system(size: 10))
+                                Text("View Predictions")
+                                    .font(SPTypography.detail)
                             }
-                            .foregroundStyle(AppColors.warning600)
+                            .foregroundStyle(Color.sp.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(AppColors.warning600.opacity(0.1))
+                            .background(Color.sp.primaryLight)
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+
+                        if currentUserIsAdmin {
+                            Button {
+                                adjustEntry = entry
+                                adjustAmount = ""
+                                adjustReason = ""
+                                showAdjustSheet = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "plusminus")
+                                        .font(.system(size: 10))
+                                    Text("Adjust Points")
+                                        .font(SPTypography.detail)
+                                }
+                                .foregroundStyle(Color.sp.amber)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.sp.amberLight)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+
+                            if isSubmitted(entry) {
+                                Button {
+                                    entryToUnlock = entry
+                                    showUnlockAlert = true
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "lock.open")
+                                            .font(.system(size: 10))
+                                        Text("Unlock")
+                                            .font(SPTypography.detail)
+                                    }
+                                    .foregroundStyle(Color.sp.red)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color.sp.redLight)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
 
-                    if entry.hasSubmittedPredictions, let submittedAt = entry.predictionsSubmittedAt {
+                    if isSubmitted(entry), let submittedAt = entry.predictionsSubmittedAt {
                         HStack {
                             Spacer()
-                            Text(formattedDateTime(submittedAt))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                            Text(SPDateFormatter.long(submittedAt))
+                                .font(SPTypography.detail)
+                                .foregroundStyle(Color.sp.silver)
                         }
                     }
                 }
@@ -285,17 +313,18 @@ struct MemberDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Adjustments")
-                        .font(.headline)
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
                     if entries.count > 1 {
                         Text(entry.entryName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
                 Spacer()
                 Text(total > 0 ? "+\(total)" : "\(total)")
-                    .font(.headline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(total > 0 ? AppColors.success600 : AppColors.error600)
+                    .font(SPTypography.mono(size: 18, weight: .bold))
+                    .foregroundStyle(total > 0 ? Color.sp.green : Color.sp.red)
             }
 
             Divider()
@@ -303,36 +332,36 @@ struct MemberDetailView: View {
             ForEach(adjustments) { adj in
                 HStack(alignment: .top, spacing: 10) {
                     Text(adj.amount > 0 ? "+\(adj.amount)" : "\(adj.amount)")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(adj.amount > 0 ? AppColors.success600 : AppColors.error600)
+                        .font(SPTypography.mono(size: 14, weight: .bold))
+                        .foregroundStyle(adj.amount > 0 ? Color.sp.green : Color.sp.red)
                         .frame(width: 44, alignment: .trailing)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(adj.reason)
-                            .font(.subheadline)
-                        Text(formattedDateTime(adj.createdAt))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.ink)
+                        Text(SPDateFormatter.long(adj.createdAt))
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.silver)
                     }
 
                     Spacer()
 
-                    // Delete button
                     Button {
                         adjustmentToDelete = adj
                         showDeleteAdjustmentAlert = true
                     } label: {
                         Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.error600)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.sp.red)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(10)
-                .background(AppColors.warning600.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.sp.amberLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
     }
@@ -344,7 +373,7 @@ struct MemberDetailView: View {
             sectionHeader("Details")
 
             infoRow("Role", value: member.isAdmin ? "Admin" : "Player")
-            infoRow("Joined", value: formattedDate(member.joinedAt))
+            infoRow("Joined", value: SPDateFormatter.short(member.joinedAt))
             infoRow("Entry Fee", value: member.entryFeePaid ? "Paid" : "Unpaid")
             infoRow("Entries", value: "\(entries.count)")
         }
@@ -356,16 +385,15 @@ struct MemberDetailView: View {
         card {
             sectionHeader("Actions")
 
-            // Promote / Demote
             Button {
                 toggleRole()
             } label: {
                 HStack {
                     Image(systemName: member.isAdmin ? "arrow.down.circle" : "arrow.up.circle")
-                        .foregroundStyle(AppColors.primary600)
+                        .foregroundStyle(Color.sp.primary)
                     Text(member.isAdmin ? "Demote to Player" : "Promote to Admin")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.primary600)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.primary)
                     Spacer()
                 }
             }
@@ -374,14 +402,13 @@ struct MemberDetailView: View {
 
             Divider()
 
-            // Remove
             Button(role: .destructive) {
                 showRemoveAlert = true
             } label: {
                 HStack {
                     Image(systemName: "person.badge.minus")
                     Text("Remove from Pool")
-                        .font(.subheadline)
+                        .font(SPTypography.body)
                     Spacer()
                 }
             }
@@ -397,16 +424,15 @@ struct MemberDetailView: View {
             content()
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func sectionHeader(_ title: String) -> some View {
         VStack(spacing: 10) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             Divider()
@@ -416,63 +442,23 @@ struct MemberDetailView: View {
     private func infoRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text(value)
-                .font(.subheadline.weight(.medium))
-        }
-    }
-
-    private func detailLabel(_ label: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.subheadline.weight(.bold))
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
         }
     }
 
     private func statusPill(_ label: String, color: Color) -> some View {
         Text(label)
-            .font(.system(size: 9, weight: .bold))
+            .font(SPTypography.caption)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
-    }
-
-    private func formattedDate(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = formatter.date(from: dateString) else {
-            // Try without fractional seconds
-            formatter.formatOptions = [.withInternetDateTime]
-            guard let date = formatter.date(from: dateString) else { return dateString }
-            return formatDate(date)
-        }
-        return formatDate(date)
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let display = DateFormatter()
-        display.dateFormat = "MMM d, yyyy"
-        return display.string(from: date)
-    }
-
-    private func formattedDateTime(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = formatter.date(from: dateString) ?? {
-            formatter.formatOptions = [.withInternetDateTime]
-            return formatter.date(from: dateString)
-        }()
-        guard let date else { return dateString }
-        let display = DateFormatter()
-        display.dateFormat = "MMM d, yyyy 'at' h:mm a"
-        return display.string(from: date)
     }
 
     // MARK: - Data Loading
@@ -520,18 +506,22 @@ struct MemberDetailView: View {
         }
     }
 
+    private func isSubmitted(_ entry: Entry) -> Bool {
+        entry.hasSubmittedPredictions && !unlockedEntryIds.contains(entry.entryId)
+    }
+
     private func unlockEntryAction() {
         guard let entry = entryToUnlock else { return }
-        isProcessing = true
+        // Optimistic update — show as unlocked immediately
+        unlockedEntryIds.insert(entry.entryId)
+        entryToUnlock = nil
         Task {
             do {
                 try await poolService.unlockEntry(entryId: entry.entryId)
-                isProcessing = false
-                entryToUnlock = nil
             } catch {
+                // Revert optimistic update on failure
+                unlockedEntryIds.remove(entry.entryId)
                 actionError = "Failed to unlock entry: \(error.localizedDescription)"
-                isProcessing = false
-                entryToUnlock = nil
             }
         }
     }
@@ -550,7 +540,6 @@ struct MemberDetailView: View {
                 )
                 isProcessing = false
                 showAdjustSheet = false
-                // Refresh adjustment history and leaderboard
                 loadAdjustments()
                 onAdjustmentChanged?()
             } catch {
@@ -568,7 +557,6 @@ struct MemberDetailView: View {
                 try await poolService.deleteAdjustment(adjustmentId: adj.id, entryId: adj.entryId, poolId: poolId)
                 isProcessing = false
                 adjustmentToDelete = nil
-                // Refresh adjustment history and leaderboard
                 loadAdjustments()
                 onAdjustmentChanged?()
             } catch {
@@ -629,5 +617,124 @@ struct MemberDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    // MARK: - Prediction Viewing
+
+    private func loadMemberPredictions(entry: Entry) async {
+        readOnlyEditVM = nil
+        bracketPickerVM = nil
+
+        if memberPredictionVM == nil {
+            memberPredictionVM = PredictionsViewModel(poolId: poolId)
+        }
+
+        await memberPredictionVM?.loadPredictions(entryId: entry.entryId)
+
+        let isBracket = pool?.predictionMode == .bracketPicker
+        if isBracket {
+            await setupBracketPickerVM(entry: entry)
+        } else {
+            setupReadOnlyVM(entry: entry)
+        }
+    }
+
+    private func setupReadOnlyVM(entry: Entry) {
+        guard readOnlyEditVM == nil, let predVM = memberPredictionVM else { return }
+
+        let editVM = PredictionEditViewModel(poolId: poolId, matches: matches, teams: teams)
+        editVM.setEntryId(entry.entryId)
+
+        for pred in predVM.existingPredictions {
+            editVM.predictions[pred.matchId] = PredictionInput(
+                matchId: pred.matchId,
+                homeScore: pred.predictedHomeScore,
+                awayScore: pred.predictedAwayScore,
+                homePso: pred.predictedHomePso,
+                awayPso: pred.predictedAwayPso,
+                winnerTeamId: pred.predictedWinnerTeamId
+            )
+        }
+
+        readOnlyEditVM = editVM
+    }
+
+    private func setupBracketPickerVM(entry: Entry) async {
+        guard bracketPickerVM == nil else { return }
+
+        let bpVM = BracketPickerViewModel(poolId: poolId, matches: matches, teams: teams)
+        bpVM.setEntryId(entry.entryId)
+        bpVM.currentStep = .review
+        await bpVM.loadExisting(entryId: entry.entryId)
+        bracketPickerVM = bpVM
+    }
+
+    @ViewBuilder
+    private func memberPredictionCover(entry: Entry) -> some View {
+        let entryPoints = leaderboardData.first(where: { $0.entryId == entry.entryId })?.totalPoints ?? entry.totalPoints
+        let isBracket = pool?.predictionMode == .bracketPicker
+
+        ZStack {
+            if isBracket, let bpVM = bracketPickerVM {
+                BracketPickerWizardView(
+                    viewModel: bpVM,
+                    entry: entry,
+                    readOnly: true,
+                    readOnlyPoints: entryPoints,
+                    onSubmitSuccess: {}
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: .bottom)
+            } else if !isBracket, let editVM = readOnlyEditVM {
+                PredictionWizardView(
+                    viewModel: editVM,
+                    entry: entry,
+                    initialStage: .summary,
+                    readOnly: true,
+                    readOnlyPoints: entryPoints
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: .bottom)
+            } else {
+                ProgressView("Loading predictions...")
+            }
+
+            // Floating header
+            VStack {
+                HStack {
+                    Button {
+                        presentedPredictionEntry = nil
+                        readOnlyEditVM = nil
+                        bracketPickerVM = nil
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+
+                    Spacer()
+
+                    VStack(spacing: 2) {
+                        Text(member.users.fullName)
+                            .font(.headline)
+                        Text(entry.entryName)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
+                    }
+
+                    Spacer()
+
+                    Color.clear
+                        .frame(width: 36, height: 36)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+
+                Spacer()
+            }
+        }
+        .background(Color(.systemGroupedBackground))
     }
 }

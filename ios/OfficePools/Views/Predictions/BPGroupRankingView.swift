@@ -13,26 +13,28 @@ struct BPGroupRankingView: View {
             // Progress header
             HStack {
                 Text("\(touchedGroups.count)")
-                    .font(.subheadline.weight(.bold))
+                    .font(SPTypography.body)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.sp.ink)
                 +
                 Text(" / 12 groups ranked")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundColor(Color.sp.slate)
 
                 Spacer()
 
                 if touchedGroups.count == 12 {
                     Label("All ranked", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(AppColors.success500)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.green)
                 }
             }
             .padding(.horizontal)
 
             if touchedGroups.isEmpty && !readOnly {
                 Text("Rankings initialized from FIFA rankings \u{2014} reorder to make your predictions")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                     .padding(.horizontal)
             }
 
@@ -70,12 +72,13 @@ private struct BPGroupCard: View {
             // Header
             HStack {
                 Text("Group \(groupLetter)")
-                    .font(.subheadline.weight(.bold))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color(.systemGray6))
+            .background(Color.sp.mist)
 
             Divider()
 
@@ -117,11 +120,11 @@ private struct BPGroupCard: View {
                 .scrollDisabled(true)
             }
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
         )
         .onAppear { localTeamIds = teamIds }
         .onChange(of: teamIds) { _, newValue in
@@ -149,17 +152,17 @@ private struct BPTeamRow: View {
 
     private var positionColor: Color {
         switch position {
-        case 0, 1: return AppColors.success500
-        case 2: return AppColors.warning500
-        default: return AppColors.neutral400
+        case 0, 1: return Color.sp.green
+        case 2: return Color.sp.amber
+        default: return Color.sp.slate
         }
     }
 
     private var positionBackground: Color {
         switch position {
-        case 0, 1: return AppColors.success100
-        case 2: return AppColors.warning100
-        default: return AppColors.neutral100
+        case 0, 1: return Color.sp.greenLight
+        case 2: return Color.sp.amberLight
+        default: return Color.sp.mist
         }
     }
 
@@ -179,13 +182,13 @@ private struct BPTeamRow: View {
                 CachedAsyncImage(url: url, width: 24, height: 16, cornerRadius: 2)
             } else {
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(.systemGray4))
+                    .fill(Color.sp.silver)
                     .frame(width: 24, height: 16)
             }
 
             // Team name
             Text(team?.countryName ?? "Unknown")
-                .font(.subheadline.weight(.medium))
+                .font(SPTypography.body)
                 .lineLimit(1)
 
             Spacer()

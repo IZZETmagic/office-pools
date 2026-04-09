@@ -32,8 +32,8 @@ struct KnockoutStageView: View {
             if !thirdPlaceMatches.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Third Place Match")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.slate)
                         .padding(.horizontal)
 
                     ForEach(thirdPlaceMatches) { match in
@@ -45,8 +45,8 @@ struct KnockoutStageView: View {
             if !finalMatches.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Final")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.slate)
                         .padding(.horizontal)
 
                     ForEach(finalMatches) { match in
@@ -98,13 +98,13 @@ struct KnockoutStageView: View {
             }
         }
         .padding(.vertical, 4)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.md)
                 .strokeBorder(
-                    isFinal ? AppColors.accent400.opacity(0.6) : Color(.systemGray4),
-                    lineWidth: isFinal ? 2 : 0.5
+                    isFinal ? Color.sp.accent.opacity(0.6) : Color.sp.silver,
+                    lineWidth: isFinal ? 2 : AppDesign.Border.thin
                 )
         )
         .padding(.horizontal)
@@ -116,8 +116,8 @@ struct KnockoutStageView: View {
         HStack(spacing: 0) {
             // Home team
             Text(resolved.home?.teamName ?? match.homeTeamPlaceholder ?? "TBD")
-                .font(.subheadline)
-                .foregroundStyle(resolved.home != nil ? .primary : .secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(resolved.home != nil ? Color.sp.ink : Color.sp.slate)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -125,27 +125,27 @@ struct KnockoutStageView: View {
             // Placeholder score
             HStack(spacing: 6) {
                 Text("?")
-                    .font(.headline)
-                    .foregroundStyle(.quaternary)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.silver)
                     .frame(width: 38, height: 36)
-                    .background(Color(.systemGray6).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.mist.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 Text("-")
-                    .font(.headline)
-                    .foregroundStyle(.quaternary)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.silver)
                 Text("?")
-                    .font(.headline)
-                    .foregroundStyle(.quaternary)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.silver)
                     .frame(width: 38, height: 36)
-                    .background(Color(.systemGray6).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.mist.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
             .padding(.horizontal, 8)
 
             // Away team
             Text(resolved.away?.teamName ?? match.awayTeamPlaceholder ?? "TBD")
-                .font(.subheadline)
-                .foregroundStyle(resolved.away != nil ? .primary : .secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(resolved.away != nil ? Color.sp.ink : Color.sp.slate)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -161,29 +161,29 @@ struct KnockoutStageView: View {
         HStack(spacing: 4) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.sp.slate)
 
             if resolved.home == nil, let placeholder = match.homeTeamPlaceholder {
                 Text(placeholder)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.sp.slate)
             }
             if resolved.home == nil && resolved.away == nil {
                 Text("vs")
                     .font(.caption2)
-                    .foregroundStyle(.quaternary)
+                    .foregroundStyle(Color.sp.silver)
             }
             if resolved.away == nil, let placeholder = match.awayTeamPlaceholder {
                 Text(placeholder)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.sp.slate)
             }
 
             Spacer()
 
             Text("Complete earlier rounds")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.sp.silver)
         }
     }
 

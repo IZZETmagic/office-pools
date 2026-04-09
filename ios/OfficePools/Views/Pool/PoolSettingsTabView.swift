@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage.CIFilterBuiltins
 
 struct PoolSettingsTabView: View {
     let pool: Pool?
@@ -36,8 +37,10 @@ struct PoolSettingsTabView: View {
     @State private var isDeleting = false
     @State private var actionError: String?
 
-    // Copy feedback
+    // Copy & share feedback
     @State private var copiedCode = false
+    @State private var copiedLink = false
+    @State private var showQRFullScreen = false
 
     var body: some View {
         ScrollView {
@@ -57,7 +60,7 @@ struct PoolSettingsTabView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, hasChanges ? 80 : 24)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
         .safeAreaInset(edge: .bottom) {
             if hasChanges || showSaveSuccess {
                 Button {
@@ -67,27 +70,27 @@ struct PoolSettingsTabView: View {
                         if isSaving {
                             ProgressView()
                                 .scaleEffect(0.7)
-                                .tint(AppColors.primary700)
+                                .tint(Color.sp.primary)
                         }
                         if showSaveSuccess {
                             Image(systemName: "checkmark")
                                 .fontWeight(.bold)
                             Text("Saved")
-                                .fontWeight(.semibold)
+                                .font(SPTypography.cardTitle)
                         } else {
                             Text("Save Changes")
-                                .fontWeight(.semibold)
+                                .font(SPTypography.cardTitle)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background {
-                        (showSaveSuccess ? AppColors.success500 : AppColors.primary500).opacity(0.2)
+                        (showSaveSuccess ? Color.sp.green : Color.sp.primary).opacity(0.2)
                     }
                     .background(.ultraThinMaterial)
-                    .foregroundStyle(showSaveSuccess ? AppColors.success600 : AppColors.primary700)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: (showSaveSuccess ? AppColors.success500 : AppColors.primary500).opacity(0.3), radius: 8, y: 4)
+                    .foregroundStyle(showSaveSuccess ? Color.sp.green : Color.sp.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+                    .shadow(color: (showSaveSuccess ? Color.sp.green : Color.sp.primary).opacity(0.3), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
                 .disabled(isSaving || showSaveSuccess)
@@ -121,25 +124,21 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    // MARK: - Card Builder (matches Rules tab)
+    // MARK: - Card Builder
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.caption.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
+                .spCaption()
+                .foregroundStyle(Color.sp.slate)
             Spacer()
         }
     }
@@ -147,42 +146,184 @@ struct PoolSettingsTabView: View {
     private func settingsRow(_ label: String, value: some View) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             value
         }
     }
 
-    // MARK: - Pool Code
+    // MARK: - Pool Code & Share
+
+    private var joinURL: String {
+        "https://sportpool.io/join/\(pool?.poolCode ?? "")"
+    }
 
     private var poolCodeCard: some View {
         card {
+            sectionHeader("Share & Invite")
+
+            // Pool code display
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Pool Code")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                     Text(pool?.poolCode ?? "—")
-                        .font(.system(.title2, design: .monospaced, weight: .bold))
+                        .font(SPTypography.mono(size: 22, weight: .bold))
+                        .foregroundStyle(Color.sp.ink)
+                }
+                Spacer()
+            }
+
+            // QR Code
+            if let qrImage = generateQRCode(from: joinURL) {
+                Button {
+                    showQRFullScreen = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(uiImage: qrImage)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 180)
+                            .padding(12)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+
+                        Text("Tap to enlarge")
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Action buttons
+            HStack(spacing: 10) {
+                shareButton(
+                    label: copiedCode ? "Copied!" : "Copy Code",
+                    icon: copiedCode ? "checkmark" : "doc.on.doc",
+                    isActive: copiedCode
+                ) {
+                    UIPasteboard.general.string = pool?.poolCode ?? ""
+                    copiedCode = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedCode = false }
+                }
+
+                shareButton(
+                    label: copiedLink ? "Copied!" : "Copy Link",
+                    icon: copiedLink ? "checkmark" : "link",
+                    isActive: copiedLink
+                ) {
+                    UIPasteboard.general.string = joinURL
+                    copiedLink = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedLink = false }
+                }
+            }
+        }
+        .sheet(isPresented: $showQRFullScreen) {
+            qrFullScreenSheet
+        }
+    }
+
+    private func shareButton(label: String, icon: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(label)
+                    .font(SPTypography.cardTitle)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isActive ? Color.sp.green.opacity(0.12) : Color.sp.primaryLight)
+            .foregroundStyle(isActive ? Color.sp.green : Color.sp.primary)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func generateQRCode(from string: String) -> UIImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        filter.correctionLevel = "M"
+
+        guard let outputImage = filter.outputImage else { return nil }
+
+        // Scale up for crisp rendering
+        let scale = 10.0
+        let scaled = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
+    @ViewBuilder
+    private var qrFullScreenSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer()
+
+                if let qrImage = generateQRCode(from: joinURL) {
+                    Image(uiImage: qrImage)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 300, maxHeight: 300)
+                        .padding(20)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+                        .spCardShadow()
+                }
+
+                VStack(spacing: 6) {
+                    Text(pool?.poolName ?? "")
+                        .font(SPTypography.sectionHeader)
+                        .foregroundStyle(Color.sp.ink)
+                    Text(pool?.poolCode ?? "")
+                        .font(SPTypography.mono(size: 28, weight: .bold))
+                        .foregroundStyle(Color.sp.primary)
+                    Text(joinURL)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
 
-                Button {
-                    UIPasteboard.general.string = pool?.poolCode ?? ""
-                    copiedCode = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        copiedCode = false
+                if let qrImage = generateQRCode(from: joinURL) {
+                    ShareLink(
+                        item: Image(uiImage: qrImage),
+                        preview: SharePreview(
+                            "Join \(pool?.poolName ?? "pool") on SportPool",
+                            image: Image(uiImage: qrImage)
+                        )
+                    ) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Share QR Code")
+                                .font(SPTypography.cardTitle)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.sp.primary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                     }
-                } label: {
-                    Label(copiedCode ? "Copied!" : "Copy", systemImage: copiedCode ? "checkmark" : "doc.on.doc")
-                        .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .tint(copiedCode ? AppColors.success500 : AppColors.primary500)
+            }
+            .padding(16)
+            .background(Color.sp.snow)
+            .navigationTitle("QR Code")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { showQRFullScreen = false }
+                }
             }
         }
     }
@@ -195,32 +336,32 @@ struct PoolSettingsTabView: View {
                 sectionHeader("Pool Info")
                 if let pool {
                     Text(modeLabel(pool.predictionMode))
-                        .font(.caption.weight(.semibold))
+                        .font(SPTypography.caption)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(AppColors.primary500.opacity(0.1))
-                        .foregroundStyle(AppColors.primary600)
+                        .background(Color.sp.primaryLight)
+                        .foregroundStyle(Color.sp.primary)
                         .clipShape(Capsule())
                 }
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Pool Name")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                 TextField("Pool Name", text: $editName)
                     .textFieldStyle(.plain)
-                    .font(.body)
+                    .font(SPTypography.body)
                 Divider()
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Description")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                 TextField("Description (optional)", text: $editDescription, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .font(.body)
+                    .font(SPTypography.body)
                     .lineLimit(2...4)
             }
         }
@@ -239,8 +380,8 @@ struct PoolSettingsTabView: View {
             .pickerStyle(.segmented)
 
             Text(statusDescription)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
         }
     }
 
@@ -256,8 +397,8 @@ struct PoolSettingsTabView: View {
             .pickerStyle(.segmented)
 
             Text(editIsPrivate ? "Only people with the pool code can join." : "Anyone with the pool code can join.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
         }
     }
 
@@ -270,14 +411,14 @@ struct PoolSettingsTabView: View {
                     TextField("0", value: $editMaxParticipants, format: .number)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
-                        .font(.subheadline.weight(.bold))
+                        .font(SPTypography.mono(size: 14, weight: .bold))
                         .frame(width: 56)
                         .padding(.vertical, 6)
-                        .background(Color(.tertiarySystemFill))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(Color.sp.mist)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                     Text(editMaxParticipants == 0 ? "(unlimited)" : "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             )
         }
@@ -292,19 +433,19 @@ struct PoolSettingsTabView: View {
             if let pool, pool.predictionMode == .progressive {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(AppColors.primary500)
-                        .font(.subheadline)
+                        .foregroundStyle(Color.sp.primary)
+                        .font(.system(size: 14))
                     Text("Round deadlines are managed separately. This deadline applies to the initial group stage.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(10)
-                .background(AppColors.primary500.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.sp.primaryLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
 
             DatePicker("Deadline", selection: $editDeadline, displayedComponents: [.date, .hourAndMinute])
-                .font(.subheadline)
+                .font(SPTypography.body)
 
             HStack {
                 Spacer()
@@ -320,11 +461,11 @@ struct PoolSettingsTabView: View {
                         Spacer()
                         HStack(spacing: 6) {
                             Image(systemName: countdown.contains("passed") ? "exclamationmark.circle.fill" : "clock.fill")
-                                .font(.caption2)
+                                .font(.system(size: 10))
                             Text(countdown)
-                                .font(.caption2)
+                                .font(SPTypography.detail)
                         }
-                        .foregroundStyle(countdown.contains("passed") ? AppColors.error600 : AppColors.success600)
+                        .foregroundStyle(countdown.contains("passed") ? Color.sp.red : Color.sp.green)
                     }
                 }
             }
@@ -338,13 +479,13 @@ struct PoolSettingsTabView: View {
             sectionHeader("Prediction Entries")
 
             Text("Allow members to submit multiple prediction entries. Each is scored independently on the leaderboard.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Max Entries Per Member")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 HStack(spacing: 0) {
                     ForEach(1...10, id: \.self) { n in
@@ -352,30 +493,30 @@ struct PoolSettingsTabView: View {
                             editMaxEntries = n
                         } label: {
                             Text("\(n)")
-                                .font(.subheadline.weight(editMaxEntries == n ? .bold : .regular))
+                                .font(SPTypography.mono(size: 14, weight: editMaxEntries == n ? .bold : .regular))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .background(editMaxEntries == n ? Color.accentColor : Color(.tertiarySystemFill))
-                                .foregroundStyle(editMaxEntries == n ? .white : .primary)
+                                .background(editMaxEntries == n ? Color.sp.primary : Color.sp.mist)
+                                .foregroundStyle(editMaxEntries == n ? .white : Color.sp.ink)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
 
             if editMaxEntries > 1 {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(AppColors.primary500)
-                        .font(.subheadline)
+                        .foregroundStyle(Color.sp.primary)
+                        .font(.system(size: 14))
                     Text("Members can create up to \(editMaxEntries) entries (e.g. \"Serious\", \"Fun\"). Each appears as its own row on the leaderboard.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .padding(10)
-                .background(AppColors.primary500.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.sp.primaryLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
     }
@@ -394,20 +535,20 @@ struct PoolSettingsTabView: View {
             card {
                 HStack(spacing: 12) {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.body)
-                        .foregroundStyle(AppColors.primary500)
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.sp.primary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Scoring Configuration")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
+                            .font(SPTypography.cardTitle)
+                            .foregroundStyle(Color.sp.ink)
                         Text("Customize point values for matches and bonuses")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sp.silver)
                 }
             }
         }
@@ -425,21 +566,21 @@ struct PoolSettingsTabView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "archivebox")
-                        .font(.body)
+                        .font(.system(size: 16))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Archive Pool")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.cardTitle)
                         Text("Preserve data but prevent new activity")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sp.silver)
                 }
                 .padding(.vertical, 4)
-                .foregroundStyle(AppColors.warning600)
+                .foregroundStyle(Color.sp.amber)
             }
             .buttonStyle(.plain)
 
@@ -452,34 +593,34 @@ struct PoolSettingsTabView: View {
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "trash")
-                            .font(.body)
+                            .font(.system(size: 16))
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Delete Pool")
-                            .font(.subheadline.weight(.medium))
+                            .font(SPTypography.cardTitle)
                         Text("Permanently delete pool and all data")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sp.silver)
                 }
                 .padding(.vertical, 4)
-                .foregroundStyle(AppColors.error600)
+                .foregroundStyle(Color.sp.red)
             }
             .buttonStyle(.plain)
             .disabled(isDeleting)
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(AppColors.error500.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
+                .strokeBorder(Color.sp.red.opacity(0.15), lineWidth: AppDesign.Border.thin)
         )
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCardShadow()
     }
 
     // MARK: - Init State
@@ -493,7 +634,7 @@ struct PoolSettingsTabView: View {
         editMaxEntries = pool.maxEntriesPerUser
         editMaxParticipants = pool.maxParticipants ?? 0
         if let deadline = pool.predictionDeadline {
-            let parsed = parseISO8601(deadline)
+            let parsed = SPDateFormatter.parse(deadline)
             editDeadline = parsed ?? Date()
             savedDeadline = parsed
         } else {
@@ -617,11 +758,11 @@ struct PoolSettingsTabView: View {
             if let date { editDeadline = date }
         } label: {
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color(.quaternarySystemFill))
+                .background(Color.sp.mist)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -635,16 +776,8 @@ struct PoolSettingsTabView: View {
         }
     }
 
-    private func parseISO8601(_ string: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
-    }
-
     private func deadlineCountdown(_ iso: String) -> String {
-        guard let date = parseISO8601(iso) else { return "" }
+        guard let date = SPDateFormatter.parse(iso) else { return "" }
         let now = Date()
         if date < now { return "Deadline passed" }
         let diff = Calendar.current.dateComponents([.day, .hour], from: now, to: date)

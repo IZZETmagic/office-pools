@@ -49,13 +49,13 @@ struct MatchPredictionRow: View {
                 HStack(spacing: 6) {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(homeTeamOverride ?? match.homeDisplayName)
-                            .font(.subheadline)
+                            .font(SPTypography.body)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         if let subtitle = homeSubtitle {
                             Text(subtitle)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                         }
                     }
                     homeFlag
@@ -70,8 +70,8 @@ struct MatchPredictionRow: View {
                     HStack(spacing: 6) {
                         scoreField(text: $homeText, fieldId: .home(match.matchId), onChange: handleScoreChange, autoAdvanceTo: .away(match.matchId))
                         Text("-")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.cardTitle)
+                            .foregroundStyle(Color.sp.slate)
                         scoreField(text: $awayText, fieldId: .away(match.matchId), onChange: handleScoreChange, autoAdvanceTo: nil)
                     }
                     .padding(.horizontal, 8)
@@ -82,13 +82,13 @@ struct MatchPredictionRow: View {
                     awayFlag
                     VStack(alignment: .leading, spacing: 2) {
                         Text(awayTeamOverride ?? match.awayDisplayName)
-                            .font(.subheadline)
+                            .font(SPTypography.body)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         if let subtitle = awaySubtitle {
                             Text(subtitle)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                         }
                     }
                 }
@@ -127,15 +127,15 @@ struct MatchPredictionRow: View {
             Text(homeText.isEmpty ? "-" : homeText)
                 .font(.title3.weight(.semibold).monospacedDigit())
                 .frame(width: 48, height: 44)
-                .background(Color(.systemGray5))
+                .background(Color.sp.mist)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             Text("-")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.slate)
             Text(awayText.isEmpty ? "-" : awayText)
                 .font(.title3.weight(.semibold).monospacedDigit())
                 .frame(width: 48, height: 44)
-                .background(Color(.systemGray5))
+                .background(Color.sp.mist)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -148,27 +148,27 @@ struct MatchPredictionRow: View {
             VStack(spacing: 4) {
                 Text("Penalty Shootout")
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.sp.slate)
                 HStack(spacing: 6) {
                     Text(homePsoText.isEmpty ? "-" : homePsoText)
-                        .font(.subheadline.monospacedDigit().weight(.medium))
+                        .font(SPTypography.mono(size: 14, weight: .medium))
                         .frame(width: 38, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(Color.sp.mist)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                     Text("-")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                     Text(awayPsoText.isEmpty ? "-" : awayPsoText)
-                        .font(.subheadline.monospacedDigit().weight(.medium))
+                        .font(SPTypography.mono(size: 14, weight: .medium))
                         .frame(width: 38, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(Color.sp.mist)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Color(.systemGray6).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.sp.mist.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             Spacer()
         }
     }
@@ -222,19 +222,19 @@ struct MatchPredictionRow: View {
             VStack(spacing: 4) {
                 Text("Penalty Shootout")
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.sp.slate)
                 HStack(spacing: 6) {
                     scoreField(text: $homePsoText, fieldId: .home("\(match.matchId)_pso"), onChange: handlePsoChange, autoAdvanceTo: .away("\(match.matchId)_pso"))
                     Text("-")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                     scoreField(text: $awayPsoText, fieldId: .away("\(match.matchId)_pso"), onChange: handlePsoChange, autoAdvanceTo: nil)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Color(.systemGray6).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.sp.mist.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             Spacer()
         }
     }
@@ -279,11 +279,11 @@ private struct TapScoreField: View {
                     .multilineTextAlignment(.center)
                     .font(.title3.weight(.semibold).monospacedDigit())
                     .frame(width: 48, height: 44)
-                    .background(Color.accentColor.opacity(0.12))
+                    .background(Color.sp.primaryLight)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                            .strokeBorder(Color.sp.primary, lineWidth: 1.5)
                     )
                     .focused($keyboardFocused)
                     .onChange(of: text) {
@@ -308,7 +308,7 @@ private struct TapScoreField: View {
                 Group {
                     if text.isEmpty {
                         Circle()
-                            .fill(Color(.systemGray3))
+                            .fill(Color.sp.silver)
                             .frame(width: 8, height: 8)
                             .opacity(dotOpacity)
                             .onAppear {
@@ -319,11 +319,11 @@ private struct TapScoreField: View {
                     } else {
                         Text(text)
                             .font(.title3.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.sp.ink)
                     }
                 }
                     .frame(width: 48, height: 44)
-                    .background(Color(.systemGray5))
+                    .background(Color.sp.mist)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .scaleEffect(scale)
                     .opacity(isPressed ? 0.7 : 1.0)

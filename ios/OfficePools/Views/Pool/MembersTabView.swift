@@ -12,21 +12,26 @@ struct MembersTabView: View {
                     Spacer().frame(height: 4)
 
                     // Members card
-                    card {
+                    VStack(alignment: .leading, spacing: 10) {
                         sectionHeader("\(members.count) Members")
 
                         ForEach(Array(sortedMembers.enumerated()), id: \.element.id) { index, member in
+                            if index > 0 {
+                                Divider().padding(.leading, 48)
+                            }
                             NavigationLink(value: member) {
                                 memberRow(member)
                             }
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(16)
+                    .spCard()
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
     }
 
     // MARK: - Filtered Members
@@ -47,31 +52,32 @@ struct MembersTabView: View {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(member.isAdmin ? AppColors.neutral600.opacity(0.15) : AppColors.primary500.opacity(0.1))
+                    .fill(member.isAdmin ? Color.sp.slate.opacity(0.15) : Color.sp.primaryLight)
                     .frame(width: 36, height: 36)
                 Text(String(member.users.fullName.prefix(1)).uppercased())
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(member.isAdmin ? AppColors.neutral600 : AppColors.primary500)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(member.isAdmin ? Color.sp.slate : Color.sp.primary)
             }
 
             // Name + username + entry count
             VStack(alignment: .leading, spacing: 2) {
                 Text(member.users.fullName)
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 HStack(spacing: 4) {
                     Text("@\(member.users.username)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
 
                     let entryCount = member.entries?.count ?? 0
                     if entryCount > 0 {
                         Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                         Text("\(entryCount) \(entryCount == 1 ? "entry" : "entries")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
             }
@@ -79,8 +85,8 @@ struct MembersTabView: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.sp.silver)
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
@@ -88,21 +94,12 @@ struct MembersTabView: View {
 
     // MARK: - Helpers
 
-    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            content()
-        }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
-
     private func sectionHeader(_ title: String) -> some View {
         VStack(spacing: 10) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             Divider()

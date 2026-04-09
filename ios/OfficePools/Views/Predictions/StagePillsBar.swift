@@ -36,23 +36,23 @@ struct StagePillsBar: View {
         } label: {
             VStack(spacing: 2) {
                 Text(pillLabel(for: stage))
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
                     .lineLimit(1)
 
                 if stage != .summary {
                     let counts = viewModel.stageCompletionCount(stage)
                     Text("\(counts.completed)/\(counts.total)")
-                        .font(.caption.monospacedDigit())
+                        .font(SPTypography.mono(size: 12))
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(pillColor(for: stage))
-            .foregroundStyle(stage == currentStage ? .white : .primary)
+            .foregroundStyle(stage == currentStage ? .white : Color.sp.ink)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(stage == currentStage ? Color.clear : Color(.systemGray4), lineWidth: 1)
+                    .strokeBorder(stage == currentStage ? Color.clear : Color.sp.silver, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -76,18 +76,18 @@ struct StagePillsBar: View {
 
     private func pillColor(for stage: WizardStage) -> Color {
         if stage == currentStage {
-            return AppColors.primary500
+            return Color.sp.primary
         }
         if stage == .summary {
-            return viewModel.isComplete ? AppColors.success500.opacity(0.2) : Color(.systemGray5)
+            return viewModel.isComplete ? Color.sp.greenLight : Color.sp.mist
         }
         let counts = viewModel.stageCompletionCount(stage)
         if counts.completed == counts.total && counts.total > 0 {
-            return AppColors.success500.opacity(0.2)
+            return Color.sp.greenLight
         } else if counts.completed > 0 {
-            return AppColors.warning400.opacity(0.2)
+            return Color.sp.amberLight
         } else {
-            return Color(.systemGray5)
+            return Color.sp.mist
         }
     }
 }

@@ -72,10 +72,11 @@ struct PredictionsTabView: View {
                             },
                             onSetup: { setupBracketPickerViewModel(entry: entry) },
                             onSubmitSuccess: {
-                                showingEntryDetail = false
-                                bracketPickerViewModel = nil
                                 Task {
                                     await viewModel.loadPredictions(entryId: entry.entryId)
+                                    await onEntryCreated?()
+                                    showingEntryDetail = false
+                                    bracketPickerViewModel = nil
                                 }
                             }
                         )
@@ -94,6 +95,7 @@ struct PredictionsTabView: View {
                                 Task {
                                     await viewModel.loadPredictions(entryId: entry.entryId)
                                     await onRoundStatesRefresh?(entry.entryId)
+                                    await onEntryCreated?()
                                 }
                             }
                         )
@@ -117,10 +119,11 @@ struct PredictionsTabView: View {
                             onStartEditing: { startEditing(entry: entry) },
                             onSetupReadOnly: { setupReadOnlyViewModel(entry: entry) },
                             onSubmitSuccess: {
-                                isEditing = false
-                                editViewModel = nil
                                 Task {
                                     await viewModel.loadPredictions(entryId: entry.entryId)
+                                    await onEntryCreated?()
+                                    isEditing = false
+                                    editViewModel = nil
                                 }
                             }
                         )
@@ -188,20 +191,22 @@ struct PredictionsTabView: View {
                 // Your Entries card
                 VStack(alignment: .leading, spacing: 0) {
                     // Section header
-                    VStack(spacing: 10) {
-                        HStack {
-                            Text("Your Entries")
-                                .font(.headline)
-                            Spacer()
-                        }
-                        Divider()
+                    HStack {
+                        Text("Your Entries")
+                            .font(SPTypography.sectionHeader)
+                            .foregroundStyle(Color.sp.ink)
+                        Spacer()
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 12)
 
                     // Entry rows
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 {
+                            Divider().padding(.leading, 16)
+                        }
+
                         Button {
                             selectedEntry = entry
                             Task {
@@ -209,37 +214,37 @@ struct PredictionsTabView: View {
                                 showingEntryDetail = true
                             }
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 6) {
                                         Text(entry.entryName)
-                                            .font(.body.weight(.medium))
-                                            .foregroundStyle(.primary)
+                                            .font(SPTypography.cardTitle)
+                                            .foregroundStyle(Color.sp.ink)
 
                                         if entry.hasSubmittedPredictions {
                                             Image(systemName: "checkmark.seal.fill")
-                                                .font(.caption)
-                                                .foregroundStyle(AppColors.success500)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(Color.sp.green)
                                         }
                                     }
 
                                     Text(entryStatusText(entry))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(SPTypography.body)
+                                        .foregroundStyle(Color.sp.slate)
                                 }
 
                                 Spacer()
 
                                 Text("\(pointsForEntry(entry.entryId)) pts")
-                                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                                    .font(SPTypography.mono(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.sp.slate)
 
                                 Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.sp.silver)
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 12)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -261,21 +266,19 @@ struct PredictionsTabView: View {
                                 }
                             }
                         }
-
                     }
 
+                    Spacer().frame(height: 8)
                 }
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                .spCard()
 
                 // Footer note
                 if let pool = pool {
                     HStack {
                         Spacer()
                         Text("\(entries.count) of \(pool.maxEntriesPerUser) entries used")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                     .padding(.horizontal, 4)
                 }
@@ -287,15 +290,15 @@ struct PredictionsTabView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
                             Text("Add Entry")
-                                .font(.subheadline.weight(.semibold))
+                                .font(SPTypography.cardTitle)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color.accentColor)
+                        .background(Color.sp.primary)
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                     }
                     .buttonStyle(.plain)
                 }
@@ -304,7 +307,7 @@ struct PredictionsTabView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
     }
 
     private func entryStatusText(_ entry: Entry) -> String {
@@ -340,17 +343,9 @@ struct PredictionsTabView: View {
     }
 
     private var isPastDeadline: Bool {
-        guard let deadline = pool?.predictionDeadline else { return false }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: deadline) {
-            return date < Date()
-        }
-        formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: deadline) {
-            return date < Date()
-        }
-        return false
+        guard let deadline = pool?.predictionDeadline,
+              let date = SPDateFormatter.parse(deadline) else { return false }
+        return date < Date()
     }
 
     // MARK: - Read-Only View Model

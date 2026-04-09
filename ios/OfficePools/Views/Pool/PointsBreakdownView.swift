@@ -22,7 +22,15 @@ struct PointsBreakdownView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("Loading breakdown...")
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading breakdown...")
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.sp.snow)
             } else if let error = errorMessage {
                 ContentUnavailableView("Error", systemImage: "exclamationmark.triangle", description: Text(error))
             } else if let breakdown = breakdown {
@@ -39,68 +47,61 @@ struct PointsBreakdownView: View {
 
     private func breakdownContent(_ data: PointsBreakdownResponse) -> some View {
         ZStack(alignment: .top) {
-            // Scrollable content
             ScrollView {
                 VStack(spacing: 16) {
-                    // Summary Cards
                     summaryCards(data.summary, adjustment: data.entry.pointAdjustment)
 
-                    // Adjustment Reason
                     if data.entry.pointAdjustment != 0 {
                         adjustmentSection(data.entry)
                     }
 
-                    // Match Points Breakdown
                     if !data.matchResults.isEmpty {
                         matchPointsSection(data.matchResults)
                     }
 
-                    // Bonus Points Breakdown
                     if !data.bonusEntries.isEmpty {
                         bonusPointsSection(data.bonusEntries)
                     }
 
-                    // Scoring Rules
                     scoringRulesSection(data.poolSettings)
                 }
                 .padding(.top, headerHeight + 16)
                 .padding(.horizontal)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
 
-            // Fixed header
             headerSection(data)
         }
     }
 
-    // MARK: - Header (Fixed, glass)
+    // MARK: - Header
 
     private func headerSection(_ data: PointsBreakdownResponse) -> some View {
         VStack(spacing: 6) {
             HStack(spacing: 12) {
-                // Rank badge
                 Text("#\(rank)")
-                    .font(rank >= 10 ? .callout.weight(.black).monospacedDigit() : .title3.weight(.black).monospacedDigit())
+                    .font(SPTypography.mono(size: rank >= 10 ? 15 : 18, weight: .black))
                     .foregroundStyle(.white)
                     .frame(minWidth: 40, minHeight: 40)
                     .frame(width: rank >= 100 ? 50 : 40, height: 40)
-                    .background(rankColor)
+                    .background(SPTypography.rankColor(rank))
                     .clipShape(Capsule())
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(data.user.fullName)
-                        .font(.headline.weight(.bold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
 
                     HStack(spacing: 6) {
                         if !data.entry.entryName.isEmpty {
                             Text(data.entry.entryName)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .font(SPTypography.body)
+                                .foregroundStyle(Color.sp.slate)
                         }
                         Text("@\(data.user.username)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
                 }
 
@@ -111,7 +112,7 @@ struct PointsBreakdownView: View {
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
-        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .spCardShadow()
         .overlay(
             GeometryReader { geo in
                 Color.clear
@@ -123,50 +124,39 @@ struct PointsBreakdownView: View {
         )
     }
 
-    private var rankColor: Color {
-        switch rank {
-        case 1: return AppColors.accent300
-        case 2: return AppColors.neutral400
-        case 3: return AppColors.bronze
-        default: return AppColors.primary500
-        }
-    }
-
     // MARK: - Summary Cards
 
     private func summaryCards(_ summary: BreakdownSummary, adjustment: Int) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                summaryCell(title: "Match", value: "\(summary.matchPoints)", color: AppColors.xpMatch)
+                summaryCell(title: "MATCH", value: "\(summary.matchPoints)", color: Color.sp.primary)
                 verticalDivider
-                summaryCell(title: "Bonus", value: "\(summary.bonusPoints)", color: AppColors.xpBonus)
+                summaryCell(title: "BONUS", value: "\(summary.bonusPoints)", color: Color.sp.amber)
                 if adjustment != 0 {
                     verticalDivider
-                    summaryCell(title: "Adj.", value: "\(adjustment)", color: AppColors.warning600)
+                    summaryCell(title: "ADJ.", value: "\(adjustment)", color: Color.sp.amber)
                 }
                 verticalDivider
-                summaryCell(title: "Total", value: "\(summary.totalPoints)", color: .primary, bold: true)
+                summaryCell(title: "TOTAL", value: "\(summary.totalPoints)", color: Color.sp.ink, bold: true)
             }
             .padding(.vertical, 14)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private var verticalDivider: some View {
         Rectangle()
-            .fill(Color(.separator).opacity(0.3))
+            .fill(Color.sp.silver.opacity(0.4))
             .frame(width: 1, height: 36)
     }
 
     private func summaryCell(title: String, value: String, color: Color, bold: Bool = false) -> some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .spCaption()
+                .foregroundStyle(Color.sp.slate)
             Text(value)
-                .font(bold ? .title2.weight(.black).monospacedDigit() : .title3.weight(.bold).monospacedDigit())
+                .font(SPTypography.mono(size: bold ? 24 : 20, weight: bold ? .black : .bold))
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
@@ -178,73 +168,62 @@ struct PointsBreakdownView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Point Adjustments")
-                    .font(.headline)
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
                 Text(entry.pointAdjustment > 0 ? "+\(entry.pointAdjustment)" : "\(entry.pointAdjustment)")
-                    .font(.headline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(entry.pointAdjustment > 0 ? AppColors.success600 : AppColors.error600)
+                    .font(SPTypography.mono(size: 17, weight: .bold))
+                    .foregroundStyle(entry.pointAdjustment > 0 ? Color.sp.green : Color.sp.red)
             }
+
             Divider()
+                .background(Color.sp.silver.opacity(0.5))
 
             if !adjustments.isEmpty {
                 ForEach(adjustments) { adj in
                     HStack(alignment: .top, spacing: 10) {
                         Text(adj.amount > 0 ? "+\(adj.amount)" : "\(adj.amount)")
-                            .font(.subheadline.weight(.bold).monospacedDigit())
-                            .foregroundStyle(adj.amount > 0 ? AppColors.success600 : AppColors.error600)
+                            .font(SPTypography.mono(size: 14, weight: .bold))
+                            .foregroundStyle(adj.amount > 0 ? Color.sp.green : Color.sp.red)
                             .frame(width: 44, alignment: .trailing)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(adj.reason)
-                                .font(.subheadline)
-                            Text(formattedAdjustmentDate(adj.createdAt))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .font(SPTypography.body)
+                                .foregroundStyle(Color.sp.ink)
+                            Text(SPDateFormatter.long(adj.createdAt))
+                                .font(SPTypography.detail)
+                                .foregroundStyle(Color.sp.slate)
                         }
 
                         Spacer()
                     }
                     .padding(10)
-                    .background(AppColors.warning600.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.amberLight)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                 }
             } else if let reason = entry.adjustmentReason, !reason.isEmpty {
-                // Fallback for legacy single-reason display
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(AppColors.warning600)
+                        .foregroundStyle(Color.sp.amber)
                         .font(.subheadline)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Reason")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .spCaption()
+                            .foregroundStyle(Color.sp.slate)
                         Text(reason)
-                            .font(.subheadline)
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.ink)
                     }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppColors.warning600.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Color.sp.amberLight)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
-    }
-
-    private func formattedAdjustmentDate(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = formatter.date(from: dateString) ?? {
-            formatter.formatOptions = [.withInternetDateTime]
-            return formatter.date(from: dateString)
-        }()
-        guard let date else { return dateString }
-        let display = DateFormatter()
-        display.dateFormat = "MMM d, yyyy 'at' h:mm a"
-        return display.string(from: date)
+        .spCard()
     }
 
     // MARK: - Match Points Section
@@ -272,56 +251,54 @@ struct PointsBreakdownView: View {
         let multiplier = results.first?.multiplier ?? 1.0
 
         return VStack(spacing: 0) {
-            // Stage header
             HStack {
                 Text(stageLabel(stage))
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 if multiplier > 1.0 {
                     Text("\(String(format: "%.1f", multiplier))x")
-                        .font(.caption2.weight(.bold))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(AppColors.primary500.opacity(0.12))
-                        .foregroundStyle(AppColors.primary600)
+                        .background(Color.sp.primaryLight)
+                        .foregroundStyle(Color.sp.primary)
                         .clipShape(Capsule())
                 }
 
                 Spacer()
 
                 Text("\(stageTotal) pts")
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(AppColors.primary500)
+                    .font(SPTypography.mono(size: 14, weight: .bold))
+                    .foregroundStyle(Color.sp.primary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
-            // Summary pills
             HStack(spacing: 6) {
                 if exactCount > 0 { countPill("\(exactCount) Exact", color: AppColors.tierExact) }
                 if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: AppColors.tierWinnerGd) }
                 if winnerCount > 0 { countPill("\(winnerCount) Winner", color: AppColors.tierWinner) }
-                if missCount > 0 { countPill("\(missCount) Miss", color: AppColors.neutral400) }
+                if missCount > 0 { countPill("\(missCount) Miss", color: Color.sp.slate) }
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            // Match rows
             ForEach(results.sorted(by: { $0.matchNumber < $1.matchNumber })) { result in
                 matchRow(result)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
             }
+
+            Spacer().frame(height: 8)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func countPill(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(color.opacity(0.12))
@@ -336,9 +313,8 @@ struct PointsBreakdownView: View {
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                // Type badge
                 Text(typeLabel(result.type))
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(typeColor(result.type).opacity(0.12))
@@ -346,51 +322,46 @@ struct PointsBreakdownView: View {
                     .clipShape(Capsule())
                     .frame(width: 52)
 
-                // Predicted score
                 VStack(spacing: 1) {
                     Text("\(result.predictedHome)-\(result.predictedAway)")
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(SPTypography.mono(size: 12))
                     Text("Pred")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(width: 36)
 
-                // Actual score
                 VStack(spacing: 1) {
                     Text("\(result.actualHome)-\(result.actualAway)")
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(SPTypography.mono(size: 12))
                     Text("Actual")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(width: 40)
 
-                // Teams
                 Text("\(result.homeTeam) v \(result.awayTeam)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Spacer()
 
-                // Points
                 Text(result.totalPoints > 0 ? "+\(result.totalPoints)" : "0")
-                    .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundStyle(result.totalPoints > 0 ? AppColors.success600 : AppColors.neutral300)
+                    .font(SPTypography.mono(size: 12, weight: .bold))
+                    .foregroundStyle(result.totalPoints > 0 ? Color.sp.green : Color.sp.slate)
             }
 
-            // Second line: predicted teams (only when they differ)
             if hasDifferentTeams {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 8))
-                        .foregroundStyle(AppColors.warning600)
+                        .foregroundStyle(Color.sp.amber)
 
                     Text("You predicted: \(result.predictedHomeTeam!) v \(result.predictedAwayTeam!)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(AppColors.warning600)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.amber)
                 }
                 .padding(.leading, 60)
             }
@@ -411,7 +382,6 @@ struct PointsBreakdownView: View {
                 }
             }
 
-            // Any remaining categories not in the standard order
             let remainingCategories = Set(grouped.keys).subtracting(Set(bonusCategoryOrder))
             ForEach(Array(remainingCategories).sorted(), id: \.self) { category in
                 if let categoryEntries = grouped[category] {
@@ -425,28 +395,27 @@ struct PointsBreakdownView: View {
         let subtotal = entries.reduce(0) { $0 + $1.pointsEarned }
 
         return VStack(spacing: 0) {
-            // Category header
             HStack {
                 Text(bonusCategoryLabel(category))
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
                 Text("\(subtotal) pts")
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(AppColors.xpBonus)
+                    .font(SPTypography.mono(size: 14, weight: .bold))
+                    .foregroundStyle(Color.sp.amber)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
-            // Bonus rows
             ForEach(entries) { entry in
                 HStack {
                     Text(entry.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                     Spacer()
                     Text("+\(entry.pointsEarned)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(AppColors.xpBonus)
+                        .font(SPTypography.mono(size: 12, weight: .bold))
+                        .foregroundStyle(Color.sp.amber)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
@@ -454,9 +423,7 @@ struct PointsBreakdownView: View {
 
             Spacer().frame(height: 6)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     // MARK: - Scoring Rules
@@ -465,21 +432,18 @@ struct PointsBreakdownView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Scoring Rules")
 
-            // Group Stage
             sectionCard(title: "Group Stage Points") {
                 ruleRow("Exact Score", value: settings.groupExactScore)
                 ruleRow("Correct Winner + GD", value: settings.groupCorrectDifference)
                 ruleRow("Correct Result Only", value: settings.groupCorrectResult)
             }
 
-            // Knockout Base
             sectionCard(title: "Knockout Base Points") {
                 ruleRow("Exact Score", value: settings.knockoutExactScore)
                 ruleRow("Correct Winner + GD", value: settings.knockoutCorrectDifference)
                 ruleRow("Correct Result Only", value: settings.knockoutCorrectResult)
             }
 
-            // Multipliers
             sectionCard(title: "Round Multipliers") {
                 ruleRowMultiplier("Round of 32", multiplier: settings.round32Multiplier)
                 ruleRowMultiplier("Round of 16", multiplier: settings.round16Multiplier)
@@ -489,7 +453,6 @@ struct PointsBreakdownView: View {
                 ruleRowMultiplier("Final", multiplier: settings.finalMultiplier)
             }
 
-            // PSO
             if settings.psoEnabled {
                 sectionCard(title: "Penalty Shootout Bonus") {
                     if let v = settings.psoExactScore { ruleRow("Exact PSO Score", value: v) }
@@ -502,34 +465,31 @@ struct PointsBreakdownView: View {
 
     private func sectionCard(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
-            // Rows
             content()
 
             Spacer().frame(height: 6)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        .spCard()
     }
 
     private func ruleRow(_ label: String, value: Int) -> some View {
         HStack {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text("\(value) pts")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(SPTypography.mono(size: 12))
+                .foregroundStyle(Color.sp.slate)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -538,12 +498,12 @@ struct PointsBreakdownView: View {
     private func ruleRowMultiplier(_ label: String, multiplier: Double) -> some View {
         HStack {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
             Spacer()
             Text("\(String(format: "%.1f", multiplier))x")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(AppColors.primary600)
+                .font(SPTypography.mono(size: 12))
+                .foregroundStyle(Color.sp.primary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -553,13 +513,12 @@ struct PointsBreakdownView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.subheadline.weight(.semibold))
+            .font(SPTypography.sectionHeader)
+            .foregroundStyle(Color.sp.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+            .spCard()
     }
 
     // MARK: - Helpers
@@ -602,15 +561,14 @@ struct PointsBreakdownView: View {
         case "exact": return AppColors.tierExact
         case "winner_gd": return AppColors.tierWinnerGd
         case "winner": return AppColors.tierWinner
-        case "miss": return AppColors.neutral400
-        default: return AppColors.neutral400
+        case "miss": return Color.sp.slate
+        default: return Color.sp.slate
         }
     }
 
     // MARK: - Data Loading
 
     private func loadBreakdown() async {
-        isLoading = true
         do {
             async let breakdownTask = apiService.fetchPointsBreakdown(poolId: poolId, entryId: entryId)
             async let adjustmentsTask = poolService.fetchAdjustments(entryId: entryId)
