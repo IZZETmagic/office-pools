@@ -276,9 +276,9 @@ struct PointsBreakdownView: View {
             .padding(.vertical, 12)
 
             HStack(spacing: 6) {
-                if exactCount > 0 { countPill("\(exactCount) Exact", color: AppColors.tierExact) }
-                if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: AppColors.tierWinnerGd) }
-                if winnerCount > 0 { countPill("\(winnerCount) Winner", color: AppColors.tierWinner) }
+                if exactCount > 0 { countPill("\(exactCount) Exact", color: Color.sp.tierExact) }
+                if wgdCount > 0 { countPill("\(wgdCount) W+GD", color: Color.sp.tierWinnerGd) }
+                if winnerCount > 0 { countPill("\(winnerCount) Winner", color: Color.sp.tierWinner) }
                 if missCount > 0 { countPill("\(missCount) Miss", color: Color.sp.slate) }
                 Spacer()
             }
@@ -558,9 +558,9 @@ struct PointsBreakdownView: View {
 
     private func typeColor(_ type: String) -> Color {
         switch type {
-        case "exact": return AppColors.tierExact
-        case "winner_gd": return AppColors.tierWinnerGd
-        case "winner": return AppColors.tierWinner
+        case "exact": return Color.sp.tierExact
+        case "winner_gd": return Color.sp.tierWinnerGd
+        case "winner": return Color.sp.tierWinner
         case "miss": return Color.sp.slate
         default: return Color.sp.slate
         }

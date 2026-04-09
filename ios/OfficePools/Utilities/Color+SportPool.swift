@@ -1,15 +1,15 @@
 import SwiftUI
 
 // =============================================
-// SPORTPOOL BRAND PALETTE
+// SPORTPOOL DESIGN SYSTEM — Single Color Source
 //
-// Layered alongside AppColors. Use Color.sp.*
-// for brand/structural colors on redesigned
-// screens. AppColors.* still owns semantic
-// aliases (tier, streak, level, rarity, XP).
+// All app colors live under Color.sp.*
+// Structural (snow, surface, ink, …), brand
+// (primary, accent), feedback (green, red, amber),
+// and semantic (tier, streak, level, rarity, XP).
 //
-// Reuses the Color(hex:) initializer from
-// AppColors.swift.
+// Reuses the Color(hex:) initializer defined
+// in the Color extension below.
 // =============================================
 
 extension Color {
@@ -40,7 +40,7 @@ extension Color {
 
         // MARK: - Accent
 
-        /// Highlights, countdown number
+        /// Highlights, countdown number, exact predictions
         static let accent      = Color.adaptive(light: 0xF5C518, dark: 0xF5C518)
         /// Action banner backgrounds
         static let accentLight = Color.adaptive(light: 0xFFF8E1, dark: 0x2A2210)
@@ -53,5 +53,53 @@ extension Color {
         static let redLight   = Color.adaptive(light: 0xFEF2F2, dark: 0x2A1010)
         static let amber      = Color.adaptive(light: 0xF59E0B, dark: 0xFBBF24)
         static let amberLight = Color.adaptive(light: 0xFFFBEB, dark: 0x2A2210)
+
+        // MARK: - Prediction Tier Colors
+
+        static let tierExact    = Color(hex: 0xE2B830)  // gold — exact score
+        static let tierWinnerGd = Color(hex: 0x52D660)  // green — correct winner + GD
+        static let tierWinner   = Color(hex: 0x30B7FF)  // blue — correct result
+        static let tierMiss     = Color(hex: 0xA1A6A0)  // gray — wrong
+
+        // MARK: - XP Category Colors
+
+        static let xpMatch = Color(hex: 0x30B7FF)  // blue
+        static let xpBonus = Color(hex: 0xF0B50F)  // amber
+        static let xpBadge = Color(hex: 0xE2B830)  // gold
+
+        // MARK: - Streak Colors
+
+        static let hotStreak  = Color(hex: 0xF4C41B)  // warm yellow
+        static let coldStreak = Color(hex: 0x8DE2FF)  // cool blue
+
+        // MARK: - Special
+
+        static let bronze        = Color(hex: 0xCD7F32)
+        static let outperforming = Color(hex: 0x2BBC3B)
+
+        // MARK: - Level Progression
+
+        static func levelColor(_ level: Int) -> Color {
+            switch level {
+            case 10:    return accent        // gold — Legend
+            case 8...9: return amber         // amber — Master/Expert
+            case 6...7: return primary       // blue — Strategist/Tactician
+            case 4...5: return Color(hex: 0x57D0FF) // lighter blue — Contender/Competitor
+            default:    return green          // green — Rookie/Beginner/Amateur
+            }
+        }
+
+        // MARK: - Badge Rarity
+
+        static func rarityColor(_ rarity: String) -> Color {
+            switch rarity {
+            case "Common":    return slate
+            case "Uncommon":  return green
+            case "Rare":      return primary
+            case "Very Rare": return Color(hex: 0x1281E2)
+            case "Legendary": return accent
+            default:          return slate
+            }
+        }
     }
 }

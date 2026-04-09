@@ -47,7 +47,7 @@ enum SPTypography {
         switch rank {
         case 1: return Color.sp.accent
         case 2: return Color.sp.silver
-        case 3: return AppColors.bronze
+        case 3: return Color.sp.bronze
         default: return Color.sp.primary
         }
     }

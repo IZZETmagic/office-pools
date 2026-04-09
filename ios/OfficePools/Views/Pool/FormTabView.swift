@@ -144,9 +144,9 @@ struct FormTabView: View {
             }
 
             HStack(spacing: 0) {
-                xpStat("Match", value: xp.totalBaseXp, color: AppColors.xpMatch)
-                xpStat("Bonus", value: xp.totalBonusXp, color: AppColors.xpBonus)
-                xpStat("Badges", value: xp.totalBadgeXp, color: AppColors.xpBadge)
+                xpStat("Match", value: xp.totalBaseXp, color: Color.sp.xpMatch)
+                xpStat("Bonus", value: xp.totalBonusXp, color: Color.sp.xpBonus)
+                xpStat("Badges", value: xp.totalBadgeXp, color: Color.sp.xpBadge)
             }
         }
         .padding(16)
@@ -216,7 +216,7 @@ struct FormTabView: View {
     }
 
     private func levelColor(_ level: Int) -> Color {
-        AppColors.levelColor(level)
+        Color.sp.levelColor(level)
     }
 
     // MARK: - Badges
@@ -295,7 +295,7 @@ struct FormTabView: View {
     }
 
     private func rarityColor(_ rarity: String) -> Color {
-        AppColors.rarityColor(rarity)
+        Color.sp.rarityColor(rarity)
     }
 
     // MARK: - Hot & Cold Streak KPIs
@@ -309,7 +309,7 @@ struct FormTabView: View {
             VStack(spacing: 6) {
                 Image(systemName: "flame.fill")
                     .font(.title2)
-                    .foregroundStyle(AppColors.hotStreak)
+                    .foregroundStyle(Color.sp.hotStreak)
 
                 Text("Current Hot Streak")
                     .spCaption()
@@ -317,13 +317,13 @@ struct FormTabView: View {
 
                 Text("\(currentHot)")
                     .font(SPTypography.mono(size: 36, weight: .heavy))
-                    .foregroundStyle(AppColors.hotStreak)
+                    .foregroundStyle(Color.sp.hotStreak)
 
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         Capsule()
                             .fill(i < min(currentHot, 5)
-                                ? AppColors.hotStreak
+                                ? Color.sp.hotStreak
                                 : Color.sp.mist)
                             .frame(width: 20, height: 5)
                     }
@@ -341,7 +341,7 @@ struct FormTabView: View {
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
-                    .strokeBorder(AppColors.hotStreak.opacity(0.2), lineWidth: AppDesign.Border.thin)
+                    .strokeBorder(Color.sp.hotStreak.opacity(0.2), lineWidth: AppDesign.Border.thin)
             )
             .spCardShadow()
 
@@ -349,7 +349,7 @@ struct FormTabView: View {
             VStack(spacing: 6) {
                 Image(systemName: "snowflake")
                     .font(.title2)
-                    .foregroundStyle(AppColors.coldStreak)
+                    .foregroundStyle(Color.sp.coldStreak)
 
                 Text("Worst Cold Streak")
                     .spCaption()
@@ -357,14 +357,14 @@ struct FormTabView: View {
 
                 Text("\(coldStreak)")
                     .font(SPTypography.mono(size: 36, weight: .heavy))
-                    .foregroundStyle(AppColors.coldStreak)
+                    .foregroundStyle(Color.sp.coldStreak)
 
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         let filled = i < min(coldStreak, 5)
                         let opacity: Double = 0.15 + 0.17 * Double(i + 1)
                         Capsule()
-                            .fill(filled ? AppColors.coldStreak.opacity(opacity) : Color.sp.mist)
+                            .fill(filled ? Color.sp.coldStreak.opacity(opacity) : Color.sp.mist)
                             .frame(width: 20, height: 5)
                     }
                 }
@@ -418,10 +418,10 @@ struct FormTabView: View {
 
             // Legend
             HStack(spacing: 14) {
-                runLegendItem(color: AppColors.tierExact, label: "Exact Score")
-                runLegendItem(color: AppColors.tierWinnerGd, label: "Winner + GD")
-                runLegendItem(color: AppColors.tierWinner, label: "Correct Result")
-                runLegendItem(color: AppColors.tierMiss, label: "Miss")
+                runLegendItem(color: Color.sp.tierExact, label: "Exact Score")
+                runLegendItem(color: Color.sp.tierWinnerGd, label: "Winner + GD")
+                runLegendItem(color: Color.sp.tierWinner, label: "Correct Result")
+                runLegendItem(color: Color.sp.tierMiss, label: "Miss")
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -501,10 +501,10 @@ struct FormTabView: View {
 
     private func tierColor(_ tier: String) -> Color {
         switch tier {
-        case "exact": return AppColors.tierExact
-        case "winner_gd": return AppColors.tierWinnerGd
-        case "winner": return AppColors.tierWinner
-        default: return AppColors.tierMiss
+        case "exact": return Color.sp.tierExact
+        case "winner_gd": return Color.sp.tierWinnerGd
+        case "winner": return Color.sp.tierWinner
+        default: return Color.sp.tierMiss
         }
     }
 
@@ -677,7 +677,7 @@ struct FormTabView: View {
     }
 
     private func performanceCallout(isOutperforming: Bool, accuracyDiff: Int, contrarianAdv: Int, showContrarian: Bool) -> some View {
-        let accentColor: Color = isOutperforming ? AppColors.outperforming : AppColors.primary500
+        let accentColor: Color = isOutperforming ? Color.sp.outperforming : Color.sp.primary
         let iconName = isOutperforming ? "chart.line.uptrend.xyaxis" : "target"
         let message = isOutperforming
             ? "Outperforming the crowd by \(accuracyDiff)%"
@@ -775,7 +775,7 @@ struct FormTabView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(topPredictable.enumerated()), id: \.element.id) { idx, match in
-                        predictableMatchRow(index: idx, match: match, color: AppColors.success500, isLast: idx == topPredictable.count - 1)
+                        predictableMatchRow(index: idx, match: match, color: Color.sp.green, isLast: idx == topPredictable.count - 1)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -797,7 +797,7 @@ struct FormTabView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(topUpsets.enumerated()), id: \.element.id) { idx, match in
-                        predictableMatchRow(index: idx, match: match, color: AppColors.error500, isLast: idx == topUpsets.count - 1)
+                        predictableMatchRow(index: idx, match: match, color: Color.sp.red, isLast: idx == topUpsets.count - 1)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -914,9 +914,11 @@ struct LevelRoadmapView: View {
 
     private var roadmapHeader: some View {
         let lvlColor = levelColor(xp.currentLevel.level)
-        let progressText: String = xp.nextLevel != nil
-            ? "\(xp.xpToNextLevel.formatted()) XP to \(xp.nextLevel!.name)"
-            : "Maximum level reached"
+        let progressText: String = if let next = xp.nextLevel {
+            "\(xp.xpToNextLevel.formatted()) XP to \(next.name)"
+        } else {
+            "Maximum level reached"
+        }
 
         return VStack(spacing: 4) {
             HStack(spacing: 14) {
@@ -1037,9 +1039,9 @@ struct LevelRoadmapView: View {
             }
 
             HStack(spacing: 8) {
-                xpPill("Match XP", value: xp.totalBaseXp, color: AppColors.xpMatch)
-                xpPill("Bonus XP", value: xp.totalBonusXp, color: AppColors.xpBonus)
-                xpPill("Badge XP", value: xp.totalBadgeXp, color: AppColors.xpBadge)
+                xpPill("Match XP", value: xp.totalBaseXp, color: Color.sp.xpMatch)
+                xpPill("Bonus XP", value: xp.totalBonusXp, color: Color.sp.xpBonus)
+                xpPill("Badge XP", value: xp.totalBadgeXp, color: Color.sp.xpBadge)
             }
             .padding(.top, 4)
         }
@@ -1066,6 +1068,6 @@ struct LevelRoadmapView: View {
     }
 
     private func levelColor(_ level: Int) -> Color {
-        AppColors.levelColor(level)
+        Color.sp.levelColor(level)
     }
 }

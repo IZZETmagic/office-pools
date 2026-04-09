@@ -55,6 +55,7 @@
 		3FBEE0F62C12358EC7CE9DC4 /* EmojiPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A696A6ADE33F92340C18247 /* EmojiPickerView.swift */; };
 		42216968F65FCF1F157DD412 /* BracketPickerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E100279F2F6FECA8094A91 /* BracketPickerViewModel.swift */; };
 		45BB521FE38873BF1FC64DF3 /* ScoringDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7448132784B9FF633558D0C /* ScoringDefaults.swift */; };
+		45BB521FE38873BF1FC64DF4 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7448132784B9FF633558D0D /* Strings.swift */; };
 		45C3C7C8B58068A2CAA3430F /* PredictionsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3009B629BA8F9FA7608EF3F /* PredictionsViewModel.swift */; };
 		4975420FBD3C3231159CBEA8 /* LiveMatchCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B810E51C6F1360B38996B5 /* LiveMatchCard.swift */; };
 		49F48C395194EC1EFF88AA0B /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86C50E486C26FD94CD5E97D /* AuthViewModel.swift */; };
@@ -90,6 +91,7 @@
 		9DA00C13ED852A7942CCE066 /* MatchScoresResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF90D5D012B45CFF86C884F9 /* MatchScoresResponse.swift */; };
 		9E3A1434827C5AAB1DB6B9F1 /* PoolDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */; };
 		A3DD9C4000206052C3089EA0 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A587D2E36A8CA740A652D7 /* ProfileView.swift */; };
+		A3DD9C4000206052C3089EA1 /* ProfileStatsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A587D2E36A8CA740A652D8 /* ProfileStatsSection.swift */; };
 		A5DD94A8818B93E508AB8D86 /* HomeSkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B9C3FA6BE8C8CEFCC546D9 /* HomeSkeletonView.swift */; };
 		AA77CD7D86D4890898920F97 /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADC5B571B2AC59945F099757 /* Entry.swift */; };
 		AB3F23AABDB806AD67090743 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C146B2BC07D15E65FFD553F2 /* Assets.xcassets */; };
@@ -222,6 +224,7 @@
 		B3AEA57583486FBE2BA4885E /* ActivityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewModel.swift; sourceTree = "<group>"; };
 		B51BFF498E1A1C361BB8751D /* AppDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDataStore.swift; sourceTree = "<group>"; };
 		B7448132784B9FF633558D0C /* ScoringDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringDefaults.swift; sourceTree = "<group>"; };
+		B7448132784B9FF633558D0D /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		B8B810E51C6F1360B38996B5 /* LiveMatchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMatchCard.swift; sourceTree = "<group>"; };
 		BA0A37F0386AAE3DE7C34A06 /* CreatePoolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePoolView.swift; sourceTree = "<group>"; };
 		BCCCC11265EC117D2A645EB5 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
@@ -247,6 +250,7 @@
 		E1AF9C41CE321A3703211DF2 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		E2926D66D604930D585193CB /* ActivityEmptyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEmptyView.swift; sourceTree = "<group>"; };
 		E2A587D2E36A8CA740A652D7 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		E2A587D2E36A8CA740A652D8 /* ProfileStatsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsSection.swift; sourceTree = "<group>"; };
 		E2C64BD7C61450079C3C19A8 /* StatCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCardView.swift; sourceTree = "<group>"; };
 		ED6FE840DBB7B92EAEEA264A /* SportPoolPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportPoolPill.swift; sourceTree = "<group>"; };
 		EE5C1703AC9FE44CD2FB5C42 /* BPFormTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BPFormTabView.swift; sourceTree = "<group>"; };
@@ -399,6 +403,7 @@
 				F00D21005AC4D11766C14D6D /* Color+SportPool.swift */,
 				5CDA539E7B61229279894F0D /* GroupStandingsCalculator.swift */,
 				B7448132784B9FF633558D0C /* ScoringDefaults.swift */,
+				B7448132784B9FF633558D0D /* Strings.swift */,
 				1975340AFBB4E3EF45A3D9D9 /* SPDesign.swift */,
 				DAA18728F37CA15861D3B3C7 /* TournamentConstants.swift */,
 			);
@@ -432,6 +437,7 @@
 			isa = PBXGroup;
 			children = (
 				E2A587D2E36A8CA740A652D7 /* ProfileView.swift */,
+				E2A587D2E36A8CA740A652D8 /* ProfileStatsSection.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -715,6 +721,7 @@
 				0F677B24FCD615DC31A0ECB7 /* PredictionsTabView.swift in Sources */,
 				45C3C7C8B58068A2CAA3430F /* PredictionsViewModel.swift in Sources */,
 				A3DD9C4000206052C3089EA0 /* ProfileView.swift in Sources */,
+				A3DD9C4000206052C3089EA1 /* ProfileStatsSection.swift in Sources */,
 				293B55DCA467BA132B30CA89 /* ProfileViewModel.swift in Sources */,
 				ACBCCF935A16BD5E924ADB5A /* ProgressiveGroupStageView.swift in Sources */,
 				7726A187BEFB0DAB812A688D /* ProgressivePredictionEditViewModel.swift in Sources */,
@@ -730,6 +737,7 @@
 				F7C69A9E82326B0436ED5FAB /* SPDesign.swift in Sources */,
 				D3B69A08CCCEA18664EFC9DE /* ScoringConfigView.swift in Sources */,
 				45BB521FE38873BF1FC64DF3 /* ScoringDefaults.swift in Sources */,
+				45BB521FE38873BF1FC64DF4 /* Strings.swift in Sources */,
 				8278B0743F6661A7F901AC77 /* ScoringRulesTabView.swift in Sources */,
 				95DEF52A21B6B21820A344C3 /* Settings.swift in Sources */,
 				35920949B17FEFA657C8C27B /* SharePredictionSheet.swift in Sources */,

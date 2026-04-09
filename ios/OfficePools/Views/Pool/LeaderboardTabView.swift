@@ -87,7 +87,7 @@ struct LeaderboardTabView: View {
         HStack(alignment: .bottom, spacing: 8) {
             podiumEntry(entry: leaderboardData[1], rank: 2, pedestalHeight: 105, medalIcon: "medal.fill", ringColor: Color.sp.silver)
             podiumEntry(entry: leaderboardData[0], rank: 1, pedestalHeight: 130, medalIcon: "trophy.fill", ringColor: Color.sp.accent)
-            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: AppColors.bronze)
+            podiumEntry(entry: leaderboardData[2], rank: 3, pedestalHeight: 85, medalIcon: "medal.fill", ringColor: Color.sp.bronze)
         }
         .padding(.top, 8)
     }
@@ -221,7 +221,7 @@ struct LeaderboardTabView: View {
         switch rank {
         case 1: return Color.sp.accent.opacity(0.08)
         case 2: return Color.sp.silver.opacity(0.15)
-        case 3: return AppColors.bronze.opacity(0.1)
+        case 3: return Color.sp.bronze.opacity(0.1)
         default: return Color.clear
         }
     }
@@ -230,9 +230,9 @@ struct LeaderboardTabView: View {
 
     private var legendView: some View {
         HStack(spacing: 12) {
-            legendDot(color: AppColors.tierExact, label: "Exact")
-            legendDot(color: AppColors.tierWinnerGd, label: "W+GD")
-            legendDot(color: AppColors.tierWinner, label: "Winner")
+            legendDot(color: Color.sp.tierExact, label: "Exact")
+            legendDot(color: Color.sp.tierWinnerGd, label: "W+GD")
+            legendDot(color: Color.sp.tierWinner, label: "Winner")
             legendDot(color: Color.sp.red, label: "Miss")
         }
         .spCaption()
@@ -494,9 +494,9 @@ struct FormDotsView: View {
 
     private func dotColor(for result: String) -> Color {
         switch result {
-        case "exact": return AppColors.tierExact
-        case "winner_gd": return AppColors.tierWinnerGd
-        case "winner": return AppColors.tierWinner
+        case "exact": return Color.sp.tierExact
+        case "winner_gd": return Color.sp.tierWinnerGd
+        case "winner": return Color.sp.tierWinner
         case "miss": return Color.sp.red
         case "no_pick": return Color.sp.mist
         default: return Color.sp.mist

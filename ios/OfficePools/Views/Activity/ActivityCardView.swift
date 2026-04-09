@@ -49,6 +49,8 @@ struct ActivityCardView: View {
         .padding(14)
         .background(Color.sp.surface)
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.isRead ? "" : "Unread. ")\(item.title). \(item.body ?? "")")
     }
 
     // MARK: - Icon Circle

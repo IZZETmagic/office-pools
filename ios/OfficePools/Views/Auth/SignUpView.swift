@@ -8,41 +8,38 @@ struct SignUpView: View {
         VStack(spacing: 24) {
             Text("Create Account")
                 .font(.title.bold())
+                .foregroundStyle(Color.sp.ink)
 
             VStack(spacing: 16) {
-                TextField("Full Name", text: $viewModel.fullName)
-                    .textContentType(.name)
-                    .padding()
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                authField("Full Name", text: $viewModel.fullName, contentType: .name)
+                    .accessibilityLabel("Full name")
 
-                TextField("Username", text: $viewModel.username)
-                    .textContentType(.username)
+                authField("Username", text: $viewModel.username, contentType: .username)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .padding()
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Username")
 
-                TextField("Email", text: $viewModel.email)
-                    .textContentType(.emailAddress)
+                authField("Email", text: $viewModel.email, contentType: .emailAddress)
                     .keyboardType(.emailAddress)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .padding()
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Email address")
 
                 SecureField("Password (min 6 characters)", text: $viewModel.password)
                     .textContentType(.newPassword)
                     .padding()
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color.sp.snow)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                            .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
+                    )
+                    .accessibilityLabel("Password, minimum 6 characters")
 
                 if let error = viewModel.errorMessage {
                     Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -52,24 +49,39 @@ struct SignUpView: View {
                     Group {
                         if viewModel.isLoading {
                             ProgressView()
+                                .tint(.white)
                         } else {
                             Text("Create Account")
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accentColor)
+                    .background(Color.sp.primary)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .font(.headline)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                    .font(SPTypography.cardTitle)
                 }
                 .disabled(viewModel.isLoading)
+                .accessibilityLabel("Create account")
             }
 
             Spacer()
         }
         .padding(.horizontal, 24)
         .padding(.top, 24)
+        .background(Color.sp.surface)
         .navigationBarBackButtonHidden(false)
+    }
+
+    private func authField(_ placeholder: String, text: Binding<String>, contentType: UITextContentType) -> some View {
+        TextField(placeholder, text: text)
+            .textContentType(contentType)
+            .padding()
+            .background(Color.sp.snow)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+            .overlay(
+                RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                    .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
+            )
     }
 }

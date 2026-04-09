@@ -9,10 +9,11 @@ struct ForgotPasswordView: View {
             VStack(spacing: 24) {
                 Text("Reset Password")
                     .font(.title.bold())
+                    .foregroundStyle(Color.sp.ink)
 
                 Text("Enter your email address and we'll send you a link to reset your password.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
                     .multilineTextAlignment(.center)
 
                 TextField("Email", text: $viewModel.email)
@@ -21,13 +22,18 @@ struct ForgotPasswordView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .padding()
-                    .background(.fill.tertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color.sp.snow)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                            .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
+                    )
+                    .accessibilityLabel("Email address")
 
                 if let error = viewModel.errorMessage {
                     Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.red)
                 }
 
                 Button {
@@ -36,26 +42,30 @@ struct ForgotPasswordView: View {
                     Group {
                         if viewModel.isLoading {
                             ProgressView()
+                                .tint(.white)
                         } else {
                             Text("Send Reset Link")
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accentColor)
+                    .background(Color.sp.primary)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .font(.headline)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                    .font(SPTypography.cardTitle)
                 }
                 .disabled(viewModel.isLoading)
+                .accessibilityLabel("Send password reset link")
 
                 Spacer()
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)
+            .background(Color.sp.surface)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(Color.sp.primary)
                 }
             }
             .alert("Check your email", isPresented: $viewModel.showResetPasswordSuccess) {

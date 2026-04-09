@@ -36,6 +36,8 @@ struct StatCardView: View {
             RoundedRectangle(cornerRadius: SPDesign.Radius.md)
                 .fill(Color.sp.surface)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }
 

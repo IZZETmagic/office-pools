@@ -58,29 +58,41 @@ final class RealtimeService {
             }
         }
 
-        try? await channel.subscribeWithError()
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            print("[RealtimeService] Failed to subscribe to presence channel: \(error)")
+        }
 
         // Track after subscribing
-        try? await channel.track(PresencePayload(
-            userId: userId,
-            username: username,
-            fullName: fullName,
-            onlineAt: ISO8601DateFormatter().string(from: Date()),
-            isTyping: false
-        ))
+        do {
+            try await channel.track(PresencePayload(
+                userId: userId,
+                username: username,
+                fullName: fullName,
+                onlineAt: ISO8601DateFormatter().string(from: Date()),
+                isTyping: false
+            ))
+        } catch {
+            print("[RealtimeService] Failed to track presence: \(error)")
+        }
 
         presenceChannel = channel
     }
 
     func sendTypingIndicator(userId: String, username: String, fullName: String, isTyping: Bool) async {
         guard let channel = presenceChannel else { return }
-        try? await channel.track(PresencePayload(
-            userId: userId,
-            username: username,
-            fullName: fullName,
-            onlineAt: ISO8601DateFormatter().string(from: Date()),
-            isTyping: isTyping
-        ))
+        do {
+            try await channel.track(PresencePayload(
+                userId: userId,
+                username: username,
+                fullName: fullName,
+                onlineAt: ISO8601DateFormatter().string(from: Date()),
+                isTyping: isTyping
+            ))
+        } catch {
+            print("[RealtimeService] Failed to send typing indicator: \(error)")
+        }
     }
 
     func leavePresence() async {

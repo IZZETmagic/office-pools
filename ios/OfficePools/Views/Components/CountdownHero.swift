@@ -83,6 +83,8 @@ struct CountdownHero: View {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                 .strokeBorder(Color.sp.silver.opacity(0.3), lineWidth: AppDesign.Border.thin)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(tournamentName), \(daysRemaining) days remaining")
     }
 }
 

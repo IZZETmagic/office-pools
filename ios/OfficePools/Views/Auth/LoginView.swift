@@ -14,14 +14,16 @@ struct LoginView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.sp.primary)
+                        .accessibilityHidden(true)
 
                     Text("Office Pools")
                         .font(.largeTitle.bold())
+                        .foregroundStyle(Color.sp.ink)
 
                     Text("Predict. Compete. Win.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.sp.slate)
                 }
 
                 Spacer()
@@ -34,19 +36,29 @@ struct LoginView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .padding()
-                        .background(.fill.tertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .background(Color.sp.snow)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
+                        )
+                        .accessibilityLabel("Email address")
 
                     SecureField("Password", text: $viewModel.password)
                         .textContentType(.password)
                         .padding()
-                        .background(.fill.tertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .background(Color.sp.snow)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                                .strokeBorder(Color.sp.silver, lineWidth: AppDesign.Border.thin)
+                        )
+                        .accessibilityLabel("Password")
 
                     if let error = viewModel.errorMessage {
                         Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
@@ -56,24 +68,26 @@ struct LoginView: View {
                         Group {
                             if viewModel.isLoading {
                                 ProgressView()
+                                    .tint(.white)
                             } else {
                                 Text("Sign In")
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor)
+                        .background(Color.sp.primary)
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .font(.headline)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+                        .font(SPTypography.cardTitle)
                     }
                     .disabled(viewModel.isLoading)
+                    .accessibilityLabel("Sign in")
 
                     Button("Forgot password?") {
                         showForgotPassword = true
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(Color.accentColor)
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.primary)
                 }
 
                 Spacer()
@@ -81,15 +95,17 @@ struct LoginView: View {
                 // Sign up link
                 HStack {
                     Text("Don't have an account?")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.sp.slate)
                     Button("Sign Up") {
                         showSignUp = true
                     }
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.sp.primary)
                 }
-                .font(.subheadline)
+                .font(SPTypography.body)
             }
             .padding(.horizontal, 24)
+            .background(Color.sp.surface)
             .navigationDestination(isPresented: $showSignUp) {
                 SignUpView(viewModel: viewModel)
             }

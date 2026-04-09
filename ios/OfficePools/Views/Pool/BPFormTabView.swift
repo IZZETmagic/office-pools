@@ -144,9 +144,9 @@ struct BPFormTabView: View {
             }
 
             HStack(spacing: 0) {
-                xpStat("Group", value: xp.totalGroupXp, color: AppColors.primary500)
-                xpStat("Knockout", value: xp.totalKnockoutXp, color: AppColors.success500)
-                xpStat("Badges", value: xp.totalBadgeXp, color: AppColors.xpBadge)
+                xpStat("Group", value: xp.totalGroupXp, color: Color.sp.primary)
+                xpStat("Knockout", value: xp.totalKnockoutXp, color: Color.sp.green)
+                xpStat("Badges", value: xp.totalBadgeXp, color: Color.sp.xpBadge)
             }
         }
         .padding(16)
@@ -309,10 +309,10 @@ struct BPFormTabView: View {
                 Text("YOU")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.8)
-                    .foregroundStyle(AppColors.primary500)
+                    .foregroundStyle(Color.sp.primary)
                 Text("\(userAccuracy)%")
                     .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .foregroundStyle(AppColors.primary500)
+                    .foregroundStyle(Color.sp.primary)
             }
             .frame(maxWidth: .infinity)
 
@@ -393,7 +393,7 @@ struct BPFormTabView: View {
             GeometryReader { geo in
                 HStack(spacing: 2) {
                     Capsule()
-                        .fill(LinearGradient(colors: [AppColors.primary500, AppColors.primary500.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
+                        .fill(LinearGradient(colors: [Color.sp.primary, Color.sp.primary.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(geo.size.width * youPct - 1, 2))
                     Spacer(minLength: 0)
                     Capsule()
@@ -406,7 +406,7 @@ struct BPFormTabView: View {
     }
 
     private func performanceCallout(accuracyDiff: Int, isOutperforming: Bool, contrarianCount: Int) -> some View {
-        let accentColor = isOutperforming ? AppColors.success500 : AppColors.primary500
+        let accentColor = isOutperforming ? Color.sp.green : Color.sp.primary
         let iconName = isOutperforming ? "chart.line.uptrend.xyaxis" : "target"
         let title: String = {
             if isOutperforming { return "Outperforming the pool by \(accuracyDiff)%" }
@@ -563,13 +563,13 @@ struct BPFormTabView: View {
 
                         Text("+\(event.xp) XP")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(AppColors.accent400)
+                            .foregroundStyle(Color.sp.accent)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(
                         LinearGradient(
-                            colors: [AppColors.accent400.opacity(0.06), .clear],
+                            colors: [Color.sp.accent.opacity(0.06), .clear],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -603,11 +603,11 @@ struct BPFormTabView: View {
     }
 
     private func levelColor(_ level: Int) -> Color {
-        AppColors.levelColor(level)
+        Color.sp.levelColor(level)
     }
 
     private func rarityColor(_ rarity: String) -> Color {
-        AppColors.rarityColor(rarity)
+        Color.sp.rarityColor(rarity)
     }
 
     // MARK: - Data Loading
@@ -667,10 +667,10 @@ struct BPLevelRoadmapView: View {
     private func levelRow(_ level: LevelInfo) -> some View {
         let isReached = xp.totalXp >= level.xpRequired
         let isCurrent = level.level == xp.currentLevel.level
-        let nameColor: Color = isCurrent ? AppColors.accent400 : isReached ? Color(.label) : Color(.secondaryLabel)
-        let xpColor: Color = isCurrent ? AppColors.accent400 : isReached ? AppColors.success500 : Color(.tertiaryLabel)
-        let bgColor: Color = isCurrent ? AppColors.accent400.opacity(0.08) : Color(.systemBackground)
-        let borderColor: Color = isCurrent ? AppColors.accent400.opacity(0.3) : .clear
+        let nameColor: Color = isCurrent ? Color.sp.accent : isReached ? Color(.label) : Color(.secondaryLabel)
+        let xpColor: Color = isCurrent ? Color.sp.accent : isReached ? Color.sp.green : Color(.tertiaryLabel)
+        let bgColor: Color = isCurrent ? Color.sp.accent.opacity(0.08) : Color(.systemBackground)
+        let borderColor: Color = isCurrent ? Color.sp.accent.opacity(0.3) : .clear
 
         return HStack(spacing: 12) {
             levelCheckmark(isReached: isReached, level: level.level)
@@ -701,7 +701,7 @@ struct BPLevelRoadmapView: View {
     private func levelCheckmark(isReached: Bool, level: Int) -> some View {
         ZStack {
             Circle()
-                .fill(isReached ? AppColors.success500 : Color(.systemGray5))
+                .fill(isReached ? Color.sp.green : Color(.systemGray5))
                 .frame(width: 32, height: 32)
             if isReached {
                 Image(systemName: "checkmark")
@@ -719,7 +719,7 @@ struct BPLevelRoadmapView: View {
         VStack(spacing: 8) {
             Text("\(xp.totalXp) XP")
                 .font(.title2.weight(.black).monospacedDigit())
-                .foregroundStyle(AppColors.accent400)
+                .foregroundStyle(Color.sp.accent)
 
             if let next = xp.nextLevel {
                 Text("\(xp.xpToNextLevel) XP to \(next.name)")
@@ -732,9 +732,9 @@ struct BPLevelRoadmapView: View {
             }
 
             HStack(spacing: 8) {
-                xpPill("Group XP", value: xp.totalGroupXp, color: AppColors.primary500)
-                xpPill("Knockout XP", value: xp.totalKnockoutXp, color: AppColors.success500)
-                xpPill("Badge XP", value: xp.totalBadgeXp, color: AppColors.xpBadge)
+                xpPill("Group XP", value: xp.totalGroupXp, color: Color.sp.primary)
+                xpPill("Knockout XP", value: xp.totalKnockoutXp, color: Color.sp.green)
+                xpPill("Badge XP", value: xp.totalBadgeXp, color: Color.sp.xpBadge)
             }
             .padding(.top, 4)
         }
@@ -742,7 +742,7 @@ struct BPLevelRoadmapView: View {
     }
 
     private var stickyHeader: some View {
-        let lvlColor = AppColors.levelColor(xp.currentLevel.level)
+        let lvlColor = Color.sp.levelColor(xp.currentLevel.level)
         return VStack(spacing: 8) {
             HStack(spacing: 12) {
                 ZStack {

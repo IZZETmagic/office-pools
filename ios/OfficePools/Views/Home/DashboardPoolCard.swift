@@ -140,10 +140,12 @@ struct DashboardPoolCard: View {
         .background {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                 .fill(data.pool.hasBranding && brandColorValue != nil
-                    ? AnyShapeStyle(brandColorValue!.opacity(0.05))
+                    ? AnyShapeStyle((brandColorValue ?? Color.sp.surface).opacity(0.05))
                     : AnyShapeStyle(Color.sp.surface))
         }
         .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(data.pool.poolName), rank \(data.userRank.map { "\($0)" } ?? "none"), \(data.totalPoints) points")
     }
 
     // MARK: - Member Avatars

@@ -102,6 +102,8 @@ struct LiveMatchCard: View {
             RoundedRectangle(cornerRadius: SPDesign.Radius.lg)
                 .strokeBorder(Color.sp.silver.opacity(0.3), lineWidth: AppDesign.Border.thin)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Live match: \(match.homeDisplayName) \(match.homeScoreFt ?? 0) versus \(match.awayDisplayName) \(match.awayScoreFt ?? 0)")
     }
 
     // MARK: - Subviews

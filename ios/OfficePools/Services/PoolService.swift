@@ -160,10 +160,14 @@ final class PoolService {
                 )
             }
 
-            try? await supabase
-                .from("pool_round_states")
-                .insert(roundStates)
-                .execute()
+            do {
+                try await supabase
+                    .from("pool_round_states")
+                    .insert(roundStates)
+                    .execute()
+            } catch {
+                print("[PoolService] Failed to insert round states for pool \(pool.poolId): \(error)")
+            }
 
             // Disable bracket pairing bonus for progressive pools
             struct BracketPairingUpdate: Codable {
@@ -172,11 +176,15 @@ final class PoolService {
                     case bonusCorrectBracketPairing = "bonus_correct_bracket_pairing"
                 }
             }
-            try? await supabase
-                .from("pool_settings")
-                .update(BracketPairingUpdate(bonusCorrectBracketPairing: 0))
-                .eq("pool_id", value: pool.poolId)
-                .execute()
+            do {
+                try await supabase
+                    .from("pool_settings")
+                    .update(BracketPairingUpdate(bonusCorrectBracketPairing: 0))
+                    .eq("pool_id", value: pool.poolId)
+                    .execute()
+            } catch {
+                print("[PoolService] Failed to update bracket pairing for pool \(pool.poolId): \(error)")
+            }
         }
 
         print("[PoolService] Pool setup complete: \(pool.poolId)")
@@ -312,11 +320,15 @@ final class PoolService {
             .value
 
         // Auto-create first entry (matching web behavior)
-        try? await createPoolEntry(
-            memberId: memberResult.memberId,
-            entryName: username.isEmpty ? "Entry 1" : username,
-            entryNumber: 1
-        )
+        do {
+            try await createPoolEntry(
+                memberId: memberResult.memberId,
+                entryName: username.isEmpty ? "Entry 1" : username,
+                entryNumber: 1
+            )
+        } catch {
+            print("[PoolService] Failed to auto-create entry for member \(memberResult.memberId): \(error)")
+        }
 
         return pool
     }
@@ -507,21 +519,13 @@ final class PoolService {
         let entryIds = members.flatMap { $0.entries ?? [] }.map(\.entryId)
         guard !entryIds.isEmpty else { return [] }
 
-        // Fetch predictions for each entry
-        var allPredictions: [Prediction] = []
-        for entryId in entryIds {
-            do {
-                let preds: [Prediction] = try await supabase
-                    .from("predictions")
-                    .select("prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id")
-                    .eq("entry_id", value: entryId)
-                    .execute()
-                    .value
-                allPredictions.append(contentsOf: preds)
-            } catch {
-                print("[PoolService] Failed to fetch predictions for entry \(entryId): \(error)")
-            }
-        }
+        // Batch fetch all predictions in one query
+        let allPredictions: [Prediction] = try await supabase
+            .from("predictions")
+            .select("prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id")
+            .in("entry_id", values: entryIds)
+            .execute()
+            .value
 
         print("[PoolService] Fetched \(allPredictions.count) total predictions for \(entryIds.count) entries in pool \(poolId)")
         return allPredictions
@@ -628,9 +632,11 @@ final class PoolService {
             .execute()
             .value
 
-        for entry in entries {
-            try await supabase.from("predictions").delete().eq("entry_id", value: entry.entryId).execute()
-            try await supabase.from("pool_entries").delete().eq("entry_id", value: entry.entryId).execute()
+        let entryIds = entries.map(\.entryId)
+        if !entryIds.isEmpty {
+            // Batch delete predictions and entries
+            try await supabase.from("predictions").delete().in("entry_id", values: entryIds).execute()
+            try await supabase.from("pool_entries").delete().in("entry_id", values: entryIds).execute()
         }
 
         try await supabase.from("pool_members").delete().eq("member_id", value: memberId).execute()

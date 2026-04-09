@@ -91,7 +91,7 @@ struct ResultsTabView<HeaderContent: View>: View {
         }
 
         return grouped.keys.sorted().map { dayStart in
-            let dayMatches = grouped[dayStart]!.sorted { a, b in
+            let dayMatches = (grouped[dayStart] ?? []).sorted { a, b in
                 (a.parsedDate ?? .distantPast) < (b.parsedDate ?? .distantPast)
             }
             return MatchSection(
@@ -153,9 +153,9 @@ struct ResultsTabView<HeaderContent: View>: View {
 
     private var availableGroups: [(letter: String, matchCount: Int)] {
         let groupMatches = matches.filter { $0.stage == "group" && $0.groupLetter != nil }
-        let grouped = Dictionary(grouping: groupMatches) { $0.groupLetter! }
+        let grouped = Dictionary(grouping: groupMatches) { $0.groupLetter ?? "?" }
         return grouped.keys.sorted().map { letter in
-            (letter: letter, matchCount: grouped[letter]!.count)
+            (letter: letter, matchCount: (grouped[letter] ?? []).count)
         }
     }
 
@@ -323,7 +323,7 @@ struct ResultsTabView<HeaderContent: View>: View {
                 .padding(.bottom, 2)
 
             // Matches for this day
-            let dayMatches = grouped[day]!.sorted { a, b in
+            let dayMatches = (grouped[day] ?? []).sorted { a, b in
                 (a.parsedDate ?? .distantPast) < (b.parsedDate ?? .distantPast)
             }
             ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
@@ -608,6 +608,20 @@ struct MatchResultRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(matchAccessibilityLabel)
+    }
+
+    private var matchAccessibilityLabel: String {
+        let home = match.homeDisplayName
+        let away = match.awayDisplayName
+        if isLive {
+            return "\(home) \(match.homeScoreFt ?? 0) versus \(away) \(match.awayScoreFt ?? 0), live"
+        } else if isFinished {
+            return "\(home) \(match.homeScoreFt ?? 0) versus \(away) \(match.awayScoreFt ?? 0), full time"
+        } else {
+            return "\(home) versus \(away), \(matchTime)"
+        }
     }
 
     // MARK: - Center Content

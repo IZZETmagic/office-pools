@@ -29,11 +29,11 @@ struct RefereeTipCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Referee's Tip")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppColors.primary800)
+                        .foregroundStyle(Color.sp.ink)
 
                     Text(message)
                         .font(.caption)
-                        .foregroundStyle(AppColors.primary700)
+                        .foregroundStyle(Color.sp.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -46,7 +46,7 @@ struct RefereeTipCard: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AppColors.primary400)
+                        .foregroundStyle(Color.sp.primary)
                         .padding(6)
                         .contentShape(Circle())
                 }
@@ -55,11 +55,11 @@ struct RefereeTipCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(AppColors.primary50)
+                    .fill(Color.sp.primaryLight)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(AppColors.primary300.opacity(0.5), lineWidth: 1)
+                    .strokeBorder(Color.sp.silver, lineWidth: 1)
             )
             .padding(.horizontal)
             .transition(.opacity.combined(with: .move(edge: .top)))

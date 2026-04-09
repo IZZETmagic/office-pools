@@ -15,7 +15,7 @@ struct BanterTabView: View {
         guard let entry = memberLookup[userId] else { return "?" }
         let parts = entry.fullName.split(separator: " ")
         let first = parts.first.map { String($0.prefix(1)) } ?? ""
-        let last = parts.count > 1 ? String(parts.last!.prefix(1)) : ""
+        let last = parts.count > 1 ? (parts.last.map { String($0.prefix(1)) } ?? "") : ""
         return (first + last).uppercased()
     }
 

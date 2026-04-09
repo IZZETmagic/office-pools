@@ -121,12 +121,12 @@ struct PredictionSummaryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            if isFilled {
+            if isFilled, let p = pred, let hs = p.homeScore, let as_ = p.awayScore {
                 VStack(spacing: 1) {
-                    Text("\(pred!.homeScore!) - \(pred!.awayScore!)")
+                    Text("\(hs) - \(as_)")
                         .font(SPTypography.mono(size: 15, weight: .semibold))
-                    if needsPso && hasPso {
-                        Text("(\(pred!.homePso!)-\(pred!.awayPso!) PSO)")
+                    if needsPso && hasPso, let hp = p.homePso, let ap = p.awayPso {
+                        Text("(\(hp)-\(ap) PSO)")
                             .font(.caption2)
                             .foregroundStyle(Color.sp.slate)
                     }
