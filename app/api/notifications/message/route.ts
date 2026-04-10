@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   const recipientIds = members.map((m) => m.user_id)
-  const displayName = sender_name || userData.username || 'Someone'
+  const displayName = sender_name || 'Someone'
 
   // Truncate message for notification preview
   const preview = message_content.length > 80
