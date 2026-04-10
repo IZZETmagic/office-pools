@@ -450,26 +450,33 @@ export function CommunityTab({
   }, [poolId, isNearBottom, currentUserId])
 
   // Polling fallback — polls for new messages when Realtime isn't connected
+  const latestCreatedAtRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (messages.length > 0) {
+      latestCreatedAtRef.current = messages[messages.length - 1].created_at
+    }
+  }, [messages])
+
   useEffect(() => {
     const supabase = supabaseRef.current
-    const POLL_INTERVAL = 4000 // 4 seconds
+    const POLL_INTERVAL = 5000
 
     const poll = async () => {
       // Skip polling if Realtime is working
       if (realtimeConnectedRef.current) return
+      if (!latestCreatedAtRef.current) return
 
-      const latestMsg = messages[messages.length - 1]
-      if (!latestMsg) return
+      try {
+        const { data, error } = await supabase
+          .from('pool_messages')
+          .select('*')
+          .eq('pool_id', poolId)
+          .gt('created_at', latestCreatedAtRef.current)
+          .order('created_at', { ascending: true })
+          .limit(20)
 
-      const { data } = await supabase
-        .from('pool_messages')
-        .select('*')
-        .eq('pool_id', poolId)
-        .gt('created_at', latestMsg.created_at)
-        .order('created_at', { ascending: true })
-        .limit(20)
+        if (error || !data || data.length === 0) return
 
-      if (data && data.length > 0) {
         const newMsgs: MessageWithReactions[] = data.map(m => ({
           ...m,
           message_type: m.message_type ?? 'text',
@@ -485,7 +492,6 @@ export function CommunityTab({
           const toAdd = newMsgs.filter(m => !existing.has(m.message_id))
           if (toAdd.length === 0) return prev
 
-          // Show pill for unseen messages from others
           const othersCount = toAdd.filter(m => m.user_id !== currentUserId).length
           if (!wasNearBottomRef.current && othersCount > 0) {
             setUnseenCount(c => c + othersCount)
@@ -494,12 +500,14 @@ export function CommunityTab({
 
           return [...prev, ...toAdd]
         })
+      } catch {
+        // Silently ignore polling errors (CORS during restart, network issues, etc.)
       }
     }
 
     const interval = setInterval(poll, POLL_INTERVAL)
     return () => clearInterval(interval)
-  }, [poolId, messages, isNearBottom, currentUserId])
+  }, [poolId, isNearBottom, currentUserId])
 
   // Auto-scroll when new message arrives
   useEffect(() => {
