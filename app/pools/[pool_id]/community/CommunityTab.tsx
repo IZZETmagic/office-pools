@@ -86,6 +86,7 @@ export function CommunityTab({
   }
   const wasNearBottomRef = useRef(true)
   const supabaseRef = useRef(createClient())
+  const broadcastChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const chatWrapperRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -372,84 +373,54 @@ export function CommunityTab({
   // REALTIME SUBSCRIPTION
   // =====================
   // =====================
-  // REALTIME + POLLING FALLBACK
+  // REALTIME VIA BROADCAST (bypasses broken CDC RLS pipeline)
   // =====================
-  const realtimeConnectedRef = useRef(false)
+  const broadcastConnectedRef = useRef(false)
 
-  // Realtime subscription — try to connect, track status
   useEffect(() => {
     const supabase = supabaseRef.current
-    let channel: ReturnType<typeof supabase.channel> | null = null
-    let cancelled = false
 
-    const handleInsert = (payload: { new: Record<string, unknown> }) => {
-      const newMsg: MessageWithReactions = {
-        ...(payload.new as unknown as Message),
-        message_type: (payload.new as any).message_type ?? 'text',
-        reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
-        metadata: (payload.new as any).metadata ?? {},
-        reactions: [],
-      }
-      wasNearBottomRef.current = isNearBottom()
+    const channel = supabase
+      .channel(`pool-community-${poolId}`)
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        const msg = payload.payload as Message
+        if (!msg?.message_id) return
 
-      if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
-        setUnseenCount(prev => prev + 1)
-        setShowNewMessagesPill(true)
-      }
-
-      setMessages(prev =>
-        prev.some(m => m.message_id === newMsg.message_id)
-          ? prev
-          : [...prev, newMsg]
-      )
-    }
-
-    const subscribe = (accessToken: string) => {
-      if (cancelled || channel) return
-      supabase.realtime.setAuth(accessToken)
-
-      channel = supabase
-        .channel(`pool-community-${poolId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'pool_messages',
-            filter: `pool_id=eq.${poolId}`,
-          },
-          handleInsert,
-        )
-        .subscribe((status, err) => {
-          console.log('[Realtime] pool-community status:', status, err ?? '')
-          realtimeConnectedRef.current = status === 'SUBSCRIBED'
-        })
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.access_token) {
-        subscribe(session.access_token)
-      }
-    })
-
-    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.access_token) {
-          supabase.realtime.setAuth(session.access_token)
-          if (!channel) subscribe(session.access_token)
+        const newMsg: MessageWithReactions = {
+          ...msg,
+          message_type: msg.message_type ?? 'text',
+          reply_to_message_id: msg.reply_to_message_id ?? null,
+          metadata: msg.metadata ?? {},
+          reactions: [],
         }
-      }
-    )
+        wasNearBottomRef.current = isNearBottom()
+
+        if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
+          setUnseenCount(prev => prev + 1)
+          setShowNewMessagesPill(true)
+        }
+
+        setMessages(prev =>
+          prev.some(m => m.message_id === newMsg.message_id)
+            ? prev
+            : [...prev, newMsg]
+        )
+      })
+      .subscribe((status, err) => {
+        console.log('[Realtime] broadcast channel status:', status, err ?? '')
+        broadcastConnectedRef.current = status === 'SUBSCRIBED'
+      })
+
+    broadcastChannelRef.current = channel
 
     return () => {
-      cancelled = true
-      realtimeConnectedRef.current = false
-      authSub.unsubscribe()
-      if (channel) supabase.removeChannel(channel)
+      broadcastConnectedRef.current = false
+      broadcastChannelRef.current = null
+      supabase.removeChannel(channel)
     }
   }, [poolId, isNearBottom, currentUserId])
 
-  // Polling fallback — polls for new messages when Realtime isn't connected
+  // Polling fallback — catches messages from iOS (until iOS also broadcasts)
   const latestCreatedAtRef = useRef<string | null>(null)
   useEffect(() => {
     if (messages.length > 0) {
@@ -462,8 +433,6 @@ export function CommunityTab({
     const POLL_INTERVAL = 5000
 
     const poll = async () => {
-      // Skip polling if Realtime is working
-      if (realtimeConnectedRef.current) return
       if (!latestCreatedAtRef.current) return
 
       try {
@@ -501,7 +470,7 @@ export function CommunityTab({
           return [...prev, ...toAdd]
         })
       } catch {
-        // Silently ignore polling errors (CORS during restart, network issues, etc.)
+        // Silently ignore polling errors
       }
     }
 
@@ -811,6 +780,13 @@ export function CommunityTab({
           : [...prev, newMsg]
       )
 
+      // Broadcast to other clients via Realtime
+      broadcastChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: data,
+      })
+
       // Fire-and-forget push notification to all pool members (every message)
       fetch('/api/notifications/message', {
         method: 'POST',
@@ -930,6 +906,7 @@ export function CommunityTab({
           ? prev
           : [...prev, { ...data, message_type: data.message_type ?? 'badge_flex', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
+      broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
     }
   }, [memberLevels, currentUserId, poolId])
 
@@ -972,6 +949,7 @@ export function CommunityTab({
           ? prev
           : [...prev, { ...data, message_type: data.message_type ?? 'standings_drop', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
+      broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
     }
   }, [members, poolName, poolId, currentUserId, computedScoreMap])
 
@@ -1332,6 +1310,7 @@ export function CommunityTab({
                 ? prev
                 : [...prev, { ...data, message_type: data.message_type ?? 'prediction_share', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
             )
+            broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
           }}
         />
       )}

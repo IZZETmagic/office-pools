@@ -109,26 +109,25 @@ final class RealtimeService {
     func subscribeToMessages(poolId: String) async {
         // Don't re-subscribe if already subscribed
         if messagesChannel != nil { return }
-        let channel = supabase.channel("pool-messages-\(poolId)")
+        // Use the same channel name as the web app so broadcasts are shared
+        let channel = supabase.channel("pool-community-\(poolId)")
 
-        // Register postgres change listener BEFORE subscribing
-        messagesSubscription = channel.onPostgresChange(
-            InsertAction.self,
-            schema: "public",
-            table: "pool_messages",
-            filter: "pool_id=eq.\(poolId)"
-        ) { [weak self] action in
+        // Listen for broadcast events instead of postgres_changes
+        // (bypasses broken CDC RLS pipeline on Supabase)
+        messagesSubscription = channel.onBroadcast(event: "new_message") { [weak self] message in
             let decoder = JSONDecoder()
-            if let message: PoolMessage = try? action.decodeRecord(decoder: decoder) {
-                Task { @MainActor in
-                    self?.newMessage = message
-                }
+            guard let payloadData = try? JSONSerialization.data(withJSONObject: message),
+                  let poolMessage = try? decoder.decode(PoolMessage.self, from: payloadData) else {
+                return
+            }
+            Task { @MainActor in
+                self?.newMessage = poolMessage
             }
         }
 
         do {
             try await channel.subscribeWithError()
-            print("[Realtime] Subscribed to messages for pool \(poolId)")
+            print("[Realtime] Subscribed to broadcast messages for pool \(poolId)")
         } catch {
             print("[Realtime] ERROR subscribing to messages: \(error)")
         }
@@ -171,7 +170,8 @@ final class RealtimeService {
             }
         }
 
-        try await supabase
+        // Insert into DB and get the full row back
+        let inserted: PoolMessage = try await supabase
             .from("pool_messages")
             .insert(NewMessage(
                 poolId: poolId,
@@ -181,7 +181,19 @@ final class RealtimeService {
                 messageType: messageType,
                 metadata: metadata
             ))
+            .select()
+            .single()
             .execute()
+            .value
+
+        // Broadcast to other clients via Realtime
+        if let channel = messagesChannel {
+            let encoder = JSONEncoder()
+            if let data = try? encoder.encode(inserted),
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                try? await channel.broadcast(event: "new_message", message: dict)
+            }
+        }
     }
 
     // MARK: - Fetch Message History
