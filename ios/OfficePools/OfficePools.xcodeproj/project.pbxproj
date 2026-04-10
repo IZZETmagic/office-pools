@@ -90,6 +90,9 @@
 		971CBEFFBE53056C3AF02295 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 9F50E6DF454FF37830025118 /* Supabase */; };
 		9DA00C13ED852A7942CCE066 /* MatchScoresResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF90D5D012B45CFF86C884F9 /* MatchScoresResponse.swift */; };
 		9E3A1434827C5AAB1DB6B9F1 /* PoolDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */; };
+		A1B2C3D4E5F60718DISC0001 /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */; };
+		A1B2C3D4E5F60718DISC0003 /* DiscoverPoolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */; };
+		A1B2C3D4E5F60718DISC0005 /* DiscoverPoolDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */; };
 		A3DD9C4000206052C3089EA0 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A587D2E36A8CA740A652D7 /* ProfileView.swift */; };
 		A3DD9C4000206052C3089EA1 /* ProfileStatsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A587D2E36A8CA740A652D8 /* ProfileStatsSection.swift */; };
 		A5DD94A8818B93E508AB8D86 /* HomeSkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B9C3FA6BE8C8CEFCC546D9 /* HomeSkeletonView.swift */; };
@@ -131,9 +134,6 @@
 		F90C1BDD8901D1D8F379FAE3 /* SportPoolPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6FE840DBB7B92EAEEA264A /* SportPoolPill.swift */; };
 		F9392DDF248277B255B510AA /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C16D214CC5B59466B1F169 /* ActivityView.swift */; };
 		FDC4401E215A19D28D757595 /* Pool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142DD2B3B8F225FCA31FB190 /* Pool.swift */; };
-		A1B2C3D4E5F60718DISC0001 /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */; };
-		A1B2C3D4E5F60718DISC0003 /* DiscoverPoolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */; };
-		A1B2C3D4E5F60718DISC0005 /* DiscoverPoolDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -170,9 +170,6 @@
 		3C7D1B6CE97DD805C0F80D4C /* BadgePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgePickerSheet.swift; sourceTree = "<group>"; };
 		3EA09C4D945E009F77CF091E /* ResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewModel.swift; sourceTree = "<group>"; };
 		3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolCardView.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolDetailSheet.swift; sourceTree = "<group>"; };
 		40AA589A5883F2F54179C208 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		4220BE4126C3996E7164B4E7 /* DashboardMatchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMatchCard.swift; sourceTree = "<group>"; };
 		465265B9D4513B8F6BD66682 /* BracketPickerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BracketPickerModels.swift; sourceTree = "<group>"; };
@@ -213,6 +210,9 @@
 		997FFC1B206938C1A4315AA1 /* GroupStandingsTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupStandingsTable.swift; sourceTree = "<group>"; };
 		9BE97DCC3EE54C2626F181AF /* ShimmerModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerModifier.swift; sourceTree = "<group>"; };
 		9CADCDFDB4455B5405418782 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0002 /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0004 /* DiscoverPoolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolCardView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718DISC0006 /* DiscoverPoolDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolDetailSheet.swift; sourceTree = "<group>"; };
 		A304B08578A079A4A78E83E2 /* ActivitySkeletonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySkeletonView.swift; sourceTree = "<group>"; };
 		A5BF321B5CEEE61D562773E8 /* LeaderboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardTabView.swift; sourceTree = "<group>"; };
 		A6432B3A35CC67BF8B7420B0 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };

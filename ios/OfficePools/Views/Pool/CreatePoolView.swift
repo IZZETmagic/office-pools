@@ -19,6 +19,7 @@ struct CreatePoolView: View {
                     .padding(.bottom, 16)
 
                 Divider()
+                    .foregroundStyle(Color.sp.silver)
 
                 // Step content
                 ScrollView {
@@ -35,23 +36,26 @@ struct CreatePoolView: View {
                 }
 
                 Divider()
+                    .foregroundStyle(Color.sp.silver)
 
                 // Bottom buttons
                 bottomBar
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.sp.snow)
             .navigationTitle(viewModel.currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 ToolbarItem(placement: .principal) {
                     Text("Step \(viewModel.currentStepIndex + 1) of \(viewModel.totalSteps)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
             .task {
@@ -82,7 +86,7 @@ struct CreatePoolView: View {
                 // Connector line (except last)
                 if step.rawValue < CreatePoolStep.allCases.count - 1 {
                     Rectangle()
-                        .fill(step.rawValue < viewModel.currentStepIndex ? Color.accentColor : Color(.systemGray4))
+                        .fill(step.rawValue < viewModel.currentStepIndex ? Color.sp.primary : Color.sp.silver)
                         .frame(height: 2)
                 }
             }
@@ -91,11 +95,11 @@ struct CreatePoolView: View {
 
     private func stepColor(for step: CreatePoolStep) -> Color {
         if step.rawValue < viewModel.currentStepIndex {
-            return .accentColor
+            return Color.sp.green
         } else if step == viewModel.currentStep {
-            return .accentColor
+            return Color.sp.primary
         } else {
-            return Color(.systemGray4)
+            return Color.sp.silver
         }
     }
 
@@ -104,13 +108,15 @@ struct CreatePoolView: View {
     private var tournamentStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Choose the tournament for your prediction pool.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
 
             if viewModel.isLoadingTournaments {
                 HStack {
                     Spacer()
                     ProgressView("Loading tournaments...")
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                     Spacer()
                 }
                 .padding(.vertical, 40)
@@ -118,10 +124,10 @@ struct CreatePoolView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "trophy")
                         .font(.largeTitle)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.sp.slate)
                     Text("No tournaments available")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -142,35 +148,36 @@ struct CreatePoolView: View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tournament.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
                         .multilineTextAlignment(.leading)
 
                     if let hosts = tournament.hostCountries, !hosts.isEmpty {
                         Text(hosts)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                     }
 
                     Text(tournament.dateRangeDisplay)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
 
                     if let desc = tournament.description, !desc.isEmpty {
                         Text(desc)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .font(SPTypography.detail)
+                            .foregroundStyle(Color.sp.slate)
                             .lineLimit(2)
                     }
                 }
 
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? Color.sp.primaryLight : Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.accentColor : Color(.separator), lineWidth: isSelected ? 2 : 0.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(isSelected ? Color.sp.primary : Color.sp.silver.opacity(0.5), lineWidth: isSelected ? 2 : 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -181,8 +188,8 @@ struct CreatePoolView: View {
     private var poolTypeStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("How will members make their predictions?")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
 
             poolTypeCard(
                 mode: .fullTournament,
@@ -208,16 +215,16 @@ struct CreatePoolView: View {
             // Warning
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
+                    .foregroundStyle(Color.sp.amber)
+                    .font(SPTypography.detail)
                 Text("Pool type cannot be changed after creation.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.sp.amberLight)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
         }
     }
 
@@ -230,27 +237,28 @@ struct CreatePoolView: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .foregroundStyle(isSelected ? Color.sp.primary : Color.sp.slate)
                     .frame(width: 32)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
 
                     Text(description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                         .multilineTextAlignment(.leading)
                 }
 
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? Color.sp.primaryLight : Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.accentColor : Color(.separator), lineWidth: isSelected ? 2 : 0.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(isSelected ? Color.sp.primary : Color.sp.silver.opacity(0.5), lineWidth: isSelected ? 2 : 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -261,38 +269,32 @@ struct CreatePoolView: View {
     private var detailsStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Give your pool a name and optional description.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(SPTypography.body)
+                .foregroundStyle(Color.sp.slate)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pool Name")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 TextField(viewModel.poolNamePlaceholder, text: $viewModel.poolName)
-                    .font(.body)
+                    .font(SPTypography.body)
                     .padding(12)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(.separator), lineWidth: 0.5)
-                    )
+                    .background(Color.sp.mist)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Description")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 TextField("Tell people about your pool...", text: $viewModel.poolDescription, axis: .vertical)
                     .lineLimit(3...6)
-                    .font(.body)
+                    .font(SPTypography.body)
                     .padding(12)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(.separator), lineWidth: 0.5)
-                    )
+                    .background(Color.sp.mist)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
     }
@@ -304,7 +306,8 @@ struct CreatePoolView: View {
             // Deadline
             VStack(alignment: .leading, spacing: 12) {
                 Text(viewModel.predictionMode == .progressive ? "Group Stage Deadline" : "Prediction Deadline")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 DatePicker(
                     "Deadline",
@@ -322,13 +325,18 @@ struct CreatePoolView: View {
                 }
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(Color.sp.silver.opacity(0.5), lineWidth: 0.5)
+            )
 
             // Privacy
             VStack(alignment: .leading, spacing: 12) {
                 Text("Privacy")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 HStack(spacing: 12) {
                     privacyButton(title: "Public", subtitle: "Anyone with code can join", isSelected: !viewModel.isPrivate) {
@@ -340,40 +348,50 @@ struct CreatePoolView: View {
                 }
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(Color.sp.silver.opacity(0.5), lineWidth: 0.5)
+            )
 
             // Max Members
             VStack(alignment: .leading, spacing: 12) {
                 Text("Maximum Members")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 HStack {
                     TextField("0", value: $viewModel.maxParticipants, format: .number)
                         .keyboardType(.numberPad)
-                        .font(.body.monospacedDigit())
+                        .font(SPTypography.mono(size: 14, weight: .medium))
                         .padding(12)
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(Color.sp.mist)
+                        .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                         .frame(width: 80)
 
                     Text("Set to 0 for unlimited")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(Color.sp.silver.opacity(0.5), lineWidth: 0.5)
+            )
 
             // Max Entries
             VStack(alignment: .leading, spacing: 12) {
                 Text("Max Entries Per Member")
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 Text("Allow members to submit multiple sets of predictions. Each entry is scored independently.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
 
                 // 1-10 numbered buttons
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
@@ -382,46 +400,51 @@ struct CreatePoolView: View {
                             viewModel.maxEntriesPerUser = n
                         } label: {
                             Text("\(n)")
-                                .font(.subheadline.weight(viewModel.maxEntriesPerUser == n ? .bold : .regular).monospacedDigit())
+                                .font(SPTypography.mono(size: 14, weight: viewModel.maxEntriesPerUser == n ? .bold : .regular))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(viewModel.maxEntriesPerUser == n ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-                                .foregroundStyle(viewModel.maxEntriesPerUser == n ? .white : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .background(viewModel.maxEntriesPerUser == n ? Color.sp.primary : Color.sp.mist)
+                                .foregroundStyle(viewModel.maxEntriesPerUser == n ? .white : Color.sp.ink)
+                                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
             .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .stroke(Color.sp.silver.opacity(0.5), lineWidth: 0.5)
+            )
 
             // Scoring info
             HStack(spacing: 10) {
                 Image(systemName: "info.circle.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.sp.primary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Scoring & Bonus Points")
-                        .font(.caption.weight(.semibold))
+                        .font(SPTypography.caption)
+                        .foregroundStyle(Color.sp.ink)
                     Text("Your pool will be created with default scoring settings. You can customize all scoring rules, multipliers, and bonus points from the pool admin settings after creation.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
             .padding(12)
-            .background(Color.blue.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.sp.primaryLight)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
 
             // Error
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.red)
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sp.redLight)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             }
         }
     }
@@ -431,10 +454,11 @@ struct CreatePoolView: View {
             viewModel.setQuickDeadline(option)
         } label: {
             Text(title)
-                .font(.caption2.weight(.medium))
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.slate)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color(.secondarySystemGroupedBackground))
+                .background(Color.sp.mist)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -444,19 +468,19 @@ struct CreatePoolView: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(isSelected ? Color.sp.primary : Color.sp.ink)
                 Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(isSelected ? Color.accentColor.opacity(0.1) : Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(isSelected ? Color.sp.primaryLight : Color.sp.mist)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: SPDesign.Radius.sm)
+                    .stroke(isSelected ? Color.sp.primary : .clear, lineWidth: 1.5)
             )
         }
         .buttonStyle(.plain)
@@ -475,11 +499,12 @@ struct CreatePoolView: View {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color.sp.mist)
+                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                 }
                 .buttonStyle(.plain)
             }
@@ -502,12 +527,12 @@ struct CreatePoolView: View {
                         Text(viewModel.isLastStep ? "Create Pool" : "Next")
                     }
                 }
-                .font(.subheadline.weight(.semibold))
+                .font(SPTypography.cardTitle)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(viewModel.canProceed ? Color.accentColor : Color(.systemGray4))
+                .background(viewModel.canProceed ? Color.sp.primary : Color.sp.silver)
                 .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.canProceed || viewModel.isCreating)

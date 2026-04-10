@@ -19,6 +19,9 @@ struct PoolsView: View {
     @State private var sectionsAppeared = false
     @State private var selectedSegment: PoolsSegment = .myPools
     @State private var selectedDiscoverPool: DiscoverPoolData?
+    @State private var joinMode: PoolsJoinMode = .code
+
+    private enum PoolsJoinMode { case code, scan }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -787,64 +790,184 @@ struct PoolsView: View {
     // MARK: - Join Pool Sheet
 
     private var joinPoolSheet: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Text("Enter a pool code to join")
-                    .font(SPTypography.body)
-                    .foregroundStyle(Color.sp.slate)
+        VStack(spacing: 0) {
+            // Drag indicator
+            Capsule()
+                .fill(Color.sp.silver)
+                .frame(width: 36, height: 4)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
 
-                TextField("Pool Code", text: $viewModel.joinPoolCode)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .padding()
-                    .background(Color.sp.mist)
-                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
-                    .font(.title3.monospaced())
-                    .multilineTextAlignment(.center)
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(SPTypography.caption)
-                        .foregroundStyle(Color.sp.red)
+            // Icon + header
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.sp.primaryLight)
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.sp.primary)
                 }
 
-                Button {
-                    Task {
-                        if let userId = authService.appUser?.userId {
-                            await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1", dataStore: dataStore)
-                        }
+                Text("Join a Pool")
+                    .font(SPTypography.sectionHeader)
+                    .foregroundStyle(Color.sp.ink)
+
+                Text("Enter a code or scan a QR to join")
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.bottom, 24)
+
+            // Mode toggle
+            HStack(spacing: 0) {
+                poolsJoinModeTab(label: "Pool Code", icon: "keyboard", mode: .code)
+                poolsJoinModeTab(label: "Scan QR", icon: "qrcode.viewfinder", mode: .scan)
+            }
+            .background(Color.sp.mist)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+            .padding(.bottom, 20)
+
+            // Content
+            if joinMode == .code {
+                poolsJoinCodeContent
+            } else {
+                poolsJoinScanContent
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .background(Color.sp.snow)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private func poolsJoinModeTab(label: String, icon: String, mode: PoolsJoinMode) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { joinMode = mode }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                Text(label)
+                    .font(SPTypography.cardTitle)
+            }
+            .foregroundStyle(joinMode == mode ? Color.sp.primary : Color.sp.slate)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(joinMode == mode ? Color.sp.surface : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.sm))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var poolsJoinCodeContent: some View {
+        VStack(spacing: 6) {
+            TextField("POOL CODE", text: $viewModel.joinPoolCode)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .font(SPTypography.mono(size: 22, weight: .bold))
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .background(Color.sp.mist)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                        .stroke(
+                            viewModel.errorMessage != nil ? Color.sp.red :
+                                viewModel.joinPoolCode.isEmpty ? Color.clear : Color.sp.primary,
+                            lineWidth: 1.5
+                        )
+                )
+
+            if let error = viewModel.errorMessage {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 10))
+                    Text(error)
+                        .font(SPTypography.detail)
+                }
+                .foregroundStyle(Color.sp.red)
+                .padding(.top, 2)
+            }
+
+            Button {
+                Task {
+                    if let userId = authService.appUser?.userId {
+                        await viewModel.joinPool(userId: userId, username: authService.appUser?.username ?? "Entry 1", dataStore: dataStore)
                     }
-                } label: {
-                    Group {
-                        if viewModel.isJoining {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
+                }
+            } label: {
+                Group {
+                    if viewModel.isJoining {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 16))
                             Text("Join Pool")
                         }
                     }
-                    .font(SPTypography.cardTitle)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.sp.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
                 }
-                .disabled(viewModel.isJoining || viewModel.joinPoolCode.isEmpty)
-                .opacity(viewModel.joinPoolCode.isEmpty ? 0.5 : 1)
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(viewModel.joinPoolCode.isEmpty ? Color.sp.silver : Color.sp.primary)
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            }
+            .disabled(viewModel.isJoining || viewModel.joinPoolCode.isEmpty)
+            .padding(.top, 18)
 
-                Spacer()
+            Button {
+                viewModel.showJoinSheet = false
+            } label: {
+                Text("Cancel")
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
+                    .padding(.top, 12)
             }
-            .padding(24)
-            .navigationTitle("Join Pool")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { viewModel.showJoinSheet = false }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var poolsJoinScanContent: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                    .fill(Color.sp.mist)
+                    .frame(height: 120)
+
+                VStack(spacing: 10) {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 36, weight: .light))
+                        .foregroundStyle(Color.sp.primary)
+
+                    Text("Point your camera at a SportPool QR code")
+                        .font(SPTypography.body)
+                        .foregroundStyle(Color.sp.slate)
+                        .multilineTextAlignment(.center)
                 }
             }
+
+            Text("Coming soon")
+                .font(SPTypography.detail)
+                .foregroundStyle(Color.sp.silver)
+
+            Button {
+                viewModel.showJoinSheet = false
+            } label: {
+                Text("Cancel")
+                    .font(SPTypography.body)
+                    .foregroundStyle(Color.sp.slate)
+                    .padding(.top, 4)
+            }
+            .buttonStyle(.plain)
         }
-        .presentationDetents([.medium])
     }
 }
 
