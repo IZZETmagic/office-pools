@@ -95,6 +95,26 @@ final class APIService {
         try await requestVoid("PATCH", path: "/api/notifications/preferences", body: Body(topicKey: topicKey, enabled: enabled))
     }
 
+    // MARK: - Push Token Registration
+
+    func registerPushToken(token: String, environment: String = "production") async throws {
+        struct Body: Encodable {
+            let token: String
+            let platform: String
+            let environment: String
+        }
+        try await requestVoid("POST", path: "/api/notifications/push-token", body: Body(
+            token: token, platform: "ios", environment: environment
+        ))
+    }
+
+    func unregisterPushToken(token: String) async throws {
+        struct Body: Encodable {
+            let token: String
+        }
+        try await requestVoid("DELETE", path: "/api/notifications/push-token", body: Body(token: token))
+    }
+
     // MARK: - Notification Endpoints
 
     func notifyPoolJoined(poolId: String, userId: String) async throws {

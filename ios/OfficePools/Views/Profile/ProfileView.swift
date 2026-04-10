@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ProfileView: View {
     let authService: AuthService
@@ -47,14 +48,17 @@ struct ProfileView: View {
                     appearanceSection
                         .entranceAnimation(sectionsAppeared, delay: 0.3)
 
-                    notificationsSection
+                    pushNotificationSection
                         .entranceAnimation(sectionsAppeared, delay: 0.35)
 
-                    dangerZoneSection
+                    notificationsSection
                         .entranceAnimation(sectionsAppeared, delay: 0.4)
 
-                    versionFooter
+                    dangerZoneSection
                         .entranceAnimation(sectionsAppeared, delay: 0.45)
+
+                    versionFooter
+                        .entranceAnimation(sectionsAppeared, delay: 0.5)
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 40)
@@ -630,6 +634,64 @@ struct ProfileView: View {
     }
 
     // MARK: - Notifications
+
+    private var pushNotificationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Push Notifications")
+                .font(SPTypography.sectionHeader)
+                .foregroundStyle(Color.sp.ink)
+                .padding(.horizontal, 20)
+
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: "bell.badge.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.sp.primary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.sp.primaryLight)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Push Notifications")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.sp.ink)
+                        Text(PushNotificationService.shared.isAuthorized
+                             ? "Receiving push notifications"
+                             : "Enable in Settings to receive alerts")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.sp.slate)
+                    }
+
+                    Spacer()
+
+                    if PushNotificationService.shared.isAuthorized {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.sp.primary)
+                            .font(.system(size: 20))
+                    } else {
+                        Button("Enable") {
+                            Task {
+                                let granted = await PushNotificationService.shared.requestPermission()
+                                if !granted {
+                                    // Permission denied — open Settings
+                                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                                        await UIApplication.shared.open(url)
+                                    }
+                                }
+                            }
+                        }
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.sp.primary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
+            .padding(.horizontal, 20)
+        }
+    }
 
     private var notificationsSection: some View {
         VStack(alignment: .leading, spacing: 12) {

@@ -30,6 +30,9 @@ struct ContentView: View {
                     MainTabView(authService: authService)
                         .environment(dataStore)
                         .transition(.opacity)
+                        .task {
+                            await PushNotificationService.shared.requestPermission()
+                        }
                 }
             } else {
                 LoginView(viewModel: AuthViewModel(authService: authService))

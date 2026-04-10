@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { memberRemovedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToUser } from '@/lib/push/apns'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -47,13 +48,21 @@ export async function POST(request: NextRequest) {
     poolName: pool.pool_name,
   })
 
-  const result = await sendEmail({
-    to: removedUser.email,
-    subject,
-    html,
-    topicId: TOPICS.ADMIN,
-    tags: [{ name: 'category', value: 'admin' }],
-  })
+  const [emailResult] = await Promise.allSettled([
+    sendEmail({
+      to: removedUser.email,
+      subject,
+      html,
+      topicId: TOPICS.ADMIN,
+      tags: [{ name: 'category', value: 'admin' }],
+    }),
+    sendPushToUser(removed_user_id, {
+      title: 'Removed from Pool',
+      body: `You've been removed from ${pool.pool_name}`,
+      data: { type: 'admin', pool_id },
+    }),
+  ])
 
+  const result = emailResult.status === 'fulfilled' ? emailResult.value : { success: false }
   return NextResponse.json({ sent: result.success })
 }

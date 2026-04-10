@@ -109,6 +109,8 @@ final class AuthService {
     // MARK: - Sign Out
 
     func signOut() async throws {
+        // Unregister push token before signing out (best-effort)
+        await PushNotificationService.shared.unregisterToken()
         try await supabase.auth.signOut()
         currentUser = nil
         appUser = nil

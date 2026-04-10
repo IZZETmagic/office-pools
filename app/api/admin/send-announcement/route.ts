@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '@/lib/auth'
 import { sendBatchEmails } from '@/lib/email/send'
 import { allTeamsAnnouncementTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToAll } from '@/lib/push/apns'
 
 // =============================================================
 // POST /api/admin/send-announcement
@@ -138,10 +139,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Send push notification to all users (fire-and-forget)
+  const pushResult = await sendPushToAll({
+    title: 'All Teams Confirmed! 🏆',
+    body: `${daysUntilKickoff} days until kickoff. Make your predictions!`,
+    data: { type: 'pool_activity' },
+  }).catch(() => ({ sent: 0, total: 0 }))
+
   return NextResponse.json({
     message: `Announcement sent to ${totalSent} of ${emails.length} users`,
     totalSent,
     totalUsers: emails.length,
+    pushSent: (pushResult as any)?.sent ?? 0,
     daysUntilKickoff,
     ...(errors.length > 0 ? { errors } : {}),
   })

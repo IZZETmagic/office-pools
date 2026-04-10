@@ -4,6 +4,7 @@ import { sendEmail, sendBatchEmails } from '@/lib/email/send'
 import { mentionNotificationTemplate } from '@/lib/email/templates'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -142,6 +143,13 @@ export async function POST(request: NextRequest) {
       console.log(`[Mention] Fallback sent ${sentCount}/${emailPayloads.length}`)
     }
   }
+
+  // Send push notifications (fire-and-forget)
+  sendPushToUsers(mentionedIds, {
+    title: `${senderName} mentioned you`,
+    body: `in ${pool.pool_name}: "${message_content.slice(0, 100)}"`,
+    data: { type: 'community', pool_id },
+  }).catch((err) => console.error('[Mention] Push error:', err))
 
   console.log(`[Mention] Result: ${result.success ? 'success' : 'failed'}, count: ${emailPayloads.length}`)
   return NextResponse.json({ sent: result.success, count: emailPayloads.length })

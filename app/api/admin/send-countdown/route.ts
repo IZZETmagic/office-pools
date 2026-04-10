@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '@/lib/auth'
 import { sendBatchEmails } from '@/lib/email/send'
 import { countdownReminderTemplate, type CountdownMilestone } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToAll } from '@/lib/push/apns'
 
 const VALID_MILESTONES: CountdownMilestone[] = ['60days', '30days', '14days', '7days', '1day']
 
@@ -134,11 +135,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Send push notification to all users
+  const milestoneLabels: Record<string, string> = {
+    '60days': '60 Days to Go!',
+    '30days': '30 Days to Go!',
+    '14days': '2 Weeks to Go!',
+    '7days': '1 Week to Go!',
+    '1day': 'Tomorrow is Kickoff!',
+  }
+
+  const pushResult = await sendPushToAll({
+    title: milestoneLabels[milestone] ?? `${daysUntilKickoff} Days to Go!`,
+    body: 'Tournament kicks off soon. Make sure your predictions are in!',
+    data: { type: 'pool_activity' },
+  }).catch(() => ({ sent: 0, total: 0 }))
+
   return NextResponse.json({
     message: `Countdown (${milestone}) sent to ${totalSent} of ${emails.length} users`,
     milestone,
     totalSent,
     totalUsers: emails.length,
+    pushSent: (pushResult as any)?.sent ?? 0,
     daysUntilKickoff,
     ...(errors.length > 0 ? { errors } : {}),
   })

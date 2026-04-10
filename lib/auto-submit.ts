@@ -3,6 +3,7 @@ import { sendBatchEmails } from '@/lib/email/send'
 import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate, roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { ROUND_LABELS, ROUND_MATCH_STAGES, ROUND_ORDER, type RoundKey } from '@/lib/tournament'
+import { sendPushToUser, sendPushToUsers } from '@/lib/push/apns'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
@@ -87,6 +88,7 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
         entry_id: string
         entry_name: string
         predictionCount: number
+        userId: string
         email: string
         userName: string
       }> = []
@@ -104,6 +106,7 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
             entry_id: entry.entry_id,
             entry_name: entry.entry_name,
             predictionCount: count,
+            userId: member.user_id,
             email: user.email,
             userName: user.full_name || user.username,
           })
@@ -158,6 +161,15 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
         sendBatchEmails(chunk).catch((err) => {
           console.error('[AutoSubmit] Email batch error:', err)
         })
+      }
+
+      // Send push notifications (fire-and-forget)
+      for (const entry of eligibleEntries) {
+        sendPushToUser(entry.userId, {
+          title: 'Predictions Auto-Submitted',
+          body: `Your draft predictions for ${pool.pool_name} were submitted before the deadline.`,
+          data: { type: 'predictions', pool_id: pool.pool_id },
+        }).catch((err) => console.error('[AutoSubmit] Push error:', err))
       }
     }
   } catch (err) {
@@ -308,6 +320,13 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
               html,
               topicId: TOPICS.PREDICTIONS,
             }]).catch(console.error)
+
+            // Push notification
+            sendPushToUser(member.user_id, {
+              title: `${roundName} Auto-Submitted`,
+              body: `Your predictions for ${pool.pool_name} were submitted before the deadline.`,
+              data: { type: 'predictions', pool_id: poolId },
+            }).catch(console.error)
           }
         }
 
@@ -485,7 +504,7 @@ async function sendAutoRoundOpenNotifications(
 
   const { data: members } = await supabase
     .from('pool_members')
-    .select('users(email, full_name, username)')
+    .select('user_id, users(email, full_name, username)')
     .eq('pool_id', poolId)
 
   if (!members || members.length === 0) return
@@ -528,5 +547,16 @@ async function sendAutoRoundOpenNotifications(
 
   if (emails.length > 0) {
     await sendBatchEmails(emails)
+  }
+
+  // Push notifications
+  const userIds = members.map((m: any) => m.user_id).filter(Boolean)
+  if (userIds.length > 0) {
+    const roundName = ROUND_LABELS[roundKey]
+    sendPushToUsers(userIds, {
+      title: `${roundName} Now Open`,
+      body: `Make your predictions for ${poolName}!`,
+      data: { type: 'pool_activity', pool_id: poolId },
+    }).catch(console.error)
   }
 }

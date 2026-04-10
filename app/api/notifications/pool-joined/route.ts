@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/email/send'
 import { poolJoinedTemplate } from '@/lib/email/templates'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToUser } from '@/lib/push/apns'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -46,13 +47,21 @@ export async function POST(request: NextRequest) {
     poolUrl: `${appUrl}/pools/${pool_id}`,
   })
 
-  const result = await sendEmail({
-    to: userProfile.email,
-    subject,
-    html,
-    topicId: TOPICS.POOL_ACTIVITY,
-    tags: [{ name: 'category', value: 'pool-activity' }],
-  })
+  const [emailResult, pushResult] = await Promise.allSettled([
+    sendEmail({
+      to: userProfile.email,
+      subject,
+      html,
+      topicId: TOPICS.POOL_ACTIVITY,
+      tags: [{ name: 'category', value: 'pool-activity' }],
+    }),
+    sendPushToUser(userData.user_id, {
+      title: `Welcome to ${pool.pool_name}!`,
+      body: 'You\'ve joined the pool. Make your predictions!',
+      data: { type: 'pool_activity', pool_id },
+    }),
+  ])
 
-  return NextResponse.json({ sent: result.success })
+  const emailSent = emailResult.status === 'fulfilled' && emailResult.value.success
+  return NextResponse.json({ sent: emailSent })
 }

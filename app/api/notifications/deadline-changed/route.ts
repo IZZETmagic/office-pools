@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { sendBatchEmails } from '@/lib/email/send'
 import { deadlineChangedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -72,7 +73,18 @@ export async function POST(request: NextRequest) {
     }
   })
 
-  const result = await sendBatchEmails(emails)
+  // Send email + push in parallel
+  const memberUserIds = members.map((m) => m.user_id)
 
+  const [emailResult] = await Promise.allSettled([
+    sendBatchEmails(emails),
+    sendPushToUsers(memberUserIds, {
+      title: 'Deadline Changed',
+      body: `${pool.pool_name}: new deadline is ${formattedDeadline}`,
+      data: { type: 'admin', pool_id },
+    }),
+  ])
+
+  const result = emailResult.status === 'fulfilled' ? emailResult.value : { success: false }
   return NextResponse.json({ sent: result.success, count: emails.length })
 }
