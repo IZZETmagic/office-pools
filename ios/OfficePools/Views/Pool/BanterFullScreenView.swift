@@ -275,9 +275,10 @@ struct BanterFullScreenView: View {
         }
         .onAppear {
             Task {
-                // Set currentUserId before load() so reaction subscription callback works
+                // Set current user before load() so reaction subscription and push notifications work
                 if let userId = authService.appUser?.userId {
-                    viewModel.setCurrentUserId(userId)
+                    let displayName = authService.appUser?.fullName ?? authService.appUser?.username
+                    viewModel.setCurrentUser(userId: userId, displayName: displayName)
                 }
                 await viewModel.load()
                 if let userId = authService.appUser?.userId {

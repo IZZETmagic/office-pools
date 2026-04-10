@@ -135,6 +135,16 @@ struct MainTabView: View {
     @State private var badgeTracker = UnreadBadgeTracker()
     @State private var poolsPendingFilter = false
 
+    /// Deep link navigation state for the Pools tab
+    @State private var poolsDeepLinkPoolId: String?
+    @State private var poolsDeepLinkTab: PoolTab?
+    @State private var deepLinkTrigger: Int = 0
+
+    /// Navigation router for deep linking from push notifications
+    private let router = NavigationRouter.shared
+
+    @Environment(AppDataStore.self) private var dataStore
+
     init(authService: AuthService) {
         self.authService = authService
         let appearance = UITabBarAppearance()
@@ -152,7 +162,13 @@ struct MainTabView: View {
             }
 
             Tab("Pools", systemImage: "trophy.fill", value: .pools) {
-                PoolsView(authService: authService, applyPendingFilter: $poolsPendingFilter)
+                PoolsView(
+                    authService: authService,
+                    applyPendingFilter: $poolsPendingFilter,
+                    deepLinkPoolId: $poolsDeepLinkPoolId,
+                    deepLinkTab: $poolsDeepLinkTab,
+                    deepLinkTrigger: $deepLinkTrigger
+                )
             }
             .badge(badgeTracker.totalUnreadBanter)
 
@@ -172,6 +188,35 @@ struct MainTabView: View {
                 // Start real-time listening for new messages
                 await badgeTracker.startListening(userId: userId, poolIds: [])
             }
+        }
+        .onChange(of: router.pendingDeepLink) { _, newLink in
+            guard let link = newLink else { return }
+            handleDeepLink(link)
+        }
+        .onAppear {
+            // Check for any deep link that arrived before the view appeared
+            if let link = router.pendingDeepLink {
+                // Small delay to let the view hierarchy settle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    handleDeepLink(link)
+                }
+            }
+        }
+    }
+
+    private func handleDeepLink(_ link: DeepLink) {
+        let _ = router.consumeDeepLink()
+
+        switch link {
+        case .pool(let poolId, let tab):
+            // Switch to the Pools tab and push into the pool
+            poolsDeepLinkPoolId = poolId
+            poolsDeepLinkTab = tab
+            deepLinkTrigger += 1
+            selectedTab = .pools
+
+        case .activity:
+            selectedTab = .activity
         }
     }
 }

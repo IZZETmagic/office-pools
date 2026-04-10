@@ -78,6 +78,7 @@
 		7276281152317917EA129B7B /* ActionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DBB0558007ECEFBD484FD2 /* ActionBanner.swift */; };
 		7397C2661E5725B3D45E0D16 /* BracketPickerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465265B9D4513B8F6BD66682 /* BracketPickerModels.swift */; };
 		750F57AC9FC1B256C0BEDD22 /* ActivityItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E68AD5A025771F5F0F731A8 /* ActivityItem.swift */; };
+		76EB26E19BC6DBD86955B7E9 /* NavigationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DA624BE3DAE659A40179D9 /* NavigationRouter.swift */; };
 		7726A187BEFB0DAB812A688D /* ProgressivePredictionEditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07630FC7110C6831BA805EB1 /* ProgressivePredictionEditViewModel.swift */; };
 		77A335CAD99A3E14E8ABBB89 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA589A5883F2F54179C208 /* Config.swift */; };
 		78B23F2D0D56593460395A8F /* ActivitySkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A304B08578A079A4A78E83E2 /* ActivitySkeletonView.swift */; };
@@ -172,7 +173,6 @@
 		3976C0EA2EF36B3CEFB0F447 /* PointsBreakdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointsBreakdownView.swift; sourceTree = "<group>"; };
 		3B1E3DC453A9D1AAA7B2E83A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3C7D1B6CE97DD805C0F80D4C /* BadgePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgePickerSheet.swift; sourceTree = "<group>"; };
-		3CD1B1452F89625E00C74768 /* OfficePools.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OfficePools.entitlements; sourceTree = "<group>"; };
 		3EA09C4D945E009F77CF091E /* ResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewModel.swift; sourceTree = "<group>"; };
 		3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		40AA589A5883F2F54179C208 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
@@ -223,7 +223,7 @@
 		A5BF321B5CEEE61D562773E8 /* LeaderboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardTabView.swift; sourceTree = "<group>"; };
 		A6432B3A35CC67BF8B7420B0 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		A874EBF6322D7B78AEDA563C /* RoundsAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundsAdminView.swift; sourceTree = "<group>"; };
-		A9D1CBD1E789FD6835F30ABE /* OfficePools.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OfficePools.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9D1CBD1E789FD6835F30ABE /* OfficePools.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OfficePools.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ADC5B571B2AC59945F099757 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
 		B19D16679B4852D57AE4C6CA /* PredictionWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionWizardView.swift; sourceTree = "<group>"; };
 		B1B9C3FA6BE8C8CEFCC546D9 /* HomeSkeletonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSkeletonView.swift; sourceTree = "<group>"; };
@@ -257,6 +257,7 @@
 		E2926D66D604930D585193CB /* ActivityEmptyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEmptyView.swift; sourceTree = "<group>"; };
 		E2A587D2E36A8CA740A652D7 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		E2C64BD7C61450079C3C19A8 /* StatCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCardView.swift; sourceTree = "<group>"; };
+		E2DA624BE3DAE659A40179D9 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
 		E8EC5A1BF01D6528ECC7AAA2 /* DiscoverPoolDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverPoolDetailSheet.swift; sourceTree = "<group>"; };
 		ED6FE840DBB7B92EAEEA264A /* SportPoolPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportPoolPill.swift; sourceTree = "<group>"; };
 		EE5C1703AC9FE44CD2FB5C42 /* BPFormTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BPFormTabView.swift; sourceTree = "<group>"; };
@@ -288,7 +289,6 @@
 		0ABA9F19724EE81263B36C37 = {
 			isa = PBXGroup;
 			children = (
-				3CD1B1452F89625E00C74768 /* OfficePools.entitlements */,
 				3F786662CA7913EECC91C847 /* App */,
 				5682EC9E36442C776CD99B1F /* Models */,
 				7957CA8844593A452F2544AA /* Resources */,
@@ -515,6 +515,7 @@
 				B51BFF498E1A1C361BB8751D /* AppDataStore.swift */,
 				C1013EFC18558A172E27B74A /* AuthService.swift */,
 				40AA589A5883F2F54179C208 /* Config.swift */,
+				E2DA624BE3DAE659A40179D9 /* NavigationRouter.swift */,
 				4EC0D1E36A1D5C92393D86E9 /* PoolService.swift */,
 				5B1E374395DE8572EB9F8880 /* PredictionService.swift */,
 				4AE97C0E3677208C7CE09B7B /* PushNotificationService.swift */,
@@ -715,6 +716,7 @@
 				28783A43DFFE4A309BBAA6F5 /* MemberDetailView.swift in Sources */,
 				152C8DBA7D0AB8DF38BFA458 /* MembersTabView.swift in Sources */,
 				01C147FE71642E898FCAEA02 /* Message.swift in Sources */,
+				76EB26E19BC6DBD86955B7E9 /* NavigationRouter.swift in Sources */,
 				D649E9935D0FA89125FB8DD5 /* NextKickoffCard.swift in Sources */,
 				0899A3B89B6B28E1496D7DD1 /* OfficePoolsApp.swift in Sources */,
 				F9013C454F921CBD480B12C4 /* PlayerScore.swift in Sources */,
@@ -842,7 +844,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = OfficePools.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86Y27Z536L;
@@ -863,7 +864,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = OfficePools.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86Y27Z536L;

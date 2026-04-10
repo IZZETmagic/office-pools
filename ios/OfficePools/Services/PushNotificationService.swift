@@ -83,19 +83,39 @@ final class PushNotificationService {
     func handleNotificationTap(type: String?, poolId: String?) {
         guard let type else { return }
 
-        // Deep link based on notification type
-        // TODO: Integrate with a NavigationRouter for actual deep linking
         switch type {
-        case "pool_activity", "predictions", "match_results", "leaderboard", "admin":
-            if let poolId {
-                print("[Push] Navigate to pool: \(poolId)")
-            }
         case "community":
+            // Navigate to the pool's banter chat
             if let poolId {
-                print("[Push] Navigate to pool community: \(poolId)")
+                print("[Push] Deep link → pool \(poolId) banter tab")
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: .banter))
+            }
+        case "pool_activity", "predictions":
+            if let poolId {
+                print("[Push] Deep link → pool \(poolId) predictions tab")
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: .predictions))
+            }
+        case "match_results":
+            if let poolId {
+                print("[Push] Deep link → pool \(poolId) leaderboard tab")
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: .leaderboard))
+            }
+        case "leaderboard":
+            if let poolId {
+                print("[Push] Deep link → pool \(poolId) leaderboard tab")
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: .leaderboard))
+            }
+        case "admin":
+            if let poolId {
+                print("[Push] Deep link → pool \(poolId) settings tab")
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: .settings))
             }
         default:
-            print("[Push] Unknown notification type: \(type)")
+            print("[Push] Unknown notification type: \(type), poolId: \(poolId ?? "nil")")
+            // Default: navigate to pool leaderboard if poolId present
+            if let poolId {
+                NavigationRouter.shared.navigate(to: .pool(poolId: poolId, tab: nil))
+            }
         }
     }
 }

@@ -9,6 +9,12 @@ enum PoolsSegment: String, CaseIterable {
 struct PoolsView: View {
     let authService: AuthService
     @Binding var applyPendingFilter: Bool
+    /// Deep link pool ID from push notification (set by MainTabView)
+    @Binding var deepLinkPoolId: String?
+    /// Deep link tab from push notification
+    @Binding var deepLinkTab: PoolTab?
+    /// Incremented each time a deep link arrives (triggers navigation)
+    @Binding var deepLinkTrigger: Int
     @Environment(UnreadBadgeTracker.self) private var badgeTracker: UnreadBadgeTracker?
     @Environment(AppDataStore.self) private var dataStore
     @State private var viewModel = DashboardViewModel()
@@ -108,6 +114,60 @@ struct PoolsView: View {
                 if applyPendingFilter {
                     viewModel.predictionFilter = .pending
                     applyPendingFilter = false
+                }
+            }
+            .onChange(of: deepLinkTrigger) {
+                handleDeepLink()
+            }
+        }
+    }
+
+    /// Navigate to a pool from a push notification deep link.
+    private func handleDeepLink() {
+        guard let poolId = deepLinkPoolId else { return }
+
+        // Clear the deep link immediately
+        let tab = deepLinkTab
+        deepLinkPoolId = nil
+        deepLinkTab = nil
+
+        // Pop to root first, then push after a brief delay
+        navigationPath = NavigationPath()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            // Try to find the pool in the data store
+            if let card = dataStore.poolCards.first(where: { $0.pool.poolId == poolId }) {
+                if let tab {
+                    navigationPath.append(PoolDeepLink(pool: card.pool, tab: tab))
+                } else {
+                    navigationPath.append(card.pool)
+                }
+            } else {
+                // Pool not in data store — create a minimal Pool for navigation
+                // PoolDetailView will fetch full data via PoolDetailViewModel
+                let minimalPool = Pool(
+                    poolId: poolId,
+                    poolName: "",
+                    poolCode: "",
+                    description: nil,
+                    status: "active",
+                    isPrivate: false,
+                    maxParticipants: nil,
+                    maxEntriesPerUser: 1,
+                    tournamentId: "",
+                    predictionDeadline: nil,
+                    predictionMode: .fullTournament,
+                    createdAt: "",
+                    updatedAt: "",
+                    brandName: nil,
+                    brandEmoji: nil,
+                    brandColor: nil,
+                    brandAccent: nil
+                )
+                if let tab {
+                    navigationPath.append(PoolDeepLink(pool: minimalPool, tab: tab))
+                } else {
+                    navigationPath.append(minimalPool)
                 }
             }
         }

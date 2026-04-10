@@ -282,6 +282,12 @@ struct PoolDetailView: View {
             if banterViewModel == nil {
                 banterViewModel = BanterViewModel(poolId: viewModel.poolId)
             }
+            // If deep-linked to banter, auto-open the chat sheet
+            if initialTab == .banter && !showingBanter {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingBanter = true
+                }
+            }
             // Fetch unread count for chat button badge
             if let userId = authService.appUser?.userId {
                 Task {

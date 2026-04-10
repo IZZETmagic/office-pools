@@ -129,6 +129,23 @@ final class APIService {
         try await requestVoid("POST", path: "/api/notifications/pool-joined", body: Body(poolId: poolId, userId: userId))
     }
 
+    /// Notify all pool members about a new banter message (fire-and-forget push only).
+    func notifyMessage(poolId: String, messageContent: String, senderName: String) async throws {
+        struct Body: Encodable {
+            let poolId: String
+            let messageContent: String
+            let senderName: String
+            enum CodingKeys: String, CodingKey {
+                case poolId = "pool_id"
+                case messageContent = "message_content"
+                case senderName = "sender_name"
+            }
+        }
+        try await requestVoid("POST", path: "/api/notifications/message", body: Body(
+            poolId: poolId, messageContent: messageContent, senderName: senderName
+        ))
+    }
+
     func notifyMention(poolId: String, mentionedUserIds: [String], messageContent: String, senderName: String) async throws {
         struct Body: Encodable {
             let poolId: String

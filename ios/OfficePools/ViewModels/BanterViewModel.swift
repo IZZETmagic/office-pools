@@ -16,10 +16,12 @@ final class BanterViewModel {
     var reactions: [String: [MessageReaction]] = [:]
 
     private let realtimeService = RealtimeService()
+    private let apiService = APIService()
     private let supabase = SupabaseService.shared.client
     private var isLoadingInProgress = false
     private var pollingTask: Task<Void, Never>?
     private var currentUserId: String?
+    private var senderName: String?
 
     init(poolId: String) {
         self.poolId = poolId
@@ -120,6 +122,21 @@ final class BanterViewModel {
                 metadata: metadata
             )
             print("[BanterVM] Message sent successfully")
+
+            // Fire-and-forget push to all pool members
+            Task {
+                do {
+                    try await apiService.notifyMessage(
+                        poolId: poolId,
+                        messageContent: text,
+                        senderName: senderName ?? "Someone"
+                    )
+                    print("[BanterVM] Message push notification sent")
+                } catch {
+                    print("[BanterVM] Message push notification failed: \(error)")
+                }
+            }
+
             // Refetch to replace optimistic message with real one
             if let fetched = try? await realtimeService.fetchMessages(poolId: poolId) {
                 messages = fetched
@@ -135,6 +152,11 @@ final class BanterViewModel {
     }
 
     // MARK: - Reactions
+
+    func setCurrentUser(userId: String, displayName: String?) {
+        currentUserId = userId
+        senderName = displayName
+    }
 
     func setCurrentUserId(_ userId: String) {
         currentUserId = userId

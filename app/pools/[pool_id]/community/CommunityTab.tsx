@@ -715,6 +715,17 @@ export function CommunityTab({
           : [...prev, newMsg]
       )
 
+      // Fire-and-forget push notification to all pool members (every message)
+      fetch('/api/notifications/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pool_id: poolId,
+          message_content: content,
+        }),
+        keepalive: true,
+      }).catch(err => console.error('[MessagePush] fetch failed:', err))
+
       console.log('[Mention DEBUG] mentions array:', mentions, 'length:', mentions.length)
 
       if (mentions.length > 0) {
