@@ -371,16 +371,42 @@ export function CommunityTab({
   // =====================
   // REALTIME SUBSCRIPTION
   // =====================
-  // Realtime subscription — must set auth token BEFORE subscribing
+  // =====================
+  // REALTIME + POLLING FALLBACK
+  // =====================
+  const realtimeConnectedRef = useRef(false)
+
+  // Realtime subscription — try to connect, track status
   useEffect(() => {
     const supabase = supabaseRef.current
     let channel: ReturnType<typeof supabase.channel> | null = null
     let cancelled = false
 
+    const handleInsert = (payload: { new: Record<string, unknown> }) => {
+      const newMsg: MessageWithReactions = {
+        ...(payload.new as unknown as Message),
+        message_type: (payload.new as any).message_type ?? 'text',
+        reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
+        metadata: (payload.new as any).metadata ?? {},
+        reactions: [],
+      }
+      wasNearBottomRef.current = isNearBottom()
+
+      if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
+        setUnseenCount(prev => prev + 1)
+        setShowNewMessagesPill(true)
+      }
+
+      setMessages(prev =>
+        prev.some(m => m.message_id === newMsg.message_id)
+          ? prev
+          : [...prev, newMsg]
+      )
+    }
+
     const subscribe = (accessToken: string) => {
       if (cancelled || channel) return
       supabase.realtime.setAuth(accessToken)
-      console.log('[Realtime] auth token set, subscribing to pool-community')
 
       channel = supabase
         .channel(`pool-community-${poolId}`)
@@ -392,49 +418,24 @@ export function CommunityTab({
             table: 'pool_messages',
             filter: `pool_id=eq.${poolId}`,
           },
-          (payload) => {
-            console.log('[Realtime] INSERT received:', payload.new)
-            const newMsg: MessageWithReactions = {
-              ...(payload.new as Message),
-              message_type: (payload.new as any).message_type ?? 'text',
-              reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
-              metadata: (payload.new as any).metadata ?? {},
-              reactions: [],
-            }
-            wasNearBottomRef.current = isNearBottom()
-
-            if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
-              setUnseenCount(prev => prev + 1)
-              setShowNewMessagesPill(true)
-            }
-
-            setMessages(prev =>
-              prev.some(m => m.message_id === newMsg.message_id)
-                ? prev
-                : [...prev, newMsg]
-            )
-          }
+          handleInsert,
         )
         .subscribe((status, err) => {
           console.log('[Realtime] pool-community status:', status, err ?? '')
+          realtimeConnectedRef.current = status === 'SUBSCRIBED'
         })
     }
 
-    // Get session and subscribe once token is available
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.access_token) {
         subscribe(session.access_token)
-      } else {
-        console.warn('[Realtime] no session — waiting for auth state change')
       }
     })
 
-    // Keep Realtime token in sync when session refreshes
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.access_token) {
           supabase.realtime.setAuth(session.access_token)
-          // If channel hasn't been created yet, subscribe now
           if (!channel) subscribe(session.access_token)
         }
       }
@@ -442,10 +443,63 @@ export function CommunityTab({
 
     return () => {
       cancelled = true
+      realtimeConnectedRef.current = false
       authSub.unsubscribe()
       if (channel) supabase.removeChannel(channel)
     }
   }, [poolId, isNearBottom, currentUserId])
+
+  // Polling fallback — polls for new messages when Realtime isn't connected
+  useEffect(() => {
+    const supabase = supabaseRef.current
+    const POLL_INTERVAL = 4000 // 4 seconds
+
+    const poll = async () => {
+      // Skip polling if Realtime is working
+      if (realtimeConnectedRef.current) return
+
+      const latestMsg = messages[messages.length - 1]
+      if (!latestMsg) return
+
+      const { data } = await supabase
+        .from('pool_messages')
+        .select('*')
+        .eq('pool_id', poolId)
+        .gt('created_at', latestMsg.created_at)
+        .order('created_at', { ascending: true })
+        .limit(20)
+
+      if (data && data.length > 0) {
+        const newMsgs: MessageWithReactions[] = data.map(m => ({
+          ...m,
+          message_type: m.message_type ?? 'text',
+          reply_to_message_id: m.reply_to_message_id ?? null,
+          metadata: m.metadata ?? {},
+          reactions: [],
+        }))
+
+        wasNearBottomRef.current = isNearBottom()
+
+        setMessages(prev => {
+          const existing = new Set(prev.map(m => m.message_id))
+          const toAdd = newMsgs.filter(m => !existing.has(m.message_id))
+          if (toAdd.length === 0) return prev
+
+          // Show pill for unseen messages from others
+          const othersCount = toAdd.filter(m => m.user_id !== currentUserId).length
+          if (!wasNearBottomRef.current && othersCount > 0) {
+            setUnseenCount(c => c + othersCount)
+            setShowNewMessagesPill(true)
+          }
+
+          return [...prev, ...toAdd]
+        })
+      }
+    }
+
+    const interval = setInterval(poll, POLL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [poolId, messages, isNearBottom, currentUserId])
 
   // Auto-scroll when new message arrives
   useEffect(() => {
