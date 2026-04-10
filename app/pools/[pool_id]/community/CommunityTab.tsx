@@ -371,67 +371,79 @@ export function CommunityTab({
   // =====================
   // REALTIME SUBSCRIPTION
   // =====================
-  // Set Realtime auth token from the current session (WebSocket doesn't use cookies)
+  // Realtime subscription — must set auth token BEFORE subscribing
   useEffect(() => {
     const supabase = supabaseRef.current
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+
+    const subscribe = (accessToken: string) => {
+      if (cancelled || channel) return
+      supabase.realtime.setAuth(accessToken)
+      console.log('[Realtime] auth token set, subscribing to pool-community')
+
+      channel = supabase
+        .channel(`pool-community-${poolId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'pool_messages',
+            filter: `pool_id=eq.${poolId}`,
+          },
+          (payload) => {
+            console.log('[Realtime] INSERT received:', payload.new)
+            const newMsg: MessageWithReactions = {
+              ...(payload.new as Message),
+              message_type: (payload.new as any).message_type ?? 'text',
+              reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
+              metadata: (payload.new as any).metadata ?? {},
+              reactions: [],
+            }
+            wasNearBottomRef.current = isNearBottom()
+
+            if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
+              setUnseenCount(prev => prev + 1)
+              setShowNewMessagesPill(true)
+            }
+
+            setMessages(prev =>
+              prev.some(m => m.message_id === newMsg.message_id)
+                ? prev
+                : [...prev, newMsg]
+            )
+          }
+        )
+        .subscribe((status, err) => {
+          console.log('[Realtime] pool-community status:', status, err ?? '')
+        })
+    }
+
+    // Get session and subscribe once token is available
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.access_token) {
-        supabase.realtime.setAuth(session.access_token)
+        subscribe(session.access_token)
+      } else {
+        console.warn('[Realtime] no session — waiting for auth state change')
       }
     })
+
     // Keep Realtime token in sync when session refreshes
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.access_token) {
           supabase.realtime.setAuth(session.access_token)
+          // If channel hasn't been created yet, subscribe now
+          if (!channel) subscribe(session.access_token)
         }
       }
     )
-    return () => authSub.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    const supabase = supabaseRef.current
-    const channel = supabase
-      .channel(`pool-community-${poolId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'pool_messages',
-          filter: `pool_id=eq.${poolId}`,
-        },
-        (payload) => {
-          console.log('[Realtime] INSERT received:', payload.new)
-          const newMsg: MessageWithReactions = {
-            ...(payload.new as Message),
-            message_type: (payload.new as any).message_type ?? 'text',
-            reply_to_message_id: (payload.new as any).reply_to_message_id ?? null,
-            metadata: (payload.new as any).metadata ?? {},
-            reactions: [],
-          }
-          wasNearBottomRef.current = isNearBottom()
-
-          // Show new messages pill if scrolled up and not own message
-          if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
-            setUnseenCount(prev => prev + 1)
-            setShowNewMessagesPill(true)
-          }
-
-          setMessages(prev =>
-            prev.some(m => m.message_id === newMsg.message_id)
-              ? prev
-              : [...prev, newMsg]
-          )
-        }
-      )
-      .subscribe((status, err) => {
-        console.log('[Realtime] pool-community status:', status, err ?? '')
-      })
 
     return () => {
-      supabase.removeChannel(channel)
+      cancelled = true
+      authSub.unsubscribe()
+      if (channel) supabase.removeChannel(channel)
     }
   }, [poolId, isNearBottom, currentUserId])
 
