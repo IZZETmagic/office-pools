@@ -156,9 +156,14 @@ function sendHTTP2Request(
 
     req.on('response', (headers) => {
       const status = headers[':status'] as number
-      // Read response body (required to free resources)
-      req.on('data', () => {})
+      // Read response body for error details
+      const chunks: Buffer[] = []
+      req.on('data', (chunk: Buffer) => { chunks.push(chunk) })
       req.on('end', () => {
+        if (status !== 200) {
+          const responseBody = Buffer.concat(chunks).toString('utf8')
+          console.error(`[APNs HTTP/2] Status ${status}, body: ${responseBody}`)
+        }
         client.close()
         resolve(status)
       })
