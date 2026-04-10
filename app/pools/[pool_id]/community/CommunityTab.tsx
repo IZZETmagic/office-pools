@@ -371,6 +371,25 @@ export function CommunityTab({
   // =====================
   // REALTIME SUBSCRIPTION
   // =====================
+  // Set Realtime auth token from the current session (WebSocket doesn't use cookies)
+  useEffect(() => {
+    const supabase = supabaseRef.current
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token)
+      }
+    })
+    // Keep Realtime token in sync when session refreshes
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.access_token) {
+          supabase.realtime.setAuth(session.access_token)
+        }
+      }
+    )
+    return () => authSub.unsubscribe()
+  }, [])
+
   useEffect(() => {
     const supabase = supabaseRef.current
     const channel = supabase
