@@ -31,36 +31,33 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Get pool name
-  const { data: pool, error: poolError } = await supabase
-    .from('pools')
-    .select('pool_name')
-    .eq('pool_id', pool_id)
-    .single()
+  // Get pool name and sender info in parallel
+  const [poolResult, senderResult, membersResult] = await Promise.all([
+    supabase.from('pools').select('pool_name').eq('pool_id', pool_id).single(),
+    supabase.from('users').select('username, full_name').eq('user_id', userData.user_id).single(),
+    supabase.from('pool_members').select('user_id').eq('pool_id', pool_id).neq('user_id', userData.user_id),
+  ])
 
-  if (poolError || !pool) {
-    console.error('[MessagePush] Pool lookup failed:', poolError)
+  if (poolResult.error || !poolResult.data) {
+    console.error('[MessagePush] Pool lookup failed:', poolResult.error)
     return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
   }
 
-  // Get all pool members except the sender
-  const { data: members, error: membersError } = await supabase
-    .from('pool_members')
-    .select('user_id')
-    .eq('pool_id', pool_id)
-    .neq('user_id', userData.user_id)
-
-  if (membersError) {
-    console.error('[MessagePush] Members lookup failed:', membersError)
+  if (membersResult.error) {
+    console.error('[MessagePush] Members lookup failed:', membersResult.error)
     return NextResponse.json({ error: 'Failed to lookup members' }, { status: 500 })
   }
+
+  const pool = poolResult.data
+  const members = membersResult.data
 
   if (!members || members.length === 0) {
     return NextResponse.json({ sent: true, count: 0 })
   }
 
   const recipientIds = members.map((m) => m.user_id)
-  const displayName = sender_name || 'Someone'
+  const senderData = senderResult.data
+  const displayName = sender_name || senderData?.full_name || senderData?.username || 'Someone'
 
   // Truncate message for notification preview
   const preview = message_content.length > 80
