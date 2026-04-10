@@ -22,7 +22,7 @@ export function DayHeader({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-3 my-4">
       <div className="flex-1 border-t border-neutral-200 dark:border-border-default" />
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 shrink-0">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 shrink-0" suppressHydrationWarning>
         {text}
       </span>
       <div className="flex-1 border-t border-neutral-200 dark:border-border-default" />

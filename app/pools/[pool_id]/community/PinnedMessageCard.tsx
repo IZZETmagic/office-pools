@@ -31,7 +31,7 @@ export function PinnedMessageCard({
         .select('*')
         .eq('pool_id', poolId)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
       if (data) setPinned(data as PinnedMessage)
       setLoading(false)

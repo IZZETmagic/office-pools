@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import type { MemberData, MatchData, PredictionData } from '../types'
@@ -327,7 +329,7 @@ function MatchdayPulseSection({
                 <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
                   {homeName} vs {awayName}
                 </span>
-                <span className="text-[10px] font-medium text-primary-600 dark:text-primary-400">
+                <span className="text-[10px] font-medium text-primary-600 dark:text-primary-400" suppressHydrationWarning>
                   {dateLabel}
                 </span>
               </div>
@@ -397,7 +399,7 @@ function LeaderboardSnapshotSection({
                 }`}>
                   {entry.full_name}
                 </span>
-                <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100 tabular-nums" suppressHydrationWarning>
                   {entry.points.toLocaleString()}
                 </span>
                 {entry.delta !== 0 && (
