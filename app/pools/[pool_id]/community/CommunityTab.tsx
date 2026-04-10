@@ -384,6 +384,7 @@ export function CommunityTab({
           filter: `pool_id=eq.${poolId}`,
         },
         (payload) => {
+          console.log('[Realtime] INSERT received:', payload.new)
           const newMsg: MessageWithReactions = {
             ...(payload.new as Message),
             message_type: (payload.new as any).message_type ?? 'text',
@@ -406,7 +407,9 @@ export function CommunityTab({
           )
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        console.log('[Realtime] pool-community status:', status, err ?? '')
+      })
 
     return () => {
       supabase.removeChannel(channel)
