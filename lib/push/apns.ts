@@ -1,8 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import http2 from 'node:http2'
 
 // =============================================================
 // APNs HTTP/2 Push Notification Client
 // Uses JWT (ES256) via Web Crypto API — no extra dependencies.
+// APNs REQUIRES HTTP/2 — uses Node.js built-in http2 module.
 // =============================================================
 
 const APNS_KEY_ID = process.env.APNS_KEY_ID!
@@ -83,7 +85,8 @@ type PushPayload = {
 }
 
 /**
- * Send a push notification to a single device token.
+ * Send a push notification to a single device token via HTTP/2.
+ * APNs requires HTTP/2 — Node.js fetch only does HTTP/1.1.
  * Returns true if successful, false if failed.
  */
 export async function sendPushNotification(
@@ -94,33 +97,24 @@ export async function sendPushNotification(
   try {
     const jwt = await generateAPNsJWT()
     const host = sandbox ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'
-    const url = `https://${host}/3/device/${deviceToken}`
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        authorization: `bearer ${jwt}`,
-        'apns-topic': BUNDLE_ID,
-        'apns-push-type': 'alert',
-        'apns-priority': '10',
+    const body = JSON.stringify({
+      aps: {
+        alert: { title: payload.title, body: payload.body },
+        sound: 'default',
+        badge: 1,
       },
-      body: JSON.stringify({
-        aps: {
-          alert: { title: payload.title, body: payload.body },
-          sound: 'default',
-          badge: 1,
-        },
-        ...(payload.data ?? {}),
-      }),
+      ...(payload.data ?? {}),
     })
 
-    if (response.ok) return true
+    const statusCode = await sendHTTP2Request(host, deviceToken, jwt, body)
 
-    const errorBody = await response.text().catch(() => '')
-    console.error(`[APNs] Error ${response.status} for token ${deviceToken.slice(0, 8)}...: ${errorBody}`)
+    if (statusCode === 200) return true
+
+    console.error(`[APNs] Error ${statusCode} for token ${deviceToken.slice(0, 8)}...`)
 
     // 410 Gone = token is no longer valid, clean it up
-    if (response.status === 410) {
+    if (statusCode === 410) {
       await removeInvalidToken(deviceToken)
     }
 
@@ -129,6 +123,62 @@ export async function sendPushNotification(
     console.error(`[APNs] Exception sending to ${deviceToken.slice(0, 8)}...:`, err)
     return false
   }
+}
+
+/**
+ * Send an HTTP/2 request to APNs using Node.js built-in http2 module.
+ * Returns the HTTP status code.
+ */
+function sendHTTP2Request(
+  host: string,
+  deviceToken: string,
+  jwt: string,
+  body: string
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const client = http2.connect(`https://${host}`)
+
+    client.on('error', (err) => {
+      client.close()
+      reject(err)
+    })
+
+    const req = client.request({
+      ':method': 'POST',
+      ':path': `/3/device/${deviceToken}`,
+      authorization: `bearer ${jwt}`,
+      'apns-topic': BUNDLE_ID,
+      'apns-push-type': 'alert',
+      'apns-priority': '10',
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(body),
+    })
+
+    req.on('response', (headers) => {
+      const status = headers[':status'] as number
+      // Read response body (required to free resources)
+      req.on('data', () => {})
+      req.on('end', () => {
+        client.close()
+        resolve(status)
+      })
+    })
+
+    req.on('error', (err) => {
+      client.close()
+      reject(err)
+    })
+
+    // Set a timeout to avoid hanging connections
+    req.setTimeout(10000, () => {
+      req.close()
+      client.close()
+      reject(new Error('APNs request timed out'))
+    })
+
+    req.write(body)
+    req.end()
+  })
 }
 
 /**

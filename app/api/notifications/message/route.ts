@@ -71,12 +71,17 @@ export async function POST(request: NextRequest) {
     `[MessagePush] Sending push to ${recipientIds.length} members in pool "${pool.pool_name}"`
   )
 
-  // Fire-and-forget push to all pool members
-  sendPushToUsers(recipientIds, {
-    title: `${displayName} in ${pool.pool_name}`,
-    body: preview,
-    data: { type: 'community', pool_id },
-  }).catch((err) => console.error('[MessagePush] Push error:', err))
-
-  return NextResponse.json({ sent: true, count: recipientIds.length })
+  // Send push to all pool members (await so we can log the result)
+  try {
+    const result = await sendPushToUsers(recipientIds, {
+      title: `${displayName} in ${pool.pool_name}`,
+      body: preview,
+      data: { type: 'community', pool_id },
+    })
+    console.log(`[MessagePush] Push result: ${result.sent}/${result.total} sent`)
+    return NextResponse.json({ sent: true, count: recipientIds.length, push: result })
+  } catch (err) {
+    console.error('[MessagePush] Push error:', err)
+    return NextResponse.json({ sent: true, count: recipientIds.length, push_error: String(err) })
+  }
 }
