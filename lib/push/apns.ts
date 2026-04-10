@@ -107,11 +107,16 @@ export async function sendPushNotification(
       ...(payload.data ?? {}),
     })
 
-    const statusCode = await sendHTTP2Request(host, deviceToken, jwt, body)
+    console.log(`[APNs] Sending to ${host}, token ${deviceToken.slice(0, 8)}..., sandbox=${sandbox}`)
 
-    if (statusCode === 200) return true
+    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, body)
 
-    console.error(`[APNs] Error ${statusCode} for token ${deviceToken.slice(0, 8)}...`)
+    if (statusCode === 200) {
+      console.log(`[APNs] Success for token ${deviceToken.slice(0, 8)}...`)
+      return true
+    }
+
+    console.error(`[APNs] Error ${statusCode} for token ${deviceToken.slice(0, 8)}...: ${responseBody}`)
 
     // 410 Gone = token is no longer valid, clean it up
     if (statusCode === 410) {
@@ -134,7 +139,7 @@ function sendHTTP2Request(
   deviceToken: string,
   jwt: string,
   body: string
-): Promise<number> {
+): Promise<{ statusCode: number; responseBody: string }> {
   return new Promise((resolve, reject) => {
     const client = http2.connect(`https://${host}`)
 
@@ -155,17 +160,13 @@ function sendHTTP2Request(
     })
 
     req.on('response', (headers) => {
-      const status = headers[':status'] as number
-      // Read response body for error details
+      const statusCode = headers[':status'] as number
       const chunks: Buffer[] = []
       req.on('data', (chunk: Buffer) => { chunks.push(chunk) })
       req.on('end', () => {
-        if (status !== 200) {
-          const responseBody = Buffer.concat(chunks).toString('utf8')
-          console.error(`[APNs HTTP/2] Status ${status}, body: ${responseBody}`)
-        }
+        const responseBody = Buffer.concat(chunks).toString('utf8')
         client.close()
-        resolve(status)
+        resolve({ statusCode, responseBody })
       })
     })
 
