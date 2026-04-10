@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 
 /// Root view — shows splash during preload, login if unauthenticated, or the main tab bar.
 struct ContentView: View {
@@ -40,6 +42,10 @@ struct ContentView: View {
         }
         .animation(.easeInOut, value: authService.isAuthenticated)
         .preferredColorScheme(resolvedColorScheme)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Clear badge count when app comes to foreground
+            UNUserNotificationCenter.current().setBadgeCount(0)
+        }
         .onChange(of: authService.isAuthenticated) { _, isAuth in
             // Reset splash when user logs in so preload runs
             if isAuth {
