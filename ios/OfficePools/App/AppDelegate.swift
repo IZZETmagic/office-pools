@@ -3,13 +3,14 @@ import UserNotifications
 
 /// Handles push notification lifecycle events.
 /// Wired into SwiftUI via @UIApplicationDelegateAdaptor in OfficePoolsApp.
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, @unchecked Sendable {
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = NotificationDelegate.shared
         return true
     }
 
@@ -32,29 +33,36 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         print("[Push] Failed to register: \(error.localizedDescription)")
     }
+}
 
-    // MARK: - Foreground Notifications
+// MARK: - Notification Delegate (separate class avoids Sendable issues)
 
-    nonisolated func userNotificationCenter(
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    static let shared = NotificationDelegate()
+
+    // Foreground: show banner + sound
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        // Show banner + sound even when app is in foreground
-        return [.banner, .sound, .badge]
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound, .badge])
     }
 
-    // MARK: - Notification Tap Handling
-
-    nonisolated func userNotificationCenter(
+    // Tap handling: use completion handler API instead of async
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        // Extract values on this isolation context to avoid sending [AnyHashable: Any] across boundaries
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
         let userInfo = response.notification.request.content.userInfo
         let type = userInfo["type"] as? String
         let poolId = userInfo["pool_id"] as? String
-        await MainActor.run {
+
+        Task { @MainActor in
             PushNotificationService.shared.handleNotificationTap(type: type, poolId: poolId)
         }
+
+        completionHandler()
     }
 }
