@@ -22,6 +22,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>SportPool uses your camera to scan QR codes and join pools.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

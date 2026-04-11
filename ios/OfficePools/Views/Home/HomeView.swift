@@ -419,7 +419,7 @@ struct HomeView: View {
                 }
             }
             .padding(16)
-            .background(Color.sp.primaryLight)
+            .background(Color.sp.primary.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.lg))
             .padding(.horizontal, 20)
         }
@@ -772,26 +772,45 @@ struct HomeView: View {
 
     private var joinScanContent: some View {
         VStack(spacing: 18) {
-            ZStack {
-                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
-                    .fill(Color.sp.mist)
-                    .frame(height: 120)
+            if QRScannerView.isSupported {
+                QRScannerView { scannedValue in
+                    handleScannedCode(scannedValue)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+                .frame(height: 200)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                        .fill(Color.sp.mist)
+                        .frame(height: 120)
 
-                VStack(spacing: 10) {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 36, weight: .light))
-                        .foregroundStyle(Color.sp.primary)
+                    VStack(spacing: 10) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 36, weight: .light))
+                            .foregroundStyle(Color.sp.slate)
 
-                    Text("Point your camera at a SportPool QR code")
-                        .font(SPTypography.body)
-                        .foregroundStyle(Color.sp.slate)
-                        .multilineTextAlignment(.center)
+                        Text("Camera not available on this device")
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
 
-            Text("Coming soon")
-                .font(SPTypography.detail)
-                .foregroundStyle(Color.sp.silver)
+            if let error = joinError {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 10))
+                    Text(error)
+                        .font(SPTypography.detail)
+                }
+                .foregroundStyle(Color.sp.red)
+            }
+
+            if isJoining {
+                ProgressView()
+                    .tint(Color.sp.primary)
+            }
 
             // Cancel
             Button {
@@ -803,6 +822,35 @@ struct HomeView: View {
                     .padding(.top, 4)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func handleScannedCode(_ value: String) {
+        // Extract pool code from URL (e.g. https://sportpool.io/join/ABC123) or use raw code
+        let code: String
+        if let url = URL(string: value),
+           url.pathComponents.count >= 3,
+           url.pathComponents[1] == "join" {
+            code = url.pathComponents[2].uppercased()
+        } else {
+            code = value.uppercased()
+        }
+
+        guard !isJoining else { return }
+
+        Task {
+            guard let userId = authService.appUser?.userId else { return }
+            let username = authService.appUser?.username ?? "Entry 1"
+            isJoining = true
+            joinError = nil
+            do {
+                _ = try await poolService.joinPool(poolCode: code, userId: userId, username: username)
+                showJoinSheet = false
+                await dataStore.refresh(userId: userId)
+            } catch {
+                joinError = error.localizedDescription
+            }
+            isJoining = false
         }
     }
 }

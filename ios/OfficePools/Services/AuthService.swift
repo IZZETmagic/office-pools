@@ -120,7 +120,10 @@ final class AuthService {
     // MARK: - Password Reset
 
     func resetPassword(email: String) async throws {
-        try await supabase.auth.resetPasswordForEmail(email)
+        try await supabase.auth.resetPasswordForEmail(
+            email,
+            redirectTo: URL(string: "\(Config.apiBaseURL)/auth/callback?next=/reset-password")
+        )
     }
 
     // MARK: - Fetch App User Profile

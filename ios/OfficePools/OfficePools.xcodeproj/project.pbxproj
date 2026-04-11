@@ -122,6 +122,8 @@
 		D865931B0A51B6FA13C58991 /* PredictionEditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65DB42B956F5E96A77FD2978 /* PredictionEditViewModel.swift */; };
 		D92F5FE99688ACD53268A5DB /* MatchCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28242E493287C7F011DCB1FB /* MatchCardView.swift */; };
 		E0885A6D296E474BD2458BE8 /* ShimmerModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE97DCC3EE54C2626F181AF /* ShimmerModifier.swift */; };
+		A1B2C3D4E5F60718192A3B4C /* MentionDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718192A3B40 /* MentionDropdown.swift */; };
+		E1F17FE66A0822E57E6D0F69 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFE9C9658303748B332C85C /* QRScannerView.swift */; };
 		E3C66A8094EB8DB760E037F6 /* BPThirdPlaceRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 041ADCF65921E894A1718E74 /* BPThirdPlaceRankingView.swift */; };
 		E418B7C3FEE8990866F6C0A7 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE97C0E3677208C7CE09B7B /* PushNotificationService.swift */; };
 		EB1BE683D9D12D424F26A53D /* ProgressiveRound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1155ED462E8C626C56F459 /* ProgressiveRound.swift */; };
@@ -173,7 +175,7 @@
 		3976C0EA2EF36B3CEFB0F447 /* PointsBreakdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointsBreakdownView.swift; sourceTree = "<group>"; };
 		3B1E3DC453A9D1AAA7B2E83A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3C7D1B6CE97DD805C0F80D4C /* BadgePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgePickerSheet.swift; sourceTree = "<group>"; };
-		3CD1B1462F896F1A00C74768 /* OfficePools.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OfficePools.entitlements; sourceTree = "<group>"; };
+		3CD1B1472F89FFFD00C74768 /* OfficePools.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OfficePools.entitlements; sourceTree = "<group>"; };
 		3EA09C4D945E009F77CF091E /* ResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewModel.swift; sourceTree = "<group>"; };
 		3FE086364E7ACA7B575BAB32 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		40AA589A5883F2F54179C208 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
@@ -241,6 +243,8 @@
 		C47B7E2E0B2B95292A9A6EF4 /* ResultsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsTabView.swift; sourceTree = "<group>"; };
 		C4D8B1EE590073B8BD657028 /* PredictionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictionsTabView.swift; sourceTree = "<group>"; };
 		C528E3397294832A1078148A /* MatchDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchDetailView.swift; sourceTree = "<group>"; };
+		CBFE9C9658303748B332C85C /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718192A3B40 /* MentionDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionDropdown.swift; sourceTree = "<group>"; };
 		CF90BE387F83D948D93EE20A /* MatchStatsResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchStatsResponse.swift; sourceTree = "<group>"; };
 		CFA4A2BC3285CA74B939427F /* PoolDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoolDetailView.swift; sourceTree = "<group>"; };
 		D0C16D214CC5B59466B1F169 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
@@ -290,7 +294,7 @@
 		0ABA9F19724EE81263B36C37 = {
 			isa = PBXGroup;
 			children = (
-				3CD1B1462F896F1A00C74768 /* OfficePools.entitlements */,
+				3CD1B1472F89FFFD00C74768 /* OfficePools.entitlements */,
 				3F786662CA7913EECC91C847 /* App */,
 				5682EC9E36442C776CD99B1F /* Models */,
 				7957CA8844593A452F2544AA /* Resources */,
@@ -426,7 +430,9 @@
 				49DBB0558007ECEFBD484FD2 /* ActionBanner.swift */,
 				FA0EB89A56E3EE86CA69912A /* CachedAsyncImage.swift */,
 				0C1E1ED10D683948BDC8AAE8 /* CountdownHero.swift */,
+				A1B2C3D4E5F60718192A3B40 /* MentionDropdown.swift */,
 				DA8860687ADD1AA130F40E78 /* PulsingModifier.swift */,
+				CBFE9C9658303748B332C85C /* QRScannerView.swift */,
 				77CFFF6F05E1E75D5BDAB0BA /* RefereeTipCard.swift */,
 				9BE97DCC3EE54C2626F181AF /* ShimmerModifier.swift */,
 				ED6FE840DBB7B92EAEEA264A /* SportPoolPill.swift */,
@@ -749,6 +755,8 @@
 				EB1BE683D9D12D424F26A53D /* ProgressiveRound.swift in Sources */,
 				3B7B9B2FE54F768C1C2B3725 /* PulsingModifier.swift in Sources */,
 				E418B7C3FEE8990866F6C0A7 /* PushNotificationService.swift in Sources */,
+				A1B2C3D4E5F60718192A3B4C /* MentionDropdown.swift in Sources */,
+				E1F17FE66A0822E57E6D0F69 /* QRScannerView.swift in Sources */,
 				BDE390544B62029DE8C3DF25 /* RealtimeService.swift in Sources */,
 				6D4E7462137992438390181B /* RefereeTipCard.swift in Sources */,
 				1A05E72F4B7707ACB952429A /* ResultsContainerView.swift in Sources */,

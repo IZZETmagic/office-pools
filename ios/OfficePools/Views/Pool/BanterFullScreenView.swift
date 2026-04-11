@@ -94,8 +94,8 @@ struct BanterFullScreenView: View {
                             VStack(spacing: 2) {
                                 if shouldShowDateHeader(at: index) {
                                     Text(dateHeaderText(for: message.createdAt))
-                                        .font(.caption2.weight(.medium))
-                                        .foregroundStyle(.secondary)
+                                        .font(SPTypography.detail)
+                                        .foregroundStyle(Color.sp.slate)
                                         .padding(.top, index == 0 ? 0 : 8)
                                         .padding(.bottom, 4)
                                 }
@@ -183,7 +183,7 @@ struct BanterFullScreenView: View {
                         } label: {
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.sp.slate)
                                 .frame(width: 36, height: 36)
                                 .background(.ultraThinMaterial)
                                 .clipShape(Circle())
@@ -235,15 +235,15 @@ struct BanterFullScreenView: View {
                 VStack(spacing: 0) {
                     Spacer()
                     VStack(alignment: .leading, spacing: 4) {
-                        quickActionRow(icon: "target", iconColor: .orange, label: "Share Prediction") {
+                        quickActionRow(icon: "target", iconColor: Color.sp.accent, label: "Share Prediction") {
                             showingQuickActions = false
                             showingMatchPicker = true
                         }
-                        quickActionRow(icon: "trophy.fill", iconColor: .purple, label: "Flex Badges") {
+                        quickActionRow(icon: "trophy.fill", iconColor: Color.sp.primary, label: "Flex Badges") {
                             showingQuickActions = false
                             showingBadgePicker = true
                         }
-                        quickActionRow(icon: "chart.bar.fill", iconColor: .blue, label: "Drop Standings") {
+                        quickActionRow(icon: "chart.bar.fill", iconColor: Color.sp.green, label: "Drop Standings") {
                             showingQuickActions = false
                             sendDropStandings()
                         }
@@ -258,7 +258,7 @@ struct BanterFullScreenView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.sp.snow)
         .navigationTitle(poolName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -269,7 +269,7 @@ struct BanterFullScreenView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.sp.slate)
                 }
             }
         }
@@ -344,8 +344,8 @@ struct BanterFullScreenView: View {
                     .clipShape(Circle())
 
                 Text(label)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .font(SPTypography.cardTitle)
+                    .foregroundStyle(Color.sp.ink)
 
                 Spacer()
             }
@@ -362,7 +362,7 @@ struct BanterFullScreenView: View {
         guard let userId = authService.appUser?.userId else { return }
         Task {
             viewModel.messageText = text
-            await viewModel.sendMessage(userId: userId, messageType: messageType, metadata: metadata)
+            await viewModel.sendMessage(userId: userId, messageType: messageType, metadata: metadata, leaderboardEntries: leaderboardEntries)
             if let lastId = viewModel.messages.last?.messageId {
                 withAnimation {
                     scrollProxy?.scrollTo(lastId, anchor: .bottom)
@@ -412,55 +412,78 @@ struct BanterFullScreenView: View {
         !viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSending
     }
 
+    private var mentionMembers: [LeaderboardEntryData] {
+        viewModel.filteredMentionMembers(from: leaderboardEntries, currentUserId: authService.appUser?.userId)
+    }
+
+    @ViewBuilder
     private var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            // Plus button — Quick Actions
-            Button {
-                withAnimation(.spring(duration: 0.25)) {
-                    showingQuickActions.toggle()
-                }
-            } label: {
-                Image(systemName: showingQuickActions ? "xmark" : "plus")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
-                    .modifier(GlassEffectCircleModifier())
+        VStack(spacing: 0) {
+            // Mention autocomplete dropdown
+            if viewModel.mentionQuery != nil && !mentionMembers.isEmpty {
+                MentionDropdown(
+                    members: mentionMembers,
+                    selectedIndex: viewModel.selectedMentionIndex,
+                    onSelect: { member in
+                        viewModel.insertMention(member: member)
+                    }
+                )
+                .padding(.horizontal, 10)
             }
 
-            // Text field
-            HStack(alignment: .bottom, spacing: 4) {
-                TextField("Banter", text: $viewModel.messageText, axis: .vertical)
-                    .focused($isTextFieldFocused)
-                    .lineLimit(1...12)
-                    .padding(.leading, 12)
-                    .padding(.vertical, 8)
-
-                // Send button inside the text field
+            HStack(alignment: .bottom, spacing: 6) {
+                // Plus button — Quick Actions
                 Button {
-                    Task {
-                        if let userId = authService.appUser?.userId {
-                            await viewModel.sendMessage(userId: userId)
-                            if let lastId = viewModel.messages.last?.messageId {
-                                withAnimation {
-                                    scrollProxy?.scrollTo(lastId, anchor: .bottom)
+                    withAnimation(.spring(duration: 0.25)) {
+                        showingQuickActions.toggle()
+                    }
+                } label: {
+                    Image(systemName: showingQuickActions ? "xmark" : "plus")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color.sp.ink)
+                        .frame(width: 36, height: 36)
+                        .modifier(GlassEffectCircleModifier())
+                }
+
+                // Text field
+                HStack(alignment: .bottom, spacing: 4) {
+                    TextField("Banter", text: $viewModel.messageText, axis: .vertical)
+                        .focused($isTextFieldFocused)
+                        .font(SPTypography.body)
+                        .lineLimit(1...12)
+                        .padding(.leading, 12)
+                        .padding(.vertical, 8)
+                        .onChange(of: viewModel.messageText) {
+                            viewModel.updateMentionQuery(text: viewModel.messageText)
+                        }
+
+                    // Send button inside the text field
+                    Button {
+                        Task {
+                            if let userId = authService.appUser?.userId {
+                                await viewModel.sendMessage(userId: userId, leaderboardEntries: leaderboardEntries)
+                                if let lastId = viewModel.messages.last?.messageId {
+                                    withAnimation {
+                                        scrollProxy?.scrollTo(lastId, anchor: .bottom)
+                                    }
                                 }
                             }
                         }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, canSend ? Color.sp.primary : Color.sp.silver)
                     }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 28))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, canSend ? Color.accentColor : Color(.systemGray4))
+                    .disabled(!canSend)
+                    .padding(.trailing, 4)
+                    .padding(.bottom, 2)
                 }
-                .disabled(!canSend)
-                .padding(.trailing, 4)
-                .padding(.bottom, 2)
+                .modifier(GlassEffectRoundedRectModifier())
             }
-            .modifier(GlassEffectRoundedRectModifier())
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
     }
 }
 
@@ -505,7 +528,7 @@ private struct GlassEffectRoundedRectModifier: ViewModifier {
             content.glassEffect(.regular, in: .rect(cornerRadius: 16))
         } else {
             content
-                .background(.fill.tertiary)
+                .background(Color.sp.mist)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }

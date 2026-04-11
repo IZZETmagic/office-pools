@@ -115,6 +115,13 @@ struct PoolsView: View {
                     viewModel.predictionFilter = .pending
                     applyPendingFilter = false
                 }
+                // Handle deep link that arrived before this view appeared
+                // (onChange won't fire if deepLinkTrigger was already set)
+                if deepLinkPoolId != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        handleDeepLink()
+                    }
+                }
             }
             .onChange(of: deepLinkTrigger) {
                 handleDeepLink()
@@ -997,26 +1004,45 @@ struct PoolsView: View {
 
     private var poolsJoinScanContent: some View {
         VStack(spacing: 18) {
-            ZStack {
-                RoundedRectangle(cornerRadius: SPDesign.Radius.md)
-                    .fill(Color.sp.mist)
-                    .frame(height: 120)
+            if QRScannerView.isSupported {
+                QRScannerView { scannedValue in
+                    handleScannedCode(scannedValue)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+                .frame(height: 200)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: SPDesign.Radius.md)
+                        .fill(Color.sp.mist)
+                        .frame(height: 120)
 
-                VStack(spacing: 10) {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 36, weight: .light))
-                        .foregroundStyle(Color.sp.primary)
+                    VStack(spacing: 10) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 36, weight: .light))
+                            .foregroundStyle(Color.sp.slate)
 
-                    Text("Point your camera at a SportPool QR code")
-                        .font(SPTypography.body)
-                        .foregroundStyle(Color.sp.slate)
-                        .multilineTextAlignment(.center)
+                        Text("Camera not available on this device")
+                            .font(SPTypography.body)
+                            .foregroundStyle(Color.sp.slate)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
 
-            Text("Coming soon")
-                .font(SPTypography.detail)
-                .foregroundStyle(Color.sp.silver)
+            if let error = viewModel.errorMessage {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 10))
+                    Text(error)
+                        .font(SPTypography.detail)
+                }
+                .foregroundStyle(Color.sp.red)
+            }
+
+            if viewModel.isJoining {
+                ProgressView()
+                    .tint(Color.sp.primary)
+            }
 
             Button {
                 viewModel.showJoinSheet = false
@@ -1027,6 +1053,25 @@ struct PoolsView: View {
                     .padding(.top, 4)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func handleScannedCode(_ value: String) {
+        let code: String
+        if let url = URL(string: value),
+           url.pathComponents.count >= 3,
+           url.pathComponents[1] == "join" {
+            code = url.pathComponents[2].uppercased()
+        } else {
+            code = value.uppercased()
+        }
+
+        guard !viewModel.isJoining else { return }
+
+        Task {
+            guard let userId = authService.appUser?.userId else { return }
+            let username = authService.appUser?.username ?? "Entry 1"
+            await viewModel.joinPool(code: code, userId: userId, username: username, dataStore: dataStore)
         }
     }
 }

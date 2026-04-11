@@ -46,6 +46,7 @@ targets:
           UIColorName: AccentColor
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: SportPool uses your camera to scan QR codes and join pools.
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes:
           - remote-notification

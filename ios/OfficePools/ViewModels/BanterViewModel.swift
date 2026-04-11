@@ -15,6 +15,11 @@ final class BanterViewModel {
     var unreadCount: Int = 0
     var reactions: [String: [MessageReaction]] = [:]
 
+    // Mention autocomplete state
+    var mentionQuery: String? = nil
+    var mentionCursorPosition: Int = 0
+    var selectedMentionIndex: Int = 0
+
     private let realtimeService = RealtimeService()
     private let apiService = APIService()
     private let supabase = SupabaseService.shared.client
@@ -88,13 +93,18 @@ final class BanterViewModel {
     func sendMessage(
         userId: String,
         messageType: MessageType = .text,
-        metadata: [String: AnyJSON]? = nil
+        metadata: [String: AnyJSON]? = nil,
+        leaderboardEntries: [LeaderboardEntryData] = []
     ) async {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
+        // Extract mention user IDs before clearing text
+        let mentionedUserIds = parseMentionUserIds(from: text, members: leaderboardEntries)
+
         isSending = true
         messageText = ""
+        mentionQuery = nil
 
         // Optimistic update: add message locally immediately
         let optimisticId = UUID().uuidString
@@ -105,7 +115,7 @@ final class BanterViewModel {
             poolId: poolId,
             userId: userId,
             content: text,
-            mentions: [],
+            mentions: mentionedUserIds,
             createdAt: formatter.string(from: Date()),
             messageType: messageType,
             replyToMessageId: nil,
@@ -118,6 +128,7 @@ final class BanterViewModel {
                 poolId: poolId,
                 userId: userId,
                 content: text,
+                mentions: mentionedUserIds,
                 messageType: messageType.rawValue,
                 metadata: metadata
             )
@@ -134,6 +145,23 @@ final class BanterViewModel {
                     print("[BanterVM] Message push notification sent")
                 } catch {
                     print("[BanterVM] Message push notification failed: \(error)")
+                }
+            }
+
+            // Fire-and-forget mention notifications
+            if !mentionedUserIds.isEmpty {
+                Task {
+                    do {
+                        try await apiService.notifyMention(
+                            poolId: poolId,
+                            mentionedUserIds: mentionedUserIds,
+                            messageContent: text,
+                            senderName: senderName ?? "Someone"
+                        )
+                        print("[BanterVM] Mention notification sent for \(mentionedUserIds.count) user(s)")
+                    } catch {
+                        print("[BanterVM] Mention notification failed: \(error)")
+                    }
                 }
             }
 
@@ -209,6 +237,67 @@ final class BanterViewModel {
                 await loadReactions(userId: userId)
             }
         }
+    }
+
+    // MARK: - Mention Helpers
+
+    /// Detect @mention query from text input. Call this on every text change.
+    func updateMentionQuery(text: String) {
+        // Find the last @ that starts a mention (preceded by whitespace or start of string)
+        guard let atRange = text.range(of: #"(^|\s)@(\w*)$"#, options: .regularExpression) else {
+            mentionQuery = nil
+            return
+        }
+        let matched = String(text[atRange])
+        // Extract the query part after @
+        if let atIndex = matched.lastIndex(of: "@") {
+            mentionQuery = String(matched[matched.index(after: atIndex)...]).lowercased()
+            mentionCursorPosition = text.distance(from: text.startIndex, to: text.range(of: "@", options: .backwards)!.lowerBound)
+            selectedMentionIndex = 0
+        } else {
+            mentionQuery = nil
+        }
+    }
+
+    /// Filter leaderboard entries for mention autocomplete.
+    func filteredMentionMembers(from entries: [LeaderboardEntryData], currentUserId: String?) -> [LeaderboardEntryData] {
+        guard let query = mentionQuery else { return [] }
+        return entries
+            .filter { entry in
+                guard entry.userId != currentUserId else { return false }
+                if query.isEmpty { return true }
+                return entry.fullName.lowercased().contains(query)
+                    || entry.username.lowercased().contains(query)
+            }
+            .prefix(6)
+            .map { $0 }
+    }
+
+    /// Insert selected mention into the message text, replacing the @query.
+    func insertMention(member: LeaderboardEntryData) {
+        let before = String(messageText.prefix(mentionCursorPosition))
+        let afterAt = String(messageText.dropFirst(mentionCursorPosition))
+        // Remove the @query portion
+        let cleaned = afterAt.replacingOccurrences(of: #"@\w*"#, with: "", options: .regularExpression, range: afterAt.startIndex..<afterAt.endIndex)
+        messageText = before + "@\(member.username) " + cleaned
+        mentionQuery = nil
+    }
+
+    /// Extract user IDs from @username mentions in message text.
+    func parseMentionUserIds(from text: String, members: [LeaderboardEntryData]) -> [String] {
+        let pattern = #"@(\w+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsString = text as NSString
+        let results = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length))
+
+        var ids = Set<String>()
+        for match in results {
+            let username = nsString.substring(with: match.range(at: 1)).lowercased()
+            if let member = members.first(where: { $0.username.lowercased() == username }) {
+                ids.insert(member.userId)
+            }
+        }
+        return Array(ids)
     }
 
     func cleanup() async {

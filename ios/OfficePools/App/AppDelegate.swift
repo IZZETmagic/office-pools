@@ -59,7 +59,10 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @u
         let type = userInfo["type"] as? String
         let poolId = userInfo["pool_id"] as? String
 
-        Task { @MainActor in
+        // Use assumeIsolated for synchronous execution on cold launch —
+        // ensures pendingDeepLink is set BEFORE SwiftUI views appear.
+        // didReceive is always called on the main thread.
+        MainActor.assumeIsolated {
             PushNotificationService.shared.handleNotificationTap(type: type, poolId: poolId)
         }
 

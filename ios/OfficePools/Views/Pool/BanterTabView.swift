@@ -7,6 +7,10 @@ struct BanterTabView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @FocusState private var isTextFieldFocused: Bool
 
+    private var mentionMembers: [LeaderboardEntryData] {
+        viewModel.filteredMentionMembers(from: leaderboardEntries, currentUserId: authService.appUser?.userId)
+    }
+
     private var memberLookup: [String: LeaderboardEntryData] {
         Dictionary(leaderboardEntries.map { ($0.userId, $0) }, uniquingKeysWith: { first, _ in first })
     }
@@ -80,8 +84,8 @@ struct BanterTabView: View {
                         VStack(spacing: 2) {
                             if shouldShowDateHeader(at: index) {
                                 Text(dateHeaderText(for: message.createdAt))
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(.secondary)
+                                    .font(SPTypography.detail)
+                                    .foregroundStyle(Color.sp.slate)
                                     .padding(.top, index == 0 ? 0 : 8)
                                     .padding(.bottom, 4)
                             }
@@ -106,31 +110,49 @@ struct BanterTabView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
                     Divider()
+
+                    // Mention autocomplete dropdown
+                    if viewModel.mentionQuery != nil && !mentionMembers.isEmpty {
+                        MentionDropdown(
+                            members: mentionMembers,
+                            selectedIndex: viewModel.selectedMentionIndex,
+                            onSelect: { member in
+                                viewModel.insertMention(member: member)
+                            }
+                        )
+                        .padding(.horizontal)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
                     HStack(spacing: 12) {
                         TextField("Message", text: $viewModel.messageText, axis: .vertical)
                             .focused($isTextFieldFocused)
                             .lineLimit(1...12)
+                            .font(SPTypography.body)
                             .padding(10)
-                            .background(.fill.tertiary)
+                            .background(Color.sp.mist)
                             .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .onChange(of: viewModel.messageText) {
+                                viewModel.updateMentionQuery(text: viewModel.messageText)
+                            }
 
                         Button {
                             Task {
                                 if let userId = authService.appUser?.userId {
-                                    await viewModel.sendMessage(userId: userId)
+                                    await viewModel.sendMessage(userId: userId, leaderboardEntries: leaderboardEntries)
                                 }
                             }
                         } label: {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.title2)
-                                .foregroundColor(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
+                                .foregroundColor(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.sp.silver : Color.sp.primary)
                         }
                         .disabled(viewModel.messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
-                .background(.bar)
+                .background(Color.sp.surface)
             }
             .onAppear { scrollProxy = proxy }
             .onChange(of: viewModel.messages.count) {
@@ -164,6 +186,27 @@ struct MessageBubble: View {
     var showSenderName: Bool = true
     var showSenderAvatar: Bool = true
 
+    /// Build an AttributedString that highlights @mentions.
+    private func mentionHighlightedContent() -> AttributedString {
+        let content = message.content
+        var result = AttributedString(content)
+
+        // Find all @username patterns and style them
+        let pattern = #"@(\w+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return result }
+        let nsString = content as NSString
+        let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsString.length))
+
+        for match in matches {
+            guard let swiftRange = Range(match.range, in: content),
+                  let attrRange = Range(swiftRange, in: result) else { continue }
+            result[attrRange].font = .body.bold()
+            result[attrRange].foregroundColor = isOwnMessage ? Color.sp.accent : Color.sp.primary
+        }
+
+        return result
+    }
+
     private var quickActionType: QuickActionType? {
         // Primary: check messageType from database
         switch message.messageType {
@@ -192,17 +235,17 @@ struct MessageBubble: View {
 
     private var senderAvatar: some View {
         Text(senderInitials)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 11, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)
-            .background(Color(.systemGray3))
+            .background(Color.sp.slate)
             .clipShape(Circle())
     }
 
     private var senderNameLabel: some View {
         Text(senderName)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(.secondary)
+            .font(SPTypography.detail)
+            .foregroundStyle(Color.sp.slate)
     }
 
     // MARK: - Standard Text Bubble
@@ -226,12 +269,12 @@ struct MessageBubble: View {
                         }
                     }
 
-                    Text(message.content)
-                        .font(.subheadline)
+                    Text(mentionHighlightedContent())
+                        .font(SPTypography.body)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(isOwnMessage ? Color.accentColor : Color(.systemGray5))
-                        .foregroundStyle(isOwnMessage ? .white : .primary)
+                        .background(isOwnMessage ? Color.sp.primary : Color.sp.mist)
+                        .foregroundStyle(isOwnMessage ? .white : Color.sp.ink)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -267,9 +310,8 @@ struct MessageBubble: View {
                         .clipShape(RoundedRectangle(cornerRadius: 7))
 
                     Text(type.title)
-                        .font(.caption.weight(.bold))
+                        .spCaption()
                         .foregroundStyle(type.accentColor)
-                        .textCase(.uppercase)
 
                     Spacer()
                 }
@@ -285,9 +327,9 @@ struct MessageBubble: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
+            .background(Color.sp.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SPDesign.Radius.md))
+            .spCardShadow()
             .frame(maxWidth: 300)
             }
         }
@@ -315,8 +357,8 @@ struct MessageBubble: View {
             // Match info header
             HStack {
                 Text("Match \(data.matchNum) · \(data.stage)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                 Spacer()
                 predictionOutcomeBadge(data.outcome)
             }
@@ -327,7 +369,7 @@ struct MessageBubble: View {
                 VStack(spacing: 4) {
                     predictionFlagView(url: data.homeFlagUrl, size: 36)
                     Text(data.homeName)
-                        .font(.caption.weight(.semibold))
+                        .font(SPTypography.detail)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                 }
@@ -337,12 +379,12 @@ struct MessageBubble: View {
                 VStack(spacing: 4) {
                     // Actual score (larger)
                     Text("\(data.actualHome) - \(data.actualAway)")
-                        .font(.title2.weight(.bold).monospacedDigit())
+                        .font(SPTypography.mono(size: 22, weight: .bold))
 
                     // Predicted score (smaller, below)
                     Text("\(data.predHome) - \(data.predAway)")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 11))
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(width: 70)
 
@@ -350,7 +392,7 @@ struct MessageBubble: View {
                 VStack(spacing: 4) {
                     predictionFlagView(url: data.awayFlagUrl, size: 36)
                     Text(data.awayName)
-                        .font(.caption.weight(.semibold))
+                        .font(SPTypography.detail)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                 }
@@ -414,14 +456,14 @@ struct MessageBubble: View {
     private func predictionOutcomeBadge(_ outcome: String) -> some View {
         let (label, icon, color): (String, String, Color) = {
             switch outcome {
-            case "exact": return ("EXACT", "star.fill", .orange)
-            case "correct": return ("CORRECT", "checkmark", .green)
-            default: return ("MISS", "xmark", .red)
+            case "exact": return ("EXACT", "star.fill", Color.sp.accent)
+            case "correct": return ("CORRECT", "checkmark", Color.sp.green)
+            default: return ("MISS", "xmark", Color.sp.red)
             }
         }()
 
         return Label(label, systemImage: icon)
-            .font(.caption2.weight(.heavy))
+            .font(.system(size: 9, weight: .heavy, design: .rounded))
             .foregroundStyle(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -437,7 +479,7 @@ struct MessageBubble: View {
             CachedAsyncImage(url: imageUrl, width: width, height: height, cornerRadius: 3)
         } else {
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color(.systemGray5))
+                .fill(Color.sp.mist)
                 .frame(width: width, height: height)
         }
     }
@@ -477,10 +519,11 @@ struct MessageBubble: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
 
                     Text(badge.name)
-                        .font(.subheadline.weight(.bold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
 
                     Text(badge.rarity.uppercased())
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
                         .foregroundStyle(badgeRarityColor(badge.rarity))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -488,26 +531,27 @@ struct MessageBubble: View {
                         .clipShape(Capsule())
 
                     Text("+\(badge.xpBonus) XP")
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.mono(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sp.slate)
                 }
                 .frame(maxWidth: .infinity)
             } else {
                 VStack(spacing: 10) {
                     HStack(spacing: 12) {
                         Text("\(meta.level)")
-                            .font(.title.weight(.bold))
-                            .foregroundStyle(.purple)
+                            .font(SPTypography.mono(size: 24, weight: .bold))
+                            .foregroundStyle(Color.sp.primary)
                             .frame(width: 44, height: 44)
-                            .background(Color.purple.opacity(0.1))
+                            .background(Color.sp.primaryLight)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(meta.levelName)
-                                .font(.subheadline.weight(.bold))
+                                .font(SPTypography.cardTitle)
+                                .foregroundStyle(Color.sp.ink)
                             Text("\(meta.badges.count) badge\(meta.badges.count != 1 ? "s" : "") earned")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(SPTypography.detail)
+                                .foregroundStyle(Color.sp.slate)
                         }
                         Spacer()
                     }
@@ -518,19 +562,20 @@ struct MessageBubble: View {
                         ForEach(Array(meta.badges.enumerated()), id: \.offset) { _, badge in
                             HStack(spacing: 8) {
                                 Image(systemName: badgeIcon(badge.id))
-                                    .font(.caption)
+                                    .font(SPTypography.detail)
                                     .foregroundStyle(badgeRarityColor(badge.rarity))
                                     .frame(width: 22, height: 22)
                                     .background(badgeRarityColor(badge.rarity).opacity(0.1))
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
 
                                 Text(badge.name)
-                                    .font(.caption.weight(.medium))
+                                    .font(SPTypography.body)
+                                    .foregroundStyle(Color.sp.ink)
 
                                 Spacer()
 
                                 Text(badge.rarity.uppercased())
-                                    .font(.system(size: 8, weight: .heavy))
+                                    .font(.system(size: 8, weight: .heavy, design: .rounded))
                                     .foregroundStyle(badgeRarityColor(badge.rarity))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
@@ -564,10 +609,11 @@ struct MessageBubble: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(name)
-                .font(.subheadline.weight(.bold))
+                .font(SPTypography.cardTitle)
+                .foregroundStyle(Color.sp.ink)
 
             Text(rarity.uppercased())
-                .font(.system(size: 9, weight: .heavy))
+                .font(.system(size: 9, weight: .heavy, design: .rounded))
                 .foregroundStyle(badgeRarityColor(rarity))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
@@ -576,14 +622,14 @@ struct MessageBubble: View {
 
             if !condition.isEmpty {
                 Text(condition)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SPTypography.detail)
+                    .foregroundStyle(Color.sp.slate)
                     .multilineTextAlignment(.center)
             }
 
             Text("+\(xpBonus) XP")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(SPTypography.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Color.sp.slate)
         }
         .frame(maxWidth: .infinity)
     }
@@ -603,18 +649,19 @@ struct MessageBubble: View {
         return VStack(spacing: 10) {
             HStack(spacing: 12) {
                 Text("\(parsed.level)")
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(.purple)
+                    .font(SPTypography.mono(size: 24, weight: .bold))
+                    .foregroundStyle(Color.sp.primary)
                     .frame(width: 44, height: 44)
-                    .background(Color.purple.opacity(0.1))
+                    .background(Color.sp.primaryLight)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(parsed.levelName)
-                        .font(.subheadline.weight(.bold))
+                        .font(SPTypography.cardTitle)
+                        .foregroundStyle(Color.sp.ink)
                     Text("\(parsed.badgeCount) badge\(parsed.badgeCount != 1 ? "s" : "") earned")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(SPTypography.detail)
+                        .foregroundStyle(Color.sp.slate)
                 }
                 Spacer()
             }
@@ -626,19 +673,20 @@ struct MessageBubble: View {
                     ForEach(Array(badgeLines.enumerated()), id: \.offset) { _, badge in
                         HStack(spacing: 8) {
                             Image(systemName: badgeIcon(badge.id))
-                                .font(.caption)
+                                .font(SPTypography.detail)
                                 .foregroundStyle(badgeRarityColor(badge.rarity))
                                 .frame(width: 22, height: 22)
                                 .background(badgeRarityColor(badge.rarity).opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
 
                             Text(badge.name)
-                                .font(.caption.weight(.medium))
+                                .font(SPTypography.body)
+                                .foregroundStyle(Color.sp.ink)
 
                             Spacer()
 
                             Text(badge.rarity.uppercased())
-                                .font(.system(size: 8, weight: .heavy))
+                                .font(.system(size: 8, weight: .heavy, design: .rounded))
                                 .foregroundStyle(badgeRarityColor(badge.rarity))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
@@ -689,29 +737,30 @@ struct MessageBubble: View {
             ForEach(Array(entries.enumerated()), id: \.offset) { idx, entry in
                 let isSender = entry.userId == senderUserId
                 let isLeader = idx == 0
+                let displayRank = entry.rank >= 900 ? idx + 1 : entry.rank
 
                 HStack(spacing: 10) {
-                    Text("\(entry.rank)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(isLeader ? .white : .secondary)
+                    Text("\(displayRank)")
+                        .font(SPTypography.mono(size: 11, weight: .bold))
+                        .foregroundStyle(isLeader ? .white : Color.sp.slate)
                         .frame(width: 24, height: 24)
-                        .background(isLeader ? Color.blue.gradient : Color.clear.gradient)
+                        .background(isLeader ? Color.sp.primary.gradient : Color.clear.gradient)
                         .clipShape(Circle())
 
                     Text(entry.name)
-                        .font(isLeader ? .subheadline.weight(.bold) : .caption.weight(isSender ? .semibold : .regular))
-                        .foregroundStyle(isSender ? Color.accentColor : .primary)
+                        .font(isLeader ? SPTypography.cardTitle : SPTypography.body)
+                        .foregroundStyle(isSender ? Color.sp.primary : Color.sp.ink)
 
                     Spacer()
 
                     Text("\(entry.points) pts")
-                        .font(isLeader ? .subheadline.weight(.semibold).monospacedDigit() : .caption.monospacedDigit())
-                        .foregroundStyle(isLeader ? .blue : .secondary)
+                        .font(isLeader ? SPTypography.mono(size: 14, weight: .semibold) : SPTypography.mono(size: 12))
+                        .foregroundStyle(isLeader ? Color.sp.primary : Color.sp.slate)
                 }
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isSender ? Color.accentColor.opacity(0.08) : Color.clear)
+                        .fill(isSender ? Color.sp.primaryLight : Color.clear)
                         .padding(.horizontal, -4)
                 )
             }
@@ -774,9 +823,9 @@ enum QuickActionType {
 
     var accentColor: Color {
         switch self {
-        case .prediction: return .orange
-        case .badges: return .purple
-        case .standings: return .blue
+        case .prediction: return Color.sp.accent
+        case .badges: return Color.sp.primary
+        case .standings: return Color.sp.green
         }
     }
 }

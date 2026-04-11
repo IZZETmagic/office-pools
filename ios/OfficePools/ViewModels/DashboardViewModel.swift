@@ -5,6 +5,7 @@ enum PoolSortOption: String, CaseIterable {
     case newest = "Newest"
     case name = "Name A-Z"
     case points = "Most Points"
+    case unread = "Unread Messages"
 }
 
 enum PoolStatusFilter: String, CaseIterable {
@@ -114,6 +115,8 @@ final class DashboardViewModel {
             result.sort { $0.pool.poolName.localizedCaseInsensitiveCompare($1.pool.poolName) == .orderedAscending }
         case .points:
             result.sort { $0.totalPoints > $1.totalPoints }
+        case .unread:
+            result.sort { $0.unreadBanterCount > $1.unreadBanterCount }
         }
 
         // Branded pools first, then pools needing predictions
@@ -146,6 +149,22 @@ final class DashboardViewModel {
             dataStore.addPoolCard(card)
 
             joinPoolCode = ""
+            showJoinSheet = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isJoining = false
+    }
+
+    func joinPool(code: String, userId: String, username: String, dataStore: AppDataStore) async {
+        isJoining = true
+        errorMessage = nil
+
+        do {
+            let pool = try await poolService.joinPool(poolCode: code, userId: userId, username: username)
+            let card = await homeViewModel.buildPoolCard(pool: pool, userId: userId)
+            dataStore.addPoolCard(card)
             showJoinSheet = false
         } catch {
             errorMessage = error.localizedDescription

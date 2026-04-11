@@ -77,7 +77,8 @@ final class AuthViewModel {
             try await authService.resetPassword(email: email)
             showResetPasswordSuccess = true
         } catch {
-            errorMessage = error.localizedDescription
+            print("[AuthViewModel] Password reset error: \(error)")
+            errorMessage = "Error sending recovery email. Please try again."
         }
 
         isLoading = false

@@ -200,6 +200,14 @@ struct MainTabView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     handleDeepLink(link)
                 }
+            } else {
+                // Cold launch fallback: deep link may arrive slightly after onAppear.
+                // Re-check after 1s to catch it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if let link = router.pendingDeepLink {
+                        handleDeepLink(link)
+                    }
+                }
             }
         }
     }
