@@ -30,14 +30,26 @@ async function handleGET(
   const entryId = searchParams.get('entry_id')
   if (!entryId) return NextResponse.json({ error: 'entry_id required' }, { status: 400 })
 
-  // Verify entry belongs to this member
+  // Verify entry exists and belongs to a member in this pool
   const { data: entry } = await supabase
     .from('pool_entries')
-    .select('entry_id, has_submitted_predictions')
+    .select('entry_id, has_submitted_predictions, member_id, pool_members!inner(pool_id)')
     .eq('entry_id', entryId)
-    .eq('member_id', membership.member_id)
+    .eq('pool_members.pool_id', pool_id)
     .single()
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+
+  // Non-admins can only view their own entries
+  if (entry.member_id !== membership.member_id) {
+    const { data: adminCheck } = await supabase
+      .from('pool_members')
+      .select('role')
+      .eq('member_id', membership.member_id)
+      .single()
+    if (adminCheck?.role !== 'admin') {
+      return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    }
+  }
 
   // Fetch all bracket picker data
   const [groupRankings, thirdPlaceRankings, knockoutPicks] = await Promise.all([
