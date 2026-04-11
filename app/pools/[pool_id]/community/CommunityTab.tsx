@@ -907,6 +907,13 @@ export function CommunityTab({
           : [...prev, { ...data, message_type: data.message_type ?? 'badge_flex', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
       broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
+      // Push notification for quick action
+      fetch('/api/notifications/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: poolId, message_content: data.content }),
+        keepalive: true,
+      }).catch(err => console.error('[MessagePush] badge_flex push failed:', err))
     }
   }, [memberLevels, currentUserId, poolId])
 
@@ -950,6 +957,13 @@ export function CommunityTab({
           : [...prev, { ...data, message_type: data.message_type ?? 'standings_drop', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
       broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
+      // Push notification for quick action
+      fetch('/api/notifications/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: poolId, message_content: data.content }),
+        keepalive: true,
+      }).catch(err => console.error('[MessagePush] standings_drop push failed:', err))
     }
   }, [members, poolName, poolId, currentUserId, computedScoreMap])
 
@@ -1311,6 +1325,13 @@ export function CommunityTab({
                 : [...prev, { ...data, message_type: data.message_type ?? 'prediction_share', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
             )
             broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
+            // Push notification for prediction share
+            fetch('/api/notifications/message', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pool_id: poolId, message_content: data.content }),
+              keepalive: true,
+            }).catch(err => console.error('[MessagePush] prediction_share push failed:', err))
           }}
         />
       )}
