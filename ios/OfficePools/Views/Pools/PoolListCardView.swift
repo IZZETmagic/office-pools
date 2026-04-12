@@ -189,7 +189,7 @@ struct PoolListCardView: View {
                                     .fill(Color.sp.amber)
                                     .frame(width: 7, height: 7)
                                     .modifier(PulsingModifier())
-                                Text("Predictions needed")
+                                Text(data.currentRoundLabel != nil ? "\(data.currentRoundLabel!) predictions needed" : "Predictions needed")
                                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.sp.amber)
                             }

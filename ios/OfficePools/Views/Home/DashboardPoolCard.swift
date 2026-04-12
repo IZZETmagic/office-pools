@@ -249,7 +249,8 @@ struct DashboardPoolCard: View {
                 predictionsCompleted: 72,
                 predictionsTotal: 104,
                 memberInitials: ["RS", "JD", "MK"],
-                hitRate: 0.65, exactCount: 5, totalCompleted: 72
+                hitRate: 0.65, exactCount: 5, totalCompleted: 72,
+                currentRoundLabel: nil
             ))
             DashboardPoolCard(data: PoolCardData(
                 pool: Pool(
@@ -273,7 +274,8 @@ struct DashboardPoolCard: View {
                 predictionsCompleted: 36,
                 predictionsTotal: 104,
                 memberInitials: ["AL", "TW", "SB"],
-                hitRate: 0.45, exactCount: 2, totalCompleted: 36
+                hitRate: 0.45, exactCount: 2, totalCompleted: 36,
+                currentRoundLabel: "Round of 16"
             ))
         }
         .padding(.horizontal, 20)

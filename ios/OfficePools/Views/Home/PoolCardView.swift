@@ -90,7 +90,10 @@ struct PoolCardView: View {
             // Deadline or needs predictions
             HStack {
                 if data.needsPredictions {
-                    Label("Needs Predictions", systemImage: "exclamationmark.circle.fill")
+                    Label(
+                        data.currentRoundLabel != nil ? "\(data.currentRoundLabel!) needs predictions" : "Needs Predictions",
+                        systemImage: "exclamationmark.circle.fill"
+                    )
                         .font(.caption2.bold())
                         .foregroundStyle(.orange)
                 } else if let deadline = data.deadline {
@@ -181,7 +184,8 @@ struct PoolCardView: View {
                 predictionsCompleted: 72,
                 predictionsTotal: 104,
                 memberInitials: ["RS", "JD", "MK"],
-                hitRate: 0.65, exactCount: 5, totalCompleted: 72
+                hitRate: 0.65, exactCount: 5, totalCompleted: 72,
+                currentRoundLabel: nil
             ))
         }
         .padding()

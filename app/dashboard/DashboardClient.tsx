@@ -46,6 +46,7 @@ type PoolCardData = {
   predictedMatches: number
   entries: EntryProgress[]
   form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
+  currentRoundLabel?: string | null
   brand_name?: string | null
   brand_emoji?: string | null
   brand_color?: string | null
@@ -409,7 +410,9 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
         )}
       </div>
       {needsPredictions ? (
-        <p className="text-[10px] font-semibold text-warning-600 dark:text-warning-400 mt-1">Needs predictions</p>
+        <p className="text-[10px] font-semibold text-warning-600 dark:text-warning-400 mt-1">
+          {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
+        </p>
       ) : (
         <p className="text-[10px] font-semibold text-success-700 dark:text-success-400 mt-1">All set</p>
       )}
@@ -499,7 +502,9 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
                   </span>
                 </div>
                 {(pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions && (
-                  <span className="ml-auto text-[11px] font-semibold text-warning-600 dark:text-warning-400 shrink-0">Needs predictions</span>
+                  <span className="ml-auto text-[11px] font-semibold text-warning-600 dark:text-warning-400 shrink-0">
+                    {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
+                  </span>
                 )}
               </div>
             </div>

@@ -183,9 +183,42 @@ export default async function DashboardPage() {
       const bestEntry = entries.length > 0
         ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
         : null
-      const anySubmitted = entries.some((e: any) => e.has_submitted_predictions)
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
+
+      // For progressive pools, determine prediction status from round submissions
+      // (pool_entries.has_submitted_predictions is not set by round submission flow)
+      let anySubmitted = entries.some((e: any) => e.has_submitted_predictions)
+      let currentRoundLabel: string | null = null
+      if (pool.prediction_mode === 'progressive' && defaultEntryId) {
+        const [{ data: roundStates }, { data: roundSubs }] = await Promise.all([
+          supabase
+            .from('pool_round_states')
+            .select('round_key, state')
+            .eq('pool_id', pool.pool_id),
+          supabase
+            .from('entry_round_submissions')
+            .select('round_key, has_submitted')
+            .eq('entry_id', defaultEntryId),
+        ])
+        const submittedRounds = new Set(
+          (roundSubs ?? []).filter((s: any) => s.has_submitted).map((s: any) => s.round_key)
+        )
+        const openRounds = (roundStates ?? [])
+          .filter((r: any) => r.state === 'open')
+          .map((r: any) => r.round_key as string)
+        const unsubmittedOpenRounds = openRounds.filter(rk => !submittedRounds.has(rk))
+
+        if (unsubmittedOpenRounds.length > 0) {
+          // There's an open round that needs predictions
+          anySubmitted = false
+          const { ROUND_LABELS } = await import('@/lib/tournament')
+          currentRoundLabel = ROUND_LABELS[unsubmittedOpenRounds[0] as keyof typeof ROUND_LABELS] ?? unsubmittedOpenRounds[0]
+        } else if (submittedRounds.size > 0) {
+          // All open rounds are submitted (or no rounds are open) — user is all set
+          anySubmitted = true
+        }
+      }
 
       // Read stored v2 scores instead of computing on-the-fly
       const matchPoints = defaultEntry?.match_points ?? 0
@@ -247,6 +280,7 @@ export default async function DashboardPage() {
         predictedMatches: entryPredCounts[defaultEntryId] || 0,
         entries: entriesProgress,
         form,
+        currentRoundLabel,
       }
     })
   )

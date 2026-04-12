@@ -34,6 +34,7 @@ type PoolData = {
   joined_at: string
   memberCount: number
   form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
+  currentRoundLabel?: string | null
   brand_name?: string | null
   brand_emoji?: string | null
   brand_color?: string | null
@@ -154,7 +155,7 @@ function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check'
     isButton: false,
   }
   return {
-    label: 'Predict',
+    label: pool.currentRoundLabel ? `Predict ${pool.currentRoundLabel}` : 'Predict',
     icon: 'arrow',
     className: 'bg-warning-500 text-white',
     isButton: true,

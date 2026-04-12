@@ -21,6 +21,7 @@ struct PoolCardData: Identifiable {
     let hitRate: Double?         // prediction accuracy (0-1), from leaderboard
     let exactCount: Int?         // exact score predictions, from leaderboard
     let totalCompleted: Int?     // total scored predictions, from leaderboard
+    let currentRoundLabel: String? // for progressive pools: which round needs predictions
 
     var id: String { pool.poolId }
 
@@ -171,6 +172,7 @@ final class HomeViewModel {
         var predictionsCompleted = 0
         var predictionsTotal = 0
         var bestEntryId: String?
+        var currentRoundLabel: String? = nil
         var hitRate: Double? = nil
         var exactCount: Int? = nil
         var totalCompleted: Int? = nil
@@ -186,6 +188,30 @@ final class HomeViewModel {
                 userPoints = bestEntry.totalPoints
                 needsPredictions = !bestEntry.hasSubmittedPredictions
                 bestEntryId = bestEntry.entryId
+
+                // For progressive pools, override needsPredictions based on open rounds
+                if pool.predictionMode == .progressive {
+                    do {
+                        let roundsResponse = try await apiService.fetchRounds(poolId: pool.poolId, entryId: bestEntry.entryId)
+                        let openRoundsNeedingSub = roundsResponse.rounds.filter { round in
+                            round.state == "open" && !(round.entrySubmission?.hasSubmitted ?? false)
+                        }
+                        if !openRoundsNeedingSub.isEmpty {
+                            needsPredictions = true
+                            if let roundKey = RoundKey(rawValue: openRoundsNeedingSub[0].roundKey) {
+                                currentRoundLabel = roundKey.displayName
+                            }
+                        } else {
+                            // All open rounds are submitted — user is "all set"
+                            let hasAnyOpenRound = roundsResponse.rounds.contains { $0.state == "open" }
+                            if !hasAnyOpenRound || roundsResponse.rounds.filter({ $0.state == "open" }).allSatisfy({ $0.entrySubmission?.hasSubmitted == true }) {
+                                needsPredictions = false
+                            }
+                        }
+                    } catch {
+                        print("[HomeViewModel] Failed to fetch rounds for progressive needsPredictions: \(error)")
+                    }
+                }
                 hitRate = bestEntry.hitRate
                 exactCount = bestEntry.exactCount
                 totalCompleted = bestEntry.totalCompleted
@@ -258,7 +284,8 @@ final class HomeViewModel {
             memberInitials: memberInitials,
             hitRate: hitRate,
             exactCount: exactCount,
-            totalCompleted: totalCompleted
+            totalCompleted: totalCompleted,
+            currentRoundLabel: currentRoundLabel
         )
     }
 
