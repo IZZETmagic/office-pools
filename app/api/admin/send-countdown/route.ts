@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
-import { sendBatchEmails } from '@/lib/email/send'
+import { getResendClient } from '@/lib/email/resend'
 import { countdownReminderTemplate, type CountdownMilestone } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { sendPushToAll } from '@/lib/push/apns'
 
 const VALID_MILESTONES: CountdownMilestone[] = ['60days', '30days', '14days', '7days', '1day']
 
 // =============================================================
 // POST /api/admin/send-countdown
-// Sends a countdown reminder email to all users.
+// Sends a countdown reminder email to all users via Resend Broadcasts.
 // Body: { milestone: "60days"|"30days"|"14days"|"7days"|"1day", idempotency_key: string }
 // Super admin only.
 // =============================================================
 export async function POST(request: NextRequest) {
-  // 1. Authenticate — super admin only
   const auth = await requireSuperAdmin()
   if (auth.error) return auth.error
   const { supabase } = auth.data
 
-  // 2. Parse body
   let body: { milestone?: string; idempotency_key?: string } = {}
   try {
     body = await request.json()
@@ -39,7 +36,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 3. Idempotency check
+  // Idempotency check
   const { data: existing } = await supabase
     .from('sent_announcements')
     .select('id')
@@ -67,96 +64,96 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to record announcement' }, { status: 500 })
   }
 
-  // 4. Calculate days until kickoff (June 11, 2026)
-  const kickoff = new Date('2026-06-11T00:00:00Z')
-  const now = new Date()
-  const daysUntilKickoff = Math.ceil((kickoff.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  try {
+    // Calculate days until kickoff (June 11, 2026)
+    const kickoff = new Date('2026-06-11T00:00:00Z')
+    const now = new Date()
+    const daysUntilKickoff = Math.ceil((kickoff.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-  // 5. Fetch all users with their pool counts
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('user_id, full_name, username, email')
-    .not('email', 'is', null)
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'}/dashboard`
 
-  if (usersError || !users) {
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
-  }
-
-  // Fetch pool membership counts per user
-  const { data: memberships } = await supabase
-    .from('pool_members')
-    .select('user_id')
-
-  const poolCountMap = new Map<string, number>()
-  if (memberships) {
-    for (const m of memberships) {
-      poolCountMap.set(m.user_id, (poolCountMap.get(m.user_id) || 0) + 1)
-    }
-  }
-
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'}/dashboard`
-
-  // 6. Build email batch
-  const emails = users
-    .filter((u) => u.email)
-    .map((u) => {
-      const { subject, html } = countdownReminderTemplate({
-        userName: u.full_name || u.username || 'there',
-        milestone,
-        daysUntilKickoff,
-        poolCount: poolCountMap.get(u.user_id) || 0,
-        dashboardUrl,
-      })
-      return {
-        to: u.email!,
-        subject,
-        html,
-        topicId: TOPICS.POOL_ACTIVITY,
-        tags: [{ name: 'type', value: `countdown-${milestone}` }],
-      }
+    // Generate the email template (now uses {{{FIRST_NAME|there}}} for personalization)
+    const { subject, html } = countdownReminderTemplate({
+      milestone,
+      daysUntilKickoff,
+      dashboardUrl,
     })
 
-  if (emails.length === 0) {
-    return NextResponse.json({ message: 'No users to email' })
-  }
-
-  // 7. Send in batches of 100
-  const BATCH_SIZE = 100
-  let totalSent = 0
-  const errors: unknown[] = []
-
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    const batch = emails.slice(i, i + BATCH_SIZE)
-    const result = await sendBatchEmails(batch)
-    if (result.success) {
-      totalSent += batch.length
-    } else {
-      errors.push(result.error)
+    // Send via Resend Broadcasts API to the main audience
+    const resend = getResendClient()
+    const mainAudienceId = process.env.RESEND_AUDIENCE_ID
+    if (!mainAudienceId) {
+      return NextResponse.json({ error: 'RESEND_AUDIENCE_ID not configured' }, { status: 500 })
     }
+
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+    const broadcastName = `Countdown: ${milestone} [All Users]`
+
+    const { data: broadcast, error: createError } = await resend.broadcasts.create({
+      name: broadcastName,
+      audienceId: mainAudienceId,
+      from: fromAddress,
+      subject,
+      html,
+    })
+
+    if (createError || !broadcast?.id) {
+      console.error('[Countdown] Failed to create broadcast:', createError)
+      return NextResponse.json({ error: 'Failed to create broadcast' }, { status: 500 })
+    }
+
+    const { error: sendError } = await resend.broadcasts.send(broadcast.id)
+
+    if (sendError) {
+      console.error('[Countdown] Failed to send broadcast:', sendError)
+      return NextResponse.json({
+        error: 'Broadcast created but failed to send',
+        broadcastId: broadcast.id,
+      }, { status: 500 })
+    }
+
+    // Log to broadcast_log for audit trail
+    const { data: users } = await supabase
+      .from('users')
+      .select('email')
+      .not('email', 'is', null)
+
+    const recipientEmails = (users || []).map((u) => u.email)
+
+    await supabase.from('broadcast_log').insert({
+      broadcast_id: broadcast.id,
+      subject,
+      segment: 'all',
+      recipient_count: recipientEmails.length,
+      recipients: recipientEmails,
+      sent_by: auth.data.userData.user_id,
+    })
+
+    // Send push notification to all users
+    const milestoneLabels: Record<string, string> = {
+      '60days': '60 Days to Go!',
+      '30days': '30 Days to Go!',
+      '14days': '2 Weeks to Go!',
+      '7days': '1 Week to Go!',
+      '1day': 'Tomorrow is Kickoff!',
+    }
+
+    const pushResult = await sendPushToAll({
+      title: milestoneLabels[milestone] ?? `${daysUntilKickoff} Days to Go!`,
+      body: 'Tournament kicks off soon. Make sure your predictions are in!',
+      data: { type: 'pool_activity' },
+    }).catch(() => ({ sent: 0, total: 0 }))
+
+    return NextResponse.json({
+      message: `Countdown (${milestone}) broadcast sent to audience`,
+      milestone,
+      broadcastId: broadcast.id,
+      recipientCount: recipientEmails.length,
+      pushSent: (pushResult as any)?.sent ?? 0,
+      daysUntilKickoff,
+    })
+  } catch (err) {
+    console.error('[Countdown] Unhandled error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  // Send push notification to all users
-  const milestoneLabels: Record<string, string> = {
-    '60days': '60 Days to Go!',
-    '30days': '30 Days to Go!',
-    '14days': '2 Weeks to Go!',
-    '7days': '1 Week to Go!',
-    '1day': 'Tomorrow is Kickoff!',
-  }
-
-  const pushResult = await sendPushToAll({
-    title: milestoneLabels[milestone] ?? `${daysUntilKickoff} Days to Go!`,
-    body: 'Tournament kicks off soon. Make sure your predictions are in!',
-    data: { type: 'pool_activity' },
-  }).catch(() => ({ sent: 0, total: 0 }))
-
-  return NextResponse.json({
-    message: `Countdown (${milestone}) sent to ${totalSent} of ${emails.length} users`,
-    milestone,
-    totalSent,
-    totalUsers: emails.length,
-    pushSent: (pushResult as any)?.sent ?? 0,
-    daysUntilKickoff,
-    ...(errors.length > 0 ? { errors } : {}),
-  })
 }
