@@ -13,9 +13,10 @@ import { UsersTab } from './UsersTab'
 import { PoolsTab } from './PoolsTab'
 import { AuditLogTab } from './AuditLogTab'
 import { StatsTab } from './StatsTab'
+import { BroadcastTab } from './BroadcastTab'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
-type Tab = 'matches' | 'users' | 'pools' | 'audit' | 'stats'
+type Tab = 'matches' | 'users' | 'pools' | 'audit' | 'stats' | 'broadcast'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'stats', label: 'Stats' },
@@ -23,6 +24,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'users', label: 'Users' },
   { key: 'pools', label: 'Pools' },
   { key: 'audit', label: 'Audit Log' },
+  { key: 'broadcast', label: 'Broadcast' },
 ]
 
 type SuperAdminDashboardProps = {
@@ -128,6 +130,9 @@ export function SuperAdminDashboard({
             users={users}
             pools={pools}
           />
+        )}
+        {activeTab === 'broadcast' && (
+          <BroadcastTab />
         )}
       </main>
     </div>

@@ -1,6 +1,6 @@
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
-function baseTemplate(params: {
+export function baseTemplate(params: {
   preheader: string
   heading: string
   body: string

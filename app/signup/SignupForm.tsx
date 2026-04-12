@@ -120,6 +120,13 @@ export function SignupForm() {
         console.error('Failed to log terms agreement:', err)
       }
 
+      // Sync contact to Resend audience (non-blocking)
+      try {
+        await fetch('/api/notifications/sync-contact', { method: 'POST' })
+      } catch (err) {
+        console.error('Failed to sync Resend contact:', err)
+      }
+
       router.push(redirectTo)
     }
   }
