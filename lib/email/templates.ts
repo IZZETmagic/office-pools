@@ -686,6 +686,89 @@ export function countdownReminderTemplate(params: {
   }
 }
 
+// --- Pending Predictions Reminder Templates ---
+
+export function pendingPredictionsReminderTemplate(params: {
+  firstName: string
+  pools: {
+    poolName: string
+    predictionsLeft: number
+    totalPredictions: number
+    deadline: string
+    daysLeft: number
+    poolUrl: string
+  }[]
+}): { subject: string; html: string } {
+  const { firstName, pools } = params
+
+  const poolCount = pools.length
+  const subject =
+    poolCount === 1
+      ? `You have predictions due for ${pools[0].poolName}`
+      : `You have predictions due for ${poolCount} pools`
+
+  const poolRows = pools
+    .map((p) => {
+      const deadlineFormatted = new Date(p.deadline).toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      })
+      const urgencyColor =
+        p.daysLeft <= 1 ? '#991b1b' : p.daysLeft <= 3 ? '#92400e' : '#1e40af'
+      const urgencyBg =
+        p.daysLeft <= 1 ? '#fef2f2' : p.daysLeft <= 3 ? '#fffbeb' : '#eff6ff'
+      const urgencyBorder =
+        p.daysLeft <= 1 ? '#fecaca' : p.daysLeft <= 3 ? '#fde68a' : '#bfdbfe'
+      const daysText =
+        p.daysLeft === 0
+          ? 'Today!'
+          : p.daysLeft === 1
+            ? '1 day left'
+            : `${p.daysLeft} days left`
+
+      return `
+        <div style="background:${urgencyBg};border:1px solid ${urgencyBorder};border-radius:8px;padding:16px;margin:0 0 12px;">
+          <p style="margin:0 0 8px;font-weight:600;color:#171717;font-size:15px;">${p.poolName}</p>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr>
+              <td style="color:#737373;font-size:13px;padding:2px 0;">Predictions remaining</td>
+              <td style="color:${urgencyColor};font-weight:600;font-size:13px;text-align:right;padding:2px 0;">${p.predictionsLeft} of ${p.totalPredictions}</td>
+            </tr>
+            <tr>
+              <td style="color:#737373;font-size:13px;padding:2px 0;">Deadline</td>
+              <td style="color:${urgencyColor};font-size:13px;text-align:right;padding:2px 0;">${deadlineFormatted}</td>
+            </tr>
+            <tr>
+              <td style="color:#737373;font-size:13px;padding:2px 0;">Time remaining</td>
+              <td style="color:${urgencyColor};font-weight:700;font-size:13px;text-align:right;padding:2px 0;">${daysText}</td>
+            </tr>
+          </table>
+          <div style="text-align:center;margin:12px 0 0;">
+            <a href="${p.poolUrl}" style="display:inline-block;padding:8px 20px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:13px;">Make Predictions</a>
+          </div>
+        </div>`
+    })
+    .join('')
+
+  return {
+    subject,
+    html: baseTemplate({
+      preheader: `You have ${poolCount === 1 ? 'predictions' : `predictions in ${poolCount} pools`} that still need to be submitted!`,
+      heading: 'Predictions Still Needed!',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 16px;">You still have predictions to submit. Don't miss out on earning points!</p>
+        ${poolRows}
+        <p style="color:#525252;line-height:1.6;margin:12px 0 0;">Submit your predictions before the deadline — any unsaved predictions won't earn points!</p>
+      `,
+    }),
+  }
+}
+
 // --- Community Templates ---
 
 export function pointsAdjustedTemplate(params: {
