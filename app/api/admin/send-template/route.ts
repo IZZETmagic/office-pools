@@ -4,9 +4,17 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import {
   baseTemplate,
+  supportTemplate,
   deadlineReminderTemplate,
   roundDeadlineReminderTemplate,
   pendingPredictionsReminderTemplate,
+  emptyPoolNudgeTemplate,
+  soloPoolNudgeTemplate,
+  smallPoolBoostTemplate,
+  startAPoolTemplate,
+  weMissYouTemplate,
+  readyToJoinTemplate,
+  pastPredictorHypeTemplate,
 } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { querySegment, type SegmentKey, SEGMENT_KEYS } from '@/lib/email/segments'
@@ -18,6 +26,14 @@ type TemplateType =
   | 'pending_predictions'
   | 'deadline_reminder'
   | 'round_deadline_reminder'
+  | 'empty_pool_nudge'
+  | 'solo_pool_nudge'
+  | 'small_pool_boost'
+  | 'start_a_pool'
+  | 'we_miss_you'
+  | 'ready_to_join'
+  | 'past_predictor_hype'
+  | 'support_reply'
   | 'custom'
 
 // =============================================================
@@ -131,6 +147,30 @@ export async function POST(request: NextRequest) {
       break
     case 'round_deadline_reminder':
       result = await handleRoundDeadlineReminder(supabase, body)
+      break
+    case 'empty_pool_nudge':
+      result = await handleGrowthTemplate(supabase, 'empty_pool_admins', emptyPoolNudgeTemplate, 'pool')
+      break
+    case 'solo_pool_nudge':
+      result = await handleGrowthTemplate(supabase, 'solo_pool_admins', soloPoolNudgeTemplate, 'pool')
+      break
+    case 'small_pool_boost':
+      result = await handleGrowthTemplate(supabase, 'small_pool_admins', smallPoolBoostTemplate, 'pool')
+      break
+    case 'start_a_pool':
+      result = await handleSimpleGrowthTemplate(supabase, 'non_admin_members', startAPoolTemplate)
+      break
+    case 'we_miss_you':
+      result = await handleSimpleGrowthTemplate(supabase, 'lapsed_users', weMissYouTemplate)
+      break
+    case 'ready_to_join':
+      result = await handleSimpleGrowthTemplate(supabase, 'engaged_no_pool', readyToJoinTemplate)
+      break
+    case 'past_predictor_hype':
+      result = await handleSimpleGrowthTemplate(supabase, 'past_predictors', pastPredictorHypeTemplate)
+      break
+    case 'support_reply':
+      result = await handleSupportReply(supabase, body)
       break
     case 'custom':
       result = await handleCustom(supabase, body)
@@ -618,6 +658,150 @@ async function handleCustom(
       html,
       ...(topicId ? { topicId } : {}),
       tags: [{ name: 'category', value: 'admin-custom' }],
+    }
+  })
+
+  return { emails }
+}
+
+// --- Growth Template Handlers ---
+
+// For pool-specific growth templates (empty, solo, small pool nudges)
+// Queries pools by admin, enriches with pool info, sends personalized email per pool
+async function handleGrowthTemplate(
+  supabase: ReturnType<typeof createAdminClient>,
+  segmentKey: SegmentKey,
+  templateFn: (params: { firstName: string; poolName: string; poolCode: string; memberCount: number; dashboardUrl: string }) => { subject: string; html: string },
+  _variant: 'pool'
+): Promise<SendResult> {
+  const users = await querySegment(supabase, segmentKey)
+  if (users.length === 0) return { emails: [] }
+
+  // Get user IDs from segment results — need to re-fetch with user_id
+  const { data: usersWithId } = await supabase
+    .from('users')
+    .select('user_id, email, full_name, username')
+    .in('email', users.map((u) => u.email))
+    .not('email', 'is', null)
+  if (!usersWithId) return { emails: [] }
+
+  const userMap = new Map(usersWithId.map((u) => [u.user_id, u]))
+
+  // Get all pools with their admin and code
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('pool_id, pool_name, pool_code, admin_user_id')
+  if (!pools) return { emails: [] }
+
+  // Get member counts per pool
+  const { data: members } = await supabase
+    .from('pool_members')
+    .select('pool_id')
+  const memberCountByPool = new Map<string, number>()
+  for (const m of members || []) {
+    memberCountByPool.set(m.pool_id, (memberCountByPool.get(m.pool_id) || 0) + 1)
+  }
+
+  const emails: EmailPayload[] = []
+  const adminIds = new Set(usersWithId.map((u) => u.user_id))
+
+  for (const pool of pools) {
+    if (!adminIds.has(pool.admin_user_id)) continue
+    const user = userMap.get(pool.admin_user_id)
+    if (!user) continue
+
+    const count = memberCountByPool.get(pool.pool_id) || 0
+
+    // Filter by segment criteria
+    if (segmentKey === 'empty_pool_admins' && count !== 0) continue
+    if (segmentKey === 'solo_pool_admins' && count !== 1) continue
+    if (segmentKey === 'small_pool_admins' && (count < 2 || count > 4)) continue
+
+    const { subject, html } = templateFn({
+      firstName: extractFirstName(user.full_name, user.username),
+      poolName: pool.pool_name,
+      poolCode: pool.pool_code,
+      memberCount: count,
+      dashboardUrl: `${APP_URL}/pools/${pool.pool_id}`,
+    })
+
+    emails.push({
+      to: user.email,
+      subject,
+      html,
+      tags: [{ name: 'category', value: segmentKey }],
+    })
+  }
+
+  return { emails }
+}
+
+// For simple segment-based growth templates (no pool context needed)
+async function handleSimpleGrowthTemplate(
+  supabase: ReturnType<typeof createAdminClient>,
+  segmentKey: SegmentKey,
+  templateFn: (params: { firstName: string; dashboardUrl: string }) => { subject: string; html: string }
+): Promise<SendResult> {
+  const users = await querySegment(supabase, segmentKey)
+  if (users.length === 0) return { emails: [] }
+
+  const emails: EmailPayload[] = users.map((u) => {
+    const { subject, html } = templateFn({
+      firstName: extractFirstName(u.full_name, u.username),
+      dashboardUrl: `${APP_URL}/dashboard`,
+    })
+    return {
+      to: u.email,
+      subject,
+      html,
+      tags: [{ name: 'category', value: segmentKey }],
+    }
+  })
+
+  return { emails }
+}
+
+// --- Support Reply Handler ---
+
+async function handleSupportReply(
+  supabase: ReturnType<typeof createAdminClient>,
+  body: any
+): Promise<SendResult> {
+  if (!body.subject) return { emails: [], error: 'subject is required for support reply' }
+  if (!body.body_text) return { emails: [], error: 'body_text is required for support reply' }
+
+  // Support replies always target individual users
+  if (!body.user_ids?.length) {
+    return { emails: [], error: 'user_ids must be provided for support reply' }
+  }
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('email, full_name, username')
+    .in('user_id', body.user_ids)
+    .not('email', 'is', null)
+
+  if (!users || users.length === 0) return { emails: [] }
+
+  const emails: EmailPayload[] = users.map((u) => {
+    const firstName = extractFirstName(u.full_name, u.username)
+    const bodyHtml = (body.body_text as string).replace(/\n/g, '<br>')
+    const html = supportTemplate({
+      preheader: body.subject,
+      heading: body.heading || body.subject,
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <div style="color:#525252;line-height:1.6;">${bodyHtml}</div>
+        <p style="color:#737373;line-height:1.6;margin:16px 0 0;font-size:13px;">— The Sport Pool Team</p>
+      `,
+      ctaText: body.cta_text || undefined,
+      ctaUrl: body.cta_url || undefined,
+    })
+    return {
+      to: u.email,
+      subject: body.subject,
+      html,
+      tags: [{ name: 'category', value: 'support-reply' }],
     }
   })
 

@@ -8,13 +8,25 @@ import { useToast } from '@/components/ui/Toast'
 
 // --- Template definitions ---
 
-type TemplateKey = 'pending_predictions' | 'deadline_reminder' | 'round_deadline_reminder' | 'custom'
+type TemplateKey =
+  | 'pending_predictions'
+  | 'deadline_reminder'
+  | 'round_deadline_reminder'
+  | 'empty_pool_nudge'
+  | 'solo_pool_nudge'
+  | 'small_pool_boost'
+  | 'start_a_pool'
+  | 'we_miss_you'
+  | 'ready_to_join'
+  | 'past_predictor_hype'
+  | 'support_reply'
+  | 'custom'
 
 type TemplateDef = {
   key: TemplateKey
   label: string
   description: string
-  category: 'smart' | 'pool' | 'custom'
+  category: 'smart' | 'pool' | 'growth' | 'support' | 'custom'
   icon: string
   recipientNote: string
 }
@@ -45,6 +57,70 @@ const TEMPLATES: TemplateDef[] = [
     recipientNote: 'Auto-detected: pool members with unsubmitted round entries',
   },
   {
+    key: 'empty_pool_nudge',
+    label: 'Empty Pool Nudge',
+    description: 'Encourages pool admins with zero members to share their pool code and start inviting people.',
+    category: 'growth',
+    icon: 'M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z',
+    recipientNote: 'Auto-detected: pool admins with 0 members',
+  },
+  {
+    key: 'solo_pool_nudge',
+    label: 'Solo Pool Nudge',
+    description: 'Reaches out to pool admins who are the only member in their pool — encourages them to share.',
+    category: 'growth',
+    icon: 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z',
+    recipientNote: 'Auto-detected: admins who are the only pool member',
+  },
+  {
+    key: 'small_pool_boost',
+    label: 'Small Pool Boost',
+    description: 'Encourages admins with 2-4 members to keep growing their pool toward the sweet spot.',
+    category: 'growth',
+    icon: 'M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941',
+    recipientNote: 'Auto-detected: pool admins with 2-4 members',
+  },
+  {
+    key: 'start_a_pool',
+    label: 'Start Your Own Pool',
+    description: 'Nudges members who are in a pool but haven\'t created one to start their own for another group.',
+    category: 'growth',
+    icon: 'M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+    recipientNote: 'Auto-detected: pool members who aren\'t admins',
+  },
+  {
+    key: 'we_miss_you',
+    label: 'We Miss You',
+    description: 'Re-engages users who signed up 30+ days ago but never joined a pool. World Cup hype angle.',
+    category: 'growth',
+    icon: 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z',
+    recipientNote: 'Auto-detected: signed up 30+ days ago, no pool',
+  },
+  {
+    key: 'ready_to_join',
+    label: 'Ready to Join?',
+    description: 'Reaches out to recent signups who haven\'t joined a pool yet. Guides them to join or create one.',
+    category: 'growth',
+    icon: 'M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z',
+    recipientNote: 'Auto-detected: recent signups not in any pool',
+  },
+  {
+    key: 'past_predictor_hype',
+    label: 'Past Predictor Hype',
+    description: 'VIP treatment for users who have submitted predictions before. Hype them up for the next tournament.',
+    category: 'growth',
+    icon: 'M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z',
+    recipientNote: 'Auto-detected: users who submitted predictions before',
+  },
+  {
+    key: 'support_reply',
+    label: 'Support Reply',
+    description: 'Reply to a user\'s support request with Sport Pool branding. Uses a neutral support design — not a marketing email.',
+    category: 'support',
+    icon: 'M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155',
+    recipientNote: 'You choose: individual user(s)',
+  },
+  {
     key: 'custom',
     label: 'Custom Email',
     description: 'Compose a freeform transactional email with personalized greeting. Each recipient gets their own email with their first name.',
@@ -57,8 +133,15 @@ const TEMPLATES: TemplateDef[] = [
 const SEGMENTS = {
   all: { label: 'All Users', description: 'Every registered user' },
   pool_admins: { label: 'Pool Admins', description: 'Users who have created a pool' },
+  empty_pool_admins: { label: 'Empty Pool Admins', description: 'Pool admins with no members yet' },
+  solo_pool_admins: { label: 'Solo Pool Admins', description: 'Only member of their pool' },
+  small_pool_admins: { label: 'Small Pool Admins', description: '2-4 members in their pool' },
+  non_admin_members: { label: 'Non-Admin Members', description: 'In a pool but haven\'t created one' },
   active_members: { label: 'Active Members', description: 'Users in at least one pool' },
   inactive_users: { label: 'Inactive Users', description: 'Signed up but never joined a pool' },
+  lapsed_users: { label: 'Lapsed Users', description: 'Signed up 30+ days ago, no pool' },
+  engaged_no_pool: { label: 'Engaged, No Pool', description: 'Recent signup, not in any pool' },
+  past_predictors: { label: 'Past Predictors', description: 'Have submitted predictions before' },
   recent_signups: { label: 'Recent Signups', description: 'Joined in the last 14 days' },
   super_admins: { label: 'Super Admins', description: 'Internal / test emails only' },
 } as const
@@ -163,7 +246,7 @@ export function TemplatesTab() {
     setCtaText('')
     setCtaUrl('')
     setTopic('')
-    setRecipientMode('segment')
+    setRecipientMode(key === 'support_reply' ? 'users' : 'segment')
     setSegment('all')
     setSelectedUserIds([])
     setUserSearch('')
@@ -178,11 +261,19 @@ export function TemplatesTab() {
 
     switch (selectedTemplate) {
       case 'pending_predictions':
+      case 'empty_pool_nudge':
+      case 'solo_pool_nudge':
+      case 'small_pool_boost':
+      case 'start_a_pool':
+      case 'we_miss_you':
+      case 'ready_to_join':
+      case 'past_predictor_hype':
         return base
       case 'deadline_reminder':
         return { ...base, pool_id: poolId }
       case 'round_deadline_reminder':
         return { ...base, pool_id: poolId, round_key: roundKey }
+      case 'support_reply':
       case 'custom':
         return {
           ...base,
@@ -203,11 +294,20 @@ export function TemplatesTab() {
   function isFormValid(): boolean {
     switch (selectedTemplate) {
       case 'pending_predictions':
+      case 'empty_pool_nudge':
+      case 'solo_pool_nudge':
+      case 'small_pool_boost':
+      case 'start_a_pool':
+      case 'we_miss_you':
+      case 'ready_to_join':
+      case 'past_predictor_hype':
         return true
       case 'deadline_reminder':
         return !!poolId
       case 'round_deadline_reminder':
         return !!poolId && !!roundKey
+      case 'support_reply':
+        return !!subject && !!bodyText && selectedUserIds.length > 0
       case 'custom':
         return !!subject && !!bodyText && (recipientMode === 'segment' || selectedUserIds.length > 0)
       default:
@@ -362,6 +462,179 @@ export function TemplatesTab() {
                 Each user gets a single email listing all their pending pools with deadlines and prediction counts.
               </p>
             </div>
+          )}
+
+          {/* Growth templates — no config needed */}
+          {selectedTemplate === 'empty_pool_nudge' && (
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-green-800 dark:text-green-300">
+                Targets pool admins whose pools have zero members. Each admin gets a personalized email with their pool name and code, encouraging them to share it.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'solo_pool_nudge' && (
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-green-800 dark:text-green-300">
+                Targets pool admins who are the only member of their pool. Encourages them to share the pool code and get others involved.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'small_pool_boost' && (
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-green-800 dark:text-green-300">
+                Targets pool admins with 2-4 members. Each email includes the pool name, current member count, and pool code — encouraging them to keep growing.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'start_a_pool' && (
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-green-800 dark:text-green-300">
+                Targets users who are in a pool but haven't created their own. Encourages them to start a pool for another group (office, family, friends).
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'we_miss_you' && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                Re-engagement email for users who signed up 30+ days ago but never joined a pool. World Cup hype angle to draw them back.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'ready_to_join' && (
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-green-800 dark:text-green-300">
+                Targets recent signups (last 30 days) who haven't joined a pool yet. Guides them to join or create one before the tournament starts.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'past_predictor_hype' && (
+            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+              <p className="text-sm text-purple-800 dark:text-purple-300">
+                VIP treatment for proven users who have submitted predictions before. Hypes them up for the next tournament and encourages them to grow their pools.
+              </p>
+            </div>
+          )}
+
+          {/* Support reply fields */}
+          {selectedTemplate === 'support_reply' && (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
+                  Reply to a user's support request with Sport Pool branding. Uses a neutral support design with a help-desk tone instead of the marketing template.
+                </p>
+              </div>
+
+              {/* User picker */}
+              <FormField label="Reply To">
+                <div className="space-y-3">
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Search by name or email..."
+                  />
+
+                  {/* Selected users badges */}
+                  {selectedUserIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedUserIds.map((id) => {
+                        const user = allUsers.find((u) => u.user_id === id)
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs"
+                          >
+                            {user?.name || user?.email || id}
+                            <button
+                              onClick={() => toggleUser(id)}
+                              className="text-primary-500 hover:text-primary-700 dark:hover:text-primary-200"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* User list */}
+                  <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-48 overflow-y-auto">
+                    {filteredUsers.length === 0 ? (
+                      <p className="text-sm text-neutral-500 p-3 text-center">No users found</p>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <button
+                          key={u.user_id}
+                          onClick={() => toggleUser(u.user_id)}
+                          className={`w-full text-left px-3 py-2 text-sm border-b border-neutral-100 dark:border-neutral-800 last:border-0 transition-colors flex items-center gap-2 ${
+                            selectedUserIds.includes(u.user_id)
+                              ? 'bg-primary-50 dark:bg-primary-950'
+                              : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            selectedUserIds.includes(u.user_id)
+                              ? 'bg-primary-600 border-primary-600'
+                              : 'border-neutral-300 dark:border-neutral-600'
+                          }`}>
+                            {selectedUserIds.includes(u.user_id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-neutral-900 dark:text-neutral-100 truncate">{u.name}</div>
+                            <div className="text-xs text-neutral-500 truncate">{u.email}</div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <p className="text-xs text-neutral-500">
+                    {selectedUserIds.length} user{selectedUserIds.length !== 1 ? 's' : ''} selected
+                  </p>
+                </div>
+              </FormField>
+
+              {/* Email content fields */}
+              <FormField label="Subject">
+                <Input
+                  value={subject}
+                  onChange={(e) => { setSubject(e.target.value); setConfirmSend(false) }}
+                  placeholder="e.g. Re: Help with my predictions"
+                />
+              </FormField>
+
+              <FormField label="Reply" helperText="Plain text — line breaks are preserved. Each user gets a personalized 'Hi [first name]' greeting.">
+                <textarea
+                  value={bodyText}
+                  onChange={(e) => { setBodyText(e.target.value); setConfirmSend(false) }}
+                  placeholder="Write your support reply here..."
+                  rows={6}
+                  className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+                />
+              </FormField>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Button Text" helperText="Optional">
+                  <Input
+                    value={ctaText}
+                    onChange={(e) => setCtaText(e.target.value)}
+                    placeholder="e.g. Go to Dashboard"
+                  />
+                </FormField>
+                <FormField label="Button URL" helperText="Optional">
+                  <Input
+                    value={ctaUrl}
+                    onChange={(e) => setCtaUrl(e.target.value)}
+                    placeholder="e.g. https://sportpool.io/dashboard"
+                  />
+                </FormField>
+              </div>
+            </>
           )}
 
           {/* Pool selector (deadline_reminder, round_deadline_reminder) */}

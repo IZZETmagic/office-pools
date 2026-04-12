@@ -41,6 +41,55 @@ export function baseTemplate(params: {
 </body></html>`
 }
 
+export function supportTemplate(params: {
+  preheader: string
+  heading: string
+  body: string
+  ctaText?: string
+  ctaUrl?: string
+}): string {
+  const { preheader, heading, body, ctaText, ctaUrl } = params
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:#1e293b;padding:20px 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="text-align:left;">
+                <h1 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+              </td>
+              <td style="text-align:right;">
+                <span style="color:#94a3b8;font-size:12px;font-weight:500;">Support</span>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `
+          <div style="text-align:center;margin:24px 0;">
+            <a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#1e293b;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a>
+          </div>` : ''}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            Need more help? Reply to this email
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+}
+
 // --- Pool Activity Templates ---
 
 export function poolJoinedTemplate(params: {
@@ -765,6 +814,201 @@ export function pendingPredictionsReminderTemplate(params: {
         ${poolRows}
         <p style="color:#525252;line-height:1.6;margin:12px 0 0;">Submit your predictions before the deadline — any unsaved predictions won't earn points!</p>
       `,
+    }),
+  }
+}
+
+// --- Growth & Re-engagement Templates ---
+
+export function emptyPoolNudgeTemplate(params: {
+  firstName: string
+  poolName: string
+  poolCode: string
+  memberCount: number
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, poolName, poolCode, dashboardUrl } = params
+  return {
+    subject: `Your pool "${poolName}" is waiting for members!`,
+    html: baseTemplate({
+      preheader: `You created ${poolName} — now it's time to invite people and get the competition started!`,
+      heading: 'Your Pool Needs Players!',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You created <strong>${poolName}</strong> — great start! But a pool is no fun without people to compete against.</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0 0 4px;color:#166534;font-size:13px;">Your pool code</p>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#166534;letter-spacing:0.05em;">${poolCode}</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Share this code with friends, family, or coworkers to get them in. The more people, the better the competition!</p>
+      `,
+      ctaText: 'Go to Your Pool',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
+export function soloPoolNudgeTemplate(params: {
+  firstName: string
+  poolName: string
+  poolCode: string
+  memberCount: number
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, poolName, poolCode, dashboardUrl } = params
+  return {
+    subject: `You're the only one in "${poolName}" — invite your crew!`,
+    html: baseTemplate({
+      preheader: `${poolName} has one member (you!). Share your pool code and get the competition going.`,
+      heading: "It's Lonely at the Top",
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're currently the only member of <strong>${poolName}</strong>. It's hard to have bragging rights with no one to brag to!</p>
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0 0 4px;color:#1e40af;font-size:13px;">Share your pool code</p>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#1e40af;letter-spacing:0.05em;">${poolCode}</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Text it to your group chat, drop it in Slack, or share it at the office. Pools are the most fun with 5+ people!</p>
+      `,
+      ctaText: 'Go to Your Pool',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
+export function smallPoolBoostTemplate(params: {
+  firstName: string
+  poolName: string
+  memberCount: number
+  poolCode: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, poolName, memberCount, poolCode, dashboardUrl } = params
+  return {
+    subject: `"${poolName}" is growing — keep the momentum going!`,
+    html: baseTemplate({
+      preheader: `You've got ${memberCount} members in ${poolName}. A few more and you'll have a real competition!`,
+      heading: 'Your Pool Is Growing!',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Nice work — <strong>${poolName}</strong> now has <strong>${memberCount} members</strong>. You're building something fun!</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Pools really come alive with 8-10+ people. One more share could make all the difference:</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0 0 4px;color:#166534;font-size:13px;">Pool code</p>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#166534;letter-spacing:0.05em;">${poolCode}</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">Send it to anyone who loves football — the more the merrier!</p>
+      `,
+      ctaText: 'View Your Pool',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
+export function startAPoolTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, dashboardUrl } = params
+  return {
+    subject: 'Love being in a pool? Start your own!',
+    html: baseTemplate({
+      preheader: `You're already in a pool — now create one for your other group of friends, family, or coworkers!`,
+      heading: 'Start Your Own Pool',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're already part of the action — but why stop at one pool?</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Create a pool for:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li>Your <strong>office</strong> or work team</li>
+          <li>Your <strong>family</strong> group chat</li>
+          <li>Your <strong>fantasy league</strong> crew</li>
+          <li>Your <strong>local pub</strong> or sports bar</li>
+        </ul>
+        <p style="color:#525252;line-height:1.6;margin:0;">It only takes 30 seconds to set up. You'll be the commissioner!</p>
+      `,
+      ctaText: 'Create a Pool',
+      ctaUrl: `${dashboardUrl}/pools/create`,
+    }),
+  }
+}
+
+export function weMissYouTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, dashboardUrl } = params
+  return {
+    subject: "The World Cup is coming — don't miss out!",
+    html: baseTemplate({
+      preheader: `You signed up for Sport Pool but haven't joined a pool yet. The World Cup is around the corner!`,
+      heading: "We Saved Your Spot",
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You created a Sport Pool account a while back but haven't joined a pool yet. The FIFA World Cup 2026 is getting closer and you don't want to miss the fun!</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's how to get started:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>Got a pool code?</strong> Join an existing pool in seconds</li>
+          <li><strong>Want to run one?</strong> Create your own and invite friends</li>
+        </ul>
+        <p style="color:#525252;line-height:1.6;margin:0;">48 teams, 104 matches, and bragging rights on the line. Don't sit this one out.</p>
+      `,
+      ctaText: 'Get Started',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
+export function readyToJoinTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, dashboardUrl } = params
+  return {
+    subject: 'Ready to join a pool? Here\'s how to get started',
+    html: baseTemplate({
+      preheader: `You signed up recently — now join or create a pool before the World Cup starts!`,
+      heading: 'Time to Jump In!',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Welcome to Sport Pool! You've signed up — now it's time to get in on the action.</p>
+        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="color:#171717;margin:0 0 12px;font-weight:600;">Two ways to play:</p>
+          <p style="color:#525252;margin:0 0 8px;font-size:14px;"><strong>1. Join a pool</strong> — Ask a friend for their pool code and enter it on the dashboard</p>
+          <p style="color:#525252;margin:0;font-size:14px;"><strong>2. Create a pool</strong> — Set one up in 30 seconds and share the code with your group</p>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">The World Cup is coming — make sure you're part of the competition!</p>
+      `,
+      ctaText: 'Go to Dashboard',
+      ctaUrl: dashboardUrl,
+    }),
+  }
+}
+
+export function pastPredictorHypeTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName, dashboardUrl } = params
+  return {
+    subject: "You've done this before — World Cup 2026 is calling",
+    html: baseTemplate({
+      preheader: `You're a proven predictor. The World Cup is approaching — time to defend your honor!`,
+      heading: 'The Prediction Pro Returns',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You've been here before — you know the thrill of nailing a prediction and watching your name climb the leaderboard.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 is around the corner, and this one is going to be <strong>bigger than ever</strong> — 48 teams, 104 matches, three host nations.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's what you can do right now:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>Invite more people</strong> to your pools — bigger pool, bigger glory</li>
+          <li><strong>Create a new pool</strong> for a different group</li>
+          <li><strong>Study the groups</strong> — predictions open soon</li>
+        </ul>
+        <p style="color:#525252;line-height:1.6;margin:0;">You've got the experience. Time to put it to work.</p>
+      `,
+      ctaText: 'Go to Dashboard',
+      ctaUrl: dashboardUrl,
     }),
   }
 }
