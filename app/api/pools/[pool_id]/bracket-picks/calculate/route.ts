@@ -9,6 +9,7 @@ import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/l
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, SettingsData } from '@/app/pools/[pool_id]/types'
 import { recalculatePool } from '@/lib/scoring'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // Allow up to 60s on Vercel Hobby plan (default is 10s, too short for this route)
 export const maxDuration = 60
@@ -18,7 +19,7 @@ export const maxDuration = 60
 // Recalculates bracket picker points for all members in the pool.
 // Admin or super admin only.
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -468,3 +469,5 @@ function formatStage(stage: string): string {
     default: return stage
   }
 }
+
+export const POST = withPerfLogging('/api/pools/[id]/bracket-picks/calculate', handlePOST)

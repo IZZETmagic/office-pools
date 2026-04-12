@@ -3,9 +3,10 @@ import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsUnlockedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // POST /api/pools/:poolId/predictions/unlock - Admin unlocks an entry's predictions
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -138,3 +139,5 @@ export async function POST(
 
   return NextResponse.json({ unlocked: true })
 }
+
+export const POST = withPerfLogging('/api/pools/[id]/predictions/unlock', handlePOST)

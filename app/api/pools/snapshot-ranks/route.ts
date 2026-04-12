@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // POST /api/pools/snapshot-ranks
@@ -8,7 +9,7 @@ import { requireSuperAdmin } from '@/lib/auth'
 // given pools. Called when a match is set to live and no other
 // match is currently live (new matchday baseline).
 // =============================================================
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const auth = await requireSuperAdmin()
   if (auth.error) return auth.error
 
@@ -65,3 +66,5 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ success: true, snapshotted })
 }
+
+export const POST = withPerfLogging('/api/pools/snapshot-ranks', handlePOST)

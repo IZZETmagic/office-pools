@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 
@@ -16,7 +17,7 @@ function buildTopicIdToKeyMap(): Map<string, TopicKey> {
 }
 
 // GET - Fetch user's real notification preferences from Resend
-export async function GET() {
+async function handleGET() {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
@@ -79,7 +80,7 @@ export async function GET() {
 }
 
 // PATCH - Update a notification preference in Resend
-export async function PATCH(request: NextRequest) {
+async function handlePATCH(request: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData: authUserData } = auth.data
@@ -138,3 +139,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update preference' }, { status: 500 })
   }
 }
+
+export const GET = withPerfLogging('/api/notifications/preferences', handleGET)
+export const PATCH = withPerfLogging('/api/notifications/preferences', handlePATCH)

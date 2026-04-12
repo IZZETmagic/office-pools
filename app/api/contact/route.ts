@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email/send'
+import { withPerfLogging } from '@/lib/api-perf'
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const { name, email, subject, message } = await request.json()
 
@@ -86,3 +87,5 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
 }
+
+export const POST = withPerfLogging('/api/contact', handlePOST)

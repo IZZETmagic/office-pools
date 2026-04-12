@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { ROUND_KEYS, ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // GET /api/pools/:poolId/rounds - Get round states for progressive pool
 // =============================================================
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -134,3 +135,5 @@ export async function GET(
     rounds,
   })
 }
+
+export const GET = withPerfLogging('/api/pools/[id]/rounds', handleGET)

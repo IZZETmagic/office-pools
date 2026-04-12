@@ -4,12 +4,13 @@ import { ROUND_MATCH_STAGES, ROUND_LABELS } from '@/lib/tournament'
 import { sendEmail } from '@/lib/email/send'
 import { roundSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
 // =============================================================
 // PUT /api/pools/:poolId/predictions/round - Submit round predictions
 // =============================================================
-export async function PUT(
+async function handlePUT(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -177,3 +178,5 @@ export async function PUT(
     predictedCount: predictedCount ?? 0,
   })
 }
+
+export const PUT = withPerfLogging('/api/pools/[id]/predictions/round', handlePUT)

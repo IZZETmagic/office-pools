@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { withPerfLogging } from '@/lib/api-perf'
 
-export async function DELETE() {
+async function handleDELETE() {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, user, userData } = auth.data
@@ -112,3 +113,5 @@ export async function DELETE() {
 
   return NextResponse.json({ deleted: true })
 }
+
+export const DELETE = withPerfLogging('/api/account/delete', handleDELETE)

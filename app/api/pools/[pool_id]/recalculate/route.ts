@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { recalculatePool } from '@/lib/scoring'
+import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // POST /api/pools/:poolId/recalculate
 // Triggers a v2 score recalculation for the pool.
 // Pool members can trigger this (e.g. after leaving a pool).
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
 ) {
@@ -28,3 +29,5 @@ export async function POST(
     matchScoresWritten: result.matchScoresWritten,
   })
 }
+
+export const POST = withPerfLogging('/api/pools/[id]/recalculate', handlePOST)

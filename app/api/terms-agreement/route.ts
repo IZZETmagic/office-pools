@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { withPerfLogging } from '@/lib/api-perf'
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const auth = await requireAuth()
     if (auth.error) return auth.error
@@ -40,3 +41,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 })
   }
 }
+
+export const POST = withPerfLogging('/api/terms-agreement', handlePOST)

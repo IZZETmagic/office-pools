@@ -5,13 +5,14 @@ import { ROUND_ORDER, ROUND_LABELS, ROUND_MATCH_STAGES } from '@/lib/tournament'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { withPerfLogging } from '@/lib/api-perf'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
 // =============================================================
 // POST /api/pools/:poolId/rounds/:roundKey/state
 // Admin-only: transition round state
 // =============================================================
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string; round_key: string }> }
 ) {
@@ -267,3 +268,5 @@ async function sendRoundOpenNotifications(
     await sendBatchEmails(emails)
   }
 }
+
+export const POST = withPerfLogging('/api/pools/[id]/rounds/[key]/state', handlePOST)

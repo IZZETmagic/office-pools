@@ -130,75 +130,30 @@ async function handlePOST(
     return NextResponse.json({ error: 'Predictions are locked' }, { status: 403 })
   }
 
-  // Save group rankings (upsert)
-  if (group_rankings && group_rankings.length > 0) {
-    // Delete existing and re-insert (simpler than individual upserts with compound keys)
-    await supabase
-      .from('bracket_picker_group_rankings')
-      .delete()
-      .eq('entry_id', entry_id)
+  // Save all bracket picks atomically via RPC (prevents race conditions on concurrent auto-saves)
+  const { error: rpcError } = await supabase.rpc('save_bracket_picks', {
+    p_entry_id: entry_id,
+    p_group_rankings: (group_rankings ?? []).map((r: { team_id: string; group_letter: string; predicted_position: number }) => ({
+      team_id: r.team_id,
+      group_letter: r.group_letter,
+      predicted_position: r.predicted_position,
+    })),
+    p_third_place_rankings: (third_place_rankings ?? []).map((r: { team_id: string; group_letter: string; rank: number }) => ({
+      team_id: r.team_id,
+      group_letter: r.group_letter,
+      rank: r.rank,
+    })),
+    p_knockout_picks: (knockout_picks ?? []).map((p: { match_id: string; match_number: number; winner_team_id: string; predicted_penalty: boolean }) => ({
+      match_id: p.match_id,
+      match_number: p.match_number,
+      winner_team_id: p.winner_team_id,
+      predicted_penalty: p.predicted_penalty ?? false,
+    })),
+  })
 
-    const { error: grError } = await supabase
-      .from('bracket_picker_group_rankings')
-      .insert(
-        group_rankings.map((r: { team_id: string; group_letter: string; predicted_position: number }) => ({
-          entry_id,
-          team_id: r.team_id,
-          group_letter: r.group_letter,
-          predicted_position: r.predicted_position,
-        }))
-      )
-    if (grError) {
-      console.error('Failed to save group rankings:', grError)
-      return NextResponse.json({ error: 'Failed to save group rankings: ' + grError.message }, { status: 500 })
-    }
-  }
-
-  // Save third-place rankings (upsert)
-  if (third_place_rankings && third_place_rankings.length > 0) {
-    await supabase
-      .from('bracket_picker_third_place_rankings')
-      .delete()
-      .eq('entry_id', entry_id)
-
-    const { error: tpError } = await supabase
-      .from('bracket_picker_third_place_rankings')
-      .insert(
-        third_place_rankings.map((r: { team_id: string; group_letter: string; rank: number }) => ({
-          entry_id,
-          team_id: r.team_id,
-          group_letter: r.group_letter,
-          rank: r.rank,
-        }))
-      )
-    if (tpError) {
-      console.error('Failed to save third-place rankings:', tpError)
-      return NextResponse.json({ error: 'Failed to save third-place rankings: ' + tpError.message }, { status: 500 })
-    }
-  }
-
-  // Save knockout picks (upsert)
-  if (knockout_picks && knockout_picks.length > 0) {
-    await supabase
-      .from('bracket_picker_knockout_picks')
-      .delete()
-      .eq('entry_id', entry_id)
-
-    const { error: kpError } = await supabase
-      .from('bracket_picker_knockout_picks')
-      .insert(
-        knockout_picks.map((p: { match_id: string; match_number: number; winner_team_id: string; predicted_penalty: boolean }) => ({
-          entry_id,
-          match_id: p.match_id,
-          match_number: p.match_number,
-          winner_team_id: p.winner_team_id,
-          predicted_penalty: p.predicted_penalty ?? false,
-        }))
-      )
-    if (kpError) {
-      console.error('Failed to save knockout picks:', kpError)
-      return NextResponse.json({ error: 'Failed to save knockout picks: ' + kpError.message }, { status: 500 })
-    }
+  if (rpcError) {
+    console.error('Failed to save bracket picks:', rpcError)
+    return NextResponse.json({ error: 'Failed to save bracket picks: ' + rpcError.message }, { status: 500 })
   }
 
   // Update last saved timestamp
