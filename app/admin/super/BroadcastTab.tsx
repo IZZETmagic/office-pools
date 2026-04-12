@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { useToast } from '@/components/ui/Toast'
@@ -131,31 +130,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 // --- Types ---
 
-type BroadcastLog = {
-  broadcast_id: string
-  subject: string
-  segment: string
-  recipient_count: number
-  recipients: string[]
-  sent_at: string
-}
-
-type Broadcast = {
-  id: string
-  name: string | null
-  status: string
-  created_at: string
-  sent_at: string | null
-  log: BroadcastLog | null
-}
-
 export function BroadcastTab() {
   const [sending, setSending] = useState(false)
   const [composeStep, setComposeStep] = useState<'hidden' | 'presets' | 'compose'>('hidden')
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(true)
-  const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null)
   const { showToast } = useToast()
 
   // Compose form state
@@ -167,24 +145,6 @@ export function BroadcastTab() {
   const [segment, setSegment] = useState<SegmentKey>('all')
   const [previewHtml, setPreviewHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
-
-  useEffect(() => {
-    fetchBroadcasts()
-  }, [])
-
-  async function fetchBroadcasts() {
-    try {
-      const res = await fetch('/api/admin/broadcast')
-      if (res.ok) {
-        const data = await res.json()
-        setBroadcasts(data.broadcasts || [])
-      }
-    } catch {
-      // Silent fail
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
 
   function buildHtml() {
     const APP_URL = window.location.origin
@@ -270,7 +230,6 @@ export function BroadcastTab() {
 
       showToast(data.message, 'success')
       resetForm()
-      fetchBroadcasts()
     } catch {
       showToast('Failed to send broadcast', 'error')
     } finally {
@@ -289,15 +248,6 @@ export function BroadcastTab() {
     setSegment('all')
     setPreviewHtml('')
     setConfirmSend(false)
-  }
-
-  const statusColor = (status: string): 'green' | 'gray' | 'yellow' | 'blue' => {
-    switch (status) {
-      case 'sent': return 'green'
-      case 'draft': return 'gray'
-      case 'sending': return 'yellow'
-      default: return 'gray'
-    }
   }
 
   // Group presets by category for display
@@ -325,7 +275,6 @@ export function BroadcastTab() {
               resetForm()
             } else {
               setComposeStep('presets')
-              setSelectedBroadcast(null)
             }
           }}
           size="sm"
@@ -564,130 +513,6 @@ export function BroadcastTab() {
         </div>
       )}
 
-      {/* Broadcast detail panel */}
-      {selectedBroadcast && (
-        <div className="bg-surface border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-              {selectedBroadcast.name || 'Untitled'}
-            </h4>
-            <Button size="sm" variant="outline" onClick={() => setSelectedBroadcast(null)}>
-              Close
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-neutral-500 text-xs mb-1">Status</div>
-              <Badge variant={statusColor(selectedBroadcast.status)}>{selectedBroadcast.status}</Badge>
-            </div>
-            <div>
-              <div className="text-neutral-500 text-xs mb-1">Sent</div>
-              <div className="text-neutral-900 dark:text-neutral-100">
-                {selectedBroadcast.sent_at ? new Date(selectedBroadcast.sent_at).toLocaleString() : '-'}
-              </div>
-            </div>
-            {selectedBroadcast.log && (
-              <>
-                <div>
-                  <div className="text-neutral-500 text-xs mb-1">Segment</div>
-                  <Badge variant="blue">
-                    {SEGMENTS[selectedBroadcast.log.segment as SegmentKey]?.label || selectedBroadcast.log.segment}
-                  </Badge>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-xs mb-1">Recipients</div>
-                  <div className="text-neutral-900 dark:text-neutral-100 font-medium">
-                    {selectedBroadcast.log.recipient_count}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {selectedBroadcast.log?.recipients && selectedBroadcast.log.recipients.length > 0 && (
-            <div>
-              <div className="text-neutral-500 text-xs mb-2">Recipient List</div>
-              <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 max-h-48 overflow-y-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
-                  {selectedBroadcast.log.recipients.map((email) => (
-                    <div key={email} className="text-xs text-neutral-700 dark:text-neutral-300 truncate">
-                      {email}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!selectedBroadcast.log && (
-            <p className="text-sm text-neutral-500">
-              No audit log available for this broadcast (sent before logging was enabled).
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Broadcast history from Resend */}
-      {loadingHistory ? (
-        <div className="text-neutral-500 text-sm py-8 text-center">Loading broadcast history...</div>
-      ) : broadcasts.length > 0 ? (
-        <div className="bg-surface border border-neutral-200 dark:border-neutral-700 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50">
-            <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Broadcast History</h4>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                <th className="text-left px-4 py-2.5 font-medium text-neutral-600 dark:text-neutral-400">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium text-neutral-600 dark:text-neutral-400">Segment</th>
-                <th className="text-left px-4 py-2.5 font-medium text-neutral-600 dark:text-neutral-400">Status</th>
-                <th className="text-left px-4 py-2.5 font-medium text-neutral-600 dark:text-neutral-400">Sent</th>
-                <th className="text-left px-4 py-2.5 font-medium text-neutral-600 dark:text-neutral-400">Recipients</th>
-              </tr>
-            </thead>
-            <tbody>
-              {broadcasts.map((b) => (
-                <tr
-                  key={b.id}
-                  onClick={() => setSelectedBroadcast(selectedBroadcast?.id === b.id ? null : b)}
-                  className={`border-b border-neutral-100 dark:border-neutral-800 last:border-0 cursor-pointer transition-colors ${
-                    selectedBroadcast?.id === b.id
-                      ? 'bg-primary-50 dark:bg-primary-950'
-                      : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
-                  }`}
-                >
-                  <td className="px-4 py-2.5 text-neutral-900 dark:text-neutral-100 font-medium">
-                    {b.name || 'Untitled'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {b.log ? (
-                      <Badge variant="blue">
-                        {SEGMENTS[b.log.segment as SegmentKey]?.label || b.log.segment}
-                      </Badge>
-                    ) : (
-                      <span className="text-neutral-400 text-xs">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <Badge variant={statusColor(b.status)}>{b.status}</Badge>
-                  </td>
-                  <td className="px-4 py-2.5 text-neutral-500">
-                    {b.sent_at ? new Date(b.sent_at).toLocaleString() : '-'}
-                  </td>
-                  <td className="px-4 py-2.5 text-neutral-500">
-                    {b.log ? b.log.recipient_count : '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : composeStep === 'hidden' ? (
-        <div className="text-center py-12 text-neutral-500 text-sm">
-          No broadcasts sent yet. Create your first one!
-        </div>
-      ) : null}
     </div>
   )
 }

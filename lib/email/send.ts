@@ -7,9 +7,11 @@ type SendEmailParams = {
   text?: string
   topicId?: string
   tags?: { name: string; value: string }[]
+  reply_to?: string | string[]
+  headers?: Record<string, string>
 }
 
-export async function sendEmail({ to, subject, html, text, topicId, tags }: SendEmailParams) {
+export async function sendEmail({ to, subject, html, text, topicId, tags, reply_to, headers }: SendEmailParams) {
   const resend = getResendClient()
   const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
 
@@ -21,6 +23,8 @@ export async function sendEmail({ to, subject, html, text, topicId, tags }: Send
     text: text || subject,
     ...(topicId ? { topicId } : {}),
     ...(tags ? { tags } : {}),
+    ...(reply_to ? { reply_to: Array.isArray(reply_to) ? reply_to : [reply_to] } : {}),
+    ...(headers ? { headers } : {}),
   }
 
   try {

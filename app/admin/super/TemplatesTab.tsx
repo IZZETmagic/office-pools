@@ -174,6 +174,7 @@ export function TemplatesTab() {
   const [allUsers, setAllUsers] = useState<UserInfo[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
+
   // Pool-specific fields
   const [poolId, setPoolId] = useState('')
   const [roundKey, setRoundKey] = useState('')
@@ -991,6 +992,7 @@ export function TemplatesTab() {
           </p>
         </div>
       )}
+
     </div>
   )
 }
