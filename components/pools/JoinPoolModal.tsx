@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -19,7 +18,6 @@ type JoinPoolModalProps = {
 }
 
 export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoolName = '' }: JoinPoolModalProps) {
-  const supabase = createClient()
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -38,84 +36,38 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
     setLoading(true)
     setError(null)
 
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_id, username')
-      .eq('auth_user_id', authUser?.id)
-      .single()
-
-    if (!userData) {
-      setError('Could not find your account.')
-      setLoading(false)
-      return
-    }
-
-    const { data: pool, error: poolError } = await supabase
-      .from('pools')
-      .select('pool_id, pool_name, status')
-      .eq('pool_code', joinCode)
-      .single()
-
-    if (poolError || !pool) {
-      setError('Pool not found. Check the code and try again.')
-      setLoading(false)
-      return
-    }
-
-    if (pool.status !== 'open') {
-      setError('This pool is no longer accepting new members.')
-      setLoading(false)
-      return
-    }
-
-    const { data: memberData, error: insertError } = await supabase
-      .from('pool_members')
-      .insert({
-        pool_id: pool.pool_id,
-        user_id: userData.user_id,
-        role: 'player',
+    try {
+      const res = await fetch('/api/pools/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_code: joinCode }),
       })
-      .select('member_id')
-      .single()
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError('You are already a member of this pool!')
-      } else {
-        setError(insertError.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to join pool.')
+        setLoading(false)
+        return
       }
+
+      // Send welcome email (fire-and-forget)
+      fetch('/api/notifications/pool-joined', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: data.pool_id }),
+      }).catch(() => {})
+
       setLoading(false)
-      return
+      showToast(`Joined "${data.pool_name}"!`, 'success')
+      setJoinCode('')
+      onSuccess?.()
+      onClose()
+      router.refresh()
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
     }
-
-    // Auto-create first entry for the new member (default name = username)
-    const { error: entryError } = await supabase
-      .from('pool_entries')
-      .insert({
-        member_id: memberData.member_id,
-        entry_name: userData.username || 'Entry 1',
-        entry_number: 1,
-      })
-
-    if (entryError) {
-      console.error('Failed to create first entry:', entryError.message)
-    }
-
-    // Send welcome email (fire-and-forget)
-    fetch('/api/notifications/pool-joined', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pool_id: pool.pool_id }),
-    }).catch(() => {})
-
-    setLoading(false)
-    showToast(`Joined "${pool.pool_name}"!`, 'success')
-    setJoinCode('')
-    onSuccess?.()
-    onClose()
-    router.refresh()
   }
 
   return (

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -24,8 +23,6 @@ type JoinPoolClientProps = {
   pool: PoolInfo
   memberCount: number
   isAlreadyMember: boolean
-  username: string
-  userId: string
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -34,8 +31,7 @@ const MODE_LABELS: Record<string, string> = {
   bracket_picker: 'Bracket Picker',
 }
 
-export function JoinPoolClient({ pool, memberCount, isAlreadyMember, username, userId }: JoinPoolClientProps) {
-  const supabase = createClient()
+export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolClientProps) {
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -48,50 +44,35 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember, username, u
     setLoading(true)
     setError(null)
 
-    // Insert membership
-    const { data: memberData, error: insertError } = await supabase
-      .from('pool_members')
-      .insert({
-        pool_id: pool.pool_id,
-        user_id: userId,
-        role: 'player',
+    try {
+      const res = await fetch('/api/pools/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: pool.pool_id }),
       })
-      .select('member_id')
-      .single()
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError('You are already a member of this pool!')
-      } else {
-        setError(insertError.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to join pool.')
+        setLoading(false)
+        return
       }
+
+      // Send welcome email (fire-and-forget)
+      fetch('/api/notifications/pool-joined', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: data.pool_id }),
+      }).catch(() => {})
+
+      showToast(`Joined "${pool.pool_name}"!`, 'success')
+      router.push(`/pools/${pool.pool_id}`)
+      router.refresh()
+    } catch {
+      setError('Something went wrong. Please try again.')
       setLoading(false)
-      return
     }
-
-    // Auto-create first entry
-    const { error: entryError } = await supabase
-      .from('pool_entries')
-      .insert({
-        member_id: memberData.member_id,
-        entry_name: username || 'Entry 1',
-        entry_number: 1,
-      })
-
-    if (entryError) {
-      console.error('Failed to create first entry:', entryError.message)
-    }
-
-    // Send welcome email (fire-and-forget)
-    fetch('/api/notifications/pool-joined', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pool_id: pool.pool_id }),
-    }).catch(() => {})
-
-    showToast(`Joined "${pool.pool_name}"!`, 'success')
-    router.push(`/pools/${pool.pool_id}`)
-    router.refresh()
   }
 
   return (

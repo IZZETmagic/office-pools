@@ -85,8 +85,6 @@ export default async function JoinPage({
       }}
       memberCount={memberCount ?? 0}
       isAlreadyMember={!!existingMembership}
-      username={userData.username}
-      userId={userData.user_id}
     />
   )
 }

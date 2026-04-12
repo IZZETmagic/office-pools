@@ -165,6 +165,30 @@ final class APIService {
         ))
     }
 
+    // MARK: - Join Pool
+
+    struct JoinPoolResponse: Decodable {
+        let memberId: String
+        let poolId: String
+        let poolName: String
+
+        enum CodingKeys: String, CodingKey {
+            case memberId = "member_id"
+            case poolId = "pool_id"
+            case poolName = "pool_name"
+        }
+    }
+
+    func joinPool(poolCode: String) async throws -> JoinPoolResponse {
+        struct Body: Encodable {
+            let poolCode: String
+            enum CodingKeys: String, CodingKey {
+                case poolCode = "pool_code"
+            }
+        }
+        return try await request("POST", path: "/api/pools/join", body: Body(poolCode: poolCode))
+    }
+
     // MARK: - Leaderboard
 
     func fetchLeaderboard(poolId: String) async throws -> LeaderboardResponse {

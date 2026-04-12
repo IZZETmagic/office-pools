@@ -262,6 +262,11 @@ final class PoolService {
     // MARK: - Join Pool by Code
 
     func joinPool(poolCode: String, userId: String, username: String = "Entry 1") async throws -> Pool {
+        // Use the server-side API route which bypasses RLS
+        let apiService = APIService()
+        let _ = try await apiService.joinPool(poolCode: poolCode)
+
+        // Fetch the full pool object to return
         let pools: [Pool] = try await supabase
             .from("pools")
             .select("pool_id, pool_name, pool_code, description, status, is_private, max_participants, max_entries_per_user, tournament_id, prediction_deadline, prediction_mode, created_at, updated_at, brand_name, brand_emoji, brand_color, brand_accent")
@@ -272,62 +277,6 @@ final class PoolService {
 
         guard let pool = pools.first else {
             throw PoolError.poolNotFound
-        }
-
-        // Check if already a member
-        struct MemberCheck: Codable {
-            let memberId: String
-            enum CodingKeys: String, CodingKey {
-                case memberId = "member_id"
-            }
-        }
-
-        let existing: [MemberCheck] = try await supabase
-            .from("pool_members")
-            .select("member_id")
-            .eq("pool_id", value: pool.poolId)
-            .eq("user_id", value: userId)
-            .execute()
-            .value
-
-        if !existing.isEmpty {
-            throw PoolError.alreadyMember
-        }
-
-        // Insert membership and get member_id back
-        struct NewMember: Codable {
-            let poolId: String
-            let userId: String
-            let role: String
-            enum CodingKeys: String, CodingKey {
-                case poolId = "pool_id"
-                case userId = "user_id"
-                case role
-            }
-        }
-
-        struct MemberReturn: Codable {
-            let memberId: String
-            enum CodingKeys: String, CodingKey { case memberId = "member_id" }
-        }
-
-        let memberResult: MemberReturn = try await supabase
-            .from("pool_members")
-            .insert(NewMember(poolId: pool.poolId, userId: userId, role: "member"))
-            .select("member_id")
-            .single()
-            .execute()
-            .value
-
-        // Auto-create first entry (matching web behavior)
-        do {
-            try await createPoolEntry(
-                memberId: memberResult.memberId,
-                entryName: username.isEmpty ? "Entry 1" : username,
-                entryNumber: 1
-            )
-        } catch {
-            print("[PoolService] Failed to auto-create entry for member \(memberResult.memberId): \(error)")
         }
 
         return pool
