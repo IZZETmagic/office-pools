@@ -216,6 +216,57 @@ final class ActivityService {
             }
         }
 
+        // 6. POINTS_ADJUSTED events
+        let allEntryIds = memberships.flatMap { $0.entries.map(\.entryId) }
+        if !allEntryIds.isEmpty {
+            struct AdjustmentRow: Codable {
+                let id: String
+                let entryId: String
+                let poolId: String
+                let amount: Int
+                let reason: String
+                let createdAt: String
+
+                enum CodingKeys: String, CodingKey {
+                    case id
+                    case entryId = "entry_id"
+                    case poolId = "pool_id"
+                    case amount, reason
+                    case createdAt = "created_at"
+                }
+            }
+
+            let adjustments: [AdjustmentRow] = (try? await supabase
+                .from("point_adjustments")
+                .select("id, entry_id, pool_id, amount, reason, created_at")
+                .in("entry_id", values: allEntryIds)
+                .order("created_at", ascending: false)
+                .limit(20)
+                .execute()
+                .value) ?? []
+
+            let poolNameMap = Dictionary(uniqueKeysWithValues: memberships.map { ($0.pools.poolId, $0.pools.poolName) })
+
+            for adj in adjustments {
+                let poolName = poolNameMap[adj.poolId] ?? "Pool"
+                let sign = adj.amount > 0 ? "+" : ""
+                items.append(ActivityItem.synthesized(
+                    activityType: .pointsAdjusted,
+                    title: "Points adjusted (\(sign)\(adj.amount))",
+                    body: "\(poolName): \(adj.reason)",
+                    icon: "slider.horizontal.3",
+                    colorKey: adj.amount > 0 ? "success" : "warning",
+                    poolId: adj.poolId,
+                    createdAt: adj.createdAt,
+                    metadata: [
+                        "pool_name": .string(poolName),
+                        "adjustment": .integer(adj.amount),
+                        "reason": .string(adj.reason),
+                    ]
+                ))
+            }
+        }
+
         // Sort newest first
         items.sort { $0.createdAt > $1.createdAt }
 

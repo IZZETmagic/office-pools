@@ -285,6 +285,21 @@ export function MembersTab({
         `Points adjusted for ${member.users.username} (${entry.entry_name}): ${pointAdjustment > 0 ? '+' : ''}${pointAdjustment} (New total: ${newTotal})`,
         'success'
       )
+
+      // Send notification to the affected user (fire-and-forget)
+      fetch('/api/notifications/points-adjusted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pool_id: pool.pool_id,
+          target_user_id: member.user_id,
+          entry_name: entry.entry_name,
+          adjustment: pointAdjustment,
+          reason: adjustReason.trim(),
+          new_total: newTotal,
+        }),
+      }).catch(console.error)
+
       await refreshMembers()
     }
     setLoading(false)

@@ -14,6 +14,7 @@ enum ActivityType: String, Codable, CaseIterable {
     case predictionResult = "prediction_result"
     case matchdayMvp = "matchday_mvp"
     case predictionSubmitted = "prediction_submitted"
+    case pointsAdjusted = "points_adjusted"
     case welcome
 }
 
@@ -99,6 +100,8 @@ struct ActivityItem: Codable, Identifiable {
             if let m = try? decoder.decode(MatchdayMvpMeta.self, from: data) { return .matchdayMvp(m) }
         case .predictionSubmitted:
             if let m = try? decoder.decode(PredictionSubmittedMeta.self, from: data) { return .predictionSubmitted(m) }
+        case .pointsAdjusted:
+            if let m = try? decoder.decode(PointsAdjustedMeta.self, from: data) { return .pointsAdjusted(m) }
         case .welcome:
             return .welcome
         }
@@ -118,6 +121,7 @@ struct ActivityItem: Codable, Identifiable {
         case .predictionResult(let m): return m.poolName
         case .matchdayMvp(let m):          return m.poolName
         case .predictionSubmitted(let m): return m.poolName
+        case .pointsAdjusted(let m):     return m.poolName
         case .welcome, .none:              return nil
         }
     }
@@ -136,6 +140,7 @@ enum ParsedActivityMetadata {
     case predictionResult(PredictionResultMeta)
     case matchdayMvp(MatchdayMvpMeta)
     case predictionSubmitted(PredictionSubmittedMeta)
+    case pointsAdjusted(PointsAdjustedMeta)
     case welcome
 }
 
@@ -264,5 +269,17 @@ struct PredictionSubmittedMeta: Codable {
         case poolName = "pool_name"
         case entryName = "entry_name"
         case matchCount = "match_count"
+    }
+}
+
+struct PointsAdjustedMeta: Codable {
+    let poolName: String
+    let adjustment: Int
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case poolName = "pool_name"
+        case adjustment
+        case reason
     }
 }

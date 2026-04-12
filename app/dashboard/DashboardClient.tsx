@@ -68,6 +68,7 @@ type ActivityItem =
   | (ActivityItemBase & { type: 'rank_up'; rankDelta: number; newRank: number; entryName: string })
   | (ActivityItemBase & { type: 'rank_down'; rankDelta: number; newRank: number; entryName: string })
   | (ActivityItemBase & { type: 'mentioned'; mentionedBy: string })
+  | (ActivityItemBase & { type: 'points_adjusted'; adjustment: number; reason: string })
 
 type UpcomingMatch = {
   match_id: string
@@ -342,6 +343,12 @@ function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
         </svg>
       )
+    case 'points_adjusted':
+      return (
+        <svg className={base} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+        </svg>
+      )
   }
 }
 
@@ -355,6 +362,7 @@ function activityIconColor(type: ActivityItem['type']): string {
     case 'rank_up': return 'text-success-600 bg-success-50'
     case 'rank_down': return 'text-neutral-500 bg-neutral-100'
     case 'mentioned': return 'text-primary-600 bg-primary-50'
+    case 'points_adjusted': return 'text-warning-600 bg-warning-50'
   }
 }
 
@@ -376,6 +384,8 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
       return <>Dropped {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to #{activity.newRank} in {poolLink}</>
     case 'mentioned':
       return <><span className="font-medium">@{activity.mentionedBy}</span> mentioned you in {poolLink}</>
+    case 'points_adjusted':
+      return <>Points adjusted <span className={`font-semibold ${activity.adjustment > 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'}`}>{activity.adjustment > 0 ? '+' : ''}{activity.adjustment}</span> in {poolLink} &mdash; {activity.reason}</>
   }
 }
 

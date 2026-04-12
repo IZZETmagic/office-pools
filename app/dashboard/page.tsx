@@ -435,6 +435,33 @@ export default async function DashboardPage() {
     }
   }
 
+  // 7. POINTS_ADJUSTED events — admin point adjustments on user's entries
+  const allEntryIds = (userPools ?? []).flatMap((m: any) =>
+    ((m as any).pool_entries || []).map((e: any) => e.entry_id)
+  )
+  if (allEntryIds.length > 0) {
+    const { data: adjustments } = await supabase
+      .from('point_adjustments')
+      .select('id, entry_id, pool_id, amount, reason, created_at')
+      .in('entry_id', allEntryIds)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    for (const adj of adjustments ?? []) {
+      const pool = (userPools ?? []).find((p: any) => p.pools.pool_id === adj.pool_id)
+      if (pool) {
+        allActivities.push({
+          type: 'points_adjusted' as const,
+          poolName: (pool as any).pools.pool_name,
+          poolId: adj.pool_id,
+          date: adj.created_at,
+          adjustment: adj.amount,
+          reason: adj.reason,
+        })
+      }
+    }
+  }
+
   const activities = allActivities
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 15)

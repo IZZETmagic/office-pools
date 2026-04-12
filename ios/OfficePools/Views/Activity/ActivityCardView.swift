@@ -91,6 +91,8 @@ struct ActivityCardView: View {
             mvpDetail(meta)
         case .predictionSubmitted(let meta):
             predictionSubmittedDetail(meta)
+        case .pointsAdjusted(let meta):
+            pointsAdjustedDetail(meta)
         default:
             EmptyView()
         }
@@ -219,6 +221,21 @@ struct ActivityCardView: View {
         }
     }
 
+    // MARK: - Points Adjusted Detail
+
+    private func pointsAdjustedDetail(_ meta: PointsAdjustedMeta) -> some View {
+        HStack(spacing: 6) {
+            let sign = meta.adjustment > 0 ? "+" : ""
+            Text("\(sign)\(meta.adjustment) pts")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(meta.adjustment > 0 ? Color.sp.green : Color.sp.red)
+            Text(meta.reason)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.sp.slate)
+                .lineLimit(1)
+        }
+    }
+
     // MARK: - Outcome Chip
 
     private func outcomeChip(_ outcome: String) -> some View {
@@ -285,6 +302,8 @@ struct ActivityCardView: View {
             return "crown.fill"
         case .predictionSubmitted:
             return "paperplane.circle.fill"
+        case .pointsAdjusted:
+            return "slider.horizontal.3"
         case .welcome:
             return "hand.wave.fill"
         }
@@ -326,6 +345,11 @@ struct ActivityCardView: View {
             return "success"
         case .matchdayMvp:          return "accent"
         case .predictionSubmitted:  return "success"
+        case .pointsAdjusted:
+            if let meta = item.parsedMetadata, case .pointsAdjusted(let m) = meta {
+                return m.adjustment > 0 ? "success" : "warning"
+            }
+            return "warning"
         case .welcome:              return "primary"
         }
     }

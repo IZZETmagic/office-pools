@@ -688,6 +688,52 @@ export function countdownReminderTemplate(params: {
 
 // --- Community Templates ---
 
+export function pointsAdjustedTemplate(params: {
+  userName: string
+  poolName: string
+  entryName: string
+  adjustment: number
+  reason: string
+  newTotal: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, entryName, adjustment, reason, newTotal, poolUrl } = params
+  const sign = adjustment > 0 ? '+' : ''
+  const color = adjustment > 0 ? '#16a34a' : '#dc2626'
+  return {
+    subject: `Points adjusted in ${poolName} (${sign}${adjustment})`,
+    html: baseTemplate({
+      preheader: `Your points for ${entryName} in ${poolName} have been adjusted by ${sign}${adjustment}`,
+      heading: 'Points Adjusted',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 16px;">A pool admin has adjusted your points for <strong>${entryName}</strong> in <strong>${poolName}</strong>.</p>
+        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 16px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr>
+              <td style="color:#737373;font-size:13px;padding:4px 0;">Adjustment</td>
+              <td style="color:${color};font-weight:700;font-size:16px;text-align:right;padding:4px 0;">${sign}${adjustment} pts</td>
+            </tr>
+            <tr>
+              <td style="color:#737373;font-size:13px;padding:4px 0;">New Total</td>
+              <td style="color:#171717;font-weight:700;font-size:16px;text-align:right;padding:4px 0;">${newTotal} pts</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding:8px 0 0;border-top:1px solid #e5e5e5;">
+                <p style="color:#737373;font-size:12px;margin:0 0 2px;">Reason</p>
+                <p style="color:#404040;font-size:14px;margin:0;">${reason}</p>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0;">If you have questions about this adjustment, contact your pool admin.</p>
+      `,
+      ctaText: 'View Leaderboard',
+      ctaUrl: `${poolUrl}?tab=leaderboard`,
+    }),
+  }
+}
+
 export function mentionNotificationTemplate(params: {
   recipientName: string
   mentionerName: string
