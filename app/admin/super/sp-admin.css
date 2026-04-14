@@ -1,0 +1,150 @@
+/* =============================================
+   SP ADMIN DESIGN TOKENS
+
+   Standalone design system for the Super Admin
+   dashboard. Inspired by iOS SPDesign tokens.
+   Applied via utility classes prefixed with "sp-".
+
+   Import this file in the super admin page/layout.
+   ============================================= */
+
+/* ---- Typography ---- */
+
+.sp-heading {
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sp-label {
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sp-nav-item {
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sp-body {
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 500;
+}
+
+/* ---- Radius (from iOS SPDesign.Radius) ---- */
+
+.sp-radius-sm  { border-radius: 12px; }
+.sp-radius-md  { border-radius: 18px; }
+.sp-radius-lg  { border-radius: 24px; }
+.sp-radius-xl  { border-radius: 32px; }
+
+/* ---- Card ---- */
+
+.sp-card {
+  border-radius: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ---- Colors (from iOS Color.sp namespace) ---- */
+/* Light mode defaults, dark mode via .dark parent  */
+
+:root {
+  /* Neutrals */
+  --sp-snow:      #F7F8FC;
+  --sp-surface:   #FFFFFF;
+  --sp-mist:      #EEF1F8;
+  --sp-silver:    #D4DAE8;
+  --sp-slate:     #7B87A8;
+  --sp-ink:       #1B2340;
+  --sp-midnight:  #0B0F1A;
+
+  /* Primary */
+  --sp-primary:       #3B6EFF;
+  --sp-primary-light: #F7F9FF;
+
+  /* Accent */
+  --sp-accent:       #F5C518;
+  --sp-accent-light: #FFF8E1;
+
+  /* Feedback */
+  --sp-green:       #22C55E;
+  --sp-green-light: #ECFDF5;
+  --sp-red:         #EF4444;
+  --sp-red-light:   #FEF2F2;
+  --sp-amber:       #F59E0B;
+  --sp-amber-light: #FFFBEB;
+
+  /* Tiers */
+  --sp-tier-exact:     #E2B830;
+  --sp-tier-winner-gd: #52D660;
+  --sp-tier-winner:    #30B7FF;
+  --sp-tier-miss:      #A1A6A0;
+
+  /* Special */
+  --sp-bronze: #CD7F32;
+}
+
+:root:where(.dark) {
+  /* Neutrals */
+  --sp-snow:      #121520;
+  --sp-surface:   #1C2030;
+  --sp-mist:      #232840;
+  --sp-silver:    #2E3448;
+  --sp-slate:     #8B97B8;
+  --sp-ink:       #E8EAF0;
+  --sp-midnight:  #0B0F1A;
+
+  /* Primary */
+  --sp-primary:       #5B8AFF;
+  --sp-primary-light: #1A2440;
+
+  /* Accent */
+  --sp-accent:       #F5C518;
+  --sp-accent-light: #2A2210;
+
+  /* Feedback */
+  --sp-green:       #34D972;
+  --sp-green-light: #0F2A1A;
+  --sp-red:         #F87171;
+  --sp-red-light:   #2A1010;
+  --sp-amber:       #FBBF24;
+  --sp-amber-light: #2A2210;
+}
+
+/* ---- Color utility classes ---- */
+
+.sp-text-ink       { color: var(--sp-ink) !important; }
+.sp-text-slate     { color: var(--sp-slate) !important; }
+.sp-text-primary   { color: var(--sp-primary) !important; }
+.sp-text-accent    { color: var(--sp-accent) !important; }
+.sp-text-green     { color: var(--sp-green) !important; }
+.sp-text-red       { color: var(--sp-red) !important; }
+.sp-text-amber     { color: var(--sp-amber) !important; }
+
+.sp-bg-snow        { background-color: var(--sp-snow) !important; }
+.sp-bg-surface     { background-color: var(--sp-surface) !important; }
+.sp-bg-mist        { background-color: var(--sp-mist) !important; }
+.sp-bg-primary-light { background-color: var(--sp-primary-light) !important; }
+.sp-bg-accent-light  { background-color: var(--sp-accent-light) !important; }
+.sp-bg-green-light { background-color: var(--sp-green-light) !important; }
+.sp-bg-red-light   { background-color: var(--sp-red-light) !important; }
+.sp-bg-amber-light { background-color: var(--sp-amber-light) !important; }
+
+.sp-border-silver  { border-color: var(--sp-silver) !important; }
+.sp-border-mist    { border-color: var(--sp-mist) !important; }
+
+/* ---- Hover utility classes (dark-mode aware) ---- */
+
+.sp-hover-snow:hover { background-color: var(--sp-snow) !important; }
+.sp-hover-mist:hover { background-color: var(--sp-mist) !important; }
+
+/* ---- Scroll behavior ---- */
+
+.sp-card {
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior-x: none;
+}

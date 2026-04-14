@@ -9,18 +9,21 @@ export async function POST(request: NextRequest) {
 
   const { pool_id, pool_code } = await request.json()
 
+  // Use admin client to bypass RLS for pool lookup (pool code is the auth mechanism for private pools)
+  const adminClient = createAdminClient()
+
   // Look up pool by ID or code
   let pool: { pool_id: string; pool_name: string; status: string } | null = null
 
   if (pool_id) {
-    const { data } = await supabase
+    const { data } = await adminClient
       .from('pools')
       .select('pool_id, pool_name, status')
       .eq('pool_id', pool_id)
       .single()
     pool = data
   } else if (pool_code) {
-    const { data } = await supabase
+    const { data } = await adminClient
       .from('pools')
       .select('pool_id, pool_name, status')
       .eq('pool_code', pool_code)
@@ -37,9 +40,6 @@ export async function POST(request: NextRequest) {
   if (pool.status !== 'open') {
     return NextResponse.json({ error: 'This pool is no longer accepting new members.' }, { status: 400 })
   }
-
-  // Use admin client to bypass RLS for the insert
-  const adminClient = createAdminClient()
 
   // Check for existing membership
   const { data: existing } = await adminClient

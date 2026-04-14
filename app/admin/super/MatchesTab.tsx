@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
+import { SpTable, type SpColumn } from './SpTable'
 
 type MatchesTabProps = {
   matches: SuperMatchData[]
@@ -751,103 +752,222 @@ export function MatchesTab({
     setAdvancing(false)
   }
 
+  const matchColumns: SpColumn<SuperMatchData>[] = [
+    {
+      key: 'number',
+      header: '#',
+      render: (match) => (
+        <span className="text-xs font-mono font-semibold" style={{ color: 'var(--sp-slate)' }}>
+          #{match.match_number}
+        </span>
+      ),
+    },
+    {
+      key: 'stage',
+      header: 'Stage',
+      render: (match) => (
+        <Badge variant="blue">
+          {getStageName(match.stage)}
+          {match.group_letter ? ` ${match.group_letter}` : ''}
+        </Badge>
+      ),
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      render: (match) => {
+        const d = new Date(match.match_date)
+        return (
+          <div>
+            <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+              {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <p style={{ fontSize: 11, color: 'var(--sp-slate)', opacity: 0.7, marginTop: 1 }}>
+              {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'match',
+      header: 'Match',
+      render: (match) => {
+        const home = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
+        const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+        return (
+          <span>
+            <span className="sp-heading" style={{ fontSize: 14, fontWeight: 700 }}>{home}</span>
+            <span style={{ color: 'var(--sp-slate)', margin: '0 8px' }}>vs</span>
+            <span className="sp-heading" style={{ fontSize: 14, fontWeight: 700 }}>{away}</span>
+          </span>
+        )
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      align: 'center',
+      render: (match) => (
+        <Badge variant={getStatusBadgeVariant(match.status)}>
+          {match.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'score',
+      header: 'Score',
+      align: 'center',
+      render: (match) => {
+        if (match.is_completed) {
+          return (
+            <span className="font-bold" style={{ color: 'var(--sp-ink)' }}>
+              {match.home_score_ft} - {match.away_score_ft}
+              {match.home_score_pso !== null && (
+                <span className="block" style={{ fontSize: 11, color: 'var(--sp-slate)' }}>
+                  PSO: {match.home_score_pso}-{match.away_score_pso}
+                </span>
+              )}
+            </span>
+          )
+        }
+        if (match.status === 'live' && match.home_score_ft !== null) {
+          return (
+            <span className="font-bold text-warning-700">
+              {match.home_score_ft} - {match.away_score_ft}
+              <span className="text-xs text-warning-500 block">provisional</span>
+            </span>
+          )
+        }
+        return <span style={{ color: 'var(--sp-slate)' }}>-</span>
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (match) => (
+        <div className="flex gap-1.5 justify-end">
+          {match.status === 'scheduled' && (
+            <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
+              Set Live
+            </Button>
+          )}
+          {match.status === 'live' && (
+            <>
+              <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openLiveScoreModal(match)}>
+                Update Score
+              </Button>
+              <Button size="xs" className="min-w-[100px]" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
+                Set Scheduled
+              </Button>
+            </>
+          )}
+          {match.status !== 'cancelled' && (
+            <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => openResultModal(match)}>
+              {match.is_completed ? 'Edit Result' : 'Enter Result'}
+            </Button>
+          )}
+          {match.is_completed && (
+            <Button size="xs" className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>
+              Reset
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Match Results</h2>
-        <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
-          Advance Teams
-        </Button>
-      </div>
-
-
-      {/* Stage filter buttons */}
-      <div className="mb-4 border-b border-neutral-200 dark:border-neutral-700 pb-3">
-        <div className="flex gap-1 overflow-x-auto">
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'group', label: 'Group' },
-            { key: 'round_32', label: 'R32' },
-            { key: 'round_16', label: 'R16' },
-            { key: 'quarter_final', label: 'QF' },
-            { key: 'semi_final', label: 'SF' },
-            { key: 'third_place', label: '3rd' },
-            { key: 'final', label: 'Final' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                setStageFilter(tab.key)
-                if (tab.key !== 'group') setGroupFilter('all')
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                stageFilter === tab.key
-                  ? 'bg-primary-600 text-white'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-2xl font-extrabold sp-heading shrink-0">
+            <span className="text-neutral-900 dark:text-white">Match</span>
+            <span className="text-primary-600 dark:text-primary-500">Results</span>
+          </h2>
+          <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
+            Advance Teams
+          </Button>
         </div>
 
-        {/* Group letter pills (only when Group tab active) */}
-        {stageFilter === 'group' && (
-          <div className="flex gap-0.5 mt-2 overflow-x-auto">
-            <button
-              onClick={() => setGroupFilter('all')}
-              className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
-                groupFilter === 'all'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
-              }`}
-            >
-              All
-            </button>
-            {groups.map((g, i) => (
-              <button
-                key={g}
-                onClick={() => setGroupFilter(g)}
-                className={`w-8 h-7 text-xs font-medium transition-colors ${
-                  i === groups.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
-                } ${
-                  groupFilter === g
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+        {/* Stage + status filters */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <div className="flex gap-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'group', label: 'Group' },
+                { key: 'round_32', label: 'R32' },
+                { key: 'round_16', label: 'R16' },
+                { key: 'quarter_final', label: 'QF' },
+                { key: 'semi_final', label: 'SF' },
+                { key: 'third_place', label: '3rd' },
+                { key: 'final', label: 'Final' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setStageFilter(tab.key)
+                    if (tab.key !== 'group') setGroupFilter('all')
+                  }}
+                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium sp-radius-sm transition-colors whitespace-nowrap ${
+                    stageFilter === tab.key
+                      ? 'bg-primary-600 text-white'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-      {/* Status filter buttons */}
-      <div className="flex gap-1 mb-6 overflow-x-auto">
-        {[
-          { key: 'all', label: 'All', count: null },
-          { key: 'scheduled', label: 'Scheduled', count: scheduledCount },
-          { key: 'live', label: 'Live', count: liveCount },
-          { key: 'completed', label: 'Completed', count: completedCount },
-          { key: 'cancelled', label: 'Cancelled', count: cancelledCount },
-        ].map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => setStatusFilter(opt.key)}
-            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-              statusFilter === opt.key
-                ? opt.key === 'live' ? 'bg-danger-600 text-white'
-                : opt.key === 'completed' ? 'bg-success-600 text-white'
-                : opt.key === 'scheduled' ? 'bg-primary-600 text-white'
-                : opt.key === 'cancelled' ? 'bg-neutral-600 text-white'
-                : 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
-            }`}
+            {/* Group letter pills (only when Group tab active) */}
+            {stageFilter === 'group' && (
+              <div className="flex gap-0.5">
+                <button
+                  onClick={() => setGroupFilter('all')}
+                  className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
+                    groupFilter === 'all'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                  }`}
+                >
+                  All
+                </button>
+                {groups.map((g, i) => (
+                  <button
+                    key={g}
+                    onClick={() => setGroupFilter(g)}
+                    className={`w-8 h-7 text-xs font-medium transition-colors ${
+                      i === groups.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
+                    } ${
+                      groupFilter === g
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Status filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 appearance-none pr-8 shrink-0"
+            style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
           >
-            {opt.label}{opt.count != null && <span className="opacity-70"> {opt.count}</span>}
-          </button>
-        ))}
+            <option value="all">All Statuses</option>
+            <option value="scheduled">Scheduled ({scheduledCount})</option>
+            <option value="live">Live ({liveCount})</option>
+            <option value="completed">Completed ({completedCount})</option>
+            <option value="cancelled">Cancelled ({cancelledCount})</option>
+          </select>
+        </div>
       </div>
 
       {/* Matches — mobile cards */}
@@ -927,153 +1047,13 @@ export function MatchesTab({
       </div>
 
       {/* Matches — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div>
-          <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Stage
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Match
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Score
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {filteredMatches.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
-                    No matches found with current filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredMatches.map((match, i) => {
-                  const home =
-                    match.home_team?.country_name ||
-                    match.home_team_placeholder ||
-                    'TBD'
-                  const away =
-                    match.away_team?.country_name ||
-                    match.away_team_placeholder ||
-                    'TBD'
-                  const matchDate = new Date(match.match_date)
-
-                  return (
-                    <tr key={match.match_id} className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up" style={{ animationDelay: `${i * 0.03}s` }}>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-mono font-semibold text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
-                          #{match.match_number}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="blue">
-                          {getStageName(match.stage)}
-                          {match.group_letter ? ` ${match.group_letter}` : ''}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 whitespace-nowrap">
-                        {matchDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                        <br />
-                        <span className="text-xs text-neutral-500">
-                          {matchDate.toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-neutral-900">
-                          {home}
-                        </span>
-                        <span className="text-neutral-500 mx-2">vs</span>
-                        <span className="font-medium text-neutral-900">
-                          {away}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant={getStatusBadgeVariant(match.status)}>
-                          {match.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {match.is_completed ? (
-                          <span className="font-bold text-neutral-900">
-                            {match.home_score_ft} - {match.away_score_ft}
-                            {match.home_score_pso !== null && (
-                              <span className="text-xs text-neutral-500 block">
-                                PSO: {match.home_score_pso}-
-                                {match.away_score_pso}
-                              </span>
-                            )}
-                          </span>
-                        ) : match.status === 'live' && match.home_score_ft !== null ? (
-                          <span className="font-bold text-warning-700">
-                            {match.home_score_ft} - {match.away_score_ft}
-                            <span className="text-xs text-warning-500 block">
-                              provisional
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-neutral-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-1.5 justify-end">
-                          {match.status === 'scheduled' && (
-                            <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openSetStatusModal(match, 'live')}>
-                              Set Live
-                            </Button>
-                          )}
-                          {match.status === 'live' && (
-                            <>
-                              <Button size="xs" className="min-w-[100px]" variant="warning" onClick={() => openLiveScoreModal(match)}>
-                                Update Score
-                              </Button>
-                              <Button size="xs" className="min-w-[100px]" variant="gray" onClick={() => openSetStatusModal(match, 'scheduled')}>
-                                Set Scheduled
-                              </Button>
-                            </>
-                          )}
-                          {match.status !== 'cancelled' && (
-                            <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => openResultModal(match)}>
-                              {match.is_completed
-                                ? 'Edit Result'
-                                : 'Enter Result'}
-                            </Button>
-                          )}
-                          {match.is_completed && (
-                            <Button size="xs" className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>
-                              Reset
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="hidden sm:block">
+        <SpTable<SuperMatchData>
+          columns={matchColumns}
+          data={filteredMatches}
+          keyFn={(m) => m.match_id}
+          emptyMessage="No matches found with current filters."
+        />
       </div>
 
       {/* Enter/Edit Result Modal */}

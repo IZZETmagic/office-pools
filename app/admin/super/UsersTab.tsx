@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
+import { SpTable, type SpColumn } from './SpTable'
 
 type UsersTabProps = {
   users: SuperUserData[]
@@ -159,31 +160,137 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
     })
   }
 
+  const userColumns: SpColumn<SuperUserData>[] = [
+    {
+      key: 'user',
+      header: 'User',
+      sticky: true,
+      render: (user) => (
+        <div>
+          <span className="sp-heading" style={{ fontSize: 14, fontWeight: 700 }}>
+            {user.username}
+          </span>
+          {user.user_id === currentUserId && (
+            <span className="ml-1" style={{ fontSize: 12, color: 'var(--sp-primary)' }}>(you)</span>
+          )}
+          {user.full_name && (
+            <p style={{ fontSize: 12, color: 'var(--sp-slate)', marginTop: 1 }}>{user.full_name}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      render: (user) => <span style={{ fontSize: 13 }}>{user.email}</span>,
+    },
+    {
+      key: 'role',
+      header: 'Role',
+      align: 'center',
+      render: (user) =>
+        user.is_super_admin ? (
+          <Badge variant="yellow">Super Admin</Badge>
+        ) : (
+          <Badge variant="gray">User</Badge>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      align: 'center',
+      render: (user) => (
+        <Badge variant={user.is_active ? 'green' : 'gray'}>
+          {user.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'joined',
+      header: 'Joined',
+      render: (user) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+          {new Date(user.created_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+          })}
+        </span>
+      ),
+    },
+    {
+      key: 'last_login',
+      header: 'Last Login',
+      render: (user) => {
+        if (!user.last_login) return <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>Never</span>
+        const d = new Date(user.last_login)
+        return (
+          <div>
+            <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+              {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <p style={{ fontSize: 11, color: 'var(--sp-slate)', opacity: 0.7, marginTop: 1 }}>
+              {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (user) => {
+        if (user.user_id === currentUserId) return null
+        return (
+          <div className="flex gap-1.5 justify-end">
+            <Button
+              size="xs"
+              className="min-w-[100px]"
+              variant="outline"
+              onClick={() => handleToggleSuperAdmin(user, !user.is_super_admin)}
+            >
+              {user.is_super_admin ? 'Remove Admin' : 'Make Admin'}
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              className={`min-w-[100px] ${user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}`}
+              onClick={() => handleToggleActive(user)}
+            >
+              {user.is_active ? 'Deactivate' : 'Reactivate'}
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
+
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">User Management</h2>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search users..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
-        />
-
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <h2 className="text-2xl font-extrabold sp-heading shrink-0">
+          <span className="text-neutral-900 dark:text-white">User</span>
+          <span className="text-primary-600 dark:text-primary-500">Management</span>
+        </h2>
+        <div className="flex items-center gap-3">
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300"
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 appearance-none pr-8"
+          style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
         >
           <option value="all">All Roles</option>
           <option value="super">Super Admins</option>
           <option value="regular">Regular Users</option>
         </select>
+
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search users..."
+          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
+        />
+        </div>
       </div>
 
       {/* Users — mobile cards */}
@@ -258,131 +365,14 @@ export function UsersTab({ users, setUsers, currentUserId }: UsersTabProps) {
       </div>
 
       {/* Users — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div>
-          <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  User
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Role
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Joined
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Last Login
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-neutral-600">
-                    No users found.
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((user, i) => {
-                  const isCurrentUser = user.user_id === currentUserId
-                  return (
-                    <tr
-                      key={user.user_id}
-                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up ${isCurrentUser ? 'bg-danger-50/30' : ''}`}
-                      style={{ animationDelay: `${i * 0.03}s` }}
-                    >
-                      <td className="px-4 py-3">
-                        <div>
-                          <span className="font-medium text-neutral-900 dark:text-white">
-                            {user.username}
-                          </span>
-                          {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
-                          {user.full_name && (
-                            <p className="text-xs text-neutral-600">
-                              {user.full_name}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                        {user.email}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {user.is_super_admin ? (
-                          <Badge variant="yellow">Super Admin</Badge>
-                        ) : (
-                          <Badge variant="gray">User</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant={user.is_active ? 'green' : 'gray'}>
-                          {user.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                        {new Date(user.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                        {user.last_login
-                          ? new Date(user.last_login).toLocaleDateString(
-                              'en-US',
-                              { month: 'short', day: 'numeric' }
-                            )
-                          : 'Never'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-1.5 justify-end">
-                          {!isCurrentUser && (
-                            <>
-                              <Button
-                                size="xs"
-                                className="min-w-[100px]"
-                                variant="outline"
-                                onClick={() =>
-                                  handleToggleSuperAdmin(
-                                    user,
-                                    !user.is_super_admin
-                                  )
-                                }
-                              >
-                                {user.is_super_admin
-                                  ? 'Remove Admin'
-                                  : 'Make Admin'}
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                className={`min-w-[100px] ${user.is_active ? '!text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950' : '!text-success-600 !border-success-200 hover:!bg-success-50 dark:!text-success-400 dark:!border-success-800 dark:hover:!bg-success-950'}`}
-                                onClick={() => handleToggleActive(user)}
-                              >
-                                {user.is_active ? 'Deactivate' : 'Reactivate'}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="hidden sm:block">
+        <SpTable<SuperUserData>
+          columns={userColumns}
+          data={filteredUsers}
+          keyFn={(u) => u.user_id}
+          emptyMessage="No users found."
+          rowClassName={(u) => u.user_id === currentUserId ? 'ring-1 ring-inset' : ''}
+        />
       </div>
 
       {/* Promote to Super Admin Modal */}

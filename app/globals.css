@@ -314,6 +314,7 @@ html.theme-classic.dark {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+
   /* Primary */
   --color-primary-50:  var(--primary-50);
   --color-primary-100: var(--primary-100);
@@ -403,10 +404,12 @@ html.theme-classic.dark {
   --animate-shimmer: shimmer 3s linear infinite;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+  }
 }
 
 /* Hide scrollbar for tab navigation on mobile */

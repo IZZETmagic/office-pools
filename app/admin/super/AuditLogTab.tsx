@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuditLogData } from './page'
 import { Badge } from '@/components/ui/Badge'
+import { SpTable, type SpColumn } from './SpTable'
 
 type AuditLogTabProps = {
   auditLogs: AuditLogData[]
@@ -163,10 +164,65 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
     { value: 'pool', label: 'Pool', count: poolCount },
   ]
 
+  const auditColumns: SpColumn<AuditLogData>[] = [
+    {
+      key: 'time',
+      header: 'Time',
+      render: (log) => {
+        const d = new Date(log.performed_at)
+        return (
+          <div>
+            <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+              {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <p style={{ fontSize: 11, color: 'var(--sp-slate)', opacity: 0.7, marginTop: 1 }}>
+              {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      render: (log) => (
+        <Badge variant={getActionBadgeVariant(log.action)}>
+          {getActionLabel(log.action)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'target',
+      header: 'Target',
+      render: (log) => renderTarget(log),
+    },
+    {
+      key: 'details',
+      header: 'Details',
+      render: (log) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }} className="truncate max-w-xs block">
+          {log.summary || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'performed_by',
+      header: 'Performed By',
+      render: (log) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+          {log.performer?.username || 'Unknown'}
+        </span>
+      ),
+    },
+  ]
+
   if (auditLogs.length === 0 && !refreshing) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Audit Log</h2>
+        <h2 className="text-2xl font-extrabold sp-heading mb-6">
+          <span className="text-neutral-900 dark:text-white">Audit</span>
+          <span className="text-primary-600 dark:text-primary-500">Log</span>
+        </h2>
         <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
           No audit entries yet. Super admin actions will be logged here.
         </div>
@@ -177,27 +233,23 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Audit Log</h2>
-      </div>
-
-      {/* Category filter pills */}
-      <div className="flex gap-1 mb-6 overflow-x-auto">
-        {categoryOptions.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setCategoryFilter(opt.value)}
-            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-              categoryFilter === opt.value
-                ? opt.value === 'match' ? 'bg-primary-600 text-white'
-                : opt.value === 'user' ? 'bg-warning-600 text-white'
-                : opt.value === 'pool' ? 'bg-success-600 text-white'
-                : 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
-            }`}
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-extrabold sp-heading shrink-0">
+            <span className="text-neutral-900 dark:text-white">Audit</span>
+            <span className="text-primary-600 dark:text-primary-500">Log</span>
+          </h2>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+            className="px-4 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 appearance-none shrink-0"
+            style={{ WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: 36, minWidth: 180, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
           >
-            {opt.label}{opt.count != null && <span className="opacity-70"> {opt.count}</span>}
-          </button>
-        ))}
+            <option value="all">All Categories</option>
+            <option value="match">Match ({matchCount})</option>
+            <option value="user">User ({userCount})</option>
+            <option value="pool">Pool ({poolCount})</option>
+          </select>
+        </div>
       </div>
 
       {/* Audit — mobile cards */}
@@ -249,79 +301,13 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
       </div>
 
       {/* Audit — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div>
-          <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Time
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Action
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Target
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Details
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Performed By
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-neutral-600 dark:text-neutral-400">
-                    No entries for this category.
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log, i) => {
-                  const logDate = new Date(log.performed_at)
-                  return (
-                    <tr
-                      key={log.id ?? `log-${i}`}
-                      className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up"
-                      style={{ animationDelay: `${i * 0.03}s` }}
-                    >
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
-                        {logDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                        <br />
-                        <span className="text-xs text-neutral-500">
-                          {logDate.toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={getActionBadgeVariant(log.action)}>
-                          {getActionLabel(log.action)}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {renderTarget(log)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 max-w-xs truncate">
-                        {log.summary || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                        {log.performer?.username || 'Unknown'}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="hidden sm:block">
+        <SpTable<AuditLogData>
+          columns={auditColumns}
+          data={filteredLogs}
+          keyFn={(log) => log.id ?? log.performed_at}
+          emptyMessage="No entries for this category."
+        />
       </div>
     </div>
   )

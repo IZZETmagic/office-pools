@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
+import { SpTable, type SpColumn } from './SpTable'
 
 type PoolsTabProps = {
   pools: SuperPoolData[]
@@ -196,35 +197,135 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
     { value: 'completed', label: 'Completed', count: pools.filter(p => p.status === 'completed').length, color: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200' },
   ]
 
+  const poolColumns: SpColumn<SuperPoolData>[] = [
+    {
+      key: 'pool',
+      header: 'Pool',
+      sticky: true,
+      render: (pool) => (
+        <div>
+          <span className="sp-heading" style={{ fontSize: 14, fontWeight: 700 }}>
+            {pool.pool_name}
+          </span>
+          {pool.description && (
+            <p style={{ fontSize: 12, color: 'var(--sp-slate)', marginTop: 1 }} className="truncate max-w-[200px]">
+              {pool.description}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'code',
+      header: 'Code',
+      render: (pool) => (
+        <span className="font-mono" style={{ fontSize: 13 }}>{pool.pool_code}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      align: 'center',
+      render: (pool) => (
+        <Badge variant={getStatusVariant(pool.status)}>
+          {pool.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'members',
+      header: 'Members',
+      align: 'center',
+      render: (pool) => (
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{getMemberCount(pool)}</span>
+      ),
+    },
+    {
+      key: 'admin',
+      header: 'Admin',
+      render: (pool) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+          {pool.admin_user?.username || 'Unknown'}
+        </span>
+      ),
+    },
+    {
+      key: 'tournament',
+      header: 'Tournament',
+      render: (pool) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+          {pool.tournaments?.name || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'created',
+      header: 'Created',
+      render: (pool) => (
+        <span style={{ fontSize: 13, color: 'var(--sp-slate)' }}>
+          {new Date(pool.created_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+          })}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (pool) => (
+        <div className="flex gap-1.5 justify-end">
+          <Button
+            size="xs"
+            className="min-w-[100px]"
+            variant="outline"
+            href={`/pools/${pool.pool_id}`}
+          >
+            View
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
+            onClick={() => openDeleteModal(pool)}
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Pool Management</h2>
-      </div>
-
-      {/* Filters */}
-      <div className="space-y-3 mb-6">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search pools..."
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 rounded-xl text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {statusOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setStatusFilter(opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                statusFilter === opt.value
-                  ? opt.color
-                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-300 dark:text-neutral-700 dark:hover:bg-neutral-200'
-              }`}
-            >
-              {opt.label}{opt.count != null && <span className="ml-1 opacity-70">{opt.count}</span>}
-            </button>
-          ))}
+        <h2 className="text-2xl font-extrabold sp-heading mb-4">
+          <span className="text-neutral-900 dark:text-white">Pool</span>
+          <span className="text-primary-600 dark:text-primary-500">Management</span>
+        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {statusOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStatusFilter(opt.value)}
+                className={`px-3 py-1.5 sp-radius-sm text-xs font-medium transition ${
+                  statusFilter === opt.value
+                    ? opt.color
+                    : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-300 dark:text-neutral-700 dark:hover:bg-neutral-200'
+                }`}
+              >
+                {opt.label}{opt.count != null && <span className="ml-1 opacity-70">{opt.count}</span>}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search pools..."
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 w-64 focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:placeholder-neutral-600"
+          />
         </div>
       </div>
 
@@ -296,115 +397,13 @@ export function PoolsTab({ pools, setPools }: PoolsTabProps) {
       </div>
 
       {/* Pools — desktop table */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div>
-          <table className="w-full">
-            <thead className="bg-neutral-100 dark:bg-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Pool
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Code
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Members
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Admin
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Tournament
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Created
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 dark:text-neutral-700 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {filteredPools.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-neutral-600 dark:text-neutral-400">
-                    No pools found.
-                  </td>
-                </tr>
-              ) : (
-                filteredPools.map((pool, i) => (
-                  <tr
-                    key={pool.pool_id}
-                    className="hover:bg-neutral-50 dark:hover:bg-neutral-100 animate-fade-up"
-                    style={{ animationDelay: `${i * 0.03}s` }}
-                  >
-                    <td className="px-4 py-3">
-                      <div>
-                        <span className="font-medium text-neutral-900 dark:text-white">
-                          {pool.pool_name}
-                        </span>
-                        {pool.description && (
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-[200px]">
-                            {pool.description}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm text-neutral-600 dark:text-neutral-400">
-                        {pool.pool_code}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant={getStatusVariant(pool.status)}>
-                        {pool.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-neutral-700 dark:text-neutral-300 font-medium">
-                      {getMemberCount(pool)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                      {pool.admin_user?.username || 'Unknown'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                      {pool.tournaments?.name || 'N/A'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
-                      {new Date(pool.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex gap-1.5 justify-end">
-                        <Button
-                          size="xs"
-                          className="min-w-[100px]"
-                          variant="outline"
-                          href={`/pools/${pool.pool_id}`}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950"
-                          onClick={() => openDeleteModal(pool)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="hidden sm:block">
+        <SpTable<SuperPoolData>
+          columns={poolColumns}
+          data={filteredPools}
+          keyFn={(p) => p.pool_id}
+          emptyMessage="No pools found."
+        />
       </div>
 
       {/* Delete Pool Modal */}

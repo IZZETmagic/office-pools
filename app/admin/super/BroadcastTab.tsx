@@ -30,7 +30,7 @@ type BroadcastPreset = {
   key: string
   label: string
   description: string
-  category: 'growth' | 're-engagement' | 'hype' | 'custom'
+  category: 'growth' | 're-engagement' | 'hype' | 'legal' | 'custom'
   icon: string
   segment: SegmentKey
   subject: string
@@ -119,12 +119,39 @@ const PRESETS: BroadcastPreset[] = [
     ctaText: 'Get Started',
     ctaUrl: 'https://sportpool.io/dashboard',
   },
+  {
+    key: 'privacy_policy_update',
+    label: 'Privacy Policy Update',
+    description: 'Notify all users about changes to the Privacy Policy. Includes acceptance-by-continued-use notice.',
+    category: 'legal',
+    icon: 'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z',
+    segment: 'all',
+    subject: "We've updated our Privacy Policy",
+    heading: 'Privacy Policy Update',
+    body: "We're writing to let you know that we've made changes to our Privacy Policy. We encourage you to review the updated policy so you understand how your information is collected, used, and protected.\n\nYou can read the full updated Privacy Policy using the link below.\n\nBy continuing to use Sport Pool or by not deleting your account, you acknowledge and accept the updated Privacy Policy. If you do not agree with the changes, you may delete your account at any time from your profile settings.",
+    ctaText: 'Read Privacy Policy',
+    ctaUrl: 'https://sportpool.io/privacy',
+  },
+  {
+    key: 'terms_update',
+    label: 'Terms & Conditions Update',
+    description: 'Notify all users about changes to the Terms & Conditions. Includes acceptance-by-continued-use notice.',
+    category: 'legal',
+    icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
+    segment: 'all',
+    subject: "We've updated our Terms & Conditions",
+    heading: 'Terms & Conditions Update',
+    body: "We're writing to let you know that we've made changes to our Terms & Conditions. We encourage you to review the updated terms so you understand the rules and guidelines that govern your use of Sport Pool.\n\nYou can read the full updated Terms & Conditions using the link below.\n\nBy continuing to use Sport Pool or by not deleting your account, you acknowledge and accept the updated Terms & Conditions. If you do not agree with the changes, you may delete your account at any time from your profile settings.",
+    ctaText: 'Read Terms & Conditions',
+    ctaUrl: 'https://sportpool.io/terms',
+  },
 ]
 
 const CATEGORY_LABELS: Record<string, string> = {
   growth: 'Growth',
   're-engagement': 'Re-engagement',
   hype: 'Hype',
+  legal: 'Legal',
   custom: 'Custom',
 }
 
@@ -257,135 +284,120 @@ export function BroadcastTab() {
     return acc
   }, {})
 
+  const selectedPresetDef = selectedPreset ? PRESETS.find((p) => p.key === selectedPreset) : null
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            Broadcast Emails
-          </h3>
-          <p className="text-sm text-neutral-500 mt-0.5">
-            Send marketing emails to user segments
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            if (composeStep !== 'hidden') {
-              resetForm()
-            } else {
-              setComposeStep('presets')
-            }
-          }}
-          size="sm"
-        >
-          {composeStep !== 'hidden' ? 'Cancel' : 'New Broadcast'}
-        </Button>
-      </div>
+    <div className="space-y-6 sp-body">
+      {/* ===== LIST VIEW (nothing selected) ===== */}
+      {composeStep === 'hidden' ? (
+        <>
+          {/* Header */}
+          <div>
+            <h2 className="text-2xl font-extrabold sp-heading">
+              <span className="sp-text-ink">Broadcast</span>
+              <span className="sp-text-primary">Emails</span>
+            </h2>
+            <p className="text-sm text-neutral-500 mt-0.5 sp-body">
+              Select a broadcast template or compose from scratch. Each recipient gets a personalized greeting.
+            </p>
+          </div>
 
-      {/* Step 1: Preset gallery */}
-      {composeStep === 'presets' && (
-        <div className="space-y-5">
-          <div className="bg-surface border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-5">
-            <div>
-              <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                Choose a Template
-              </h4>
-              <p className="text-xs text-neutral-500 mt-1">
-                Pick a pre-written template to get started, or compose from scratch. Each recipient gets a personalized greeting with their first name.
-              </p>
-            </div>
-
+          {/* Preset gallery */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Object.entries(presetsByCategory).map(([category, presets]) => (
-              <div key={category}>
-                <p className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-2">
-                  {CATEGORY_LABELS[category] || category}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {presets.map((preset) => (
-                    <button
-                      key={preset.key}
-                      onClick={() => selectPreset(preset)}
-                      className="text-left p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 bg-surface transition-all"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-neutral-100 dark:bg-neutral-800">
-                          <svg className="w-5 h-5 text-neutral-500 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d={preset.icon} />
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
-                            {preset.label}
-                          </div>
-                          <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">
-                            {preset.description}
-                          </div>
-                          <div className="text-[11px] text-primary-600 dark:text-primary-400 mt-1.5 font-medium">
-                            Segment: {SEGMENTS[preset.segment].label}
-                          </div>
-                        </div>
+              presets.map((preset) => (
+                <button
+                  key={preset.key}
+                  onClick={() => selectPreset(preset)}
+                  className="text-left p-4 sp-radius-lg border transition-all sp-border-silver hover:border-neutral-300 bg-surface hover:shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-mist">
+                      <svg className="w-5 h-5 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d={preset.icon} />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm sp-text-ink sp-heading">
+                        {preset.label}
                       </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <div className="text-xs sp-text-slate mt-0.5 line-clamp-2 sp-body">
+                        {preset.description}
+                      </div>
+                      <div className="text-[11px] sp-text-primary mt-1.5 font-medium sp-body">
+                        Segment: {SEGMENTS[preset.segment].label}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))
             ))}
 
             {/* Custom option */}
-            <div>
-              <p className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-2">
-                Custom
-              </p>
-              <button
-                onClick={startCustom}
-                className="text-left p-4 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 dark:hover:border-neutral-500 bg-surface transition-all w-full"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-neutral-100 dark:bg-neutral-800">
-                    <svg className="w-5 h-5 text-neutral-500 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                    </svg>
+            <button
+              onClick={startCustom}
+              className="text-left p-4 sp-radius-lg border border-dashed transition-all sp-border-silver hover:border-neutral-400 bg-surface hover:shadow-sm"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-mist">
+                  <svg className="w-5 h-5 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-sm sp-text-ink sp-heading">
+                    Compose from Scratch
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
-                      Compose from Scratch
-                    </div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      Write a custom broadcast email. Choose your segment and compose the content from a blank slate.
-                    </div>
+                  <div className="text-xs sp-text-slate mt-0.5 sp-body">
+                    Write a custom broadcast email. Choose your segment and compose the content.
                   </div>
                 </div>
-              </button>
-            </div>
+              </div>
+            </button>
           </div>
-        </div>
-      )}
-
-      {/* Step 2: Compose form */}
-      {composeStep === 'compose' && (
-        <div className="bg-surface border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                {selectedPreset
-                  ? PRESETS.find((p) => p.key === selectedPreset)?.label || 'Compose Broadcast'
-                  : 'Compose Broadcast'}
-              </h4>
-              {selectedPreset && (
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Pre-filled from template — edit anything before sending
-                </p>
-              )}
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { setComposeStep('presets'); setPreviewHtml(''); setConfirmSend(false) }}
+        </>
+      ) : (
+        /* ===== DETAIL SHEET VIEW (composing) ===== */
+        <>
+          {/* Back button */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={resetForm}
+              className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900  transition-colors"
             >
-              Back to Templates
-            </Button>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Broadcasts
+            </button>
           </div>
+
+          {/* Template header */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-primary-light">
+              <svg className="w-5 h-5 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d={selectedPresetDef?.icon || 'm16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'} />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-2xl font-extrabold sp-heading sp-text-ink">
+                {selectedPresetDef?.label || 'Compose Broadcast'}
+              </h2>
+              <p className="text-sm text-neutral-500 mt-0.5 sp-body">
+                {selectedPresetDef
+                  ? selectedPresetDef.description
+                  : 'Write a custom broadcast email. Choose your segment and compose the content.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Compose form */}
+          <div className="bg-surface border sp-border-silver sp-radius-lg p-6 space-y-4">
+            {selectedPreset && (
+              <p className="text-xs text-neutral-500 sp-body">
+                Pre-filled from template — edit anything before sending
+              </p>
+            )}
 
           {/* Segment selector */}
           <FormField label="Send To">
@@ -394,14 +406,14 @@ export function BroadcastTab() {
                 <button
                   key={key}
                   onClick={() => { setSegment(key); setConfirmSend(false) }}
-                  className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                  className={`text-left px-3 py-2.5 sp-radius-sm border text-sm transition-colors ${
                     segment === key
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 ring-1 ring-primary-500'
-                      : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 text-neutral-700 dark:text-neutral-300'
+                      ? 'border-primary-500 bg-primary-50  text-primary-700  ring-1 ring-primary-500'
+                      : 'sp-border-silver hover:border-neutral-300 sp-text-slate'
                   }`}
                 >
-                  <div className="font-medium text-xs">{seg.label}</div>
-                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">{seg.description}</div>
+                  <div className="font-bold text-xs sp-heading">{seg.label}</div>
+                  <div className="text-[11px] sp-text-slate mt-0.5 sp-body">{seg.description}</div>
                 </button>
               ))}
             </div>
@@ -429,7 +441,7 @@ export function BroadcastTab() {
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write your email content here..."
               rows={8}
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+              className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y sp-body"
             />
           </FormField>
 
@@ -463,8 +475,8 @@ export function BroadcastTab() {
           </div>
 
           {previewHtml && (
-            <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-              <div className="bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-xs font-medium text-neutral-500 border-b border-neutral-200 dark:border-neutral-700">
+            <div className="border sp-border-silver sp-radius-sm overflow-hidden">
+              <div className="sp-bg-snow px-3 py-2 text-xs font-bold text-neutral-500 border-b sp-border-silver sp-heading">
                 Email Preview
               </div>
               <iframe
@@ -478,7 +490,7 @@ export function BroadcastTab() {
           )}
 
           {/* Send controls */}
-          <div className="flex items-center gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="flex items-center gap-3 pt-2 border-t sp-border-silver">
             {!confirmSend ? (
               <Button
                 size="sm"
@@ -489,7 +501,7 @@ export function BroadcastTab() {
               </Button>
             ) : (
               <div className="flex items-center gap-3">
-                <span className="text-xs text-warning-600 dark:text-warning-400 font-medium">
+                <span className="text-xs text-warning-600  font-medium sp-body">
                   Send to all {SEGMENTS[segment].label.toLowerCase()}?
                 </span>
                 <Button
@@ -511,6 +523,7 @@ export function BroadcastTab() {
             )}
           </div>
         </div>
+        </>
       )}
 
     </div>

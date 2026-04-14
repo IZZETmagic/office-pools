@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { JoinPoolClient } from './JoinPoolClient'
 
@@ -28,8 +28,9 @@ export default async function JoinPage({
 
   if (!userData) redirect('/dashboard')
 
-  // Look up pool by code
-  const { data: pool } = await supabase
+  // Look up pool by code using admin client to bypass RLS (pool code is the auth mechanism for private pools)
+  const adminClient = createAdminClient()
+  const { data: pool } = await adminClient
     .from('pools')
     .select('pool_id, pool_name, pool_code, description, status, prediction_mode, brand_name, brand_emoji, brand_color, brand_accent')
     .eq('pool_code', pool_code.toUpperCase())
@@ -56,7 +57,7 @@ export default async function JoinPage({
   }
 
   // Check if already a member
-  const { data: existingMembership } = await supabase
+  const { data: existingMembership } = await adminClient
     .from('pool_members')
     .select('member_id')
     .eq('pool_id', pool.pool_id)
@@ -64,7 +65,7 @@ export default async function JoinPage({
     .single()
 
   // Get member count
-  const { count: memberCount } = await supabase
+  const { count: memberCount } = await adminClient
     .from('pool_members')
     .select('member_id', { count: 'exact', head: true })
     .eq('pool_id', pool.pool_id)

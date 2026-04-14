@@ -88,6 +88,16 @@ const MODE_COLORS: Record<string, string> = {
   'Bracket Picker': '#f97316',
 }
 
+// SP border/shadow style reused across cards
+const SP_CARD_STYLE = {
+  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
+  border: '0.5px solid var(--sp-silver, #C8CCD4)80',
+}
+
+const SP_INNER_BORDER = {
+  border: '0.5px solid var(--sp-silver, #C8CCD4)66',
+}
+
 // =============================================
 // HELPER COMPONENTS
 // =============================================
@@ -96,27 +106,25 @@ function StatCard({
   value,
   label,
   sub,
-  delay,
 }: {
   icon: React.ReactNode
   value: string | number
   label: string
   sub?: string
-  delay: number
 }) {
   return (
     <div
-      className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 animate-fade-up"
-      style={{ animationDelay: `${delay}s` }}
+      className="sp-bg-surface sp-radius-sm p-4"
+      style={SP_INNER_BORDER}
     >
-      <div className="flex items-center gap-2 mb-2 text-neutral-500 dark:text-neutral-400">
+      <div className="flex items-center gap-2 mb-2 text-neutral-500">
         {icon}
-        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-xs font-medium uppercase tracking-wide sp-body">{label}</span>
       </div>
-      <p className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
+      <p className="text-2xl sm:text-3xl font-extrabold sp-text-ink sp-heading">
         {typeof value === 'number' ? formatNumber(value) : value}
       </p>
-      {sub && <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-neutral-500 mt-0.5 sp-body">{sub}</p>}
     </div>
   )
 }
@@ -134,10 +142,14 @@ function SectionCard({
 }) {
   return (
     <div
-      className={`bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden ${className ?? ''}`}
+      className={`sp-bg-surface sp-radius-lg overflow-hidden ${className ?? ''}`}
+      style={SP_CARD_STYLE}
     >
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</h3>
+      <div
+        className="flex items-center justify-between px-4 sm:px-5 py-3.5"
+        style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
+      >
+        <h3 className="text-sm font-semibold sp-text-ink sp-body">{title}</h3>
         {headerRight}
       </div>
       <div className="p-4 sm:p-5">{children}</div>
@@ -148,7 +160,7 @@ function SectionCard({
 function ChartSkeleton({ height = 200 }: { height?: number }) {
   return (
     <div
-      className="w-full rounded-lg bg-neutral-100 dark:bg-neutral-800 animate-pulse"
+      className="w-full sp-radius-sm sp-bg-mist animate-pulse"
       style={{ height }}
     />
   )
@@ -156,7 +168,7 @@ function ChartSkeleton({ height = 200 }: { height?: number }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">{message}</div>
+    <div className="py-8 text-center text-sm text-neutral-500 sp-body">{message}</div>
   )
 }
 
@@ -320,62 +332,60 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
   // RENDER
   // =============================================
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Platform Statistics</h2>
+    <div className="sp-body space-y-6">
+      {/* Header */}
+      <h2 className="text-2xl font-extrabold sp-heading">
+        <span className="sp-text-ink">Platform</span><span className="sp-text-primary">Statistics</span>
+      </h2>
 
       {error && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-xl p-4 text-sm text-danger-700 dark:text-danger-300">
+        <div className="sp-bg-red-light sp-radius-sm p-4 text-sm sp-text-red" style={SP_INNER_BORDER}>
           Failed to load some stats: {error}
         </div>
       )}
 
       {/* ============ OVERVIEW CARDS ============ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard icon={UsersIcon} value={totalUsers} label="Users" sub={`${activeUsers} active`} delay={0} />
-        <StatCard icon={PoolsIcon} value={totalPools} label="Pools" sub={`${activePools} open`} delay={0.05} />
+        <StatCard icon={UsersIcon} value={totalUsers} label="Users" sub={`${activeUsers} active`} />
+        <StatCard icon={PoolsIcon} value={totalPools} label="Pools" sub={`${activePools} open`} />
         <StatCard
           icon={MatchesIcon}
           value={totalMatches}
           label="Matches"
           sub={`${completedMatches} completed`}
-          delay={0.1}
         />
         <StatCard
           icon={EntriesIcon}
-          value={apiData ? apiData.totalEntries : '—'}
+          value={apiData ? apiData.totalEntries : '\u2014'}
           label="Entries"
           sub={apiData ? `${apiData.submittedEntries} submitted` : undefined}
-          delay={0.15}
         />
         <StatCard
           icon={PredictionsIcon}
-          value={apiData ? apiData.totalPredictions : '—'}
+          value={apiData ? apiData.totalPredictions : '\u2014'}
           label="Predictions"
           sub={apiData ? `${apiData.totalPoolMembers} members` : undefined}
-          delay={0.2}
         />
       </div>
 
       {/* ============ TOURNAMENT PROGRESS ============ */}
       <SectionCard title="Tournament Progress">
-        {/* Primary bar — Overall */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-sm font-semibold text-neutral-900 dark:text-white">
+            <span className="text-sm font-semibold sp-text-ink sp-body">
               Overall
             </span>
-            <span className="text-sm font-bold text-neutral-900 dark:text-white">
+            <span className="text-sm font-bold sp-text-ink sp-body">
               {completedMatches} / {totalMatches} ({completionPercent}%)
             </span>
           </div>
-          <div className="w-full h-5 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+          <div className="w-full h-5 sp-bg-mist sp-radius-sm overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-success-500 to-success-600 rounded-full transition-all duration-500"
+              className="h-full bg-gradient-to-r from-success-500 to-success-600 sp-radius-sm transition-all duration-500"
               style={{ width: `${completionPercent}%` }}
             />
           </div>
         </div>
-
       </SectionCard>
 
       {/* ============ TWO-COLUMN: USER GROWTH + POOL BREAKDOWN ============ */}
@@ -388,16 +398,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             <div className="h-[200px] sm:h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={apiData.weeklyRegistrations} barSize={20}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#C8CCD4" opacity={0.4} />
                   <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#9ca3af' }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
                   <Tooltip
                     contentStyle={{
-                      background: '#1f2937',
-                      border: 'none',
+                      background: '#fff',
+                      border: '0.5px solid #C8CCD4',
                       borderRadius: '8px',
                       fontSize: '12px',
-                      color: '#fff',
+                      color: '#1f2937',
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
                     }}
                   />
                   <Bar dataKey="count" fill="#3b82f6" name="Signups" radius={[4, 4, 0, 0]} />
@@ -409,17 +420,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           )}
 
           {/* Recent signups */}
-          <div className="mt-4 border-t border-neutral-200 dark:border-neutral-700 pt-3">
-            <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+          <div className="mt-4 pt-3" style={{ borderTop: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+            <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
               Recent Signups
             </h4>
             <div className="space-y-1.5">
               {recentSignups.map((u) => (
                 <div key={u.user_id} className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-neutral-900 dark:text-white truncate mr-2">
+                  <span className="font-medium sp-text-ink truncate mr-2 sp-body">
                     {u.username}
                   </span>
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                  <span className="text-xs text-neutral-500 whitespace-nowrap sp-body">
                     {formatTimeAgo(u.created_at)}
                   </span>
                 </div>
@@ -433,7 +444,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* By status */}
             <div>
-              <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2 text-center">
+              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 text-center sp-body">
                 By Status
               </h4>
               {poolsByStatus.length > 0 ? (
@@ -451,11 +462,12 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       />
                       <Tooltip
                         contentStyle={{
-                          background: '#1f2937',
-                          border: 'none',
+                          background: '#fff',
+                          border: '0.5px solid #C8CCD4',
                           borderRadius: '8px',
                           fontSize: '12px',
-                          color: '#fff',
+                          color: '#1f2937',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
                         }}
                       />
                     </PieChart>
@@ -466,7 +478,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
               )}
               <div className="flex flex-wrap justify-center gap-2 mt-1">
                 {poolsByStatus.map((d) => (
-                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 sp-body">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: STATUS_COLORS[d.name] || '#6b7280' }}
@@ -479,7 +491,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
 
             {/* By mode */}
             <div>
-              <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2 text-center">
+              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 text-center sp-body">
                 By Mode
               </h4>
               {poolsByMode.length > 0 ? (
@@ -497,11 +509,12 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       />
                       <Tooltip
                         contentStyle={{
-                          background: '#1f2937',
-                          border: 'none',
+                          background: '#fff',
+                          border: '0.5px solid #C8CCD4',
                           borderRadius: '8px',
                           fontSize: '12px',
-                          color: '#fff',
+                          color: '#1f2937',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
                         }}
                       />
                     </PieChart>
@@ -512,7 +525,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
               )}
               <div className="flex flex-wrap justify-center gap-2 mt-1">
                 {poolsByMode.map((d) => (
-                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 sp-body">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: MODE_COLORS[d.name] || '#6b7280' }}
@@ -525,8 +538,8 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           </div>
 
           {/* Top pools */}
-          <div className="border-t border-neutral-200 dark:border-neutral-700 pt-3">
-            <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+          <div className="pt-3" style={{ borderTop: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+            <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
               Top Pools by Members
             </h4>
             {topPools.length > 0 ? (
@@ -534,8 +547,8 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 {topPools.map((p, i) => (
                   <div key={`${p.pool_name}-${i}`} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-bold text-neutral-400 w-4">{i + 1}.</span>
-                      <span className="font-medium text-neutral-900 dark:text-white truncate">
+                      <span className="text-xs font-bold text-neutral-400 w-4 sp-body">{i + 1}.</span>
+                      <span className="font-medium sp-text-ink truncate sp-body">
                         {p.pool_name}
                       </span>
                     </div>
@@ -543,7 +556,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       <Badge variant={p.status === 'open' ? 'green' : p.status === 'closed' ? 'yellow' : 'gray'}>
                         {p.status}
                       </Badge>
-                      <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      <span className="text-xs font-bold sp-text-slate sp-body">
                         {p.member_count}
                       </span>
                     </div>
@@ -566,10 +579,10 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Submission rate */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-sm font-medium sp-text-slate sp-body">
                   Submission Rate
                 </span>
-                <span className="text-sm font-bold text-neutral-900 dark:text-white">
+                <span className="text-sm font-bold sp-text-ink sp-body">
                   {apiData.submittedEntries} / {apiData.totalEntries} (
                   {apiData.totalEntries > 0
                     ? Math.round((apiData.submittedEntries / apiData.totalEntries) * 100)
@@ -577,9 +590,9 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   %)
                 </span>
               </div>
-              <div className="w-full h-3 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+              <div className="w-full h-3 sp-bg-mist sp-radius-sm overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600 sp-radius-sm transition-all duration-500"
                   style={{
                     width: `${
                       apiData.totalEntries > 0
@@ -602,16 +615,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                     }))}
                     barSize={28}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#C8CCD4" opacity={0.4} />
                     <XAxis dataKey="stage" tick={{ fontSize: 12, fill: '#9ca3af' }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
                     <Tooltip
                       contentStyle={{
-                        background: '#1f2937',
-                        border: 'none',
+                        background: '#fff',
+                        border: '0.5px solid #C8CCD4',
                         borderRadius: '8px',
                         fontSize: '12px',
-                        color: '#fff',
+                        color: '#1f2937',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
                       }}
                     />
                     <Bar dataKey="count" fill="#8b5cf6" name="Predictions" radius={[4, 4, 0, 0]} />
@@ -648,7 +662,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <>
             {/* Response time area chart */}
             <div className="mb-5">
-              <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
+              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
                 Avg Response Time (ms)
               </h4>
               <div className="h-[200px] sm:h-[260px]">
@@ -660,16 +674,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#C8CCD4" opacity={0.4} />
                     <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#9ca3af' }} />
                     <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} unit="ms" />
                     <Tooltip
                       contentStyle={{
-                        background: '#1f2937',
-                        border: 'none',
+                        background: '#fff',
+                        border: '0.5px solid #C8CCD4',
                         borderRadius: '8px',
                         fontSize: '12px',
-                        color: '#fff',
+                        color: '#1f2937',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
                       }}
                       formatter={(value) => [`${value}ms`, 'Avg Response']}
                     />
@@ -689,7 +704,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Endpoint breakdown table */}
             {apiData.apiPerf.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
+                <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
                   Endpoint Breakdown
                 </h4>
                 {/* Mobile cards */}
@@ -697,10 +712,11 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   {apiData.apiPerf.map((ep, i) => (
                     <div
                       key={`${ep.endpoint}-${ep.method}-${i}`}
-                      className="bg-neutral-50 dark:bg-neutral-200 rounded-lg p-3 text-sm"
+                      className="sp-bg-surface sp-radius-sm p-3 text-sm"
+                      style={SP_INNER_BORDER}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <code className="text-xs font-mono text-neutral-700 dark:text-neutral-700 truncate mr-2">
+                        <code className="text-xs font-mono text-neutral-700 truncate mr-2">
                           {ep.method} {ep.endpoint}
                         </code>
                         <Badge
@@ -711,7 +727,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                           {ep.error_rate}% err
                         </Badge>
                       </div>
-                      <div className="flex gap-4 text-xs text-neutral-500 dark:text-neutral-500">
+                      <div className="flex gap-4 text-xs text-neutral-500 sp-body">
                         <span>Avg: {ep.avg_response_ms}ms</span>
                         <span>Max: {ep.max_response_ms}ms</span>
                         <span>{ep.request_count} reqs</span>
@@ -721,39 +737,42 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 </div>
 
                 {/* Desktop table */}
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="hidden sm:block overflow-x-auto sp-radius-sm" style={SP_INNER_BORDER}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-neutral-500 dark:text-neutral-600 uppercase">
-                        <th className="text-left py-2 pr-4">Endpoint</th>
-                        <th className="text-left py-2 px-3">Method</th>
-                        <th className="text-right py-2 px-3">Avg (ms)</th>
-                        <th className="text-right py-2 px-3">Max (ms)</th>
-                        <th className="text-right py-2 px-3">Requests</th>
-                        <th className="text-right py-2 pl-3">Error Rate</th>
+                      <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                        <th className="text-left px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Endpoint</th>
+                        <th className="text-left px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Method</th>
+                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Avg (ms)</th>
+                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Max (ms)</th>
+                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Requests</th>
+                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Error Rate</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                    <tbody>
                       {apiData.apiPerf.map((ep, i) => (
-                        <tr key={`${ep.endpoint}-${ep.method}-${i}`}>
-                          <td className="py-2 pr-4">
-                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-500">
+                        <tr
+                          key={`${ep.endpoint}-${ep.method}-${i}`}
+                          style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
+                        >
+                          <td className="px-4 py-3">
+                            <code className="text-xs font-mono sp-text-slate">
                               {ep.endpoint}
                             </code>
                           </td>
-                          <td className="py-2 px-3">
+                          <td className="px-4 py-3">
                             <Badge variant="blue">{ep.method}</Badge>
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-500">
+                          <td className="px-4 py-3 text-right font-mono sp-text-slate">
                             {ep.avg_response_ms}
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-neutral-700 dark:text-neutral-500">
+                          <td className="px-4 py-3 text-right font-mono sp-text-slate">
                             {ep.max_response_ms}
                           </td>
-                          <td className="py-2 px-3 text-right font-medium text-neutral-900 dark:text-white">
+                          <td className="px-4 py-3 text-right font-medium sp-text-ink">
                             {formatNumber(ep.request_count)}
                           </td>
-                          <td className="py-2 pl-3 text-right">
+                          <td className="px-4 py-3 text-right">
                             <Badge
                               variant={
                                 ep.error_rate > 10
@@ -787,7 +806,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <div className="space-y-4">
             {/* Audit activity */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-700 dark:text-neutral-500">
+              <span className="text-sm sp-text-slate sp-body">
                 Admin audit activity (24h):
               </span>
               <Badge variant={apiData.recentAuditCount > 0 ? 'green' : 'gray'}>
@@ -798,17 +817,17 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Table sizes */}
             {apiData.tableSizes.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-600 uppercase mb-2">
+                <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
                   Database Table Sizes
                 </h4>
                 {/* Mobile: compact list */}
                 <div className="sm:hidden space-y-1">
                   {apiData.tableSizes.map((t) => (
                     <div key={t.table_name} className="flex items-center justify-between text-sm py-1">
-                      <code className="text-xs font-mono text-neutral-600 dark:text-neutral-500">
+                      <code className="text-xs font-mono text-neutral-600">
                         {t.table_name}
                       </code>
-                      <span className="font-mono font-medium text-neutral-900 dark:text-white text-xs">
+                      <span className="font-mono font-medium sp-text-ink text-xs sp-body">
                         {formatNumber(t.row_count)}
                       </span>
                     </div>
@@ -816,23 +835,23 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 </div>
 
                 {/* Desktop: table */}
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="hidden sm:block overflow-x-auto sp-radius-sm" style={SP_INNER_BORDER}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-neutral-500 dark:text-neutral-600 uppercase">
-                        <th className="text-left py-2 pr-4">Table</th>
-                        <th className="text-right py-2">Row Count</th>
+                      <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                        <th className="text-left px-4 py-3 font-medium text-neutral-500 sp-body">Table</th>
+                        <th className="text-right px-4 py-3 font-medium text-neutral-500 sp-body">Row Count</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                    <tbody>
                       {apiData.tableSizes.map((t) => (
-                        <tr key={t.table_name}>
-                          <td className="py-1.5 pr-4">
-                            <code className="text-xs font-mono text-neutral-700 dark:text-neutral-500">
+                        <tr key={t.table_name} style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                          <td className="px-4 py-2.5">
+                            <code className="text-xs font-mono sp-text-slate">
                               {t.table_name}
                             </code>
                           </td>
-                          <td className="py-1.5 text-right font-mono font-medium text-neutral-900 dark:text-white">
+                          <td className="px-4 py-2.5 text-right font-mono font-medium sp-text-ink">
                             {formatNumber(t.row_count)}
                           </td>
                         </tr>

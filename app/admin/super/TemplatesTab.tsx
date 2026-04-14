@@ -390,74 +390,87 @@ export function TemplatesTab() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          Email Templates
-        </h3>
-        <p className="text-sm text-neutral-500 mt-0.5">
-          Send personalized transactional emails to specific users or groups
-        </p>
-      </div>
-
-      {/* Template gallery */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {TEMPLATES.map((tmpl) => (
-          <button
-            key={tmpl.key}
-            onClick={() => selectTemplate(tmpl.key)}
-            className={`text-left p-4 rounded-xl border transition-all ${
-              selectedTemplate === tmpl.key
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-1 ring-primary-500'
-                : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 bg-surface'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                selectedTemplate === tmpl.key
-                  ? 'bg-primary-100 dark:bg-primary-900'
-                  : 'bg-neutral-100 dark:bg-neutral-800'
-              }`}>
-                <svg className={`w-5 h-5 ${
-                  selectedTemplate === tmpl.key
-                    ? 'text-primary-600 dark:text-primary-400'
-                    : 'text-neutral-500 dark:text-neutral-400'
-                }`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d={tmpl.icon} />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
-                  {tmpl.label}
-                </div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">
-                  {tmpl.description}
-                </div>
-                <div className="text-[11px] text-primary-600 dark:text-primary-400 mt-1.5 font-medium">
-                  {tmpl.recipientNote}
-                </div>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Configuration panel */}
-      {selectedTemplateDef && (
-        <div className="bg-surface border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-              {selectedTemplateDef.label}
-            </h4>
-            <Button size="sm" variant="outline" onClick={() => { setSelectedTemplate(null); setDryRunResult(null) }}>
-              Cancel
-            </Button>
+    <div className="space-y-6 sp-body">
+      {/* ===== LIST VIEW (no template selected) ===== */}
+      {!selectedTemplateDef ? (
+        <>
+          {/* Header */}
+          <div>
+            <h2 className="text-2xl font-extrabold sp-heading">
+              <span className="sp-text-ink">Email</span>
+              <span className="sp-text-primary">Templates</span>
+            </h2>
+            <p className="text-sm text-neutral-500 mt-0.5 sp-body">
+              Select a template to send personalized transactional emails — each recipient gets their own email with their name.
+            </p>
           </div>
+
+          {/* Template gallery */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {TEMPLATES.map((tmpl) => (
+              <button
+                key={tmpl.key}
+                onClick={() => selectTemplate(tmpl.key)}
+                className="text-left p-4 sp-radius-lg border transition-all sp-border-silver hover:border-neutral-300 bg-surface hover:shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-mist">
+                    <svg className="w-5 h-5 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d={tmpl.icon} />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm sp-text-ink sp-heading">
+                      {tmpl.label}
+                    </div>
+                    <div className="text-xs sp-text-slate mt-0.5 line-clamp-2">
+                      {tmpl.description}
+                    </div>
+                    <div className="text-[11px] sp-text-primary mt-1.5 font-medium">
+                      {tmpl.recipientNote}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        /* ===== DETAIL SHEET VIEW (template selected) ===== */
+        <>
+          {/* Back button + title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setSelectedTemplate(null); setDryRunResult(null); setPreviewHtml(null); setPreviewSubject(null) }}
+              className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900  transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Templates
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-primary-light">
+              <svg className="w-5 h-5 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d={selectedTemplateDef.icon} />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-2xl font-extrabold sp-heading sp-text-ink">
+                {selectedTemplateDef.label}
+              </h2>
+              <p className="text-sm text-neutral-500 mt-0.5 sp-body">{selectedTemplateDef.description}</p>
+            </div>
+          </div>
+
+          {/* Configuration */}
+          <div className="bg-surface border sp-border-silver sp-radius-lg p-6 space-y-5">
 
           {/* Smart template: pending predictions — no config needed */}
           {selectedTemplate === 'pending_predictions' && (
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 sp-radius-sm p-4">
               <p className="text-sm text-blue-800 dark:text-blue-300">
                 This template automatically finds all users with outstanding predictions across all pools.
                 Each user gets a single email listing all their pending pools with deadlines and prediction counts.
@@ -467,49 +480,49 @@ export function TemplatesTab() {
 
           {/* Growth templates — no config needed */}
           {selectedTemplate === 'empty_pool_nudge' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets pool admins whose pools have zero members. Each admin gets a personalized email with their pool name and code, encouraging them to share it.
               </p>
             </div>
           )}
           {selectedTemplate === 'solo_pool_nudge' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets pool admins who are the only member of their pool. Encourages them to share the pool code and get others involved.
               </p>
             </div>
           )}
           {selectedTemplate === 'small_pool_boost' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets pool admins with 2-4 members. Each email includes the pool name, current member count, and pool code — encouraging them to keep growing.
               </p>
             </div>
           )}
           {selectedTemplate === 'start_a_pool' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets users who are in a pool but haven't created their own. Encourages them to start a pool for another group (office, family, friends).
               </p>
             </div>
           )}
           {selectedTemplate === 'we_miss_you' && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 sp-radius-sm p-4">
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 Re-engagement email for users who signed up 30+ days ago but never joined a pool. World Cup hype angle to draw them back.
               </p>
             </div>
           )}
           {selectedTemplate === 'ready_to_join' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets recent signups (last 30 days) who haven't joined a pool yet. Guides them to join or create one before the tournament starts.
               </p>
             </div>
           )}
           {selectedTemplate === 'past_predictor_hype' && (
-            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 sp-radius-sm p-4">
               <p className="text-sm text-purple-800 dark:text-purple-300">
                 VIP treatment for proven users who have submitted predictions before. Hypes them up for the next tournament and encourages them to grow their pools.
               </p>
@@ -519,7 +532,7 @@ export function TemplatesTab() {
           {/* Support reply fields */}
           {selectedTemplate === 'support_reply' && (
             <>
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 sp-radius-sm p-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
                   Reply to a user's support request with Sport Pool branding. Uses a neutral support design with a help-desk tone instead of the marketing template.
                 </p>
@@ -542,12 +555,12 @@ export function TemplatesTab() {
                         return (
                           <span
                             key={id}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs"
+                            className="inline-flex items-center gap-1 px-2 py-1 sp-radius-sm sp-bg-primary-light text-primary-700  text-xs"
                           >
                             {user?.name || user?.email || id}
                             <button
                               onClick={() => toggleUser(id)}
-                              className="text-primary-500 hover:text-primary-700 dark:hover:text-primary-200"
+                              className="text-primary-500 hover:text-primary-700 "
                             >
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -560,7 +573,7 @@ export function TemplatesTab() {
                   )}
 
                   {/* User list */}
-                  <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-48 overflow-y-auto">
+                  <div className="border sp-border-silver sp-radius-sm max-h-48 overflow-y-auto">
                     {filteredUsers.length === 0 ? (
                       <p className="text-sm text-neutral-500 p-3 text-center">No users found</p>
                     ) : (
@@ -568,16 +581,16 @@ export function TemplatesTab() {
                         <button
                           key={u.user_id}
                           onClick={() => toggleUser(u.user_id)}
-                          className={`w-full text-left px-3 py-2 text-sm border-b border-neutral-100 dark:border-neutral-800 last:border-0 transition-colors flex items-center gap-2 ${
+                          className={`w-full text-left px-3 py-2 text-sm border-b sp-border-mist last:border-0 transition-colors flex items-center gap-2 ${
                             selectedUserIds.includes(u.user_id)
-                              ? 'bg-primary-50 dark:bg-primary-950'
-                              : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                              ? 'sp-bg-primary-light'
+                              : 'sp-hover-snow'
                           }`}
                         >
                           <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                             selectedUserIds.includes(u.user_id)
                               ? 'bg-primary-600 border-primary-600'
-                              : 'border-neutral-300 dark:border-neutral-600'
+                              : 'sp-border-silver'
                           }`}>
                             {selectedUserIds.includes(u.user_id) && (
                               <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
@@ -586,7 +599,7 @@ export function TemplatesTab() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="text-neutral-900 dark:text-neutral-100 truncate">{u.name}</div>
+                            <div className="sp-text-ink truncate">{u.name}</div>
                             <div className="text-xs text-neutral-500 truncate">{u.email}</div>
                           </div>
                         </button>
@@ -615,7 +628,7 @@ export function TemplatesTab() {
                   onChange={(e) => { setBodyText(e.target.value); setConfirmSend(false) }}
                   placeholder="Write your support reply here..."
                   rows={6}
-                  className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+                  className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
                 />
               </FormField>
 
@@ -648,7 +661,7 @@ export function TemplatesTab() {
                   <select
                     value={poolId}
                     onChange={(e) => { setPoolId(e.target.value); setRoundKey(''); setConfirmSend(false); setDryRunResult(null) }}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     <option value="">Select a pool...</option>
                     {pools
@@ -675,7 +688,7 @@ export function TemplatesTab() {
                   <select
                     value={roundKey}
                     onChange={(e) => { setRoundKey(e.target.value); setConfirmSend(false); setDryRunResult(null) }}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     <option value="">Select a round...</option>
                     {poolRounds.map((r) => (
@@ -689,7 +702,7 @@ export function TemplatesTab() {
               )}
 
               {poolId && (
-                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 sp-radius-sm p-4">
                   <p className="text-sm text-blue-800 dark:text-blue-300">
                     Recipients are automatically determined — only pool members with unsubmitted entries will receive the email.
                   </p>
@@ -706,20 +719,20 @@ export function TemplatesTab() {
                 <div className="flex gap-2 mb-3">
                   <button
                     onClick={() => { setRecipientMode('segment'); setConfirmSend(false); setDryRunResult(null) }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 sp-radius-sm text-xs font-medium transition-colors ${
                       recipientMode === 'segment'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        : 'sp-bg-mist sp-text-slate sp-hover-mist'
                     }`}
                   >
                     By Segment
                   </button>
                   <button
                     onClick={() => { setRecipientMode('users'); setConfirmSend(false); setDryRunResult(null) }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 sp-radius-sm text-xs font-medium transition-colors ${
                       recipientMode === 'users'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        : 'sp-bg-mist sp-text-slate sp-hover-mist'
                     }`}
                   >
                     Individual Users
@@ -733,14 +746,14 @@ export function TemplatesTab() {
                       <button
                         key={key}
                         onClick={() => { setSegment(key); setConfirmSend(false); setDryRunResult(null) }}
-                        className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                        className={`text-left px-3 py-2.5 sp-radius-sm border text-sm transition-colors ${
                           segment === key
-                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 ring-1 ring-primary-500'
-                            : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 text-neutral-700 dark:text-neutral-300'
+                            ? 'border-primary-500 sp-bg-primary-light text-primary-700  ring-1 ring-primary-500'
+                            : 'sp-border-silver hover:border-neutral-300 sp-text-slate'
                         }`}
                       >
-                        <div className="font-medium text-xs">{seg.label}</div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">{seg.description}</div>
+                        <div className="font-bold text-xs sp-heading">{seg.label}</div>
+                        <div className="text-[11px] sp-text-slate mt-0.5">{seg.description}</div>
                       </button>
                     ))}
                   </div>
@@ -763,12 +776,12 @@ export function TemplatesTab() {
                           return (
                             <span
                               key={id}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 sp-radius-sm sp-bg-primary-light text-primary-700  text-xs"
                             >
                               {user?.name || user?.email || id}
                               <button
                                 onClick={() => toggleUser(id)}
-                                className="text-primary-500 hover:text-primary-700 dark:hover:text-primary-200"
+                                className="text-primary-500 hover:text-primary-700 "
                               >
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -781,7 +794,7 @@ export function TemplatesTab() {
                     )}
 
                     {/* User list */}
-                    <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-48 overflow-y-auto">
+                    <div className="border sp-border-silver sp-radius-sm max-h-48 overflow-y-auto">
                       {filteredUsers.length === 0 ? (
                         <p className="text-sm text-neutral-500 p-3 text-center">No users found</p>
                       ) : (
@@ -789,16 +802,16 @@ export function TemplatesTab() {
                           <button
                             key={u.user_id}
                             onClick={() => toggleUser(u.user_id)}
-                            className={`w-full text-left px-3 py-2 text-sm border-b border-neutral-100 dark:border-neutral-800 last:border-0 transition-colors flex items-center gap-2 ${
+                            className={`w-full text-left px-3 py-2 text-sm border-b sp-border-mist last:border-0 transition-colors flex items-center gap-2 ${
                               selectedUserIds.includes(u.user_id)
-                                ? 'bg-primary-50 dark:bg-primary-950'
-                                : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                                ? 'sp-bg-primary-light'
+                                : 'sp-hover-snow'
                             }`}
                           >
                             <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                               selectedUserIds.includes(u.user_id)
                                 ? 'bg-primary-600 border-primary-600'
-                                : 'border-neutral-300 dark:border-neutral-600'
+                                : 'sp-border-silver'
                             }`}>
                               {selectedUserIds.includes(u.user_id) && (
                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
@@ -807,7 +820,7 @@ export function TemplatesTab() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <div className="text-neutral-900 dark:text-neutral-100 truncate">{u.name}</div>
+                              <div className="sp-text-ink truncate">{u.name}</div>
                               <div className="text-xs text-neutral-500 truncate">{u.email}</div>
                             </div>
                           </button>
@@ -845,7 +858,7 @@ export function TemplatesTab() {
                   onChange={(e) => { setBodyText(e.target.value); setConfirmSend(false) }}
                   placeholder="Write your email content here..."
                   rows={6}
-                  className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+                  className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
                 />
               </FormField>
 
@@ -870,7 +883,7 @@ export function TemplatesTab() {
                 <select
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-surface px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   {TOPIC_OPTIONS.map((t) => (
                     <option key={t.key} value={t.key}>{t.label}</option>
@@ -882,12 +895,12 @@ export function TemplatesTab() {
 
           {/* Dry run result */}
           {dryRunResult && (
-            <div className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
+            <div className="bg-neutral-50 dark:bg-neutral-800 border sp-border-silver sp-radius-sm p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                 </svg>
-                <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="text-sm font-bold sp-text-ink sp-heading">
                   Dry Run: {dryRunResult.totalEmails} email{dryRunResult.totalEmails !== 1 ? 's' : ''} would be sent
                 </span>
               </div>
@@ -898,7 +911,7 @@ export function TemplatesTab() {
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <span className="text-neutral-500 truncate max-w-[200px]">{p.to}</span>
                       <span className="text-neutral-300 dark:text-neutral-600">—</span>
-                      <span className="text-neutral-700 dark:text-neutral-300 truncate">{p.subject}</span>
+                      <span className="sp-text-slate truncate">{p.subject}</span>
                     </div>
                   ))}
                 </div>
@@ -908,10 +921,10 @@ export function TemplatesTab() {
 
           {/* Email content preview */}
           {previewHtml && (
-            <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-              <div className="bg-neutral-50 dark:bg-neutral-800 px-3 py-2 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700">
+            <div className="border sp-border-silver sp-radius-sm overflow-hidden">
+              <div className="bg-neutral-50 dark:bg-neutral-800 px-3 py-2 flex items-center justify-between border-b sp-border-silver">
                 <div>
-                  <span className="text-xs font-medium text-neutral-500">Email Preview</span>
+                  <span className="text-xs font-bold text-neutral-500 sp-heading">Email Preview</span>
                   {previewSubject && (
                     <span className="text-xs text-neutral-400 ml-2">— {previewSubject}</span>
                   )}
@@ -936,7 +949,7 @@ export function TemplatesTab() {
           )}
 
           {/* Action buttons */}
-          <div className="flex items-center gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="flex items-center gap-3 pt-2 border-t sp-border-silver">
             <Button
               size="sm"
               variant="outline"
@@ -979,18 +992,7 @@ export function TemplatesTab() {
             )}
           </div>
         </div>
-      )}
-
-      {/* Info box when nothing is selected */}
-      {!selectedTemplate && (
-        <div className="bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-xl p-6 text-center">
-          <svg className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-          </svg>
-          <p className="text-sm text-neutral-500">
-            Select a template above to get started. Unlike broadcasts, these are <strong>transactional emails</strong> — each recipient gets a personalized email with their name.
-          </p>
-        </div>
+        </>
       )}
 
     </div>
