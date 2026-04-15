@@ -182,126 +182,43 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       return
     }
 
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('user_id, username')
-      .eq('auth_user_id', authUser?.id)
-      .single()
-
-    if (!userData) {
-      setError('Could not find your account.')
-      setLoading(false)
-      return
-    }
-
     const maxP = parseInt(maxParticipants) || 0
     const maxE = Math.max(1, Math.min(10, parseInt(maxEntries) || 1))
     const deadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
 
-    // 1. Create pool
-    const { data: newPool, error: poolError } = await supabase
-      .from('pools')
-      .insert({
-        pool_name: poolName.trim(),
-        description: description.trim() || null,
-        tournament_id: selectedTournamentId,
-        admin_user_id: userData.user_id,
-        prediction_deadline: deadline.toISOString(),
-        prediction_mode: predictionMode,
-        status: 'open',
-        is_private: isPrivate,
-        max_participants: maxP > 0 ? maxP : null,
-        max_entries_per_user: maxE,
-      })
-      .select()
-      .single()
-
-    if (poolError) {
-      if (poolError.code === '23505') {
-        setError('Please try again.')
-      } else {
-        setError(poolError.message)
-      }
-      setLoading(false)
-      return
-    }
-
-    // 2. Add creator as admin
-    const { data: memberData, error: memberError } = await supabase
-      .from('pool_members')
-      .insert({
-        pool_id: newPool.pool_id,
-        user_id: userData.user_id,
-        role: 'admin',
-      })
-      .select('member_id')
-      .single()
-
-    if (memberError) {
-      setError('Pool created but could not add you as admin: ' + memberError.message)
-      setLoading(false)
-      return
-    }
-
-    // 2b. Auto-create first entry for the creator (default name = username)
-    const { error: entryError } = await supabase
-      .from('pool_entries')
-      .insert({
-        member_id: memberData.member_id,
-        entry_name: userData.username || 'Entry 1',
-        entry_number: 1,
+    try {
+      const res = await fetch('/api/pools/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pool_name: poolName.trim(),
+          description: description.trim() || null,
+          tournament_id: selectedTournamentId,
+          prediction_deadline: deadline.toISOString(),
+          prediction_mode: predictionMode,
+          is_private: isPrivate,
+          max_participants: maxP,
+          max_entries_per_user: maxE,
+        }),
       })
 
-    if (entryError) {
-      console.error('Failed to create first entry:', entryError.message)
-    }
+      const data = await res.json()
 
-    // 3. Update pool_settings with default scoring values (trigger auto-creates the row)
-    const { error: settingsError } = await supabase
-      .from('pool_settings')
-      .update(SCORING_DEFAULTS)
-      .eq('pool_id', newPool.pool_id)
-
-    if (settingsError) {
-      setError('Pool created but could not save scoring settings: ' + settingsError.message)
-      setLoading(false)
-      return
-    }
-
-    // 4. For progressive pools: seed round states and disable bracket pairing bonus
-    if (predictionMode === 'progressive') {
-      const roundKeys = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
-      const roundStates = roundKeys.map(key => ({
-        pool_id: newPool.pool_id,
-        round_key: key,
-        state: key === 'group' ? 'open' : 'locked',
-        deadline: key === 'group' ? deadline.toISOString() : null,
-        opened_at: key === 'group' ? new Date().toISOString() : null,
-      }))
-
-      const { error: roundError } = await supabase
-        .from('pool_round_states')
-        .insert(roundStates)
-
-      if (roundError) {
-        console.error('Failed to create round states:', roundError.message)
+      if (!res.ok) {
+        setError(data.error || 'Failed to create pool.')
+        setLoading(false)
+        return
       }
 
-      // Disable bracket pairing bonus for progressive pools (users already know pairings)
-      await supabase
-        .from('pool_settings')
-        .update({ bonus_correct_bracket_pairing: 0 })
-        .eq('pool_id', newPool.pool_id)
+      setLoading(false)
+      showToast(`Pool "${data.pool_name}" created! Code: ${data.pool_code}`, 'success')
+      onSuccess?.()
+      onClose()
+      router.push(`/pools/${data.pool_id}?tab=settings`)
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
     }
-
-    setLoading(false)
-    showToast(`Pool "${poolName.trim()}" created! Code: ${newPool.pool_code}`, 'success')
-    onSuccess?.()
-    onClose()
-    // Navigate to the new pool's settings tab
-    router.push(`/pools/${newPool.pool_id}?tab=settings`)
   }
 
   const canProceedFromTournament = !!selectedTournamentId
