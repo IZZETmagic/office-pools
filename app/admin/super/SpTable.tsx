@@ -53,6 +53,8 @@ type SpTableProps<T> = {
   emptyMessage?: string
   /** Optional className for highlighting specific rows */
   rowClassName?: (row: T) => string
+  /** Optional click handler for row selection */
+  onRowClick?: (row: T) => void
 }
 
 // ---- Component ----
@@ -63,6 +65,7 @@ export function SpTable<T>({
   keyFn,
   emptyMessage = 'No results found.',
   rowClassName,
+  onRowClick,
 }: SpTableProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -131,11 +134,12 @@ export function SpTable<T>({
             data.map((row, i) => (
               <tr
                 key={keyFn(row)}
-                className={`transition-colors ${rowClassName?.(row) ?? ''}`}
+                className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName?.(row) ?? ''}`}
                 style={{
                   backgroundColor: SP.surface,
                   borderBottom: i < data.length - 1 ? `0.5px solid ${SP.silver}66` : undefined,
                 }}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = SP.snow
                 }}

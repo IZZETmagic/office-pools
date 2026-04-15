@@ -149,9 +149,41 @@ export function SuperAdminDashboard({
   const [pools, setPools] = useState(initialPools)
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs)
 
+  // Cross-tab navigation: when PoolsTab wants to open a user profile
+  const [navigateToUserId, setNavigateToUserId] = useState<string | null>(null)
+
+  function handleNavigateToUser(userId: string) {
+    setNavigateToUserId(userId)
+    setActiveTab('users')
+  }
+
   return (
     <div className="min-h-screen bg-surface-secondary">
       <AppHeader breadcrumbs={[{ label: 'Super Admin' }]} isSuperAdmin />
+
+      {/* Mobile horizontal tab bar — visible below lg */}
+      <div className="lg:hidden sticky top-[57px] z-[9] w-full">
+        <div className="bg-surface border-b border-border-default">
+          <div className="px-2">
+            <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide py-2">
+              {ALL_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-medium whitespace-nowrap transition-colors ${
+                    activeTab === tab.key
+                      ? 'sp-bg-mist sp-text-ink'
+                      : 'sp-text-slate sp-hover-snow'
+                  }`}
+                >
+                  <span className={activeTab === tab.key ? 'sp-text-primary' : ''}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="flex">
         {/* Vertical sidebar navigation — desktop only */}
@@ -220,30 +252,6 @@ export function SuperAdminDashboard({
           </div>
         </aside>
 
-        {/* Mobile horizontal tab bar — visible below lg */}
-        <div className="lg:hidden sticky top-[57px] z-[9] w-full">
-          <div className="bg-surface border-b border-border-default">
-            <div className="px-2">
-              <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide py-2">
-                {ALL_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-medium whitespace-nowrap transition-colors ${
-                      activeTab === tab.key
-                        ? 'sp-bg-mist sp-text-ink'
-                        : 'sp-text-slate sp-hover-snow'
-                    }`}
-                  >
-                    <span className={activeTab === tab.key ? 'sp-text-primary' : ''}>{tab.icon}</span>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Content pane */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 lg:py-8" style={{ backgroundColor: SP.mist }}>
           {activeTab === 'matches' && (
@@ -259,12 +267,15 @@ export function SuperAdminDashboard({
               users={users}
               setUsers={setUsers}
               currentUserId={currentUserId}
+              navigateToUserId={navigateToUserId}
+              clearNavigateToUser={() => setNavigateToUserId(null)}
             />
           )}
           {activeTab === 'pools' && (
             <PoolsTab
               pools={pools}
               setPools={setPools}
+              onNavigateToUser={handleNavigateToUser}
             />
           )}
           {activeTab === 'audit' && (
