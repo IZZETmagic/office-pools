@@ -895,9 +895,9 @@ export function TemplatesTab() {
 
           {/* Dry run result */}
           {dryRunResult && (
-            <div className="bg-neutral-50 dark:bg-neutral-800 border sp-border-silver sp-radius-sm p-4 space-y-3">
+            <div className="sp-bg-surface border sp-border-silver sp-radius-sm p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg className="w-4 h-4 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                 </svg>
                 <span className="text-sm font-bold sp-text-ink sp-heading">
@@ -906,12 +906,12 @@ export function TemplatesTab() {
               </div>
               {dryRunResult.preview.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-xs text-neutral-500 font-medium">Recipients (first {dryRunResult.preview.length}):</p>
+                  <p className="text-xs sp-text-slate font-medium sp-body">Recipients (first {dryRunResult.preview.length}):</p>
                   {dryRunResult.preview.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className="text-neutral-500 truncate max-w-[200px]">{p.to}</span>
-                      <span className="text-neutral-300 dark:text-neutral-600">—</span>
-                      <span className="sp-text-slate truncate">{p.subject}</span>
+                      <span className="sp-text-ink truncate max-w-[200px] sp-body">{p.to}</span>
+                      <span className="sp-text-slate">—</span>
+                      <span className="sp-text-slate truncate sp-body">{p.subject}</span>
                     </div>
                   ))}
                 </div>

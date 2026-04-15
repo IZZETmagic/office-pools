@@ -860,41 +860,176 @@ export function EmailHistoryTab() {
           {/* ========== Sent Emails ========== */}
           {activeSection === 'sent' && (
             sentEmails.length === 0 ? (
-              <div className="bg-surface sp-radius-lg p-6 text-center" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <p className="text-sm text-neutral-500">No emails sent yet.</p>
+              <div className="sp-bg-surface sp-radius-lg p-6 text-center" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                <p className="text-sm sp-text-slate sp-body">No emails sent yet.</p>
               </div>
             ) : (
-              <div className="sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <div className="overflow-x-auto overscroll-x-contain">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">To</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Subject</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Status</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Sent</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sentEmails.map((email) => {
-                        const eventStyle = EVENT_STYLES[email.last_event] || { label: email.last_event, color: 'bg-neutral-100 text-neutral-600' }
-                        return (
+              <>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-3">
+                  {sentEmails.map((email) => {
+                    const eventStyle = EVENT_STYLES[email.last_event] || { label: email.last_event, color: 'bg-neutral-100 text-neutral-600' }
+                    return (
+                      <button
+                        key={email.id}
+                        onClick={() => openSentDetail(email)}
+                        className="w-full text-left sp-bg-surface sp-radius-lg overflow-hidden transition-shadow hover:shadow-md"
+                        style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}
+                      >
+                        <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventStyle.color}`}>
+                            {eventStyle.label}
+                          </span>
+                          <span className="text-[11px] sp-text-slate ml-auto sp-body">
+                            {new Date(email.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="px-3.5 py-3">
+                          <div className="text-sm font-medium sp-text-ink sp-body truncate">{email.to.join(', ')}</div>
+                          <p className="text-xs sp-text-slate mt-1 line-clamp-1 sp-body">{email.subject}</p>
+                          <div className="flex items-center justify-end mt-2">
+                            <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                            </svg>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                  <div className="overflow-x-auto overscroll-x-contain">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">To</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Subject</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Status</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Sent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sentEmails.map((email) => {
+                          const eventStyle = EVENT_STYLES[email.last_event] || { label: email.last_event, color: 'bg-neutral-100 text-neutral-600' }
+                          return (
+                            <tr
+                              key={email.id}
+                              onClick={() => openSentDetail(email)}
+                              className="cursor-pointer transition-colors sp-hover-snow"
+                              style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
+                            >
+                              <td className="px-4 py-4 sp-text-ink whitespace-nowrap">
+                                <div className="max-w-[200px] truncate">{email.to.join(', ')}</div>
+                              </td>
+                              <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
+                                <div className="max-w-[300px] truncate">{email.subject}</div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventStyle.color}`}>
+                                  {eventStyle.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
+                                {new Date(email.created_at).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )
+          )}
+
+          {/* ========== Received Emails ========== */}
+          {activeSection === 'received' && (
+            receivedEmails.length === 0 ? (
+              <div className="sp-bg-surface sp-radius-lg p-6 text-center" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                <p className="text-sm sp-text-slate sp-body">No received emails yet.</p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-3">
+                  {receivedEmails.map((email) => (
+                    <button
+                      key={email.id}
+                      onClick={() => openReceivedDetail(email)}
+                      className="w-full text-left sp-bg-surface sp-radius-lg overflow-hidden transition-shadow hover:shadow-md"
+                      style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}
+                    >
+                      <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                        <span className="text-xs font-medium sp-text-ink sp-body truncate">{email.from}</span>
+                        {email.attachments.length > 0 && (
+                          <span className="inline-flex items-center gap-0.5 shrink-0 sp-text-slate">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                            </svg>
+                            <span className="text-[11px]">{email.attachments.length}</span>
+                          </span>
+                        )}
+                        <span className="text-[11px] sp-text-slate ml-auto sp-body shrink-0">
+                          {new Date(email.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="px-3.5 py-3">
+                        <p className="text-sm sp-text-ink sp-body line-clamp-1">{email.subject}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[11px] sp-text-slate sp-body">To: {email.to.join(', ')}</span>
+                          <svg className="w-4 h-4 sp-text-slate shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                  <div className="overflow-x-auto overscroll-x-contain">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">From</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Subject</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">To</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Received</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {receivedEmails.map((email) => (
                           <tr
                             key={email.id}
-                            onClick={() => openSentDetail(email)}
+                            onClick={() => openReceivedDetail(email)}
                             className="cursor-pointer transition-colors sp-hover-snow"
                             style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
                           >
                             <td className="px-4 py-4 sp-text-ink whitespace-nowrap">
-                              <div className="max-w-[200px] truncate">{email.to.join(', ')}</div>
+                              <div className="max-w-[200px] truncate">{email.from}</div>
                             </td>
                             <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
-                              <div className="max-w-[300px] truncate">{email.subject}</div>
+                              <div className="flex items-center gap-2 max-w-[300px]">
+                                <span className="truncate">{email.subject}</span>
+                                {email.attachments.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 shrink-0 sp-text-slate">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                                    </svg>
+                                    <span className="text-[11px]">{email.attachments.length}</span>
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventStyle.color}`}>
-                                {eventStyle.label}
-                              </span>
+                            <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
+                              <div className="max-w-[200px] truncate">{email.to.join(', ')}</div>
                             </td>
                             <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
                               {new Date(email.created_at).toLocaleDateString(undefined, {
@@ -905,138 +1040,119 @@ export function EmailHistoryTab() {
                               })}
                             </td>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )
-          )}
-
-          {/* ========== Received Emails ========== */}
-          {activeSection === 'received' && (
-            receivedEmails.length === 0 ? (
-              <div className="bg-surface sp-radius-lg p-6 text-center" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <p className="text-sm text-neutral-500">No received emails yet.</p>
-              </div>
-            ) : (
-              <div className="sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <div className="overflow-x-auto overscroll-x-contain">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">From</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Subject</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">To</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Received</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {receivedEmails.map((email) => (
-                        <tr
-                          key={email.id}
-                          onClick={() => openReceivedDetail(email)}
-                          className="cursor-pointer transition-colors sp-hover-snow"
-                          style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
-                        >
-                          <td className="px-4 py-4 sp-text-ink whitespace-nowrap">
-                            <div className="max-w-[200px] truncate">{email.from}</div>
-                          </td>
-                          <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
-                            <div className="flex items-center gap-2 max-w-[300px]">
-                              <span className="truncate">{email.subject}</span>
-                              {email.attachments.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 shrink-0 text-neutral-400">
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                                  </svg>
-                                  <span className="text-[11px]">{email.attachments.length}</span>
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
-                            <div className="max-w-[200px] truncate">{email.to.join(', ')}</div>
-                          </td>
-                          <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
-                            {new Date(email.created_at).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              </>
             )
           )}
 
           {/* ========== Broadcasts ========== */}
           {activeSection === 'broadcasts' && (
             broadcasts.length === 0 ? (
-              <div className="bg-surface sp-radius-lg p-6 text-center" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <p className="text-sm text-neutral-500">No broadcasts sent yet.</p>
+              <div className="sp-bg-surface sp-radius-lg p-6 text-center" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                <p className="text-sm sp-text-slate sp-body">No broadcasts sent yet.</p>
               </div>
             ) : (
-              <div className="sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
-                <div className="overflow-x-auto overscroll-x-contain">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Name</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Segment</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Status</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Sent</th>
-                        <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Recipients</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {broadcasts.map((b) => (
-                        <tr
-                          key={b.id}
-                          onClick={() => setDetailView({ type: 'broadcast', broadcast: b })}
-                          className="cursor-pointer transition-colors sp-hover-snow"
-                          style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
-                        >
-                          <td className="px-4 py-4 sp-text-ink font-medium whitespace-nowrap">
-                            {b.name || 'Untitled'}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            {b.log ? (
+              <>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-3">
+                  {broadcasts.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => setDetailView({ type: 'broadcast', broadcast: b })}
+                      className="w-full text-left sp-bg-surface sp-radius-lg overflow-hidden transition-shadow hover:shadow-md"
+                      style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}
+                    >
+                      <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                        <Badge variant={statusColor(b.status)}>{b.status}</Badge>
+                        <span className="text-[11px] sp-text-slate ml-auto sp-body">
+                          {b.sent_at
+                            ? new Date(b.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                            : 'Not sent'}
+                        </span>
+                      </div>
+                      <div className="px-3.5 py-3">
+                        <div className="text-sm font-medium sp-text-ink sp-body truncate">{b.name || 'Untitled'}</div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          {b.log ? (
+                            <>
                               <Badge variant="blue">
                                 {SEGMENTS[b.log.segment]?.label || b.log.segment}
                               </Badge>
-                            ) : (
-                              <span className="text-neutral-400 text-xs">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <Badge variant={statusColor(b.status)}>{b.status}</Badge>
-                          </td>
-                          <td className="px-4 py-4 text-neutral-500 whitespace-nowrap">
-                            {b.sent_at
-                              ? new Date(b.sent_at).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })
-                              : '-'}
-                          </td>
-                          <td className="px-4 py-4 text-neutral-500 whitespace-nowrap">
-                            {b.log ? b.log.recipient_count : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              <span className="text-xs sp-text-slate sp-body">{b.log.recipient_count} recipients</span>
+                            </>
+                          ) : (
+                            <span className="text-xs sp-text-slate sp-body">No log data</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-end mt-2">
+                          <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+                  <div className="overflow-x-auto overscroll-x-contain">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Name</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Segment</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Status</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Sent</th>
+                          <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Recipients</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {broadcasts.map((b) => (
+                          <tr
+                            key={b.id}
+                            onClick={() => setDetailView({ type: 'broadcast', broadcast: b })}
+                            className="cursor-pointer transition-colors sp-hover-snow"
+                            style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}
+                          >
+                            <td className="px-4 py-4 sp-text-ink font-medium whitespace-nowrap">
+                              {b.name || 'Untitled'}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              {b.log ? (
+                                <Badge variant="blue">
+                                  {SEGMENTS[b.log.segment]?.label || b.log.segment}
+                                </Badge>
+                              ) : (
+                                <span className="sp-text-slate text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <Badge variant={statusColor(b.status)}>{b.status}</Badge>
+                            </td>
+                            <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
+                              {b.sent_at
+                                ? new Date(b.sent_at).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
+                              {b.log ? b.log.recipient_count : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )
           )}
         </>

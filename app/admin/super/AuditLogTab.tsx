@@ -57,49 +57,51 @@ function getActionCategory(action: string): 'match' | 'user' | 'pool' {
   return 'match'
 }
 
+// Shared inline border styles
+const thinBorder = '0.5px solid var(--sp-silver)66'
+const cardBorder = '0.5px solid var(--sp-silver)80'
+
 function renderTarget(log: AuditLogData): React.ReactNode {
   const category = getActionCategory(log.action)
 
   if (category === 'match') {
     if (log.action === 'advance_teams') {
-      return <span className="text-neutral-600 dark:text-neutral-400">Manual advancement</span>
+      return <span className="sp-text-slate">Manual advancement</span>
     }
     if (log.matches) {
       const home = log.matches.home_team?.country_name || 'TBD'
       const away = log.matches.away_team?.country_name || 'TBD'
       return (
         <span>
-          <span className="font-medium text-neutral-900 dark:text-white">#{log.matches.match_number}</span>
-          <span className="text-neutral-600 dark:text-neutral-400 ml-1.5">{home} vs {away}</span>
+          <span className="font-medium sp-text-ink">#{log.matches.match_number}</span>
+          <span className="sp-text-slate ml-1.5">{home} vs {away}</span>
         </span>
       )
     }
-    // Fallback: try match_number from details
     if (log.details?.match_number) {
-      return <span className="font-medium text-neutral-900 dark:text-white">#{log.details.match_number}</span>
+      return <span className="font-medium sp-text-ink">#{log.details.match_number}</span>
     }
-    return <span className="text-neutral-500">—</span>
+    return <span className="sp-text-slate">—</span>
   }
 
   if (category === 'user') {
     if (log.target_user) {
-      return <span className="text-neutral-900 dark:text-white font-medium">{log.target_user.username}</span>
+      return <span className="sp-text-ink font-medium">{log.target_user.username}</span>
     }
     if (log.details?.username) {
-      return <span className="text-neutral-900 dark:text-white font-medium">{log.details.username}</span>
+      return <span className="sp-text-ink font-medium">{log.details.username}</span>
     }
-    return <span className="text-neutral-500">Unknown user</span>
+    return <span className="sp-text-slate">Unknown user</span>
   }
 
   if (category === 'pool') {
-    // Pool name from details JSONB (FK may be null after delete)
     if (log.details?.pool_name) {
-      return <span className="text-neutral-900 dark:text-white font-medium">{log.details.pool_name}</span>
+      return <span className="sp-text-ink font-medium">{log.details.pool_name}</span>
     }
-    return <span className="text-neutral-500">Unknown pool</span>
+    return <span className="sp-text-slate">Unknown pool</span>
   }
 
-  return <span className="text-neutral-500">—</span>
+  return <span className="sp-text-slate">—</span>
 }
 
 export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
@@ -220,10 +222,10 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
     return (
       <div>
         <h2 className="text-2xl font-extrabold sp-heading mb-6">
-          <span className="text-neutral-900 dark:text-white">Audit</span>
-          <span className="text-primary-600 dark:text-primary-500">Log</span>
+          <span className="sp-text-ink">Audit</span>
+          <span className="sp-text-primary">Log</span>
         </h2>
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+        <div className="sp-bg-surface sp-radius-lg p-8 text-center sp-text-slate" style={{ border: cardBorder }}>
           No audit entries yet. Super admin actions will be logged here.
         </div>
       </div>
@@ -233,29 +235,33 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
   return (
     <div>
       <div className="mb-6">
+        <h2 className="text-2xl font-extrabold sp-heading mb-4">
+          <span className="sp-text-ink">Audit</span>
+          <span className="sp-text-primary">Log</span>
+        </h2>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-extrabold sp-heading shrink-0">
-            <span className="text-neutral-900 dark:text-white">Audit</span>
-            <span className="text-primary-600 dark:text-primary-500">Log</span>
-          </h2>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
-            className="px-4 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 appearance-none shrink-0"
-            style={{ WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: 36, minWidth: 180, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-          >
-            <option value="all">All Categories</option>
-            <option value="match">Match ({matchCount})</option>
-            <option value="user">User ({userCount})</option>
-            <option value="pool">Pool ({poolCount})</option>
-          </select>
+          <div className="flex flex-wrap gap-1.5">
+            {categoryOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setCategoryFilter(opt.value)}
+                className={`px-3 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
+                  categoryFilter === opt.value
+                    ? 'sp-bg-primary-light sp-text-primary'
+                    : 'sp-bg-mist sp-text-slate sp-hover-snow'
+                }`}
+              >
+                {opt.label}{opt.count != null && <span className="ml-1 opacity-70">{opt.count}</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Audit — mobile cards */}
       <div className="sm:hidden space-y-3">
         {filteredLogs.length === 0 ? (
-          <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+          <div className="sp-bg-surface sp-radius-lg p-8 text-center sp-text-slate" style={{ border: cardBorder }}>
             No entries for this category.
           </div>
         ) : (
@@ -264,33 +270,30 @@ export function AuditLogTab({ auditLogs: initialAuditLogs }: AuditLogTabProps) {
             return (
               <div
                 key={log.id ?? `log-${i}`}
-                className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden animate-fade-up"
-                style={{ animationDelay: `${i * 0.05}s` }}
+                className="sp-bg-surface sp-radius-lg overflow-hidden"
+                style={{ border: cardBorder }}
               >
-                {/* Header bar: action badge + time */}
-                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
+                {/* Header bar */}
+                <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow)', borderBottom: thinBorder }}>
                   <Badge variant={getActionBadgeVariant(log.action)}>
                     {getActionLabel(log.action)}
                   </Badge>
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400 ml-auto">
+                  <span className="text-[11px] sp-text-slate ml-auto sp-body">
                     {logDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
                     {logDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 </div>
                 {/* Body */}
                 <div className="px-3.5 py-3">
-                  {/* Target */}
-                  <div className="text-sm mb-1.5">
+                  <div className="text-sm mb-1.5 sp-body">
                     {renderTarget(log)}
                   </div>
-                  {/* Summary */}
                   {log.summary && (
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1.5 line-clamp-2">
+                    <p className="text-[11px] sp-text-slate mb-1.5 line-clamp-2 sp-body">
                       {log.summary}
                     </p>
                   )}
-                  {/* Performed by */}
-                  <div className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                  <div className="text-[11px] sp-text-slate sp-body">
                     By: {log.performer?.username || 'Unknown'}
                   </div>
                 </div>

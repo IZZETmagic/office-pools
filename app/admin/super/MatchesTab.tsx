@@ -11,6 +11,10 @@ import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
 
+// Shared inline border styles
+const thinBorder = '0.5px solid var(--sp-silver)66'
+const cardBorder = '0.5px solid var(--sp-silver)80'
+
 type MatchesTabProps = {
   matches: SuperMatchData[]
   setMatches: (matches: SuperMatchData[]) => void
@@ -883,8 +887,8 @@ export function MatchesTab({
       <div className="mb-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-2xl font-extrabold sp-heading shrink-0">
-            <span className="text-neutral-900 dark:text-white">Match</span>
-            <span className="text-primary-600 dark:text-primary-500">Results</span>
+            <span className="sp-text-ink">Match</span>
+            <span className="sp-text-primary">Results</span>
           </h2>
           <Button size="sm" variant="primary" onClick={handleManualAdvance} loading={advancing} loadingText="Advancing...">
             Advance Teams
@@ -911,10 +915,10 @@ export function MatchesTab({
                     setStageFilter(tab.key)
                     if (tab.key !== 'group') setGroupFilter('all')
                   }}
-                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium sp-radius-sm transition-colors whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium sp-radius-sm sp-body transition-colors whitespace-nowrap ${
                     stageFilter === tab.key
-                      ? 'bg-primary-600 text-white'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-200'
+                      ? 'sp-bg-primary-light sp-text-primary'
+                      : 'sp-bg-mist sp-text-slate sp-hover-snow'
                   }`}
                 >
                   {tab.label}
@@ -927,10 +931,10 @@ export function MatchesTab({
               <div className="flex gap-0.5">
                 <button
                   onClick={() => setGroupFilter('all')}
-                  className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
+                  className={`px-3 py-1 text-xs font-medium sp-body rounded-l-lg rounded-r-md transition-colors ${
                     groupFilter === 'all'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                      ? 'sp-bg-primary-light sp-text-primary'
+                      : 'sp-bg-mist sp-text-slate sp-hover-snow'
                   }`}
                 >
                   All
@@ -939,12 +943,12 @@ export function MatchesTab({
                   <button
                     key={g}
                     onClick={() => setGroupFilter(g)}
-                    className={`w-8 h-7 text-xs font-medium transition-colors ${
+                    className={`w-8 h-7 text-xs font-medium sp-body transition-colors ${
                       i === groups.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
                     } ${
                       groupFilter === g
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600'
+                        ? 'sp-bg-primary-light sp-text-primary'
+                        : 'sp-bg-mist sp-text-slate sp-hover-snow'
                     }`}
                   >
                     {g}
@@ -955,25 +959,34 @@ export function MatchesTab({
           </div>
 
           {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 dark:border-neutral-500 sp-radius-md text-sm text-neutral-700 dark:text-neutral-800 bg-white dark:bg-neutral-300 appearance-none pr-8 shrink-0"
-            style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
-          >
-            <option value="all">All Statuses</option>
-            <option value="scheduled">Scheduled ({scheduledCount})</option>
-            <option value="live">Live ({liveCount})</option>
-            <option value="completed">Completed ({completedCount})</option>
-            <option value="cancelled">Cancelled ({cancelledCount})</option>
-          </select>
+          <div className="flex flex-wrap gap-1 shrink-0">
+            {[
+              { value: 'all', label: 'All', count: null },
+              { value: 'scheduled', label: 'Sched', count: scheduledCount },
+              { value: 'live', label: 'Live', count: liveCount },
+              { value: 'completed', label: 'Done', count: completedCount },
+              { value: 'cancelled', label: 'Canc', count: cancelledCount },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStatusFilter(opt.value)}
+                className={`px-2.5 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
+                  statusFilter === opt.value
+                    ? 'sp-bg-primary-light sp-text-primary'
+                    : 'sp-bg-mist sp-text-slate sp-hover-snow'
+                }`}
+              >
+                {opt.label}{opt.count != null && opt.count > 0 && <span className="ml-1 opacity-70">{opt.count}</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Matches — mobile cards */}
       <div className="sm:hidden space-y-3">
         {filteredMatches.length === 0 ? (
-          <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center text-neutral-600 dark:text-neutral-400">
+          <div className="sp-bg-surface sp-radius-lg p-8 text-center sp-text-slate" style={{ border: cardBorder }}>
             No matches found with current filters.
           </div>
         ) : (
@@ -982,41 +995,41 @@ export function MatchesTab({
             const away = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
             const matchDate = new Date(match.match_date)
             return (
-              <div key={match.match_id} className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden animate-fade-up" style={{ animationDelay: `${i * 0.05}s` }}>
+              <div key={match.match_id} className="sp-bg-surface sp-radius-lg overflow-hidden" style={{ border: cardBorder }}>
                 {/* Row 1: metadata bar */}
-                <div className="flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-                  <span className="text-xs font-mono font-semibold text-neutral-500 dark:text-neutral-700">#{match.match_number}</span>
-                  <span className="text-xs text-neutral-400 dark:text-neutral-500">&middot;</span>
-                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-700">
+                <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow)', borderBottom: thinBorder }}>
+                  <span className="text-xs font-mono font-semibold sp-text-slate">#{match.match_number}</span>
+                  <span className="text-xs sp-text-slate">&middot;</span>
+                  <span className="text-xs font-medium sp-text-ink sp-body">
                     {getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}
                   </span>
                   <Badge variant={getStatusBadgeVariant(match.status)}>
                     {match.status}
                   </Badge>
-                  <span className="ml-auto text-[11px] text-neutral-400 dark:text-neutral-500">
+                  <span className="ml-auto text-[11px] sp-text-slate sp-body">
                     {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
                     {matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 </div>
                 {/* Row 2: teams + score */}
                 <div className="flex items-center justify-between px-3.5 py-3">
-                  <div className="font-semibold text-neutral-900 dark:text-white">
-                    {home} <span className="text-neutral-400 dark:text-neutral-500 font-normal mx-1">vs</span> {away}
+                  <div className="font-semibold sp-text-ink sp-heading">
+                    {home} <span className="sp-text-slate font-normal mx-1">vs</span> {away}
                   </div>
                   <div className="flex-shrink-0 ml-3">
                     {match.is_completed ? (
-                      <span className="font-bold font-mono text-lg text-neutral-900 dark:text-white">
+                      <span className="font-bold font-mono text-lg sp-text-ink">
                         {match.home_score_ft} - {match.away_score_ft}
                         {match.home_score_pso !== null && (
-                          <span className="text-[10px] font-normal font-sans text-neutral-500 block text-right">PSO {match.home_score_pso}-{match.away_score_pso}</span>
+                          <span className="text-[10px] font-normal font-sans sp-text-slate block text-right">PSO {match.home_score_pso}-{match.away_score_pso}</span>
                         )}
                       </span>
                     ) : match.status === 'live' && match.home_score_ft !== null ? (
-                      <span className="font-bold font-mono text-lg text-warning-700 dark:text-warning-400">
+                      <span className="font-bold font-mono text-lg text-warning-700">
                         {match.home_score_ft} - {match.away_score_ft}
                       </span>
                     ) : (
-                      <span className="text-neutral-300 dark:text-neutral-600">—</span>
+                      <span className="sp-text-slate">—</span>
                     )}
                   </div>
                 </div>

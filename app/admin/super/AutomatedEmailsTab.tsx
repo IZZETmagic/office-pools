@@ -162,6 +162,19 @@ export function AutomatedEmailsTab() {
     ? AUTOMATED_EMAILS
     : AUTOMATED_EMAILS.filter((e) => e.category === categoryFilter)
 
+  const confirmationCount = AUTOMATED_EMAILS.filter((e) => e.category === 'confirmation').length
+  const notificationCount = AUTOMATED_EMAILS.filter((e) => e.category === 'notification').length
+  const adminCount = AUTOMATED_EMAILS.filter((e) => e.category === 'admin').length
+  const transactionalCount = AUTOMATED_EMAILS.filter((e) => e.category === 'transactional').length
+
+  const categoryOptions: { value: CategoryFilter; label: string; count: number | null }[] = [
+    { value: 'all', label: 'All', count: null },
+    { value: 'confirmation', label: 'Confirmation', count: confirmationCount },
+    { value: 'notification', label: 'Notification', count: notificationCount },
+    { value: 'admin', label: 'Admin', count: adminCount },
+    { value: 'transactional', label: 'Transactional', count: transactionalCount },
+  ]
+
   // ===== DETAIL SHEET VIEW =====
   if (selectedEmail) {
     const cat = CATEGORY_CONFIG[selectedEmail.category]
@@ -170,7 +183,7 @@ export function AutomatedEmailsTab() {
         {/* Back button */}
         <button
           onClick={() => setSelectedEmail(null)}
-          className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900  transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium sp-text-slate hover:sp-text-ink transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -193,29 +206,29 @@ export function AutomatedEmailsTab() {
               </h2>
               <Badge variant={cat.variant}>{cat.label}</Badge>
             </div>
-            <p className="text-sm text-neutral-500 mt-0.5 sp-body">{selectedEmail.description}</p>
+            <p className="text-sm sp-text-slate mt-0.5 sp-body">{selectedEmail.description}</p>
           </div>
         </div>
 
         {/* Detail cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-            <div className="text-neutral-500 text-xs mb-1.5 sp-body">Trigger</div>
+          <div className="sp-bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+            <div className="sp-text-slate text-xs mb-1.5 sp-body">Trigger</div>
             <div className="text-sm sp-text-ink font-medium">{selectedEmail.trigger}</div>
           </div>
-          <div className="bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-            <div className="text-neutral-500 text-xs mb-1.5 sp-body">Recipient</div>
+          <div className="sp-bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+            <div className="sp-text-slate text-xs mb-1.5 sp-body">Recipient</div>
             <div className="text-sm sp-text-ink font-medium">{selectedEmail.recipient}</div>
           </div>
-          <div className="bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-            <div className="text-neutral-500 text-xs mb-1.5 sp-body">API Endpoint</div>
+          <div className="sp-bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+            <div className="sp-text-slate text-xs mb-1.5 sp-body">API Endpoint</div>
             <div className="text-sm sp-text-slate font-mono text-xs">{selectedEmail.endpoint}</div>
           </div>
           {selectedEmail.topic && (
-            <div className="bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-              <div className="text-neutral-500 text-xs mb-1.5 sp-body">Notification Topic</div>
+            <div className="sp-bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+              <div className="sp-text-slate text-xs mb-1.5 sp-body">Notification Topic</div>
               <Badge variant="blue">{selectedEmail.topic}</Badge>
-              <p className="text-xs text-neutral-500 mt-1.5">Users can unsubscribe from this topic</p>
+              <p className="text-xs sp-text-slate mt-1.5">Users can unsubscribe from this topic</p>
             </div>
           )}
         </div>
@@ -227,27 +240,64 @@ export function AutomatedEmailsTab() {
   return (
     <div className="sp-body space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-extrabold sp-heading shrink-0">
+      <div className="mb-6">
+        <h2 className="text-2xl font-extrabold sp-heading mb-4">
           <span className="sp-text-ink">Automated</span>
           <span className="sp-text-primary">Emails</span>
         </h2>
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
-          className="px-4 py-2 border sp-border-silver sp-radius-md text-sm sp-text-slate sp-bg-surface appearance-none shrink-0"
-          style={{ WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: 36, minWidth: 180, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237B87A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-        >
-          <option value="all">All Types ({AUTOMATED_EMAILS.length})</option>
-          <option value="confirmation">Confirmations</option>
-          <option value="notification">Notifications</option>
-          <option value="admin">Admin</option>
-          <option value="transactional">Transactional</option>
-        </select>
+        <div className="flex flex-wrap gap-1.5">
+          {categoryOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setCategoryFilter(opt.value)}
+              className={`px-3 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
+                categoryFilter === opt.value
+                  ? 'sp-bg-primary-light sp-text-primary'
+                  : 'sp-bg-mist sp-text-slate sp-hover-snow'
+              }`}
+            >
+              {opt.label}{opt.count != null && <span className="ml-1 opacity-70">{opt.count}</span>}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {filtered.map((email) => {
+          const cat = CATEGORY_CONFIG[email.category]
+          return (
+            <button
+              key={email.key}
+              onClick={() => setSelectedEmail(email)}
+              className="w-full text-left sp-bg-surface sp-radius-lg overflow-hidden transition-shadow hover:shadow-md"
+              style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}
+            >
+              <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+                <Badge variant={cat.variant}>{cat.label}</Badge>
+                {email.topic && (
+                  <span className="text-[11px] font-medium sp-text-primary sp-body">{email.topic}</span>
+                )}
+                <svg className="w-4 h-4 sp-text-slate ml-auto" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+              <div className="px-3.5 py-3">
+                <div className="text-sm font-medium sp-text-ink sp-body">{email.label}</div>
+                <p className="text-xs sp-text-slate mt-1 line-clamp-2 sp-body">{email.description}</p>
+                <div className="flex items-center gap-3 mt-2 text-[11px] sp-text-slate sp-body">
+                  <span>{email.trigger}</span>
+                  <span className="opacity-40">·</span>
+                  <span>{email.recipient}</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block sp-radius-lg overflow-hidden sp-bg-surface" style={{ boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)', border: '0.5px solid var(--sp-silver, #C8CCD4)80' }}>
         <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full text-sm">
             <thead>
@@ -271,7 +321,7 @@ export function AutomatedEmailsTab() {
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="font-medium sp-text-ink">{email.label}</div>
-                      <div className="text-xs text-neutral-500 mt-0.5 max-w-[280px] truncate">{email.description}</div>
+                      <div className="text-xs sp-text-slate mt-0.5 max-w-[280px] truncate">{email.description}</div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <Badge variant={cat.variant}>{cat.label}</Badge>
@@ -279,14 +329,14 @@ export function AutomatedEmailsTab() {
                     <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
                       {email.trigger}
                     </td>
-                    <td className="px-4 py-4 text-neutral-500 whitespace-nowrap">
+                    <td className="px-4 py-4 sp-text-slate whitespace-nowrap">
                       {email.recipient}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       {email.topic ? (
                         <span className="text-xs font-medium sp-text-primary">{email.topic}</span>
                       ) : (
-                        <span className="text-xs text-neutral-400">—</span>
+                        <span className="text-xs sp-text-slate">—</span>
                       )}
                     </td>
                   </tr>
