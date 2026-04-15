@@ -219,6 +219,8 @@ async function handleGET(
         bonus_points: e.bonus_points ?? 0,
         scored_total_points: e.scored_total_points ?? 0,
         created_at: '',
+        fee_paid: e.fee_paid ?? false,
+        fee_paid_at: e.fee_paid_at ?? null,
       })),
     }
   })
