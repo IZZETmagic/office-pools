@@ -409,14 +409,82 @@ export async function POST(
       return NextResponse.json({ success: true })
     }
 
-    // ===== TOGGLE FEE PAID =====
+    // ===== TOGGLE FEE PAID (per-entry) =====
     case 'toggle_fee_paid': {
-      const { member_id } = payload
-      if (!member_id) {
-        return NextResponse.json({ error: 'member_id is required' }, { status: 400 })
+      const { entry_id, member_id } = payload
+
+      // Support per-entry toggle (new) or legacy member-level toggle
+      if (entry_id) {
+        // Per-entry fee toggle
+        const { data: entry } = await supabase
+          .from('pool_entries')
+          .select('entry_id, entry_name, fee_paid, member_id')
+          .eq('entry_id', entry_id)
+          .single()
+
+        if (!entry) {
+          return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+        }
+
+        // Verify entry belongs to this pool
+        const { data: membership } = await supabase
+          .from('pool_members')
+          .select('member_id, user_id')
+          .eq('member_id', entry.member_id)
+          .eq('pool_id', id)
+          .single()
+
+        if (!membership) {
+          return NextResponse.json({ error: 'Entry does not belong to this pool' }, { status: 404 })
+        }
+
+        const newFeePaid = !entry.fee_paid
+
+        const { error: updateError } = await supabase
+          .from('pool_entries')
+          .update({
+            fee_paid: newFeePaid,
+            fee_paid_at: newFeePaid ? new Date().toISOString() : null,
+          })
+          .eq('entry_id', entry_id)
+
+        if (updateError) {
+          return NextResponse.json({ error: updateError.message }, { status: 500 })
+        }
+
+        // Also keep member-level flag in sync (set to true if ANY entry is paid)
+        const { data: allEntries } = await supabase
+          .from('pool_entries')
+          .select('fee_paid')
+          .eq('member_id', entry.member_id)
+
+        const anyPaid = (allEntries || []).some(e => e.fee_paid) || newFeePaid
+        await supabase
+          .from('pool_members')
+          .update({ entry_fee_paid: anyPaid })
+          .eq('member_id', entry.member_id)
+
+        // Get username for audit
+        const { data: memberUser } = await supabase
+          .from('users')
+          .select('username')
+          .eq('user_id', membership.user_id)
+          .single()
+
+        await audit(
+          'toggle_fee_paid',
+          `Set fee_paid to ${newFeePaid} for entry "${entry.entry_name}" (${memberUser?.username || 'unknown'}) in ${targetPool.pool_name}`,
+          { entry_id, entry_name: entry.entry_name, member_id: entry.member_id, user_id: membership.user_id, username: memberUser?.username, fee_paid: newFeePaid }
+        )
+
+        return NextResponse.json({ success: true, fee_paid: newFeePaid })
       }
 
-      // Get current fee status
+      // Legacy: member-level toggle (for backward compatibility)
+      if (!member_id) {
+        return NextResponse.json({ error: 'entry_id or member_id is required' }, { status: 400 })
+      }
+
       const { data: membership } = await supabase
         .from('pool_members')
         .select('member_id, entry_fee_paid, user_id')

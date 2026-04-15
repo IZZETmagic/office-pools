@@ -14,6 +14,9 @@ export type PoolData = {
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string
   updated_at: string
+  // Entry fee configuration (NULL = free pool)
+  entry_fee: number | null
+  entry_fee_currency: string
   // Optional bar/partner branding (NULL for standard pools)
   brand_name: string | null
   brand_emoji: string | null
@@ -59,6 +62,9 @@ export type EntryData = {
   match_points: number | null
   bonus_points: number | null
   scored_total_points: number | null
+  // Per-entry fee tracking
+  fee_paid: boolean
+  fee_paid_at: string | null
 }
 
 // Flattened entry with user info for leaderboard display

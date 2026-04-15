@@ -26,6 +26,8 @@ struct Pool: Codable, Identifiable, Hashable {
     let predictionMode: PredictionMode
     let createdAt: String
     let updatedAt: String
+    let entryFee: Double?
+    let entryFeeCurrency: String?
     let brandName: String?
     let brandEmoji: String?
     let brandColor: String?
@@ -52,6 +54,8 @@ struct Pool: Codable, Identifiable, Hashable {
         case predictionMode = "prediction_mode"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case entryFee = "entry_fee"
+        case entryFeeCurrency = "entry_fee_currency"
         case brandName = "brand_name"
         case brandEmoji = "brand_emoji"
         case brandColor = "brand_color"

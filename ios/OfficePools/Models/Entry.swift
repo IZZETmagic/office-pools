@@ -17,6 +17,8 @@ struct Entry: Codable, Identifiable, Hashable {
     let previousRank: Int?
     let lastRankUpdate: String?
     let createdAt: String
+    let feePaid: Bool
+    let feePaidAt: String?
 
     var id: String { entryId }
 
@@ -42,5 +44,7 @@ struct Entry: Codable, Identifiable, Hashable {
         case previousRank = "previous_rank"
         case lastRankUpdate = "last_rank_update"
         case createdAt = "created_at"
+        case feePaid = "fee_paid"
+        case feePaidAt = "fee_paid_at"
     }
 }

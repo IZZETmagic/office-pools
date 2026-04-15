@@ -223,6 +223,12 @@ struct MemberDetailView: View {
                             isSubmitted(entry) ? "Submitted" : "Pending",
                             color: isSubmitted(entry) ? Color.sp.green : Color.sp.silver
                         )
+                        if let fee = pool?.entryFee, fee > 0 {
+                            statusPill(
+                                entry.feePaid ? "Paid" : "Unpaid",
+                                color: entry.feePaid ? Color.sp.green : Color.sp.amber
+                            )
+                        }
                     }
 
                     HStack(spacing: 8) {
@@ -374,7 +380,10 @@ struct MemberDetailView: View {
 
             infoRow("Role", value: member.isAdmin ? "Admin" : "Player")
             infoRow("Joined", value: SPDateFormatter.short(member.joinedAt))
-            infoRow("Entry Fee", value: member.entryFeePaid ? "Paid" : "Unpaid")
+            if let fee = pool?.entryFee, fee > 0 {
+                let paidCount = entries.filter(\.feePaid).count
+                infoRow("Entry Fee", value: "\(paidCount)/\(entries.count) paid")
+            }
             infoRow("Entries", value: "\(entries.count)")
         }
     }

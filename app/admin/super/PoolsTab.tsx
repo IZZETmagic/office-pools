@@ -44,6 +44,8 @@ type PoolMember = {
     match_points: number | null
     bonus_points: number | null
     created_at: string
+    fee_paid: boolean
+    fee_paid_at: string | null
   }[]
 }
 
@@ -1106,17 +1108,17 @@ function PoolDetailSheet({
                             onClick: () => onNavigateToUser(m.user_id),
                           }]
                         : []),
-                      {
-                        label: m.entry_fee_paid ? 'Mark Unpaid' : 'Mark Paid',
+                      ...m.pool_entries.map(entry => ({
+                        label: `${entry.fee_paid ? 'Mark Unpaid' : 'Mark Paid'}${m.pool_entries.length > 1 ? ` (${entry.entry_name})` : ''}`,
                         onClick: async () => {
                           try {
                             const res = await fetch(`/api/admin/pools/${pool.pool_id}/actions`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'toggle_fee_paid', member_id: m.member_id }),
+                              body: JSON.stringify({ action: 'toggle_fee_paid', entry_id: entry.entry_id }),
                             })
                             if (res.ok) {
-                              showToast(`Fee status updated for ${m.users?.username}`, 'success')
+                              showToast(`Fee status updated for ${m.users?.username} (${entry.entry_name})`, 'success')
                               onRefresh()
                             } else {
                               const data = await res.json()
@@ -1126,7 +1128,7 @@ function PoolDetailSheet({
                             showToast('Network error', 'error')
                           }
                         },
-                      },
+                      })),
                       {
                         label: m.role === 'admin' ? 'Demote to Player' : 'Promote to Admin',
                         onClick: () => setActionModal({
@@ -1204,8 +1206,14 @@ function PoolDetailSheet({
                           )}
                         </td>
                         <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {m.entry_fee_paid ? (
-                            <span className="sp-text-green">Paid</span>
+                          {m.pool_entries.length > 0 ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              {m.pool_entries.map(e => (
+                                <span key={e.entry_id} className={`text-xs ${e.fee_paid ? 'sp-text-green' : 'sp-text-slate'}`}>
+                                  {m.pool_entries.length > 1 ? `${e.entry_name}: ` : ''}{e.fee_paid ? 'Paid' : '-'}
+                                </span>
+                              ))}
+                            </div>
                           ) : (
                             <span className="sp-text-slate">-</span>
                           )}

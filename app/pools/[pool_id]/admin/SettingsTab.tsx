@@ -34,6 +34,8 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   const [maxEntries, setMaxEntries] = useState(
     pool.max_entries_per_user?.toString() || '1'
   )
+  const [entryFee, setEntryFee] = useState(pool.entry_fee?.toString() || '')
+  const [entryFeeCurrency, setEntryFeeCurrency] = useState(pool.entry_fee_currency || 'USD')
 
   const [copied, setCopied] = useState(false)
 
@@ -79,9 +81,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       maxParticipants !== (pool.max_participants?.toString() || '0') ||
       maxEntries !== (pool.max_entries_per_user?.toString() || '1') ||
       deadlineDate !== initialDeadlineDate ||
-      deadlineTime !== initialDeadlineTime
+      deadlineTime !== initialDeadlineTime ||
+      entryFee !== (pool.entry_fee?.toString() || '') ||
+      entryFeeCurrency !== (pool.entry_fee_currency || 'USD')
     )
-  }, [poolName, description, status, isPrivate, maxParticipants, maxEntries, deadlineDate, deadlineTime, pool, initialDeadlineDate, initialDeadlineTime])
+  }, [poolName, description, status, isPrivate, maxParticipants, maxEntries, deadlineDate, deadlineTime, pool, initialDeadlineDate, initialDeadlineTime, entryFee, entryFeeCurrency])
 
   // Notify parent of dirty state
   useEffect(() => {
@@ -155,6 +159,8 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       is_private: isPrivate,
       max_participants: maxP > 0 ? maxP : null,
       max_entries_per_user: maxE,
+      entry_fee: entryFee ? parseFloat(entryFee) : null,
+      entry_fee_currency: entryFeeCurrency,
       updated_at: new Date().toISOString(),
     }
 
@@ -196,6 +202,8 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       is_private: isPrivate,
       max_participants: maxP > 0 ? maxP : null,
       max_entries_per_user: maxE,
+      entry_fee: entryFee ? parseFloat(entryFee) : null,
+      entry_fee_currency: entryFeeCurrency,
       ...(newDeadline ? { prediction_deadline: newDeadline.toISOString() } : {}),
     })
     showToast('Settings saved.', 'success')
@@ -591,6 +599,60 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                 </svg>
                 <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
                   Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Entry Fees ── */}
+        <Card>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1">
+            Entry Fees
+          </h3>
+          <p className="text-sm text-neutral-500 mb-4">
+            Set an entry fee that members pay for each entry. Leave blank for a free pool.
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <FormField label="Fee Amount" className="flex-1">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={entryFee}
+                  onChange={(e) => setEntryFee(e.target.value)}
+                />
+              </FormField>
+              <FormField label="Currency" className="w-28">
+                <select
+                  value={entryFeeCurrency}
+                  onChange={(e) => setEntryFeeCurrency(e.target.value)}
+                  className="w-full h-10 px-3 border border-neutral-200 rounded-xl text-sm text-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:border-neutral-700 dark:text-white dark:bg-neutral-800"
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                  <option value="CAD">CAD (C$)</option>
+                  <option value="AUD">AUD (A$)</option>
+                  <option value="MXN">MXN ($)</option>
+                  <option value="BRL">BRL (R$)</option>
+                  <option value="JPY">JPY (¥)</option>
+                  <option value="CHF">CHF (Fr)</option>
+                  <option value="BMD">BMD ($)</option>
+                </select>
+              </FormField>
+            </div>
+
+            {entryFee && parseFloat(entryFee) > 0 && (
+              <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
+                <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+                </svg>
+                <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
+                  Each entry will cost {new Intl.NumberFormat(undefined, { style: 'currency', currency: entryFeeCurrency }).format(parseFloat(entryFee))}. Track payments in the <strong>Fees</strong> tab.
                 </p>
               </div>
             )}

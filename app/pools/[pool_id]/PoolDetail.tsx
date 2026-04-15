@@ -22,6 +22,7 @@ import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
+import { FeesTab } from './admin/FeesTab'
 import { RoundsTab } from './admin/RoundsTab'
 import { DEFAULT_POOL_SETTINGS, type PoolSettings } from './results/points'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
@@ -59,6 +60,7 @@ type Tab =
   | 'scoring_rules'
   | 'community'
   | 'members'
+  | 'fees'
   | 'scoring_config'
   | 'settings'
   | 'rounds'
@@ -183,7 +185,7 @@ export function PoolDetail({
   }, [activeTab, initialPool.pool_id, markAsRead])
 
   // Determine indicator color based on active tab
-  const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds'
+  const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds' || activeTab === 'fees'
 
   // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
   useEffect(() => {
@@ -808,9 +810,13 @@ export function PoolDetail({
     away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
   }))
 
-  const adminTabs = isProgressive
-    ? [{ key: 'rounds' as Tab, label: 'Rounds' }, ...ADMIN_TABS]
-    : ADMIN_TABS
+  const adminTabs = [
+    ...(isProgressive ? [{ key: 'rounds' as Tab, label: 'Rounds' }] : []),
+    { key: 'members' as Tab, label: 'Members' },
+    ...(pool.entry_fee ? [{ key: 'fees' as Tab, label: 'Fees' }] : []),
+    { key: 'scoring_config' as Tab, label: 'Scoring Config' },
+    { key: 'settings' as Tab, label: 'Settings' },
+  ]
   const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
   const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
@@ -1292,6 +1298,8 @@ export function PoolDetail({
                     roundStates={roundStates}
                     allRoundSubmissions={roundSubmissions}
                     liveRoundSubmissions={liveRoundSubmissions}
+                    entryFee={pool.entry_fee}
+                    entryFeeCurrency={pool.entry_fee_currency}
                   />
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">
@@ -1364,6 +1372,8 @@ export function PoolDetail({
                     onRenameEntry={handleRenameEntryFromList}
                     onEditEntry={handleOpenEntryDetail}
                     entryProgressOverride={bpEntryProgressMap}
+                    entryFee={pool.entry_fee}
+                    entryFeeCurrency={pool.entry_fee_currency}
                   />
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">
@@ -1439,6 +1449,8 @@ export function PoolDetail({
                     onDeleteEntry={handleDeleteEntryFromList}
                     onRenameEntry={handleRenameEntryFromList}
                     onEditEntry={handleOpenEntryDetail}
+                    entryFee={pool.entry_fee}
+                    entryFeeCurrency={pool.entry_fee_currency}
                   />
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">
@@ -1633,6 +1645,15 @@ export function PoolDetail({
                 teams={teams}
                 currentUserId={currentUserId}
                 computedEntryTotals={computedEntryTotals}
+              />
+            )}
+
+            {activeTab === 'fees' && isAdmin && pool.entry_fee && (
+              <FeesTab
+                pool={pool}
+                members={members}
+                setMembers={setMembers}
+                currentUserId={currentUserId}
               />
             )}
 

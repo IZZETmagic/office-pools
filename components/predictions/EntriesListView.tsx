@@ -27,6 +27,10 @@ type EntriesListViewProps = {
   allRoundSubmissions?: EntryRoundSubmission[]
   /** Progressive mode: live (client-fetched) round submissions keyed by entry_id */
   liveRoundSubmissions?: Record<string, EntryRoundSubmission[]>
+  /** Entry fee amount (null = free pool, no fee badge shown) */
+  entryFee?: number | null
+  /** Currency code for entry fee display (e.g. 'USD') */
+  entryFeeCurrency?: string
 }
 
 function getEntryStatus(
@@ -75,6 +79,8 @@ export function EntriesListView({
   roundStates,
   allRoundSubmissions,
   liveRoundSubmissions,
+  entryFee,
+  entryFeeCurrency,
 }: EntriesListViewProps) {
   // Inline rename state (local to list view)
   const [renamingEntryId, setRenamingEntryId] = useState<string | null>(null)
@@ -212,6 +218,11 @@ export function EntriesListView({
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={status.variant}>{status.label}</Badge>
+                      {entryFee != null && entryFee > 0 && (
+                        <Badge variant={entry.fee_paid ? 'green' : 'yellow'}>
+                          {entry.fee_paid ? 'Paid' : 'Fee Due'}
+                        </Badge>
+                      )}
                       {/* Chevron indicator */}
                       <svg className="w-4 h-4 text-neutral-400 group-hover:text-primary-500 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -364,7 +375,14 @@ export function EntriesListView({
 
                   {/* Status */}
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                      {entryFee != null && entryFee > 0 && (
+                        <Badge variant={entry.fee_paid ? 'green' : 'yellow'}>
+                          {entry.fee_paid ? 'Paid' : 'Fee Due'}
+                        </Badge>
+                      )}
+                    </div>
                   </td>
 
                   {/* Progress */}
