@@ -17,6 +17,7 @@ type PoolInfo = {
   brand_emoji: string | null
   brand_color: string | null
   brand_accent: string | null
+  brand_logo_url: string | null
 }
 
 type JoinPoolClientProps = {
@@ -84,7 +85,13 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolC
             className={`px-6 py-8 text-center text-white ${!pool.brand_color ? 'bg-gradient-to-br from-primary-600 to-primary-700' : ''}`}
             style={pool.brand_color ? { background: `linear-gradient(135deg, ${pool.brand_color} 0%, ${pool.brand_color}dd 100%)` } : undefined}
           >
-            <div className="text-4xl mb-3">{pool.brand_emoji || '\u26BD'}</div>
+            <div className="mb-3">
+              {pool.brand_logo_url ? (
+                <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-16 h-16 rounded-xl object-cover mx-auto" />
+              ) : (
+                <span className="text-4xl">{pool.brand_emoji || '\u26BD'}</span>
+              )}
+            </div>
             <p className="text-white/60 text-sm font-medium mb-1">You&apos;ve been invited to join</p>
             <h1 className="text-2xl font-bold">{pool.pool_name}</h1>
           </div>

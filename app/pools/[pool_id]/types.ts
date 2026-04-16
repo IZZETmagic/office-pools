@@ -23,6 +23,7 @@ export type PoolData = {
   brand_color: string | null
   brand_accent: string | null
   brand_landing_url: string | null
+  brand_logo_url: string | null
 }
 
 export type MemberData = {

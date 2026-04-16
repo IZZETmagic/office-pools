@@ -39,7 +39,8 @@ export default async function DashboardPage() {
         brand_name,
         brand_emoji,
         brand_color,
-        brand_accent
+        brand_accent,
+        brand_logo_url
       ),
       pool_entries(
         entry_id,

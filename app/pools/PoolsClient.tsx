@@ -40,6 +40,7 @@ type PoolData = {
   brand_color?: string | null
   brand_accent?: string | null
   brand_landing_url?: string | null
+  brand_logo_url?: string | null
 }
 
 type PublicPool = {
@@ -295,8 +296,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
     const statusOrder: Record<string, number> = { open: 0, active: 0, upcoming: 1, closed: 2, completed: 3 }
     result.sort((a, b) => {
       // Branded pools always first
-      const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
-      const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+      const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
+      const bBrand = (b.brand_name && (b.brand_emoji || b.brand_logo_url) && b.brand_color) ? 0 : 1
       if (aBrand !== bBrand) return aBrand - bBrand
 
       const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
@@ -615,7 +616,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                     const isLinkCopied = linkCopiedPoolId === pool.pool_id
                     const statusText = getPoolStatusText(pool)
 
-                    const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+                    const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
                     return (
                       <Link
@@ -627,7 +628,11 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                         {/* Branded accent strip */}
                         {hasBranding && (
                           <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
-                            <span className="text-base">{pool.brand_emoji}</span>
+                            {pool.brand_logo_url ? (
+                              <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-5 h-5 rounded-sm object-cover" />
+                            ) : (
+                              <span className="text-base">{pool.brand_emoji}</span>
+                            )}
                             <span className="text-xs font-bold">{pool.brand_name}</span>
                             <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
                           </div>

@@ -39,7 +39,8 @@ export default async function PoolsPage() {
         brand_emoji,
         brand_color,
         brand_accent,
-        brand_landing_url
+        brand_landing_url,
+        brand_logo_url
       ),
       pool_entries(
         entry_id,

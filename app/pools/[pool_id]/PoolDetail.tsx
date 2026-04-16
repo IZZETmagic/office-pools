@@ -893,7 +893,12 @@ export function PoolDetail({
     }
   }, [activeTab, mobilePrimaryKeys, handleTabSwitch])
 
-  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+  const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
+  const brandLogo = pool.brand_logo_url ? (
+    <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-8 h-8 rounded-md object-cover shrink-0" />
+  ) : (
+    <span className="text-2xl shrink-0">{pool.brand_emoji}</span>
+  )
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -911,23 +916,11 @@ export function PoolDetail({
           /* ── Branded header for partner pools ── */
           <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
             <div className="flex items-center gap-2.5 min-w-0">
-              {pool.brand_landing_url ? (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-2xl shrink-0">{pool.brand_emoji}</span>
-                  <div className="min-w-0">
-                    <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
-                    <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <span className="text-2xl">{pool.brand_emoji}</span>
-                  <div className="min-w-0">
-                    <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
-                    <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
-                  </div>
-                </>
-              )}
+              {brandLogo}
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
+                <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
+              </div>
             </div>
             {/* Desktop nav links */}
             <div className="hidden sm:flex items-center gap-4 shrink-0">

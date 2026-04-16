@@ -909,7 +909,11 @@ function PoolDetailSheet({
           className="w-14 h-14 sp-radius-md flex items-center justify-center shrink-0 text-xl font-bold sp-heading"
           style={{ backgroundColor: 'var(--sp-primary-light)', color: 'var(--sp-primary)' }}
         >
-          {pool.brand_emoji || pool.pool_name.charAt(0).toUpperCase()}
+          {pool.brand_logo_url ? (
+            <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-full h-full rounded-md object-cover" />
+          ) : (
+            pool.brand_emoji || pool.pool_name.charAt(0).toUpperCase()
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1007,6 +1011,7 @@ function PoolDetailSheet({
               ['Brand Name', pool.brand_name],
               ['Brand Emoji', pool.brand_emoji || '-'],
               ['Brand Color', pool.brand_color || '-'],
+              ['Brand Logo', pool.brand_logo_url || '-'],
               ['Landing URL', pool.brand_landing_url || '-'],
             ].map(([label, value]) => (
               <div key={String(label)} className="flex gap-3 text-sm">

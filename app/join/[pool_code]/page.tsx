@@ -32,7 +32,7 @@ export default async function JoinPage({
   const adminClient = createAdminClient()
   const { data: pool } = await adminClient
     .from('pools')
-    .select('pool_id, pool_name, pool_code, description, status, prediction_mode, brand_name, brand_emoji, brand_color, brand_accent')
+    .select('pool_id, pool_name, pool_code, description, status, prediction_mode, brand_name, brand_emoji, brand_color, brand_accent, brand_logo_url')
     .eq('pool_code', pool_code.toUpperCase())
     .single()
 
@@ -83,6 +83,7 @@ export default async function JoinPage({
         brand_emoji: pool.brand_emoji ?? null,
         brand_color: pool.brand_color ?? null,
         brand_accent: pool.brand_accent ?? null,
+        brand_logo_url: pool.brand_logo_url ?? null,
       }}
       memberCount={memberCount ?? 0}
       isAlreadyMember={!!existingMembership}

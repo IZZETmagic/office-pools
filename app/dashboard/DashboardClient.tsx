@@ -51,6 +51,7 @@ type PoolCardData = {
   brand_emoji?: string | null
   brand_color?: string | null
   brand_accent?: string | null
+  brand_logo_url?: string | null
 }
 
 type ActivityItemBase = {
@@ -395,7 +396,7 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
   const level = getLevel(pool.total_points ?? 0)
-  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+  const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (
     <Link
@@ -405,7 +406,11 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
     >
       {hasBranding && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
-          <span className="text-xs">{pool.brand_emoji}</span>
+          {pool.brand_logo_url ? (
+            <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-4 h-4 rounded-sm object-cover" />
+          ) : (
+            <span className="text-xs">{pool.brand_emoji}</span>
+          )}
           <span className="text-[10px] font-bold">{pool.brand_name}</span>
           <span className="text-[8px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
         </div>
@@ -472,7 +477,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
   const deadline = formatDeadline(pool.prediction_deadline)
   const statusText = getPoolStatusText(pool)
   const level = getLevel(pool.total_points ?? 0)
-  const hasBranding = !!(pool.brand_name && pool.brand_emoji && pool.brand_color)
+  const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (
     <Link
@@ -482,7 +487,11 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
     >
       {hasBranding && (
         <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
-          <span className="text-base">{pool.brand_emoji}</span>
+          {pool.brand_logo_url ? (
+            <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-5 h-5 rounded-sm object-cover" />
+          ) : (
+            <span className="text-base">{pool.brand_emoji}</span>
+          )}
           <span className="text-xs font-bold">{pool.brand_name}</span>
           <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
         </div>
@@ -826,8 +835,8 @@ export function DashboardClient({
                 <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {[...pools].sort((a, b) => {
                     // Branded pools always first
-                    const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
-                    const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+                    const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
+                    const bBrand = (b.brand_name && (b.brand_emoji || b.brand_logo_url) && b.brand_color) ? 0 : 1
                     if (aBrand !== bBrand) return aBrand - bBrand
                     // Pools with unread banter first
                     const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
@@ -863,8 +872,8 @@ export function DashboardClient({
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...pools].sort((a, b) => {
                   // Branded pools always first
-                  const aBrand = (a.brand_name && a.brand_emoji && a.brand_color) ? 0 : 1
-                  const bBrand = (b.brand_name && b.brand_emoji && b.brand_color) ? 0 : 1
+                  const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
+                  const bBrand = (b.brand_name && (b.brand_emoji || b.brand_logo_url) && b.brand_color) ? 0 : 1
                   if (aBrand !== bBrand) return aBrand - bBrand
                   // Pools with unread banter first
                   const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
