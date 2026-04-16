@@ -21,6 +21,7 @@ type PoolConfig = {
   mode: string
   brandEmoji: string | null
   status: string
+  entryFee: string | null
   prizes: { place: string; prize: string; icon: string; color: string; border: string }[]
 }
 
@@ -143,7 +144,15 @@ export default function BrandedLandingClient({
               Join the Pool
             </button>
           </div>
-          <p className="text-white/30 text-sm mt-4">{poolConfig.memberCount} player{poolConfig.memberCount !== 1 ? 's' : ''} already joined</p>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <p className="text-white/30 text-sm">{poolConfig.memberCount} player{poolConfig.memberCount !== 1 ? 's' : ''} already joined</p>
+            {poolConfig.entryFee && (
+              <>
+                <span className="text-white/20">·</span>
+                <p className="text-white/30 text-sm">{poolConfig.entryFee} entry</p>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
@@ -314,9 +323,11 @@ export default function BrandedLandingClient({
             ))}
           </div>
 
-          <p className="text-center text-sm text-neutral-400 mt-6">
-            Prizes will be announced before the tournament starts
-          </p>
+          {poolConfig.prizes.every((p) => p.prize === 'TBD') && (
+            <p className="text-center text-sm text-neutral-400 mt-6">
+              Prizes will be announced before the tournament starts
+            </p>
+          )}
         </div>
       </section>
 

@@ -59,10 +59,13 @@ export default async function BrandedLandingPage({
     mode: pool.prediction_mode === 'progressive' ? 'Progressive' : pool.prediction_mode === 'bracket_picker' ? 'Bracket Picker' : 'Full Tournament',
     brandEmoji: pool.brand_emoji || null,
     status: pool.status,
+    entryFee: pool.entry_fee && pool.entry_fee > 0
+      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: pool.entry_fee_currency || 'USD' }).format(pool.entry_fee)
+      : null,
     prizes: [
-      { place: '1st Place', prize: 'TBD', icon: '\u{1F3C6}', color: 'from-amber-500 to-amber-600', border: 'border-amber-200' },
-      { place: '2nd Place', prize: 'TBD', icon: '\u{1F948}', color: 'from-neutral-400 to-neutral-500', border: 'border-neutral-200' },
-      { place: '3rd Place', prize: 'TBD', icon: '\u{1F949}', color: 'from-amber-700 to-amber-800', border: 'border-amber-200/50' },
+      { place: '1st Place', prize: pool.brand_prize_1st || 'TBD', icon: '\u{1F3C6}', color: 'from-amber-500 to-amber-600', border: 'border-amber-200' },
+      { place: '2nd Place', prize: pool.brand_prize_2nd || 'TBD', icon: '\u{1F948}', color: 'from-neutral-400 to-neutral-500', border: 'border-neutral-200' },
+      { place: '3rd Place', prize: pool.brand_prize_3rd || 'TBD', icon: '\u{1F949}', color: 'from-amber-700 to-amber-800', border: 'border-amber-200/50' },
     ],
   }
 

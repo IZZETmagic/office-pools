@@ -15,12 +15,14 @@ export async function PATCH(
   const body = await request.json()
   const adminClient = createAdminClient()
 
-  // Only allow updating brand fields
-  const allowedFields = ['brand_name', 'brand_slug', 'brand_emoji', 'brand_color', 'brand_accent', 'brand_logo_url', 'brand_landing_url']
+  // Only allow updating brand fields, fee, and prizes
+  const allowedFields = ['brand_name', 'brand_slug', 'brand_emoji', 'brand_color', 'brand_accent', 'brand_logo_url', 'brand_landing_url', 'entry_fee', 'entry_fee_currency', 'brand_prize_1st', 'brand_prize_2nd', 'brand_prize_3rd']
   const updates: Record<string, any> = {}
   for (const field of allowedFields) {
     if (field in body) {
-      updates[field] = body[field] ?? null
+      // Convert empty strings to null for fields with DB constraints
+      const val = body[field]
+      updates[field] = (val === '' || val === undefined) ? null : val
     }
   }
 
@@ -104,6 +106,9 @@ export async function DELETE(
       brand_accent: null,
       brand_logo_url: null,
       brand_landing_url: null,
+      brand_prize_1st: null,
+      brand_prize_2nd: null,
+      brand_prize_3rd: null,
     })
     .eq('pool_id', id)
 

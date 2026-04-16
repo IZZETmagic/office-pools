@@ -38,6 +38,11 @@ type CreateFormState = BrandFormState & {
   is_private: boolean
   max_participants: number
   max_entries_per_user: number
+  entry_fee: string
+  entry_fee_currency: string
+  brand_prize_1st: string
+  brand_prize_2nd: string
+  brand_prize_3rd: string
 }
 
 type ViewState =
@@ -116,6 +121,11 @@ const DEFAULT_CREATE_FORM: CreateFormState = {
   is_private: false,
   max_participants: 0,
   max_entries_per_user: 1,
+  entry_fee: '',
+  entry_fee_currency: 'USD',
+  brand_prize_1st: '',
+  brand_prize_2nd: '',
+  brand_prize_3rd: '',
 }
 
 // =============================================
@@ -394,6 +404,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
   // Form states
   const [createForm, setCreateForm] = useState<CreateFormState>(DEFAULT_CREATE_FORM)
   const [editForm, setEditForm] = useState<BrandFormState>(DEFAULT_BRAND_FORM)
+  const [editExtras, setEditExtras] = useState({ entry_fee: '', entry_fee_currency: 'USD', brand_prize_1st: '', brand_prize_2nd: '', brand_prize_3rd: '' })
 
   // Filter to branded pools only
   const brandedPools = pools.filter(
@@ -509,6 +520,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
         logoUrl = (await uploadLogo(editForm.logoFile, editForm.brand_slug, editForm.brand_logo_url)) || ''
       }
 
+      const feeAmount = parseFloat(editExtras.entry_fee)
       const res = await fetch(`/api/admin/branded-pools/${poolId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -519,6 +531,11 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
           brand_color: editForm.brand_color,
           brand_accent: editForm.brand_accent,
           brand_logo_url: logoUrl || null,
+          entry_fee: feeAmount > 0 ? feeAmount : null,
+          entry_fee_currency: editExtras.entry_fee_currency,
+          brand_prize_1st: editExtras.brand_prize_1st.trim() || null,
+          brand_prize_2nd: editExtras.brand_prize_2nd.trim() || null,
+          brand_prize_3rd: editExtras.brand_prize_3rd.trim() || null,
         }),
       })
       const data = await res.json()
@@ -614,6 +631,13 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
       brand_logo_url: pool.brand_logo_url || '',
       logoFile: null,
       logoPreview: null,
+    })
+    setEditExtras({
+      entry_fee: pool.entry_fee != null && pool.entry_fee > 0 ? String(pool.entry_fee) : '',
+      entry_fee_currency: pool.entry_fee_currency || 'USD',
+      brand_prize_1st: pool.brand_prize_1st || '',
+      brand_prize_2nd: pool.brand_prize_2nd || '',
+      brand_prize_3rd: pool.brand_prize_3rd || '',
     })
     setFormError(null)
     setView({ type: 'edit', pool })
@@ -765,6 +789,80 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
             />
           </div>
         </div>
+
+        {/* Entry Fee & Prizes row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Entry Fee */}
+          <div className="sp-card sp-bg-surface p-5 space-y-4" style={{ border: cardBorder }}>
+            <h4 className="sp-label sp-text-slate">Entry Fee</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">Amount</label>
+                <input
+                  type="number"
+                  value={createForm.entry_fee}
+                  onChange={(e) => setCreateForm({ ...createForm, entry_fee: e.target.value })}
+                  className={spInput}
+                  placeholder="0 = Free"
+                  min={0}
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">Currency</label>
+                <select
+                  value={createForm.entry_fee_currency}
+                  onChange={(e) => setCreateForm({ ...createForm, entry_fee_currency: e.target.value })}
+                  className={spInput}
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                  <option value="BMD">BMD ($)</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs sp-text-slate sp-body">Leave amount empty or 0 for a free pool.</p>
+          </div>
+
+          {/* Prizes */}
+          <div className="sp-card sp-bg-surface p-5 space-y-4" style={{ border: cardBorder }}>
+            <h4 className="sp-label sp-text-slate">Prizes</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🏆 1st Place</label>
+                <input
+                  type="text"
+                  value={createForm.brand_prize_1st}
+                  onChange={(e) => setCreateForm({ ...createForm, brand_prize_1st: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. $150 Bar Tab"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🥈 2nd Place</label>
+                <input
+                  type="text"
+                  value={createForm.brand_prize_2nd}
+                  onChange={(e) => setCreateForm({ ...createForm, brand_prize_2nd: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. $75 Bar Tab"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🥉 3rd Place</label>
+                <input
+                  type="text"
+                  value={createForm.brand_prize_3rd}
+                  onChange={(e) => setCreateForm({ ...createForm, brand_prize_3rd: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. Free appetizer platter"
+                />
+              </div>
+            </div>
+            <p className="text-xs sp-text-slate sp-body">Leave empty to show &ldquo;TBD&rdquo; on the landing page.</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -772,8 +870,6 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
   // ═══════ EDIT SUB-SHEET ═══════
   if (view.type === 'edit') {
     const pool = view.pool
-    const canSubmit = !!(editForm.brand_name.trim() && editForm.brand_slug.trim())
-
     return (
       <div className="sp-body space-y-6">
         {/* Back button */}
@@ -828,7 +924,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
             <Button
               variant="primary"
               onClick={() => handleEdit(pool.pool_id)}
-              disabled={!canSubmit}
+              disabled={saving}
               loading={saving}
               loadingText="Saving..."
             >
@@ -841,6 +937,78 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
 
         <div className="sp-card sp-bg-surface p-5" style={{ border: cardBorder }}>
           <BrandFormFields form={editForm} setForm={setEditForm} />
+        </div>
+
+        {/* Entry Fee & Prizes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="sp-card sp-bg-surface p-5 space-y-4" style={{ border: cardBorder }}>
+            <h4 className="sp-label sp-text-slate">Entry Fee</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">Amount</label>
+                <input
+                  type="number"
+                  value={editExtras.entry_fee}
+                  onChange={(e) => setEditExtras({ ...editExtras, entry_fee: e.target.value })}
+                  className={spInput}
+                  placeholder="0 = Free"
+                  min={0}
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">Currency</label>
+                <select
+                  value={editExtras.entry_fee_currency}
+                  onChange={(e) => setEditExtras({ ...editExtras, entry_fee_currency: e.target.value })}
+                  className={spInput}
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                  <option value="BMD">BMD ($)</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs sp-text-slate sp-body">Leave amount empty or 0 for a free pool.</p>
+          </div>
+
+          <div className="sp-card sp-bg-surface p-5 space-y-4" style={{ border: cardBorder }}>
+            <h4 className="sp-label sp-text-slate">Prizes</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🏆 1st Place</label>
+                <input
+                  type="text"
+                  value={editExtras.brand_prize_1st}
+                  onChange={(e) => setEditExtras({ ...editExtras, brand_prize_1st: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. $150 Bar Tab"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🥈 2nd Place</label>
+                <input
+                  type="text"
+                  value={editExtras.brand_prize_2nd}
+                  onChange={(e) => setEditExtras({ ...editExtras, brand_prize_2nd: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. $75 Bar Tab"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">🥉 3rd Place</label>
+                <input
+                  type="text"
+                  value={editExtras.brand_prize_3rd}
+                  onChange={(e) => setEditExtras({ ...editExtras, brand_prize_3rd: e.target.value })}
+                  className={spInput}
+                  placeholder="e.g. Free appetizer platter"
+                />
+              </div>
+            </div>
+            <p className="text-xs sp-text-slate sp-body">Leave empty to show &ldquo;TBD&rdquo; on the landing page.</p>
+          </div>
         </div>
 
         {/* Remove branding modal (still a modal since it's a danger confirmation) */}

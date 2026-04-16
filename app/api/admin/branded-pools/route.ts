@@ -90,6 +90,13 @@ export async function POST(request: NextRequest) {
     brand_color,
     brand_accent,
     brand_logo_url,
+    // Entry fee
+    entry_fee,
+    entry_fee_currency,
+    // Prizes
+    brand_prize_1st,
+    brand_prize_2nd,
+    brand_prize_3rd,
   } = body
 
   if (!pool_name?.trim() || !tournament_id) {
@@ -139,6 +146,13 @@ export async function POST(request: NextRequest) {
       brand_accent: brand_accent || null,
       brand_logo_url: brand_logo_url || null,
       brand_landing_url: `/play/${brand_slug.trim()}`,
+      // Entry fee
+      entry_fee: entry_fee && parseFloat(entry_fee) > 0 ? parseFloat(entry_fee) : null,
+      entry_fee_currency: entry_fee_currency || 'USD',
+      // Prizes
+      brand_prize_1st: brand_prize_1st?.trim() || null,
+      brand_prize_2nd: brand_prize_2nd?.trim() || null,
+      brand_prize_3rd: brand_prize_3rd?.trim() || null,
     })
     .select()
     .single()
