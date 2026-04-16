@@ -55,6 +55,14 @@ export type SuperPoolData = {
   tournaments: { name: string } | null
   admin_user: { username: string; email: string } | null
   pool_members: { count: number }[]
+  // Branding fields
+  brand_name: string | null
+  brand_slug: string | null
+  brand_emoji: string | null
+  brand_color: string | null
+  brand_accent: string | null
+  brand_logo_url: string | null
+  brand_landing_url: string | null
 }
 
 export type AuditLogData = {

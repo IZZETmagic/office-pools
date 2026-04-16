@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { SuperPoolData } from './page'
 import { Badge, getStatusVariant } from '@/components/ui/Badge'
@@ -17,6 +17,8 @@ type PoolsTabProps = {
   pools: SuperPoolData[]
   setPools: (pools: SuperPoolData[]) => void
   onNavigateToUser?: (userId: string) => void
+  navigateToPoolId?: string | null
+  clearNavigateToPool?: () => void
 }
 
 type PoolMember = {
@@ -1367,53 +1369,176 @@ function PoolDetailSheet({
       {settings && (
         <div>
           <h3 className="text-sm font-semibold sp-text-ink sp-heading mb-3">Scoring Configuration</h3>
-          <div
-            className="sp-bg-surface sp-radius-sm p-4"
-            style={{ border: thinBorder }}
-          >
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium uppercase tracking-wide sp-text-slate sp-body">Group Stage</h4>
-                {[
-                  ['Exact Score', settings.group_exact_score],
-                  ['Correct GD', settings.group_correct_difference],
-                  ['Correct Result', settings.group_correct_result],
-                ].map(([label, val]) => (
-                  <div key={String(label)} className="flex justify-between">
-                    <span className="sp-text-slate sp-body">{label}</span>
-                    <span className="sp-text-ink font-medium sp-body">{val} pts</span>
-                  </div>
-                ))}
+
+          {pool.prediction_mode === 'bracket_picker' ? (
+            /* ── Bracket Picker Scoring ── */
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* Group Placement */}
+              <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                <h4 className="sp-label sp-text-slate mb-2">Group Placement</h4>
+                <div className="space-y-1 text-sm">
+                  {[
+                    ['Correct 1st', settings.bp_group_correct_1st],
+                    ['Correct 2nd', settings.bp_group_correct_2nd],
+                    ['Correct 3rd', settings.bp_group_correct_3rd],
+                    ['Correct 4th', settings.bp_group_correct_4th],
+                  ].filter(([, v]) => v != null).map(([label, val]) => (
+                    <div key={String(label)} className="flex items-center justify-between gap-2">
+                      <span className="sp-text-slate sp-body">{label}</span>
+                      <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium uppercase tracking-wide sp-text-slate sp-body">Knockout</h4>
-                {[
-                  ['Exact Score', settings.knockout_exact_score],
-                  ['Correct GD', settings.knockout_correct_difference],
-                  ['Correct Result', settings.knockout_correct_result],
-                ].map(([label, val]) => (
-                  <div key={String(label)} className="flex justify-between">
-                    <span className="sp-text-slate sp-body">{label}</span>
-                    <span className="sp-text-ink font-medium sp-body">{val} pts</span>
-                  </div>
-                ))}
+              {/* Knockout Rounds */}
+              <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                <h4 className="sp-label sp-text-slate mb-2">Knockout Rounds</h4>
+                <div className="space-y-1 text-sm">
+                  {[
+                    ['R32', settings.bp_r32_correct],
+                    ['R16', settings.bp_r16_correct],
+                    ['QF', settings.bp_qf_correct],
+                    ['SF', settings.bp_sf_correct],
+                    ['3rd Place', settings.bp_third_place_match_correct],
+                    ['Final', settings.bp_final_correct],
+                  ].filter(([, v]) => v != null).map(([label, val]) => (
+                    <div key={String(label)} className="flex items-center justify-between gap-2">
+                      <span className="sp-text-slate sp-body">{label}</span>
+                      <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium uppercase tracking-wide sp-text-slate sp-body">Multipliers</h4>
-                {[
-                  ['R16', settings.round_16_multiplier],
-                  ['QF', settings.quarter_final_multiplier],
-                  ['SF', settings.semi_final_multiplier],
-                  ['Final', settings.final_multiplier],
-                ].map(([label, val]) => (
-                  <div key={String(label)} className="flex justify-between">
-                    <span className="sp-text-slate sp-body">{label}</span>
-                    <span className="sp-text-ink font-medium sp-body">{val}x</span>
-                  </div>
-                ))}
+              {/* Special */}
+              <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                <h4 className="sp-label sp-text-slate mb-2">Special</h4>
+                <div className="space-y-1 text-sm">
+                  {[
+                    ['3rd Qualifier', settings.bp_third_correct_qualifier],
+                    ['3rd Eliminated', settings.bp_third_correct_eliminated],
+                    ['3rd All Correct', settings.bp_third_all_correct_bonus],
+                    ['Champion Bonus', settings.bp_champion_bonus],
+                    ['Penalty Correct', settings.bp_penalty_correct],
+                  ].filter(([, v]) => v != null).map(([label, val]) => (
+                    <div key={String(label)} className="flex items-center justify-between gap-2">
+                      <span className="sp-text-slate sp-body">{label}</span>
+                      <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* ── Standard Scoring (Progressive / Full Tournament) ── */
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {/* Group Stage */}
+                <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                  <h4 className="sp-label sp-text-slate mb-2">Group Stage</h4>
+                  <div className="space-y-1 text-sm">
+                    {[
+                      ['Exact Score', settings.group_exact_score],
+                      ['Correct GD', settings.group_correct_difference],
+                      ['Correct Result', settings.group_correct_result],
+                    ].map(([label, val]) => (
+                      <div key={String(label)} className="flex items-center justify-between gap-2">
+                        <span className="sp-text-slate sp-body">{label}</span>
+                        <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Knockout */}
+                <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                  <h4 className="sp-label sp-text-slate mb-2">Knockout</h4>
+                  <div className="space-y-1 text-sm">
+                    {[
+                      ['Exact Score', settings.knockout_exact_score],
+                      ['Correct GD', settings.knockout_correct_difference],
+                      ['Correct Result', settings.knockout_correct_result],
+                    ].map(([label, val]) => (
+                      <div key={String(label)} className="flex items-center justify-between gap-2">
+                        <span className="sp-text-slate sp-body">{label}</span>
+                        <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                  {settings.pso_enabled && (
+                    <div className="mt-2.5 pt-2.5" style={{ borderTop: thinBorder }}>
+                      <h4 className="sp-label sp-text-slate mb-2">Penalty Shootout</h4>
+                      <div className="space-y-1 text-sm">
+                        {[
+                          ['Exact Score', settings.pso_exact_score],
+                          ['Correct GD', settings.pso_correct_difference],
+                          ['Correct Result', settings.pso_correct_result],
+                        ].filter(([, v]) => v != null).map(([label, val]) => (
+                          <div key={String(label)} className="flex items-center justify-between gap-2">
+                            <span className="sp-text-slate sp-body">{label}</span>
+                            <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Multipliers */}
+                <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                  <h4 className="sp-label sp-text-slate mb-2">Multipliers</h4>
+                  <div className="space-y-1 text-sm">
+                    {[
+                      ['R32', settings.round_32_multiplier],
+                      ['R16', settings.round_16_multiplier],
+                      ['QF', settings.quarter_final_multiplier],
+                      ['SF', settings.semi_final_multiplier],
+                      ['3rd Place', settings.third_place_multiplier],
+                      ['Final', settings.final_multiplier],
+                    ].filter(([, v]) => v != null && v !== 0).map(([label, val]) => (
+                      <div key={String(label)} className="flex items-center justify-between gap-2">
+                        <span className="sp-text-slate sp-body">{label}</span>
+                        <span className="sp-text-ink font-medium sp-body tabular-nums">{val}x</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bonus scoring — only show if any bonus is configured */}
+              {(() => {
+                const bonuses = [
+                  ['Group Winner & Runner-up', settings.bonus_group_winner_and_runnerup],
+                  ['Group Winner Only', settings.bonus_group_winner_only],
+                  ['Group Runner-up Only', settings.bonus_group_runnerup_only],
+                  ['Both Qualify (Swapped)', settings.bonus_both_qualify_swapped],
+                  ['One Qualifies (Wrong Pos)', settings.bonus_one_qualifies_wrong_position],
+                  ['All 16 Qualified', settings.bonus_all_16_qualified],
+                  ['12–15 Qualified', settings.bonus_12_15_qualified],
+                  ['8–11 Qualified', settings.bonus_8_11_qualified],
+                  ['Correct Bracket Pairing', settings.bonus_correct_bracket_pairing],
+                  ['Match Winner Correct', settings.bonus_match_winner_correct],
+                  ['Champion Correct', settings.bonus_champion_correct],
+                  ['2nd Place Correct', settings.bonus_second_place_correct],
+                  ['3rd Place Correct', settings.bonus_third_place_correct],
+                  ['Best Player Correct', settings.bonus_best_player_correct],
+                  ['Top Scorer Correct', settings.bonus_top_scorer_correct],
+                ] as [string, number | null][]
+                const active = bonuses.filter(([, v]) => v != null && v > 0)
+                if (active.length === 0) return null
+                return (
+                  <div className="sp-bg-surface sp-radius-sm p-3.5" style={{ border: thinBorder }}>
+                    <h4 className="sp-label sp-text-slate mb-2">Bonus Points</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 text-sm">
+                      {active.map(([label, val]) => (
+                        <div key={label} className="flex items-center justify-between gap-2">
+                          <span className="sp-text-slate sp-body">{label}</span>
+                          <span className="sp-text-ink font-medium sp-body tabular-nums">{val} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
         </div>
       )}
 
@@ -1490,7 +1615,7 @@ function PoolDetailSheet({
 // =============================================
 // MAIN COMPONENT
 // =============================================
-export function PoolsTab({ pools, setPools, onNavigateToUser }: PoolsTabProps) {
+export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, clearNavigateToPool }: PoolsTabProps) {
   const { showToast } = useToast()
 
   const [search, setSearch] = useState('')
@@ -1556,6 +1681,15 @@ export function PoolsTab({ pools, setPools, onNavigateToUser }: PoolsTabProps) {
     setSelectedPool(null)
     setLoadingDetail(false)
   }
+
+  // Navigate to a specific pool from another tab
+  useEffect(() => {
+    if (navigateToPoolId) {
+      const pool = pools.find((p) => p.pool_id === navigateToPoolId)
+      if (pool) openPoolDetail(pool)
+      clearNavigateToPool?.()
+    }
+  }, [navigateToPoolId, pools, openPoolDetail, clearNavigateToPool])
 
   function handlePoolDeleted() {
     if (selectedPool) {

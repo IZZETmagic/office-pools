@@ -18,9 +18,10 @@ import { BroadcastTab } from './BroadcastTab'
 import { TemplatesTab } from './TemplatesTab'
 import { EmailHistoryTab } from './EmailHistoryTab'
 import { AutomatedEmailsTab } from './AutomatedEmailsTab'
+import { BrandedPoolsTab } from './BrandedPoolsTab'
 import { SP } from './SpTable'
 
-type Tab = 'matches' | 'users' | 'pools' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails'
+type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails'
 
 type TabItem = { key: Tab; label: string; icon: React.ReactNode }
 type TabSection = { heading: string; items: TabItem[] }
@@ -76,6 +77,15 @@ const TAB_SECTIONS: TabSection[] = [
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+          </svg>
+        ),
+      },
+      {
+        key: 'branded',
+        label: 'Branded',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
           </svg>
         ),
       },
@@ -151,10 +161,17 @@ export function SuperAdminDashboard({
 
   // Cross-tab navigation: when PoolsTab wants to open a user profile
   const [navigateToUserId, setNavigateToUserId] = useState<string | null>(null)
+  // Cross-tab navigation: when BrandedPoolsTab wants to open a pool detail
+  const [navigateToPoolId, setNavigateToPoolId] = useState<string | null>(null)
 
   function handleNavigateToUser(userId: string) {
     setNavigateToUserId(userId)
     setActiveTab('users')
+  }
+
+  function handleNavigateToPool(poolId: string) {
+    setNavigateToPoolId(poolId)
+    setActiveTab('pools')
   }
 
   return (
@@ -276,6 +293,15 @@ export function SuperAdminDashboard({
               pools={pools}
               setPools={setPools}
               onNavigateToUser={handleNavigateToUser}
+              navigateToPoolId={navigateToPoolId}
+              clearNavigateToPool={() => setNavigateToPoolId(null)}
+            />
+          )}
+          {activeTab === 'branded' && (
+            <BrandedPoolsTab
+              pools={pools}
+              setPools={setPools}
+              onNavigateToPool={handleNavigateToPool}
             />
           )}
           {activeTab === 'audit' && (
