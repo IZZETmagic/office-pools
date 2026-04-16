@@ -14,6 +14,7 @@ import { ScoringRulesTab } from './ScoringRulesTab'
 import { CommunityTab } from './CommunityTab'
 import { HowToPlayModal } from './HowToPlayModal'
 import { AnalyticsTab } from './AnalyticsTab'
+import { PoolInfoTab } from './PoolInfoTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
 import BracketPickerFlow from '@/components/predictions/BracketPickerFlow'
@@ -57,6 +58,7 @@ type Tab =
   | 'my_bracket'
   | 'analytics'
   | 'standings'
+  | 'pool_info'
   | 'scoring_rules'
   | 'community'
   | 'members'
@@ -72,6 +74,7 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
   // { key: 'standings', label: 'Standings' }, // temporarily hidden — duplicate of info in Form
+  { key: 'pool_info', label: 'Pool Info' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -81,6 +84,7 @@ const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'my_bracket', label: 'My Bracket' },
+  { key: 'pool_info', label: 'Pool Info' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
 ]
 
@@ -1596,6 +1600,16 @@ export function PoolDetail({
                 matches={matches}
                 teams={teams}
                 conductData={conductData}
+              />
+            )}
+
+            {activeTab === 'pool_info' && (
+              <PoolInfoTab
+                pool={pool}
+                members={members}
+                userEntries={entries}
+                roundStates={roundStates}
+                isPastDeadline={isPastDeadline}
               />
             )}
 
