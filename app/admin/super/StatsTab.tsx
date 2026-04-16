@@ -117,14 +117,14 @@ function StatCard({
       className="sp-bg-surface sp-radius-sm p-4"
       style={SP_INNER_BORDER}
     >
-      <div className="flex items-center gap-2 mb-2 text-neutral-500">
+      <div className="flex items-center gap-2 mb-2 sp-text-slate">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide sp-body">{label}</span>
       </div>
       <p className="text-2xl sm:text-3xl font-extrabold sp-text-ink sp-heading">
         {typeof value === 'number' ? formatNumber(value) : value}
       </p>
-      {sub && <p className="text-xs text-neutral-500 mt-0.5 sp-body">{sub}</p>}
+      {sub && <p className="text-xs sp-text-slate mt-0.5 sp-body">{sub}</p>}
     </div>
   )
 }
@@ -168,7 +168,7 @@ function ChartSkeleton({ height = 200 }: { height?: number }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-8 text-center text-sm text-neutral-500 sp-body">{message}</div>
+    <div className="py-8 text-center text-sm sp-text-slate sp-body">{message}</div>
   )
 }
 
@@ -421,7 +421,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
 
           {/* Recent signups */}
           <div className="mt-4 pt-3" style={{ borderTop: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-            <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
+            <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 sp-body">
               Recent Signups
             </h4>
             <div className="space-y-1.5">
@@ -430,7 +430,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   <span className="font-medium sp-text-ink truncate mr-2 sp-body">
                     {u.username}
                   </span>
-                  <span className="text-xs text-neutral-500 whitespace-nowrap sp-body">
+                  <span className="text-xs sp-text-slate whitespace-nowrap sp-body">
                     {formatTimeAgo(u.created_at)}
                   </span>
                 </div>
@@ -444,7 +444,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* By status */}
             <div>
-              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 text-center sp-body">
+              <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 text-center sp-body">
                 By Status
               </h4>
               {poolsByStatus.length > 0 ? (
@@ -478,7 +478,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
               )}
               <div className="flex flex-wrap justify-center gap-2 mt-1">
                 {poolsByStatus.map((d) => (
-                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 sp-body">
+                  <div key={d.name} className="flex items-center gap-1 text-[11px] sp-text-slate sp-body">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: STATUS_COLORS[d.name] || '#6b7280' }}
@@ -491,7 +491,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
 
             {/* By mode */}
             <div>
-              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 text-center sp-body">
+              <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 text-center sp-body">
                 By Mode
               </h4>
               {poolsByMode.length > 0 ? (
@@ -525,7 +525,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
               )}
               <div className="flex flex-wrap justify-center gap-2 mt-1">
                 {poolsByMode.map((d) => (
-                  <div key={d.name} className="flex items-center gap-1 text-[11px] text-neutral-600 sp-body">
+                  <div key={d.name} className="flex items-center gap-1 text-[11px] sp-text-slate sp-body">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: MODE_COLORS[d.name] || '#6b7280' }}
@@ -539,7 +539,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
 
           {/* Top pools */}
           <div className="pt-3" style={{ borderTop: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-            <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
+            <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 sp-body">
               Top Pools by Members
             </h4>
             {topPools.length > 0 ? (
@@ -547,7 +547,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                 {topPools.map((p, i) => (
                   <div key={`${p.pool_name}-${i}`} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-bold text-neutral-400 w-4 sp-body">{i + 1}.</span>
+                      <span className="text-xs font-bold sp-text-slate w-4 sp-body">{i + 1}.</span>
                       <span className="font-medium sp-text-ink truncate sp-body">
                         {p.pool_name}
                       </span>
@@ -662,7 +662,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           <>
             {/* Response time area chart */}
             <div className="mb-5">
-              <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
+              <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 sp-body">
                 Avg Response Time (ms)
               </h4>
               <div className="h-[200px] sm:h-[260px]">
@@ -704,7 +704,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Endpoint breakdown table */}
             {apiData.apiPerf.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
+                <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 sp-body">
                   Endpoint Breakdown
                 </h4>
                 {/* Mobile cards */}
@@ -716,7 +716,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       style={SP_INNER_BORDER}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <code className="text-xs font-mono text-neutral-700 truncate mr-2">
+                        <code className="text-xs font-mono sp-text-ink truncate mr-2">
                           {ep.method} {ep.endpoint}
                         </code>
                         <Badge
@@ -727,7 +727,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                           {ep.error_rate}% err
                         </Badge>
                       </div>
-                      <div className="flex gap-4 text-xs text-neutral-500 sp-body">
+                      <div className="flex gap-4 text-xs sp-text-slate sp-body">
                         <span>Avg: {ep.avg_response_ms}ms</span>
                         <span>Max: {ep.max_response_ms}ms</span>
                         <span>{ep.request_count} reqs</span>
@@ -741,12 +741,12 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-                        <th className="text-left px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Endpoint</th>
-                        <th className="text-left px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Method</th>
-                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Avg (ms)</th>
-                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Max (ms)</th>
-                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Requests</th>
-                        <th className="text-right px-4 py-3 font-medium text-neutral-500 whitespace-nowrap sp-body">Error Rate</th>
+                        <th className="text-left px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Endpoint</th>
+                        <th className="text-left px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Method</th>
+                        <th className="text-right px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Avg (ms)</th>
+                        <th className="text-right px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Max (ms)</th>
+                        <th className="text-right px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Requests</th>
+                        <th className="text-right px-4 py-3 font-medium sp-text-slate whitespace-nowrap sp-body">Error Rate</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -817,14 +817,14 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
             {/* Table sizes */}
             {apiData.tableSizes.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-neutral-500 uppercase mb-2 sp-body">
+                <h4 className="text-xs font-medium sp-text-slate uppercase mb-2 sp-body">
                   Database Table Sizes
                 </h4>
                 {/* Mobile: compact list */}
                 <div className="sm:hidden space-y-1">
                   {apiData.tableSizes.map((t) => (
                     <div key={t.table_name} className="flex items-center justify-between text-sm py-1">
-                      <code className="text-xs font-mono text-neutral-600">
+                      <code className="text-xs font-mono sp-text-slate">
                         {t.table_name}
                       </code>
                       <span className="font-mono font-medium sp-text-ink text-xs sp-body">
@@ -839,8 +839,8 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-                        <th className="text-left px-4 py-3 font-medium text-neutral-500 sp-body">Table</th>
-                        <th className="text-right px-4 py-3 font-medium text-neutral-500 sp-body">Row Count</th>
+                        <th className="text-left px-4 py-3 font-medium sp-text-slate sp-body">Table</th>
+                        <th className="text-right px-4 py-3 font-medium sp-text-slate sp-body">Row Count</th>
                       </tr>
                     </thead>
                     <tbody>

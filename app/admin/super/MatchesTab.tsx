@@ -895,8 +895,55 @@ export function MatchesTab({
           </Button>
         </div>
 
-        {/* Stage + status filters */}
-        <div className="flex items-center justify-between gap-3">
+        {/* Stage + status filters — mobile dropdowns */}
+        <div className="sm:hidden flex gap-2">
+          <select
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value)
+              if (e.target.value !== 'group') setGroupFilter('all')
+            }}
+            className="flex-1 h-9 px-3 text-sm font-medium sp-body sp-radius-md sp-bg-surface sp-text-ink"
+            style={{ border: cardBorder, appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px 16px', paddingRight: 28 }}
+          >
+            <option value="all">All Rounds</option>
+            <option value="group">Group</option>
+            <option value="round_32">Round of 32</option>
+            <option value="round_16">Round of 16</option>
+            <option value="quarter_final">Quarter Final</option>
+            <option value="semi_final">Semi Final</option>
+            <option value="third_place">3rd Place</option>
+            <option value="final">Final</option>
+          </select>
+          {stageFilter === 'group' && (
+            <select
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              className="w-20 h-9 px-2 text-sm font-medium sp-body sp-radius-md sp-bg-surface sp-text-ink"
+              style={{ border: cardBorder, appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', backgroundSize: '16px 16px', paddingRight: 24 }}
+            >
+              <option value="all">All</option>
+              {groups.map((g) => (
+                <option key={g} value={g}>Grp {g}</option>
+              ))}
+            </select>
+          )}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="flex-1 h-9 px-3 text-sm font-medium sp-body sp-radius-md sp-bg-surface sp-text-ink"
+            style={{ border: cardBorder, appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px 16px', paddingRight: 28 }}
+          >
+            <option value="all">All Status</option>
+            <option value="scheduled">Scheduled{scheduledCount > 0 ? ` (${scheduledCount})` : ''}</option>
+            <option value="live">Live{liveCount > 0 ? ` (${liveCount})` : ''}</option>
+            <option value="completed">Completed{completedCount > 0 ? ` (${completedCount})` : ''}</option>
+            <option value="cancelled">Cancelled{cancelledCount > 0 ? ` (${cancelledCount})` : ''}</option>
+          </select>
+        </div>
+
+        {/* Stage + status filters — desktop pills */}
+        <div className="hidden sm:flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 overflow-x-auto">
             <div className="flex gap-1">
               {[
@@ -915,7 +962,7 @@ export function MatchesTab({
                     setStageFilter(tab.key)
                     if (tab.key !== 'group') setGroupFilter('all')
                   }}
-                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium sp-radius-sm sp-body transition-colors whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-sm font-medium sp-radius-sm sp-body transition-colors whitespace-nowrap ${
                     stageFilter === tab.key
                       ? 'sp-bg-primary-light sp-text-primary'
                       : 'sp-bg-mist sp-text-slate sp-hover-snow'

@@ -882,6 +882,7 @@ function PoolDetailSheet({
 
   // Header dropdown items
   const headerActions = [
+    { label: 'View Pool', onClick: () => window.open(`/pools/${pool.pool_id}`, '_blank') },
     { label: 'Change Status', onClick: () => setActionModal({ type: 'change_status', currentStatus: pool.status }) },
     { label: 'Edit Pool Code', onClick: () => setActionModal({ type: 'edit_pool_code', currentCode: pool.pool_code }) },
     { label: 'Transfer Ownership', onClick: () => setActionModal({ type: 'transfer_ownership', members: poolMembers }) },
@@ -937,13 +938,6 @@ function PoolDetailSheet({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            size="xs"
-            variant="outline"
-            href={`/pools/${pool.pool_id}`}
-          >
-            View Pool
-          </Button>
           <DropdownMenu items={headerActions} />
         </div>
       </div>
@@ -1820,7 +1814,31 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
           <span className="sp-text-ink">Pool</span>
           <span className="sp-text-primary">Management</span>
         </h2>
-        <div className="flex items-center justify-between gap-3">
+        {/* Mobile: dropdown + search */}
+        <div className="sm:hidden flex gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 px-3 text-sm font-medium sp-body sp-radius-md sp-bg-surface sp-text-ink"
+            style={{ border: cardBorder, appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px 16px', paddingRight: 28 }}
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}{opt.count != null && opt.count > 0 ? ` (${opt.count})` : ''}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search pools..."
+            className="flex-1 min-w-0 px-3 py-2 border sp-border-silver sp-radius-md text-sm sp-text-ink sp-bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-neutral-400"
+          />
+        </div>
+
+        {/* Desktop: pills + search */}
+        <div className="hidden sm:flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1.5">
             {statusOptions.map((opt) => (
               <button

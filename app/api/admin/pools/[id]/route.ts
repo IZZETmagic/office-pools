@@ -45,7 +45,9 @@ export async function GET(
           current_rank,
           match_points,
           bonus_points,
-          created_at
+          created_at,
+          fee_paid,
+          fee_paid_at
         )
       `)
       .eq('pool_id', id)

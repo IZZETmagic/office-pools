@@ -287,7 +287,8 @@ final class PoolDetailViewModel {
                         predictionsLastSavedAt: nil, totalPoints: data.totalPoints,
                         pointAdjustment: data.pointAdjustment, adjustmentReason: nil,
                         currentRank: data.currentRank, previousRank: data.previousRank,
-                        lastRankUpdate: nil, createdAt: ""
+                        lastRankUpdate: nil, createdAt: "",
+                        feePaid: false, feePaidAt: nil
                     ),
                     user: user,
                     role: member?.role ?? "member"

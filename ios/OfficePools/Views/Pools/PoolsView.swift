@@ -166,6 +166,8 @@ struct PoolsView: View {
                     predictionMode: .fullTournament,
                     createdAt: "",
                     updatedAt: "",
+                    entryFee: nil,
+                    entryFeeCurrency: nil,
                     brandName: nil,
                     brandEmoji: nil,
                     brandColor: nil,

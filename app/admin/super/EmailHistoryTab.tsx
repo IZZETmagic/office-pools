@@ -814,13 +814,47 @@ export function EmailHistoryTab() {
   return (
     <div className="sp-body space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-extrabold sp-heading shrink-0">
-          <span className="sp-text-ink">Email</span>
-          <span className="sp-text-primary">History</span>
-        </h2>
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 sp-radius-md p-1" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-3 sm:mb-0">
+          <h2 className="text-2xl font-extrabold sp-heading shrink-0">
+            <span className="sp-text-ink">Email</span>
+            <span className="sp-text-primary">History</span>
+          </h2>
+          {/* Desktop: filters + refresh inline with title */}
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="flex gap-1 sp-radius-md p-1" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
+              {([
+                { key: 'sent' as const, label: 'Sent', count: sentEmails.length },
+                { key: 'received' as const, label: 'Received', count: receivedEmails.length },
+                { key: 'broadcasts' as const, label: 'Broadcasts', count: broadcasts.length },
+              ]).map((section) => (
+                <button
+                  key={section.key}
+                  onClick={() => setActiveSection(section.key)}
+                  className={`px-3 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
+                    activeSection === section.key
+                      ? 'sp-bg-surface sp-text-ink shadow-sm'
+                      : 'sp-text-slate hover:text-neutral-700'
+                  }`}
+                >
+                  {section.label} ({section.count})
+                </button>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={loadAll}
+              disabled={loading}
+              loading={loading}
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+        {/* Mobile: filters + refresh below title */}
+        <div className="sm:hidden flex items-center gap-2">
+          <div className="flex gap-1 sp-radius-md p-1 flex-1" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
             {([
               { key: 'sent' as const, label: 'Sent', count: sentEmails.length },
               { key: 'received' as const, label: 'Received', count: receivedEmails.length },
@@ -829,7 +863,7 @@ export function EmailHistoryTab() {
               <button
                 key={section.key}
                 onClick={() => setActiveSection(section.key)}
-                className={`px-3 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
+                className={`flex-1 px-2 py-1.5 sp-radius-sm text-xs font-medium sp-body transition-colors ${
                   activeSection === section.key
                     ? 'sp-bg-surface sp-text-ink shadow-sm'
                     : 'sp-text-slate hover:text-neutral-700'

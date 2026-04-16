@@ -235,6 +235,7 @@ struct DashboardPoolCard: View {
                     tournamentId: "t1", predictionDeadline: nil,
                     predictionMode: .fullTournament,
                     createdAt: "", updatedAt: "",
+                    entryFee: nil, entryFeeCurrency: nil,
                     brandName: "Acme Co", brandEmoji: "🏢", brandColor: "#3B6EFF", brandAccent: nil
                 ),
                 userRank: 2, totalEntries: 13, totalPoints: 87,
@@ -260,6 +261,7 @@ struct DashboardPoolCard: View {
                     tournamentId: "t1", predictionDeadline: nil,
                     predictionMode: .progressive,
                     createdAt: "", updatedAt: "",
+                    entryFee: nil, entryFeeCurrency: nil,
                     brandName: nil, brandEmoji: nil, brandColor: nil, brandAccent: nil
                 ),
                 userRank: 5, totalEntries: 8, totalPoints: 42,

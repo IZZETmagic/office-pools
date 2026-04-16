@@ -376,7 +376,8 @@ final class PoolService {
                     has_submitted_predictions, predictions_submitted_at,
                     predictions_locked, auto_submitted, predictions_last_saved_at,
                     total_points, point_adjustment, adjustment_reason,
-                    current_rank, previous_rank, last_rank_update, created_at
+                    current_rank, previous_rank, last_rank_update, created_at,
+                    fee_paid, fee_paid_at
                 )
             """)
             .eq("pool_id", value: poolId)

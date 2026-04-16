@@ -914,7 +914,8 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Desktop: buttons inline */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             <Button
               variant="gray"
               onClick={() => { setFormError(null); setActionModal({ type: 'remove_branding', pool }) }}
@@ -931,6 +932,27 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
               Save Changes
             </Button>
           </div>
+        </div>
+
+        {/* Mobile: buttons below header */}
+        <div className="sm:hidden flex gap-2">
+          <Button
+            variant="gray"
+            className="flex-1"
+            onClick={() => { setFormError(null); setActionModal({ type: 'remove_branding', pool }) }}
+          >
+            Remove Branding
+          </Button>
+          <Button
+            variant="primary"
+            className="flex-1"
+            onClick={() => handleEdit(pool.pool_id)}
+            disabled={saving}
+            loading={saving}
+            loadingText="Saving..."
+          >
+            Save Changes
+          </Button>
         </div>
 
         {formError && <Alert variant="error">{formError}</Alert>}
