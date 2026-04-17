@@ -1,0 +1,20 @@
+# Local agent / tooling state
+.claude/**
+memory/**
+
+# Native iOS app is deployed separately
+ios/**
+
+# Build/editor artifacts
+*.tsbuildinfo
+.DS_Store
+.gitattributes_tmp
+
+# Standalone email preview artifacts (not used at runtime)
+office-pools-invite-email.html
+preview-email.html
+
+# Docs / plans — not needed in the deployed bundle
+AGENTS.md
+PLAN.md
+UAT-TESTING-SCRIPT.md

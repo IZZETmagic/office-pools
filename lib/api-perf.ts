@@ -1,19 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-type RouteHandler = (
+// Next.js 15/16 passes `{ params: Promise<...> }` as the second argument to
+// dynamic route handlers. Generic over the params shape so each route keeps
+// its precise segment typing through the wrapper.
+type RouteContext<P extends Record<string, string> = Record<string, string>> = {
+  params: Promise<P>
+}
+
+type RouteHandler<P extends Record<string, string> = Record<string, string>> = (
   request: NextRequest,
-  context?: any
+  context: RouteContext<P>
 ) => Promise<NextResponse>
 
 /**
  * Wraps an API route handler to log performance metrics.
  * Logs are fire-and-forget to avoid impacting response times.
  */
-export function withPerfLogging(
+export function withPerfLogging<P extends Record<string, string>>(
   endpoint: string,
-  handler: RouteHandler
-): RouteHandler {
+  handler: RouteHandler<P>
+): RouteHandler<P> {
   return async (request, context) => {
     const start = performance.now()
     let statusCode = 200
