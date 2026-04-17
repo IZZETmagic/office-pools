@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
@@ -69,10 +69,7 @@ async function handleGET(
 
   // Use admin client for all data queries to bypass RLS
   // (pool membership was already verified above, so this is safe)
-  const adminClient = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const adminClient = createAdminClient()
 
   // 3. Fetch pool info
   const { data: pool } = await adminClient
@@ -89,7 +86,6 @@ async function handleGET(
     { data: teams },
     { data: conductData },
     { data: settingsRow },
-    { data: _tournamentAwardsRow },
     { data: poolMembers },
   ] = await Promise.all([
     adminClient
@@ -108,11 +104,6 @@ async function handleGET(
       .from('pool_settings')
       .select('*')
       .eq('pool_id', pool_id)
-      .single(),
-    adminClient
-      .from('tournament_awards')
-      .select('champion_team_id, runner_up_team_id, third_place_team_id, best_player, top_scorer')
-      .eq('tournament_id', pool.tournament_id)
       .single(),
     adminClient
       .from('pool_members')

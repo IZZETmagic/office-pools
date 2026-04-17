@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
@@ -142,10 +142,7 @@ async function handleGET(
 
   // Use admin client for data queries to bypass RLS
   // (pool membership was already verified above, so this is safe)
-  const adminClient = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const adminClient = createAdminClient()
 
   // 7. Fetch stored v2 scores, matches (for display names), settings, and bonus scores in parallel
   const [

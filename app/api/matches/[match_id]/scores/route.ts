@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -57,10 +57,7 @@ async function handleGET(
   }
 
   // Use admin client for data queries (pool membership was verified by entry ownership)
-  const adminClient = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const adminClient = createAdminClient()
 
   // Fetch match_scores, teams, and group completion status in parallel
   const [{ data: scores }, { data: teams }, { data: groupMatches }] = await Promise.all([

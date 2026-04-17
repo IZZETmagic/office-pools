@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { withPerfLogging } from '@/lib/api-perf'
 
+// Shape returned by `pool_entries` SELECT with `pool_members!inner(...)` join.
+// Supabase's TS inference types this as an array or object depending on the FK,
+// so we narrow to the single-row shape used by the ownership checks below.
+type EntryWithMembership = {
+  entry_id: string
+  member_id: string
+  entry_number?: number
+  has_submitted_predictions?: boolean
+  pool_members: { user_id: string; pool_id: string } | null
+}
+
 // =============================================================
 // GET /api/pools/:poolId/entries - List user's entries for this pool
 // =============================================================
@@ -57,50 +68,29 @@ async function handlePOST(
 
   if (!membership) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
-  // Check max entries limit
-  const { data: pool } = await supabase
-    .from('pools')
-    .select('max_entries_per_user, prediction_deadline')
-    .eq('pool_id', pool_id)
-    .single()
+  const body = await request.json().catch(() => ({} as { entryName?: string }))
+  const entryName = typeof body.entryName === 'string' ? body.entryName : null
 
-  if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+  // Atomic: count + validate + insert inside a single plpgsql function.
+  // See lib/migrations/005_create_pool_entry_rpc.sql
+  const { data: entry, error } = await supabase.rpc('create_pool_entry', {
+    p_member_id: membership.member_id,
+    p_pool_id: pool_id,
+    p_entry_name: entryName,
+  })
 
-  // Check deadline
-  const isPastDeadline = pool.prediction_deadline
-    ? new Date(pool.prediction_deadline) < new Date()
-    : false
-
-  if (isPastDeadline) {
-    return NextResponse.json({ error: 'Prediction deadline has passed' }, { status: 403 })
+  if (error) {
+    // Business errors from the RPC (RAISE EXCEPTION with P0001) → 400
+    // Not-found (P0002) → 404. Everything else → 500.
+    const code = (error as { code?: string }).code
+    if (code === 'P0001') {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (code === 'P0002') {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
+    return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 })
   }
-
-  // Count existing entries
-  const { count: existingCount } = await supabase
-    .from('pool_entries')
-    .select('*', { count: 'exact', head: true })
-    .eq('member_id', membership.member_id)
-
-  if ((existingCount ?? 0) >= pool.max_entries_per_user) {
-    return NextResponse.json({
-      error: `Maximum of ${pool.max_entries_per_user} entries allowed per user`,
-    }, { status: 400 })
-  }
-
-  const body = await request.json()
-  const entryName = body.entryName || `Entry ${(existingCount ?? 0) + 1}`
-
-  const { data: entry, error } = await supabase
-    .from('pool_entries')
-    .insert({
-      member_id: membership.member_id,
-      entry_name: entryName,
-      entry_number: (existingCount ?? 0) + 1,
-    })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ entry }, { status: 201 })
 }
@@ -126,14 +116,15 @@ async function handlePATCH(
   }
 
   // Verify ownership
-  const { data: entry } = await supabase
+  const { data: entryRaw } = await supabase
     .from('pool_entries')
     .select('entry_id, member_id, pool_members!inner(user_id, pool_id)')
     .eq('entry_id', entryId)
     .single()
 
-  if (!entry || (entry as any).pool_members?.user_id !== userData.user_id ||
-      (entry as any).pool_members?.pool_id !== pool_id) {
+  const entry = entryRaw as EntryWithMembership | null
+  if (!entry || entry.pool_members?.user_id !== userData.user_id ||
+      entry.pool_members?.pool_id !== pool_id) {
     return NextResponse.json({ error: 'Entry not found or not yours' }, { status: 404 })
   }
 
@@ -168,14 +159,15 @@ async function handleDELETE(
   }
 
   // Verify ownership and check it's not submitted
-  const { data: entry } = await supabase
+  const { data: entryRaw } = await supabase
     .from('pool_entries')
     .select('entry_id, entry_number, has_submitted_predictions, member_id, pool_members!inner(user_id, pool_id)')
     .eq('entry_id', entryId)
     .single()
 
-  if (!entry || (entry as any).pool_members?.user_id !== userData.user_id ||
-      (entry as any).pool_members?.pool_id !== pool_id) {
+  const entry = entryRaw as EntryWithMembership | null
+  if (!entry || entry.pool_members?.user_id !== userData.user_id ||
+      entry.pool_members?.pool_id !== pool_id) {
     return NextResponse.json({ error: 'Entry not found or not yours' }, { status: 404 })
   }
 

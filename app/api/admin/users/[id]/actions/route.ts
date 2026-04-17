@@ -499,10 +499,6 @@ export async function POST(
         await adminSupabase.auth.admin.deleteUser(targetUser.auth_user_id)
       }
 
-      console.log(
-        `[Super Admin] User ${targetUser.username} (${id}) deleted by ${userData.user_id}`
-      )
-
       return NextResponse.json({ success: true, deleted: true })
     }
 

@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, TeamData, MatchData } from '@/app/pools/[pool_id]/types'
@@ -43,10 +43,7 @@ async function handleGET(
   }
 
   // Use admin client for all data queries to bypass RLS
-  const adminClient = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const adminClient = createAdminClient()
 
   // 3. Fetch pool info
   const { data: pool } = await adminClient

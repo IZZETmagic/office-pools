@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, LEVELS, BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
@@ -40,10 +40,7 @@ async function handleGET(
 
   // Use admin client for all data queries to bypass RLS
   // (pool membership was already verified above, so this is safe)
-  const adminClient = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const adminClient = createAdminClient()
 
   // 4. Fetch pool info
   const { data: pool } = await adminClient

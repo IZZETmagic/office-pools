@@ -240,10 +240,6 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to delete pool record' }, { status: 500 })
       }
 
-      console.log(
-        `[Super Admin] Pool ${targetPool.pool_name} (${id}) deleted by ${userData.user_id}`
-      )
-
       return NextResponse.json({ success: true, deleted: true })
     }
 
@@ -601,8 +597,16 @@ export async function POST(
       }
 
       const adj = Number(adjustment)
-      if (isNaN(adj) || adj === 0) {
+      if (!Number.isFinite(adj) || adj === 0) {
         return NextResponse.json({ error: 'adjustment must be a non-zero number' }, { status: 400 })
+      }
+      // Bound to a reasonable range to prevent accidental/malicious score manipulation
+      const MAX_ADJUSTMENT = 10000
+      if (Math.abs(adj) > MAX_ADJUSTMENT) {
+        return NextResponse.json(
+          { error: `adjustment must be between -${MAX_ADJUSTMENT} and ${MAX_ADJUSTMENT}` },
+          { status: 400 }
+        )
       }
 
       // Get current entry
