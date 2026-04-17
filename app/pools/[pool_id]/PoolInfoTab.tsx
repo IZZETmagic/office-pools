@@ -35,14 +35,24 @@ function formatFee(amount: number, currency: string): string {
   }).format(amount)
 }
 
-function formatDeadline(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+function formatDeadline(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+function formatCreated(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -172,7 +182,7 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
             </Badge>
           </InfoRow>
           <InfoRow label="Created">
-            {new Date(pool.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+            {formatCreated(pool.created_at)}
           </InfoRow>
         </div>
       </Card>

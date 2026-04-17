@@ -86,6 +86,11 @@ export function CommunityTab({
   }
   const wasNearBottomRef = useRef(true)
   const supabaseRef = useRef(createClient())
+  // Track latest members without re-firing effects that only need them for lookups
+  const membersRef = useRef(members)
+  useEffect(() => {
+    membersRef.current = members
+  }, [members])
   const broadcastChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const chatWrapperRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -338,7 +343,7 @@ export function CommunityTab({
           if (replyMsgs) {
             const previews = new Map<string, ReplyPreview>()
             for (const rm of replyMsgs) {
-              const author = members.find(m => m.user_id === rm.user_id)
+              const author = membersRef.current.find(m => m.user_id === rm.user_id)
               previews.set(rm.message_id, {
                 message_id: rm.message_id,
                 content: rm.content.slice(0, 60) + (rm.content.length > 60 ? '...' : ''),
@@ -367,7 +372,7 @@ export function CommunityTab({
       })
     }
     loadMessages()
-  }, [poolId, scrollToBottom, members])
+  }, [poolId, scrollToBottom])
 
   // =====================
   // REALTIME SUBSCRIPTION
@@ -406,8 +411,7 @@ export function CommunityTab({
             : [...prev, newMsg]
         )
       })
-      .subscribe((status, err) => {
-        console.log('[Realtime] broadcast channel status:', status, err ?? '')
+      .subscribe((status) => {
         broadcastConnectedRef.current = status === 'SUBSCRIBED'
       })
 
@@ -744,8 +748,6 @@ export function CommunityTab({
     mentions: string[],
     replyToId: string | null,
   ) => {
-    console.log('[Mention DEBUG] handleSendMessage called:', { content, mentions, replyToId })
-
     const { data, error } = await supabaseRef.current
       .from('pool_messages')
       .insert({
@@ -798,10 +800,7 @@ export function CommunityTab({
         keepalive: true,
       }).catch(err => console.error('[MessagePush] fetch failed:', err))
 
-      console.log('[Mention DEBUG] mentions array:', mentions, 'length:', mentions.length)
-
       if (mentions.length > 0) {
-        console.log('[Mention DEBUG] Firing notification fetch...')
         const mentionPayload = JSON.stringify({
           pool_id: poolId,
           message_content: content,

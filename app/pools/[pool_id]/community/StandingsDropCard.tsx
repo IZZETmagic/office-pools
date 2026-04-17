@@ -55,7 +55,7 @@ export function StandingsDropCard({
           const isCurrentUser = entry.user_id === currentUserId
           const isFirst = entry.rank === 1
           return (
-            <div key={entry.user_id}>
+            <div key={`${entry.user_id}-${idx}`}>
               <div
                 className={`flex items-center gap-2 px-2.5 py-2 rounded-lg ${
                   isFirst ? 'bg-accent-50/60 dark:bg-accent-400/30' : ''

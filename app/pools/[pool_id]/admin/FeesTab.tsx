@@ -71,14 +71,18 @@ export function FeesTab({ pool, members, setMembers, currentUserId }: FeesTabPro
   })
 
   async function refreshMembers() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('pool_members')
       .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
       .eq('pool_id', pool.pool_id)
+    if (error) {
+      showToast('Failed to refresh member list', 'error')
+      return
+    }
     if (data) {
-      const processed = data.map((m: any) => {
-        const entries = ((m.pool_entries || []) as EntryData[]).sort(
-          (a: EntryData, b: EntryData) => a.entry_number - b.entry_number
+      const processed = (data as Array<MemberData & { pool_entries?: EntryData[] }>).map((m) => {
+        const entries = (m.pool_entries ?? []).slice().sort(
+          (a, b) => a.entry_number - b.entry_number
         )
         return { ...m, pool_entries: undefined, entries } as MemberData
       })
@@ -89,36 +93,56 @@ export function FeesTab({ pool, members, setMembers, currentUserId }: FeesTabPro
   async function handleToggleFee(entry: EntryData) {
     setLoading(true)
     const newPaid = !entry.fee_paid
-    const { error } = await supabase
-      .from('pool_entries')
-      .update({
-        fee_paid: newPaid,
-        fee_paid_at: newPaid ? new Date().toISOString() : null,
-      })
-      .eq('entry_id', entry.entry_id)
+    try {
+      const { error } = await supabase
+        .from('pool_entries')
+        .update({
+          fee_paid: newPaid,
+          fee_paid_at: newPaid ? new Date().toISOString() : null,
+        })
+        .eq('entry_id', entry.entry_id)
 
-    if (error) {
-      showToast('Failed to update fee status', 'error')
+      if (error) {
+        showToast('Failed to update fee status', 'error')
+        return
+      }
+      showToast(newPaid ? 'Marked as paid' : 'Marked as unpaid', 'success')
+      await refreshMembers()
+    } finally {
       setLoading(false)
-      return
     }
-    showToast(newPaid ? 'Marked as paid' : 'Marked as unpaid', 'success')
-    await refreshMembers()
-    setLoading(false)
   }
 
   async function handleMarkAllPaid(member: MemberData) {
     setLoading(true)
     const unpaid = (member.entries || []).filter((e) => !e.fee_paid)
-    for (const entry of unpaid) {
-      await supabase
-        .from('pool_entries')
-        .update({ fee_paid: true, fee_paid_at: new Date().toISOString() })
-        .eq('entry_id', entry.entry_id)
+    let succeeded = 0
+    let failed = 0
+    try {
+      for (const entry of unpaid) {
+        const { error } = await supabase
+          .from('pool_entries')
+          .update({ fee_paid: true, fee_paid_at: new Date().toISOString() })
+          .eq('entry_id', entry.entry_id)
+        if (error) {
+          failed += 1
+          // Stop on first failure so the user can see what went wrong
+          break
+        }
+        succeeded += 1
+      }
+      if (failed > 0) {
+        showToast(
+          `Marked ${succeeded} paid, ${unpaid.length - succeeded} failed. Please retry.`,
+          'error'
+        )
+      } else {
+        showToast(`All entries marked as paid for ${member.users.username}`, 'success')
+      }
+      await refreshMembers()
+    } finally {
+      setLoading(false)
     }
-    showToast(`All entries marked as paid for ${member.users.username}`, 'success')
-    await refreshMembers()
-    setLoading(false)
   }
 
   const filterOptions: { key: Filter; label: string }[] = [

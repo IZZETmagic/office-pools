@@ -617,9 +617,7 @@ export function PoolDetail({
         }
       )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[realtime] Subscribed to pool_entries changes')
-        } else if (status === 'CHANNEL_ERROR') {
+        if (status === 'CHANNEL_ERROR') {
           console.error('[realtime] Channel error — falling back to polling')
         }
       })

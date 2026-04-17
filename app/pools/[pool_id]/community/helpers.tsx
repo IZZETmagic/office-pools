@@ -54,21 +54,13 @@ export function parseMentionUserIds(content: string, members: MemberData[]): str
   const mentionPattern = /@(\w+)/g
   const ids: string[] = []
   let match
-  const allUsernames = members.map(m => m.users.username)
-  console.log('[Mention DEBUG] parseMentionUserIds content:', content)
-  console.log('[Mention DEBUG] Available usernames:', allUsernames)
   while ((match = mentionPattern.exec(content)) !== null) {
     const username = match[1].toLowerCase()
-    console.log('[Mention DEBUG] Found @mention:', match[1], '→ looking for username:', username)
     const member = members.find(m => m.users.username.toLowerCase() === username)
     if (member) {
-      console.log('[Mention DEBUG] Matched member:', member.user_id, member.users.username)
       ids.push(member.user_id)
-    } else {
-      console.warn('[Mention DEBUG] No match for @' + username)
     }
   }
-  console.log('[Mention DEBUG] Final mention IDs:', ids)
   return [...new Set(ids)]
 }
 
