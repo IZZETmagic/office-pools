@@ -11,10 +11,10 @@ const features = [
       'Set up your World Cup pool in seconds. Customize scoring rules, invite friends, and start predicting.',
   },
   {
-    icon: '🎯',
-    title: 'Predict All 104 Matches',
+    icon: '🗂️',
+    title: 'Multiple Pool Formats',
     description:
-      'Make predictions for every World Cup match from group stage to the final. PSO predictions included.',
+      'Run a full-tournament pool, a round-by-round progressive pool, or a quick bracket-only pick’em.',
   },
   {
     icon: '🏆',
@@ -23,34 +23,10 @@ const features = [
       'Track your performance with automatic point calculation and live leaderboard updates.',
   },
   {
-    icon: '⚙️',
-    title: 'Customizable Scoring Rules',
-    description:
-      'Pool admins can customize point values for exact scores, correct results, and bonus predictions.',
-  },
-  {
     icon: '💬',
     title: 'Pool Chat & Reactions',
     description:
       'Talk trash, react with emoji, pin the big calls, and @mention your friends in every pool.',
-  },
-  {
-    icon: '📝',
-    title: 'Multiple Entries',
-    description:
-      'Admins can allow up to 10 entries per member — run a serious pick and a fun one side by side.',
-  },
-  {
-    icon: '🆓',
-    title: 'Free Forever',
-    description:
-      'No subscriptions, no ads, no paywalls. Sport Pool is free for everyone, forever.',
-  },
-  {
-    icon: '🏷️',
-    title: 'Branded Pools',
-    description:
-      'Organizations can run fully branded pools with their own name, logo, colors, and landing page.',
   },
 ]
 
