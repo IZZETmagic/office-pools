@@ -40,6 +40,18 @@ const features = [
     description:
       'Admins can allow up to 10 entries per member — run a serious pick and a fun one side by side.',
   },
+  {
+    icon: '🆓',
+    title: 'Free Forever',
+    description:
+      'No subscriptions, no ads, no paywalls. Sport Pool is free for everyone, forever.',
+  },
+  {
+    icon: '🏷️',
+    title: 'Branded Pools',
+    description:
+      'Organizations can run fully branded pools with their own name, logo, colors, and landing page.',
+  },
 ]
 
 const steps = [
