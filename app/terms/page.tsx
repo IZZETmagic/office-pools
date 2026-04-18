@@ -31,7 +31,7 @@ export default function TermsPage() {
       {/* Content */}
       <section className="py-16 sm:py-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-neutral-500 mb-12">Last updated: March 1, 2026</p>
+          <p className="text-sm text-neutral-500 mb-12">Last updated: April 18, 2026</p>
 
           <div className="space-y-10">
             {/* 1. Overview */}
@@ -86,18 +86,81 @@ export default function TermsPage() {
                   Sport Pool allows users to create prediction pools, invite friends, and predict match results for the FIFA World Cup 2026. Points are awarded based on the accuracy of predictions, and leaderboards track participant rankings within each pool.
                 </p>
                 <p>
-                  <strong>Sport Pool is not a gambling platform.</strong> No real money, prizes, or anything of monetary value is wagered, won, or lost through the Service. The platform is intended purely for entertainment and friendly competition. Pool administrators may independently organize prizes outside the platform, but Sport Pool has no involvement in, responsibility for, or liability related to any such arrangements.
+                  <strong>Sport Pool is not a gambling platform.</strong> No real money, prizes, or anything of monetary value is wagered, won, or lost through the Service. The platform is intended purely for entertainment and friendly competition. See Section 5 for how entry fees and prizes are handled.
                 </p>
                 <p>
-                  Scoring rules, multipliers, and bonus points are customizable by pool administrators. Sport Pool calculates points automatically based on the configured rules and official match results.
+                  Scoring rules, multipliers, and bonus points are customizable by pool administrators. Sport Pool calculates points automatically based on the configured rules and official match results. Pool administrators may also allow members to submit multiple independent entries to a single pool, each with its own predictions and leaderboard position.
+                </p>
+                <p>
+                  The Service includes community features such as in-pool chat, emoji reactions, pinned messages, and @mentions. See Section 7 for rules that apply to content you post.
+                </p>
+                <p>
+                  By creating an account, you consent to receive transactional emails necessary to operate the Service &mdash; for example, account notifications, prediction deadline reminders, match results, and administrative messages. You can control which categories of notifications you receive from your profile settings, and broadcast emails include a one-click unsubscribe link.
                 </p>
               </div>
             </div>
 
-            {/* 5. Acceptable Use */}
+            {/* 5. Entry Fees & Prizes */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                5. Acceptable Use
+                5. Entry Fees &amp; Prizes
+              </h2>
+              <div className="space-y-3 text-neutral-700 leading-relaxed">
+                <p>
+                  Sport Pool does not collect, hold, process, or disburse money. We are not a payment processor, escrow service, or prize sponsor.
+                </p>
+                <p>
+                  Pool administrators may independently organize entry fees and prizes with the members of their pool &mdash; for example, collecting contributions through an external payment app and awarding a prize to the winner. Sport Pool provides only an optional tool for admins to mark a member&apos;s entry as paid or unpaid. This flag is a record-keeping convenience; it does not evidence payment to Sport Pool, does not create any obligation on Sport Pool, and does not make Sport Pool a party to any fee or prize arrangement.
+                </p>
+                <p>
+                  Any dispute over fees, prizes, or payouts is solely between the members and the pool administrator. You agree that Sport Pool has no liability for any such arrangement and is not responsible for ensuring that fees are collected or that prizes are paid.
+                </p>
+                <p>
+                  You are responsible for ensuring that any fee or prize arrangement you participate in complies with the laws of your jurisdiction, including any laws governing contests, sweepstakes, or gambling.
+                </p>
+              </div>
+            </div>
+
+            {/* 6. Branded Pools */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
+                6. Branded Pools
+              </h2>
+              <div className="space-y-3 text-neutral-700 leading-relaxed">
+                <p>
+                  Organizations, companies, and communities may operate branded (white-labeled) pools on Sport Pool. A branded pool may display a custom name, logo, color, and landing page chosen by the sponsoring organization.
+                </p>
+                <p>
+                  Brand assets displayed in a branded pool remain the property of their respective owners and are used with permission of the sponsoring organization. Sport Pool does not endorse any branded pool, offer, or external prize.
+                </p>
+                <p>
+                  If you participate in a branded pool, any relationship with the sponsoring organization (including any promotions, prizes, or communications they provide) is between you and that organization. Sport Pool&apos;s role is limited to operating the underlying platform, and platform-wide rules including Section 7 (User-Generated Content) and Section 8 (Acceptable Use) apply inside branded pools.
+                </p>
+              </div>
+            </div>
+
+            {/* 7. User-Generated Content */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
+                7. User-Generated Content
+              </h2>
+              <div className="space-y-3 text-neutral-700 leading-relaxed">
+                <p>
+                  Some features of the Service let you post content that other users can see &mdash; including pool names and descriptions, entry names, chat messages, emoji reactions, pinned messages, and @mentions. We call these collectively &quot;User Content.&quot;
+                </p>
+                <p>
+                  You are solely responsible for the User Content you post. You represent that you have the right to post it and that it does not violate any law or any third party&apos;s rights. By posting User Content, you grant Sport Pool a non-exclusive, royalty-free, worldwide license to host, store, reproduce, and display that content as necessary to operate the Service &mdash; for example, showing your chat messages to other members of the same pool.
+                </p>
+                <p>
+                  Pool administrators and Sport Pool may remove User Content that we believe violates these Terms, the Acceptable Use rules in Section 8, or applicable law, and we may do so without notice. We are not obligated to pre-screen or monitor User Content, and we make no guarantee about the accuracy, legality, or safety of content posted by other users.
+                </p>
+              </div>
+            </div>
+
+            {/* 8. Acceptable Use */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
+                8. Acceptable Use
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>You agree not to:</p>
@@ -105,22 +168,25 @@ export default function TermsPage() {
                   <li>Manipulate or attempt to manipulate scores, rankings, or leaderboard positions through any unauthorized means</li>
                   <li>Create multiple accounts to gain an unfair advantage in any pool</li>
                   <li>Use automated tools, bots, or scripts to access or interact with the Service</li>
-                  <li>Harass, abuse, or threaten other users</li>
+                  <li>Harass, bully, threaten, dox, or discriminate against other users, including in pool chat or @mentions</li>
+                  <li>Post hate speech, sexually explicit content, or content that encourages violence or self-harm</li>
+                  <li>Impersonate another person, including pool administrators or Sport Pool staff</li>
+                  <li>Post spam, unsolicited promotions, phishing links, or malware in chat, pool names, or any other field</li>
                   <li>Upload or transmit harmful content, spam, or malware</li>
                   <li>Attempt to access other users&apos; accounts or private data</li>
                   <li>Use the Service for any illegal purpose or in violation of any applicable laws</li>
                   <li>Interfere with or disrupt the Service or its infrastructure</li>
                 </ul>
                 <p>
-                  We reserve the right to suspend or terminate accounts that violate these guidelines at our sole discretion.
+                  We reserve the right to remove content, suspend, or terminate accounts that violate these guidelines at our sole discretion.
                 </p>
               </div>
             </div>
 
-            {/* 6. Intellectual Property */}
+            {/* 9. Intellectual Property */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                6. Intellectual Property
+                9. Intellectual Property
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
@@ -132,10 +198,10 @@ export default function TermsPage() {
               </div>
             </div>
 
-            {/* 7. Disclaimers */}
+            {/* 10. Disclaimers */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                7. Disclaimers
+                10. Disclaimers
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
@@ -150,10 +216,10 @@ export default function TermsPage() {
               </div>
             </div>
 
-            {/* 8. Limitation of Liability */}
+            {/* 11. Limitation of Liability */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                8. Limitation of Liability
+                11. Limitation of Liability
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
@@ -165,10 +231,10 @@ export default function TermsPage() {
               </div>
             </div>
 
-            {/* 9. Termination */}
+            {/* 12. Termination */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                9. Termination
+                12. Termination
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
@@ -180,10 +246,10 @@ export default function TermsPage() {
               </div>
             </div>
 
-            {/* 10. Changes to Terms */}
+            {/* 13. Changes to Terms */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                10. Changes to Terms
+                13. Changes to Terms
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
@@ -195,10 +261,10 @@ export default function TermsPage() {
               </div>
             </div>
 
-            {/* 11. Contact */}
+            {/* 14. Contact */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-4">
-                11. Contact
+                14. Contact
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>

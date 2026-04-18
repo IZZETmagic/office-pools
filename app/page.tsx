@@ -28,6 +28,18 @@ const features = [
     description:
       'Pool admins can customize point values for exact scores, correct results, and bonus predictions.',
   },
+  {
+    icon: '💬',
+    title: 'Pool Chat & Reactions',
+    description:
+      'Talk trash, react with emoji, pin the big calls, and @mention your friends in every pool.',
+  },
+  {
+    icon: '📝',
+    title: 'Multiple Entries',
+    description:
+      'Admins can allow up to 10 entries per member — run a serious pick and a fun one side by side.',
+  },
 ]
 
 const steps = [
@@ -45,9 +57,9 @@ const steps = [
   },
   {
     number: '3',
-    title: 'Make Predictions & Compete',
+    title: 'Predict, Chat & Compete',
     description:
-      'Predict match results before the deadline. Points are automatically calculated and rankings updated live.',
+      'Submit predictions before the deadline, chat with friends in every pool, and watch rankings update live as results come in.',
   },
 ]
 
@@ -93,8 +105,8 @@ export default function Home() {
               Create Your FIFA World Cup 2026 Prediction Pool
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-primary-100 dark:text-white/60 max-w-2xl mx-auto">
-              Compete with friends, predict match results, and climb the
-              leaderboard. The ultimate way to experience the World Cup.
+              Compete with friends, chat between matches, predict results, and
+              climb the leaderboard. The ultimate way to experience the World Cup.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Button href="/signup" variant="green" size="lg" className="text-lg px-8 py-4">

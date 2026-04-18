@@ -168,6 +168,79 @@ export const faqCategories: FAQCategory[] = [
         answer:
           'Visit the Profile page from the navigation menu. You can view your account details, see all the pools you\'ve joined, review your prediction history, and track your overall performance across all pools.',
       },
+      {
+        question: 'How do I delete my account?',
+        answer:
+          'Go to Profile → Settings and choose "Delete Account." Deleting your account removes your pool memberships, entries, predictions, scores, and chat messages. Some records may be retained in anonymized form for analytics or legal compliance. This action cannot be undone.',
+      },
+      {
+        question: 'How do I change which emails I receive?',
+        answer:
+          'Go to Profile → Notifications to toggle email categories on or off — pool activity, predictions, match results, leaderboards, admin messages, and community updates can each be controlled separately. Broadcast emails also include an unsubscribe link at the bottom.',
+      },
+    ],
+  },
+  {
+    title: 'Emails & Notifications',
+    icon: '🔔',
+    items: [
+      {
+        question: 'What types of emails does Sport Pool send?',
+        answer:
+          'Emails fall into six categories: Pool Activity (member joins, invites, pool updates), Predictions (deadline reminders, confirmations), Match Results (scores and points earned), Leaderboard (rank changes, weekly recaps), Admin (settings changes, member actions), and Community (mentions and broadcasts).',
+      },
+      {
+        question: 'Can I control which emails I get?',
+        answer:
+          'Yes. Each of the six email categories can be turned on or off independently from Profile → Notifications. You can also use the unsubscribe link at the bottom of any broadcast email to opt out of that type immediately.',
+      },
+      {
+        question: 'Can I stop emails entirely?',
+        answer:
+          'You can turn off every notification category from your profile settings. Some essential account emails (such as password resets and confirmations you explicitly request) will still be sent because they are required to operate your account.',
+      },
+    ],
+  },
+  {
+    title: 'Pool Community',
+    icon: '💬',
+    items: [
+      {
+        question: 'What is pool chat?',
+        answer:
+          'Every pool has a built-in chat where members can talk, trash-talk, react with emoji, pin important messages, and @mention each other. Chat is a great way to keep the group engaged between matches.',
+      },
+      {
+        question: 'Who can see my chat messages?',
+        answer:
+          'Chat messages, reactions, pins, and @mentions are visible to every member of that pool. Pool admins and Sport Pool super admins may also view chat content for moderation. Messages are not shared with members of other pools.',
+      },
+      {
+        question: 'Can admins moderate chat?',
+        answer:
+          'Yes. Pool admins can remove messages and members that violate our Acceptable Use rules. Sport Pool may also remove content or accounts at our discretion if they break our Terms of Service.',
+      },
+    ],
+  },
+  {
+    title: 'Entry Fees & Branded Pools',
+    icon: '💳',
+    items: [
+      {
+        question: 'Does Sport Pool take payments or charge fees?',
+        answer:
+          'No. Sport Pool is free and does not process payments. We are not a payment processor and we do not collect, hold, or disburse money.',
+      },
+      {
+        question: 'How do pool admins collect entry fees?',
+        answer:
+          'Any entry fee or prize arrangement is organized off-platform by the pool admin — typically using an external payment app like Venmo, PayPal, or cash. Sport Pool provides only an optional tool for admins to mark each member\'s entry as paid or unpaid. We are not a party to fee or prize arrangements, and any dispute is between the members and the admin.',
+      },
+      {
+        question: 'What is a branded pool?',
+        answer:
+          'A branded pool is a white-labeled pool operated by an organization with a custom name, logo, color, and landing page. Branded pools work the same as regular pools — predictions, leaderboards, chat, and scoring are all available — but feature the sponsor\'s branding. All platform rules and Acceptable Use policies still apply inside branded pools.',
+      },
     ],
   },
 ]
