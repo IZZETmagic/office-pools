@@ -401,8 +401,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`w-56 h-full min-h-[9rem] rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
-      style={hasBranding ? { borderColor: pool.brand_color! } : undefined}
+      className={`w-56 h-full min-h-[9rem] rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
     >
       {hasBranding && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
@@ -415,7 +414,10 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
           <span className="text-[8px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
         </div>
       )}
-      <div className="p-3 flex flex-col flex-1">
+      <div
+        className="p-3 flex flex-col flex-1"
+        style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
+      >
       <div className="flex items-center gap-1.5">
         <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
         {unreadCount > 0 && (
@@ -482,8 +484,8 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`block rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
-      style={{ animationDelay: `${index * 0.06}s`, ...(hasBranding ? { borderColor: pool.brand_color! } : {}) }}
+      className={`block rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
+      style={{ animationDelay: `${index * 0.06}s` }}
     >
       {hasBranding && (
         <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
@@ -496,7 +498,10 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
           <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
         </div>
       )}
-      <div className="flex">
+      <div
+        className="flex"
+        style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
+      >
         <div className="flex-1 p-4">
           {/* Header row */}
           <div className="flex items-center justify-between gap-3 mb-2">
@@ -828,11 +833,9 @@ export function DashboardClient({
             </Card>
           ) : (
             <>
-              {/* Mobile: compact horizontal scroll strip with edge fades */}
-              <div className="md:hidden relative">
-                <div className="absolute left-0 top-0 bottom-2 w-4 bg-gradient-to-r from-surface-secondary to-transparent z-10 pointer-events-none" />
-                <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface-secondary to-transparent z-10 pointer-events-none" />
-                <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {/* Mobile: compact horizontal scroll strip — full-bleed, first card aligns with header */}
+              <div className="md:hidden relative -mx-4 sm:-mx-6">
+                <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 pl-4 sm:pl-6 pr-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {[...pools].sort((a, b) => {
                     // Branded pools always first
                     const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
@@ -1019,19 +1022,21 @@ export function DashboardClient({
                       const awayTeamData = match.away_team as any
                       const homeTeam = homeTeamData?.country_name ?? 'TBD'
                       const awayTeam = awayTeamData?.country_name ?? 'TBD'
+                      const homeCode = (homeTeamData?.country_code ?? homeTeam.slice(0, 3)).toUpperCase()
+                      const awayCode = (awayTeamData?.country_code ?? awayTeam.slice(0, 3)).toUpperCase()
                       const homeFlagUrl = homeTeamData?.flag_url ?? null
                       const awayFlagUrl = awayTeamData?.flag_url ?? null
                       return (
                         <Card key={match.match_id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5">
-                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-5 h-3.5 rounded-[2px] object-cover shrink-0" />}
-                              <span className="font-semibold text-neutral-900 text-sm">{homeTeam}</span>
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col items-center gap-1">
+                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
+                              <span className="text-xs font-semibold tracking-wide text-neutral-900 tabular-nums">{homeCode}</span>
                             </div>
-                            <span className="text-neutral-400 text-xs">vs</span>
-                            <div className="flex items-center gap-1.5">
-                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-5 h-3.5 rounded-[2px] object-cover shrink-0" />}
-                              <span className="font-semibold text-neutral-900 text-sm">{awayTeam}</span>
+                            <span className="text-neutral-400 text-xs self-center">vs</span>
+                            <div className="flex flex-col items-center gap-1">
+                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
+                              <span className="text-xs font-semibold tracking-wide text-neutral-900 tabular-nums">{awayCode}</span>
                             </div>
                           </div>
                           <div className="text-right shrink-0 ml-3">

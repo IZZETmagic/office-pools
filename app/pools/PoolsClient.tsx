@@ -622,8 +622,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <Link
                         key={pool.pool_id}
                         href={`/pools/${pool.pool_id}`}
-                        className={`block rounded-xl border ${hasBranding ? 'border-transparent' : `border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
-                        style={{ animationDelay: `${i * 0.06}s`, ...(hasBranding ? { borderColor: pool.brand_color! } : {}) }}
+                        className={`block rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* Branded accent strip */}
                         {hasBranding && (
@@ -639,7 +639,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                         )}
 
                         {/* ========== MOBILE CARD ========== */}
-                        <div className="md:hidden flex">
+                        <div
+                          className="md:hidden flex"
+                          style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
+                        >
                           <div className="flex-1 px-4 py-3.5">
                             {/* Header: name + tags + action pill */}
                             <div className="flex items-center justify-between gap-3 mb-3">
@@ -778,7 +781,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                         </div>
 
                         {/* ========== DESKTOP CARD ========== */}
-                        <div className="hidden md:flex">
+                        <div
+                          className="hidden md:flex"
+                          style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
+                        >
                           <div className="flex-1 p-4">
                             {/* Header row */}
                             <div className="flex items-center justify-between gap-3 mb-2">

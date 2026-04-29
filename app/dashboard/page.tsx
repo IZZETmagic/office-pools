@@ -103,8 +103,8 @@ export default async function DashboardPage() {
         match_date,
         status,
         venue,
-        home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
-        away_team:teams!matches_away_team_id_fkey(country_name, flag_url),
+        home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
+        away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url),
         home_team_placeholder,
         away_team_placeholder
       `)
