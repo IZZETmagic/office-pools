@@ -32,7 +32,6 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
     .from('pool_members')
     .select(`
       user_id,
-      users!inner(username, full_name),
       pool_entries(
         entry_name,
         total_points,
@@ -42,10 +41,32 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
     `)
     .eq('pool_id', poolId)
 
-  const entriesWithPoints = (members || []).flatMap((m: any) => m.pool_entries || []).filter((e: any) => (e.total_points ?? 0) > 0)
+  const allEntries = (members || []).flatMap((m: any) => m.pool_entries || [])
+  const entriesWithPoints = allEntries.filter((e: any) => (e.total_points ?? 0) > 0)
 
   if (entriesWithPoints.length < 3) {
-    return { players: MOCK_PLAYERS, memberCount: Math.max(MOCK_PLAYERS.length, members?.length || 0), isMock: true }
+    const namedEntries = allEntries.filter((e: any) => typeof e.entry_name === 'string' && e.entry_name.trim().length > 0)
+
+    if (namedEntries.length === 0) {
+      return { players: MOCK_PLAYERS, memberCount: members?.length || 0, isMock: true }
+    }
+
+    const previewPlayers: LeaderboardPlayer[] = namedEntries
+      .slice()
+      .sort((a: any, b: any) => (b.total_points ?? 0) - (a.total_points ?? 0))
+      .slice(0, 10)
+      .map((e: any, idx: number) => ({
+        rank: idx + 1,
+        name: e.entry_name,
+        points: e.total_points ?? 0,
+        move: 0,
+        exact: 0,
+        correct: 0,
+        bonus: 0,
+        form: [],
+      }))
+
+    return { players: previewPlayers, memberCount: members?.length || 0, isMock: true }
   }
 
   const entries: LeaderboardPlayer[] = []
@@ -53,11 +74,13 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
   for (const member of members!) {
     const memberEntries = (member as any).pool_entries || []
     for (const entry of memberEntries) {
+      const entryName = typeof entry.entry_name === 'string' ? entry.entry_name.trim() : ''
+      if (!entryName) continue
       const currentRank = entry.current_rank ?? 999
       const previousRank = entry.previous_rank ?? currentRank
       entries.push({
         rank: currentRank,
-        name: entry.entry_name || (member as any).users?.username || 'Unknown',
+        name: entryName,
         points: entry.total_points ?? 0,
         move: previousRank - currentRank,
         exact: 0,
