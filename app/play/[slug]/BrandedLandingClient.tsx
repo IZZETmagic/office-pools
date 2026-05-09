@@ -272,7 +272,7 @@ export default function BrandedLandingClient({
 
               <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
                 <span className="text-sm text-neutral-500">
-                  Showing top {Math.min(10, players.length)} of {memberCount} player{memberCount !== 1 ? 's' : ''}
+                  Showing top {Math.min(10, players.length)} of {players.length} player{players.length !== 1 ? 's' : ''}
                 </span>
                 <Link href={`/tv/${poolConfig.slug}`} className="text-sm font-semibold transition-colors" style={{ color: poolConfig.accentColor }}>
                   Full TV leaderboard &rarr;
