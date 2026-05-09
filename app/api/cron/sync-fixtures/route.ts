@@ -125,6 +125,7 @@ async function handle(request: NextRequest) {
   let fixturesChanged = 0
   let fixturesSkippedManual = 0
   const newlyCompleted: Array<{ match_id: string; stage: string }> = []
+  let scoresChanged = false  // any FT or PSO score moved this run → triggers live leaderboard recalc
 
   // Process candidates that have a corresponding fixture today
   for (const ours of candidates) {
@@ -169,6 +170,14 @@ async function handle(request: NextRequest) {
       if (!wasCompleted && becomesCompleted) {
         newlyCompleted.push({ match_id: ours.match_id, stage: ours.stage })
       }
+      if (
+        update.home_score_ft !== undefined ||
+        update.away_score_ft !== undefined ||
+        update.home_score_pso !== undefined ||
+        update.away_score_pso !== undefined
+      ) {
+        scoresChanged = true
+      }
     }
 
     // Pull events for live or recently-completed matches and upsert conduct
@@ -192,7 +201,7 @@ async function handle(request: NextRequest) {
     }
   }
 
-  // For newly completed matches, fire the cascade and recalc affected pools
+  // Cascade team advancement for newly completed matches.
   if (newlyCompleted.length > 0) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || originFromRequest(request)
     for (const m of newlyCompleted) {
@@ -215,7 +224,12 @@ async function handle(request: NextRequest) {
         errors.push({ stage: 'advance_teams', message: errMsg(e), details: { match_id: m.match_id } })
       }
     }
+  }
 
+  // Recalculate leaderboards on ANY score change (live or final). The recalc
+  // is idempotent and reads match_scores in one pass per pool, so running it
+  // every minute during a live match is fine. Skipped when nothing changed.
+  if (scoresChanged || newlyCompleted.length > 0) {
     const { data: pools } = await admin
       .from('pools')
       .select('pool_id')
