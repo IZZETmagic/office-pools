@@ -54,7 +54,6 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
     const previewPlayers: LeaderboardPlayer[] = namedEntries
       .slice()
       .sort((a: any, b: any) => (b.total_points ?? 0) - (a.total_points ?? 0))
-      .slice(0, 10)
       .map((e: any, idx: number) => ({
         rank: idx + 1,
         name: e.entry_name,
