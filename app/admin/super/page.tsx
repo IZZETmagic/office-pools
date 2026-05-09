@@ -25,6 +25,11 @@ export type SuperMatchData = {
   winner_team_id: string | null
   is_completed: boolean
   completed_at: string | null
+  data_source: 'api' | 'manual' | null
+  external_match_id: string | null
+  last_synced_at: string | null
+  live_minute: number | null
+  live_period: string | null
   home_team: { country_name: string } | null
   away_team: { country_name: string } | null
   tournaments: { name: string } | null

@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
+import { SyncStatusPanel } from './SyncStatusPanel'
 
 // Shared inline border styles
 const thinBorder = '0.5px solid var(--sp-silver)66'
@@ -42,6 +43,41 @@ function getStatusBadgeVariant(
     default:
       return 'blue'
   }
+}
+
+function timeAgoShort(iso: string | null): string {
+  if (!iso) return ''
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 60_000) return `${Math.max(1, Math.floor(ms / 1000))}s`
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`
+  return new Date(iso).toLocaleDateString()
+}
+
+function SourceBadge({ match }: { match: SuperMatchData }) {
+  const source = match.data_source ?? 'api'
+  if (source === 'manual') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] sp-text-slate">
+        <span aria-hidden>✏️</span>Manual
+      </span>
+    )
+  }
+  if (!match.external_match_id) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] sp-text-slate opacity-60">
+        <span aria-hidden>·</span>Unmapped
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] sp-text-slate">
+      <span aria-hidden>🔌</span>API
+      {match.last_synced_at && (
+        <span className="opacity-70">· {timeAgoShort(match.last_synced_at)}</span>
+      )}
+    </span>
+  )
 }
 
 function getStageName(stage: string): string {
@@ -233,8 +269,10 @@ export function MatchesTab({
     setError(null)
 
     // When setting to live, also initialize scores to 0-0
+    // Manual edits flip the match to data_source='manual' so the api-football
+    // sync no longer overwrites them. Use "Re-enable API sync" to release.
     const updatePayload = newStatus === 'live'
-      ? { status: newStatus, home_score_ft: 0, away_score_ft: 0 }
+      ? { status: newStatus, home_score_ft: 0, away_score_ft: 0, data_source: 'manual' }
       : {
           status: newStatus,
           home_score_ft: null,
@@ -243,6 +281,7 @@ export function MatchesTab({
           away_score_pso: null,
           is_completed: false,
           winner_team_id: null,
+          data_source: 'manual',
         }
 
     const { error: updateError } = await supabase
@@ -346,6 +385,7 @@ export function MatchesTab({
       .update({
         home_score_ft: hScore,
         away_score_ft: aScore,
+        data_source: 'manual',
       })
       .eq('match_id', match.match_id)
 
@@ -498,6 +538,7 @@ export function MatchesTab({
         is_completed: true,
         status: 'completed',
         winner_team_id: winnerTeamId,
+        data_source: 'manual',
       })
       .eq('match_id', match.match_id)
 
@@ -639,6 +680,7 @@ export function MatchesTab({
     setError(null)
 
     // Step 1: Reset match fields back to scheduled state
+    // Reset releases the manual lock so the next API sync can repopulate.
     const { error: matchError } = await supabase
       .from('matches')
       .update({
@@ -649,6 +691,9 @@ export function MatchesTab({
         away_score_pso: null,
         is_completed: false,
         winner_team_id: null,
+        data_source: 'api',
+        live_minute: null,
+        live_period: null,
       })
       .eq('match_id', match.match_id)
 
@@ -721,6 +766,28 @@ export function MatchesTab({
       },
       summary: `Reset match #${match.match_number}: ${resetReason || 'Manual reset by super admin'}`,
     })
+  }
+
+  async function handleRelinquish(match: SuperMatchData) {
+    if (!confirm(`Re-enable API sync for match #${match.match_number}?\n\nThe next sync run can overwrite this match with live data.`)) return
+    try {
+      const res = await fetch(`/api/admin/match/${match.match_id}/relinquish`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        showToast(`Failed to re-enable sync: ${err.error ?? res.status}`, 'error')
+        return
+      }
+      await refreshMatches()
+      showToast(`Match #${match.match_number} re-enabled for API sync.`, 'success')
+      logAuditEvent({
+        action: 'data_source_changed',
+        match_id: match.match_id,
+        details: { match_number: match.match_number, from: 'manual', to: 'api' },
+        summary: `Re-enabled API sync for #${match.match_number}`,
+      })
+    } catch (e) {
+      showToast('Failed to re-enable sync.', 'error')
+    }
   }
 
   async function handleManualAdvance() {
@@ -813,9 +880,13 @@ export function MatchesTab({
       header: 'Status',
       align: 'center',
       render: (match) => (
-        <Badge variant={getStatusBadgeVariant(match.status)}>
-          {match.status}
-        </Badge>
+        <div className="flex flex-col items-center gap-0.5">
+          <Badge variant={getStatusBadgeVariant(match.status)}>
+            {match.status}
+            {match.status === 'live' && match.live_minute != null && ` ${match.live_minute}'`}
+          </Badge>
+          <SourceBadge match={match} />
+        </div>
       ),
     },
     {
@@ -877,6 +948,11 @@ export function MatchesTab({
               Reset
             </Button>
           )}
+          {match.data_source === 'manual' && match.external_match_id && (
+            <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => handleRelinquish(match)}>
+              Re-enable sync
+            </Button>
+          )}
         </div>
       ),
     },
@@ -884,6 +960,7 @@ export function MatchesTab({
 
   return (
     <div>
+      <SyncStatusPanel />
       <div className="mb-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-2xl font-extrabold sp-heading shrink-0">
@@ -1052,7 +1129,9 @@ export function MatchesTab({
                   </span>
                   <Badge variant={getStatusBadgeVariant(match.status)}>
                     {match.status}
+                    {match.status === 'live' && match.live_minute != null && ` ${match.live_minute}'`}
                   </Badge>
+                  <SourceBadge match={match} />
                   <span className="ml-auto text-[11px] sp-text-slate sp-body">
                     {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
                     {matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
@@ -1098,6 +1177,9 @@ export function MatchesTab({
                   )}
                   {match.is_completed && (
                     <Button size="xs" className="min-w-[100px] !text-danger-600 !border-danger-200 hover:!bg-danger-50 dark:!text-danger-400 dark:!border-danger-800 dark:hover:!bg-danger-950" onClick={() => openResetModal(match)}>Reset</Button>
+                  )}
+                  {match.data_source === 'manual' && match.external_match_id && (
+                    <Button size="xs" className="min-w-[100px]" variant="outline" onClick={() => handleRelinquish(match)}>Re-enable sync</Button>
                   )}
                 </div>
               </div>
