@@ -8,6 +8,7 @@ import type {
   SuperUserData,
   SuperPoolData,
   AuditLogData,
+  SubscriptionPeriodData,
 } from './page'
 import { MatchesTab } from './MatchesTab'
 import { UsersTab } from './UsersTab'
@@ -19,9 +20,10 @@ import { TemplatesTab } from './TemplatesTab'
 import { EmailHistoryTab } from './EmailHistoryTab'
 import { AutomatedEmailsTab } from './AutomatedEmailsTab'
 import { BrandedPoolsTab } from './BrandedPoolsTab'
+import { SubscriptionsTab } from './SubscriptionsTab'
 import { SP } from './SpTable'
 
-type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails'
+type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails' | 'subscriptions'
 
 type TabItem = { key: Tab; label: string; icon: React.ReactNode }
 type TabSection = { heading: string; items: TabItem[] }
@@ -133,6 +135,20 @@ const TAB_SECTIONS: TabSection[] = [
       },
     ],
   },
+  {
+    heading: 'Operations',
+    items: [
+      {
+        key: 'subscriptions',
+        label: 'Subscriptions',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+          </svg>
+        ),
+      },
+    ],
+  },
 ]
 
 const ALL_TABS = TAB_SECTIONS.flatMap((s) => s.items)
@@ -142,6 +158,7 @@ type SuperAdminDashboardProps = {
   users: SuperUserData[]
   pools: SuperPoolData[]
   auditLogs: AuditLogData[]
+  subscriptionPeriods: SubscriptionPeriodData[]
   currentUserId: string
 }
 
@@ -150,6 +167,7 @@ export function SuperAdminDashboard({
   users: initialUsers,
   pools: initialPools,
   auditLogs: initialAuditLogs,
+  subscriptionPeriods: initialSubscriptionPeriods,
   currentUserId,
 }: SuperAdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('stats')
@@ -158,6 +176,7 @@ export function SuperAdminDashboard({
   const [users, setUsers] = useState(initialUsers)
   const [pools, setPools] = useState(initialPools)
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs)
+  const [subscriptionPeriods, setSubscriptionPeriods] = useState(initialSubscriptionPeriods)
 
   // Cross-tab navigation: when PoolsTab wants to open a user profile
   const [navigateToUserId, setNavigateToUserId] = useState<string | null>(null)
@@ -325,6 +344,12 @@ export function SuperAdminDashboard({
           )}
           {activeTab === 'automated_emails' && (
             <AutomatedEmailsTab />
+          )}
+          {activeTab === 'subscriptions' && (
+            <SubscriptionsTab
+              periods={subscriptionPeriods}
+              setPeriods={setSubscriptionPeriods}
+            />
           )}
         </main>
       </div>

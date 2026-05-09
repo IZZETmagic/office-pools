@@ -77,6 +77,19 @@ export type SuperPoolData = {
   brand_prize_3rd: string | null
 }
 
+export type SubscriptionPeriodData = {
+  period_id: string
+  provider: string
+  plan_name: string
+  monthly_cost_cents: number
+  currency: string
+  start_date: string
+  ended_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type AuditLogData = {
   id: string
   action: string
@@ -121,7 +134,7 @@ export default async function SuperAdminPage() {
   }
 
   // STEP 3: Fetch all data in parallel
-  const [matchesRes, usersRes, poolsRes, auditRes] = await Promise.all([
+  const [matchesRes, usersRes, poolsRes, auditRes, subscriptionsRes] = await Promise.all([
     // All matches with team names
     supabase
       .from('matches')
@@ -167,6 +180,13 @@ export default async function SuperAdminPage() {
       )
       .order('performed_at', { ascending: false })
       .limit(100),
+
+    // Subscription periods
+    supabase
+      .from('subscription_periods')
+      .select('*')
+      .order('provider', { ascending: true })
+      .order('start_date', { ascending: false }),
   ])
 
   // Normalize team data
@@ -206,12 +226,15 @@ export default async function SuperAdminPage() {
     }
   })
 
+  const subscriptionPeriods = (subscriptionsRes.data || []) as SubscriptionPeriodData[]
+
   return (
     <SuperAdminDashboard
       matches={matches}
       users={users}
       pools={pools}
       auditLogs={auditLogs}
+      subscriptionPeriods={subscriptionPeriods}
       currentUserId={userData.user_id}
     />
   )

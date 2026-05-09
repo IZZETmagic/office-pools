@@ -7,6 +7,32 @@ export function formatNumber(value: number): string {
 }
 
 /**
+ * Format an integer cent amount as a localized currency string.
+ * e.g. (1900, 'USD') → "$19.00", (5000, 'EUR') → "€50.00"
+ */
+export function formatCurrency(cents: number, currency: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(cents / 100)
+}
+
+/**
+ * Number of full monthly anniversaries that have elapsed between `start`
+ * and `end` (inclusive of `start`, exclusive of `end`). Used to compute
+ * how many monthly billing cycles a subscription has incurred.
+ *
+ * Example: start=2025-09-15, end=2026-01-14 → 3 (Sep15→Oct15, Oct15→Nov15, Nov15→Dec15)
+ *          start=2025-09-15, end=2026-01-15 → 4
+ */
+export function monthsElapsed(start: Date, end: Date): number {
+  if (end < start) return 0
+  let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+  if (end.getDate() < start.getDate()) months -= 1
+  return Math.max(0, months)
+}
+
+/**
  * Format a date string as a human-readable relative time.
  * e.g. "just now", "5m ago", "3h ago", "Feb 14"
  */
