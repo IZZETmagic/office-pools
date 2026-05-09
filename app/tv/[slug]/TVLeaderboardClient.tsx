@@ -207,7 +207,7 @@ export function TVLeaderboardClient({
 
               {tablePlayers.length > 0 && (
                 <p className="text-center text-[11px] text-white/20 uppercase tracking-wider font-semibold mt-2">
-                  Showing {pageStart + 4}&ndash;{pageEnd + 3} of {memberCount}
+                  Showing {pageStart + 4}&ndash;{pageEnd + 3} of {players.length}
                 </p>
               )}
             </>
