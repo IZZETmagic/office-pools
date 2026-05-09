@@ -23,6 +23,17 @@ function normalize(name: string): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
+// Aliases for countries whose name differs between our DB and api-football.
+// Both keys and values are passed through `normalize` before lookup.
+const COUNTRY_ALIASES: Record<string, string> = {
+  bosniaandherzegovina: 'bosniaherzegovina',
+  czechia: 'czechrepublic',
+  turkey: 'turkiye',
+  drcongo: 'congodr',
+  unitedstates: 'usa',
+  capeverde: 'capeverdeislands',
+}
+
 export type SeedTeamsResult = {
   matched: Array<{ team_id: string; country_name: string; external_team_id: number }>
   unmatched_external: Array<{ id: number; name: string }>
@@ -50,7 +61,9 @@ export async function seedTeamMapping(
   const used = new Set<number>()
 
   for (const ours of teams) {
-    const ext = byNorm.get(normalize(ours.country_name))
+    const ourNorm = normalize(ours.country_name)
+    const aliasNorm = COUNTRY_ALIASES[ourNorm]
+    const ext = byNorm.get(ourNorm) ?? (aliasNorm ? byNorm.get(aliasNorm) : undefined)
     if (!ext) {
       unmatched_internal.push({ team_id: ours.team_id, country_name: ours.country_name })
       continue
