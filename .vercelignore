@@ -5,6 +5,9 @@ memory/**
 # Native iOS app is deployed separately
 ios/**
 
+# Expo mobile app is deployed via EAS, not Vercel
+mobile/**
+
 # Build/editor artifacts
 *.tsbuildinfo
 .DS_Store

@@ -60,3 +60,11 @@ DerivedData/
 .swiftpm/
 .build/
 .env*.local
+
+# Expo / React Native (mobile/)
+mobile/node_modules/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/dist/
+mobile/.env*.local
