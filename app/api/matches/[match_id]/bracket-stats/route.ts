@@ -46,7 +46,21 @@ async function handleGET(
 
   // 1. Look up match + joined teams (caller-scoped client; RLS on matches is
   //    read-open for authenticated users).
-  const { data: match, error: matchErr } = await supabase
+  type TeamFK =
+    | { country_name?: string | null; flag_url?: string | null }
+    | Array<{ country_name?: string | null; flag_url?: string | null }>
+    | null
+  type MatchRow = {
+    match_id: string
+    match_number: number
+    group_letter: string | null
+    home_team_id: string | null
+    away_team_id: string | null
+    home_team: TeamFK
+    away_team: TeamFK
+  }
+
+  const { data: matchRaw, error: matchErr } = await supabase
     .from('matches')
     .select(
       'match_id, match_number, group_letter, home_team_id, away_team_id,' +
@@ -55,17 +69,21 @@ async function handleGET(
     )
     .eq('match_id', match_id)
     .single()
-  if (matchErr || !match) {
+  if (matchErr || !matchRaw) {
     return NextResponse.json({ error: 'Match not found' }, { status: 404 })
   }
 
-  const groupLetter = match.group_letter as string | null
-  const homeTeamId = match.home_team_id as string | null
-  const awayTeamId = match.away_team_id as string | null
+  // Supabase's typed select returns a union that TS doesn't narrow cleanly
+  // past the error check under stricter Next 16 / TS settings — cast to the
+  // known shape once so downstream property access is clean.
+  const match = matchRaw as unknown as MatchRow
+  const groupLetter = match.group_letter
+  const homeTeamId = match.home_team_id
+  const awayTeamId = match.away_team_id
 
   const baseResponse: BracketStatsResponse = {
     match_id,
-    match_number: match.match_number as number,
+    match_number: match.match_number,
     group_letter: groupLetter,
     group_predictions: null,
   }
