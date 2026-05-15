@@ -132,10 +132,61 @@ async function handleGET(
   const thirdPlaceRankings = (entryThirdPlaceRankings || []) as BPThirdPlaceRanking[]
   const knockoutPicks = (entryKnockoutPicks || []) as BPKnockoutPick[]
 
-  // Check if any matches are completed
+  // Check if any matches are completed. Pre-tournament we still return a
+  // zero-state response (with full badge + level metadata) so the Form tab
+  // can render its structure with placeholders. Matches the score-prediction
+  // analytics route's behaviour.
   const completedMatches = matches.filter((m: any) => m.is_completed)
   if (completedMatches.length === 0) {
-    return NextResponse.json({ error: 'No completed matches yet' }, { status: 404 })
+    const firstLevel = LEVELS[0]
+    const secondLevel = LEVELS[1] ?? null
+    return NextResponse.json({
+      xp: {
+        total_xp: 0,
+        total_group_base_xp: 0,
+        total_group_bonus_xp: 0,
+        total_third_place_xp: 0,
+        total_knockout_base_xp: 0,
+        total_knockout_bonus_xp: 0,
+        total_badge_xp: 0,
+        current_level: {
+          level: firstLevel.level,
+          name: firstLevel.name,
+          xp_required: firstLevel.xpRequired,
+        },
+        next_level: secondLevel
+          ? {
+              level: secondLevel.level,
+              name: secondLevel.name,
+              xp_required: secondLevel.xpRequired,
+            }
+          : null,
+        xp_to_next_level: secondLevel?.xpRequired ?? 0,
+        level_progress: 0,
+        bonus_events: [],
+        earned_badges: [],
+        all_badges: BP_BADGE_DEFINITIONS.map(b => ({
+          id: b.id,
+          emoji: b.emoji,
+          name: b.name,
+          xp_bonus: b.xpBonus,
+          condition: b.condition,
+          rarity: b.rarity,
+          tier: b.tier,
+        })),
+        levels: LEVELS.map(l => ({
+          level: l.level,
+          name: l.name,
+          xp_required: l.xpRequired,
+          badge: l.badge ?? null,
+        })),
+        group_xp: [],
+        third_place_xp: [],
+        third_place_perfect_bonus_xp: 0,
+        knockout_xp: [],
+      },
+      pool_comparison: null,
+    })
   }
 
   // 6. Compute actual group standings from real match results
