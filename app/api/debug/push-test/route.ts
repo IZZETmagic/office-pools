@@ -34,7 +34,14 @@ const SAMPLES: Sample[] = [
     key: 'prediction_result',
     category: 'MATCH_RESULTS',
     title: 'Brazil 2 - 1 Argentina',
-    body: 'Exact · +5 pts · WC Office',
+    body: 'Main · WC Office · Exact · +5 pts',
+    data: { type: 'match_result', match_id: 'sample', pool_id: 'sample' },
+  },
+  {
+    key: 'prediction_result_multi',
+    category: 'MATCH_RESULTS',
+    title: 'Brazil 2 - 1 Argentina',
+    body: 'Main (WC Office): Exact +5 · Backup (Friends Pool): Winner +3',
     data: { type: 'match_result', match_id: 'sample', pool_id: 'sample' },
   },
   {

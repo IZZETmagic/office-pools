@@ -165,39 +165,42 @@ async function fanOutForMatch(
     ? `${homeTeam} ${scoreLine} ${awayTeam}`
     : `${homeTeam} vs ${awayTeam}`
 
-  // 5. PREDICTION RESULT — one push per user, collapsing multi-entry pools to
-  // the entry with the best outcome (highest total_points). Most users have
-  // a single entry per pool so this is a no-op for them.
-  const bestByUser = new Map<
-    string,
-    { score: ScoreRow; poolName: string; entryName: string }
-  >()
+  // 5. PREDICTION RESULT — one push per user per match. Body lists EVERY
+  // entry × pool the user has that scored this match so power users (multi-
+  // entry / multi-pool) see all their results in one notification. Common
+  // case (1 entry, 1 pool) reads as "Main · WC Office · Exact +5 pts".
+  type UserResult = { score: ScoreRow; poolName: string; entryName: string }
+  const allByUser = new Map<string, UserResult[]>()
   for (const s of scores) {
     const entry = entryById.get(s.entry_id)
     if (!entry) continue
-    const existing = bestByUser.get(entry.userId)
-    if (!existing || s.total_points > existing.score.total_points) {
-      bestByUser.set(entry.userId, {
-        score: s,
-        poolName: poolNameById.get(s.pool_id) ?? 'Pool',
-        entryName: entry.entryName,
-      })
-    }
+    const list = allByUser.get(entry.userId) ?? []
+    list.push({
+      score: s,
+      poolName: poolNameById.get(s.pool_id) ?? 'Pool',
+      entryName: entry.entryName,
+    })
+    allByUser.set(entry.userId, list)
   }
 
   const work: Array<Promise<unknown>> = []
 
-  for (const [userId, info] of bestByUser) {
+  for (const [userId, results] of allByUser) {
+    // Sort highest-scoring first so the most interesting result leads the body.
+    results.sort((a, b) => b.score.total_points - a.score.total_points)
+    const body = formatPredictionResultBody(results)
+    // Use the highest-scoring entry's pool for the deeplink pool_id.
+    const primaryPoolId = results[0].score.pool_id
     work.push(
       sendPushToUser(
         userId,
         {
           title: titleLine,
-          body: `${formatOutcome(info.score.score_type, info.score.total_points)} · ${info.poolName}`,
+          body,
           data: {
             type: 'match_result',
             match_id: match.match_id,
-            pool_id: info.score.pool_id,
+            pool_id: primaryPoolId,
           },
         },
         'MATCH_RESULTS',
@@ -241,7 +244,7 @@ async function fanOutForMatch(
 
   // 7. STREAK MILESTONES — for each user whose score just landed, look at
   // their latest 10 match_scores per entry and detect a 3/5/10 streak.
-  for (const userId of bestByUser.keys()) {
+  for (const userId of allByUser.keys()) {
     work.push(
       detectAndPushStreak(adminClient, userId).catch((err) =>
         console.error('[match-results] streak push failed', userId, err),
@@ -255,7 +258,7 @@ async function fanOutForMatch(
   // overtook / got passed by and fire a shake-up push.
   // Category: LEADERBOARD. Auto-deduped by the match-level cursor.
   work.push(
-    fanOutShakeups(adminClient, bestByUser, poolIds, poolNameById, entryById).catch((err) =>
+    fanOutShakeups(adminClient, allByUser, poolIds, poolNameById, entryById).catch((err) =>
       console.error('[match-results] shakeup push failed', err),
     ),
   )
@@ -270,12 +273,12 @@ async function fanOutForMatch(
  */
 async function fanOutShakeups(
   adminClient: ReturnType<typeof createAdminClient>,
-  bestByUser: Map<string, { score: ScoreRow; poolName: string; entryName: string }>,
+  allByUser: Map<string, Array<{ score: ScoreRow; poolName: string; entryName: string }>>,
   poolIds: string[],
   poolNameById: Map<string, string>,
   entryById: Map<string, { userId: string; poolId: string; entryName: string }>,
 ): Promise<void> {
-  if (bestByUser.size === 0 || poolIds.length === 0) return
+  if (allByUser.size === 0 || poolIds.length === 0) return
 
   type PeerRow = {
     entry_id: string
@@ -315,23 +318,23 @@ async function fanOutShakeups(
     }
   }
 
-  // For each user with a participating entry in a pool, check rank movement
-  // and find the closest crossover peer.
-  for (const [userId, info] of bestByUser) {
-    const poolId = info.score.pool_id
-    const peers = peersByPool.get(poolId) ?? []
-    // Find the user's entry — match by user_id via the member_id chain.
-    // We have entryById built from this match's scores, but not all of their
-    // entries; the peer query above gives us the full set, so re-resolve.
-    const userEntry = peers.find((p) => {
-      const pm = Array.isArray(p.pool_members) ? p.pool_members[0] : p.pool_members
-      // pm doesn't carry user_id directly — but we have entryById from the
-      // scores. Easier: use entryById to find the entry_id for this user × pool.
-      return false // placeholder, see below
-    })
-    void userEntry
+  // For each (user × pool) that scored, check rank movement and find the
+  // closest crossover peer. One shake-up push per (user × pool) per match.
+  type UserPoolPair = { userId: string; poolId: string }
+  const userPoolPairs: UserPoolPair[] = []
+  const seenPairs = new Set<string>()
+  for (const [userId, results] of allByUser) {
+    for (const r of results) {
+      const key = `${userId}::${r.score.pool_id}`
+      if (seenPairs.has(key)) continue
+      seenPairs.add(key)
+      userPoolPairs.push({ userId, poolId: r.score.pool_id })
+    }
+  }
 
-    // Better resolution: scan entryById for the entry this user has in this pool.
+  for (const { userId, poolId } of userPoolPairs) {
+    const peers = peersByPool.get(poolId) ?? []
+    // Scan entryById for the entry this user has in this pool.
     let myEntryId: string | null = null
     for (const [eid, info2] of entryById) {
       if (info2.userId === userId && info2.poolId === poolId) {
@@ -495,6 +498,76 @@ function formatOutcome(
       return `Winner + GD · +${points} pts`
     case 'winner':
       return `Winner · +${points} pts`
+    case 'miss':
+      return 'Miss'
+  }
+}
+
+/**
+ * Compact one-line summary for the user's outcome on this match. Adapts to
+ * 1-pool/1-entry common case vs multi-pool / multi-entry power users.
+ */
+function formatPredictionResultBody(
+  results: Array<{ score: ScoreRow; poolName: string; entryName: string }>,
+): string {
+  if (results.length === 0) return ''
+
+  // Single entry — most common case. Show entry name, pool, and outcome.
+  if (results.length === 1) {
+    const r = results[0]
+    return `${r.entryName} · ${r.poolName} · ${formatOutcome(r.score.score_type, r.score.total_points)}`
+  }
+
+  // Multiple entries — group by pool. If only one pool, leave pool name
+  // out of each segment (keep it as a suffix). If multiple pools, qualify
+  // each segment with the pool.
+  const byPool = new Map<string, typeof results>()
+  for (const r of results) {
+    const list = byPool.get(r.poolName) ?? []
+    list.push(r)
+    byPool.set(r.poolName, list)
+  }
+
+  const segments: string[] = []
+  if (byPool.size === 1) {
+    const poolName = [...byPool.keys()][0]
+    const entries = [...byPool.values()][0]
+    const entrySegs = entries.map(
+      (e) =>
+        `${e.entryName}: ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
+    )
+    return `${entrySegs.join(', ')} · ${poolName}`
+  }
+  // Multiple pools — each segment includes both entry + pool.
+  for (const [poolName, entries] of byPool) {
+    if (entries.length === 1) {
+      const e = entries[0]
+      segments.push(
+        `${e.entryName} (${poolName}): ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
+      )
+    } else {
+      const entrySegs = entries.map(
+        (e) =>
+          `${e.entryName}: ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
+      )
+      segments.push(`${entrySegs.join(', ')} in ${poolName}`)
+    }
+  }
+  return segments.join(' · ')
+}
+
+/** Tighter outcome label for multi-entry segments — no "pts" suffix. */
+function formatOutcomeShort(
+  scoreType: 'exact' | 'winner_gd' | 'winner' | 'miss',
+  points: number,
+): string {
+  switch (scoreType) {
+    case 'exact':
+      return `Exact +${points}`
+    case 'winner_gd':
+      return `GD +${points}`
+    case 'winner':
+      return `Winner +${points}`
     case 'miss':
       return 'Miss'
   }
