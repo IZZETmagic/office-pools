@@ -249,7 +249,165 @@ async function fanOutForMatch(
     )
   }
 
+  // 8. LEADERBOARD SHAKE-UPS — for each user who got a prediction_result
+  // push, check if their entry's rank moved in this pool's leaderboard
+  // (current_rank vs previous_rank). If yes, identify the peer they
+  // overtook / got passed by and fire a shake-up push.
+  // Category: LEADERBOARD. Auto-deduped by the match-level cursor.
+  work.push(
+    fanOutShakeups(adminClient, bestByUser, poolIds, poolNameById, entryById).catch((err) =>
+      console.error('[match-results] shakeup push failed', err),
+    ),
+  )
+
   await Promise.allSettled(work)
+}
+
+/**
+ * Per-pool rank-change push fan-out. For each pool with affected users,
+ * loads the full leaderboard topology, identifies neighbor crossovers,
+ * and pushes per user.
+ */
+async function fanOutShakeups(
+  adminClient: ReturnType<typeof createAdminClient>,
+  bestByUser: Map<string, { score: ScoreRow; poolName: string; entryName: string }>,
+  poolIds: string[],
+  poolNameById: Map<string, string>,
+  entryById: Map<string, { userId: string; poolId: string; entryName: string }>,
+): Promise<void> {
+  if (bestByUser.size === 0 || poolIds.length === 0) return
+
+  type PeerRow = {
+    entry_id: string
+    pool_id: string
+    entry_name: string
+    current_rank: number | null
+    previous_rank: number | null
+    member_id: string
+    pool_members:
+      | { member_id: string; users: { full_name: string | null; username: string | null } | Array<{ full_name: string | null; username: string | null }> | null }
+      | Array<{ member_id: string; users: { full_name: string | null; username: string | null } | Array<{ full_name: string | null; username: string | null }> | null }>
+      | null
+  }
+
+  const { data: rawPeers } = await adminClient
+    .from('pool_entries')
+    .select(
+      'entry_id, pool_id, entry_name, current_rank, previous_rank, member_id,' +
+        ' pool_members:pool_members!pool_entries_member_id_fkey(' +
+        'member_id, users(full_name, username)' +
+        ')',
+    )
+    .in('pool_id', poolIds)
+  const peerRows = (rawPeers ?? []) as unknown as PeerRow[]
+
+  // Index peers by pool + entry_id; build a display-name table.
+  const peersByPool = new Map<string, PeerRow[]>()
+  const displayNameByMember = new Map<string, string>()
+  for (const p of peerRows) {
+    const list = peersByPool.get(p.pool_id) ?? []
+    list.push(p)
+    peersByPool.set(p.pool_id, list)
+    const pm = Array.isArray(p.pool_members) ? p.pool_members[0] : p.pool_members
+    const u = pm?.users ? (Array.isArray(pm.users) ? pm.users[0] : pm.users) : null
+    if (pm && u) {
+      displayNameByMember.set(pm.member_id, u.full_name || u.username || 'Someone')
+    }
+  }
+
+  // For each user with a participating entry in a pool, check rank movement
+  // and find the closest crossover peer.
+  for (const [userId, info] of bestByUser) {
+    const poolId = info.score.pool_id
+    const peers = peersByPool.get(poolId) ?? []
+    // Find the user's entry — match by user_id via the member_id chain.
+    // We have entryById built from this match's scores, but not all of their
+    // entries; the peer query above gives us the full set, so re-resolve.
+    const userEntry = peers.find((p) => {
+      const pm = Array.isArray(p.pool_members) ? p.pool_members[0] : p.pool_members
+      // pm doesn't carry user_id directly — but we have entryById from the
+      // scores. Easier: use entryById to find the entry_id for this user × pool.
+      return false // placeholder, see below
+    })
+    void userEntry
+
+    // Better resolution: scan entryById for the entry this user has in this pool.
+    let myEntryId: string | null = null
+    for (const [eid, info2] of entryById) {
+      if (info2.userId === userId && info2.poolId === poolId) {
+        myEntryId = eid
+        break
+      }
+    }
+    if (!myEntryId) continue
+    const me = peers.find((p) => p.entry_id === myEntryId)
+    if (!me || me.current_rank == null || me.previous_rank == null) continue
+    if (me.current_rank === me.previous_rank) continue // no movement
+
+    const delta = me.previous_rank - me.current_rank // positive = climbed
+    const climbed = delta > 0
+
+    // Find the closest peer who crossed paths.
+    let neighborName: string | null = null
+    if (climbed) {
+      const candidates = peers
+        .filter(
+          (p) =>
+            p.entry_id !== me.entry_id &&
+            p.previous_rank != null &&
+            p.current_rank != null &&
+            p.previous_rank < me.previous_rank! &&
+            p.current_rank > me.current_rank!,
+        )
+        .sort((a, b) => b.previous_rank! - a.previous_rank!)
+      const top = candidates[0]
+      if (top) neighborName = displayNameByMember.get(top.member_id) ?? top.entry_name
+    } else {
+      const candidates = peers
+        .filter(
+          (p) =>
+            p.entry_id !== me.entry_id &&
+            p.previous_rank != null &&
+            p.current_rank != null &&
+            p.previous_rank > me.previous_rank! &&
+            p.current_rank < me.current_rank!,
+        )
+        .sort((a, b) => a.previous_rank! - b.previous_rank!)
+      const top = candidates[0]
+      if (top) neighborName = displayNameByMember.get(top.member_id) ?? top.entry_name
+    }
+
+    const arrow = climbed ? '↑' : '↓'
+    const absDelta = Math.abs(delta)
+    const title = climbed
+      ? `${arrow} Moved up to #${me.current_rank}`
+      : `${arrow} Dropped to #${me.current_rank}`
+    const poolName = poolNameById.get(poolId) ?? 'Pool'
+    const body = neighborName
+      ? climbed
+        ? `Overtook ${neighborName} in ${poolName}`
+        : `${neighborName} overtook you in ${poolName}`
+      : `${absDelta} spot${absDelta === 1 ? '' : 's'} in ${poolName}`
+
+    try {
+      await sendPushToUser(
+        userId,
+        {
+          title,
+          body,
+          data: {
+            type: 'rank_change',
+            pool_id: poolId,
+            old_rank: String(me.previous_rank),
+            new_rank: String(me.current_rank),
+          },
+        },
+        'LEADERBOARD',
+      )
+    } catch (err) {
+      console.error('[match-results] shakeup send failed', userId, poolId, err)
+    }
+  }
 }
 
 async function detectAndPushStreak(
