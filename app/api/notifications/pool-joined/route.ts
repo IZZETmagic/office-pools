@@ -25,11 +25,26 @@ export async function POST(request: NextRequest) {
 
   const { data: pool } = await supabase
     .from('pools')
-    .select('pool_name, pool_code')
+    .select('pool_name, pool_code, admin_user_id')
     .eq('pool_id', pool_id)
     .single()
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  // Notify the pool admin (POOL_ACTIVITY category) that a new member joined.
+  // Skipped if the joiner IS the admin (e.g., they created the pool).
+  if (pool.admin_user_id && pool.admin_user_id !== userData.user_id) {
+    const memberName = userProfile.full_name || userProfile.username || 'Someone'
+    void sendPushToUser(
+      pool.admin_user_id,
+      {
+        title: `${memberName} joined ${pool.pool_name}`,
+        body: 'A new member just joined your pool',
+        data: { type: 'pool_activity', sub: 'member_joined', pool_id },
+      },
+      'POOL_ACTIVITY',
+    ).catch((err) => console.error('[pool-joined] admin push failed', err))
+  }
 
   // Sync contact to Resend (idempotent)
   const nameParts = (userProfile.full_name || '').split(' ')
