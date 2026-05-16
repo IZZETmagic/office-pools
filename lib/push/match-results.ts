@@ -209,36 +209,46 @@ async function fanOutForMatch(
     }
   }
 
-  // 6. MVP — per pool, the entry with the highest total_points on THIS match
-  // (skipped if score_type is miss or 0 pts — no MVP for a bad match).
+  // 6. MVP — per pool, the entry(ies) with the highest total_points on THIS
+  // match. Ties → co-MVP push to every tied entry (no single "winner" picked
+  // arbitrarily). Skipped entirely if the top score was a miss or 0 pts.
   for (const poolId of poolIds) {
     const poolScores = scores
       .filter((s) => s.pool_id === poolId && s.score_type !== 'miss' && s.total_points > 0)
       .sort((a, b) => b.total_points - a.total_points)
-    const top = poolScores[0]
-    if (!top) continue
-    const entry = entryById.get(top.entry_id)
-    if (!entry) continue
+    if (poolScores.length === 0) continue
+    const topPoints = poolScores[0].total_points
+    const tops = poolScores.filter((s) => s.total_points === topPoints)
+    const isCoMvp = tops.length > 1
     const poolName = poolNameById.get(poolId) ?? 'Pool'
     const matchLabel = match.match_number != null ? `Match ${match.match_number}` : 'this match'
-    work.push(
-      sendPushToUser(
-        entry.userId,
-        {
-          title: `🏆 You're MVP for ${matchLabel}`,
-          body: `+${top.total_points} pts · top scorer in ${poolName}`,
-          data: {
-            type: 'gamification',
-            sub: 'mvp',
-            match_id: match.match_id,
-            pool_id: poolId,
+    for (const top of tops) {
+      const entry = entryById.get(top.entry_id)
+      if (!entry) continue
+      work.push(
+        sendPushToUser(
+          entry.userId,
+          {
+            title: isCoMvp
+              ? `🏆 You're co-MVP for ${matchLabel}`
+              : `🏆 You're MVP for ${matchLabel}`,
+            body: isCoMvp
+              ? `+${top.total_points} pts · tied for top in ${poolName}`
+              : `+${top.total_points} pts · top scorer in ${poolName}`,
+            data: {
+              type: 'gamification',
+              sub: 'mvp',
+              match_id: match.match_id,
+              pool_id: poolId,
+              tied: String(isCoMvp),
+            },
           },
-        },
-        'GAMIFICATION',
-      ).catch((err) =>
-        console.error('[match-results] mvp push failed', entry.userId, err),
-      ),
-    )
+          'GAMIFICATION',
+        ).catch((err) =>
+          console.error('[match-results] mvp push failed', entry.userId, err),
+        ),
+      )
+    }
   }
 
   // 7. STREAK MILESTONES — for each user whose score just landed, look at

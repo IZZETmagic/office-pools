@@ -61,6 +61,13 @@ const SAMPLES: Sample[] = [
     data: { type: 'gamification', sub: 'mvp', match_id: 'sample', pool_id: 'sample' },
   },
   {
+    key: 'matchday_mvp_tied',
+    category: 'GAMIFICATION',
+    title: "🏆 You're co-MVP for Match 12",
+    body: '+5 pts · tied for top in WC Office',
+    data: { type: 'gamification', sub: 'mvp', match_id: 'sample', pool_id: 'sample', tied: 'true' },
+  },
+  {
     key: 'streak_hot',
     category: 'GAMIFICATION',
     title: '🔥 5-match hot streak!',
