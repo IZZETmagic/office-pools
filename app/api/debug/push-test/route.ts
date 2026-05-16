@@ -82,6 +82,85 @@ const SAMPLES: Sample[] = [
     data: { type: 'gamification', sub: 'streak', pool_id: 'sample', streak_type: 'cold', streak_length: '3' },
   },
 
+  // Badges — one preview per badge so you can review the unlock copy.
+  {
+    key: 'badge_sharpshooter',
+    category: 'GAMIFICATION',
+    title: '🎯 Sharpshooter unlocked!',
+    body: 'Score 2 exact predictions · +50 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'sharpshooter', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_oracle',
+    category: 'GAMIFICATION',
+    title: '🔮 Oracle unlocked!',
+    body: '3 consecutive correct results · +75 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'oracle', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_ice_breaker',
+    category: 'GAMIFICATION',
+    title: '🧊 Ice Breaker unlocked!',
+    body: 'End a cold streak of 5+ misses · +40 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'ice_breaker', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_on_fire',
+    category: 'GAMIFICATION',
+    title: '🔥 On Fire unlocked!',
+    body: 'Hit a 5-match correct streak · +80 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'on_fire', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_top_dog',
+    category: 'GAMIFICATION',
+    title: '👑 Top Dog unlocked!',
+    body: 'Reach #1 on the leaderboard · +100 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'top_dog', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_globe_trotter',
+    category: 'GAMIFICATION',
+    title: '🌍 Globe Trotter unlocked!',
+    body: 'Predict all 12 groups with 50%+ accuracy · +75 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'globe_trotter', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_lightning_rod',
+    category: 'GAMIFICATION',
+    title: '⚡ Lightning Rod unlocked!',
+    body: 'Submit all predictions before deadline · +50 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'lightning_rod', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_stadium_regular',
+    category: 'GAMIFICATION',
+    title: '🏟️ Stadium Regular unlocked!',
+    body: 'Predict all 104 matches · +60 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'stadium_regular', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_showtime',
+    category: 'GAMIFICATION',
+    title: '🎪 Showtime unlocked!',
+    body: 'Correct exact score in a knockout match · +80 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'showtime', pool_id: 'sample' },
+  },
+  {
+    key: 'badge_grand_finale',
+    category: 'GAMIFICATION',
+    title: '🏆 Grand Finale unlocked!',
+    body: 'Correctly predict the World Cup Final result · +120 XP · Main · WC Office',
+    data: { type: 'gamification', sub: 'badge', badge_id: 'grand_finale', pool_id: 'sample' },
+  },
+  {
+    key: 'level_up',
+    category: 'GAMIFICATION',
+    title: '⭐ Level 6 reached!',
+    body: 'Tactician · Main · WC Office',
+    data: { type: 'gamification', sub: 'level_up', level: '6', pool_id: 'sample' },
+  },
+
   // --- PREDICTIONS ---
   {
     key: 'deadline_24h',

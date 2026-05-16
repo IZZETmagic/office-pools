@@ -12,6 +12,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { fanOutResultPushes } from '@/lib/push/match-results'
+import { detectAndPushBadgesForPool } from '@/lib/push/badges'
 import type {
   ScoringResult,
   MatchScoreRow,
@@ -228,6 +229,14 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     // claim guard so concurrent recalcs across pools don't double-send.
     void fanOutResultPushes().catch((err) =>
       console.error(`[scoring] push fan-out failed for pool ${poolId}:`, err),
+    )
+
+    // 8. Fire badge + level-up pushes for entries whose XP state changed.
+    // Diffs against entry_xp_state snapshot so users only get pushed for
+    // *newly* earned badges and *newly crossed* levels. First-run entries
+    // are seeded silently.
+    void detectAndPushBadgesForPool(poolId).catch((err) =>
+      console.error(`[scoring] badge fan-out failed for pool ${poolId}:`, err),
     )
 
     return {
