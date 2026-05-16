@@ -88,15 +88,21 @@ type PushPayload = {
  * Send a push notification to a single device token via HTTP/2.
  * APNs requires HTTP/2 — Node.js fetch only does HTTP/1.1.
  * Returns true if successful, false if failed.
+ *
+ * `bundleId` overrides the global APNS_BUNDLE_ID — required for routing pushes
+ * to a different binary (e.g. Swift app vs Expo app share an Apple team but
+ * have separate bundle IDs). When null/undefined, falls back to env default.
  */
 export async function sendPushNotification(
   deviceToken: string,
   payload: PushPayload,
-  sandbox = false
+  sandbox = false,
+  bundleId?: string | null
 ): Promise<boolean> {
   try {
     const jwt = await generateAPNsJWT()
     const host = sandbox ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'
+    const topic = bundleId ?? BUNDLE_ID
 
     const body = JSON.stringify({
       aps: {
@@ -107,9 +113,9 @@ export async function sendPushNotification(
       ...(payload.data ?? {}),
     })
 
-    console.log(`[APNs] Sending to ${host}, token ${deviceToken.slice(0, 8)}..., sandbox=${sandbox}`)
+    console.log(`[APNs] Sending to ${host}, token ${deviceToken.slice(0, 8)}..., topic=${topic}, sandbox=${sandbox}`)
 
-    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, body)
+    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, body, topic)
 
     if (statusCode === 200) {
       console.log(`[APNs] Success for token ${deviceToken.slice(0, 8)}...`)
@@ -138,7 +144,8 @@ function sendHTTP2Request(
   host: string,
   deviceToken: string,
   jwt: string,
-  body: string
+  body: string,
+  topic: string
 ): Promise<{ statusCode: number; responseBody: string }> {
   return new Promise((resolve, reject) => {
     const client = http2.connect(`https://${host}`)
@@ -152,7 +159,7 @@ function sendHTTP2Request(
       ':method': 'POST',
       ':path': `/3/device/${deviceToken}`,
       authorization: `bearer ${jwt}`,
-      'apns-topic': BUNDLE_ID,
+      'apns-topic': topic,
       'apns-push-type': 'alert',
       'apns-priority': '10',
       'content-type': 'application/json',
@@ -198,7 +205,7 @@ export async function sendPushToUser(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment')
+    .select('token, environment, bundle_id')
     .eq('user_id', userId)
 
   if (!tokens || tokens.length === 0) {
@@ -207,7 +214,7 @@ export async function sendPushToUser(
 
   const results = await Promise.allSettled(
     tokens.map((t) =>
-      sendPushNotification(t.token, payload, t.environment === 'development')
+      sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
     )
   )
 
@@ -231,7 +238,7 @@ export async function sendPushToUsers(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment')
+    .select('token, environment, bundle_id')
     .in('user_id', userIds)
 
   if (!tokens || tokens.length === 0) {
@@ -240,7 +247,7 @@ export async function sendPushToUsers(
 
   const results = await Promise.allSettled(
     tokens.map((t) =>
-      sendPushNotification(t.token, payload, t.environment === 'development')
+      sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
     )
   )
 
@@ -261,7 +268,7 @@ export async function sendPushToAll(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment')
+    .select('token, environment, bundle_id')
 
   if (!tokens || tokens.length === 0) {
     return { sent: 0, total: 0 }
@@ -275,7 +282,7 @@ export async function sendPushToAll(
     const chunk = tokens.slice(i, i + CHUNK_SIZE)
     const results = await Promise.allSettled(
       chunk.map((t) =>
-        sendPushNotification(t.token, payload, t.environment === 'development')
+        sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
       )
     )
     sent += results.filter(

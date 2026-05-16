@@ -5,14 +5,21 @@ import { requireAuth } from '@/lib/auth'
  * POST /api/notifications/push-token
  * Register or refresh an APNs device token for the authenticated user.
  *
- * Body: { token: string, platform?: string, environment?: "production" | "development" }
+ * Body: {
+ *   token: string,
+ *   platform?: string,
+ *   environment?: "production" | "development",
+ *   bundle_id?: string // e.g. "com.officepools.expo" — required for APNs
+ *                      // topic routing when the user has multiple binaries.
+ *                      // Omit to fall back to the server's APNS_BUNDLE_ID env.
+ * }
  */
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
 
-  const { token, platform, environment } = await request.json()
+  const { token, platform, environment, bundle_id } = await request.json()
 
   if (!token || typeof token !== 'string') {
     return NextResponse.json({ error: 'token is required' }, { status: 400 })
@@ -26,6 +33,7 @@ export async function POST(request: NextRequest) {
         token,
         platform: platform || 'ios',
         environment: environment || 'production',
+        bundle_id: bundle_id || null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,token' }
