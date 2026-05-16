@@ -192,16 +192,31 @@ const SAMPLES: Sample[] = [
 ]
 
 async function handle(request: NextRequest) {
-  const auth = await requireSuperAdmin()
-  if (auth.error) return auth.error
-  const { userData } = auth.data
-
-  let body: { type?: string } = {}
+  // Two auth paths:
+  //  1. Super-admin session (default) — sends to the caller's own tokens.
+  //  2. Cron Bearer secret + body.target_user_id — lets ops trigger a push
+  //     for any user via Supabase MCP / pg_net without needing a user
+  //     session token. Same secret used by the cron jobs.
+  let body: { type?: string; target_user_id?: string } = {}
   try {
     body = await request.json()
   } catch {
     /* empty body is fine — defaults to "all" */
   }
+
+  const cronSecret = process.env.CRON_SECRET
+  const authHeader = request.headers.get('authorization')
+  const isCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+
+  let targetUserId: string
+  if (isCron && body.target_user_id) {
+    targetUserId = body.target_user_id
+  } else {
+    const auth = await requireSuperAdmin()
+    if (auth.error) return auth.error
+    targetUserId = auth.data.userData.user_id
+  }
+
   const requested = body.type && body.type !== 'all' ? body.type : null
 
   const toSend = requested ? SAMPLES.filter((s) => s.key === requested) : SAMPLES
@@ -219,7 +234,7 @@ async function handle(request: NextRequest) {
   for (const sample of toSend) {
     try {
       const r = await sendPushToUser(
-        userData.user_id,
+        targetUserId,
         { title: sample.title, body: sample.body, data: sample.data },
         sample.category,
       )
@@ -241,10 +256,11 @@ async function handle(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    user_id: userData.user_id,
+    user_id: targetUserId,
+    auth: isCron ? 'cron' : 'super_admin',
     requested: requested ?? 'all',
     results,
-    note: 'Tokens are filtered by your per-category push prefs. If sent=0 and total=0, you either have no registered token for that bundle, or you opted out of that category in Profile.',
+    note: 'Tokens are filtered by per-category push prefs. If sent=0 and total=0, the user either has no registered token for that bundle, or opted out of that category in Profile.',
   })
 }
 
