@@ -11,6 +11,7 @@
 // =============================================================
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { fanOutResultPushes } from '@/lib/push/match-results'
 import type {
   ScoringResult,
   MatchScoreRow,
@@ -220,6 +221,14 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
 
     // 6. Write results to database (shadow-write for Phase 1)
     const writeResult = await writeScoresToDB(adminClient, poolId, result, submissionTimeMap)
+
+    // 7. Fire match-completion pushes (prediction_result + matchday MVP +
+    // streak milestones). Fire-and-forget — if push fan-out fails or hangs,
+    // the recalc still returns success. The fan-out has its own per-match
+    // claim guard so concurrent recalcs across pools don't double-send.
+    void fanOutResultPushes().catch((err) =>
+      console.error(`[scoring] push fan-out failed for pool ${poolId}:`, err),
+    )
 
     return {
       success: true,

@@ -1,0 +1,343 @@
+// Fan-out for match-completion push notifications.
+//
+// Triggered at the end of every `recalculatePool` run. Identifies matches
+// that just completed (is_completed=true AND result_pushes_sent_at IS NULL),
+// fires three push types per affected user, then marks the match as
+// "pushes sent" so subsequent recalcs (for the same OR different pools)
+// don't re-send.
+//
+// Push types fired here (Phase 1):
+//   1. `prediction_result` (category: MATCH_RESULTS)
+//        — one push per user per match summarising their best outcome
+//   2. `matchday_mvp` (category: GAMIFICATION)
+//        — one push per pool per match to the top scorer (skipped if miss)
+//   3. `streak_milestone` (category: GAMIFICATION)
+//        — push at exactly 3, 5, or 10-match hot/cold streaks per entry
+//
+// Concurrency: uses an atomic "claim" update so two parallel recalculatePool
+// calls for the same match only let one send pushes.
+//
+// Failures: per-push errors are swallowed (logged) so a bad token doesn't
+// block the rest of the fan-out. The match's `result_pushes_sent_at` cursor
+// gets set even on partial failure — push retry isn't worth the complexity.
+
+import { createAdminClient } from '@/lib/supabase/server'
+import { sendPushToUser } from './apns'
+
+type PendingMatch = {
+  match_id: string
+  match_number: number | null
+  home_score_ft: number | null
+  away_score_ft: number | null
+  home_team: { country_name?: string | null } | Array<{ country_name?: string | null }> | null
+  away_team: { country_name?: string | null } | Array<{ country_name?: string | null }> | null
+}
+
+type ScoreRow = {
+  entry_id: string
+  pool_id: string
+  total_points: number
+  score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+}
+
+type EntryRow = {
+  entry_id: string
+  entry_name: string
+  member_id: string
+}
+
+type MemberRow = {
+  member_id: string
+  user_id: string
+  pool_id: string
+}
+
+/**
+ * Atomically claim a match for push fan-out. Returns true if we successfully
+ * claimed it; false if another process already did.
+ */
+async function claimMatch(
+  adminClient: ReturnType<typeof createAdminClient>,
+  matchId: string,
+): Promise<boolean> {
+  const { data } = await adminClient
+    .from('matches')
+    .update({ result_pushes_sent_at: new Date().toISOString() })
+    .eq('match_id', matchId)
+    .is('result_pushes_sent_at', null)
+    .select('match_id')
+    .maybeSingle()
+  return !!data
+}
+
+/**
+ * Find newly-completed matches across all tournaments and fan out their
+ * pushes. Safe to call multiple times — the cursor + claim guard prevent
+ * duplicate sends.
+ */
+export async function fanOutResultPushes(): Promise<void> {
+  const adminClient = createAdminClient()
+
+  const { data: pending } = await adminClient
+    .from('matches')
+    .select(
+      'match_id, match_number, home_score_ft, away_score_ft,' +
+        ' home_team:teams!matches_home_team_id_fkey(country_name),' +
+        ' away_team:teams!matches_away_team_id_fkey(country_name)',
+    )
+    .eq('is_completed', true)
+    .is('result_pushes_sent_at', null)
+    .limit(50)
+
+  const matches = (pending ?? []) as unknown as PendingMatch[]
+  if (matches.length === 0) return
+
+  for (const match of matches) {
+    const claimed = await claimMatch(adminClient, match.match_id)
+    if (!claimed) continue
+    try {
+      await fanOutForMatch(adminClient, match)
+    } catch (err) {
+      console.error('[match-results] fanOutForMatch error', match.match_id, err)
+    }
+  }
+}
+
+async function fanOutForMatch(
+  adminClient: ReturnType<typeof createAdminClient>,
+  match: PendingMatch,
+): Promise<void> {
+  // 1. Find all match_scores for this match across all pools.
+  const { data: rawScores } = await adminClient
+    .from('match_scores')
+    .select('entry_id, pool_id, total_points, score_type')
+    .eq('match_id', match.match_id)
+  const scores = (rawScores ?? []) as ScoreRow[]
+  if (scores.length === 0) return
+
+  // 2. Resolve entry → user. Two-hop: pool_entries (entry → member_id) +
+  // pool_members (member_id → user_id).
+  const entryIds = [...new Set(scores.map((s) => s.entry_id))]
+  const { data: rawEntries } = await adminClient
+    .from('pool_entries')
+    .select('entry_id, entry_name, member_id')
+    .in('entry_id', entryIds)
+  const entries = (rawEntries ?? []) as EntryRow[]
+
+  const memberIds = [...new Set(entries.map((e) => e.member_id))]
+  const { data: rawMembers } = await adminClient
+    .from('pool_members')
+    .select('member_id, user_id, pool_id')
+    .in('member_id', memberIds)
+  const members = (rawMembers ?? []) as MemberRow[]
+
+  const memberByMemberId = new Map(members.map((m) => [m.member_id, m]))
+  const entryById = new Map(
+    entries
+      .map((e) => {
+        const member = memberByMemberId.get(e.member_id)
+        if (!member) return null
+        return [
+          e.entry_id,
+          { userId: member.user_id, poolId: member.pool_id, entryName: e.entry_name },
+        ] as const
+      })
+      .filter((v): v is readonly [string, { userId: string; poolId: string; entryName: string }] => v !== null),
+  )
+
+  // 3. Pool names for body copy.
+  const poolIds = [...new Set(scores.map((s) => s.pool_id))]
+  const { data: pools } = await adminClient
+    .from('pools')
+    .select('pool_id, pool_name')
+    .in('pool_id', poolIds)
+  const poolNameById = new Map((pools ?? []).map((p) => [p.pool_id, p.pool_name]))
+
+  // 4. Format the score line ("Brazil 2 - 1 Argentina") — same across all
+  // recipients.
+  const homeTeam = teamName(match.home_team)
+  const awayTeam = teamName(match.away_team)
+  const scoreLine =
+    match.home_score_ft != null && match.away_score_ft != null
+      ? `${match.home_score_ft} - ${match.away_score_ft}`
+      : ''
+  const titleLine = scoreLine
+    ? `${homeTeam} ${scoreLine} ${awayTeam}`
+    : `${homeTeam} vs ${awayTeam}`
+
+  // 5. PREDICTION RESULT — one push per user, collapsing multi-entry pools to
+  // the entry with the best outcome (highest total_points). Most users have
+  // a single entry per pool so this is a no-op for them.
+  const bestByUser = new Map<
+    string,
+    { score: ScoreRow; poolName: string; entryName: string }
+  >()
+  for (const s of scores) {
+    const entry = entryById.get(s.entry_id)
+    if (!entry) continue
+    const existing = bestByUser.get(entry.userId)
+    if (!existing || s.total_points > existing.score.total_points) {
+      bestByUser.set(entry.userId, {
+        score: s,
+        poolName: poolNameById.get(s.pool_id) ?? 'Pool',
+        entryName: entry.entryName,
+      })
+    }
+  }
+
+  const work: Array<Promise<unknown>> = []
+
+  for (const [userId, info] of bestByUser) {
+    work.push(
+      sendPushToUser(
+        userId,
+        {
+          title: titleLine,
+          body: `${formatOutcome(info.score.score_type, info.score.total_points)} · ${info.poolName}`,
+          data: {
+            type: 'match_result',
+            match_id: match.match_id,
+            pool_id: info.score.pool_id,
+          },
+        },
+        'MATCH_RESULTS',
+      ).catch((err) =>
+        console.error('[match-results] prediction_result push failed', userId, err),
+      ),
+    )
+  }
+
+  // 6. MVP — per pool, the entry with the highest total_points on THIS match
+  // (skipped if score_type is miss or 0 pts — no MVP for a bad match).
+  for (const poolId of poolIds) {
+    const poolScores = scores
+      .filter((s) => s.pool_id === poolId && s.score_type !== 'miss' && s.total_points > 0)
+      .sort((a, b) => b.total_points - a.total_points)
+    const top = poolScores[0]
+    if (!top) continue
+    const entry = entryById.get(top.entry_id)
+    if (!entry) continue
+    const poolName = poolNameById.get(poolId) ?? 'Pool'
+    const matchLabel = match.match_number != null ? `Match ${match.match_number}` : 'this match'
+    work.push(
+      sendPushToUser(
+        entry.userId,
+        {
+          title: `🏆 You're MVP for ${matchLabel}`,
+          body: `+${top.total_points} pts · top scorer in ${poolName}`,
+          data: {
+            type: 'gamification',
+            sub: 'mvp',
+            match_id: match.match_id,
+            pool_id: poolId,
+          },
+        },
+        'GAMIFICATION',
+      ).catch((err) =>
+        console.error('[match-results] mvp push failed', entry.userId, err),
+      ),
+    )
+  }
+
+  // 7. STREAK MILESTONES — for each user whose score just landed, look at
+  // their latest 10 match_scores per entry and detect a 3/5/10 streak.
+  for (const userId of bestByUser.keys()) {
+    work.push(
+      detectAndPushStreak(adminClient, userId).catch((err) =>
+        console.error('[match-results] streak push failed', userId, err),
+      ),
+    )
+  }
+
+  await Promise.allSettled(work)
+}
+
+async function detectAndPushStreak(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<void> {
+  // Get the user's entries across all pools, with pool names.
+  const { data: rawMembers } = await adminClient
+    .from('pool_members')
+    .select(
+      'pool_id, pools(pool_name),' +
+        ' pool_entries:pool_entries!pool_entries_member_id_fkey(entry_id, entry_name)',
+    )
+    .eq('user_id', userId)
+
+  type StreakMembershipRow = {
+    pool_id: string
+    pools: { pool_name: string } | Array<{ pool_name: string }> | null
+    pool_entries: Array<{ entry_id: string; entry_name: string }> | null
+  }
+  const memberships = (rawMembers ?? []) as unknown as StreakMembershipRow[]
+
+  for (const m of memberships) {
+    const pool = Array.isArray(m.pools) ? m.pools[0] : m.pools
+    const poolName = pool?.pool_name ?? 'Pool'
+    for (const entry of m.pool_entries ?? []) {
+      const { data: recent } = await adminClient
+        .from('match_scores')
+        .select('score_type, calculated_at')
+        .eq('entry_id', entry.entry_id)
+        .order('calculated_at', { ascending: false })
+        .limit(10)
+      if (!recent || recent.length === 0) continue
+
+      const first = (recent[0] as { score_type: string }).score_type
+      const isHot = first !== 'miss'
+      let length = 0
+      for (const r of recent as Array<{ score_type: string }>) {
+        const isCorrect = r.score_type !== 'miss'
+        if (isHot ? isCorrect : !isCorrect) length++
+        else break
+      }
+
+      // Fire only at the exact milestone — and only when the streak is
+      // happening on this entry's latest match (i.e., the head of the list).
+      if (![3, 5, 10].includes(length)) continue
+
+      const emoji = isHot ? '🔥' : '🧊'
+      const word = isHot ? 'hot' : 'cold'
+      await sendPushToUser(
+        userId,
+        {
+          title: `${emoji} ${length}-match ${word} streak!`,
+          body: `${entry.entry_name} · ${poolName}`,
+          data: {
+            type: 'gamification',
+            sub: 'streak',
+            pool_id: m.pool_id,
+            streak_type: word,
+            streak_length: String(length),
+          },
+        },
+        'GAMIFICATION',
+      ).catch((err) =>
+        console.error('[match-results] streak push send failed', userId, err),
+      )
+    }
+  }
+}
+
+function teamName(raw: PendingMatch['home_team']): string {
+  if (!raw) return 'TBD'
+  const t = Array.isArray(raw) ? raw[0] : raw
+  return t?.country_name ?? 'TBD'
+}
+
+function formatOutcome(
+  scoreType: 'exact' | 'winner_gd' | 'winner' | 'miss',
+  points: number,
+): string {
+  switch (scoreType) {
+    case 'exact':
+      return `Exact · +${points} pts`
+    case 'winner_gd':
+      return `Winner + GD · +${points} pts`
+    case 'winner':
+      return `Winner · +${points} pts`
+    case 'miss':
+      return 'Miss'
+  }
+}
