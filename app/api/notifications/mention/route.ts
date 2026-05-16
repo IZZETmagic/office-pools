@@ -144,12 +144,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Send push notifications (fire-and-forget)
-  sendPushToUsers(mentionedIds, {
-    title: `${senderName} mentioned you`,
-    body: `in ${pool.pool_name}: "${message_content.slice(0, 100)}"`,
-    data: { type: 'community', pool_id },
-  }).catch((err) => console.error('[Mention] Push error:', err))
+  // Send push notifications (fire-and-forget). Category: COMMUNITY → users
+  // who opted out of community pushes won't receive this.
+  sendPushToUsers(
+    mentionedIds,
+    {
+      title: `${senderName} mentioned you`,
+      body: `in ${pool.pool_name}: "${message_content.slice(0, 100)}"`,
+      data: { type: 'community', pool_id },
+    },
+    'COMMUNITY',
+  ).catch((err) => console.error('[Mention] Push error:', err))
 
   console.log(`[Mention] Result: ${result.success ? 'success' : 'failed'}, count: ${emailPayloads.length}`)
   return NextResponse.json({ sent: result.success, count: emailPayloads.length })

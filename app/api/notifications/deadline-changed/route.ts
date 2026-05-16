@@ -78,11 +78,15 @@ export async function POST(request: NextRequest) {
 
   const [emailResult] = await Promise.allSettled([
     sendBatchEmails(emails),
-    sendPushToUsers(memberUserIds, {
-      title: 'Deadline Changed',
-      body: `${pool.pool_name}: new deadline is ${formattedDeadline}`,
-      data: { type: 'admin', pool_id },
-    }),
+    sendPushToUsers(
+      memberUserIds,
+      {
+        title: 'Deadline Changed',
+        body: `${pool.pool_name}: new deadline is ${formattedDeadline}`,
+        data: { type: 'admin', pool_id },
+      },
+      'PREDICTIONS',
+    ),
   ])
 
   const result = emailResult.status === 'fulfilled' ? emailResult.value : { success: false }

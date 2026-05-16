@@ -65,11 +65,15 @@ export async function POST(request: NextRequest) {
       topicId: TOPICS.ADMIN,
       tags: [{ name: 'category', value: 'points_adjusted' }],
     }),
-    sendPushToUser(target_user_id, {
-      title: `Points Adjusted (${sign}${adjustment})`,
-      body: `${pool.pool_name}: ${reason}`,
-      data: { type: 'admin', pool_id },
-    }),
+    sendPushToUser(
+      target_user_id,
+      {
+        title: `Points Adjusted (${sign}${adjustment})`,
+        body: `${pool.pool_name}: ${reason}`,
+        data: { type: 'admin', pool_id },
+      },
+      'ADMIN',
+    ),
   ])
 
   const result = emailResult.status === 'fulfilled' ? emailResult.value : { success: false }

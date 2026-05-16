@@ -55,11 +55,15 @@ export async function POST(request: NextRequest) {
       topicId: TOPICS.POOL_ACTIVITY,
       tags: [{ name: 'category', value: 'pool-activity' }],
     }),
-    sendPushToUser(userData.user_id, {
-      title: `Welcome to ${pool.pool_name}!`,
-      body: 'You\'ve joined the pool. Make your predictions!',
-      data: { type: 'pool_activity', pool_id },
-    }),
+    sendPushToUser(
+      userData.user_id,
+      {
+        title: `Welcome to ${pool.pool_name}!`,
+        body: 'You\'ve joined the pool. Make your predictions!',
+        data: { type: 'pool_activity', pool_id },
+      },
+      'POOL_ACTIVITY',
+    ),
   ])
 
   const emailSent = emailResult.status === 'fulfilled' && emailResult.value.success

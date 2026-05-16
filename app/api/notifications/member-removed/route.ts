@@ -56,11 +56,15 @@ export async function POST(request: NextRequest) {
       topicId: TOPICS.ADMIN,
       tags: [{ name: 'category', value: 'admin' }],
     }),
-    sendPushToUser(removed_user_id, {
-      title: 'Removed from Pool',
-      body: `You've been removed from ${pool.pool_name}`,
-      data: { type: 'admin', pool_id },
-    }),
+    sendPushToUser(
+      removed_user_id,
+      {
+        title: 'Removed from Pool',
+        body: `You've been removed from ${pool.pool_name}`,
+        data: { type: 'admin', pool_id },
+      },
+      'ADMIN',
+    ),
   ])
 
   const result = emailResult.status === 'fulfilled' ? emailResult.value : { success: false }

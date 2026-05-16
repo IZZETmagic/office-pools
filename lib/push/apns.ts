@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import http2 from 'node:http2'
 
+import { PUSH_CATEGORY_COLUMNS, type PushCategory } from './categories'
+
 // =============================================================
 // APNs HTTP/2 Push Notification Client
 // Uses JWT (ES256) via Web Crypto API — no extra dependencies.
@@ -195,12 +197,45 @@ function sendHTTP2Request(
 }
 
 /**
+ * Filter a list of user IDs down to those who haven't opted out of `category`.
+ * Users with no preferences row are treated as opted-in (defaults are all-true).
+ */
+async function filterByCategoryOptIn(
+  userIds: string[],
+  category: PushCategory | undefined,
+): Promise<string[]> {
+  if (!category || userIds.length === 0) return userIds
+  const supabase = createAdminClient()
+  const column = PUSH_CATEGORY_COLUMNS[category]
+  // Find users who EXPLICITLY have the column set to false; everyone else
+  // (including users with no row at all) gets the push.
+  const { data: optedOut } = await supabase
+    .from('push_notification_preferences')
+    .select(`user_id, ${column}`)
+    .in('user_id', userIds)
+    .eq(column, false)
+  const optedOutSet = new Set(
+    ((optedOut ?? []) as unknown as Array<{ user_id: string }>).map((r) => r.user_id),
+  )
+  return userIds.filter((id) => !optedOutSet.has(id))
+}
+
+/**
  * Send a push notification to all devices registered for a user.
+ *
+ * If `category` is set, the user's opt-out preference for that category is
+ * checked first — a `false` pref silently no-ops the send. Pass `undefined`
+ * to bypass the gate (admin broadcasts, member-removed, deadline-changed —
+ * messages users can't reasonably mute).
  */
 export async function sendPushToUser(
   userId: string,
-  payload: PushPayload
+  payload: PushPayload,
+  category?: PushCategory,
 ): Promise<{ sent: number; total: number }> {
+  const allowed = await filterByCategoryOptIn([userId], category)
+  if (allowed.length === 0) return { sent: 0, total: 0 }
+
   const supabase = createAdminClient()
 
   const { data: tokens } = await supabase
@@ -227,19 +262,24 @@ export async function sendPushToUser(
 
 /**
  * Send a push notification to multiple users in parallel.
+ *
+ * Same `category` opt-out semantics as `sendPushToUser`.
  */
 export async function sendPushToUsers(
   userIds: string[],
-  payload: PushPayload
+  payload: PushPayload,
+  category?: PushCategory,
 ): Promise<{ sent: number; total: number }> {
   if (userIds.length === 0) return { sent: 0, total: 0 }
+  const allowed = await filterByCategoryOptIn(userIds, category)
+  if (allowed.length === 0) return { sent: 0, total: 0 }
 
   const supabase = createAdminClient()
 
   const { data: tokens } = await supabase
     .from('push_tokens')
     .select('token, environment, bundle_id')
-    .in('user_id', userIds)
+    .in('user_id', allowed)
 
   if (!tokens || tokens.length === 0) {
     return { sent: 0, total: 0 }

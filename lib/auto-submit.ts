@@ -165,11 +165,15 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
 
       // Send push notifications (fire-and-forget)
       for (const entry of eligibleEntries) {
-        sendPushToUser(entry.userId, {
-          title: 'Predictions Auto-Submitted',
-          body: `Your draft predictions for ${pool.pool_name} were submitted before the deadline.`,
-          data: { type: 'predictions', pool_id: pool.pool_id },
-        }).catch((err) => console.error('[AutoSubmit] Push error:', err))
+        sendPushToUser(
+          entry.userId,
+          {
+            title: 'Predictions Auto-Submitted',
+            body: `Your draft predictions for ${pool.pool_name} were submitted before the deadline.`,
+            data: { type: 'predictions', pool_id: pool.pool_id },
+          },
+          'PREDICTIONS',
+        ).catch((err) => console.error('[AutoSubmit] Push error:', err))
       }
     }
   } catch (err) {
@@ -322,11 +326,15 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
             }]).catch(console.error)
 
             // Push notification
-            sendPushToUser(member.user_id, {
-              title: `${roundName} Auto-Submitted`,
-              body: `Your predictions for ${pool.pool_name} were submitted before the deadline.`,
-              data: { type: 'predictions', pool_id: poolId },
-            }).catch(console.error)
+            sendPushToUser(
+              member.user_id,
+              {
+                title: `${roundName} Auto-Submitted`,
+                body: `Your predictions for ${pool.pool_name} were submitted before the deadline.`,
+                data: { type: 'predictions', pool_id: poolId },
+              },
+              'PREDICTIONS',
+            ).catch(console.error)
           }
         }
 
@@ -553,10 +561,14 @@ async function sendAutoRoundOpenNotifications(
   const userIds = members.map((m: any) => m.user_id).filter(Boolean)
   if (userIds.length > 0) {
     const roundName = ROUND_LABELS[roundKey]
-    sendPushToUsers(userIds, {
-      title: `${roundName} Now Open`,
-      body: `Make your predictions for ${poolName}!`,
-      data: { type: 'pool_activity', pool_id: poolId },
-    }).catch(console.error)
+    sendPushToUsers(
+      userIds,
+      {
+        title: `${roundName} Now Open`,
+        body: `Make your predictions for ${poolName}!`,
+        data: { type: 'pool_activity', pool_id: poolId },
+      },
+      'PREDICTIONS',
+    ).catch(console.error)
   }
 }

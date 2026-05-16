@@ -70,11 +70,15 @@ export async function POST(request: NextRequest) {
 
   // Send push to all pool members (await so we can log the result)
   try {
-    const result = await sendPushToUsers(recipientIds, {
-      title: `${displayName} in ${pool.pool_name}`,
-      body: preview,
-      data: { type: 'community', pool_id },
-    })
+    const result = await sendPushToUsers(
+      recipientIds,
+      {
+        title: `${displayName} in ${pool.pool_name}`,
+        body: preview,
+        data: { type: 'community', pool_id },
+      },
+      'COMMUNITY',
+    )
     console.log(`[MessagePush] Push result: ${result.sent}/${result.total} sent`)
     return NextResponse.json({ sent: true, count: recipientIds.length, push: result })
   } catch (err) {
