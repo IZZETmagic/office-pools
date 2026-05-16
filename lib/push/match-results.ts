@@ -165,10 +165,11 @@ async function fanOutForMatch(
     ? `${homeTeam} ${scoreLine} ${awayTeam}`
     : `${homeTeam} vs ${awayTeam}`
 
-  // 5. PREDICTION RESULT — one push per user per match. Body lists EVERY
-  // entry × pool the user has that scored this match so power users (multi-
-  // entry / multi-pool) see all their results in one notification. Common
-  // case (1 entry, 1 pool) reads as "Main · WC Office · Exact +5 pts".
+  // 5. PREDICTION RESULT — ONE PUSH PER (user × pool × entry). Most users
+  // are in 1-2 pools with 1-2 entries, so this is 1-4 pushes max per
+  // matchday for the typical user. Each push clearly identifies the entry
+  // AND the pool so multi-entry users can tell which result is which.
+  // Body reads: "Main · WC Office · Exact +5 pts"
   type UserResult = { score: ScoreRow; poolName: string; entryName: string }
   const allByUser = new Map<string, UserResult[]>()
   for (const s of scores) {
@@ -186,28 +187,26 @@ async function fanOutForMatch(
   const work: Array<Promise<unknown>> = []
 
   for (const [userId, results] of allByUser) {
-    // Sort highest-scoring first so the most interesting result leads the body.
-    results.sort((a, b) => b.score.total_points - a.score.total_points)
-    const body = formatPredictionResultBody(results)
-    // Use the highest-scoring entry's pool for the deeplink pool_id.
-    const primaryPoolId = results[0].score.pool_id
-    work.push(
-      sendPushToUser(
-        userId,
-        {
-          title: titleLine,
-          body,
-          data: {
-            type: 'match_result',
-            match_id: match.match_id,
-            pool_id: primaryPoolId,
+    for (const r of results) {
+      work.push(
+        sendPushToUser(
+          userId,
+          {
+            title: titleLine,
+            body: `${r.entryName} · ${r.poolName} · ${formatOutcome(r.score.score_type, r.score.total_points)}`,
+            data: {
+              type: 'match_result',
+              match_id: match.match_id,
+              pool_id: r.score.pool_id,
+              entry_id: r.score.entry_id,
+            },
           },
-        },
-        'MATCH_RESULTS',
-      ).catch((err) =>
-        console.error('[match-results] prediction_result push failed', userId, err),
-      ),
-    )
+          'MATCH_RESULTS',
+        ).catch((err) =>
+          console.error('[match-results] prediction_result push failed', userId, r.score.entry_id, err),
+        ),
+      )
+    }
   }
 
   // 6. MVP — per pool, the entry with the highest total_points on THIS match
@@ -503,72 +502,3 @@ function formatOutcome(
   }
 }
 
-/**
- * Compact one-line summary for the user's outcome on this match. Adapts to
- * 1-pool/1-entry common case vs multi-pool / multi-entry power users.
- */
-function formatPredictionResultBody(
-  results: Array<{ score: ScoreRow; poolName: string; entryName: string }>,
-): string {
-  if (results.length === 0) return ''
-
-  // Single entry — most common case. Show entry name, pool, and outcome.
-  if (results.length === 1) {
-    const r = results[0]
-    return `${r.entryName} · ${r.poolName} · ${formatOutcome(r.score.score_type, r.score.total_points)}`
-  }
-
-  // Multiple entries — group by pool. If only one pool, leave pool name
-  // out of each segment (keep it as a suffix). If multiple pools, qualify
-  // each segment with the pool.
-  const byPool = new Map<string, typeof results>()
-  for (const r of results) {
-    const list = byPool.get(r.poolName) ?? []
-    list.push(r)
-    byPool.set(r.poolName, list)
-  }
-
-  const segments: string[] = []
-  if (byPool.size === 1) {
-    const poolName = [...byPool.keys()][0]
-    const entries = [...byPool.values()][0]
-    const entrySegs = entries.map(
-      (e) =>
-        `${e.entryName}: ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
-    )
-    return `${entrySegs.join(', ')} · ${poolName}`
-  }
-  // Multiple pools — each segment includes both entry + pool.
-  for (const [poolName, entries] of byPool) {
-    if (entries.length === 1) {
-      const e = entries[0]
-      segments.push(
-        `${e.entryName} (${poolName}): ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
-      )
-    } else {
-      const entrySegs = entries.map(
-        (e) =>
-          `${e.entryName}: ${formatOutcomeShort(e.score.score_type, e.score.total_points)}`,
-      )
-      segments.push(`${entrySegs.join(', ')} in ${poolName}`)
-    }
-  }
-  return segments.join(' · ')
-}
-
-/** Tighter outcome label for multi-entry segments — no "pts" suffix. */
-function formatOutcomeShort(
-  scoreType: 'exact' | 'winner_gd' | 'winner' | 'miss',
-  points: number,
-): string {
-  switch (scoreType) {
-    case 'exact':
-      return `Exact +${points}`
-    case 'winner_gd':
-      return `GD +${points}`
-    case 'winner':
-      return `Winner +${points}`
-    case 'miss':
-      return 'Miss'
-  }
-}
