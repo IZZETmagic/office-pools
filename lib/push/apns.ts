@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import http2 from 'node:http2'
 
 import { PUSH_CATEGORY_COLUMNS, type PushCategory } from './categories'
+import { sendExpoPushNotification } from './expo-push'
 
 // =============================================================
 // APNs HTTP/2 Push Notification Client
@@ -221,6 +222,27 @@ async function filterByCategoryOptIn(
 }
 
 /**
+ * Per-token dispatch — routes APNs tokens (iOS, hex device tokens) to APNs
+ * direct, Expo push tokens (Android, ExponentPushToken[...]) to Expo's
+ * hosted relay. Picks the right path based on the stored `platform` column,
+ * with a token-shape fallback for legacy rows where platform may be wrong.
+ */
+type TokenRow = {
+  token: string
+  environment: string | null
+  bundle_id: string | null
+  platform: string | null
+}
+
+async function dispatchPush(t: TokenRow, payload: PushPayload): Promise<boolean> {
+  const isExpoToken = t.token.startsWith('ExponentPushToken[')
+  if (t.platform === 'android' || isExpoToken) {
+    return sendExpoPushNotification(t.token, payload)
+  }
+  return sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
+}
+
+/**
  * Send a push notification to all devices registered for a user.
  *
  * If `category` is set, the user's opt-out preference for that category is
@@ -240,7 +262,7 @@ export async function sendPushToUser(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment, bundle_id')
+    .select('token, environment, bundle_id, platform')
     .eq('user_id', userId)
 
   if (!tokens || tokens.length === 0) {
@@ -248,9 +270,7 @@ export async function sendPushToUser(
   }
 
   const results = await Promise.allSettled(
-    tokens.map((t) =>
-      sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
-    )
+    (tokens as TokenRow[]).map((t) => dispatchPush(t, payload)),
   )
 
   const sent = results.filter(
@@ -278,7 +298,7 @@ export async function sendPushToUsers(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment, bundle_id')
+    .select('token, environment, bundle_id, platform')
     .in('user_id', allowed)
 
   if (!tokens || tokens.length === 0) {
@@ -286,9 +306,7 @@ export async function sendPushToUsers(
   }
 
   const results = await Promise.allSettled(
-    tokens.map((t) =>
-      sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
-    )
+    (tokens as TokenRow[]).map((t) => dispatchPush(t, payload)),
   )
 
   const sent = results.filter(
@@ -308,7 +326,7 @@ export async function sendPushToAll(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment, bundle_id')
+    .select('token, environment, bundle_id, platform')
 
   if (!tokens || tokens.length === 0) {
     return { sent: 0, total: 0 }
@@ -319,11 +337,9 @@ export async function sendPushToAll(
   let sent = 0
 
   for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-    const chunk = tokens.slice(i, i + CHUNK_SIZE)
+    const chunk = tokens.slice(i, i + CHUNK_SIZE) as TokenRow[]
     const results = await Promise.allSettled(
-      chunk.map((t) =>
-        sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
-      )
+      chunk.map((t) => dispatchPush(t, payload)),
     )
     sent += results.filter(
       (r) => r.status === 'fulfilled' && r.value === true

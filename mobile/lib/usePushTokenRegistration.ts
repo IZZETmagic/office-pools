@@ -10,6 +10,7 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 
 import { registerPushToken, unregisterPushToken } from './api';
 import { useAuth } from './auth';
@@ -17,6 +18,37 @@ import { usePushPermission } from './usePushPermission';
 
 const BUNDLE_ID =
   Constants.expoConfig?.ios?.bundleIdentifier ?? 'com.officepools.expo';
+
+const EAS_PROJECT_ID =
+  (Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined)?.projectId;
+
+type PlatformToken = { token: string; platform: 'ios' | 'android' };
+
+/**
+ * Get the appropriate push token for the current platform:
+ *  - iOS: native APNs device token (hex string) via getDevicePushTokenAsync
+ *  - Android: Expo push token (ExponentPushToken[...]) via getExpoPushTokenAsync
+ *
+ * Server routing reads the stored `platform` and sends iOS tokens direct to
+ * APNs while Android tokens go through Expo's hosted relay (which forwards
+ * to FCM). Returns null if the platform has no push setup we can use
+ * (e.g. Android with missing EAS projectId).
+ */
+async function fetchPlatformPushToken(): Promise<PlatformToken | null> {
+  if (Platform.OS === 'ios') {
+    const result = await Notifications.getDevicePushTokenAsync();
+    return { token: result.data, platform: 'ios' };
+  }
+  if (Platform.OS === 'android') {
+    if (!EAS_PROJECT_ID) {
+      console.warn('[push] missing EAS projectId — Android push disabled');
+      return null;
+    }
+    const result = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
+    return { token: result.data, platform: 'android' };
+  }
+  return null;
+}
 
 /**
  * APNs gateway routing — must match the build's `aps-environment` entitlement.
@@ -53,9 +85,10 @@ export function usePushTokenRegistration() {
     inFlightRef.current = true;
     void (async () => {
       try {
-        const result = await Notifications.getDevicePushTokenAsync();
+        const platformToken = await fetchPlatformPushToken();
         if (cancelled) return;
-        const token = result.data;
+        if (!platformToken) return;
+        const { token, platform } = platformToken;
         if (typeof token !== 'string' || token.length === 0) {
           console.warn('[push] empty device token, skipping registration');
           return;
@@ -66,12 +99,14 @@ export function usePushTokenRegistration() {
         }
         await registerPushToken({
           token,
-          platform: 'ios',
+          platform,
+          // environment + bundle_id only used by APNs (iOS); harmless on
+          // Android but kept consistent for any future analytics.
           environment: ENVIRONMENT,
           bundle_id: BUNDLE_ID,
         });
         lastRegisteredTokenRef.current = token;
-        console.log('[push] registered token', token.slice(0, 8), 'env', ENVIRONMENT);
+        console.log('[push] registered', platform, 'token', token.slice(0, 12));
       } catch (err) {
         console.warn('[push] token registration failed', err);
       } finally {
@@ -85,8 +120,12 @@ export function usePushTokenRegistration() {
   }, [user, status]);
 
   // ---- Listen for OS-driven token rotation (rare but possible) ----
+  // Note: addPushTokenListener fires for iOS device-token changes only.
+  // Expo push tokens (Android) are stable for the install lifetime so a
+  // listener isn't needed there.
   useEffect(() => {
     if (!user || status !== 'granted') return;
+    if (Platform.OS !== 'ios') return;
     const sub = Notifications.addPushTokenListener((event) => {
       const next = event.data;
       if (typeof next !== 'string' || next.length === 0) return;
@@ -99,7 +138,7 @@ export function usePushTokenRegistration() {
       })
         .then(() => {
           lastRegisteredTokenRef.current = next;
-          console.log('[push] rotated token, re-registered', next.slice(0, 8));
+          console.log('[push] rotated ios token, re-registered', next.slice(0, 8));
         })
         .catch((err) => console.warn('[push] rotation registration failed', err));
     });
