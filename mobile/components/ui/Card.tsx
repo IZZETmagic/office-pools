@@ -23,7 +23,7 @@ export function Card({
   padding = 'xl',
   radius = 'lg',
   shadow = 'card',
-  bordered = true,
+  bordered = false,
   style,
 }: CardProps) {
   const theme = useTheme();

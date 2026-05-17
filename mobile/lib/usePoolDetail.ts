@@ -1,0 +1,142 @@
+import { useCallback, useEffect, useState } from 'react';
+
+import { useAuth } from './auth';
+import {
+  fetchLeaderboard,
+  type LeaderboardEntry,
+  type MatchdayInfo,
+  type MatchdayMvp,
+  type PoolAward,
+  type Superlative,
+} from './api';
+import { supabase } from './supabase';
+
+export type PoolDetailInfo = {
+  poolId: string;
+  poolName: string;
+  poolCode: string;
+  description: string | null;
+  predictionMode: string | null;
+  brandName: string | null;
+  brandEmoji: string | null;
+  brandColor: string | null;
+  brandLogoUrl: string | null;
+  predictionDeadline: string | null;
+  status: string;
+  maxParticipants: number | null;
+  maxEntriesPerUser: number;
+  isPrivate: boolean;
+  memberCount: number;
+  isAdmin: boolean;
+  currentUserId: string | null;
+};
+
+export type PoolDetailData = {
+  pool: PoolDetailInfo;
+  leaderboard: LeaderboardEntry[];
+  awards: PoolAward[];
+  superlatives: Superlative[];
+  matchdayMvp: MatchdayMvp | null;
+  matchdayInfo: MatchdayInfo | null;
+};
+
+export function usePoolDetail(poolId: string | undefined) {
+  const { user } = useAuth();
+  const [data, setData] = useState<PoolDetailData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (mode: 'initial' | 'refresh') => {
+      if (!poolId || !user) return;
+      if (mode === 'refresh') setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const [{ data: userData, error: userErr }, { data: pool, error: poolErr }, lb] =
+          await Promise.all([
+            supabase.from('users').select('user_id').eq('auth_user_id', user.id).maybeSingle(),
+            supabase
+              .from('pools')
+              .select(
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, max_participants, max_entries_per_user, is_private, admin_user_id',
+              )
+              .eq('pool_id', poolId)
+              .maybeSingle(),
+            fetchLeaderboard(poolId),
+          ]);
+        if (userErr) throw userErr;
+        if (poolErr) throw poolErr;
+        if (!pool) throw new Error('Pool not found.');
+
+        const { count: memberCount } = await supabase
+          .from('pool_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('pool_id', poolId);
+
+        const poolRow = pool as {
+          pool_id: string;
+          pool_name: string;
+          pool_code: string;
+          description: string | null;
+          prediction_mode: string | null;
+          brand_name: string | null;
+          brand_emoji: string | null;
+          brand_color: string | null;
+          brand_logo_url: string | null;
+          prediction_deadline: string | null;
+          status: string;
+          max_participants: number | null;
+          max_entries_per_user: number;
+          is_private: boolean | null;
+          admin_user_id: string;
+        };
+        const currentUserId = (userData as { user_id: string } | null)?.user_id ?? null;
+
+        setData({
+          pool: {
+            poolId: poolRow.pool_id,
+            poolName: poolRow.pool_name,
+            poolCode: poolRow.pool_code,
+            description: poolRow.description,
+            predictionMode: poolRow.prediction_mode,
+            brandName: poolRow.brand_name,
+            brandEmoji: poolRow.brand_emoji,
+            brandColor: poolRow.brand_color,
+            brandLogoUrl: poolRow.brand_logo_url,
+            predictionDeadline: poolRow.prediction_deadline,
+            status: poolRow.status,
+            maxParticipants: poolRow.max_participants,
+            maxEntriesPerUser: poolRow.max_entries_per_user,
+            isPrivate: !!poolRow.is_private,
+            memberCount: memberCount ?? 0,
+            isAdmin: currentUserId !== null && poolRow.admin_user_id === currentUserId,
+            currentUserId,
+          },
+          leaderboard: lb.entries ?? [],
+          awards: lb.awards ?? [],
+          superlatives: lb.superlatives ?? [],
+          matchdayMvp: lb.matchday_mvp ?? null,
+          matchdayInfo: lb.matchday_info ?? null,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load pool';
+        setError(message);
+        console.warn('[usePoolDetail]', err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [poolId, user],
+  );
+
+  useEffect(() => {
+    if (poolId && user) load('initial');
+  }, [poolId, user, load]);
+
+  const refresh = useCallback(() => load('refresh'), [load]);
+
+  return { data, loading, refreshing, error, refresh };
+}
