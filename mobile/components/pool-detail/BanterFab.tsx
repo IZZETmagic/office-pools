@@ -1,8 +1,8 @@
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useRef } from 'react';
-import { Animated, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Animated, Pressable, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -65,17 +65,17 @@ export function BanterFab({ unreadCount, onPress }: Props) {
             elevation: 6,
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="bubble.left.and.bubble.right.fill"
-              size={24}
-              tintColor="#FFFFFF"
-              weight="semibold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <View style={{ width: 24, height: 24 }} />
-          )}
+          {/* Cross-platform filled message bubble. Uses Icon's `filled` prop
+              to render Lucide's MessagesSquare as a solid shape, approximating
+              the SF Symbol `bubble.left.and.bubble.right.fill` look on both
+              platforms. */}
+          <Icon
+            name="bubble.left.and.bubble.right.fill"
+            size={24}
+            tint="#FFFFFF"
+            weight="bold"
+            filled
+          />
         </Pressable>
         {unreadCount > 0 ? (
           <View

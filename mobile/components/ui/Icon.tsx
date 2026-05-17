@@ -97,6 +97,13 @@ type IconProps = {
   /** Overrides `color` with an arbitrary hex (e.g. for branded surfaces). */
   tint?: string;
   weight?: 'regular' | 'medium' | 'semibold' | 'bold' | 'black';
+  /**
+   * Render the icon as a solid shape — the interior is filled with the same
+   * color as the stroke. Approximates SF Symbols' `.fill` variants for Lucide,
+   * which is otherwise stroke-only. Use when a "filled" look is desired for
+   * emphasis or visual weight (e.g. FABs, primary CTAs).
+   */
+  filled?: boolean;
 };
 
 // Map SF Symbol names to Lucide components. Keep alphabetised for scannability.
@@ -219,18 +226,30 @@ function strokeWidthFor(weight: IconProps['weight']): number {
   }
 }
 
-export function Icon({ name, size = 24, color = 'ink', tint, weight = 'regular' }: IconProps) {
+export function Icon({
+  name,
+  size = 24,
+  color = 'ink',
+  tint,
+  weight = 'regular',
+  filled = false,
+}: IconProps) {
   const theme = useTheme();
   const LucideComponent = ICON_MAP[name] ?? Circle;
   if (!ICON_MAP[name] && __DEV__) {
     // eslint-disable-next-line no-console
     console.warn(`[Icon] No Lucide mapping for "${name}" — rendering fallback Circle.`);
   }
+  const tintColor = tint ?? theme.colors[color];
   return (
     <LucideComponent
       size={size}
-      color={tint ?? theme.colors[color]}
+      color={tintColor}
       strokeWidth={strokeWidthFor(weight)}
+      // `fill` is a Lucide-native prop. Defaults to "none" (transparent
+      // interior) — passing the same color as the stroke makes the icon
+      // appear solid, matching the look of SF Symbols' `.fill` variants.
+      fill={filled ? tintColor : 'none'}
     />
   );
 }
