@@ -18,6 +18,7 @@
     },
     "android": {
       "package": "com.officepools.expo",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#3B5BDB",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -68,3 +68,4 @@ mobile/ios/
 mobile/android/
 mobile/dist/
 mobile/.env*.local
+firebase-debug.log

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "800968871802",
+    "project_id": "sportpool-e34a3",
+    "storage_bucket": "sportpool-e34a3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:800968871802:android:a41cee96912e95732290c3",
+        "android_client_info": {
+          "package_name": "com.officepools.expo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS8XGYwFtqm2xEqD6hboR6xvWnxvY-6TM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
