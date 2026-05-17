@@ -18,8 +18,14 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { HomeDataProvider } from '@/lib/HomeDataProvider';
+import { initSentry, Sentry } from '@/lib/sentry';
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
 import { usePushTokenRegistration } from '@/lib/usePushTokenRegistration';
+
+// Crash + error reporting. Module-scope init runs once per JS context — Fast
+// Refresh re-runs the file but Sentry.init guards against duplicate setup.
+// Falls back to a no-op when EXPO_PUBLIC_SENTRY_DSN is unset.
+initSentry();
 
 // react-native-reorderable-list legitimately nests its FlatList inside an
 // Animated.ScrollView via ScrollViewContainer. RN's VirtualizedList warning is
@@ -36,7 +42,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Nunito_400Regular,
     Nunito_500Medium,
@@ -55,6 +61,11 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+// `Sentry.wrap` installs an error boundary at the root and instruments
+// the navigation container for performance traces. No-op when Sentry isn't
+// configured (DSN missing), so safe to leave wrapped in all environments.
+export default Sentry.wrap(RootLayout);
 
 function InnerLayout() {
   const colorScheme = useColorScheme();
