@@ -65,16 +65,14 @@ export function BanterFab({ unreadCount, onPress }: Props) {
             elevation: 6,
           }}
         >
-          {/* Cross-platform filled message bubble. Uses Icon's `filled` prop
-              to render Lucide's MessagesSquare as a solid shape, approximating
-              the SF Symbol `bubble.left.and.bubble.right.fill` look on both
-              platforms. */}
+          {/* Cross-platform message bubble (outline). Tried `filled` first
+              but the solid silhouette obscured the bubble's internal detail;
+              the outline reads cleaner on the blue FAB. */}
           <Icon
             name="bubble.left.and.bubble.right.fill"
             size={24}
             tint="#FFFFFF"
             weight="bold"
-            filled
           />
         </Pressable>
         {unreadCount > 0 ? (
