@@ -109,6 +109,12 @@ export default function PrivacyPage() {
                     If you contact us through the contact form, we collect the name, email address, and message content you provide. We also store records of email notifications sent to you through the Service.
                   </p>
                 </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-2">Mobile Push Notifications</h3>
+                  <p>
+                    When you use the Sport Pool mobile app and grant notification permission, your device&apos;s operating system issues us a push notification token (an APNs device token on iOS or an Expo push token routed via Firebase Cloud Messaging on Android). We store this token, the platform it was issued for, and your per-category notification preferences so we can deliver pushes about pool activity, prediction deadlines, match results, leaderboard changes, mentions, and badges or level-ups you earn. You can revoke notification permission at any time in your device settings, and you can toggle individual categories off from your profile in the app &mdash; in either case we stop sending the affected pushes and remove invalid tokens automatically.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -125,6 +131,7 @@ export default function PrivacyPage() {
                   <li>Calculate scores, update leaderboards, and process predictions</li>
                   <li>Deliver community features such as pool chat, reactions, and @mentions</li>
                   <li>Send you email notifications about pool activity, prediction deadlines, match results, leaderboard updates, and administrative events, subject to your notification preferences</li>
+                  <li>Send push notifications to your mobile device about the same categories of events when you use the Sport Pool mobile app and have granted notification permission, subject to your per-category notification preferences</li>
                   <li>Respond to your contact form inquiries</li>
                   <li>Maintain administrative audit logs so pool and super admin actions remain accountable</li>
                   <li>Improve the Service through analytics and usage patterns (where enabled &mdash; see Section 4)</li>
@@ -195,6 +202,15 @@ export default function PrivacyPage() {
                   <li>
                     <strong>Vercel</strong> &mdash; Hosts the Service. Vercel may collect standard server logs including IP addresses and request data.
                   </li>
+                  <li>
+                    <strong>Apple Push Notification service (APNs)</strong> &mdash; Used to deliver push notifications to iOS devices. Apple receives the encrypted notification payload and your APNs device token in order to route the notification to your device.
+                  </li>
+                  <li>
+                    <strong>Expo Push Service &amp; Firebase Cloud Messaging (FCM)</strong> &mdash; Used to deliver push notifications to Android devices. Expo&apos;s hosted service relays the notification payload and your Expo push token to Google&apos;s Firebase Cloud Messaging, which then delivers the notification to your device.
+                  </li>
+                  <li>
+                    <strong>Sentry</strong> &mdash; When enabled in the Sport Pool mobile app, collects anonymized crash reports and error telemetry (stack traces, app version, device model, OS version) so we can diagnose and fix bugs. No prediction content or personal pool data is sent to Sentry.
+                  </li>
                 </ul>
                 <p>
                   Each of these services has their own privacy policies governing how they handle data. We encourage you to review their respective policies.
@@ -249,7 +265,7 @@ export default function PrivacyPage() {
                   <li><strong>Access</strong> the personal information we hold about you</li>
                   <li><strong>Correct</strong> any inaccurate or incomplete information</li>
                   <li><strong>Delete</strong> your account and associated data from your profile settings</li>
-                  <li><strong>Manage</strong> which categories of email notifications you receive from your profile settings</li>
+                  <li><strong>Manage</strong> which categories of email and push notifications you receive from your profile settings, and revoke push notification permission at any time in your device&apos;s system settings</li>
                   <li><strong>Unsubscribe</strong> from broadcast emails using the unsubscribe link in any such email</li>
                 </ul>
                 <p>
