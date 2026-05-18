@@ -258,6 +258,12 @@ function YourPoolsSection({ pools }: { pools: PoolSummary[] }) {
           gap: theme.spacing.md,
           paddingLeft: theme.spacing.xl,
           paddingRight: theme.spacing.xl,
+          // Extra vertical padding so the cards' drop shadows + elevation
+          // halo render fully instead of being clipped at the FlatList's
+          // tight content-height boundary (which sized exactly to the
+          // 180px card height before, cutting off the bottom shadow band).
+          paddingTop: theme.spacing.xxs,
+          paddingBottom: theme.spacing.sm,
         }}
         renderItem={({ item }) => (
           <PoolCard pool={item} onPress={() => router.navigate(`/pool/${item.poolId}`)} />
