@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Icon, Input, Text } from '@/components/ui';
 import { createPool, type CreatePoolRequest } from '@/lib/api';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -104,6 +105,9 @@ function formatDeadlineDisplay(d: Date): string {
 
 export default function CreatePoolModal() {
   const theme = useTheme();
+  // Refreshed after a successful create so the new pool's card appears
+  // on the home dashboard + Pools tab immediately when we navigate to it.
+  const { refresh: refreshHomeData } = useHomeData();
 
   const [step, setStep] = useState<Step>('tournament');
   const stepIndex = STEP_ORDER.indexOf(step);
@@ -200,7 +204,7 @@ export default function CreatePoolModal() {
     setLoading(true);
     try {
       const maxP = parseInt(maxParticipants, 10);
-      await createPool({
+      const created = await createPool({
         pool_name: poolName.trim(),
         description: description.trim() || null,
         tournament_id: selectedTournamentId,
@@ -210,7 +214,14 @@ export default function CreatePoolModal() {
         max_participants: Number.isFinite(maxP) && maxP > 0 ? maxP : null,
         max_entries_per_user: Math.max(1, Math.min(10, maxEntriesPerUser)),
       });
-      router.back();
+      // Refresh the home dashboard / Pools tab list so the new pool card
+      // is already there when the user navigates between tabs. Fire-and-
+      // forget — the deep-link below doesn't wait for it.
+      void refreshHomeData();
+      // Land the admin on the new pool's leaderboard tab (default tab on
+      // app/pool/[id].tsx). Replace, not push, so back navigation skips
+      // the create modal.
+      router.replace(`/pool/${created.pool_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create pool');
     } finally {

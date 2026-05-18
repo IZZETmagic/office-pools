@@ -9,12 +9,14 @@ import BottomSheet, {
   BottomSheetView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
+import { router } from 'expo-router';
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
 import { joinPool } from '@/lib/api';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Tab = 'code' | 'qr';
@@ -32,6 +34,9 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
   const [poolCode, setPoolCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Used after a successful join so the new pool shows up on the Home
+  // and Pools tab cards immediately — same pattern as create-pool.
+  const { refresh: refreshHomeData } = useHomeData();
 
   // Reset local state every time the sheet opens so the previous attempt's
   // input / error doesn't leak across opens.
@@ -59,8 +64,16 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
     setError(null);
     setLoading(true);
     try {
-      await joinPool(trimmed);
+      const joined = await joinPool(trimmed);
       sheetRef.current?.close();
+      // Refresh the Home / Pools dashboards so the new pool card appears
+      // immediately when the user lands on those tabs later.
+      void refreshHomeData();
+      // Land the user on the pool's leaderboard (default tab on
+      // app/pool/[id].tsx). navigate() so they can swipe back to where
+      // they came from (Home or Pools tab) — the join sheet has already
+      // closed so there's no flicker.
+      router.navigate(`/pool/${joined.pool_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join pool');
     } finally {

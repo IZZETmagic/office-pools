@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
 import { joinPool } from '@/lib/api';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -78,6 +79,9 @@ export default function PoolPreviewSheet() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Refresh the home dashboard's pool list after a successful join so the
+  // new card shows up on Home and Pools tabs immediately.
+  const { refresh: refreshHomeData } = useHomeData();
 
   useEffect(() => {
     let cancelled = false;
@@ -177,7 +181,12 @@ export default function PoolPreviewSheet() {
     setJoining(true);
     try {
       await joinPool(detail.poolCode);
-      router.back();
+      // Refresh Home / Pools cards so the new pool appears immediately
+      // when the user navigates back to those tabs later.
+      void refreshHomeData();
+      // Replace the discover-preview modal with the pool's leaderboard so
+      // tapping back doesn't return to the modal (the user already joined).
+      router.replace(`/pool/${detail.poolId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join pool.');
     } finally {
