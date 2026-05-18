@@ -8,6 +8,7 @@ import {
   Text as RNText,
   View,
 } from 'react-native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
@@ -445,7 +446,11 @@ function BPBadgesSection({
         title="Bracket Badges"
         subtitle={`${earned.length}/${all.length} earned`}
       />
-      <ScrollView
+      {/* GestureScrollView (from react-native-gesture-handler) — Android
+          loses the inner horizontal swipe to the outer page pager when
+          using plain ScrollView. Gesture-handler's tree-aware version
+          properly yields the swipe to the inner scroller. */}
+      <GestureScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
@@ -466,7 +471,7 @@ function BPBadgesSection({
             />
           );
         })}
-      </ScrollView>
+      </GestureScrollView>
     </View>
   );
 }
@@ -1228,13 +1233,14 @@ function EntrySelector({
       {segmented ? (
         <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>{chips}</View>
       ) : (
-        <ScrollView
+        // GestureScrollView — see comment on the Bracket Badges scroller.
+        <GestureScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: theme.spacing.xs }}
         >
           {chips}
-        </ScrollView>
+        </GestureScrollView>
       )}
     </View>
   );

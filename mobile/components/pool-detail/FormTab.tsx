@@ -7,6 +7,7 @@ import {
   Text as RNText,
   View,
 } from 'react-native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
@@ -216,13 +217,20 @@ function EntrySelector({
       {segmented ? (
         <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>{chips}</View>
       ) : (
-        <ScrollView
+        // GestureScrollView (from react-native-gesture-handler) is
+        // required for horizontal scrollers nested inside the pool
+        // detail screen's horizontal page pager. iOS routes touches to
+        // the innermost scrollable automatically; Android's gesture
+        // system needs gesture-handler's tree-aware ScrollView to
+        // disambiguate between this inner horizontal swipe and the
+        // outer pager's tab-swipe.
+        <GestureScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: theme.spacing.xs }}
         >
           {chips}
-        </ScrollView>
+        </GestureScrollView>
       )}
     </View>
   );
@@ -521,7 +529,10 @@ function BadgesSection({
       }}
     >
       <SectionHeader title="Badges" subtitle={`${earned.length}/${all.length} earned`} />
-      <ScrollView
+      {/* GestureScrollView (from react-native-gesture-handler) — see
+          the entry-selector comment above. Plain ScrollView's horizontal
+          gesture gets eaten by the outer page pager on Android. */}
+      <GestureScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
@@ -542,7 +553,7 @@ function BadgesSection({
             />
           );
         })}
-      </ScrollView>
+      </GestureScrollView>
     </View>
   );
 }
