@@ -10,7 +10,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ChampionIcon,
   FootballIcon,
-  Home01Icon,
+  Home03Icon,
   Notification01Icon,
   UserCircleIcon,
 } from '@hugeicons/core-free-icons';
@@ -24,7 +24,7 @@ import { fontFamilies, useTheme } from '@/theme';
 // Per-tab icon constant. Hugeicons doesn't have a literal Trophy in its
 // free set, so the Pools tab uses Champion (a podium with a winner) —
 // thematically aligned for a prediction pool app.
-const HOME_ICON = Home01Icon;
+const HOME_ICON = Home03Icon;
 const POOLS_ICON = ChampionIcon;
 const RESULTS_ICON = FootballIcon;
 const ACTIVITY_ICON = Notification01Icon; // closest free Hugeicons equivalent to a bell
@@ -40,7 +40,7 @@ export default function TabLayout() {
   // tabBarActiveTintColor below) and (b) a thicker stroke. The icon shape
   // stays soft-rounded and consistent across states; only its visual
   // weight changes on focus.
-  function renderTabIcon(icon: typeof Home01Icon) {
+  function renderTabIcon(icon: typeof Home03Icon) {
     return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
       <HugeiconsIcon
         icon={icon}
