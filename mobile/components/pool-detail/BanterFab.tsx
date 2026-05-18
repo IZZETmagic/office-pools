@@ -1,8 +1,9 @@
+import { MessageMultiple01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -65,14 +66,17 @@ export function BanterFab({ unreadCount, onPress }: Props) {
             elevation: 6,
           }}
         >
-          {/* Cross-platform message bubble (outline). Tried `filled` first
-              but the solid silhouette obscured the bubble's internal detail;
-              the outline reads cleaner on the blue FAB. */}
-          <Icon
-            name="bubble.left.and.bubble.right.fill"
-            size={24}
-            tint="#FFFFFF"
-            weight="bold"
+          {/* Hugeicons MessageMultiple01 — the "stacked chat bubbles"
+              glyph. Imported directly (rather than going through the
+              SF-symbol-name Icon map) because we want this exact icon
+              specifically on the FAB, not anywhere else that references
+              `bubble.left.and.bubble.right.fill` (profile notification
+              rows, banter empty state). */}
+          <HugeiconsIcon
+            icon={MessageMultiple01Icon}
+            size={26}
+            color="#FFFFFF"
+            strokeWidth={2.5}
           />
         </Pressable>
         {unreadCount > 0 ? (
