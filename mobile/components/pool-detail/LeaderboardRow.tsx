@@ -32,25 +32,27 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         gap: theme.spacing.md,
         padding: theme.spacing.md + 2,
         borderRadius: theme.radii.lg,
-        // Current-user row: iOS keeps the alpha-based primary tint + border
-        // (the proven-good rendering). Android uses pre-blended solid colors
-        // and an integer (1pt) border — hypothesis is that Android's alpha
-        // compositing of border-on-tint-on-elevation creates the visible
-        // "double container" / ring effect. Solid colors should remove the
-        // alpha-blending variable. iOS is unchanged.
+        // Current-user row. iOS uses the alpha-based tint + 1.5pt border that
+        // renders cleanly via iOS's CoreAnimation compositor. Android uses
+        // pre-blended solid hex equivalents — alpha-compositing the border
+        // over the tint over elevation created a visible "double container"
+        // ring. Android values are also bumped a notch (~15% bg, ~40%
+        // border, 2pt) so the row reads as clearly distinct against the
+        // surrounding white rows; iOS achieves the same visual punch with
+        // its softer alpha values thanks to platform shadow/tint rendering.
         backgroundColor: isCurrentUser
           ? Platform.OS === 'android'
-            ? '#EFF2FC' // primary @ 8% pre-blended over white
+            ? '#E2E6FA' // primary @ 15% pre-blended over white
             : withOpacity(theme.colors.primary, 0.08)
           : theme.colors.surface,
         borderWidth: isCurrentUser
           ? Platform.OS === 'android'
-            ? 1
+            ? 2
             : theme.borders.accent
           : 0,
         borderColor: isCurrentUser
           ? Platform.OS === 'android'
-            ? '#CED6F6' // primary @ 25% pre-blended over white
+            ? '#B1BDF1' // primary @ 40% pre-blended over white
             : withOpacity(theme.colors.primary, 0.25)
           : 'transparent',
         opacity: pressed ? 0.85 : 1,
