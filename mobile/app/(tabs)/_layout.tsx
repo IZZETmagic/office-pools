@@ -1,38 +1,53 @@
-// JS-rendered tab bar via Expo Router's <Tabs>. Tab icons specifically use
-// Solar Icons (via react-native-solar-icons) — a soft-rounded icon set
-// where every glyph ships in 6 styles. We use `linear` (clean stroke) for
-// inactive tabs and `bold` (filled silhouette with internal details
-// preserved) for the active tab. Rest of the app stays on Lucide via the
-// existing Icon component.
+// JS-rendered tab bar via Expo Router's <Tabs>. Tab icons use Hugeicons'
+// free set — soft-rounded stroke style across all glyphs. The free tier
+// doesn't include filled variants, so we signal the active tab via a
+// thicker strokeWidth instead of fill (color also changes to primary,
+// handled by tabBarActiveTintColor below). If we ever buy the Pro icon
+// pack with bulk/duotone variants, the active state can switch to a
+// true filled icon then.
 
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import {
+  ChampionIcon,
+  FootballIcon,
+  Home01Icon,
+  Notification01Icon,
+  UserCircleIcon,
+} from '@hugeicons/core-free-icons';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
-import { SolarIcon } from 'react-native-solar-icons';
 
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme } from '@/theme';
 
-// Per-tab Solar icon name. Each renders in `linear` style when inactive
-// and `bold` style when active — Solar handles both as variants of the
-// same icon concept so the silhouette is consistent on focus.
-const HOME_ICON = 'Home';
-const POOLS_ICON = 'CupStar'; // soft rounded trophy cup with a star
-const RESULTS_ICON = 'Football';
-const ACTIVITY_ICON = 'Bell';
-const PROFILE_ICON = 'UserCircle';
+// Per-tab icon constant. Hugeicons doesn't have a literal Trophy in its
+// free set, so the Pools tab uses Champion (a podium with a winner) —
+// thematically aligned for a prediction pool app.
+const HOME_ICON = Home01Icon;
+const POOLS_ICON = ChampionIcon;
+const RESULTS_ICON = FootballIcon;
+const ACTIVITY_ICON = Notification01Icon; // closest free Hugeicons equivalent to a bell
+const PROFILE_ICON = UserCircleIcon;
 
 export default function TabLayout() {
   const theme = useTheme();
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
-  // Solar's `linear` style is a clean soft-rounded stroke; `bold` is the
-  // filled variant of the same shape with internal lines preserved (bell
-  // clapper, person silhouette, etc). Toggle on focus.
-  function renderTabIcon(iconName: string) {
+  // Free Hugeicons icons are stroke-only — no filled twin in the package.
+  // Active state signal is therefore (a) the primary color (from
+  // tabBarActiveTintColor below) and (b) a thicker stroke. The icon shape
+  // stays soft-rounded and consistent across states; only its visual
+  // weight changes on focus.
+  function renderTabIcon(icon: typeof Home01Icon) {
     return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
-      <SolarIcon name={iconName} type={focused ? 'bold' : 'linear'} size={size} color={color} />
+      <HugeiconsIcon
+        icon={icon}
+        color={color}
+        size={size}
+        strokeWidth={focused ? 2.5 : 1.5}
+      />
     );
   }
 
