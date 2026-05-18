@@ -16,9 +16,18 @@ export default function TabLayout() {
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
+  // Lucide icons are stroke-only by default. Passing `fill={color}` matches
+  // the stroke color and produces a solid silhouette — same approach as our
+  // <Icon filled> prop. We toggle it on focus so the selected tab reads as
+  // "active" with a solid icon while inactive tabs stay outlined.
   function renderTabIcon(IconComp: LucideIcon) {
-    return ({ color, size }: { color: string; size: number; focused: boolean }) => (
-      <IconComp color={color} size={size} strokeWidth={2.75} />
+    return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
+      <IconComp
+        color={color}
+        size={size}
+        strokeWidth={2.75}
+        fill={focused ? color : 'none'}
+      />
     );
   }
 
