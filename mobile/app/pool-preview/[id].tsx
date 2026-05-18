@@ -253,7 +253,15 @@ export default function PoolPreviewSheet() {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: theme.spacing.xl,
-          paddingTop: theme.spacing.xxl,
+          // iOS: the modal presentation provides its own safe inset above
+          // the card, so a fixed xxl gap places the header comfortably below
+          // the rounded modal lip. Android: the modal renders edge-to-edge
+          // and inherits the system status bar — we need insets.top so the
+          // title isn't tucked behind the notch / camera cutout.
+          paddingTop:
+            Platform.OS === 'android'
+              ? insets.top + theme.spacing.md
+              : theme.spacing.xxl,
           paddingBottom: theme.spacing.sm,
         }}
       >
@@ -266,11 +274,25 @@ export default function PoolPreviewSheet() {
           hitSlop={12}
           style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, width: 32, alignItems: 'flex-end' })}
         >
-          <SymbolView
-            name="xmark.circle.fill"
-            size={28}
-            tintColor={withOpacity(theme.colors.slate, 0.35)}
-          />
+          {/* iOS uses the native SF Symbol xmark.circle.fill (matches iOS
+              navigation patterns). Android falls back to the cross-platform
+              Icon component since SymbolView is iOS-only and would render
+              nothing on Android — leaving users with no visible way to
+              close the modal. */}
+          {Platform.OS === 'ios' ? (
+            <SymbolView
+              name="xmark.circle.fill"
+              size={28}
+              tintColor={withOpacity(theme.colors.slate, 0.35)}
+            />
+          ) : (
+            <Icon
+              name="xmark.circle.fill"
+              size={28}
+              tint={withOpacity(theme.colors.slate, 0.35)}
+              filled
+            />
+          )}
         </Pressable>
       </View>
 
