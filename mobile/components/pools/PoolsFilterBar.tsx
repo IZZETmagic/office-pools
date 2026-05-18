@@ -1,6 +1,8 @@
-import { ActionSheetIOS, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useRef } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { PoolsFilterSheet, type PoolsFilterSheetHandle } from './PoolsFilterSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type StatusFilter = 'all' | 'open' | 'completed' | 'archived';
@@ -56,35 +58,15 @@ type PoolsFilterBarProps = {
 
 export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
   const theme = useTheme();
+  const sheetRef = useRef<PoolsFilterSheetHandle | null>(null);
   const hasActiveFilters =
     filters.status !== 'all' || filters.type !== 'all' || filters.predictions !== 'all';
 
-  function pick<T extends string>(
-    title: string,
-    options: Array<{ value: T; label: string }>,
-    currentValue: T,
-    onPick: (v: T) => void,
-  ) {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title,
-          options: [...options.map((o) => o.label), 'Cancel'],
-          cancelButtonIndex: options.length,
-        },
-        (i) => {
-          if (i === options.length) return;
-          onPick(options[i].value);
-        },
-      );
-    } else {
-      // Android: cycle through options on tap (V4 minimum)
-      const idx = options.findIndex((o) => o.value === currentValue);
-      const next = options[(idx + 1) % options.length];
-      onPick(next.value);
-    }
-  }
-
+  // One bottom sheet instance handles all four pickers. We pass it a fresh
+  // config (title + options + current value + onPick callback) each time a
+  // chip / sort button is tapped. Same UX on iOS and Android — replaces
+  // the previous ActionSheetIOS (iOS only) + Android-cycles-through-options
+  // split, which was disorienting on Android for anything beyond 2 options.
   return (
     <View
       style={{
@@ -109,9 +91,12 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.status !== 'all'}
           onPress={() =>
-            pick('Status', STATUS_OPTIONS, filters.status, (v) =>
-              onChange({ ...filters, status: v }),
-            )
+            sheetRef.current?.open({
+              title: 'Status',
+              options: STATUS_OPTIONS,
+              selectedValue: filters.status,
+              onPick: (v) => onChange({ ...filters, status: v as StatusFilter }),
+            })
           }
         />
         <FilterChip
@@ -122,9 +107,12 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.type !== 'all'}
           onPress={() =>
-            pick('Pool Type', TYPE_OPTIONS, filters.type, (v) =>
-              onChange({ ...filters, type: v }),
-            )
+            sheetRef.current?.open({
+              title: 'Pool Type',
+              options: TYPE_OPTIONS,
+              selectedValue: filters.type,
+              onPick: (v) => onChange({ ...filters, type: v as TypeFilter }),
+            })
           }
         />
         <FilterChip
@@ -136,9 +124,12 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.predictions !== 'all'}
           onPress={() =>
-            pick('Predictions', PREDICTION_OPTIONS, filters.predictions, (v) =>
-              onChange({ ...filters, predictions: v }),
-            )
+            sheetRef.current?.open({
+              title: 'Predictions',
+              options: PREDICTION_OPTIONS,
+              selectedValue: filters.predictions,
+              onPick: (v) => onChange({ ...filters, predictions: v as PredictionFilter }),
+            })
           }
         />
         {hasActiveFilters ? (
@@ -174,9 +165,12 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
 
       <Pressable
         onPress={() =>
-          pick('Sort by', SORT_OPTIONS, filters.sort, (v) =>
-            onChange({ ...filters, sort: v }),
-          )
+          sheetRef.current?.open({
+            title: 'Sort by',
+            options: SORT_OPTIONS,
+            selectedValue: filters.sort,
+            onPick: (v) => onChange({ ...filters, sort: v as SortMode }),
+          })
         }
         hitSlop={8}
         style={({ pressed }) => ({
@@ -199,6 +193,12 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           weight="semibold"
         />
       </Pressable>
+
+      {/* Single sheet instance shared across all four pickers. The parent
+          (this filter bar) re-passes a fresh config every time a chip is
+          tapped; the sheet remembers the active config until the next open
+          call. */}
+      <PoolsFilterSheet ref={sheetRef} />
     </View>
   );
 }
