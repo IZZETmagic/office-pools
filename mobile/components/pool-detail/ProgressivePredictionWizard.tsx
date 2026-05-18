@@ -1,10 +1,8 @@
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -13,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GroupCollapsibleSection, MatchPredictionRow, ThirdPlaceTable } from '@/components/pool-detail';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { submitRoundPredictions } from '@/lib/api';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
@@ -332,11 +330,7 @@ function Header({ title }: { title: string }) {
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView name="chevron.left" size={16} tintColor={theme.colors.ink} weight="semibold" />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.ink }}>‹</RNText>
-        )}
+        <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
       <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
         {title}
@@ -422,35 +416,13 @@ function TabIcon({
 }) {
   const theme = useTheme();
   if (submitted) {
-    return Platform.OS === 'ios' ? (
-      <SymbolView
-        name="checkmark.circle.fill"
-        size={11}
-        tintColor={theme.colors.green}
-        weight="semibold"
-      />
-    ) : (
-      <RNText style={{ fontSize: 11, color: theme.colors.green }}>✓</RNText>
-    );
+    return <Icon name="checkmark.circle.fill" size={11} tint={theme.colors.green} weight="semibold" />;
   }
   if (locked) {
-    return Platform.OS === 'ios' ? (
-      <SymbolView
-        name="lock.fill"
-        size={11}
-        tintColor={theme.colors.silver}
-        weight="semibold"
-      />
-    ) : (
-      <RNText style={{ fontSize: 11, color: theme.colors.silver }}>🔒</RNText>
-    );
+    return <Icon name="lock.fill" size={11} tint={theme.colors.silver} weight="semibold" />;
   }
   if (state === 'completed') {
-    return Platform.OS === 'ios' ? (
-      <SymbolView name="checkmark" size={11} tintColor={theme.colors.slate} weight="semibold" />
-    ) : (
-      <RNText style={{ fontSize: 11, color: theme.colors.slate }}>✓</RNText>
-    );
+    return <Icon name="checkmark" size={11} tint={theme.colors.slate} weight="semibold" />;
   }
   return null;
 }
@@ -518,17 +490,7 @@ function RoundInfoBanner({
         backgroundColor: withOpacity(spec.color, 0.12),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={spec.iosIcon as never}
-          size={12}
-          tintColor={spec.color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color: spec.color }}>{spec.emoji}</RNText>
-      )}
+      <Icon name={spec.iosIcon} size={12} tint={spec.color} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,

@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -12,7 +11,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import type {
   BadgeInfo,
   BPAnalyticsResponse,
@@ -188,25 +187,7 @@ function BPHeroCard({ xp }: { xp: BPXPData }) {
             justifyContent: 'center',
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="chevron.right"
-              size={12}
-              tintColor={theme.colors.slate}
-              weight="semibold"
-            />
-          ) : (
-            <RNText
-              style={{
-                fontSize: 16,
-                lineHeight: 16,
-                color: theme.colors.slate,
-                fontWeight: '700',
-              }}
-            >
-              ›
-            </RNText>
-          )}
+          <Icon name="chevron.right" size={12} tint={theme.colors.slate} weight="semibold" />
         </View>
       </View>
 
@@ -523,27 +504,9 @@ function BPBadgeCell({
         }}
       >
         {earned ? (
-          Platform.OS === 'ios' ? (
-            <SymbolView
-              name={icon.ios as never}
-              size={18}
-              tintColor={color}
-              weight="semibold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <RNText style={{ fontSize: 22, lineHeight: 26 }}>{icon.emoji}</RNText>
-          )
-        ) : Platform.OS === 'ios' ? (
-          <SymbolView
-            name="lock.fill"
-            size={14}
-            tintColor={theme.colors.slate}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
+          <Icon name={icon.ios} size={18} tint={color} weight="semibold" />
         ) : (
-          <RNText style={{ fontSize: 16, color: theme.colors.slate }}>🔒</RNText>
+          <Icon name="lock.fill" size={14} tint={theme.colors.slate} weight="semibold" />
         )}
       </View>
       <RNText
@@ -1296,15 +1259,7 @@ function EmptyState({
         paddingVertical: theme.spacing.xxxl,
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={icon as never}
-          size={36}
-          tintColor={theme.colors.silver}
-          weight="light"
-          resizeMode="scaleAspectFit"
-        />
-      ) : null}
+      <Icon name={icon} size={36} tint={theme.colors.silver} weight="regular" />
       <Text variant="cardTitle" align="center">
         {title}
       </Text>

@@ -413,6 +413,21 @@ export function leavePool(poolId: string) {
 }
 
 /**
+ * Delete a single pool entry the caller owns. Server enforces the
+ * non-admin-must-keep-one-entry rule: admins can delete all of theirs
+ * (matches Stop Participating semantics); non-admins get a 400 if the
+ * entry being deleted is their only one. Routed server-side for the
+ * same RLS-on-cascade reason Stop Participating uses — the protected
+ * score-table children would block a client-initiated cascade.
+ */
+export function deleteEntry(poolId: string, entryId: string) {
+  return apiFetch<{ deleted: boolean }>(
+    `/api/pools/${poolId}/entries/${entryId}/delete`,
+    { method: 'POST' },
+  );
+}
+
+/**
  * Admin "Stop Participating": delete the caller's pool_entries for
  * `poolId` while keeping their pool_members row (admin role intact).
  * Must funnel through the server because pool_entries' cascade chain

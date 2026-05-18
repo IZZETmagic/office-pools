@@ -1,6 +1,6 @@
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type FilterMode = 'date' | 'round' | 'team' | 'group';
@@ -121,19 +121,12 @@ function Pill({
 }
 
 function FilterIcon({ kind, tint }: { kind: 'clear' | 'chevron'; tint: string }) {
-  if (Platform.OS === 'ios') {
-    return (
-      <SymbolView
-        name={kind === 'clear' ? 'xmark.circle.fill' : 'chevron.down'}
-        size={kind === 'clear' ? 11 : 8}
-        tintColor={tint}
-        weight="semibold"
-      />
-    );
-  }
   return (
-    <RNText style={{ fontSize: kind === 'clear' ? 11 : 8, color: tint, lineHeight: 14 }}>
-      {kind === 'clear' ? '✕' : '▾'}
-    </RNText>
+    <Icon
+      name={kind === 'clear' ? 'xmark.circle.fill' : 'chevron.down'}
+      size={kind === 'clear' ? 11 : 8}
+      tint={tint}
+      weight="semibold"
+    />
   );
 }

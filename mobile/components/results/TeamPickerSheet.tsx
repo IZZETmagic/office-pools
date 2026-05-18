@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -7,7 +6,6 @@ import {
   Easing,
   FlatList,
   Modal,
-  Platform,
   Pressable,
   Text as RNText,
   TextInput,
@@ -15,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type TeamOption = {
@@ -175,16 +174,7 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
               backgroundColor: theme.colors.mist,
             }}
           >
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name="magnifyingglass"
-                size={14}
-                tintColor={theme.colors.slate}
-                weight="medium"
-              />
-            ) : (
-              <RNText style={{ fontSize: 14, color: theme.colors.slate }}>🔍</RNText>
-            )}
+            <Icon name="magnifyingglass" size={14} tint={theme.colors.slate} weight="medium" />
             <TextInput
               placeholder="Search teams"
               placeholderTextColor={theme.colors.slate}
@@ -257,16 +247,7 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
               >
                 {item.name}
               </RNText>
-              {Platform.OS === 'ios' ? (
-                <SymbolView
-                  name="chevron.right"
-                  size={11}
-                  tintColor={theme.colors.silver}
-                  weight="semibold"
-                />
-              ) : (
-                <RNText style={{ fontSize: 14, color: theme.colors.silver }}>›</RNText>
-              )}
+              <Icon name="chevron.right" size={11} tint={theme.colors.silver} weight="semibold" />
             </Pressable>
           )}
         />
@@ -293,25 +274,7 @@ function CloseButton({ onPress }: { onPress: () => void }) {
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="xmark"
-          size={14}
-          tintColor={theme.colors.ink}
-          weight="semibold"
-        />
-      ) : (
-        <RNText
-          style={{
-            fontSize: 16,
-            color: theme.colors.ink,
-            fontFamily: fontFamilies.bold,
-            lineHeight: 16,
-          }}
-        >
-          ✕
-        </RNText>
-      )}
+      <Icon name="xmark" size={14} tint={theme.colors.ink} weight="semibold" />
     </Pressable>
   );
 }

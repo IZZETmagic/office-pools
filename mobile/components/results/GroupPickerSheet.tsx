@@ -1,11 +1,9 @@
-import { SymbolView } from 'expo-symbols';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Easing,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -13,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type GroupOption = {
@@ -186,16 +185,7 @@ export const GroupPickerSheet = forwardRef<GroupPickerSheetHandle, Props>(functi
                 >
                   {g.matchCount} matches
                 </RNText>
-                {Platform.OS === 'ios' ? (
-                  <SymbolView
-                    name="chevron.right"
-                    size={11}
-                    tintColor={theme.colors.silver}
-                    weight="semibold"
-                  />
-                ) : (
-                  <RNText style={{ fontSize: 14, color: theme.colors.silver }}>›</RNText>
-                )}
+                <Icon name="chevron.right" size={11} tint={theme.colors.silver} weight="semibold" />
               </Pressable>
             </View>
           ))}
@@ -223,25 +213,7 @@ function CloseButton({ onPress }: { onPress: () => void }) {
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="xmark"
-          size={14}
-          tintColor={theme.colors.ink}
-          weight="semibold"
-        />
-      ) : (
-        <RNText
-          style={{
-            fontSize: 16,
-            color: theme.colors.ink,
-            fontFamily: fontFamilies.bold,
-            lineHeight: 16,
-          }}
-        >
-          ✕
-        </RNText>
-      )}
+      <Icon name="xmark" size={14} tint={theme.colors.ink} weight="semibold" />
     </Pressable>
   );
 }

@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { useMemo, useState, type ComponentType } from 'react';
 import {
   Alert,
@@ -11,11 +10,12 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { router } from 'expo-router';
 
 import { stopParticipating } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { usePoolEntries } from '@/lib/usePoolEntries';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -68,6 +68,12 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   // pool list so the deleted card disappears immediately when we navigate
   // back to the home tab.
   const { refresh: refreshHomeData } = useHomeData();
+  // Drives the "Stop Participating" row's visibility. usePoolEntries
+  // subscribes to pool_entries realtime for this user's member_id, so
+  // the count updates live — the row disappears immediately when the
+  // last entry is removed, with no manual refresh needed.
+  const { entries: userEntries } = usePoolEntries(pool.poolId);
+  const hasParticipation = userEntries.length > 0;
 
   const initial = useMemo<EditableState>(
     () => ({
@@ -90,6 +96,19 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // Stop Participating uses two ConfirmDialog instances — one to ask,
+  // one to acknowledge. `stopParticipatingBusy` keeps both the
+  // destructive-confirm and any reopen-of-row gated while the API call
+  // is in flight. `stopParticipatingSummary` carries the post-success
+  // body text (carries the entry-count returned by the endpoint).
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [stopParticipatingBusy, setStopParticipatingBusy] = useState(false);
+  const [stopParticipatingSummary, setStopParticipatingSummary] = useState<string | null>(
+    null,
+  );
+  const [stopParticipatingError, setStopParticipatingError] = useState<string | null>(
+    null,
+  );
 
   const hasChanges =
     edit.name !== initial.name ||
@@ -181,49 +200,64 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   // returned false and we fell through to the generic fallback). The
   // server endpoint uses the admin client to bypass RLS, same pattern
   // as /leave and /api/notifications/member-removed.
-  function handleStopParticipating() {
-    Alert.alert(
-      'Stop Participating',
-      `Remove your entries from ${pool.poolName}? Your predictions, standings, and scores will be deleted, but you'll stay on as admin managing the pool.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Stop Participating',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await stopParticipating(pool.poolId);
-              // Recalculate ranks so remaining members' ranks
-              // re-settle without the now-deleted entries skewing the
-              // leaderboard. Same fire-and-forget pattern web's
-              // handleLeavePool uses.
-              void fetch(`/api/pools/${pool.poolId}/recalculate`, { method: 'POST' });
-              // Refresh the home dashboard (your card's entry list
-              // shrinks) and the in-screen pool detail (leaderboard
-              // re-renders without your standings). usePoolDetail's
-              // realtime listener watches pool_members, not
-              // pool_entries, so the explicit refresh is needed here.
-              void refreshHomeData();
-              onSaved?.();
-            } catch (err) {
-              // Robust message extraction: Supabase PostgrestError and
-              // most API error responses surface `.message` as a plain
-              // object property without extending Error. `instanceof
-              // Error` returns false for those, which is exactly what
-              // hid the real failure on the previous build.
-              const message =
-                err instanceof Error
-                  ? err.message
-                  : typeof err === 'object' && err !== null && 'message' in err
-                    && typeof (err as { message: unknown }).message === 'string'
-                    ? (err as { message: string }).message
-                    : 'Unknown error';
-              Alert.alert("Couldn't update participation", message);
-            }
-          },
-        },
-      ],
-    );
+  // "Stop Participating" — admin-only action that pulls the admin out of
+  // the competition without removing them from the pool. They keep the
+  // admin role, the settings tab, banter access, etc. Only their
+  // pool_entries (and the cascading predictions / scores / bracket picks
+  // — every child of pool_entries is ON DELETE CASCADE) get cleaned up,
+  // so they no longer appear on the leaderboard. This is NOT a "leave"
+  // event — no pool_membership_events row is written and no
+  // pool_left / pool_removed activity card is generated.
+  //
+  // Routed through /api/pools/[pool_id]/stop-participating rather than a
+  // direct client-side supabase.delete on pool_entries because three of
+  // the cascade children (bonus_scores, match_scores, player_scores)
+  // have RLS enabled with no user-facing DELETE policy. A client
+  // cascade would get rejected by those children and roll back the
+  // whole transaction. The server endpoint uses the admin client to
+  // bypass RLS, same pattern as /leave and /api/notifications/member-removed.
+  async function performStopParticipating() {
+    setStopParticipatingBusy(true);
+    try {
+      const result = await stopParticipating(pool.poolId);
+      // Recalculate ranks so remaining members' ranks re-settle
+      // without the now-deleted entries skewing the leaderboard. Same
+      // fire-and-forget pattern web's handleLeavePool uses.
+      void fetch(`/api/pools/${pool.poolId}/recalculate`, { method: 'POST' });
+      // Refresh the home dashboard (your card's entry list shrinks)
+      // and the in-screen pool detail (leaderboard re-renders without
+      // your standings). usePoolEntries' realtime sub already removes
+      // the row from the PredictionsTab + collapses the Stop
+      // Participating row here; the refreshes below are
+      // belt-and-suspenders for surfaces that don't subscribe directly.
+      void refreshHomeData();
+      onSaved?.();
+      // Build the post-success summary. The count comes from the
+      // endpoint so the user knows exactly what was removed.
+      const count = result?.removed_entries ?? 0;
+      setStopParticipatingSummary(
+        count > 0
+          ? `${count} ${count === 1 ? 'entry' : 'entries'} and the associated predictions and scores have been removed from ${pool.poolName}. You're still the admin.`
+          : `You're still the admin of ${pool.poolName}.`,
+      );
+      setShowStopConfirm(false);
+    } catch (err) {
+      // Robust message extraction: PostgrestError-shaped errors don't
+      // pass `instanceof Error` so we have to probe `.message` on a
+      // plain object too. Without this the Alert previously read
+      // "Unknown error", which is what hid the original RLS failure.
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            && typeof (err as { message: unknown }).message === 'string'
+            ? (err as { message: string }).message
+            : 'Unknown error';
+      setShowStopConfirm(false);
+      setStopParticipatingError(message);
+    } finally {
+      setStopParticipatingBusy(false);
+    }
   }
 
   function handleArchive() {
@@ -327,15 +361,13 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
           <ShareButton
             label={copiedKey === 'code' ? 'Copied!' : 'Copy Code'}
             active={copiedKey === 'code'}
-            iosIcon={copiedKey === 'code' ? 'checkmark' : 'doc.on.doc'}
-            emoji={copiedKey === 'code' ? '✓' : '📋'}
+            icon={copiedKey === 'code' ? 'checkmark' : 'doc.on.doc'}
             onPress={() => handleCopy('code')}
           />
           <ShareButton
             label={copiedKey === 'link' ? 'Copied!' : 'Copy Link'}
             active={copiedKey === 'link'}
-            iosIcon={copiedKey === 'link' ? 'checkmark' : 'link'}
-            emoji={copiedKey === 'link' ? '✓' : '🔗'}
+            icon={copiedKey === 'link' ? 'checkmark' : 'link'}
             onPress={() => handleCopy('link')}
           />
         </View>
@@ -551,25 +583,30 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         >
           Danger Zone
         </RNText>
+        {/* Only surface "Stop Participating" while there are entries to
+            remove — once `userEntries.length === 0` (either after the
+            user just tapped this row, or because they were always an
+            admin-only member with no entries), the action is a no-op
+            and would confuse them. usePoolEntries' realtime sub keeps
+            this gate accurate without a manual refresh. */}
+        {hasParticipation ? (
+          <DangerRow
+            icon="person.crop.circle.badge.minus"
+            title="Stop Participating"
+            subtitle="Delete your entries; stay on as admin"
+            color={theme.colors.amber}
+            onPress={() => setShowStopConfirm(true)}
+          />
+        ) : null}
         <DangerRow
-          iosIcon="person.crop.circle.badge.minus"
-          emoji="🙅"
-          title="Stop Participating"
-          subtitle="Delete your entries; stay on as admin"
-          color={theme.colors.amber}
-          onPress={handleStopParticipating}
-        />
-        <DangerRow
-          iosIcon="archivebox"
-          emoji="📦"
+          icon="archivebox"
           title="Archive Pool"
           subtitle="Preserve data but prevent new activity"
           color={theme.colors.amber}
           onPress={handleArchive}
         />
         <DangerRow
-          iosIcon="trash"
-          emoji="🗑️"
+          icon="trash"
           title="Delete Pool"
           subtitle="Permanently delete pool and all data"
           color={theme.colors.red}
@@ -592,6 +629,43 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
           setDeleteConfirmText('');
         }}
         onConfirm={() => void handleDelete()}
+      />
+
+      {/* Destructive confirm — asks "really?" before clearing entries.
+          Same floating-card chrome as the PromptDialog in PredictionsTab,
+          via the shared ConfirmDialog primitive. */}
+      <ConfirmDialog
+        visible={showStopConfirm}
+        title="Stop Participating"
+        description={`Remove your entries from ${pool.poolName}? Your predictions, standings, and scores will be deleted, but you'll stay on as admin managing the pool.`}
+        cancelLabel="Cancel"
+        confirmLabel="Stop Participating"
+        destructive
+        busy={stopParticipatingBusy}
+        onCancel={() => setShowStopConfirm(false)}
+        onConfirm={() => void performStopParticipating()}
+      />
+
+      {/* Post-success acknowledgement — single-button dialog so the
+          user has a clear "got it" moment. Tells them how many entries
+          were removed and that they're still the admin. */}
+      <ConfirmDialog
+        visible={stopParticipatingSummary !== null}
+        title="You're no longer participating"
+        description={stopParticipatingSummary ?? ''}
+        confirmLabel="OK"
+        onConfirm={() => setStopParticipatingSummary(null)}
+      />
+
+      {/* Failure path — kept on the same primitive so error feedback
+          uses the same visual language as the success path. */}
+      <ConfirmDialog
+        visible={stopParticipatingError !== null}
+        title="Couldn't update participation"
+        description={stopParticipatingError ?? ''}
+        confirmLabel="OK"
+        destructive
+        onConfirm={() => setStopParticipatingError(null)}
       />
     </View>
   );
@@ -763,8 +837,7 @@ function Stepper({
       <StepperButton
         disabled={value <= min}
         onPress={() => onChange(Math.max(min, value - step))}
-        iosIcon="minus"
-        emoji="−"
+        icon="minus"
       />
       <RNText
         style={{
@@ -781,8 +854,7 @@ function Stepper({
       <StepperButton
         disabled={value >= max}
         onPress={() => onChange(Math.min(max, value + step))}
-        iosIcon="plus"
-        emoji="+"
+        icon="plus"
       />
     </View>
   );
@@ -791,13 +863,11 @@ function Stepper({
 function StepperButton({
   disabled,
   onPress,
-  iosIcon,
-  emoji,
+  icon,
 }: {
   disabled: boolean;
   onPress: () => void;
-  iosIcon: string;
-  emoji: string;
+  icon: string;
 }) {
   const theme = useTheme();
   return (
@@ -814,26 +884,7 @@ function StepperButton({
         opacity: disabled ? 0.3 : pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={14}
-          tintColor={theme.colors.ink}
-          weight="bold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 18,
-            color: theme.colors.ink,
-            lineHeight: 18,
-          }}
-        >
-          {emoji}
-        </RNText>
-      )}
+      <Icon name={icon} tint={theme.colors.ink} size={14} weight="bold" />
     </Pressable>
   );
 }
@@ -841,14 +892,12 @@ function StepperButton({
 function ShareButton({
   label,
   active,
-  iosIcon,
-  emoji,
+  icon,
   onPress,
 }: {
   label: string;
   active: boolean;
-  iosIcon: string;
-  emoji: string;
+  icon: string;
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -870,17 +919,7 @@ function ShareButton({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={12}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color }}>{emoji}</RNText>
-      )}
+      <Icon name={icon} tint={color} size={12} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.bold,
@@ -930,14 +969,8 @@ function SaveBar({
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        {flashSaved && Platform.OS === 'ios' ? (
-          <SymbolView
-            name="checkmark"
-            size={14}
-            tintColor={color}
-            weight="bold"
-            resizeMode="scaleAspectFit"
-          />
+        {flashSaved ? (
+          <Icon name="checkmark" tint={color} size={14} weight="bold" />
         ) : null}
         <RNText
           style={{
@@ -1090,17 +1123,7 @@ function InfoBox({ children }: { children: React.ReactNode }) {
         backgroundColor: withOpacity(theme.colors.primary, 0.08),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="info.circle.fill"
-          size={14}
-          tintColor={theme.colors.primary}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: theme.colors.primary }}>ⓘ</RNText>
-      )}
+      <Icon name="info.circle.fill" tint={theme.colors.primary} size={14} weight="semibold" />
       <RNText
         style={{
           flex: 1,
@@ -1168,15 +1191,12 @@ function DeadlineCountdown({ deadline }: { deadline: string | null }) {
         paddingTop: 4,
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={passed ? 'exclamationmark.circle.fill' : 'clock.fill'}
-          size={11}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : null}
+      <Icon
+        name={passed ? 'exclamationmark.circle.fill' : 'clock.fill'}
+        tint={color}
+        size={11}
+        weight="semibold"
+      />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -1191,15 +1211,13 @@ function DeadlineCountdown({ deadline }: { deadline: string | null }) {
 }
 
 function DangerRow({
-  iosIcon,
-  emoji,
+  icon,
   title,
   subtitle,
   color,
   onPress,
 }: {
-  iosIcon: string;
-  emoji: string;
+  icon: string;
   title: string;
   subtitle: string;
   color: string;
@@ -1217,17 +1235,7 @@ function DangerRow({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={16}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 16, color }}>{emoji}</RNText>
-      )}
+      <Icon name={icon} tint={color} size={16} weight="semibold" />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText
           style={{
@@ -1248,17 +1256,7 @@ function DangerRow({
           {subtitle}
         </RNText>
       </View>
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="chevron.right"
-          size={11}
-          tintColor={theme.colors.slate}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: theme.colors.slate }}>›</RNText>
-      )}
+      <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
     </Pressable>
   );
 }
@@ -1278,17 +1276,7 @@ function ScoringConfigCard({ onPress }: { onPress?: () => void }) {
       })}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="slider.horizontal.3"
-            size={18}
-            tintColor={theme.colors.primary}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.primary }}>🎛️</RNText>
-        )}
+        <Icon name="slider.horizontal.3" tint={theme.colors.primary} size={18} weight="semibold" />
         <View style={{ flex: 1, gap: 2 }}>
           <RNText
             style={{
@@ -1309,17 +1297,7 @@ function ScoringConfigCard({ onPress }: { onPress?: () => void }) {
             View point values for matches and bonuses
           </RNText>
         </View>
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="chevron.right"
-            size={11}
-            tintColor={theme.colors.slate}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
-        ) : (
-          <RNText style={{ fontSize: 14, color: theme.colors.slate }}>›</RNText>
-        )}
+        <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
       </View>
     </Pressable>
   );

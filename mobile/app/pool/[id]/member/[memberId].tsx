@@ -1,10 +1,8 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -16,7 +14,7 @@ import {
   AdjustPointsSheet,
   type AdjustPointsSheetHandle,
 } from '@/components/pool-detail/AdjustPointsSheet';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { notifyMemberRemoved } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
@@ -251,11 +249,7 @@ function Header({ insetTop, title }: { insetTop: number; title: string }) {
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView name="chevron.left" size={16} tintColor={theme.colors.ink} weight="semibold" />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.ink }}>‹</RNText>
-        )}
+        <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text variant="cardTitle" numberOfLines={1}>
@@ -548,16 +542,7 @@ function AdminEntryAction({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iconIos as never}
-          size={12}
-          tintColor={color}
-          weight="semibold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color }}>{iconEmoji}</RNText>
-      )}
+      <Icon name={iconIos} size={12} tint={color} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -674,17 +659,7 @@ function ActionRow({
         opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={18}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 18, color }}>{emoji}</RNText>
-      )}
+      <Icon name={iosIcon} size={18} tint={color} weight="semibold" />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color }}>{title}</RNText>
         <RNText
@@ -697,17 +672,7 @@ function ActionRow({
           {subtitle}
         </RNText>
       </View>
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="chevron.right"
-          size={11}
-          tintColor={theme.colors.slate}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: theme.colors.slate }}>›</RNText>
-      )}
+      <Icon name="chevron.right" size={11} tint={theme.colors.slate} weight="semibold" />
     </Pressable>
   );
 }

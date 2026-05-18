@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -44,7 +43,7 @@ import {
 } from '@/components/pool-detail/SharePredictionSheet';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { fetchLeaderboard, type LeaderboardEntry } from '@/lib/api';
 import {
   detectMentionQuery,
@@ -544,11 +543,7 @@ export default function BanterScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView name="xmark" size={14} tintColor={theme.colors.ink} weight="bold" />
-          ) : (
-            <View style={{ width: 14, height: 14 }} />
-          )}
+          <Icon name="xmark" size={14} tint={theme.colors.ink} weight="bold" />
         </Pressable>
       </View>
 
@@ -657,25 +652,7 @@ export default function BanterScreen() {
               ...theme.shadows.card,
             })}
           >
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name="chevron.down"
-                size={14}
-                tintColor={theme.colors.ink}
-                weight="bold"
-              />
-            ) : (
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 16,
-                  color: theme.colors.ink,
-                  lineHeight: 16,
-                }}
-              >
-                ▾
-              </RNText>
-            )}
+            <Icon name="chevron.down" size={14} tint={theme.colors.ink} weight="bold" />
           </Pressable>
         ) : null}
       </View>
@@ -1015,15 +992,7 @@ function EmptyState() {
         paddingVertical: theme.spacing.xxxl,
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="bubble.left.and.bubble.right"
-          size={36}
-          tintColor={theme.colors.silver}
-          weight="light"
-          resizeMode="scaleAspectFit"
-        />
-      ) : null}
+      <Icon name="bubble.left.and.bubble.right" size={36} tint={theme.colors.silver} weight="regular" />
       <Text variant="cardTitle" align="center">
         No messages yet
       </Text>
@@ -1366,17 +1335,7 @@ function Composer({
             opacity: pressed && !disabled ? 0.85 : 1,
           })}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name={sending ? 'ellipsis' : 'arrow.up'}
-              size={14}
-              tintColor="#FFFFFF"
-              weight="bold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <View style={{ width: 14, height: 14 }} />
-          )}
+          <Icon name={sending ? 'ellipsis' : 'arrow.up'} size={14} tint="#FFFFFF" weight="bold" />
         </Pressable>
       </View>
     </View>
@@ -1397,20 +1356,7 @@ function PlusXIcon({ open, theme }: { open: boolean; theme: ReturnType<typeof us
   }));
   return (
     <Animated.View style={style}>
-      {Platform.OS === 'ios' ? (
-        <SymbolView name="plus" size={14} tintColor={theme.colors.ink} weight="bold" />
-      ) : (
-        <RNText
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 18,
-            color: theme.colors.ink,
-            lineHeight: 18,
-          }}
-        >
-          +
-        </RNText>
-      )}
+      <Icon name="plus" size={14} tint={theme.colors.ink} weight="bold" />
     </Animated.View>
   );
 }

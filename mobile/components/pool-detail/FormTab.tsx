@@ -1,9 +1,7 @@
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -13,7 +11,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
 import { badgeIcon, type BadgeIconSpec } from './badge-icons';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import type {
   AnalyticsResponse,
   AnalyticsStreakData,
@@ -150,15 +148,7 @@ function EmptyMessage({
         paddingVertical: theme.spacing.xxxl,
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={icon as never}
-          size={36}
-          tintColor={theme.colors.silver}
-          weight="light"
-          resizeMode="scaleAspectFit"
-        />
-      ) : null}
+      <Icon name={icon} size={36} tint={theme.colors.silver} weight="regular" />
       <Text variant="cardTitle" align="center">
         {title}
       </Text>
@@ -289,25 +279,7 @@ function XPHeroCard({ xp }: { xp: XPData }) {
             justifyContent: 'center',
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="chevron.right"
-              size={12}
-              tintColor={theme.colors.slate}
-              weight="semibold"
-            />
-          ) : (
-            <RNText
-              style={{
-                fontSize: 16,
-                lineHeight: 16,
-                color: theme.colors.slate,
-                fontWeight: '700',
-              }}
-            >
-              ›
-            </RNText>
-          )}
+          <Icon name="chevron.right" size={12} tint={theme.colors.slate} weight="semibold" />
         </View>
       </View>
 
@@ -608,27 +580,9 @@ function BadgeCell({
         }}
       >
         {earned ? (
-          Platform.OS === 'ios' ? (
-            <SymbolView
-              name={icon.ios as never}
-              size={18}
-              tintColor={color}
-              weight="semibold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <RNText style={{ fontSize: 22, lineHeight: 26 }}>{icon.emoji}</RNText>
-          )
-        ) : Platform.OS === 'ios' ? (
-          <SymbolView
-            name="lock.fill"
-            size={14}
-            tintColor={theme.colors.slate}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
+          <Icon name={icon.ios} size={18} tint={color} weight="semibold" />
         ) : (
-          <RNText style={{ fontSize: 16, color: theme.colors.slate }}>🔒</RNText>
+          <Icon name="lock.fill" size={14} tint={theme.colors.slate} weight="semibold" />
         )}
       </View>
       <RNText
@@ -745,17 +699,7 @@ function StreakCard({
         ...theme.shadows.card,
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={22}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 22, lineHeight: 26 }}>{emoji}</RNText>
-      )}
+      <Icon name={iosIcon} size={22} tint={color} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -1018,41 +962,18 @@ function TournamentNode({
 }
 
 function TierIcon({ tier, color }: { tier: string; color: string }) {
-  if (Platform.OS === 'ios') {
-    if (tier === 'exact') {
-      return (
-        <SymbolView name="star.fill" size={12} tintColor={color} weight="bold" resizeMode="scaleAspectFit" />
-      );
-    }
-    if (tier === 'winner_gd') {
-      return (
-        <SymbolView name="checkmark" size={11} tintColor={color} weight="bold" resizeMode="scaleAspectFit" />
-      );
-    }
-    if (tier === 'winner') {
-      return (
-        <RNText style={{ fontSize: 14, fontFamily: fontFamilies.black, color, lineHeight: 14 }}>~</RNText>
-      );
-    }
+  if (tier === 'exact') {
+    return <Icon name="star.fill" size={12} tint={color} weight="bold" />;
+  }
+  if (tier === 'winner_gd') {
+    return <Icon name="checkmark" size={11} tint={color} weight="bold" />;
+  }
+  if (tier === 'winner') {
     return (
-      <SymbolView name="xmark" size={10} tintColor={color} weight="bold" resizeMode="scaleAspectFit" />
+      <RNText style={{ fontSize: 14, fontFamily: fontFamilies.black, color, lineHeight: 14 }}>~</RNText>
     );
   }
-  // Android fallback — text/glyph
-  const glyph =
-    tier === 'exact' ? '★' : tier === 'winner_gd' ? '✓' : tier === 'winner' ? '~' : '✕';
-  return (
-    <RNText
-      style={{
-        fontSize: tier === 'winner' ? 14 : 12,
-        fontFamily: fontFamilies.black,
-        color,
-        lineHeight: 14,
-      }}
-    >
-      {glyph}
-    </RNText>
-  );
+  return <Icon name="xmark" size={10} tint={color} weight="bold" />;
 }
 
 function RunLegend() {
@@ -1367,17 +1288,7 @@ function PerformanceCallout({
         borderColor: withOpacity(accent, 0.13),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={18}
-          tintColor={accent}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</RNText>
-      )}
+      <Icon name={iosIcon} size={18} tint={accent} weight="semibold" />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText
           style={{
@@ -1522,17 +1433,7 @@ function PredictableBlock({
           paddingBottom: theme.spacing.sm,
         }}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name={icon.ios as never}
-            size={13}
-            tintColor={color}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
-        ) : (
-          <RNText style={{ fontSize: 13, lineHeight: 15 }}>{icon.emoji}</RNText>
-        )}
+        <Icon name={icon.ios} size={13} tint={color} weight="semibold" />
         <RNText
           style={{
             fontFamily: fontFamilies.bold,

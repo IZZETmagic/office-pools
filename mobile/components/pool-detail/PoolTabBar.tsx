@@ -35,6 +35,7 @@ export type PoolTabKey =
   | 'predictions'
   | 'form'
   | 'scoring'
+  | 'info'
   | 'rounds'
   | 'members'
   | 'settings';
@@ -45,11 +46,16 @@ type TabDef = {
   icon: string;
 };
 
+// Order matters — this drives the swipe sequence and tab-bar layout.
+// 'info' sits AFTER Scoring (the last tab non-admins see today) so it
+// becomes the natural "end-of-strip" surface for non-admins. Admins
+// then continue into the admin-only Rounds / Members / Settings.
 const ALL_TABS: TabDef[] = [
   { key: 'leaderboard', label: 'Leaderboard', icon: 'trophy.fill' },
   { key: 'predictions', label: 'Predictions', icon: 'pencil.line' },
   { key: 'form', label: 'Form', icon: 'chart.bar.xaxis' },
   { key: 'scoring', label: 'Scoring', icon: 'list.number' },
+  { key: 'info', label: 'Info', icon: 'info.circle.fill' },
   { key: 'rounds', label: 'Rounds', icon: 'calendar.badge.clock' },
   { key: 'members', label: 'Members', icon: 'person.3.fill' },
   { key: 'settings', label: 'Settings', icon: 'gearshape.fill' },

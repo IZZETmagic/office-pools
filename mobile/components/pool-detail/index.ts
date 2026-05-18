@@ -29,6 +29,7 @@ export { MatchdayInfoBar } from './MatchdayInfoBar';
 export { MatchdayMVPBanner } from './MatchdayMVPBanner';
 export { MatchPredictionRow } from './MatchPredictionRow';
 export { PoolDetailHeader } from './PoolDetailHeader';
+export { PoolInfoTab } from './PoolInfoTab';
 export { PoolTabBar, getVisiblePoolTabs, type PoolTabKey } from './PoolTabBar';
 export { PredictionsTab } from './PredictionsTab';
 export { StageNavBar, WIZARD_STAGES, type WizardStage } from './StageNavBar';

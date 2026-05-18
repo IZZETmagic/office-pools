@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { useState, type ComponentType } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import {
   changeRoundState,
   type ChangeRoundStateAction,
@@ -84,15 +83,7 @@ export function RoundsTab({ poolId }: Props) {
           paddingVertical: theme.spacing.xxxl,
         }}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="calendar.badge.clock"
-            size={36}
-            tintColor={theme.colors.silver}
-            weight="light"
-            resizeMode="scaleAspectFit"
-          />
-        ) : null}
+        <Icon name="calendar.badge.clock" size={36} tint={theme.colors.silver} weight="regular" />
         <Text variant="cardTitle" align="center">
           Rounds unavailable
         </Text>
@@ -244,17 +235,7 @@ function RoundActions({
   if (state === 'completed') {
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="checkmark.circle.fill"
-            size={14}
-            tintColor={theme.colors.green}
-            weight="semibold"
-            resizeMode="scaleAspectFit"
-          />
-        ) : (
-          <RNText style={{ fontSize: 14, color: theme.colors.green }}>✓</RNText>
-        )}
+        <Icon name="checkmark.circle.fill" size={14} tint={theme.colors.green} weight="semibold" />
         <RNText
           style={{
             fontFamily: fontFamilies.medium,
@@ -358,17 +339,7 @@ function ActionButton({
         opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={12}
-          tintColor={color}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color }}>{emoji}</RNText>
-      )}
+      <Icon name={iosIcon} size={12} tint={color} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.bold,
@@ -426,17 +397,7 @@ function DetailRow({
   const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name={iosIcon as never}
-          size={11}
-          tintColor={theme.colors.slate}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 11, color: theme.colors.slate }}>{emoji}</RNText>
-      )}
+      <Icon name={iosIcon} size={11} tint={theme.colors.slate} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.regular,

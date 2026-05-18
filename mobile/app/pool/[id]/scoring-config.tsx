@@ -1,10 +1,8 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -13,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { recalculatePool } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { usePoolSettings, type PoolSettings } from '@/lib/usePoolSettings';
@@ -488,11 +486,7 @@ function Header({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView name="chevron.left" size={16} tintColor={theme.colors.ink} weight="semibold" />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.ink }}>‹</RNText>
-        )}
+        <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text variant="cardTitle" numberOfLines={1}>
@@ -755,24 +749,12 @@ function SaveBar({
             ),
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name={message.isError ? 'xmark.circle.fill' : 'checkmark.circle.fill'}
-              size={14}
-              tintColor={message.isError ? theme.colors.red : theme.colors.green}
-              weight="semibold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <RNText
-              style={{
-                fontSize: 14,
-                color: message.isError ? theme.colors.red : theme.colors.green,
-              }}
-            >
-              {message.isError ? '✕' : '✓'}
-            </RNText>
-          )}
+          <Icon
+            name={message.isError ? 'xmark.circle.fill' : 'checkmark.circle.fill'}
+            size={14}
+            tint={message.isError ? theme.colors.red : theme.colors.green}
+            weight="semibold"
+          />
           <RNText
             style={{
               flex: 1,

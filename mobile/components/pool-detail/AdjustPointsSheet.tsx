@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import {
   forwardRef,
   useEffect,
@@ -22,6 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -279,25 +279,7 @@ export const AdjustPointsSheet = forwardRef<AdjustPointsSheetHandle, Props>(
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                {Platform.OS === 'ios' ? (
-                  <SymbolView
-                    name="xmark"
-                    size={12}
-                    tintColor={theme.colors.ink}
-                    weight="semibold"
-                  />
-                ) : (
-                  <RNText
-                    style={{
-                      fontSize: 14,
-                      color: theme.colors.ink,
-                      fontWeight: '700',
-                      lineHeight: 14,
-                    }}
-                  >
-                    ✕
-                  </RNText>
-                )}
+                <Icon name="xmark" size={12} tint={theme.colors.ink} weight="semibold" />
               </Pressable>
             </View>
 

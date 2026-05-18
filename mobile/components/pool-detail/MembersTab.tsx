@@ -1,8 +1,7 @@
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { useMemberRoster, type RosterMember } from '@/lib/useMemberRoster';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -32,15 +31,7 @@ export function MembersTab({ poolId }: Props) {
           paddingVertical: theme.spacing.xxxl,
         }}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="person.3"
-            size={36}
-            tintColor={theme.colors.silver}
-            weight="light"
-            resizeMode="scaleAspectFit"
-          />
-        ) : null}
+        <Icon name="person.3" tint={theme.colors.silver} size={36} weight="regular" />
         <Text variant="cardTitle" align="center">
           No members yet
         </Text>
@@ -174,17 +165,7 @@ function MemberRow({ member, onPress }: { member: RosterMember; onPress: () => v
           ) : null}
         </View>
       </View>
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="chevron.right"
-          size={11}
-          tintColor={theme.colors.slate}
-          weight="semibold"
-          resizeMode="scaleAspectFit"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: theme.colors.slate }}>›</RNText>
-      )}
+      <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
     </Pressable>
   );
 }

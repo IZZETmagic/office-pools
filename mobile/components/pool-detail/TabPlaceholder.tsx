@@ -1,11 +1,10 @@
-import type { SymbolViewProps } from 'expo-symbols';
 import { View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 
 type TabPlaceholderProps = {
-  icon: SymbolViewProps['name'];
+  icon: string;
   title: string;
   caption: string;
 };

@@ -20,6 +20,7 @@ import {
   LeaderboardTab,
   MembersTab,
   PoolDetailHeader,
+  PoolInfoTab,
   RoundsTab,
   PoolTabBar,
   PredictionsTab,
@@ -42,6 +43,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
   'predictions',
   'form',
   'scoring',
+  'info',
   'rounds',
   'members',
   'settings',
@@ -177,6 +179,7 @@ export default function PoolDetailScreen() {
             poolId={pool.poolId}
             maxEntriesPerUser={pool.maxEntriesPerUser}
             predictionMode={pool.predictionMode}
+            isAdmin={pool.isAdmin}
           />
         );
       case 'form':
@@ -192,6 +195,8 @@ export default function PoolDetailScreen() {
             predictionMode={pool.predictionMode}
           />
         );
+      case 'info':
+        return <PoolInfoTab pool={pool} />;
       case 'rounds':
         return <RoundsTab poolId={pool.poolId} />;
       case 'members':

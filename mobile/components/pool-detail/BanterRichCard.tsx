@@ -1,6 +1,6 @@
-import { SymbolView } from 'expo-symbols';
-import { Platform, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -71,17 +71,7 @@ export function BanterRichCard({
             justifyContent: 'center',
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name={spec.icon as never}
-              size={18}
-              tintColor="#FFFFFF"
-              weight="bold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <View style={{ width: 18, height: 18 }} />
-          )}
+          <Icon name={spec.icon} size={18} tint="#FFFFFF" weight="bold" />
         </View>
         <RNText
           style={{

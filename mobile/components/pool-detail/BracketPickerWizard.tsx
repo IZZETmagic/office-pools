@@ -1,12 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -23,7 +21,7 @@ import {
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import type {
   BPGroupRanking,
   BPKnockoutPick,
@@ -624,16 +622,7 @@ function BackButton({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="chevron.left"
-          size={12}
-          tintColor={theme.colors.ink}
-          weight="bold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: theme.colors.ink, fontWeight: '700' }}>‹</RNText>
-      )}
+      <Icon name="chevron.left" size={12} tint={theme.colors.ink} weight="bold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -684,16 +673,7 @@ function NextButton({
       >
         {label}
       </RNText>
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="chevron.right"
-          size={12}
-          tintColor="#FFFFFF"
-          weight="bold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 14, color: '#FFFFFF', fontWeight: '700' }}>›</RNText>
-      )}
+      <Icon name="chevron.right" size={12} tint="#FFFFFF" weight="bold" />
     </Pressable>
   );
 }
@@ -784,16 +764,7 @@ function KnockoutStage({
             <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xxs }}
             >
-              {Platform.OS === 'ios' ? (
-                <SymbolView
-                  name="checkmark.circle.fill"
-                  size={12}
-                  tintColor={theme.colors.green}
-                  weight="semibold"
-                />
-              ) : (
-                <RNText style={{ fontSize: 12, color: theme.colors.green }}>✓</RNText>
-              )}
+              <Icon name="checkmark.circle.fill" size={12} tint={theme.colors.green} weight="semibold" />
               <RNText
                 style={{
                   fontFamily: fontFamilies.semibold,
@@ -1090,18 +1061,7 @@ function BPTeamPill({
         {displayName}
       </RNText>
       {selected ? (
-        Platform.OS === 'ios' ? (
-          <SymbolView
-            name="checkmark.circle.fill"
-            size={16}
-            tintColor={theme.colors.green}
-            weight="semibold"
-          />
-        ) : (
-          <RNText style={{ fontSize: 14, color: theme.colors.green, fontWeight: '700' }}>
-            ✓
-          </RNText>
-        )
+        <Icon name="checkmark.circle.fill" size={16} tint={theme.colors.green} weight="semibold" />
       ) : null}
     </Pressable>
   );
@@ -1174,16 +1134,7 @@ function Header({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="chevron.left"
-            size={16}
-            tintColor={theme.colors.ink}
-            weight="semibold"
-          />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.ink }}>‹</RNText>
-        )}
+        <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text variant="cardTitle" numberOfLines={1}>
@@ -1271,27 +1222,9 @@ function StageTabs({
             })}
           >
             {locked ? (
-              Platform.OS === 'ios' ? (
-                <SymbolView
-                  name="lock.fill"
-                  size={11}
-                  tintColor={theme.colors.slate}
-                  weight="semibold"
-                />
-              ) : (
-                <RNText style={{ fontSize: 11, color: theme.colors.slate }}>🔒</RNText>
-              )
+              <Icon name="lock.fill" size={11} tint={theme.colors.slate} weight="semibold" />
             ) : complete ? (
-              Platform.OS === 'ios' ? (
-                <SymbolView
-                  name="checkmark.circle.fill"
-                  size={11}
-                  tintColor={theme.colors.green}
-                  weight="semibold"
-                />
-              ) : (
-                <RNText style={{ fontSize: 11, color: theme.colors.green }}>✓</RNText>
-              )
+              <Icon name="checkmark.circle.fill" size={11} tint={theme.colors.green} weight="semibold" />
             ) : null}
             <RNText
               style={{
@@ -1328,16 +1261,7 @@ function SubmittedBanner() {
         backgroundColor: withOpacity(theme.colors.green, 0.12),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="checkmark.seal.fill"
-          size={12}
-          tintColor={theme.colors.green}
-          weight="semibold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color: theme.colors.green }}>✓</RNText>
-      )}
+      <Icon name="checkmark.seal.fill" size={12} tint={theme.colors.green} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -1365,16 +1289,7 @@ function AdminViewBanner({ submitted }: { submitted: boolean }) {
         backgroundColor: withOpacity(theme.colors.primary, 0.12),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="eye.fill"
-          size={12}
-          tintColor={theme.colors.primary}
-          weight="semibold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 12, color: theme.colors.primary }}>👁</RNText>
-      )}
+      <Icon name="eye.fill" size={12} tint={theme.colors.primary} weight="semibold" />
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
@@ -1494,23 +1409,12 @@ function ReviewContent({
             backgroundColor: theme.colors.mist,
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name={allComplete ? 'checkmark.circle.fill' : 'circle.dashed'}
-              size={20}
-              tintColor={allComplete ? theme.colors.green : theme.colors.amber}
-              weight="semibold"
-            />
-          ) : (
-            <RNText
-              style={{
-                fontSize: 20,
-                color: allComplete ? theme.colors.green : theme.colors.amber,
-              }}
-            >
-              {allComplete ? '✓' : '◌'}
-            </RNText>
-          )}
+          <Icon
+            name={allComplete ? 'checkmark.circle.fill' : 'circle.dashed'}
+            size={20}
+            tint={allComplete ? theme.colors.green : theme.colors.amber}
+            weight="semibold"
+          />
           <View style={{ flex: 1 }}>
             <RNText
               style={{
@@ -1570,16 +1474,7 @@ function ChampionCard({
           backgroundColor: theme.colors.mist,
         }}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="trophy.fill"
-            size={28}
-            tintColor={theme.colors.slate}
-            weight="regular"
-          />
-        ) : (
-          <RNText style={{ fontSize: 28, color: theme.colors.slate }}>🏆</RNText>
-        )}
+        <Icon name="trophy.fill" size={28} tint={theme.colors.slate} weight="regular" />
         <RNText
           style={{
             fontFamily: fontFamilies.semibold,
@@ -1617,16 +1512,7 @@ function ChampionCard({
         borderColor: withOpacity(theme.colors.accent, 0.3),
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <SymbolView
-          name="trophy.fill"
-          size={36}
-          tintColor={theme.colors.accent}
-          weight="semibold"
-        />
-      ) : (
-        <RNText style={{ fontSize: 36 }}>🏆</RNText>
-      )}
+      <Icon name="trophy.fill" size={36} tint={theme.colors.accent} weight="semibold" />
       <View
         style={{
           flexDirection: 'row',
@@ -1761,23 +1647,12 @@ function StageChecklist({
               borderBottomColor: withOpacity(theme.colors.silver, 0.5),
             }}
           >
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name={complete ? 'checkmark.circle.fill' : 'circle'}
-                size={18}
-                tintColor={complete ? theme.colors.green : theme.colors.slate}
-                weight="semibold"
-              />
-            ) : (
-              <RNText
-                style={{
-                  fontSize: 16,
-                  color: complete ? theme.colors.green : theme.colors.slate,
-                }}
-              >
-                {complete ? '✓' : '○'}
-              </RNText>
-            )}
+            <Icon
+              name={complete ? 'checkmark.circle.fill' : 'circle'}
+              size={18}
+              tint={complete ? theme.colors.green : theme.colors.slate}
+              weight="semibold"
+            />
             <RNText
               style={{
                 flex: 1,
@@ -1909,16 +1784,7 @@ function GroupRankingCard({
         </RNText>
         {complete ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xxs }}>
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name="checkmark.circle.fill"
-                size={12}
-                tintColor={theme.colors.green}
-                weight="semibold"
-              />
-            ) : (
-              <RNText style={{ fontSize: 12, color: theme.colors.green }}>✓</RNText>
-            )}
+            <Icon name="checkmark.circle.fill" size={12} tint={theme.colors.green} weight="semibold" />
             <RNText
               style={{
                 fontFamily: fontFamilies.semibold,
@@ -2019,16 +1885,7 @@ function GroupRankingRow({
           opacity: pressed ? 0.5 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="line.3.horizontal"
-            size={18}
-            tintColor={theme.colors.silver}
-            weight="semibold"
-          />
-        ) : (
-          <RNText style={{ fontSize: 18, color: theme.colors.silver }}>≡</RNText>
-        )}
+        <Icon name="line.3.horizontal" size={18} tint={theme.colors.silver} weight="semibold" />
       </Pressable>
     </View>
   );
@@ -2286,16 +2143,7 @@ function ThirdPlaceRow({
             opacity: pressed ? 0.5 : 1,
           })}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="line.3.horizontal"
-              size={18}
-              tintColor={theme.colors.silver}
-              weight="semibold"
-            />
-          ) : (
-            <RNText style={{ fontSize: 18, color: theme.colors.silver }}>≡</RNText>
-          )}
+          <Icon name="line.3.horizontal" size={18} tint={theme.colors.silver} weight="semibold" />
         </Pressable>
       </View>
 

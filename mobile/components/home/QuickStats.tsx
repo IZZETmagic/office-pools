@@ -1,7 +1,6 @@
-import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { Platform, Text as RNText, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
 
 type QuickStatsProps = {
@@ -37,7 +36,7 @@ function StatCard({
   title,
   value,
 }: {
-  icon: SymbolViewProps['name'];
+  icon: string;
   tint: string;
   title: string;
   value: string;
@@ -56,7 +55,7 @@ function StatCard({
         ...theme.shadows.card,
       }}
     >
-      <SoloIcon name={icon} tint={tint} />
+      <Icon name={icon} size={16} tint={tint} weight="semibold" />
       <RNText
         style={{
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
@@ -80,11 +79,4 @@ function StatCard({
       </Text>
     </View>
   );
-}
-
-function SoloIcon({ name, tint }: { name: SymbolViewProps['name']; tint: string }) {
-  if (Platform.OS === 'ios') {
-    return <SymbolView name={name} size={16} tintColor={tint} weight="semibold" />;
-  }
-  return null;
 }

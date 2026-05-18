@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import {
   ActivityIndicator,
   Platform,
@@ -12,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import {
   type BracketPickInfo,
   type GroupStanding,
@@ -79,25 +78,7 @@ export default function MatchDetailScreen() {
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name="chevron.left"
-                size={16}
-                tintColor={theme.colors.ink}
-                weight="semibold"
-              />
-            ) : (
-              <RNText
-                style={{
-                  fontSize: 18,
-                  fontFamily: fontFamilies.bold,
-                  color: theme.colors.ink,
-                  lineHeight: 18,
-                }}
-              >
-                ‹
-              </RNText>
-            )}
+            <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
           </Pressable>
         </View>
         {match ? <MatchHeader match={match} /> : null}
@@ -440,18 +421,9 @@ function MatchInfoCard({ match }: { match: ResultsMatch }) {
               paddingVertical: 12,
             }}
           >
-            {Platform.OS === 'ios' ? (
-              <SymbolView
-                name={r.icon as never}
-                size={14}
-                tintColor={theme.colors.slate}
-                weight="medium"
-                resizeMode="scaleAspectFit"
-                style={{ width: 24, height: 16 }}
-              />
-            ) : (
-              <RNText style={{ width: 24, fontSize: 14 }}>{r.emoji}</RNText>
-            )}
+            <View style={{ width: 24, height: 16, alignItems: 'flex-start', justifyContent: 'center' }}>
+              <Icon name={r.icon} size={14} tint={theme.colors.slate} weight="medium" />
+            </View>
             <RNText
               style={{
                 flex: 1,

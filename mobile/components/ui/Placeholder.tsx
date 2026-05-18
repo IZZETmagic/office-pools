@@ -1,4 +1,3 @@
-import type { SymbolViewProps } from 'expo-symbols';
 import { View } from 'react-native';
 
 import { Icon } from './Icon';
@@ -10,7 +9,7 @@ import { useTheme, withOpacity } from '@/theme';
 type PlaceholderProps = {
   title: string;
   caption?: string;
-  icon: SymbolViewProps['name'];
+  icon: string;
 };
 
 export function Placeholder({ title, caption = 'Coming soon', icon }: PlaceholderProps) {

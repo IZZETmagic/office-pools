@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
@@ -11,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
+import { Icon } from '@/components/ui';
 import type { LevelInfo, XPData } from '@/lib/api';
 import { useEntryAnalytics } from '@/lib/useEntryAnalytics';
 import { useEntryBracketAnalytics } from '@/lib/useEntryBracketAnalytics';
@@ -247,25 +247,7 @@ function Header({ insetTop, xp }: { insetTop: number; xp: NormalizedXP | null })
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="xmark"
-            size={14}
-            tintColor={theme.colors.ink}
-            weight="semibold"
-          />
-        ) : (
-          <RNText
-            style={{
-              fontSize: 16,
-              color: theme.colors.ink,
-              fontWeight: '700',
-              lineHeight: 16,
-            }}
-          >
-            ✕
-          </RNText>
-        )}
+        <Icon name="xmark" size={14} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
     </View>
   );
@@ -353,11 +335,7 @@ function LevelRow({
         }}
       >
         {isReached ? (
-          Platform.OS === 'ios' ? (
-            <SymbolView name="checkmark" size={14} tintColor="#fff" weight="bold" />
-          ) : (
-            <RNText style={{ fontSize: 14, color: '#fff', fontWeight: '800' }}>✓</RNText>
-          )
+          <Icon name="checkmark" size={14} tint="#fff" weight="bold" />
         ) : (
           <RNText
             style={{

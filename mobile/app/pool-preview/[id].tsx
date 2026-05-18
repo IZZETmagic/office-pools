@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text as RNText, View } from 'react-native';
@@ -497,10 +496,10 @@ export default function PoolPreviewSheet() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <SymbolView
+              <Icon
                 name={detail.alreadyJoined ? 'arrow.right.circle.fill' : 'person.badge.plus'}
                 size={20}
-                tintColor="#FFFFFF"
+                tint="#FFFFFF"
                 weight="bold"
               />
               <RNText

@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Animated,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/ui';
 import type { BadgeInfo } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -174,27 +174,9 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
                 }}
               >
                 {earned ? (
-                  Platform.OS === 'ios' ? (
-                    <SymbolView
-                      name={icon.ios as never}
-                      size={28}
-                      tintColor={color}
-                      weight="semibold"
-                      resizeMode="scaleAspectFit"
-                    />
-                  ) : (
-                    <RNText style={{ fontSize: 30, lineHeight: 34 }}>{icon.emoji}</RNText>
-                  )
-                ) : Platform.OS === 'ios' ? (
-                  <SymbolView
-                    name="lock.fill"
-                    size={22}
-                    tintColor={theme.colors.slate}
-                    weight="semibold"
-                    resizeMode="scaleAspectFit"
-                  />
+                  <Icon name={icon.ios} size={28} tint={color} weight="semibold" />
                 ) : (
-                  <RNText style={{ fontSize: 24, color: theme.colors.slate }}>🔒</RNText>
+                  <Icon name="lock.fill" size={22} tint={theme.colors.slate} weight="semibold" />
                 )}
               </View>
 
@@ -258,25 +240,7 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                {Platform.OS === 'ios' ? (
-                  <SymbolView
-                    name="xmark"
-                    size={12}
-                    tintColor={theme.colors.ink}
-                    weight="semibold"
-                  />
-                ) : (
-                  <RNText
-                    style={{
-                      fontSize: 14,
-                      color: theme.colors.ink,
-                      fontWeight: '700',
-                      lineHeight: 14,
-                    }}
-                  >
-                    ✕
-                  </RNText>
-                )}
+                <Icon name="xmark" size={12} tint={theme.colors.ink} weight="semibold" />
               </Pressable>
             </View>
 
@@ -355,23 +319,12 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
                   : withOpacity(theme.colors.slate, 0.08),
               }}
             >
-              {Platform.OS === 'ios' ? (
-                <SymbolView
-                  name={earned ? 'checkmark.seal.fill' : 'lock.fill'}
-                  size={12}
-                  tintColor={earned ? theme.colors.green : theme.colors.slate}
-                  weight="semibold"
-                />
-              ) : (
-                <RNText
-                  style={{
-                    fontSize: 12,
-                    color: earned ? theme.colors.green : theme.colors.slate,
-                  }}
-                >
-                  {earned ? '✓' : '🔒'}
-                </RNText>
-              )}
+              <Icon
+                name={earned ? 'checkmark.seal.fill' : 'lock.fill'}
+                size={12}
+                tint={earned ? theme.colors.green : theme.colors.slate}
+                weight="semibold"
+              />
               <RNText
                 style={{
                   fontFamily: fontFamilies.bold,

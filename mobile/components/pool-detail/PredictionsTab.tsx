@@ -1,9 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
 
-import { Button, Icon, Text } from '@/components/ui';
+import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { usePoolEntries, type PoolEntry } from '@/lib/usePoolEntries';
 import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
@@ -13,6 +13,12 @@ type Props = {
   poolId: string;
   maxEntriesPerUser: number;
   predictionMode?: string | null;
+  /**
+   * Caller's admin status in this pool. Drives the client-side
+   * delete-gate: non-admins can't delete their last entry (server
+   * also enforces, but hiding the option keeps the UI honest).
+   */
+  isAdmin: boolean;
 };
 
 const ROUND_ORDER = [
@@ -25,10 +31,18 @@ const ROUND_ORDER = [
   'final',
 ];
 
-export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Props) {
+export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, isAdmin }: Props) {
   const theme = useTheme();
-  const { entries, loading, error, refresh, addEntry, username } = usePoolEntries(poolId);
+  const { entries, loading, error, refresh, addEntry, renameEntry, removeEntry, username } = usePoolEntries(poolId);
   const [adding, setAdding] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  // Per-entry edit/delete flow. Single source of truth (the entry the
+  // user just kebab-tapped) drives all three follow-up dialogs.
+  const [actionsFor, setActionsFor] = useState<PoolEntry | null>(null);
+  const [renameFor, setRenameFor] = useState<PoolEntry | null>(null);
+  const [deleteFor, setDeleteFor] = useState<PoolEntry | null>(null);
+  const [entryActionBusy, setEntryActionBusy] = useState(false);
+  const [entryActionError, setEntryActionError] = useState<string | null>(null);
   const isProgressive = predictionMode === 'progressive';
   const { data: roundsData } = usePoolRounds(isProgressive ? poolId : undefined);
   const [roundSubsByEntry, setRoundSubsByEntry] = useState<Map<string, Set<string>>>(new Map());
@@ -44,7 +58,9 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
         initialFocus.current = false;
         return;
       }
-      refreshRef.current();
+      // 'refresh' so re-entering the screen doesn't blank the tab
+      // to a full-screen spinner while the entries re-fetch.
+      void refreshRef.current('refresh');
     }, []),
   );
 
@@ -93,29 +109,75 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
     };
   }, [isProgressive, entries]);
 
-  function handleAdd() {
-    Alert.prompt(
-      'Add Entry',
-      'Name this entry',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: async (raw?: string) => {
-            const name = raw ?? '';
-            setAdding(true);
-            const result = await addEntry(name);
-            setAdding(false);
-            if (result.error) {
-              Alert.alert("Couldn't add entry", result.error);
-            }
-          },
-        },
-      ],
-      'plain-text',
-      `${username} ${entries.length + 1}`,
-    );
+  // Cross-platform Add Entry flow. Uses the in-app PromptDialog
+  // (centered floating modal with a TextInput) so iOS and Android get
+  // the same look and confirmation step — previously iOS used
+  // Alert.prompt which is iOS-only, and Android fell back to a
+  // confirmation Alert with no naming capability.
+  const addDefaultName = `${username} ${entries.length + 1}`;
+
+  async function handleAddSubmit(name: string) {
+    setShowAddDialog(false);
+    setAdding(true);
+    const result = await addEntry(name);
+    setAdding(false);
+    if (result.error) {
+      Alert.alert("Couldn't add entry", result.error);
+    }
   }
+
+  // Per-entry rename / delete handlers. The action menu chains into a
+  // PromptDialog (rename) or ConfirmDialog (delete) — we close the
+  // menu first, then open the next dialog one tick later so the fade
+  // animations don't stack.
+  function openActionsFor(entry: PoolEntry) {
+    setActionsFor(entry);
+  }
+  function pickRename() {
+    const target = actionsFor;
+    if (!target) return;
+    setActionsFor(null);
+    setRenameFor(target);
+  }
+  function pickDelete() {
+    const target = actionsFor;
+    if (!target) return;
+    setActionsFor(null);
+    setDeleteFor(target);
+  }
+  async function handleRenameSubmit(name: string) {
+    const target = renameFor;
+    if (!target) return;
+    setEntryActionBusy(true);
+    const result = await renameEntry(target.entryId, name);
+    setEntryActionBusy(false);
+    if (result.error) {
+      setRenameFor(null);
+      setEntryActionError(result.error);
+      return;
+    }
+    setRenameFor(null);
+  }
+  async function performDelete() {
+    const target = deleteFor;
+    if (!target) return;
+    setEntryActionBusy(true);
+    const result = await removeEntry(target.entryId);
+    setEntryActionBusy(false);
+    if (result.error) {
+      setDeleteFor(null);
+      setEntryActionError(result.error);
+      return;
+    }
+    setDeleteFor(null);
+  }
+
+  // Client-side delete-gate. Admins can always delete (matches Stop
+  // Participating semantics — they can empty out their entries while
+  // keeping the admin role). Non-admins must keep at least one entry
+  // — when they only have one we hide the Delete option entirely. The
+  // server endpoint enforces the same rule as a backstop.
+  const canDelete = isAdmin || entries.length > 1;
 
   if (loading) {
     return (
@@ -138,7 +200,7 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
         <Text variant="body" color="slate" align="center">
           {error}
         </Text>
-        <Button title="Try Again" onPress={refresh} variant="secondary" />
+        <Button title="Try Again" onPress={() => refresh()} variant="secondary" />
       </View>
     );
   }
@@ -177,6 +239,7 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
             entry={entry}
             progressiveStatus={progressiveStatus}
             onPress={() => router.navigate(`/pool/${poolId}/entry/${entry.entryId}`)}
+            onActions={() => openActionsFor(entry)}
           />
         );
       })}
@@ -184,7 +247,7 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
       <View style={{ gap: theme.spacing.xs, paddingTop: theme.spacing.sm }}>
         {canAdd ? (
           <Pressable
-            onPress={handleAdd}
+            onPress={() => setShowAddDialog(true)}
             disabled={adding}
             style={({ pressed }) => ({
               flexDirection: 'row',
@@ -213,6 +276,90 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode }: Pr
           {entries.length} of {maxEntriesPerUser} entries used
         </Text>
       </View>
+
+      <PromptDialog
+        visible={showAddDialog}
+        title="Add Entry"
+        description="Pick a name for this entry. You can keep the suggestion or change it."
+        defaultValue={addDefaultName}
+        placeholder={addDefaultName}
+        confirmLabel="Add"
+        busy={adding}
+        maxLength={40}
+        onCancel={() => setShowAddDialog(false)}
+        onSubmit={(name) => {
+          void handleAddSubmit(name || addDefaultName);
+        }}
+      />
+
+      {/* Per-entry action picker. Opens when the user taps the kebab
+          on a row. Rename always shows; Delete is hidden when this
+          would empty out a non-admin's entry list. */}
+      <ActionMenu
+        visible={actionsFor !== null}
+        title={actionsFor?.entryName ?? ''}
+        items={[
+          {
+            key: 'rename',
+            label: 'Rename',
+            description: 'Change the entry name',
+            onPress: pickRename,
+          },
+          ...(canDelete
+            ? [
+                {
+                  key: 'delete',
+                  label: 'Delete Entry',
+                  description: isAdmin && entries.length === 1
+                    ? "Removes all your predictions and standings. You'll stay on as admin."
+                    : 'Removes this entry and its predictions',
+                  destructive: true,
+                  onPress: pickDelete,
+                },
+              ]
+            : []),
+        ]}
+        onCancel={() => setActionsFor(null)}
+      />
+
+      <PromptDialog
+        visible={renameFor !== null}
+        title="Rename Entry"
+        description="Pick a new name for this entry."
+        defaultValue={renameFor?.entryName ?? ''}
+        confirmLabel="Save"
+        busy={entryActionBusy}
+        maxLength={40}
+        onCancel={() => setRenameFor(null)}
+        onSubmit={(name) => void handleRenameSubmit(name)}
+      />
+
+      <ConfirmDialog
+        visible={deleteFor !== null}
+        title="Delete Entry"
+        description={
+          deleteFor
+            ? isAdmin && entries.length === 1
+              ? `Delete ${deleteFor.entryName}? This is your only entry — your predictions, standings, and scores will be removed, but you'll stay on as admin managing the pool.`
+              : `Delete ${deleteFor.entryName}? Its predictions and scores will be removed permanently. The pool keeps running.`
+            : ''
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        destructive
+        busy={entryActionBusy}
+        onCancel={() => setDeleteFor(null)}
+        onConfirm={() => void performDelete()}
+      />
+
+      <ConfirmDialog
+        visible={entryActionError !== null}
+        title="Couldn't update entry"
+        description={entryActionError ?? ''}
+        confirmLabel="OK"
+        destructive
+        onConfirm={() => setEntryActionError(null)}
+      />
     </View>
   );
 }
@@ -221,10 +368,13 @@ function EntryRow({
   entry,
   progressiveStatus,
   onPress,
+  onActions,
 }: {
   entry: PoolEntry;
   progressiveStatus: { submitted: boolean; roundLabel: string } | null;
   onPress: () => void;
+  /** Fires when the user taps the kebab. Distinct from row tap (which opens the wizard). */
+  onActions: () => void;
 }) {
   const theme = useTheme();
   const isSubmitted = progressiveStatus
@@ -291,6 +441,26 @@ function EntryRow({
           </Text>
         </View>
       </View>
+      {/* Kebab — separate tap target from the row itself. The row's
+          onPress opens the prediction wizard; the kebab opens the
+          rename/delete action menu. Generous hitSlop so the small
+          icon is comfortable to tap. */}
+      <Pressable
+        onPress={(e) => {
+          // Stop the row's Pressable from also firing — we don't
+          // want a single tap to both open the wizard AND the menu.
+          e.stopPropagation();
+          onActions();
+        }}
+        hitSlop={10}
+        style={({ pressed }) => ({
+          padding: 6,
+          borderRadius: theme.radii.sm,
+          opacity: pressed ? 0.5 : 1,
+        })}
+      >
+        <Icon name="ellipsis" color="slate" size={16} weight="semibold" />
+      </Pressable>
       <Icon name="chevron.right" color="slate" size={12} weight="semibold" />
     </Pressable>
   );

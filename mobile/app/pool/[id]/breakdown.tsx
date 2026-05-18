@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
@@ -16,6 +15,7 @@ import type {
   BreakdownPoolSettings,
   BreakdownResponse,
 } from '@/lib/api';
+import { Icon } from '@/components/ui';
 import { useBreakdown } from '@/lib/useBreakdown';
 import { useEntryAdjustments, type EntryAdjustment } from '@/lib/useEntryAdjustments';
 import { fontFamilies, typography, useTheme, withOpacity } from '@/theme';
@@ -214,25 +214,7 @@ function Header({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name="xmark"
-            size={14}
-            tintColor={theme.colors.ink}
-            weight="semibold"
-          />
-        ) : (
-          <RNText
-            style={{
-              fontSize: 16,
-              color: theme.colors.ink,
-              fontWeight: '700',
-              lineHeight: 16,
-            }}
-          >
-            ✕
-          </RNText>
-        )}
+        <Icon name="xmark" size={14} tint={theme.colors.ink} weight="semibold" />
       </Pressable>
     </View>
   );
@@ -493,17 +475,7 @@ function AdjustmentsSection({
             backgroundColor: theme.colors.amberLight,
           }}
         >
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="info.circle.fill"
-              size={14}
-              tintColor={theme.colors.amber}
-              weight="semibold"
-              resizeMode="scaleAspectFit"
-            />
-          ) : (
-            <RNText style={{ fontSize: 14, color: theme.colors.amber }}>ⓘ</RNText>
-          )}
+          <Icon name="info.circle.fill" size={14} tint={theme.colors.amber} weight="semibold" />
           <View style={{ flex: 1, gap: 4 }}>
             <RNText
               style={{
@@ -839,16 +811,7 @@ function MatchRow({ result }: { result: BreakdownMatchResult }) {
 
       {teamMismatch ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 60 }}>
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="arrow.triangle.branch"
-              size={8}
-              tintColor={theme.colors.amber}
-              weight="medium"
-            />
-          ) : (
-            <RNText style={{ fontSize: 8, color: theme.colors.amber }}>↳</RNText>
-          )}
+          <Icon name="arrow.triangle.branch" size={8} tint={theme.colors.amber} weight="medium" />
           <RNText
             style={{
               ...typography.detail,

@@ -1,8 +1,11 @@
+export { ActionMenu, type ActionMenuItem } from './ActionMenu';
 export { Button } from './Button';
 export { Card } from './Card';
+export { ConfirmDialog } from './ConfirmDialog';
 export { Icon } from './Icon';
 export { Input } from './Input';
 export { Placeholder } from './Placeholder';
+export { PromptDialog } from './PromptDialog';
 export { Screen } from './Screen';
 export { Text } from './Text';
 export { Wordmark } from './Wordmark';
