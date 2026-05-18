@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/ui';
+import { router } from 'expo-router';
+
+import { useHomeData } from '@/lib/HomeDataProvider';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -59,6 +62,10 @@ const JOIN_URL_BASE = 'https://sportpool.io/join/';
 
 export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   const theme = useTheme();
+  // Used after a successful pool delete to invalidate the home dashboard's
+  // pool list so the deleted card disappears immediately when we navigate
+  // back to the home tab.
+  const { refresh: refreshHomeData } = useHomeData();
 
   const initial = useMemo<EditableState>(
     () => ({
@@ -138,7 +145,14 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       if (error) throw error;
       setShowDeleteModal(false);
       setDeleteConfirmText('');
-      onSaved?.();
+      // Refresh the home dashboard's pool list FIRST so by the time we
+      // land on the home tab the deleted pool card is already gone.
+      // Fire-and-forget — the navigation below doesn't wait for it.
+      void refreshHomeData();
+      // Replace (not push) so the now-defunct pool detail screen isn't
+      // left in the back stack — trying to navigate back to a deleted
+      // pool would 404 or show a stale shell.
+      router.replace('/(tabs)');
     } catch (err) {
       Alert.alert("Couldn't delete", err instanceof Error ? err.message : 'Unknown error');
     } finally {
