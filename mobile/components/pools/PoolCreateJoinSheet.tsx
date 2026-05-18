@@ -26,15 +26,13 @@ export type PoolCreateJoinSheetHandle = {
   close: () => void;
 };
 
+type ActionKey = 'create' | 'join';
+
 type Action = {
-  key: 'create' | 'join';
+  key: ActionKey;
   icon: string;
   label: string;
   description: string;
-  // Inline navigate so expo-router's typed-routes can validate the literal
-  // path strings at compile time. A `route: string` field would lose the
-  // type narrowing.
-  navigate: () => void;
 };
 
 const ACTIONS: Action[] = [
@@ -43,21 +41,27 @@ const ACTIONS: Action[] = [
     icon: 'plus.circle.fill',
     label: 'Create a Pool',
     description: 'Spin up a new pool for your friends',
-    navigate: () => router.navigate('/create-pool'),
   },
   {
     key: 'join',
     icon: 'person.badge.plus',
     label: 'Join with Code',
     description: 'Enter a code to join an existing pool',
-    navigate: () => router.navigate('/join-pool'),
   },
 ];
 
-export const PoolCreateJoinSheet = forwardRef<PoolCreateJoinSheetHandle>(function PoolCreateJoinSheet(
-  _,
-  ref,
-) {
+type Props = {
+  /**
+   * Called when the user picks "Join with Code". Parent screen should
+   * close this sheet (handled inside) and open its JoinPoolSheet. We
+   * coordinate from the parent so both sheets can mount at the screen
+   * root and the gorhom animations sequence cleanly.
+   */
+  onJoinPress?: () => void;
+};
+
+export const PoolCreateJoinSheet = forwardRef<PoolCreateJoinSheetHandle, Props>(
+  function PoolCreateJoinSheet({ onJoinPress }, ref) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
@@ -87,7 +91,13 @@ export const PoolCreateJoinSheet = forwardRef<PoolCreateJoinSheetHandle>(functio
 
   function handlePick(action: Action) {
     sheetRef.current?.close();
-    action.navigate();
+    if (action.key === 'create') {
+      // Create flow stays a full-screen route (multi-step wizard).
+      router.navigate('/create-pool');
+    } else {
+      // Join flow opens a sibling JoinPoolSheet held by the parent.
+      onJoinPress?.();
+    }
   }
 
   return (

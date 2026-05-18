@@ -4,7 +4,17 @@ import { View } from 'react-native';
 import { Button, Icon, Text } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 
-export function EmptyPools() {
+type EmptyPoolsProps = {
+  /**
+   * Called when the user taps "Join with Code". Parent screen opens the
+   * JoinPoolSheet. Falls back to navigating to /join-pool if no callback
+   * is provided (e.g. during transitions) — but the route is being
+   * deprecated, so callers should always pass this.
+   */
+  onJoinPress?: () => void;
+};
+
+export function EmptyPools({ onJoinPress }: EmptyPoolsProps = {}) {
   const theme = useTheme();
 
   return (
@@ -62,7 +72,10 @@ export function EmptyPools() {
           variant="secondary"
           size="lg"
           fullWidth
-          onPress={() => router.navigate('/join-pool')}
+          // No-op fallback if the parent forgot to pass the callback — better
+          // than navigating to a removed route. EmptyPools is only used inside
+          // the Pools tab which always wires this up.
+          onPress={onJoinPress ?? (() => {})}
         />
       </View>
     </View>

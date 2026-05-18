@@ -18,7 +18,12 @@ import {
   QuickStats,
   UpcomingMatchCard,
 } from '@/components/home';
-import { PoolCreateJoinSheet, type PoolCreateJoinSheetHandle } from '@/components/pools';
+import {
+  JoinPoolSheet,
+  type JoinPoolSheetHandle,
+  PoolCreateJoinSheet,
+  type PoolCreateJoinSheetHandle,
+} from '@/components/pools';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { MatchSummary, PoolSummary } from '@/lib/useHomeData';
 import { useTheme } from '@/theme';
@@ -28,10 +33,10 @@ export default function HomeScreen() {
   const { data, loading, refreshing, error, refresh, refreshIfStale } = useHomeData();
   const tabBarHeight = useBottomTabBarHeight();
   const initialFocus = useRef(true);
-  // Create/Join sheet opened from the "+" in HomeHeader. Mounted at the
-  // screen root so the gorhom sheet positions from the bottom of the
-  // device rather than the header's bounds.
+  // Create/Join action sheet opened from the "+" in HomeHeader. Picking
+  // "Join with Code" closes this one and opens JoinPoolSheet below.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
+  const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
   // Use the staleness-checked refresh on tab focus so quick tab switches
   // don't re-fetch (no spinner flicker). Manual pull-to-refresh still uses
   // the unconditional `refresh`.
@@ -169,8 +174,16 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* Create/Join action sheet — opened by tapping the "+" in HomeHeader.
-          Mounted at the screen root for proper gorhom bottom-sheet positioning. */}
-      <PoolCreateJoinSheet ref={createJoinSheetRef} />
+          Picking "Join with Code" closes this and opens JoinPoolSheet
+          (with a small timeout so the gorhom close + open animations
+          sequence cleanly instead of fighting each other). */}
+      <PoolCreateJoinSheet
+        ref={createJoinSheetRef}
+        onJoinPress={() => {
+          setTimeout(() => joinPoolSheetRef.current?.open(), 250);
+        }}
+      />
+      <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
   );
 }

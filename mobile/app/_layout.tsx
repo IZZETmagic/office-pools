@@ -118,10 +118,6 @@ function InnerLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen
-          name="join-pool"
-          options={{ presentation: 'modal', headerShown: false }}
-        />
-        <Stack.Screen
           name="create-pool"
           options={{ presentation: 'modal', headerShown: false }}
         />

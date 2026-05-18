@@ -10,6 +10,8 @@ import {
   DiscoverFilters,
   DiscoverList,
   EmptyPools,
+  JoinPoolSheet,
+  type JoinPoolSheetHandle,
   PoolCreateJoinSheet,
   type PoolCreateJoinSheetHandle,
   PoolListItem,
@@ -49,6 +51,9 @@ export default function PoolsScreen() {
   const filterSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
   // Create/Join sheet ref — opened from the "+" button in PoolsHeader.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
+  // Join-pool input sheet — opened either from PoolCreateJoinSheet's
+  // "Join with Code" row or from EmptyPools' button.
+  const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
 
   // The dashboard's "X pools need predictions" card navigates here with
   // `?filter=pending`. Apply that to the filter state once on mount, then
@@ -168,7 +173,7 @@ export default function PoolsScreen() {
       >
         {isMyPools ? (
           !hasAnyPools ? (
-            <EmptyPools />
+            <EmptyPools onJoinPress={() => joinPoolSheetRef.current?.open()} />
           ) : visiblePools.length === 0 ? (
             <NoFilterMatch onClear={() => setFilters(DEFAULT_FILTERS)} />
           ) : (
@@ -193,8 +198,16 @@ export default function PoolsScreen() {
       <PoolsFilterSheet ref={filterSheetRef} />
 
       {/* Create/Join action sheet — opened by tapping the "+" in
-          PoolsHeader. Same screen-root mounting pattern. */}
-      <PoolCreateJoinSheet ref={createJoinSheetRef} />
+          PoolsHeader. Picking "Join with Code" closes this sheet and
+          opens JoinPoolSheet (250ms delay so close + open animations
+          sequence cleanly). */}
+      <PoolCreateJoinSheet
+        ref={createJoinSheetRef}
+        onJoinPress={() => {
+          setTimeout(() => joinPoolSheetRef.current?.open(), 250);
+        }}
+      />
+      <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
   );
 }
