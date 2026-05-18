@@ -441,6 +441,16 @@ function resolveIcon(item: ActivityItem): string {
       return 'clock.badge.exclamationmark.fill';
     case 'pool_joined':
       return item.icon || 'person.badge.plus';
+    case 'pool_left':
+      // Door-with-arrow reads as a clean "departed" signal regardless of
+      // theme; same SF Symbol used in the Settings → Leave Pool row so
+      // the visual maps across the two surfaces.
+      return item.icon || 'rectangle.portrait.and.arrow.right';
+    case 'pool_removed':
+      // Strike-through user crop: the destination of the action ("you")
+      // with an X over it. Distinguishes admin-initiated removal from
+      // self-leave at a glance.
+      return item.icon || 'person.crop.circle.badge.xmark';
     case 'level_up':
       return 'star.circle.fill';
     case 'streak_milestone': {
@@ -498,6 +508,12 @@ function resolveColorKey(item: ActivityItem): ActivityColorKey {
       return 'warning';
     case 'pool_joined':
       return 'primary';
+    case 'pool_left':
+      // Soft amber: the user chose this; not an error state.
+      return 'warning';
+    case 'pool_removed':
+      // Red: this happened TO the user without their consent.
+      return 'error';
     case 'level_up':
       return 'accent';
     case 'streak_milestone': {
@@ -598,6 +614,15 @@ function relativeTime(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return '';
   const interval = (Date.now() - t) / 1000;
+  // Future-dated timestamps (e.g. a tournament's last match used as a
+  // proxy on a feed for a competition that hasn't finished) would
+  // otherwise collapse into the < 60 branch and render as "just now".
+  // Show an absolute date in that case so it never silently lies.
+  if (interval < 0) {
+    const d = new Date(t);
+    const month = d.toLocaleString(undefined, { month: 'short' });
+    return `${month} ${d.getDate()}`;
+  }
   if (interval < 60) return 'just now';
   if (interval < 3600) return `${Math.floor(interval / 60)}m ago`;
   if (interval < 86400) return `${Math.floor(interval / 3600)}h ago`;

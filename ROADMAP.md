@@ -205,6 +205,7 @@ Index of all deferred work items. Detail lives in `memory/project_backlog_*.md` 
 | Form tab polish punch list (tappable badge cells → details bottom sheet) | `memory/project_backlog_form_tab_polish.md` | Phase 3b.1 (batch with other mobile polish) |
 | Activity tab — surface XP gains in the feed (e.g. "Submitted predictions +100 XP — Entry A in Pool X") | `memory/project_backlog_activity_tab_xp.md` | ✅ Phase 3b.0 — v1 shipped with Activity tab port (match XP, bonus XP, badge XP); deep-link to Form → Level Runway still TODO |
 | Members tab admin actions — view entry, unlock, adjust points (all 3 prediction modes) | `memory/project_backlog_admin_member_actions.md` | Phase 3b.1 (batch with other mobile admin polish) |
+| Pool Info tab + non-admin Leave Pool surface + Stop-Participating iOS bug fix (open question: merge Scoring into Pool Info?) | `memory/project_backlog_pool_info_tab.md` | Phase 3b.1 (batch with other mobile polish) |
 | Multi-sport: data model abstraction | `memory/project_backlog_data_model.md` | Phase 3c.1 |
 | Multi-sport: sports data ingestion | `memory/project_backlog_sports_data.md` | Phase 3c.2 |
 | Multi-sport: pool template system | `memory/project_backlog_pool_templates.md` | Phase 3c.3 |

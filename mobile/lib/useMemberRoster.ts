@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { supabase } from './supabase';
 
@@ -79,6 +80,46 @@ export function useMemberRoster(poolId: string | undefined) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Refresh the roster whenever the screen regains focus — so a member
+  // removed (or added) via the member-detail sub-route is reflected the
+  // moment we navigate back, instead of waiting for the user to leave the
+  // pool detail entirely. Skips the initial focus because the `load`
+  // useEffect above already fetched.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const initialFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (initialFocus.current) {
+        initialFocus.current = false;
+        return;
+      }
+      void loadRef.current();
+    }, []),
+  );
+
+  // Live updates: subscribe to INSERT/DELETE/UPDATE on pool_members for
+  // this pool. Covers the "someone else just joined while I'm sitting on
+  // the Members tab" case and keeps multiple admins consistent without a
+  // pull-to-refresh.
+  useEffect(() => {
+    if (!poolId) return;
+    const channelName = `pool-members-${poolId}-${Math.random().toString(36).slice(2, 10)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pool_members', filter: `pool_id=eq.${poolId}` },
+        () => {
+          void loadRef.current();
+        },
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [poolId]);
 
   return { members, loading, error, refresh: load };
 }

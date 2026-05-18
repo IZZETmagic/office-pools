@@ -563,14 +563,13 @@ export function PoolDetail({
 
   async function handleLeavePool() {
     setLeaving(true)
-    const supabase = createClient()
 
-    const { error } = await supabase
-      .from('pool_members')
-      .delete()
-      .eq('member_id', memberId)
-
-    if (error) {
+    // Funnel through the server endpoint instead of a direct
+    // supabase.delete so an audit row lands in pool_membership_events
+    // before the membership row is gone. That audit row drives the
+    // "Left <pool>" activity card on the user's feed afterwards.
+    const res = await fetch(`/api/pools/${pool.pool_id}/leave`, { method: 'POST' })
+    if (!res.ok) {
       setLeaving(false)
       setShowLeaveModal(false)
       return

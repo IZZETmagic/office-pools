@@ -13,6 +13,8 @@ export type ActivityType =
   | 'rank_change'
   | 'deadline_alert'
   | 'pool_joined'
+  | 'pool_left'
+  | 'pool_removed'
   | 'level_up'
   | 'streak_milestone'
   | 'badge_earned'
@@ -267,7 +269,19 @@ function fromRaw(r: ActivityFeedItemRaw): ActivityItem {
 }
 
 async function appendXPEvents(memberships: MembershipRow[], items: ActivityItem[]): Promise<void> {
-  const entryAnchors: Array<{ poolId: string; entryId: string; entryName: string; poolName: string; tournamentId: string | null }> = [];
+  const entryAnchors: Array<{
+    poolId: string;
+    entryId: string;
+    entryName: string;
+    poolName: string;
+    tournamentId: string | null;
+    // Carried into the badges fallback chain so we can still date an
+    // earned badge when the tournament has no completed matches yet
+    // (typical pre-kickoff state on a fresh pool).
+    predictionsSubmittedAt: string | null;
+    entryCreatedAt: string;
+    joinedAt: string;
+  }> = [];
   const tournamentIds = new Set<string>();
   for (const m of memberships) {
     if (!m.pools) continue;
@@ -278,26 +292,40 @@ async function appendXPEvents(memberships: MembershipRow[], items: ActivityItem[
         entryName: e.entry_name,
         poolName: m.pools.pool_name,
         tournamentId: m.pools.tournament_id,
+        predictionsSubmittedAt: e.predictions_submitted_at,
+        entryCreatedAt: e.created_at,
+        joinedAt: m.joined_at,
       });
       if (m.pools.tournament_id) tournamentIds.add(m.pools.tournament_id);
     }
   }
   if (entryAnchors.length === 0) return;
 
-  // Fetch match_number -> match_date for every tournament the user touches.
-  // One Supabase round-trip total; bounded by number of distinct tournaments.
+  // Fetch a stamp per completed match for every tournament the user
+  // touches. One Supabase round-trip total; bounded by number of distinct
+  // tournaments. Filter to `is_completed = true` so the map never carries
+  // future / scheduled match dates — those would otherwise drive every
+  // earned-badge timestamp into the future, which `relativeTime` then
+  // renders as "just now" (Date.now() - future ≈ 0, hits the < 60 branch).
+  // Prefer `completed_at` (the actual scoring timestamp) over `match_date`
+  // (the kickoff time) so the displayed earn date matches when the badge
+  // could realistically have unlocked.
   const matchDateByKey = new Map<string, string>(); // key: `${tournamentId}:${matchNumber}`
   if (tournamentIds.size > 0) {
     const { data: matchRows } = await supabase
       .from('matches')
-      .select('tournament_id, match_number, match_date')
-      .in('tournament_id', Array.from(tournamentIds));
+      .select('tournament_id, match_number, match_date, completed_at, is_completed')
+      .in('tournament_id', Array.from(tournamentIds))
+      .eq('is_completed', true);
     for (const r of (matchRows ?? []) as Array<{
       tournament_id: string;
       match_number: number;
       match_date: string;
+      completed_at: string | null;
+      is_completed: boolean;
     }>) {
-      matchDateByKey.set(`${r.tournament_id}:${r.match_number}`, r.match_date);
+      const ts = r.completed_at ?? r.match_date;
+      matchDateByKey.set(`${r.tournament_id}:${r.match_number}`, ts);
     }
   }
 
@@ -374,16 +402,33 @@ async function appendXPEvents(memberships: MembershipRow[], items: ActivityItem[
       items.push(item);
     }
 
-    // Earned badges that grant XP. No grant timestamp in the analytics payload,
-    // so fall back to the latest match_date for the entry's tournament as a
-    // proxy ("most recent completed match" ≈ when the badge would have unlocked).
-    if (xp.earned_badges?.length && anchor.tournamentId) {
-      let latestTs: string | null = null;
-      for (const [k, v] of matchDateByKey) {
-        if (!k.startsWith(`${anchor.tournamentId}:`)) continue;
-        if (!latestTs || v > latestTs) latestTs = v;
+    // Earned badges that grant XP. The analytics payload doesn't carry a
+    // per-badge unlock timestamp yet, so we fall back through a chain of
+    // proxies — best-available first:
+    //   1. Latest *completed* match in the entry's tournament. Most
+    //      badges unlock as a side effect of a scoring event, so the
+    //      most-recent completion is the closest real anchor.
+    //   2. `predictions_submitted_at` — for pre-kickoff badges like
+    //      "Early Bird" / "First Picks" that fire on submission.
+    //   3. Entry `created_at` — final fallback so a badge never
+    //      silently slips into the future-dated "just now" trap.
+    // Crucially, we never use a non-completed match's `match_date` —
+    // future dates passed to `relativeTime` underflow into the "< 60s"
+    // branch and render as "just now", which is the original bug.
+    if (xp.earned_badges?.length) {
+      let latestCompletedTs: string | null = null;
+      if (anchor.tournamentId) {
+        for (const [k, v] of matchDateByKey) {
+          if (!k.startsWith(`${anchor.tournamentId}:`)) continue;
+          if (!latestCompletedTs || v > latestCompletedTs) latestCompletedTs = v;
+        }
       }
-      if (latestTs) {
+      const fallbackTs =
+        latestCompletedTs ??
+        anchor.predictionsSubmittedAt ??
+        anchor.entryCreatedAt ??
+        anchor.joinedAt;
+      if (fallbackTs) {
         for (const b of xp.earned_badges) {
           if (!b.xp_bonus || b.xp_bonus <= 0) continue;
           const item = synth(
@@ -393,7 +438,7 @@ async function appendXPEvents(memberships: MembershipRow[], items: ActivityItem[
             'rosette',
             'accent',
             anchor.poolId,
-            latestTs,
+            fallbackTs,
             {
               pool_name: anchor.poolName,
               entry_name: anchor.entryName,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
 import {
@@ -135,6 +135,33 @@ export function usePoolDetail(poolId: string | undefined) {
   useEffect(() => {
     if (poolId && user) load('initial');
   }, [poolId, user, load]);
+
+  // Live updates: when membership changes (someone joins, an admin
+  // removes a player, a role flips), re-fetch the whole pool detail so
+  // the LeaderboardTab and the header's member-count chip reflect the
+  // new state without a manual pull-to-refresh. The same realtime
+  // channel that powers useMemberRoster's MembersTab updates fires here
+  // — different subscribers, one publication. We use the 'refresh' mode
+  // so the existing UI stays mounted (no full-screen loader flicker).
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    if (!poolId) return;
+    const channelName = `pool-detail-members-${poolId}-${Math.random().toString(36).slice(2, 10)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pool_members', filter: `pool_id=eq.${poolId}` },
+        () => {
+          void loadRef.current('refresh');
+        },
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [poolId]);
 
   const refresh = useCallback(() => load('refresh'), [load]);
 

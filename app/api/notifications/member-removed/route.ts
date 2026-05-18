@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/send'
 import { memberRemovedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -42,6 +43,21 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  // Log the audit event so the removed user's activity feed surfaces a
+  // "Removed from <pool>" card after the fact. Stored as a snapshot
+  // (pool_name in the row) so it survives a later pool deletion.
+  // Admin client because the affected user no longer has a pool_members
+  // row to satisfy any direct-membership write policy. Fire-and-forget
+  // logging: failure here doesn't block the email/push.
+  const adminClient = createAdminClient()
+  await adminClient.from('pool_membership_events').insert({
+    pool_id,
+    user_id: removed_user_id,
+    actor_user_id: userData.user_id,
+    event_type: 'removed',
+    pool_name: pool.pool_name,
+  })
 
   const { subject, html } = memberRemovedTemplate({
     userName: removedUser.full_name || removedUser.username || 'there',

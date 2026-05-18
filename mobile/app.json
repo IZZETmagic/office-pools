@@ -54,6 +54,13 @@
         {
           "color": "#3B5BDB"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan pool QR codes.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {

@@ -9,10 +9,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import { Text } from '@/components/ui';
 import { router } from 'expo-router';
 
+import { stopParticipating } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { supabase } from '@/lib/supabase';
@@ -160,6 +162,70 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
     }
   }
 
+  // "Stop Participating" — admin-only action that pulls the admin out of
+  // the competition without removing them from the pool. They keep the
+  // admin role, the settings tab, banter access, etc. Only their
+  // pool_entries (and the cascading predictions / scores / bracket picks
+  // — every child of pool_entries is ON DELETE CASCADE) get cleaned up,
+  // so they no longer appear on the leaderboard. This is NOT a "leave"
+  // event — no pool_membership_events row is written and no
+  // pool_left / pool_removed activity card is generated.
+  //
+  // Routed through /api/pools/[pool_id]/stop-participating rather than a
+  // direct client-side supabase.delete on pool_entries because three of
+  // the cascade children (bonus_scores, match_scores, player_scores)
+  // have RLS enabled with no user-facing DELETE policy. A client
+  // cascade would get rejected by those children and roll back the
+  // whole transaction — producing the original "Unknown error" Alert
+  // (PostgrestError isn't a real Error subclass so `instanceof Error`
+  // returned false and we fell through to the generic fallback). The
+  // server endpoint uses the admin client to bypass RLS, same pattern
+  // as /leave and /api/notifications/member-removed.
+  function handleStopParticipating() {
+    Alert.alert(
+      'Stop Participating',
+      `Remove your entries from ${pool.poolName}? Your predictions, standings, and scores will be deleted, but you'll stay on as admin managing the pool.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Stop Participating',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await stopParticipating(pool.poolId);
+              // Recalculate ranks so remaining members' ranks
+              // re-settle without the now-deleted entries skewing the
+              // leaderboard. Same fire-and-forget pattern web's
+              // handleLeavePool uses.
+              void fetch(`/api/pools/${pool.poolId}/recalculate`, { method: 'POST' });
+              // Refresh the home dashboard (your card's entry list
+              // shrinks) and the in-screen pool detail (leaderboard
+              // re-renders without your standings). usePoolDetail's
+              // realtime listener watches pool_members, not
+              // pool_entries, so the explicit refresh is needed here.
+              void refreshHomeData();
+              onSaved?.();
+            } catch (err) {
+              // Robust message extraction: Supabase PostgrestError and
+              // most API error responses surface `.message` as a plain
+              // object property without extending Error. `instanceof
+              // Error` returns false for those, which is exactly what
+              // hid the real failure on the previous build.
+              const message =
+                err instanceof Error
+                  ? err.message
+                  : typeof err === 'object' && err !== null && 'message' in err
+                    && typeof (err as { message: unknown }).message === 'string'
+                    ? (err as { message: string }).message
+                    : 'Unknown error';
+              Alert.alert("Couldn't update participation", message);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function handleArchive() {
     Alert.alert(
       'Archive Pool',
@@ -198,11 +264,36 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         gap: theme.spacing.lg,
       }}
     >
-      {/* Share & Invite */}
+      {/* Share & Invite — QR is inline (not behind a modal) so an admin
+          can hold the phone up and let someone scan immediately without
+          an extra tap. Pool code sits directly under as the spoken /
+          typed fallback. */}
       <Card>
         <Caption>Share & Invite</Caption>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ gap: 4 }}>
+        <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
+          {/* White QR card — solid background per QR best practice
+              (consistent contrast regardless of card theme). */}
+          <View
+            style={{
+              padding: theme.spacing.md,
+              borderRadius: theme.radii.lg,
+              backgroundColor: '#FFFFFF',
+              ...theme.shadows.card,
+            }}
+          >
+            {/* QR foreground is intentionally hard-coded — `theme.colors.ink`
+                flips to near-white in dark mode, which would render the
+                code invisible against the (also white) QR background and
+                break scanning. QR contrast must stay dark-on-light
+                regardless of the user's system theme. */}
+            <QRCode
+              value={`${JOIN_URL_BASE}${pool.poolCode}`}
+              size={180}
+              color="#1B2340"
+              backgroundColor="#FFFFFF"
+            />
+          </View>
+          <View style={{ alignItems: 'center', gap: 2 }}>
             <RNText
               style={{
                 fontFamily: fontFamilies.medium,
@@ -219,11 +310,12 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
                 color: theme.colors.ink,
                 fontVariant: ['tabular-nums'],
                 letterSpacing: 2,
+                textAlign: 'center',
                 // Android's text-measurement doesn't include the trailing
-                // letter-spacing in the Text node's content width — the last
-                // glyph gets clipped by the parent flex container. iOS measures
-                // correctly so the fix is Android-only. paddingRight matches
-                // the letterSpacing value to give the trailing space room.
+                // letter-spacing in the Text node's content width — the
+                // last glyph gets clipped. iOS measures correctly so the
+                // fix is Android-only. paddingRight matches the
+                // letterSpacing value to give the trailing space room.
                 ...Platform.select({ android: { paddingRight: 2 }, default: {} }),
               }}
             >
@@ -459,6 +551,14 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         >
           Danger Zone
         </RNText>
+        <DangerRow
+          iosIcon="person.crop.circle.badge.minus"
+          emoji="🙅"
+          title="Stop Participating"
+          subtitle="Delete your entries; stay on as admin"
+          color={theme.colors.amber}
+          onPress={handleStopParticipating}
+        />
         <DangerRow
           iosIcon="archivebox"
           emoji="📦"

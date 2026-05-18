@@ -398,6 +398,37 @@ export function notifyMemberRemoved(poolId: string, removedUserId: string) {
   });
 }
 
+/**
+ * Self-leave: the authenticated user removes themselves from `poolId`.
+ * Funnels through the server endpoint (rather than a direct supabase
+ * delete) so the audit row in pool_membership_events lands before the
+ * pool_members row is gone — that audit row drives the "Left <pool>"
+ * card on the user's activity feed afterwards. Server-side checks reject
+ * the request if the leaver is the sole admin of the pool.
+ */
+export function leavePool(poolId: string) {
+  return apiFetch<{ left: boolean }>(`/api/pools/${poolId}/leave`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Admin "Stop Participating": delete the caller's pool_entries for
+ * `poolId` while keeping their pool_members row (admin role intact).
+ * Must funnel through the server because pool_entries' cascade chain
+ * includes three RLS-protected score tables (bonus_scores, match_scores,
+ * player_scores) that lack user-facing DELETE policies — a direct
+ * supabase.delete from the client gets rolled back by those RLS rejects.
+ * The endpoint uses the admin client to bypass RLS, mirroring the
+ * /leave and /api/notifications/member-removed pattern.
+ */
+export function stopParticipating(poolId: string) {
+  return apiFetch<{ removed_entries: number }>(
+    `/api/pools/${poolId}/stop-participating`,
+    { method: 'POST' },
+  );
+}
+
 export type RoundState = 'locked' | 'open' | 'in_progress' | 'completed';
 
 export type PoolRound = {

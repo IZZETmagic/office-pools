@@ -25,6 +25,8 @@ type ActivityType =
   | 'rank_change'
   | 'deadline_alert'
   | 'pool_joined'
+  | 'pool_left'
+  | 'pool_removed'
   | 'level_up'
   | 'streak_milestone'
   | 'badge_earned'
@@ -754,6 +756,53 @@ async function handleGET(
           },
         ),
       )
+    }
+  }
+
+  // Membership lifecycle events — surfaces "you left X" and "you were
+  // removed from X" cards in the feed. Pulled from the audit table
+  // (pool_membership_events) because the source-of-truth pool_members
+  // row is gone by the time these events would be displayed; the audit
+  // row snapshots pool_name so the card text survives a pool delete.
+  const { data: lifecycleRows } = await adminClient
+    .from('pool_membership_events')
+    .select('event_id, pool_id, event_type, pool_name, created_at')
+    .eq('user_id', user_id)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  for (const e of (lifecycleRows ?? []) as Array<{
+    event_id: string
+    pool_id: string
+    event_type: 'left' | 'removed'
+    pool_name: string
+    created_at: string
+  }>) {
+    if (e.event_type === 'left') {
+      items.push({
+        activity_id: `pool_left-${e.event_id}`,
+        pool_id: e.pool_id,
+        activity_type: 'pool_left',
+        title: `Left ${e.pool_name}`,
+        body: 'You left the pool.',
+        icon: 'rectangle.portrait.and.arrow.right',
+        color_key: 'warning',
+        metadata: { pool_name: e.pool_name },
+        is_read: true,
+        created_at: e.created_at,
+      })
+    } else {
+      items.push({
+        activity_id: `pool_removed-${e.event_id}`,
+        pool_id: e.pool_id,
+        activity_type: 'pool_removed',
+        title: `Removed from ${e.pool_name}`,
+        body: 'An admin removed you from this pool.',
+        icon: 'person.crop.circle.badge.xmark',
+        color_key: 'error',
+        metadata: { pool_name: e.pool_name },
+        is_read: true,
+        created_at: e.created_at,
+      })
     }
   }
 
