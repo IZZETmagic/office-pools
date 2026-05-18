@@ -1,5 +1,4 @@
-import { router } from 'expo-router';
-import { Alert, Pressable, Text as RNText, View } from 'react-native';
+import { Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -9,6 +8,12 @@ type PoolsHeaderProps = {
   titleAccent: string;
   subtitle: string;
   showMenu?: boolean;
+  /**
+   * Called when the "+" menu button is tapped. Parent screens own the
+   * bottom sheet that opens — keeps the header reusable and lets the
+   * sheet mount at the screen root for proper positioning.
+   */
+  onMenuPress?: () => void;
 };
 
 export function PoolsHeader({
@@ -16,21 +21,9 @@ export function PoolsHeader({
   titleAccent,
   subtitle,
   showMenu = true,
+  onMenuPress,
 }: PoolsHeaderProps) {
   const theme = useTheme();
-
-  function openMenu() {
-    Alert.alert(
-      'Pool actions',
-      'Create or join a pool',
-      [
-        { text: 'Create a Pool', onPress: () => router.navigate('/create-pool') },
-        { text: 'Join with Code', onPress: () => router.navigate('/join-pool') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-      { cancelable: true },
-    );
-  }
 
   const titleStyle = {
     fontFamily: fontFamilies.black,
@@ -63,7 +56,7 @@ export function PoolsHeader({
 
       {showMenu ? (
         <Pressable
-          onPress={openMenu}
+          onPress={onMenuPress}
           hitSlop={8}
           style={({ pressed }) => ({
             width: 40,

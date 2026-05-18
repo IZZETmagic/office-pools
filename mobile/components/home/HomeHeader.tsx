@@ -1,5 +1,4 @@
-import { router } from 'expo-router';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Icon, Text, Wordmark } from '@/components/ui';
 import { getGreeting } from '@/lib/useHomeData';
@@ -7,25 +6,17 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type HomeHeaderProps = {
   fullName: string | null;
+  /**
+   * Called when the "+" menu button is tapped. Parent owns the bottom
+   * sheet so it can mount at the screen root for proper positioning.
+   */
+  onMenuPress?: () => void;
 };
 
-export function HomeHeader({ fullName }: HomeHeaderProps) {
+export function HomeHeader({ fullName, onMenuPress }: HomeHeaderProps) {
   const theme = useTheme();
   const greeting = getGreeting();
   const firstName = (fullName ?? '').split(' ')[0]?.trim() || null;
-
-  function showMenu() {
-    Alert.alert(
-      'Pool actions',
-      'Create or join a pool',
-      [
-        { text: 'Create a Pool', onPress: () => router.navigate('/create-pool') },
-        { text: 'Join with Code', onPress: () => router.navigate('/join-pool') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-      { cancelable: true },
-    );
-  }
 
   return (
     <View
@@ -48,7 +39,7 @@ export function HomeHeader({ fullName }: HomeHeaderProps) {
       </View>
 
       <Pressable
-        onPress={showMenu}
+        onPress={onMenuPress}
         hitSlop={8}
         style={({ pressed }) => ({
           width: 40,

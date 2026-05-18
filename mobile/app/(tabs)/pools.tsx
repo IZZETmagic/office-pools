@@ -10,6 +10,8 @@ import {
   DiscoverFilters,
   DiscoverList,
   EmptyPools,
+  PoolCreateJoinSheet,
+  type PoolCreateJoinSheetHandle,
   PoolListItem,
   PoolsFilterBar,
   PoolsFilterSheet,
@@ -45,6 +47,8 @@ export default function PoolsScreen() {
   // filter bar's bounds. The bar invokes `onOpenSheet(config)` which we
   // delegate to `sheetRef.current?.open(config)`.
   const filterSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
+  // Create/Join sheet ref — opened from the "+" button in PoolsHeader.
+  const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
 
   // The dashboard's "X pools need predictions" card navigates here with
   // `?filter=pending`. Apply that to the filter state once on mount, then
@@ -128,6 +132,7 @@ export default function PoolsScreen() {
         titleAccent="Pools"
         subtitle={headerSubtitle}
         showMenu={isMyPools}
+        onMenuPress={() => createJoinSheetRef.current?.open()}
       />
       <PoolsSegment active={tab} onChange={setTab} />
       {isMyPools && hasAnyPools ? (
@@ -186,6 +191,10 @@ export default function PoolsScreen() {
           filter bar's bounds. PoolsFilterBar invokes onOpenSheet(config)
           when a chip / sort button is tapped. */}
       <PoolsFilterSheet ref={filterSheetRef} />
+
+      {/* Create/Join action sheet — opened by tapping the "+" in
+          PoolsHeader. Same screen-root mounting pattern. */}
+      <PoolCreateJoinSheet ref={createJoinSheetRef} />
     </SafeAreaView>
   );
 }

@@ -5,6 +5,7 @@ export {
 } from './DiscoverContent';
 export { DiscoverPoolCard } from './DiscoverPoolCard';
 export { EmptyPools } from './EmptyPools';
+export { PoolCreateJoinSheet, type PoolCreateJoinSheetHandle } from './PoolCreateJoinSheet';
 export { PoolListItem } from './PoolListItem';
 export { PoolsFilterBar, DEFAULT_FILTERS, type PoolsFilters } from './PoolsFilterBar';
 export {

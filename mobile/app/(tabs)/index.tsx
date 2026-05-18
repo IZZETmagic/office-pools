@@ -18,6 +18,7 @@ import {
   QuickStats,
   UpcomingMatchCard,
 } from '@/components/home';
+import { PoolCreateJoinSheet, type PoolCreateJoinSheetHandle } from '@/components/pools';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { MatchSummary, PoolSummary } from '@/lib/useHomeData';
 import { useTheme } from '@/theme';
@@ -27,6 +28,10 @@ export default function HomeScreen() {
   const { data, loading, refreshing, error, refresh, refreshIfStale } = useHomeData();
   const tabBarHeight = useBottomTabBarHeight();
   const initialFocus = useRef(true);
+  // Create/Join sheet opened from the "+" in HomeHeader. Mounted at the
+  // screen root so the gorhom sheet positions from the bottom of the
+  // device rather than the header's bounds.
+  const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
   // Use the staleness-checked refresh on tab focus so quick tab switches
   // don't re-fetch (no spinner flicker). Manual pull-to-refresh still uses
   // the unconditional `refresh`.
@@ -94,7 +99,10 @@ export default function HomeScreen() {
       edges={['top', 'left', 'right']}
       style={{ flex: 1, backgroundColor: theme.colors.snow }}
     >
-      <HomeHeader fullName={data?.fullName ?? null} />
+      <HomeHeader
+        fullName={data?.fullName ?? null}
+        onMenuPress={() => createJoinSheetRef.current?.open()}
+      />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.xl,
@@ -159,6 +167,10 @@ export default function HomeScreen() {
         ) : null}
 
       </ScrollView>
+
+      {/* Create/Join action sheet — opened by tapping the "+" in HomeHeader.
+          Mounted at the screen root for proper gorhom bottom-sheet positioning. */}
+      <PoolCreateJoinSheet ref={createJoinSheetRef} />
     </SafeAreaView>
   );
 }
