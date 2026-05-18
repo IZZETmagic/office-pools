@@ -21,39 +21,12 @@ export type BadgeDetailSheetHandle = {
   close: () => void;
 };
 
-type BadgeIconSpec = { ios: string; emoji: string };
-
-const BADGE_ICONS: Record<string, BadgeIconSpec> = {
-  bullseye: { ios: 'scope', emoji: '🎯' },
-  sharpshooter: { ios: 'target', emoji: '🏹' },
-  marksman: { ios: 'dot.scope', emoji: '🎯' },
-  hot_streak: { ios: 'flame.fill', emoji: '🔥' },
-  unstoppable: { ios: 'bolt.fill', emoji: '⚡' },
-  perfectionist: { ios: 'star.circle.fill', emoji: '💯' },
-  underdog: { ios: 'dice.fill', emoji: '🎰' },
-  giant_slayer: { ios: 'figure.boxing', emoji: '🥊' },
-  oracle: { ios: 'eye.fill', emoji: '👁️' },
-  prophet: { ios: 'crystal.ball', emoji: '🔮' },
-  group_master: { ios: 'square.grid.3x3.fill', emoji: '🧩' },
-  knockout_king: { ios: 'crown.fill', emoji: '👑' },
-  bracket_buster: { ios: 'sparkles', emoji: '✨' },
-  showtime: { ios: 'sparkles', emoji: '✨' },
-  grand_finale: { ios: 'trophy.fill', emoji: '🏆' },
-  legend: { ios: 'star.fill', emoji: '⭐' },
-  // Bracket Picker badges
-  bp_cartographer: { ios: 'map.fill', emoji: '🗺️' },
-  bp_world_map: { ios: 'globe', emoji: '🌍' },
-  bp_bracket_prophet: { ios: 'eye.fill', emoji: '👁️' },
-  bp_architect: { ios: 'building.2.fill', emoji: '🏛️' },
-  bp_sniper: { ios: 'scope', emoji: '🎯' },
-  bp_final_four: { ios: 'trophy.fill', emoji: '🏆' },
-  bp_perfect_bracket: { ios: 'star.fill', emoji: '⭐' },
-  bp_upset_specialist: { ios: 'exclamationmark.triangle.fill', emoji: '⚠️' },
-  bp_group_guardian: { ios: 'shield.fill', emoji: '🛡️' },
-  bp_quick_draw: { ios: 'bolt.fill', emoji: '⚡' },
-  bp_full_bracket: { ios: 'checklist', emoji: '✅' },
-};
-const FALLBACK_ICON: BadgeIconSpec = { ios: 'star.fill', emoji: '⭐' };
+// Badge icon mapping is shared with FormTab via ./badge-icons so the chip
+// in the form tab and this detail sheet always render the same glyph for
+// a given badge ID. Previously these two files maintained independent
+// maps and drifted — unlocked badges like lightning_rod / stadium_regular
+// rendered as a generic star here because the entries were missing.
+import { badgeIcon } from './badge-icons';
 
 function rarityColorFor(theme: ReturnType<typeof useTheme>, rarity: string): string {
   switch (rarity) {
@@ -146,7 +119,7 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
     }
 
     const color = rarityColorFor(theme, badge.rarity);
-    const icon = BADGE_ICONS[badge.id] ?? FALLBACK_ICON;
+    const icon = badgeIcon(badge.id);
 
     return (
       <Modal

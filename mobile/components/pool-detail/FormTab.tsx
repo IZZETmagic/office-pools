@@ -12,6 +12,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
+import { badgeIcon, type BadgeIconSpec } from './badge-icons';
 import { Text } from '@/components/ui';
 import type {
   AnalyticsResponse,
@@ -495,28 +496,12 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
-type BadgeIconSpec = { ios: string; emoji: string };
-
-const BADGE_ICONS: Record<string, BadgeIconSpec> = {
-  sharpshooter: { ios: 'scope', emoji: '🎯' },
-  oracle: { ios: 'eye.fill', emoji: '👁️' },
-  dark_horse: { ios: 'hare.fill', emoji: '🐎' },
-  ice_breaker: { ios: 'snowflake', emoji: '❄️' },
-  on_fire: { ios: 'flame.fill', emoji: '🔥' },
-  top_dog: { ios: 'crown.fill', emoji: '👑' },
-  globe_trotter: { ios: 'globe', emoji: '🌍' },
-  lightning_rod: { ios: 'bolt.fill', emoji: '⚡' },
-  stadium_regular: { ios: 'building.columns.fill', emoji: '🏟️' },
-  showtime: { ios: 'sparkles', emoji: '✨' },
-  grand_finale: { ios: 'trophy.fill', emoji: '🏆' },
-  legend: { ios: 'star.fill', emoji: '⭐' },
-};
-
-const BADGE_ICON_FALLBACK: BadgeIconSpec = { ios: 'star.fill', emoji: '⭐' };
-
-function badgeIcon(id: string): BadgeIconSpec {
-  return BADGE_ICONS[id] ?? BADGE_ICON_FALLBACK;
-}
+// Badge icon mapping moved to ./badge-icons so BadgeDetailSheet can read
+// from the same source. Keeps the form-tab chip icon and the mini-modal
+// icon in sync — they used to drift and stale entries in BadgeDetailSheet
+// caused unlocked badges to render as a generic star.
+// Re-exported here so existing imports `import { badgeIcon, type BadgeIconSpec }
+// from './FormTab'` (if any) keep working.
 
 function useRarityColor(rarity: string): string {
   const theme = useTheme();
