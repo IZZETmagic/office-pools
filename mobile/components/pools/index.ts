@@ -7,5 +7,10 @@ export { DiscoverPoolCard } from './DiscoverPoolCard';
 export { EmptyPools } from './EmptyPools';
 export { PoolListItem } from './PoolListItem';
 export { PoolsFilterBar, DEFAULT_FILTERS, type PoolsFilters } from './PoolsFilterBar';
+export {
+  PoolsFilterSheet,
+  type PoolsFilterSheetHandle,
+  type FilterSheetConfig,
+} from './PoolsFilterSheet';
 export { PoolsHeader } from './PoolsHeader';
 export { PoolsSegment, type PoolsTab } from './PoolsSegment';

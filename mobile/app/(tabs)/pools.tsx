@@ -12,6 +12,8 @@ import {
   EmptyPools,
   PoolListItem,
   PoolsFilterBar,
+  PoolsFilterSheet,
+  type PoolsFilterSheetHandle,
   PoolsHeader,
   PoolsSegment,
   type DiscoverModeFilter,
@@ -38,6 +40,11 @@ export default function PoolsScreen() {
   const [filters, setFilters] = useState<PoolsFilters>(DEFAULT_FILTERS);
   const [discoverSearch, setDiscoverSearch] = useState('');
   const [discoverMode, setDiscoverMode] = useState<DiscoverModeFilter>('all');
+  // Filter sheet ref — mounted at the screen root (below) so the bottom
+  // sheet positions from the bottom of the device, not from inside the
+  // filter bar's bounds. The bar invokes `onOpenSheet(config)` which we
+  // delegate to `sheetRef.current?.open(config)`.
+  const filterSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
 
   // The dashboard's "X pools need predictions" card navigates here with
   // `?filter=pending`. Apply that to the filter state once on mount, then
@@ -124,7 +131,11 @@ export default function PoolsScreen() {
       />
       <PoolsSegment active={tab} onChange={setTab} />
       {isMyPools && hasAnyPools ? (
-        <PoolsFilterBar filters={filters} onChange={setFilters} />
+        <PoolsFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onOpenSheet={(config) => filterSheetRef.current?.open(config)}
+        />
       ) : null}
       {!isMyPools ? (
         <DiscoverFilters
@@ -168,6 +179,13 @@ export default function PoolsScreen() {
           <DiscoverList search={discoverSearch} mode={discoverMode} />
         )}
       </ScrollView>
+
+      {/* Filter picker sheet — mounted as a sibling of the ScrollView at
+          the screen root so the @gorhom/bottom-sheet positions itself
+          from the BOTTOM OF THE DEVICE rather than from inside the
+          filter bar's bounds. PoolsFilterBar invokes onOpenSheet(config)
+          when a chip / sort button is tapped. */}
+      <PoolsFilterSheet ref={filterSheetRef} />
     </SafeAreaView>
   );
 }

@@ -1,8 +1,7 @@
-import { useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
-import { PoolsFilterSheet, type PoolsFilterSheetHandle } from './PoolsFilterSheet';
+import { type FilterSheetConfig } from './PoolsFilterSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type StatusFilter = 'all' | 'open' | 'completed' | 'archived';
@@ -54,19 +53,21 @@ const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
 type PoolsFilterBarProps = {
   filters: PoolsFilters;
   onChange: (next: PoolsFilters) => void;
+  /**
+   * Called when a chip or the sort button is tapped. Parent should open
+   * its `PoolsFilterSheet` instance with the config. We pass a callback
+   * instead of rendering the sheet here so the sheet can mount at the
+   * screen root — a sheet rendered inside this bar's view tree positions
+   * itself relative to the bar, not the bottom of the screen.
+   */
+  onOpenSheet: (config: FilterSheetConfig) => void;
 };
 
-export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
+export function PoolsFilterBar({ filters, onChange, onOpenSheet }: PoolsFilterBarProps) {
   const theme = useTheme();
-  const sheetRef = useRef<PoolsFilterSheetHandle | null>(null);
   const hasActiveFilters =
     filters.status !== 'all' || filters.type !== 'all' || filters.predictions !== 'all';
 
-  // One bottom sheet instance handles all four pickers. We pass it a fresh
-  // config (title + options + current value + onPick callback) each time a
-  // chip / sort button is tapped. Same UX on iOS and Android — replaces
-  // the previous ActionSheetIOS (iOS only) + Android-cycles-through-options
-  // split, which was disorienting on Android for anything beyond 2 options.
   return (
     <View
       style={{
@@ -91,7 +92,7 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.status !== 'all'}
           onPress={() =>
-            sheetRef.current?.open({
+            onOpenSheet({
               title: 'Status',
               options: STATUS_OPTIONS,
               selectedValue: filters.status,
@@ -107,7 +108,7 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.type !== 'all'}
           onPress={() =>
-            sheetRef.current?.open({
+            onOpenSheet({
               title: 'Pool Type',
               options: TYPE_OPTIONS,
               selectedValue: filters.type,
@@ -124,7 +125,7 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
           }
           active={filters.predictions !== 'all'}
           onPress={() =>
-            sheetRef.current?.open({
+            onOpenSheet({
               title: 'Predictions',
               options: PREDICTION_OPTIONS,
               selectedValue: filters.predictions,
@@ -165,7 +166,7 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
 
       <Pressable
         onPress={() =>
-          sheetRef.current?.open({
+          onOpenSheet({
             title: 'Sort by',
             options: SORT_OPTIONS,
             selectedValue: filters.sort,
@@ -194,11 +195,6 @@ export function PoolsFilterBar({ filters, onChange }: PoolsFilterBarProps) {
         />
       </Pressable>
 
-      {/* Single sheet instance shared across all four pickers. The parent
-          (this filter bar) re-passes a fresh config every time a chip is
-          tapped; the sheet remembers the active config until the next open
-          call. */}
-      <PoolsFilterSheet ref={sheetRef} />
     </View>
   );
 }
