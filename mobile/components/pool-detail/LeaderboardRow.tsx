@@ -32,11 +32,27 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         gap: theme.spacing.md,
         padding: theme.spacing.md + 2,
         borderRadius: theme.radii.lg,
+        // Current-user row: iOS keeps the alpha-based primary tint + border
+        // (the proven-good rendering). Android uses pre-blended solid colors
+        // and an integer (1pt) border — hypothesis is that Android's alpha
+        // compositing of border-on-tint-on-elevation creates the visible
+        // "double container" / ring effect. Solid colors should remove the
+        // alpha-blending variable. iOS is unchanged.
         backgroundColor: isCurrentUser
-          ? withOpacity(theme.colors.primary, 0.08)
+          ? Platform.OS === 'android'
+            ? '#EFF2FC' // primary @ 8% pre-blended over white
+            : withOpacity(theme.colors.primary, 0.08)
           : theme.colors.surface,
-        borderWidth: isCurrentUser ? theme.borders.accent : 0,
-        borderColor: isCurrentUser ? withOpacity(theme.colors.primary, 0.25) : 'transparent',
+        borderWidth: isCurrentUser
+          ? Platform.OS === 'android'
+            ? 1
+            : theme.borders.accent
+          : 0,
+        borderColor: isCurrentUser
+          ? Platform.OS === 'android'
+            ? '#CED6F6' // primary @ 25% pre-blended over white
+            : withOpacity(theme.colors.primary, 0.25)
+          : 'transparent',
         opacity: pressed ? 0.85 : 1,
         ...theme.shadows.card,
       })}
