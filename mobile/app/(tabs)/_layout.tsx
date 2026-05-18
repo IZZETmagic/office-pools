@@ -1,33 +1,42 @@
-// JS-rendered tab bar via Expo Router's <Tabs>. Used (instead of the native
-// react-native-bottom-tabs) so we can render Lucide icons identically on iOS
-// and Android. Trade-off: loses iOS UITabBar's native blur/spring; gains a
-// single icon system for the whole app.
+// JS-rendered tab bar via Expo Router's <Tabs>. Tab icons specifically use
+// Ionicons (via @expo/vector-icons) instead of our app-wide Lucide set
+// because Ionicons ships a proper "outline → filled" pair per icon — the
+// filled variant keeps internal detail (bell clapper, person silhouette,
+// trophy handles) rather than turning the whole shape into a solid blob
+// when the tab is active.
 
+import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
-import { Bell, Home, type LucideIcon, Trophy, UserCircle2, Volleyball } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme } from '@/theme';
+
+// Each entry maps a tab to its Ionicons outline / filled glyph pair. Adding
+// a new tab is one line here plus a Tabs.Screen below.
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+type IconPair = { outline: IoniconName; filled: IoniconName };
+const HOME_ICONS: IconPair = { outline: 'home-outline', filled: 'home' };
+const POOLS_ICONS: IconPair = { outline: 'trophy-outline', filled: 'trophy' };
+const RESULTS_ICONS: IconPair = { outline: 'football-outline', filled: 'football' };
+const ACTIVITY_ICONS: IconPair = { outline: 'notifications-outline', filled: 'notifications' };
+const PROFILE_ICONS: IconPair = {
+  outline: 'person-circle-outline',
+  filled: 'person-circle',
+};
 
 export default function TabLayout() {
   const theme = useTheme();
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
-  // Lucide icons are stroke-only by default. Passing `fill={color}` matches
-  // the stroke color and produces a solid silhouette — same approach as our
-  // <Icon filled> prop. We toggle it on focus so the selected tab reads as
-  // "active" with a solid icon while inactive tabs stay outlined.
-  function renderTabIcon(IconComp: LucideIcon) {
+  // Pick the outline or filled glyph based on focus. Ionicons handles the
+  // "internal lines stay visible when filled" treatment natively, so the
+  // active tab reads as solid-but-detailed instead of a flat silhouette.
+  function renderTabIcon(pair: IconPair) {
     return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
-      <IconComp
-        color={color}
-        size={size}
-        strokeWidth={2.75}
-        fill={focused ? color : 'none'}
-      />
+      <Ionicons name={focused ? pair.filled : pair.outline} size={size} color={color} />
     );
   }
 
@@ -86,14 +95,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: renderTabIcon(Home),
+          tabBarIcon: renderTabIcon(HOME_ICONS),
         }}
       />
       <Tabs.Screen
         name="pools"
         options={{
           title: 'Pools',
-          tabBarIcon: renderTabIcon(Trophy),
+          tabBarIcon: renderTabIcon(POOLS_ICONS),
           tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
         }}
       />
@@ -101,21 +110,21 @@ export default function TabLayout() {
         name="results"
         options={{
           title: 'Results',
-          tabBarIcon: renderTabIcon(Volleyball),
+          tabBarIcon: renderTabIcon(RESULTS_ICONS),
         }}
       />
       <Tabs.Screen
         name="activity"
         options={{
           title: 'Activity',
-          tabBarIcon: renderTabIcon(Bell),
+          tabBarIcon: renderTabIcon(ACTIVITY_ICONS),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: renderTabIcon(UserCircle2),
+          tabBarIcon: renderTabIcon(PROFILE_ICONS),
         }}
       />
     </Tabs>
