@@ -9,7 +9,7 @@ import BottomSheet, {
   BottomSheetView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,19 +46,6 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
     close: () => sheetRef.current?.close(),
   }));
 
-  // Compute a snap height that fits the longest of the two tabs' content.
-  // The QR placeholder is shorter than the input + button + error stack,
-  // so we size to the code tab.
-  const snapPoints = useMemo<(string | number)[]>(() => {
-    const heroBlock = 152; // icon + title + subtitle
-    const segmented = 56;
-    const codeBody = 220; // input + submit + spacing
-    const footerCancel = 44;
-    const padding = theme.spacing.xl + insets.bottom;
-    const height = heroBlock + segmented + codeBody + footerCancel + padding;
-    return [height];
-  }, [insets.bottom, theme.spacing.xl]);
-
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.4} />
@@ -87,7 +74,11 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
     <BottomSheet
       ref={sheetRef}
       index={-1}
-      snapPoints={snapPoints}
+      // Dynamic sizing — sheet height tracks BottomSheetView's content
+      // height instead of a hardcoded snap point. Avoids the dead-space
+      // problem where the static estimate over-allocated whitespace below
+      // the Cancel link.
+      enableDynamicSizing
       enablePanDownToClose
       backdropComponent={renderBackdrop}
       // Sheet shifts up as the keyboard appears so the input stays visible.
