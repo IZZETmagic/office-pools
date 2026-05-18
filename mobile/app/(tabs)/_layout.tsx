@@ -35,19 +35,14 @@ export default function TabLayout() {
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
-  // Free Hugeicons icons are stroke-only — no filled twin in the package.
-  // Active state signal is therefore (a) the primary color (from
-  // tabBarActiveTintColor below) and (b) a thicker stroke. The icon shape
-  // stays soft-rounded and consistent across states; only its visual
-  // weight changes on focus.
+  // All tab icons render at the same stroke weight (2.5) regardless of
+  // focus — the only signal of the active tab is the color tint (handled
+  // by `tabBarActiveTintColor` below). Consistent visual weight across
+  // all five reads as a more deliberate design than shuffling stroke
+  // thickness on focus.
   function renderTabIcon(icon: typeof Home03Icon) {
-    return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
-      <HugeiconsIcon
-        icon={icon}
-        color={color}
-        size={size}
-        strokeWidth={focused ? 2.5 : 1.5}
-      />
+    return ({ color, size }: { color: string; size: number; focused: boolean }) => (
+      <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
     );
   }
 
