@@ -6,6 +6,7 @@ import {
   Nunito_900Black,
   useFonts,
 } from '@expo-google-fonts/nunito';
+import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/roboto-mono';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -49,6 +50,12 @@ function RootLayout() {
     Nunito_600SemiBold,
     Nunito_700Bold,
     Nunito_900Black,
+    // Roboto Mono for numeric displays on Android. iOS uses the
+    // system-available Menlo / Menlo-Bold faces; Android's `'monospace'`
+    // family has no Bold face, so we load Roboto Mono Bold so numbers
+    // render with the same visual weight as on iOS.
+    RobotoMono_400Regular,
+    RobotoMono_700Bold,
   });
 
   if (!fontsLoaded && !fontError) {

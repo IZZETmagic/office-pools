@@ -23,8 +23,12 @@ import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-const MONO_BOLD = Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace';
-const MONO = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+// iOS uses the system-available Menlo / Menlo-Bold. Android falls back to
+// the Google-fonts Roboto Mono faces loaded in `_layout.tsx` — the native
+// `'monospace'` family on Android has no Bold variant, so without this the
+// numbers would render visibly thinner than on iOS.
+const MONO_BOLD = Platform.OS === 'ios' ? 'Menlo-Bold' : 'RobotoMono_700Bold';
+const MONO = Platform.OS === 'ios' ? 'Menlo' : 'RobotoMono_400Regular';
 
 export default function MatchDetailScreen() {
   const theme = useTheme();
