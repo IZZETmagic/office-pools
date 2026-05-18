@@ -32,13 +32,11 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         gap: theme.spacing.md,
         padding: theme.spacing.md + 2,
         borderRadius: theme.radii.lg,
-        // Current-user row: subtle primary tint + standard card shadow.
-        // No border — the combination of a thin border at low opacity over
-        // a tinted background was reading as a "double container" on some
-        // surfaces. The tint + shadow alone is enough to differentiate.
         backgroundColor: isCurrentUser
-          ? withOpacity(theme.colors.primary, 0.1)
+          ? withOpacity(theme.colors.primary, 0.08)
           : theme.colors.surface,
+        borderWidth: isCurrentUser ? theme.borders.accent : 0,
+        borderColor: isCurrentUser ? withOpacity(theme.colors.primary, 0.25) : 'transparent',
         opacity: pressed ? 0.85 : 1,
         ...theme.shadows.card,
       })}
