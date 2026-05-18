@@ -384,6 +384,20 @@ export function recalculatePool(poolId: string) {
   return apiFetch<{ ok?: boolean }>(`/api/pools/${poolId}/recalculate`, { method: 'POST' });
 }
 
+/**
+ * Tell the server an admin just removed `removedUserId` from `poolId`.
+ * The endpoint sends both an email and a push notification to that user
+ * (category ADMIN — bypasses opt-out). Mobile clients call this AFTER
+ * the supabase `pool_members.delete()` succeeds so the notification is
+ * a best-effort follow-up rather than a precondition for the removal.
+ */
+export function notifyMemberRemoved(poolId: string, removedUserId: string) {
+  return apiFetch<{ sent: boolean }>('/api/notifications/member-removed', {
+    method: 'POST',
+    body: { pool_id: poolId, removed_user_id: removedUserId },
+  });
+}
+
 export type RoundState = 'locked' | 'open' | 'in_progress' | 'completed';
 
 export type PoolRound = {
