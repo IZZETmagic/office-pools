@@ -19,7 +19,7 @@ import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 
 import { useHomeData } from '@/lib/HomeDataProvider';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { fontFamilies, useTheme } from '@/theme';
 
 // Per-tab icon constant. Hugeicons doesn't have a literal Trophy in its
 // free set, so the Pools tab uses Champion (a podium with a winner) —
@@ -35,25 +35,12 @@ export default function TabLayout() {
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
-  // All tab icons render at the same stroke weight (2.5). The active-state
-  // signal is (a) the primary color tint via tabBarActiveTintColor and
-  // (b) a soft pill background behind the icon — Material 3 / iOS-26
-  // pattern. Pill sizing is padding-based so it adapts to whatever icon
-  // size React Navigation passes in.
+  // All tab icons render at the same stroke weight (2.5). The only
+  // active-state signal is the color tint (primary on focus, slate
+  // otherwise) handled by tabBarActiveTintColor below.
   function renderTabIcon(icon: typeof Home03Icon) {
-    return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
-      <View
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 4,
-          borderRadius: 999,
-          backgroundColor: focused
-            ? withOpacity(theme.colors.primary, 0.14)
-            : 'transparent',
-        }}
-      >
-        <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
-      </View>
+    return ({ color, size }: { color: string; size: number; focused: boolean }) => (
+      <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
     );
   }
 
