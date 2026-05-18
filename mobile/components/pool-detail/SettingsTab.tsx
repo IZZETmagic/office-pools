@@ -205,6 +205,12 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
                 color: theme.colors.ink,
                 fontVariant: ['tabular-nums'],
                 letterSpacing: 2,
+                // Android's text-measurement doesn't include the trailing
+                // letter-spacing in the Text node's content width — the last
+                // glyph gets clipped by the parent flex container. iOS measures
+                // correctly so the fix is Android-only. paddingRight matches
+                // the letterSpacing value to give the trailing space room.
+                ...Platform.select({ android: { paddingRight: 2 }, default: {} }),
               }}
             >
               {pool.poolCode}

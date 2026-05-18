@@ -374,6 +374,11 @@ export default function PoolPreviewSheet() {
                   fontWeight: '700',
                   color: theme.colors.primary,
                   letterSpacing: 1,
+                  // Android's text-measurement omits the trailing letter-spacing,
+                  // so the last glyph gets clipped by the parent. Match it with
+                  // a paddingRight equal to the letterSpacing value. iOS already
+                  // measures the trailing space correctly so this is Android-only.
+                  ...Platform.select({ android: { paddingRight: 1 }, default: {} }),
                 }}
               >
                 {detail.poolCode}
