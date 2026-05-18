@@ -15,10 +15,10 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type FilterOption = {
@@ -99,15 +99,7 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle>(function Pool
         }}
       >
         <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.md }}>
-          <RNText
-            style={{
-              fontFamily: fontFamilies.bold,
-              fontSize: 16,
-              color: theme.colors.ink,
-            }}
-          >
-            {config?.title ?? ''}
-          </RNText>
+          <Text variant="cardTitle">{config?.title ?? ''}</Text>
         </View>
         <View style={{ gap: theme.spacing.xs }}>
           {config?.options.map((opt, i) => {
@@ -120,28 +112,28 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle>(function Pool
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: theme.spacing.md,
-                  paddingVertical: 12,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
+                  paddingVertical: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.md,
+                  borderRadius: theme.radii.sm,
                   backgroundColor: pressed
                     ? withOpacity(theme.colors.ink, 0.06)
                     : 'transparent',
-                  borderTopWidth: i === 0 ? 0 : 0.5,
+                  borderTopWidth: i === 0 ? 0 : theme.borders.thin,
                   borderTopColor: withOpacity(theme.colors.silver, 0.4),
                 })}
               >
-                <RNText
+                <Text
+                  variant="cardTitle"
                   style={{
                     flex: 1,
                     fontFamily: isSelected ? fontFamilies.bold : fontFamilies.medium,
-                    fontSize: 15,
                     color: isSelected ? theme.colors.primary : theme.colors.ink,
                   }}
                 >
                   {opt.label}
-                </RNText>
+                </Text>
                 {isSelected ? (
-                  <Icon name="checkmark.circle.fill" color="primary" size={18} />
+                  <Icon name="checkmark.circle.fill" color="primary" size={theme.spacing.lg} />
                 ) : null}
               </Pressable>
             );
