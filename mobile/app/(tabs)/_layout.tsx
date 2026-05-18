@@ -1,42 +1,38 @@
 // JS-rendered tab bar via Expo Router's <Tabs>. Tab icons specifically use
-// Ionicons (via @expo/vector-icons) instead of our app-wide Lucide set
-// because Ionicons ships a proper "outline → filled" pair per icon — the
-// filled variant keeps internal detail (bell clapper, person silhouette,
-// trophy handles) rather than turning the whole shape into a solid blob
-// when the tab is active.
+// Solar Icons (via react-native-solar-icons) — a soft-rounded icon set
+// where every glyph ships in 6 styles. We use `linear` (clean stroke) for
+// inactive tabs and `bold` (filled silhouette with internal details
+// preserved) for the active tab. Rest of the app stays on Lucide via the
+// existing Icon component.
 
-import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
+import { SolarIcon } from 'react-native-solar-icons';
 
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme } from '@/theme';
 
-// Each entry maps a tab to its Ionicons outline / filled glyph pair. Adding
-// a new tab is one line here plus a Tabs.Screen below.
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-type IconPair = { outline: IoniconName; filled: IoniconName };
-const HOME_ICONS: IconPair = { outline: 'home-outline', filled: 'home' };
-const POOLS_ICONS: IconPair = { outline: 'trophy-outline', filled: 'trophy' };
-const RESULTS_ICONS: IconPair = { outline: 'football-outline', filled: 'football' };
-const ACTIVITY_ICONS: IconPair = { outline: 'notifications-outline', filled: 'notifications' };
-const PROFILE_ICONS: IconPair = {
-  outline: 'person-circle-outline',
-  filled: 'person-circle',
-};
+// Per-tab Solar icon name. Each renders in `linear` style when inactive
+// and `bold` style when active — Solar handles both as variants of the
+// same icon concept so the silhouette is consistent on focus.
+const HOME_ICON = 'Home';
+const POOLS_ICON = 'CupStar'; // soft rounded trophy cup with a star
+const RESULTS_ICON = 'Football';
+const ACTIVITY_ICON = 'Bell';
+const PROFILE_ICON = 'UserCircle';
 
 export default function TabLayout() {
   const theme = useTheme();
   const { data } = useHomeData();
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
 
-  // Pick the outline or filled glyph based on focus. Ionicons handles the
-  // "internal lines stay visible when filled" treatment natively, so the
-  // active tab reads as solid-but-detailed instead of a flat silhouette.
-  function renderTabIcon(pair: IconPair) {
+  // Solar's `linear` style is a clean soft-rounded stroke; `bold` is the
+  // filled variant of the same shape with internal lines preserved (bell
+  // clapper, person silhouette, etc). Toggle on focus.
+  function renderTabIcon(iconName: string) {
     return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
-      <Ionicons name={focused ? pair.filled : pair.outline} size={size} color={color} />
+      <SolarIcon name={iconName} type={focused ? 'bold' : 'linear'} size={size} color={color} />
     );
   }
 
@@ -95,14 +91,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: renderTabIcon(HOME_ICONS),
+          tabBarIcon: renderTabIcon(HOME_ICON),
         }}
       />
       <Tabs.Screen
         name="pools"
         options={{
           title: 'Pools',
-          tabBarIcon: renderTabIcon(POOLS_ICONS),
+          tabBarIcon: renderTabIcon(POOLS_ICON),
           tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
         }}
       />
@@ -110,21 +106,21 @@ export default function TabLayout() {
         name="results"
         options={{
           title: 'Results',
-          tabBarIcon: renderTabIcon(RESULTS_ICONS),
+          tabBarIcon: renderTabIcon(RESULTS_ICON),
         }}
       />
       <Tabs.Screen
         name="activity"
         options={{
           title: 'Activity',
-          tabBarIcon: renderTabIcon(ACTIVITY_ICONS),
+          tabBarIcon: renderTabIcon(ACTIVITY_ICON),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: renderTabIcon(PROFILE_ICONS),
+          tabBarIcon: renderTabIcon(PROFILE_ICON),
         }}
       />
     </Tabs>
