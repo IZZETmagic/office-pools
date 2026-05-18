@@ -34,11 +34,32 @@ import { usePoolBanter } from '@/lib/usePoolBanter';
 import { usePoolDetail } from '@/lib/usePoolDetail';
 import { useTheme } from '@/theme';
 
+// Tab names accepted via the `?tab=` deep-link param. Anything else
+// silently falls back to the leaderboard default — keeps an admin from
+// landing on an unknown tab via a stale or malformed link.
+const TAB_PARAM_VALUES: PoolTabKey[] = [
+  'leaderboard',
+  'predictions',
+  'form',
+  'scoring',
+  'rounds',
+  'members',
+  'settings',
+];
+
 export default function PoolDetailScreen() {
   const theme = useTheme();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { data, loading, refreshing, error, refresh } = usePoolDetail(id);
-  const [tab, setTab] = useState<PoolTabKey>('leaderboard');
+  // Initial tab: read from `?tab=` if present (so the create-pool flow can
+  // land admins on settings, etc.), else leaderboard. Only inspected on
+  // first render — the user can navigate freely between tabs after that.
+  const [tab, setTab] = useState<PoolTabKey>(() => {
+    if (tabParam && TAB_PARAM_VALUES.includes(tabParam as PoolTabKey)) {
+      return tabParam as PoolTabKey;
+    }
+    return 'leaderboard';
+  });
   const [pageOffset, setPageOffset] = useState(0);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<ScrollView | null>(null);

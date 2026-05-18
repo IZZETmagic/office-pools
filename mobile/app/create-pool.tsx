@@ -218,10 +218,10 @@ export default function CreatePoolModal() {
       // is already there when the user navigates between tabs. Fire-and-
       // forget — the deep-link below doesn't wait for it.
       void refreshHomeData();
-      // Land the admin on the new pool's leaderboard tab (default tab on
-      // app/pool/[id].tsx). Replace, not push, so back navigation skips
-      // the create modal.
-      router.replace(`/pool/${created.pool_id}`);
+      // Land the admin on the new pool's Settings tab so they can tune
+      // scoring rules, prizes, branding, etc. before sharing the pool.
+      // Pool detail reads `?tab=` to override its default `leaderboard`.
+      router.replace(`/pool/${created.pool_id}?tab=settings`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create pool');
     } finally {
