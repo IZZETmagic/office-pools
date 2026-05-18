@@ -33,10 +33,43 @@ export default function JoinPoolModal() {
   }
 
   return (
-    <View style={{ backgroundColor: theme.colors.snow }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
+      {/* Modal header matching pool-preview: chevron-back on the left,
+          centered title, right-side spacer for optical symmetry. iOS modal
+          presentation provides its own safe inset above the card, Android
+          renders edge-to-edge so we need insets.top. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: theme.spacing.xl,
+          paddingTop:
+            Platform.OS === 'android'
+              ? insets.top + theme.spacing.md
+              : theme.spacing.xxl,
+          paddingBottom: theme.spacing.sm,
+        }}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.5 : 1,
+            width: 32,
+            alignItems: 'flex-start',
+          })}
+        >
+          <Icon name="chevron.left" size={24} color="ink" weight="bold" />
+        </Pressable>
+        <Text variant="cardTitle" numberOfLines={1} align="center" style={{ flex: 1 }}>
+          Join Pool
+        </Text>
+        <View style={{ width: 32 }} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ backgroundColor: theme.colors.snow }}
+        style={{ flex: 1, backgroundColor: theme.colors.snow }}
       >
         <View
           style={{

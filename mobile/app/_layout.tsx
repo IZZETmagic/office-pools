@@ -119,13 +119,7 @@ function InnerLayout() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen
           name="join-pool"
-          options={{
-            presentation: 'formSheet',
-            headerShown: false,
-            sheetAllowedDetents: 'fitToContents',
-            sheetCornerRadius: 50,
-            sheetGrabberVisible: true,
-          }}
+          options={{ presentation: 'modal', headerShown: false }}
         />
         <Stack.Screen
           name="create-pool"
