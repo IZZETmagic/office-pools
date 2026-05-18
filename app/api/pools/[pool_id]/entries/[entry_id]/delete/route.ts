@@ -30,24 +30,28 @@ export async function POST(
 
   const adminClient = createAdminClient()
 
-  // Confirm the entry exists in this pool, the caller is the owner,
-  // and surface the caller's role (admin / non-admin) in one round-trip
-  // by joining pool_entries → pool_members.
+  // Confirm the entry exists, look up its owning membership in one
+  // round-trip via the FK pool_entries.member_id → pool_members. The
+  // pool_id lives on pool_members, NOT on pool_entries (no direct
+  // FK column), so we validate the URL's :pool_id against the joined
+  // pool_members.pool_id rather than filtering pool_entries by a
+  // non-existent column.
   const { data: entry } = await adminClient
     .from('pool_entries')
     .select(
-      'entry_id, pool_id, member_id, pool_members!inner(member_id, user_id, role)',
+      'entry_id, member_id, pool_members!inner(member_id, user_id, role, pool_id)',
     )
     .eq('entry_id', entry_id)
-    .eq('pool_id', pool_id)
     .single()
-  if (!entry) {
+  const membership = entry
+    ? Array.isArray(entry.pool_members)
+      ? entry.pool_members[0]
+      : entry.pool_members
+    : null
+  if (!entry || !membership || membership.pool_id !== pool_id) {
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
   }
-  const membership = Array.isArray(entry.pool_members)
-    ? entry.pool_members[0]
-    : entry.pool_members
-  if (!membership || membership.user_id !== userData.user_id) {
+  if (membership.user_id !== userData.user_id) {
     return NextResponse.json(
       { error: "You can't delete someone else's entry" },
       { status: 403 },
