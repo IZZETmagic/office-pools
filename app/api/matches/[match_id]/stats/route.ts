@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
 // GET /api/matches/:matchId/stats
-// Returns prediction statistics for a specific match, aggregated
-// across ALL pools in the system.
+//
+// Returns prediction statistics for a specific match, aggregated across
+// EVERY submitted prediction for the match — regardless of which pool
+// the prediction came from or whether the caller is a member of those
+// pools. The endpoint still requires authentication (so anonymous
+// clients can't poll it for crowd intelligence), but the predictions
+// query itself uses the admin Supabase client to bypass RLS. Safe
+// because we only return aggregated counts and percentages — never
+// individual prediction rows or user identifiers — so cross-pool
+// privacy isn't a concern.
 // =============================================================
 
 type ScoreEntry = {
@@ -42,19 +51,28 @@ async function handleGET(
 ) {
   const { match_id } = await params
 
-  // 1. Authenticate (cookie or Bearer — handled by createClient)
+  // 1. Authenticate (cookie or Bearer — handled by createClient).
+  //    We still gate the endpoint behind auth so anonymous clients can't
+  //    pull crowd intelligence, but we don't need the user-scoped client
+  //    for the data query itself — see admin client below.
   const auth = await requireAuth()
   if (auth.error) return auth.error
-  const { supabase } = auth.data
+
+  // 2. Use the admin client so the predictions query bypasses RLS. Any
+  //    user signed into the app should see the same global stats for a
+  //    given match, regardless of which pools they personally belong to.
+  //    Only aggregate counts leave this route — no row-level data — so
+  //    bypassing RLS doesn't leak any individual prediction.
+  const admin = createAdminClient()
 
   // 3. Fetch predictions and match data in parallel
   const [predictionsResult, matchResult] = await Promise.all([
-    supabase
+    admin
       .from('predictions')
       .select('predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, pool_entries!inner(has_submitted_predictions)')
       .eq('match_id', match_id)
       .eq('pool_entries.has_submitted_predictions', true),
-    supabase
+    admin
       .from('matches')
       .select('*, home_team:teams!matches_home_team_id_fkey(country_name), away_team:teams!matches_away_team_id_fkey(country_name)')
       .eq('match_id', match_id)
