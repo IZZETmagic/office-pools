@@ -251,7 +251,6 @@ export default function PoolPreviewSheet() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
           paddingHorizontal: theme.spacing.xl,
           // iOS: the modal presentation provides its own safe inset above
           // the card, so a fixed xxl gap places the header comfortably below
@@ -265,35 +264,26 @@ export default function PoolPreviewSheet() {
           paddingBottom: theme.spacing.sm,
         }}
       >
-        <View style={{ width: 32 }} />
-        <Text variant="cardTitle" numberOfLines={1} align="center" style={{ flex: 1 }}>
-          {detail.poolName}
-        </Text>
+        {/* Back chevron on the left — cross-platform navigation pattern.
+            Lucide ChevronLeft via our Icon component renders consistently
+            on both iOS and Android. */}
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
-          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, width: 32, alignItems: 'flex-end' })}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.5 : 1,
+            width: 32,
+            alignItems: 'flex-start',
+          })}
         >
-          {/* iOS uses the native SF Symbol xmark.circle.fill (matches iOS
-              navigation patterns). Android falls back to the cross-platform
-              Icon component since SymbolView is iOS-only and would render
-              nothing on Android — leaving users with no visible way to
-              close the modal. */}
-          {Platform.OS === 'ios' ? (
-            <SymbolView
-              name="xmark.circle.fill"
-              size={28}
-              tintColor={withOpacity(theme.colors.slate, 0.35)}
-            />
-          ) : (
-            <Icon
-              name="xmark.circle.fill"
-              size={28}
-              tint={withOpacity(theme.colors.slate, 0.35)}
-              filled
-            />
-          )}
+          <Icon name="chevron.left" size={24} color="ink" weight="bold" />
         </Pressable>
+        <Text variant="cardTitle" numberOfLines={1} align="center" style={{ flex: 1 }}>
+          {detail.poolName}
+        </Text>
+        {/* Right-side spacer — matches the back button's footprint so the
+            title stays optically centered. */}
+        <View style={{ width: 32 }} />
       </View>
 
       <ScrollView

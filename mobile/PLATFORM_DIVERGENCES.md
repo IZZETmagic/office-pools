@@ -19,30 +19,31 @@ unified the paths.
 
 ## Active divergences
 
-### 2. PoolPreviewSheet header — top padding + close button
+### 2. PoolPreviewSheet header — top padding
 
 **Files:** `app/pool-preview/[id].tsx`
-**Introduced:** 2026-05-17 (commit forthcoming)
+**Introduced:** 2026-05-17 (commit `095425a`, narrowed in subsequent commit)
 
 | Property | iOS | Android |
 |---|---|---|
 | `paddingTop` of header row | `theme.spacing.xxl` (32) | `insets.top + theme.spacing.md` |
-| Close button | `<SymbolView name="xmark.circle.fill" />` (native SF Symbol) | `<Icon name="xmark.circle.fill" filled />` (Lucide XCircle filled) |
 
 **Why diverge:** iOS modal presentations provide their own safe inset above
 the card lip, so a fixed top pad places the title cleanly under the modal
 chrome. Android's modal presentation renders edge-to-edge under the system
 status bar and notch/camera cutout — without `insets.top` the title is
-visually clipped by the cutout. SymbolView is iOS-only; on Android it
-renders nothing, so the close button was invisible (the Pressable still
-worked but users had no idea where to tap).
+visually clipped by the cutout.
 
 **What merging would break:**
 
-- Using iOS values on Android → title tucks under the camera cutout; close
-  button invisible.
+- Using iOS values on Android → title tucks under the camera cutout.
 - Using Android values on iOS → extra blank space at the top of the modal
   card (insets.top doubles the comfortable spacing iOS already provides).
+
+**Note:** the close button divergence that originally accompanied this
+entry was resolved by switching both platforms to a cross-platform back
+chevron via `Icon` (replacing the iOS-only `SymbolView` close + Android
+fallback). Header layout is now unified — only the padding diverges.
 
 ---
 
