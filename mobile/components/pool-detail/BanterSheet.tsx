@@ -27,10 +27,8 @@
 //      hooks back into existing shareStandings / flexBadges /
 //      sharePrediction helpers (kept alive below for re-wiring).
 
-import {
+import BottomSheet, {
   BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetTextInput,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import {
@@ -42,8 +40,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Alert, Pressable, View } from 'react-native';
-import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
+import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Bubble, GiftedChat, type IMessage } from 'react-native-gifted-chat';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,7 +51,7 @@ import { fetchLeaderboard, type LeaderboardEntry } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { usePoolBanter, type BanterMessage } from '@/lib/usePoolBanter';
-import { useTheme, withOpacity } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type BanterSheetHandle = {
   open: () => void;
@@ -71,27 +69,36 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
 ) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const sheetRef = useRef<BottomSheetModal | null>(null);
+  const sheetRef = useRef<BottomSheet | null>(null);
   const banter = usePoolBanter(poolId);
   const { clearPoolUnread } = useHomeData();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Keyboard-aware bottom padding. `progress` animates 0 → 1 as the
-  // keyboard opens, frame-by-frame, driven by UIKit's keyboard block
-  // on iOS and WindowInsetsAnimation on Android. We use it to
-  // collapse the home-indicator padding when the keyboard is up —
-  // otherwise that padding would sit BELOW the composer and ABOVE
-  // the keyboard, creating a visible gap equal to insets.bottom.
-  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
-  const paddingBottomStyle = useAnimatedStyle(() => ({
-    paddingBottom: insets.bottom * (1 - keyboardProgress.value),
+  // keyboard opens; `height` is the keyboard's height as a negative
+  // shared value (closed = 0, open = -keyboardHeight) per
+  // react-native-keyboard-controller's convention. Both driven
+  // frame-by-frame by UIKit's keyboard block on iOS and
+  // WindowInsetsAnimation on Android.
+  //
+  // The sheet is locked at 92% (no `keyboardBehavior` on the
+  // BottomSheetModal), so we push the composer up WITHIN the sheet
+  // by the keyboard height:
+  //
+  // - closed: paddingBottom = 0 + insets.bottom (composer clears home indicator)
+  // - open:   paddingBottom = keyboardHeight + 0 (composer flush with keyboard top)
+  const { progress: keyboardProgress, height: keyboardHeight } =
+    useReanimatedKeyboardAnimation();
+  const wrapperPaddingStyle = useAnimatedStyle(() => ({
+    paddingBottom:
+      -keyboardHeight.value + insets.bottom * (1 - keyboardProgress.value),
   }));
 
   // Imperative open/close — same pattern the other gorhom sheets in
   // the app use (JoinPoolSheet, PoolCreateJoinSheet, etc.).
   useImperativeHandle(ref, () => ({
-    open: () => sheetRef.current?.present(),
-    close: () => sheetRef.current?.dismiss(),
+    open: () => sheetRef.current?.expand(),
+    close: () => sheetRef.current?.close(),
   }));
 
   const renderBackdrop = useCallback(
@@ -101,10 +108,12 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
     [],
   );
 
-  // Fixed 92% snap — tall enough for chat + composer + keyboard with
-  // a sliver of the pool detail visible above. Static height (vs.
-  // dynamic sizing) so the layout never jumps as messages stream in.
-  const snapPoints = useMemo<(string | number)[]>(() => ['92%'], []);
+  // Snap point — 100% of the available area below the status bar.
+  // Combined with `topInset={insets.top}` on the BottomSheetModal,
+  // the sheet's top edge lands exactly at the bottom of the status
+  // bar / notch. Sheet stays locked there permanently; keyboard
+  // does not move it.
+  const snapPoints = useMemo<(string | number)[]>(() => ['100%'], []);
 
   // Clear the unread badge the moment the sheet opens. Mirrors what
   // the old screen route did on mount.
@@ -162,39 +171,49 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
   );
 
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      snapPoints={snapPoints}
-      enableDynamicSizing={false}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      // Gorhom owns the keyboard avoidance. `interactive` slides
-      // the whole sheet up by exactly the keyboard's height — same
-      // effect as iMessage / WhatsApp, device-agnostic because
-      // gorhom reads the actual keyboard frame from the OS.
-      // Required precondition: the focused TextInput must be a
-      // gorhom-aware `BottomSheetTextInput` (see `renderComposer`
-      // override on the GiftedChat below). Plain RN TextInputs are
-      // invisible to gorhom's keyboard handling.
-      keyboardBehavior="interactive"
-      keyboardBlurBehavior="restore"
-      handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      backgroundStyle={{ backgroundColor: theme.colors.snow }}
-      onChange={(idx) => setSheetOpen(idx >= 0)}
-      onDismiss={() => setSheetOpen(false)}
+    // pointerEvents wrapper — when the sheet is closed (translated
+    // off-screen but still mounted), gorhom keeps a full-parent
+    // container in the tree that absorbs taps on Android. Wrapping
+    // in a View with `box-none` (passes touches through unless a
+    // child captures them) lets the pool detail screen behind us
+    // stay interactive when the sheet's not in use.
+    <View
+      pointerEvents={sheetOpen ? 'auto' : 'box-none'}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
     >
+      <BottomSheet
+        ref={sheetRef}
+        // Start closed; expand() / close() drive open/close.
+        index={-1}
+        snapPoints={snapPoints}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        // Sheet's top edge lands exactly at insets.top (status
+        // bar / notch bottom). Combined with snapPoints `['100%']`,
+        // this gives the maximum sheet height that doesn't overlap
+        // the status bar. Sheet stays locked here — no
+        // keyboardBehavior, no shifting when the keyboard opens.
+        topInset={insets.top}
+        handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
+        backgroundStyle={{ backgroundColor: theme.colors.snow }}
+        onChange={(idx) => setSheetOpen(idx >= 0)}
+      >
       <Animated.View
         style={[
-          {
-            flex: 1,
-            // Static fallback — overridden by the animated style
-            // below. When the keyboard is closed the inset is
-            // insets.bottom (composer clears the home indicator).
-            // The animated style ramps this down to 0 as the
-            // keyboard opens so the composer sits flush against
-            // the keyboard's top edge — no gap, device-agnostic.
-          },
-          paddingBottomStyle,
+          { flex: 1 },
+          // Top padding ramps up to insets.top as keyboard opens
+          // (header clears the status bar when sheet hits full-screen).
+          // Bottom padding ramps down to 0 (composer flush with
+          // keyboard). Both interpolate frame-by-frame in lockstep
+          // with the OS keyboard animation.
+          wrapperPaddingStyle,
         ]}
       >
         {/* Header — pool name + message count + close X. Sits inside
@@ -222,7 +241,7 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
             </Text>
           </View>
           <Pressable
-            onPress={() => sheetRef.current?.dismiss()}
+            onPress={() => sheetRef.current?.close()}
             hitSlop={12}
             style={({ pressed }) => ({
               width: 36,
@@ -238,10 +257,12 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
           </Pressable>
         </View>
 
-        {/* GiftedChat — handles the inverted message list, keyboard
-            avoidance, send button, and bottom-anchored content. We
-            keep its defaults for now; renderBubble / renderComposer /
-            Actions overrides land in later passes. */}
+        {/* GiftedChat is mounted from the moment BanterSheet first
+            renders (along with the pool detail screen), so its
+            FlatList layout pass happens off-screen — invisible to
+            the user. Every open of the sheet shows an already-laid-
+            out chat, no jitter. State (composer draft, scroll
+            position) persists across open/close cycles. */}
         <GiftedChat
           messages={giftedMessages}
           onSend={(msgs) => void handleSend(msgs)}
@@ -252,15 +273,66 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
           // Disable gifted-chat's internal KAV — gorhom owns the
           // keyboard via the BottomSheetTextInput we render below.
           keyboardAvoidingViewProps={{ enabled: false }}
-          // Custom composer using gorhom's BottomSheetTextInput so
-          // gorhom's keyboardBehavior="interactive" can detect the
-          // focused input and slide the sheet up by the actual
-          // keyboard height (device-agnostic). Mirrors the default
-          // gifted-chat Composer styling — placeholder, multi-line,
-          // platform-appropriate keyboard appearance — but the
-          // underlying input is gesture-handler-aware.
+          // Bubble styling — match the app's theme. Sent bubbles
+          // (right side) use `theme.colors.primary` with white text;
+          // received bubbles (left side) use `theme.colors.mist` with
+          // ink text. Timestamps inside bubbles are suppressed
+          // (renderTime returns null) — they read awkwardly in the
+          // gifted-chat default; if we want timestamps later they
+          // should be grouped above date headers, not per-bubble.
+          renderBubble={(bubbleProps) => (
+            <Bubble
+              {...bubbleProps}
+              wrapperStyle={{
+                left: {
+                  backgroundColor: theme.colors.mist,
+                  borderRadius: theme.radii.md,
+                  paddingHorizontal: theme.spacing.xs,
+                  paddingVertical: theme.spacing.xxs,
+                },
+                right: {
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: theme.radii.md,
+                  paddingHorizontal: theme.spacing.xs,
+                  paddingVertical: theme.spacing.xxs,
+                },
+              }}
+              textStyle={{
+                left: {
+                  color: theme.colors.ink,
+                  fontFamily: fontFamilies.regular,
+                  // 15/20 is a chat-bubble-specific size — sits
+                  // between typography.body (14/20) and
+                  // typography.cardTitle (16/20). No token matches;
+                  // matches what the original BanterRichCard and the
+                  // legacy banter screen used.
+                  fontSize: 15,
+                  lineHeight: 20,
+                },
+                right: {
+                  // '#FFFFFF' is the codebase convention for text
+                  // on `theme.colors.primary` (BanterFab, Join
+                  // button, etc.). Primary blue doesn't theme-flip,
+                  // so the text must stay white in dark mode too —
+                  // a theme token (which would flip) would be wrong.
+                  color: '#FFFFFF',
+                  fontFamily: fontFamilies.regular,
+                  fontSize: 15,
+                  lineHeight: 20,
+                },
+              }}
+              renderTime={() => null}
+            />
+          )}
+          // Custom composer using a plain RN TextInput (not gorhom's
+          // BottomSheetTextInput). The sheet is locked at insets.top
+          // and we DON'T want gorhom to do any keyboard handling on
+          // focus — our animated paddingBottom on the wrapper is the
+          // sole driver of composer-rise. BottomSheetTextInput would
+          // dispatch keyboard-state events to the parent sheet that
+          // can introduce a second source of motion.
           renderComposer={(composerProps) => (
-            <BottomSheetTextInput
+            <TextInput
               value={composerProps.text}
               multiline
               underlineColorAndroid="transparent"
@@ -285,7 +357,8 @@ export const BanterSheet = forwardRef<BanterSheetHandle, Props>(function BanterS
           )}
         />
       </Animated.View>
-    </BottomSheetModal>
+      </BottomSheet>
+    </View>
   );
 });
 
