@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   BanterFab,
+  BanterSheet,
+  type BanterSheetHandle,
   BPFormTab,
   FormTab,
   LeaderboardTab,
@@ -51,8 +53,17 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 
 export default function PoolDetailScreen() {
   const theme = useTheme();
-  const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const { id, tab: tabParam, banter: banterParam } = useLocalSearchParams<{
+    id: string;
+    tab?: string;
+    banter?: string;
+  }>();
   const { data, loading, refreshing, error, refresh } = usePoolDetail(id);
+  // Imperative handle to the banter bottom sheet. Opening is driven
+  // from two places: the BanterFab tap (live user action) and the
+  // `?banter=open` deep-link param (cold-start from a push tap or any
+  // future incoming deep link).
+  const banterSheetRef = useRef<BanterSheetHandle | null>(null);
   // Initial tab: read from `?tab=` if present (so the create-pool flow can
   // land admins on settings, etc.), else leaderboard. Only inspected on
   // first render — the user can navigate freely between tabs after that.
@@ -83,6 +94,23 @@ export default function PoolDetailScreen() {
   );
 
   const banter = usePoolBanter(id);
+
+  // Honor `?banter=open` deep links — fires from a push-tap cold start
+  // (community pushes route here via usePushNotificationHandlers).
+  // One-shot: only inspected on initial mount so a back-and-forth
+  // through the screen doesn't re-open the sheet on every focus.
+  const banterDeepLinkConsumed = useRef(false);
+  useEffect(() => {
+    if (banterDeepLinkConsumed.current) return;
+    if (banterParam !== 'open') return;
+    if (!data) return;
+    banterDeepLinkConsumed.current = true;
+    // Defer one frame so the screen finishes its first render before
+    // the sheet animates up — avoids a flash of an empty sheet over
+    // an unrendered pool detail.
+    requestAnimationFrame(() => banterSheetRef.current?.open());
+  }, [banterParam, data]);
+
   const isAdmin = data?.pool.isAdmin ?? false;
   const isProgressive = data?.pool.predictionMode === 'progressive';
   const rawBrandColor = data?.pool.brandColor ?? null;
@@ -267,12 +295,19 @@ export default function PoolDetailScreen() {
 
       <BanterFab
         unreadCount={banter.unreadCount}
-        onPress={() =>
-          router.push({
-            pathname: '/pool/[id]/banter',
-            params: { id: pool.poolId, poolName: pool.poolName },
-          })
-        }
+        onPress={() => banterSheetRef.current?.open()}
+      />
+
+      {/* Banter chat — gorhom BottomSheetModal so it only mounts via
+          Portal when present()'d. When closed, it's entirely absent
+          from the tree — no touch interception on the parent screen
+          (the original bug was a plain `BottomSheet` at index={-1}
+          reserving a full-screen container on Android even though
+          visually invisible). */}
+      <BanterSheet
+        ref={banterSheetRef}
+        poolId={pool.poolId}
+        poolName={pool.poolName}
       />
     </SafeAreaView>
   );

@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { LogBox, useColorScheme } from 'react-native';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
@@ -112,6 +113,7 @@ function InnerLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <KeyboardProvider>
+    <BottomSheetModalProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
         <Stack>
@@ -135,13 +137,6 @@ function InnerLayout() {
             headerShown: false,
             presentation: 'fullScreenModal',
             gestureEnabled: false,
-          }}
-        />
-        <Stack.Screen
-          name="pool/[id]/banter"
-          options={{
-            headerShown: false,
-            presentation: 'modal',
           }}
         />
         <Stack.Screen
@@ -183,6 +178,7 @@ function InnerLayout() {
       </HomeDataProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
+    </BottomSheetModalProvider>
     </KeyboardProvider>
     </GestureHandlerRootView>
   );

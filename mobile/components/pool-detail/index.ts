@@ -4,6 +4,7 @@ export { BanterFab } from './BanterFab';
 export { BracketPickerWizard } from './BracketPickerWizard';
 export { BPFormTab } from './BPFormTab';
 export { BanterRichCard, isRichMessageType } from './BanterRichCard';
+export { BanterSheet, type BanterSheetHandle } from './BanterSheet';
 export { FlexBadgesSheet, type FlexBadgeOption, type FlexBadgesSheetHandle } from './FlexBadgesSheet';
 export { QuickActionsMenu, type QuickAction } from './QuickActionsMenu';
 export { REACTION_EMOJIS, ReactionPicker } from './ReactionPicker';

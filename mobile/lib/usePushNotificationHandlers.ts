@@ -5,7 +5,10 @@
 //  - Tap-to-navigate (Phase 7): when the user taps a push (warm or cold start),
 //    route to the relevant screen based on the `data.type` field set by the
 //    server. Current types:
-//      type=community + pool_id → /pool/[id]/banter
+//      type=community + pool_id → /pool/[id]?banter=open
+//        Banter is a bottom sheet mounted on the pool detail screen; the
+//        ?banter=open deep-link param signals the pool detail to open it
+//        on mount. See app/pool/[id].tsx's banterDeepLinkConsumed effect.
 //    Future types (added as more push fan-out lands) can be slotted into the
 //    `routeFor` switch below without touching any other call sites.
 
@@ -41,7 +44,11 @@ function routeFor(
     case 'community': {
       const poolId = typeof data.pool_id === 'string' ? data.pool_id : null;
       if (!poolId) return null;
-      return { pathname: '/pool/[id]/banter', params: { id: poolId } };
+      // Route to the pool detail with ?banter=open. The pool detail
+      // screen reads the param once on mount and triggers its
+      // imperative BanterSheet.open() — sidesteps the now-removed
+      // /pool/[id]/banter route.
+      return { pathname: '/pool/[id]', params: { id: poolId, banter: 'open' } };
     }
     default:
       return null;
