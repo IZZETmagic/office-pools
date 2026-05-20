@@ -11,6 +11,10 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -73,9 +77,32 @@ export default function PoolDetailScreen() {
     }
     return 'leaderboard';
   });
-  const [pageOffset, setPageOffset] = useState(0);
+  // Fractional page offset of the horizontal pager (0 = first tab,
+  // 1 = second, etc). Was previously a useState updated by onScroll,
+  // which forced a React re-render of the entire pool detail tree at
+  // 60fps during every tab swipe/tap — including all mounted tabs and
+  // the always-mounted BanterSheet — which tanked the swipe animation.
+  // Switched to a Reanimated shared value driven by
+  // useAnimatedScrollHandler: pageOffset.value updates run on the UI
+  // thread with no React re-render, and PoolTabBar reads it via
+  // useAnimatedReaction to drive its pill slide.
+  const pageOffset = useSharedValue(0);
   const { width } = useWindowDimensions();
-  const pagerRef = useRef<ScrollView | null>(null);
+  const pagerRef = useRef<Animated.ScrollView | null>(null);
+
+  // UI-thread scroll worklet. Writes the fractional page offset into the
+  // shared value on every scroll frame without touching React, so the
+  // pool detail screen and all its mounted tabs are spared the 60fps
+  // re-render that the old setState-based handler caused. Tab snapping
+  // is handled separately by the JS-side onMomentumScrollEnd callback —
+  // that one fires once per swipe, not per frame, so it stays a normal
+  // event handler on the Animated.ScrollView.
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      if (width > 0) pageOffset.value = e.contentOffset.x / width;
+    },
+  });
 
   // Refresh the leaderboard / pool data whenever the screen regains focus —
   // so an admin point adjustment from the member detail flow is reflected
@@ -183,10 +210,6 @@ export default function PoolDetailScreen() {
     if (nextTab && nextTab !== tab) setTab(nextTab);
   }
 
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    if (width > 0) setPageOffset(e.nativeEvent.contentOffset.x / width);
-  }
-
   function renderTab(key: PoolTabKey) {
     switch (key) {
       case 'leaderboard':
@@ -264,12 +287,12 @@ export default function PoolDetailScreen() {
         pageOffset={pageOffset}
         accentColor={accentColor}
       />
-      <ScrollView
+      <Animated.ScrollView
         ref={pagerRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
+        onScroll={scrollHandler}
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumScrollEnd}
         keyboardShouldPersistTaps="handled"
@@ -291,7 +314,7 @@ export default function PoolDetailScreen() {
             {renderTab(key)}
           </ScrollView>
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <BanterFab
         unreadCount={banter.unreadCount}

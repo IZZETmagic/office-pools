@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import {
   type LayoutChangeEvent,
   Pressable,
@@ -7,6 +7,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import {
+  runOnJS,
+  type SharedValue,
+  useAnimatedReaction,
+} from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -68,9 +73,13 @@ type PoolTabBarProps = {
   isProgressive: boolean;
   /**
    * Current fractional page offset of the swipe pager (0 = first page, 1 = second, etc).
-   * When provided, the pill row slides smoothly in step with the swipe.
+   * Wired as a Reanimated SharedValue so the pool detail screen can write
+   * to it on the UI thread via useAnimatedScrollHandler without triggering
+   * a React re-render of the whole pool detail tree on every scroll frame.
+   * This component subscribes via useAnimatedReaction and only fires an
+   * imperative scrollTo on the inner ScrollView ref — no setState involved.
    */
-  pageOffset?: number;
+  pageOffset?: SharedValue<number>;
   /** Overrides the active-pill color (used for branded pools). */
   accentColor?: string | null;
 };
@@ -110,9 +119,13 @@ export function PoolTabBar({
     pillLayoutsRef.current[index] = { x, width };
   }
 
-  useEffect(() => {
-    if (pageOffset === undefined) return;
-    const clamped = Math.max(0, Math.min(pageOffset, tabs.length - 1));
+  // Helper bound to the JS thread — called from the worklet via runOnJS.
+  // Computes the target pill-row scroll position from the latest pageOffset
+  // and drives an imperative scrollTo. No setState, so PoolTabBar's render
+  // does not re-run at 60fps; only the inner ScrollView's native scroll
+  // position is being updated.
+  function syncPillScroll(offset: number) {
+    const clamped = Math.max(0, Math.min(offset, tabs.length - 1));
     const lower = Math.floor(clamped);
     const upper = Math.min(lower + 1, tabs.length - 1);
     const alpha = clamped - lower;
@@ -124,7 +137,22 @@ export function PoolTabBar({
     const targetCenter = centerA * (1 - alpha) + centerB * alpha;
     const targetX = Math.max(0, targetCenter - screenWidth / 2);
     scrollRef.current?.scrollTo({ x: targetX, animated: false });
-  }, [pageOffset, screenWidth, tabs.length]);
+  }
+
+  // Subscribes to the shared pageOffset value on the UI thread; whenever it
+  // changes (and is materially different from the previous frame), hops
+  // back to the JS thread via runOnJS to call scrollTo. The hop is cheap
+  // because we're not re-rendering — just calling a ref method. The 0.005
+  // threshold filters out sub-pixel noise that would otherwise spam scrollTo
+  // calls when the pager is at rest.
+  useAnimatedReaction(
+    () => pageOffset?.value ?? 0,
+    (current, previous) => {
+      if (previous !== null && Math.abs(current - previous) < 0.005) return;
+      runOnJS(syncPillScroll)(current);
+    },
+    [tabs.length, screenWidth],
+  );
 
   return (
     <ScrollView

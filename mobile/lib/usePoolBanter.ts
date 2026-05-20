@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { notifyMention } from './api';
+import { notifyMention, notifyMessage } from './api';
 import { useAuth } from './auth';
 import { supabase } from './supabase';
+
+// Reference to the message a reply is targeting. Carries enough
+// denormalized info that the bubble's quote-pill can render the
+// parent's text + sender without a second lookup. `userId` is kept
+// for cases where the renderer wants to colour-match the gradient
+// avatar of the original sender.
+export type BanterReplyRef = {
+  messageId: string;
+  content: string;
+  userId: string;
+  senderName: string;
+  senderUsername: string | null;
+};
 
 export type BanterMessage = {
   messageId: string;
@@ -14,6 +27,10 @@ export type BanterMessage = {
   createdAt: string;
   senderName: string;
   senderUsername: string | null;
+  // Resolved info about the message this one is replying to, or null
+  // when the message isn't a reply (or the parent is outside the
+  // currently-loaded page and couldn't be hydrated).
+  replyTo: BanterReplyRef | null;
 };
 
 export type PoolMember = {
@@ -43,6 +60,7 @@ type DbMessageRow = {
   message_type: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  reply_to_message_id: string | null;
 };
 
 type DbUserRow = {
@@ -162,20 +180,96 @@ export function usePoolBanter(poolId: string | undefined) {
     }
   }, []);
 
-  const decorate = useCallback((row: DbMessageRow): BanterMessage => {
-    const u = userCacheRef.current.get(row.user_id);
-    return {
-      messageId: row.message_id,
-      poolId: row.pool_id,
-      userId: row.user_id,
-      content: row.content,
-      messageType: row.message_type ?? 'text',
-      metadata: row.metadata,
-      createdAt: row.created_at,
-      senderName: u?.full_name ?? u?.username ?? 'Member',
-      senderUsername: u?.username ?? null,
-    };
-  }, []);
+  // Given a set of message rows whose `reply_to_message_id`s may
+  // point at parents OUTSIDE the rows themselves, fetch any missing
+  // parents in one round-trip and build a lookup map keyed by
+  // message_id. The caller uses the map to resolve replyTo refs.
+  // We dropped Supabase's resource-embedding (`reply_to:pool_messages
+  // !reply_to_message_id(...)`) here because PostgREST returns
+  // unexpected shapes for self-referential FKs (sometimes `[]`,
+  // sometimes the parent object, sometimes `null`) — too easy to
+  // mis-handle as truthy and end up rendering a phantom reply pill
+  // on every message.
+  const buildParentLookup = useCallback(
+    async (rows: DbMessageRow[]): Promise<Map<string, DbMessageRow>> => {
+      const byId = new Map<string, DbMessageRow>();
+      for (const r of rows) byId.set(r.message_id, r);
+      const replyIds = rows
+        .map((r) => r.reply_to_message_id)
+        .filter((id): id is string => !!id);
+      const missingParents = replyIds.filter((id) => !byId.has(id));
+      if (missingParents.length === 0) return byId;
+      const { data: parents } = await supabase
+        .from('pool_messages')
+        .select(
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+        )
+        .in('message_id', missingParents);
+      const parentRows = (parents as DbMessageRow[] | null) ?? [];
+      // Cache parent senders so replyRefFromParentRow / decorate can
+      // resolve the @handle without yet another round-trip.
+      await hydrateSenders(parentRows);
+      for (const p of parentRows) byId.set(p.message_id, p);
+      return byId;
+    },
+    [hydrateSenders],
+  );
+
+  const decorate = useCallback(
+    (row: DbMessageRow, replyTo: BanterReplyRef | null = null): BanterMessage => {
+      const u = userCacheRef.current.get(row.user_id);
+      return {
+        messageId: row.message_id,
+        poolId: row.pool_id,
+        userId: row.user_id,
+        content: row.content,
+        messageType: row.message_type ?? 'text',
+        metadata: row.metadata,
+        createdAt: row.created_at,
+        senderName: u?.full_name ?? u?.username ?? 'Member',
+        senderUsername: u?.username ?? null,
+        replyTo,
+      };
+    },
+    [],
+  );
+
+  // Resolve a BanterReplyRef from a parent DB row. Assumes the
+  // parent's user has already been added to `userCacheRef` by
+  // `hydrateSenders`. Defensive: rejects falsy parents AND parents
+  // with a missing message_id (which would otherwise produce a
+  // phantom reply pill rendered with a "Member" fallback name).
+  const replyRefFromParentRow = useCallback(
+    (parent: DbMessageRow | null | undefined): BanterReplyRef | null => {
+      if (!parent || !parent.message_id) return null;
+      const u = userCacheRef.current.get(parent.user_id);
+      return {
+        messageId: parent.message_id,
+        content: parent.content,
+        userId: parent.user_id,
+        senderName: u?.full_name ?? u?.username ?? 'Member',
+        senderUsername: u?.username ?? null,
+      };
+    },
+    [],
+  );
+
+  // Resolve a BanterReplyRef from an already-decorated parent in the
+  // current messages list. Used by the realtime INSERT handler where
+  // the postgres_changes payload doesn't carry the join.
+  const replyRefFromMessage = useCallback(
+    (parent: BanterMessage | undefined | null): BanterReplyRef | null => {
+      if (!parent) return null;
+      return {
+        messageId: parent.messageId,
+        content: parent.content,
+        userId: parent.userId,
+        senderName: parent.senderName,
+        senderUsername: parent.senderUsername,
+      };
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     if (!poolId) return;
@@ -184,21 +278,36 @@ export function usePoolBanter(poolId: string | undefined) {
     try {
       const { data, error: fetchErr } = await supabase
         .from('pool_messages')
-        .select('message_id, pool_id, user_id, content, message_type, metadata, created_at')
+        .select(
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+        )
         .eq('pool_id', poolId)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
       if (fetchErr) throw fetchErr;
       const rows = ((data as DbMessageRow[] | null) ?? []).slice().reverse();
       await hydrateSenders(rows);
-      setMessages(rows.map(decorate));
+      // Build a lookup of every parent message any row in this page
+      // is replying to, including parents that live OUTSIDE this
+      // page (older messages). Then decorate each row with its
+      // resolved replyTo. Rows whose `reply_to_message_id` is null
+      // get `replyTo: null` and render without a quote pill.
+      const parentLookup = await buildParentLookup(rows);
+      setMessages(
+        rows.map((row) => {
+          const parent = row.reply_to_message_id
+            ? parentLookup.get(row.reply_to_message_id)
+            : null;
+          return decorate(row, replyRefFromParentRow(parent));
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load messages');
       console.warn('[usePoolBanter.load]', err);
     } finally {
       setLoading(false);
     }
-  }, [poolId, hydrateSenders, decorate]);
+  }, [poolId, hydrateSenders, decorate, replyRefFromParentRow, buildParentLookup]);
 
   const fetchUnread = useCallback(async () => {
     if (!poolId || !appUserId) {
@@ -335,7 +444,16 @@ export function usePoolBanter(poolId: string | undefined) {
   const sendMessage = useCallback(
     async (
       text: string,
-      options?: { messageType?: string; metadata?: Record<string, unknown> | null },
+      options?: {
+        messageType?: string;
+        metadata?: Record<string, unknown> | null;
+        // Set to the parent's message_id to send this as a reply.
+        // Pass undefined / null / a tmp-id to send a plain message.
+        // Optimistic replyTo is resolved by looking up the parent in
+        // the current messages list (replyRefFromMessage); the
+        // canonical replyTo comes back via the SELECT join.
+        replyToMessageId?: string | null;
+      },
     ): Promise<{ error?: string }> => {
       const trimmed = text.trim();
       if (!trimmed) return { error: 'Empty message' };
@@ -343,7 +461,22 @@ export function usePoolBanter(poolId: string | undefined) {
       setSending(true);
       const messageType = options?.messageType ?? 'text';
       const metadata = options?.metadata ?? null;
+      // Only persist real (non-tmp) parent ids — replying to an
+      // unconfirmed optimistic message would FK-fail on insert.
+      const replyToMessageId =
+        options?.replyToMessageId && !options.replyToMessageId.startsWith('tmp-')
+          ? options.replyToMessageId
+          : null;
       const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Resolve optimistic replyTo from the message we're replying to,
+      // if it's currently in state. This drives the quote-pill on the
+      // optimistic bubble so users see their reply rendered correctly
+      // before the round-trip completes.
+      const optimisticReplyTo = replyToMessageId
+        ? replyRefFromMessage(
+            messages.find((m) => m.messageId === replyToMessageId),
+          )
+        : null;
       const optimistic: BanterMessage = {
         messageId: tempId,
         poolId,
@@ -354,6 +487,7 @@ export function usePoolBanter(poolId: string | undefined) {
         createdAt: new Date().toISOString(),
         senderName: 'You',
         senderUsername: null,
+        replyTo: optimisticReplyTo,
       };
       setMessages((prev) => [...prev, optimistic]);
       try {
@@ -364,17 +498,43 @@ export function usePoolBanter(poolId: string | undefined) {
           message_type: messageType,
         };
         if (metadata) insertPayload.metadata = metadata;
+        if (replyToMessageId) insertPayload.reply_to_message_id = replyToMessageId;
         const { data, error: insertErr } = await supabase
           .from('pool_messages')
           .insert(insertPayload)
-          .select('message_id, pool_id, user_id, content, message_type, metadata, created_at')
+          .select(
+            'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+          )
           .single();
         if (insertErr) throw insertErr;
         const row = data as DbMessageRow;
         await hydrateSenders([row]);
+        // Resolve the parent for the response row. We pass the
+        // current messages snapshot to buildParentLookup so it can
+        // satisfy the lookup from in-state if possible, falling back
+        // to a tiny one-row fetch otherwise.
+        const parentLookup = await buildParentLookup([row]);
+        const parent = row.reply_to_message_id
+          ? parentLookup.get(row.reply_to_message_id)
+          : null;
         setMessages((prev) =>
-          prev.map((m) => (m.messageId === tempId ? decorate(row) : m)),
+          prev.map((m) =>
+            m.messageId === tempId
+              ? decorate(row, replyRefFromParentRow(parent))
+              : m,
+          ),
         );
+        // Fire the general banter push to every other pool member.
+        // The endpoint server-side filters out the sender, so we can
+        // call it unconditionally. Errors are non-fatal — the message
+        // is already persisted; we just log and move on rather than
+        // failing the send.
+        void notifyMessage(poolId, trimmed).catch((err) => {
+          console.warn('[usePoolBanter.notifyMessage]', err);
+        });
+        // @mentions get the targeted-mention push on top of the
+        // general one (different copy, only pings tagged users —
+        // matches the Swift app's dual-fire behavior).
         const mentionedUsernames = extractMentionUsernames(trimmed);
         if (mentionedUsernames.length > 0) {
           const idByUsername = new Map(
@@ -403,7 +563,16 @@ export function usePoolBanter(poolId: string | undefined) {
         setSending(false);
       }
     },
-    [poolId, appUserId, hydrateSenders, decorate],
+    [
+      poolId,
+      appUserId,
+      hydrateSenders,
+      decorate,
+      messages,
+      replyRefFromMessage,
+      replyRefFromParentRow,
+      buildParentLookup,
+    ],
   );
 
   useEffect(() => {
@@ -448,7 +617,17 @@ export function usePoolBanter(poolId: string | undefined) {
             const withoutOptimistic = prev.filter(
               (m) => !(m.messageId.startsWith('tmp-') && m.content === row.content && m.userId === row.user_id),
             );
-            return [...withoutOptimistic, decorate(row)];
+            // postgres_changes payloads don't carry FK joins — resolve
+            // the parent from the current messages list. If the parent
+            // is older than our PAGE_SIZE window or otherwise missing,
+            // replyTo lands as null and the bubble renders without a
+            // quote pill (acceptable degradation).
+            const replyTo = row.reply_to_message_id
+              ? replyRefFromMessage(
+                  withoutOptimistic.find((m) => m.messageId === row.reply_to_message_id),
+                )
+              : null;
+            return [...withoutOptimistic, decorate(row, replyTo)];
           });
         },
       )
@@ -504,7 +683,7 @@ export function usePoolBanter(poolId: string | undefined) {
     return () => {
       void channel.unsubscribe();
     };
-  }, [poolId, hydrateSenders, decorate]);
+  }, [poolId, hydrateSenders, decorate, replyRefFromMessage]);
 
   return {
     messages,

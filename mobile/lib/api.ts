@@ -583,6 +583,25 @@ export function notifyMention(
   });
 }
 
+// Generic banter push — fans out to every pool member except the
+// sender. Called on every successful sendMessage; the @mention path
+// uses `notifyMention` above for the targeted variant (different copy
+// + only pings tagged users). The Swift app fires both pre-existing
+// endpoints; this matches that behavior so the Expo build reaches
+// parity with mobile-push backlog item `project_backlog_mobile_push.md`.
+export type MessageNotificationResponse = { sent: boolean; count: number };
+
+export function notifyMessage(
+  pool_id: string,
+  message_content: string,
+  sender_name?: string,
+) {
+  return apiFetch<MessageNotificationResponse>('/api/notifications/message', {
+    method: 'POST',
+    body: { pool_id, message_content, sender_name },
+  });
+}
+
 export type BreakdownMatchResult = {
   match_number: number;
   stage: string;
