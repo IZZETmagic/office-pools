@@ -85,6 +85,19 @@ type PushPayload = {
   title: string
   body: string
   data?: Record<string, string>
+  // Per-recipient iOS app icon badge count. Populated by sendPushToUser
+  // (which computes the user's unread message count via the
+  // get_user_unread_message_count RPC) before dispatching. If undefined,
+  // sendPushNotification OMITS the badge field from the APNs payload so
+  // iOS leaves the current badge value alone — important for broadcasts
+  // and any path that doesn't know the recipient user_id.
+  //
+  // Why per-recipient and not hard-coded `badge: 1` like before: a hard
+  // 1 set the badge on every push and was never cleared, so phones got
+  // stuck at "1" forever. Sending the actual count means the badge
+  // mirrors reality (and naturally drops to 0 when the user reads
+  // everything, since iOS clears the badge on `badge: 0`).
+  badge?: number
 }
 
 /**
@@ -107,12 +120,19 @@ export async function sendPushNotification(
     const host = sandbox ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'
     const topic = bundleId ?? BUNDLE_ID
 
+    // Only include `badge` in the APNs payload when the caller has
+    // computed it (per-recipient unread count). When omitted, iOS leaves
+    // the current badge value untouched — the right default for any
+    // code path that can't know the recipient (broadcasts, etc.).
+    const aps: Record<string, unknown> = {
+      alert: { title: payload.title, body: payload.body },
+      sound: 'default',
+    }
+    if (typeof payload.badge === 'number') {
+      aps.badge = payload.badge
+    }
     const body = JSON.stringify({
-      aps: {
-        alert: { title: payload.title, body: payload.body },
-        sound: 'default',
-        badge: 1,
-      },
+      aps,
       ...(payload.data ?? {}),
     })
 
@@ -269,8 +289,28 @@ export async function sendPushToUser(
     return { sent: 0, total: 0 }
   }
 
+  // Compute the recipient's iOS app icon badge count once, then attach it
+  // to the payload so every device this user owns (iPhone, iPad, etc.) gets
+  // the same number. If the caller already set payload.badge (rare, but
+  // some flows might want a specific count), respect it. If the RPC fails,
+  // omit the badge — better to leave the current count untouched than to
+  // crash the whole push because of a stat-counter lookup.
+  let personalizedPayload = payload
+  if (typeof payload.badge !== 'number') {
+    const { data: unreadCount, error: unreadErr } = await supabase
+      .rpc('get_user_unread_message_count', { p_user_id: userId })
+    if (!unreadErr && typeof unreadCount === 'number') {
+      personalizedPayload = { ...payload, badge: unreadCount }
+    } else if (unreadErr) {
+      console.warn(
+        `[APNs] Failed to compute badge count for user ${userId.slice(0, 8)}...`,
+        unreadErr,
+      )
+    }
+  }
+
   const results = await Promise.allSettled(
-    (tokens as TokenRow[]).map((t) => dispatchPush(t, payload)),
+    (tokens as TokenRow[]).map((t) => dispatchPush(t, personalizedPayload)),
   )
 
   const sent = results.filter(
@@ -284,6 +324,15 @@ export async function sendPushToUser(
  * Send a push notification to multiple users in parallel.
  *
  * Same `category` opt-out semantics as `sendPushToUser`.
+ *
+ * Per-recipient badge counts: this fans out via `sendPushToUser` so each
+ * user gets a payload with their own unread-messages count. The previous
+ * implementation queried all tokens in one bulk SQL call and dispatched
+ * with a shared payload — faster, but couldn't personalize the badge.
+ * For alpha-scale fan-outs (a banter message to a pool of 10-20 members)
+ * the per-user overhead is negligible. If we ever fan out to thousands
+ * of recipients we can batch-compute badges in a single SQL query and
+ * inline-dispatch, but that's a perf optimization, not correctness.
  */
 export async function sendPushToUsers(
   userIds: string[],
@@ -294,26 +343,19 @@ export async function sendPushToUsers(
   const allowed = await filterByCategoryOptIn(userIds, category)
   if (allowed.length === 0) return { sent: 0, total: 0 }
 
-  const supabase = createAdminClient()
-
-  const { data: tokens } = await supabase
-    .from('push_tokens')
-    .select('token, environment, bundle_id, platform')
-    .in('user_id', allowed)
-
-  if (!tokens || tokens.length === 0) {
-    return { sent: 0, total: 0 }
-  }
-
   const results = await Promise.allSettled(
-    (tokens as TokenRow[]).map((t) => dispatchPush(t, payload)),
+    allowed.map((uid) => sendPushToUser(uid, payload, category)),
   )
 
-  const sent = results.filter(
-    (r) => r.status === 'fulfilled' && r.value === true
-  ).length
-
-  return { sent, total: tokens.length }
+  let sent = 0
+  let total = 0
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      sent += r.value.sent
+      total += r.value.total
+    }
+  }
+  return { sent, total }
 }
 
 /**

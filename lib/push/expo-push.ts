@@ -20,7 +20,10 @@ type ExpoPushPayload = {
   body: string
   data?: Record<string, unknown>
   sound: 'default' | null
-  badge: number
+  // Optional. On iOS this sets the app icon badge (Expo relays it through
+  // to APNs); on Android most launchers ignore the field entirely. When
+  // undefined we just omit it, so the device's current badge stays put.
+  badge?: number
   // Android notification channel — must exist on the device. expo-notifications
   // auto-creates a 'default' channel for us on Android 8+.
   channelId: string
@@ -48,7 +51,16 @@ type ExpoPushResponse = {
  */
 export async function sendExpoPushNotification(
   expoToken: string,
-  payload: { title: string; body: string; data?: Record<string, unknown> },
+  payload: {
+    title: string
+    body: string
+    data?: Record<string, unknown>
+    // Optional per-recipient badge count. Mirrors the APNs payload field;
+    // see lib/push/apns.ts for the why. When unset we omit it, leaving
+    // the device's current badge untouched (Android won't notice; iOS via
+    // the Expo relay path will keep whatever was last set).
+    badge?: number
+  },
 ): Promise<boolean> {
   const message: ExpoPushPayload = {
     to: expoToken,
@@ -56,8 +68,10 @@ export async function sendExpoPushNotification(
     body: payload.body,
     data: payload.data,
     sound: 'default',
-    badge: 1,
     channelId: 'default',
+  }
+  if (typeof payload.badge === 'number') {
+    message.badge = payload.badge
   }
 
   try {
