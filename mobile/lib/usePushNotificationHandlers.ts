@@ -15,6 +15,11 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
+
+import { useAuth } from './auth';
+import { refreshIconBadge } from './badgeSync';
+import { supabase } from './supabase';
 
 // Module-scoped so we only register the handler once even if React calls the
 // hook multiple times during dev refreshes.
@@ -64,6 +69,8 @@ function handleResponse(response: Notifications.NotificationResponse) {
 }
 
 export function usePushNotificationHandlers() {
+  const { user } = useAuth();
+
   // 1. Foreground display config — install once at app boot.
   useEffect(() => {
     installForegroundHandlerOnce();
@@ -90,4 +97,51 @@ export function usePushNotificationHandlers() {
     const sub = Notifications.addNotificationResponseReceivedListener(handleResponse);
     return () => sub.remove();
   }, []);
+
+  // 4. OS app icon badge sync — on app boot AND on every foreground.
+  //
+  // The OS persists the badge value at whatever the last APNs payload (or
+  // setBadgeCountAsync call) set it to; iOS does NOT auto-decrement when
+  // the user reads notifications or opens the app. So we explicitly pull
+  // the true count from the server (get_user_badge_count = unread banter
+  // messages + total pending actions) and apply it whenever the user
+  // arrives at the app. This is a REFRESH, not a CLEAR — if the server
+  // still says there are pending items, the badge correctly stays
+  // positive (matches the "action-required" UX where the badge only
+  // clears once the user does the thing the notification was about).
+  //
+  // We need the user's public users.user_id (different from auth.users.id)
+  // for the RPC — resolve it once per auth session via a small query, then
+  // cache in a closure. Cold-start fires on mount; warm foreground fires
+  // via AppState.
+  useEffect(() => {
+    if (!user) return;
+    let appUserId: string | null = null;
+    let mounted = true;
+
+    const fetchAndRefresh = async () => {
+      if (!appUserId) {
+        const { data } = await supabase
+          .from('users')
+          .select('user_id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        if (!mounted) return;
+        appUserId = (data as { user_id?: string } | null)?.user_id ?? null;
+      }
+      if (appUserId) void refreshIconBadge(supabase, appUserId);
+    };
+
+    // Initial fire on hook mount (covers cold-start).
+    void fetchAndRefresh();
+
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void fetchAndRefresh();
+    });
+
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, [user]);
 }

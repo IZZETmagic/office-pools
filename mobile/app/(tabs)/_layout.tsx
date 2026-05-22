@@ -18,7 +18,9 @@ import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-t
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 
+import { NotificationDot } from '@/components/ui';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { fontFamilies, useTheme } from '@/theme';
 
 // Per-tab icon constant. Hugeicons doesn't have a literal Trophy in its
@@ -33,14 +35,25 @@ const PROFILE_ICON = UserCircleIcon;
 export default function TabLayout() {
   const theme = useTheme();
   const { data } = useHomeData();
+  const pending = usePendingActionsOptional();
+  // Pools tab indicator combines unread banter messages (HomeData) and any
+  // unacknowledged pending actions (usePendingActions). When either is > 0,
+  // we surface a small red dot — replacing the old numeric badge. The user
+  // explicitly asked for dots (no numbers) at this level; only the banter
+  // FAB inside a pool keeps numeric counts.
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
+  const poolsTabHasIndicator =
+    totalUnread > 0 || (pending !== null && pending.totalIndicator > 0);
 
   // All tab icons render at the same stroke weight (2.5). The only
   // active-state signal is the color tint (primary on focus, slate
   // otherwise) handled by tabBarActiveTintColor below.
-  function renderTabIcon(icon: typeof Home03Icon) {
+  function renderTabIcon(icon: typeof Home03Icon, hasDot = false) {
     return ({ color, size }: { color: string; size: number; focused: boolean }) => (
-      <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
+      <View style={{ width: size + 8, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
+        {hasDot ? <NotificationDot size="md" top={-2} right={-2} /> : null}
+      </View>
     );
   }
 
@@ -106,8 +119,7 @@ export default function TabLayout() {
         name="pools"
         options={{
           title: 'Pools',
-          tabBarIcon: renderTabIcon(POOLS_ICON),
-          tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
+          tabBarIcon: renderTabIcon(POOLS_ICON, poolsTabHasIndicator),
         }}
       />
       <Tabs.Screen

@@ -37,6 +37,7 @@ import {
   type PoolTabKey,
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
+import { usePendingActions } from '@/lib/usePendingActions';
 import { usePoolBanter } from '@/lib/usePoolBanter';
 import { usePoolDetail } from '@/lib/usePoolDetail';
 import { useTheme } from '@/theme';
@@ -121,6 +122,32 @@ export default function PoolDetailScreen() {
   );
 
   const banter = usePoolBanter(id);
+
+  // Auto-acknowledge pending actions when the user navigates to the relevant
+  // tab. The `acknowledged_at` flip on user_pending_actions clears the tab
+  // dot, pool card dot, bottom-tab dot, and decrements the OS app icon
+  // badge — but leaves `completed_at` alone, so per-cell dots inside the
+  // tab persist until the user taps the specific cell.
+  //
+  // - Form tab → badge_unlock + level_up notifications for this pool
+  // - Predictions tab → deadline_warning notifications for this pool
+  // - Other tabs → no associated action types in this alpha
+  //
+  // We deliberately don't acknowledge on screen mount, only on tab visit,
+  // so an admin briefly opening the pool to peek at Leaderboard doesn't
+  // accidentally clear Form-tab dots they haven't looked at.
+  const pending = usePendingActions();
+  const markPoolActionsAcknowledgedRef = useRef(pending.markPoolActionsAcknowledged);
+  markPoolActionsAcknowledgedRef.current = pending.markPoolActionsAcknowledged;
+  useEffect(() => {
+    if (!id) return;
+    if (tab === 'form') {
+      void markPoolActionsAcknowledgedRef.current(id, 'badge_unlock');
+      void markPoolActionsAcknowledgedRef.current(id, 'level_up');
+    } else if (tab === 'predictions') {
+      void markPoolActionsAcknowledgedRef.current(id, 'deadline_warning');
+    }
+  }, [id, tab]);
 
   // Honor `?banter=open` deep links — fires from a push-tap cold start
   // (community pushes route here via usePushNotificationHandlers).
@@ -286,6 +313,7 @@ export default function PoolDetailScreen() {
         isProgressive={!!isProgressive}
         pageOffset={pageOffset}
         accentColor={accentColor}
+        poolId={pool.poolId}
       />
       <Animated.ScrollView
         ref={pagerRef}

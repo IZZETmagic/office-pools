@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { notifyMention, notifyMessage } from './api';
 import { useAuth } from './auth';
+import { refreshIconBadge } from './badgeSync';
 import { supabase } from './supabase';
 
 // Reference to the message a reply is targeting. Carries enough
@@ -436,6 +437,15 @@ export function usePoolBanter(poolId: string | undefined) {
         .eq('pool_id', poolId)
         .eq('user_id', appUserId);
       setUnreadCount(0);
+      // Re-sync the OS app icon badge from server truth. Banter unread count
+      // just dropped for this pool, but the OS badge value is independent —
+      // it sits at whatever the last push set it to. Without this refresh
+      // the icon shows a stale count until the next push (or app foreground)
+      // arrives. The PendingActionsProvider's realtime subscription on
+      // pool_members UPDATE will also catch this and re-sync the in-app
+      // dots, but the OS badge update needs an explicit setBadgeCountAsync
+      // call which only `refreshIconBadge` makes.
+      void refreshIconBadge(supabase, appUserId);
     } catch (err) {
       console.warn('[usePoolBanter.markAsRead]', err);
     }

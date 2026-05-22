@@ -13,7 +13,8 @@ import {
   useAnimatedReaction,
 } from 'react-native-reanimated';
 
-import { Icon } from '@/components/ui';
+import { Icon, NotificationDot } from '@/components/ui';
+import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 /**
@@ -82,6 +83,14 @@ type PoolTabBarProps = {
   pageOffset?: SharedValue<number>;
   /** Overrides the active-pill color (used for branded pools). */
   accentColor?: string | null;
+  /**
+   * Pool the tab bar belongs to. Used to look up notification-dot state via
+   * usePendingActions — e.g., Form tab gets a red dot when this pool has any
+   * unacknowledged badge_unlock or level_up rows, Predictions tab gets one
+   * when there's an unacknowledged deadline_warning. Optional: when omitted
+   * (e.g., transitional render) the tab bar renders without dots.
+   */
+  poolId?: string;
 };
 
 export function getVisiblePoolTabs(isAdmin: boolean, isProgressive: boolean): PoolTabKey[] {
@@ -99,11 +108,31 @@ export function PoolTabBar({
   isProgressive,
   pageOffset,
   accentColor,
+  poolId,
 }: PoolTabBarProps) {
   const theme = useTheme();
+  const pending = usePendingActionsOptional();
   const { width: screenWidth } = useWindowDimensions();
   const visible = getVisiblePoolTabs(isAdmin, isProgressive);
   const tabs = ALL_TABS.filter((t) => visible.includes(t.key));
+
+  // Per-tab dot predicate. Form tab surfaces badge unlocks + level ups;
+  // Predictions tab surfaces deadline warnings. Other tabs (Leaderboard,
+  // Scoring, Info, etc.) don't currently have associated push notifications
+  // in this alpha — so no dots for them.
+  function tabHasIndicator(tabKey: PoolTabKey): boolean {
+    if (!pending || !poolId) return false;
+    if (tabKey === 'form') {
+      return (
+        pending.poolHasPending(poolId, 'badge_unlock') ||
+        pending.poolHasPending(poolId, 'level_up')
+      );
+    }
+    if (tabKey === 'predictions') {
+      return pending.poolHasPending(poolId, 'deadline_warning');
+    }
+    return false;
+  }
   // If the brand/primary color is visually indistinguishable from the bar's
   // background, fall back to the secondary accent so the active pill remains
   // legible (e.g. a near-white brand on light mode, or a deep navy on dark).
@@ -175,6 +204,7 @@ export function PoolTabBar({
     >
       {tabs.map((tab, i) => {
         const isActive = tab.key === active;
+        const showDot = tabHasIndicator(tab.key);
         return (
           <View key={tab.key} onLayout={(e) => handlePillLayout(i, e)}>
             <Pressable
@@ -193,13 +223,16 @@ export function PoolTabBar({
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Icon
-                name={tab.icon as never}
-                color={isActive ? undefined : 'slate'}
-                tint={isActive ? activeColor : undefined}
-                size={13}
-                weight="semibold"
-              />
+              <View>
+                <Icon
+                  name={tab.icon as never}
+                  color={isActive ? undefined : 'slate'}
+                  tint={isActive ? activeColor : undefined}
+                  size={13}
+                  weight="semibold"
+                />
+                {showDot ? <NotificationDot size="sm" top={-4} right={-6} /> : null}
+              </View>
               <RNText
                 numberOfLines={1}
                 style={{

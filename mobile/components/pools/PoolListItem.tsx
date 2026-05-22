@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, NotificationDot, Text } from '@/components/ui';
 import { getLevel } from '@/lib/levels';
+import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { FormResult, PoolSummary } from '@/lib/useHomeData';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -37,6 +38,14 @@ function brandHex(hex: string | null): string | null {
 
 export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   const theme = useTheme();
+  const pending = usePendingActionsOptional();
+  // Unified per-pool indicator. The card shows a single red dot if EITHER
+  // banter has unread messages OR the pool has any unacknowledged pending
+  // actions (badge unlocks, deadline warnings, level ups). The banter
+  // floating action button INSIDE the pool detail keeps its numeric count
+  // — only this card-level callout consolidates everything into a dot.
+  const hasNonBanterIndicator = pending?.poolHasAny?.(pool.poolId) === true;
+  const hasIndicator = pool.unreadBanterCount > 0 || hasNonBanterIndicator;
   const brandColor = brandHex(pool.brandColor);
   const isBranded = Boolean(pool.brandName && brandColor);
   const modeLabel = pool.predictionMode ? MODE_LABEL[pool.predictionMode] ?? 'Pool' : 'Pool';
@@ -149,29 +158,7 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
               <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
                 {pool.poolName}
               </Text>
-              {pool.unreadBanterCount > 0 ? (
-                <View
-                  style={{
-                    minWidth: 22,
-                    height: 20,
-                    paddingHorizontal: 6,
-                    borderRadius: 10,
-                    backgroundColor: theme.colors.red,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <RNText
-                    style={{
-                      fontFamily: fontFamilies.bold,
-                      fontSize: 11,
-                      color: '#FFFFFF',
-                    }}
-                  >
-                    {pool.unreadBanterCount > 99 ? '99+' : pool.unreadBanterCount}
-                  </RNText>
-                </View>
-              ) : null}
+              {hasIndicator ? <NotificationDot size="md" /> : null}
             </View>
             <View
               style={{

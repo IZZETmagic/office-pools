@@ -19,6 +19,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { HomeDataProvider } from '@/lib/HomeDataProvider';
+import { PendingActionsProvider } from '@/lib/usePendingActions';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
 import { usePushTokenRegistration } from '@/lib/usePushTokenRegistration';
@@ -114,6 +115,7 @@ function InnerLayout() {
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
+      <PendingActionsProvider>
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -173,6 +175,7 @@ function InnerLayout() {
         />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+      </PendingActionsProvider>
       </HomeDataProvider>
       <StatusBar style="auto" />
     </ThemeProvider>

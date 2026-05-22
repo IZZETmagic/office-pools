@@ -4,6 +4,7 @@ export { Card } from './Card';
 export { ConfirmDialog } from './ConfirmDialog';
 export { Icon } from './Icon';
 export { Input } from './Input';
+export { NotificationDot } from './NotificationDot';
 export { Placeholder } from './Placeholder';
 export { PromptDialog } from './PromptDialog';
 export { Screen } from './Screen';
