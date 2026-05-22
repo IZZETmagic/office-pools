@@ -295,16 +295,22 @@ export async function sendPushToUser(
   // some flows might want a specific count), respect it. If the RPC fails,
   // omit the badge — better to leave the current count untouched than to
   // crash the whole push because of a stat-counter lookup.
+  //
+  // get_user_badge_count = unread banter messages + total pending actions
+  // in user_pending_actions (migration 019). Whichever push trigger called
+  // this sendPushToUser has already inserted its row into
+  // user_pending_actions (if applicable), so the count reflects this
+  // notification too.
   let personalizedPayload = payload
   if (typeof payload.badge !== 'number') {
-    const { data: unreadCount, error: unreadErr } = await supabase
-      .rpc('get_user_unread_message_count', { p_user_id: userId })
-    if (!unreadErr && typeof unreadCount === 'number') {
-      personalizedPayload = { ...payload, badge: unreadCount }
-    } else if (unreadErr) {
+    const { data: badgeCount, error: badgeErr } = await supabase
+      .rpc('get_user_badge_count', { p_user_id: userId })
+    if (!badgeErr && typeof badgeCount === 'number') {
+      personalizedPayload = { ...payload, badge: badgeCount }
+    } else if (badgeErr) {
       console.warn(
         `[APNs] Failed to compute badge count for user ${userId.slice(0, 8)}...`,
-        unreadErr,
+        badgeErr,
       )
     }
   }

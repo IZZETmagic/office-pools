@@ -90,6 +90,31 @@ export async function firePendingDeadlineWarnings(): Promise<{
         continue
       }
       try {
+        // Record pending action FIRST so the APNs badge math (computed inside
+        // sendPushToUser) includes this notification. reference_id stays null
+        // because per-pool there's only ever one outstanding deadline warning
+        // at a time — the per-pool unique index suppresses dupes if the same
+        // window fires twice. Pending row clears when the user opens the
+        // Predictions tab or submits their picks (see mobile auto-mark wiring).
+        // See migration 019.
+        await adminClient
+          .from('user_pending_actions')
+          .insert({
+            user_id: userId,
+            action_type: 'deadline_warning',
+            pool_id: pool.pool_id,
+            reference_id: null,
+          })
+          .then(({ error }) => {
+            if (error && error.code !== '23505') {
+              console.warn(
+                '[deadline-warnings] failed to insert pending action',
+                userId,
+                pool.pool_id,
+                error,
+              )
+            }
+          })
         await sendPushToUser(
           userId,
           {

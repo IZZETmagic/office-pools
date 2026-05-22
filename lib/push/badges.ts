@@ -151,6 +151,24 @@ async function detectAndPushBadgesForEntry(args: {
   for (const badgeId of newBadgeIds) {
     const badge = BADGE_DEFINITIONS.find((b) => b.id === badgeId)
     if (!badge) continue
+    // Record the pending action FIRST so the badge count in the APNs payload
+    // (computed inside sendPushToUser) reflects this notification. The
+    // partial unique index on (user_id, action_type, pool_id, reference_id)
+    // where completed_at IS NULL makes duplicate inserts no-ops, so retries
+    // and re-fires don't pile up extra dots. See migration 019.
+    await adminClient
+      .from('user_pending_actions')
+      .insert({
+        user_id: userId,
+        action_type: 'badge_unlock',
+        pool_id: poolId,
+        reference_id: badgeId,
+      })
+      .then(({ error }) => {
+        if (error && error.code !== '23505') {
+          console.warn('[badges] failed to insert pending action', userId, badgeId, error)
+        }
+      })
     await sendPushToUser(
       userId,
       {
@@ -171,6 +189,23 @@ async function detectAndPushBadgesForEntry(args: {
   // the latest is announced).
   if (leveledUp) {
     const newLevelDef = LEVELS.find((l) => l.level === state.currentLevel)
+    // Record pending action — same pattern as badge_unlock above. reference_id
+    // is the level number so the per-cell dot in Form tab can target the
+    // specific level on the runway. Duplicate-suppressed by partial unique
+    // index in migration 019.
+    await adminClient
+      .from('user_pending_actions')
+      .insert({
+        user_id: userId,
+        action_type: 'level_up',
+        pool_id: poolId,
+        reference_id: String(state.currentLevel),
+      })
+      .then(({ error }) => {
+        if (error && error.code !== '23505') {
+          console.warn('[badges] failed to insert pending level_up', userId, error)
+        }
+      })
     await sendPushToUser(
       userId,
       {
