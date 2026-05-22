@@ -21,12 +21,13 @@ type TemplateKey =
   | 'past_predictor_hype'
   | 'support_reply'
   | 'custom'
+  | 'bracket_fix'
 
 type TemplateDef = {
   key: TemplateKey
   label: string
   description: string
-  category: 'smart' | 'pool' | 'growth' | 'support' | 'custom'
+  category: 'smart' | 'pool' | 'growth' | 'support' | 'custom' | 'incident'
   icon: string
   recipientNote: string
 }
@@ -105,6 +106,14 @@ const TEMPLATES: TemplateDef[] = [
     recipientNote: 'Auto-detected: recent signups not in any pool',
   },
   {
+    key: 'bracket_fix',
+    label: 'FIFA Bracket Fix Notification',
+    description: 'One-time announcement for entries whose R16+ picks were reset when the bracket was re-aligned with FIFA. Their groups and R32 picks are preserved; they need to re-do R16 through the final.',
+    category: 'incident',
+    icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+    recipientNote: 'Auto-detected: entries whose R16+ picks were reset',
+  },
+  {
     key: 'past_predictor_hype',
     label: 'Past Predictor Hype',
     description: 'VIP treatment for users who have submitted predictions before. Hype them up for the next tournament.',
@@ -144,6 +153,7 @@ const SEGMENTS = {
   past_predictors: { label: 'Past Predictors', description: 'Have submitted predictions before' },
   recent_signups: { label: 'Recent Signups', description: 'Joined in the last 14 days' },
   super_admins: { label: 'Super Admins', description: 'Internal / test emails only' },
+  bracket_fix_affected: { label: 'Bracket Fix — Affected Entries', description: 'Users whose R16+ picks were reset when the bracket was aligned with FIFA' },
 } as const
 
 type SegmentKey = keyof typeof SEGMENTS
@@ -269,6 +279,7 @@ export function TemplatesTab() {
       case 'we_miss_you':
       case 'ready_to_join':
       case 'past_predictor_hype':
+      case 'bracket_fix':
         return base
       case 'deadline_reminder':
         return { ...base, pool_id: poolId }
@@ -302,6 +313,7 @@ export function TemplatesTab() {
       case 'we_miss_you':
       case 'ready_to_join':
       case 'past_predictor_hype':
+      case 'bracket_fix':
         return true
       case 'deadline_reminder':
         return !!poolId
@@ -525,6 +537,15 @@ export function TemplatesTab() {
             <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 sp-radius-sm p-4">
               <p className="text-sm text-purple-800 dark:text-purple-300">
                 VIP treatment for proven users who have submitted predictions before. Hypes them up for the next tournament and encourages them to grow their pools.
+              </p>
+            </div>
+          )}
+
+          {/* Bracket fix — auto-detected recipients, no config */}
+          {selectedTemplate === 'bracket_fix' && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 sp-radius-sm p-4">
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                Sends one personalized email per affected entry. Recipients are auto-detected: entries that had bracket-picker R16+ picks (now reset) or full-tournament-mode score predictions for R16, QF, SF, third-place, or final matches. Their group-stage and Round of 32 picks are preserved.
               </p>
             </div>
           )}

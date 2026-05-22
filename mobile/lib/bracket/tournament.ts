@@ -203,21 +203,21 @@ export type R32Slot =
 
 export const R32_MATCHUPS: Record<number, { home: R32Slot; away: R32Slot }> = {
   73: { home: { type: 'group_runner_up', group: 'A' }, away: { type: 'group_runner_up', group: 'B' } },
-  74: { home: { type: 'group_winner', group: 'C' }, away: { type: 'group_runner_up', group: 'F' } },
-  75: { home: { type: 'group_winner', group: 'E' }, away: { type: 'best_third', eligible_groups: ['A', 'B', 'C', 'D', 'F'] } },
-  76: { home: { type: 'group_winner', group: 'F' }, away: { type: 'group_runner_up', group: 'C' } },
-  77: { home: { type: 'group_runner_up', group: 'E' }, away: { type: 'group_runner_up', group: 'I' } },
-  78: { home: { type: 'group_winner', group: 'I' }, away: { type: 'best_third', eligible_groups: ['C', 'D', 'F', 'G', 'H'] } },
+  74: { home: { type: 'group_winner', group: 'E' }, away: { type: 'best_third', eligible_groups: ['A', 'B', 'C', 'D', 'F'] } },
+  75: { home: { type: 'group_winner', group: 'F' }, away: { type: 'group_runner_up', group: 'C' } },
+  76: { home: { type: 'group_winner', group: 'C' }, away: { type: 'group_runner_up', group: 'F' } },
+  77: { home: { type: 'group_winner', group: 'I' }, away: { type: 'best_third', eligible_groups: ['C', 'D', 'F', 'G', 'H'] } },
+  78: { home: { type: 'group_runner_up', group: 'E' }, away: { type: 'group_runner_up', group: 'I' } },
   79: { home: { type: 'group_winner', group: 'A' }, away: { type: 'best_third', eligible_groups: ['C', 'E', 'F', 'H', 'I'] } },
   80: { home: { type: 'group_winner', group: 'L' }, away: { type: 'best_third', eligible_groups: ['E', 'H', 'I', 'J', 'K'] } },
-  81: { home: { type: 'group_winner', group: 'G' }, away: { type: 'best_third', eligible_groups: ['A', 'E', 'H', 'I', 'J'] } },
-  82: { home: { type: 'group_winner', group: 'D' }, away: { type: 'best_third', eligible_groups: ['B', 'E', 'F', 'I', 'J'] } },
-  83: { home: { type: 'group_winner', group: 'H' }, away: { type: 'group_runner_up', group: 'J' } },
-  84: { home: { type: 'group_runner_up', group: 'K' }, away: { type: 'group_runner_up', group: 'L' } },
+  81: { home: { type: 'group_winner', group: 'D' }, away: { type: 'best_third', eligible_groups: ['B', 'E', 'F', 'I', 'J'] } },
+  82: { home: { type: 'group_winner', group: 'G' }, away: { type: 'best_third', eligible_groups: ['A', 'E', 'H', 'I', 'J'] } },
+  83: { home: { type: 'group_runner_up', group: 'K' }, away: { type: 'group_runner_up', group: 'L' } },
+  84: { home: { type: 'group_winner', group: 'H' }, away: { type: 'group_runner_up', group: 'J' } },
   85: { home: { type: 'group_winner', group: 'B' }, away: { type: 'best_third', eligible_groups: ['E', 'F', 'G', 'I', 'J'] } },
-  86: { home: { type: 'group_runner_up', group: 'D' }, away: { type: 'group_runner_up', group: 'G' } },
-  87: { home: { type: 'group_winner', group: 'J' }, away: { type: 'group_runner_up', group: 'H' } },
-  88: { home: { type: 'group_winner', group: 'K' }, away: { type: 'best_third', eligible_groups: ['D', 'E', 'I', 'J', 'L'] } },
+  86: { home: { type: 'group_winner', group: 'J' }, away: { type: 'group_runner_up', group: 'H' } },
+  87: { home: { type: 'group_winner', group: 'K' }, away: { type: 'best_third', eligible_groups: ['D', 'E', 'I', 'J', 'L'] } },
+  88: { home: { type: 'group_runner_up', group: 'D' }, away: { type: 'group_runner_up', group: 'G' } },
 }
 
 // =============================================

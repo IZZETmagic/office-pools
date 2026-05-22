@@ -15,6 +15,7 @@ import {
   weMissYouTemplate,
   readyToJoinTemplate,
   pastPredictorHypeTemplate,
+  bracketFixTemplate,
 } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { querySegment, type SegmentKey, SEGMENT_KEYS } from '@/lib/email/segments'
@@ -35,6 +36,7 @@ type TemplateType =
   | 'past_predictor_hype'
   | 'support_reply'
   | 'custom'
+  | 'bracket_fix'
 
 // =============================================================
 // GET /api/admin/send-template
@@ -174,6 +176,9 @@ export async function POST(request: NextRequest) {
       break
     case 'custom':
       result = await handleCustom(supabase, body)
+      break
+    case 'bracket_fix':
+      result = await handleBracketFix(supabase)
       break
     default:
       return NextResponse.json({ error: `Unknown template: ${body.template}` }, { status: 400 })
@@ -814,4 +819,78 @@ function extractFirstName(fullName?: string | null, username?: string | null): s
     if (first) return first
   }
   return username || 'there'
+}
+
+// --- Bracket Fix Handler ---
+// Sends one email per affected entry (an entry whose R16+ picks were reset when the bracket
+// was aligned with FIFA). Affected entries are those with at least one bracket_picker_knockout_picks
+// row (bracket-picker mode users) OR at least one predictions row pointing at an R16+ match
+// (full-tournament-mode users).
+async function handleBracketFix(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<SendResult> {
+  const { data: pickerRows } = await supabase
+    .from('bracket_picker_knockout_picks')
+    .select('entry_id')
+  const pickerEntryIds = new Set((pickerRows || []).map((r) => r.entry_id))
+
+  const { data: knockoutMatches } = await supabase
+    .from('matches')
+    .select('match_id')
+    .in('stage', ['round_16', 'quarter_final', 'semi_final', 'third_place', 'final'])
+  const knockoutMatchIds = (knockoutMatches || []).map((m) => m.match_id)
+
+  let fullTournamentEntryIds = new Set<string>()
+  if (knockoutMatchIds.length > 0) {
+    const { data: ftPredictions } = await supabase
+      .from('predictions')
+      .select('entry_id')
+      .in('match_id', knockoutMatchIds)
+    fullTournamentEntryIds = new Set((ftPredictions || []).map((r) => r.entry_id))
+  }
+
+  const affectedEntryIds = Array.from(new Set([...pickerEntryIds, ...fullTournamentEntryIds]))
+  if (affectedEntryIds.length === 0) return { emails: [] }
+
+  const { data: entries } = await supabase
+    .from('pool_entries')
+    .select(`
+      entry_id, entry_name,
+      pool_members!inner(pool_id, user_id, users!inner(email, full_name, username))
+    `)
+    .in('entry_id', affectedEntryIds)
+
+  if (!entries || entries.length === 0) return { emails: [] }
+
+  const poolIds = Array.from(new Set(entries.map((e) => (e.pool_members as any).pool_id as string)))
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('pool_id, pool_name')
+    .in('pool_id', poolIds)
+  const poolNameById = new Map<string, string>((pools || []).map((p) => [p.pool_id, p.pool_name]))
+
+  const emails: EmailPayload[] = []
+  for (const e of entries) {
+    const member = e.pool_members as any
+    const user = member.users
+    if (!user?.email) continue
+    const poolId = member.pool_id as string
+
+    const { subject, html } = bracketFixTemplate({
+      userName: extractFirstName(user.full_name, user.username),
+      poolName: poolNameById.get(poolId) || 'your pool',
+      entryName: e.entry_name,
+      poolUrl: `${APP_URL}/pools/${poolId}`,
+    })
+
+    emails.push({
+      to: user.email,
+      subject,
+      html,
+      topicId: TOPICS.ADMIN,
+      tags: [{ name: 'category', value: 'bracket-fix' }],
+    })
+  }
+
+  return { emails }
 }

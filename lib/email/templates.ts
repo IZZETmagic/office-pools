@@ -1061,6 +1061,48 @@ export function pointsAdjustedTemplate(params: {
   }
 }
 
+export function bracketFixTemplate(params: {
+  userName: string
+  poolName: string
+  entryName: string
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, entryName, poolUrl } = params
+  return {
+    subject: `Action needed: re-submit your knockout picks in ${poolName}`,
+    html: baseTemplate({
+      preheader: `We aligned the bracket with FIFA's official schedule. Your group and R32 picks are safe; please re-do R16 through the final.`,
+      heading: 'Bracket aligned with FIFA — please re-pick R16 onward',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">A pool member spotted that our knockout-stage match numbers and pairings did not match FIFA's official 2026 World Cup schedule. We've corrected this so every match number, venue, and bracket route now matches FIFA exactly.</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 8px;color:#15803d;font-size:14px;font-weight:600;">What's preserved for <strong>${entryName}</strong>:</p>
+          <ul style="margin:0;padding-left:20px;color:#166534;font-size:14px;line-height:1.6;">
+            <li>All your group-stage predictions</li>
+            <li>All your Round of 32 picks (the fixtures didn't change &mdash; just their match numbers)</li>
+          </ul>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 8px;color:#92400e;font-size:14px;font-weight:600;">What needs your attention:</p>
+          <p style="margin:0 0 8px;color:#78350f;font-size:14px;line-height:1.6;">Because the bracket routes changed, your picks for these rounds need to be re-submitted:</p>
+          <ul style="margin:0;padding-left:20px;color:#78350f;font-size:14px;line-height:1.6;">
+            <li>Round of 16</li>
+            <li>Quarter-finals</li>
+            <li>Semi-finals</li>
+            <li>Third-place match</li>
+            <li>Final</li>
+          </ul>
+        </div>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The tournament starts June 11, so you have time to re-do those picks. Open your bracket and step through R16 onward whenever you're ready.</p>
+        <p style="color:#525252;line-height:1.6;margin:0;">Sorry for the inconvenience &mdash; we want every fixture, route, and Annex C third-place assignment to match FIFA's official bracket so scoring is fair.</p>
+      `,
+      ctaText: 'Update My Picks',
+      ctaUrl: `${poolUrl}?tab=predictions`,
+    }),
+  }
+}
+
 export function mentionNotificationTemplate(params: {
   recipientName: string
   mentionerName: string

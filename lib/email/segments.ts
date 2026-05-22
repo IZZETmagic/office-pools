@@ -14,6 +14,7 @@ export type SegmentKey =
   | 'past_predictors'
   | 'recent_signups'
   | 'super_admins'
+  | 'bracket_fix_affected'
 
 export const SEGMENTS: Record<SegmentKey, { label: string; description: string }> = {
   all: {
@@ -67,6 +68,10 @@ export const SEGMENTS: Record<SegmentKey, { label: string; description: string }
   super_admins: {
     label: 'Super Admins',
     description: 'Internal / test emails only',
+  },
+  bracket_fix_affected: {
+    label: 'Bracket Fix — Affected Entries',
+    description: 'Users whose R16+ picks were reset when the bracket was aligned with FIFA',
   },
 }
 
@@ -288,6 +293,59 @@ export async function querySegment(
         .not('email', 'is', null)
         .eq('is_super_admin', true)
       return data || []
+    }
+
+    case 'bracket_fix_affected': {
+      // Affected = entries that had R16+ picks invalidated.
+      // Two sources:
+      //   1. Entries that have any bracket_picker_knockout_picks row (the R16+ rows were deleted by the bracket-fix migration; R32 rows remaining identify bracket-picker entries that need to re-pick R16+).
+      //   2. Entries that have at least one predictions row pointing at an R16/QF/SF/3rd/Final match (full-tournament-mode users whose score picks were made against the old bracket structure).
+      const { data: pickerEntries } = await supabase
+        .from('bracket_picker_knockout_picks')
+        .select('entry_id')
+      const pickerEntryIds = new Set((pickerEntries || []).map((r) => r.entry_id))
+
+      const { data: knockoutMatches } = await supabase
+        .from('matches')
+        .select('match_id')
+        .in('stage', ['round_16', 'quarter_final', 'semi_final', 'third_place', 'final'])
+      const knockoutMatchIds = (knockoutMatches || []).map((m) => m.match_id)
+
+      let fullTournamentEntryIds = new Set<string>()
+      if (knockoutMatchIds.length > 0) {
+        const { data: ftPredictions } = await supabase
+          .from('predictions')
+          .select('entry_id')
+          .in('match_id', knockoutMatchIds)
+        fullTournamentEntryIds = new Set((ftPredictions || []).map((r) => r.entry_id))
+      }
+
+      const affectedEntryIds = Array.from(new Set([...pickerEntryIds, ...fullTournamentEntryIds]))
+      if (affectedEntryIds.length === 0) return []
+
+      const { data: entries } = await supabase
+        .from('pool_entries')
+        .select(`
+          entry_id,
+          pool_members!inner(user_id, users!inner(email, full_name, username))
+        `)
+        .in('entry_id', affectedEntryIds)
+      if (!entries) return []
+
+      const seen = new Set<string>()
+      const result: SegmentUser[] = []
+      for (const e of entries) {
+        const member = e.pool_members as any
+        const user = member.users
+        if (!user?.email || seen.has(user.email)) continue
+        seen.add(user.email)
+        result.push({
+          email: user.email,
+          full_name: user.full_name,
+          username: user.username,
+        })
+      }
+      return result
     }
 
     default:
