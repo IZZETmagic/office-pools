@@ -12,7 +12,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
 import { badgeIcon, type BadgeIconSpec } from './badge-icons';
-import { Icon, Text } from '@/components/ui';
+import { Icon, NotificationDot, Text } from '@/components/ui';
 import type {
   AnalyticsResponse,
   AnalyticsStreakData,
@@ -26,6 +26,7 @@ import type {
   XPData,
 } from '@/lib/api';
 import { useEntryAnalytics } from '@/lib/useEntryAnalytics';
+import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { usePoolEntries, type PoolEntry } from '@/lib/usePoolEntries';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -35,9 +36,33 @@ type Props = {
 
 export function FormTab({ poolId }: Props) {
   const theme = useTheme();
+  const pending = usePendingActionsOptional();
   const { entries, loading: entriesLoading } = usePoolEntries(poolId);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const badgeSheetRef = useRef<BadgeDetailSheetHandle>(null);
+
+  // Per-cell dot lookup. Returns the user_pending_actions.id (so the caller
+  // can mark just this one badge complete via mark_action_complete) or null
+  // if this badge isn't currently flagged. Driven by the cells_by_pool_type
+  // payload from get_user_pending_summary, which lists badge_unlock rows
+  // whose `completed_at` is still NULL — i.e. the user hasn't tapped this
+  // specific badge yet (the tab-level acknowledged_at clear from
+  // app/pool/[id].tsx doesn't touch this).
+  const pendingIdForBadge = (badgeId: string): string | null => {
+    if (!pending) return null;
+    return pending.cellPendingId(poolId, 'badge_unlock', badgeId);
+  };
+
+  const handleBadgePress = (badge: BadgeInfo, earned: boolean) => {
+    // If this badge had a pending dot, mark it complete first so the dot
+    // disappears immediately. Realtime UPDATE will reconcile the in-app
+    // state across all dot indicators that key off the same row.
+    const pendingId = pendingIdForBadge(badge.id);
+    if (pendingId) {
+      void pending?.markActionComplete(pendingId);
+    }
+    badgeSheetRef.current?.open(badge, earned);
+  };
 
   const activeEntryId = selectedEntryId ?? entries[0]?.entryId ?? null;
   const { data, loading, error } = useEntryAnalytics(
@@ -115,9 +140,8 @@ export function FormTab({ poolId }: Props) {
           <BadgesSection
             earned={data.xp.earned_badges}
             all={data.xp.all_badges}
-            onBadgePress={(badge, earned) =>
-              badgeSheetRef.current?.open(badge, earned)
-            }
+            onBadgePress={handleBadgePress}
+            pendingIdForBadge={pendingIdForBadge}
           />
         ) : null}
         <HotColdStreakCards streaks={data.streaks} />
@@ -505,10 +529,19 @@ function BadgesSection({
   earned,
   all,
   onBadgePress,
+  pendingIdForBadge,
 }: {
   earned: BadgeInfo[];
   all: BadgeInfo[];
   onBadgePress: (badge: BadgeInfo, earned: boolean) => void;
+  /**
+   * Per-badge cell dot lookup. Returns null when this badge doesn't currently
+   * have a pending notification; returns the user_pending_actions row id
+   * otherwise (the cell wants a red dot AND tapping it should mark that
+   * specific row complete). Threaded down so BadgeCell can render the dot
+   * without re-importing the pending-actions context.
+   */
+  pendingIdForBadge: (badgeId: string) => string | null;
 }) {
   const theme = useTheme();
   const earnedIds = new Set(earned.map((b) => b.id));
@@ -544,11 +577,13 @@ function BadgesSection({
       >
         {sorted.map((badge) => {
           const isEarned = earnedIds.has(badge.id);
+          const hasPendingDot = pendingIdForBadge(badge.id) !== null;
           return (
             <BadgeCell
               key={badge.id}
               badge={badge}
               earned={isEarned}
+              hasPendingDot={hasPendingDot}
               onPress={() => onBadgePress(badge, isEarned)}
             />
           );
@@ -561,10 +596,14 @@ function BadgesSection({
 function BadgeCell({
   badge,
   earned,
+  hasPendingDot,
   onPress,
 }: {
   badge: BadgeInfo;
   earned: boolean;
+  /** When true, render a small red dot over the badge icon - flags this as
+   *  the badge that just got unlocked and the user hasn't acknowledged. */
+  hasPendingDot: boolean;
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -595,6 +634,7 @@ function BadgeCell({
         ) : (
           <Icon name="lock.fill" size={14} tint={theme.colors.slate} weight="semibold" />
         )}
+        {hasPendingDot ? <NotificationDot size="sm" top={-2} right={-2} /> : null}
       </View>
       <RNText
         numberOfLines={1}
