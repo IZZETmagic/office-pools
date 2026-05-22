@@ -26,11 +26,16 @@ import {
 } from '@/components/pools';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { MatchSummary, PoolSummary } from '@/lib/useHomeData';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import { useTheme } from '@/theme';
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { data, loading, refreshing, error, refresh, refreshIfStale } = useHomeData();
+  const { data, loading, error, refresh, refreshIfStale } = useHomeData();
+  // Pull-to-refresh: spinner is bound to user gesture only. Background
+  // refreshes (focus, realtime, stale) trigger via `refresh` directly and
+  // don't surface the OS-level spinner.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
   const tabBarHeight = useBottomTabBarHeight();
   const initialFocus = useRef(true);
   // Create/Join action sheet opened from the "+" in HomeHeader. Picking
@@ -116,7 +121,7 @@ export default function HomeScreen() {
           gap: theme.spacing.xl,
         }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
       >
         {hasPools ? (

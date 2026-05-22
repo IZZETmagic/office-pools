@@ -25,6 +25,7 @@ import {
   type TeamOption,
 } from '@/components/results';
 import { Text } from '@/components/ui';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   useTournamentMatches,
   type ResultsMatch,
@@ -124,8 +125,10 @@ export default function ResultsScreen() {
   // height for the current device — iOS ~83 (49 tab bar + safe area), Android
   // ~56dp + bottom safe area — so the last match clears the tab bar.
   const tabBarHeight = useBottomTabBarHeight();
-  const { matches, loading, refreshing, error, refresh, refreshIfStale } =
+  const { matches, loading, error, refresh, refreshIfStale } =
     useTournamentMatches();
+  // Pull-to-refresh: spinner driven by real user-pull gesture only.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
   const [filterMode, setFilterMode] = useState<FilterMode>('date');
   const [selectedTeam, setSelectedTeam] = useState<TeamOption | null>(null);
   const [selectedGroupLetter, setSelectedGroupLetter] = useState<string | null>(null);
@@ -356,7 +359,7 @@ export default function ResultsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={onRefresh}
             tintColor={theme.colors.primary}
           />
         }

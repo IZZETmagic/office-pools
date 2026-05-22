@@ -26,6 +26,7 @@ import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fetchNotificationPrefs, updateNotificationPref, deleteAccount, fetchPushPrefs, updatePushPref } from '@/lib/api';
 import type { PoolSummary } from '@/lib/useHomeData';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import { supabase } from '@/lib/supabase';
 import { usePushPermission, type PushPermissionStatus } from '@/lib/usePushPermission';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -42,7 +43,9 @@ const NOTIF_OPTIONS: Array<{ key: string; label: string; desc: string; icon: str
 export default function ProfileScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
-  const { data, refreshing, refresh } = useHomeData();
+  const { data, refresh } = useHomeData();
+  // Pull-to-refresh: spinner bound to real user gesture only.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
   const tabBarHeight = useBottomTabBarHeight();
 
   const pools = data?.pools ?? [];
@@ -74,7 +77,7 @@ export default function ProfileScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={onRefresh}
             tintColor={theme.colors.primary}
           />
         }

@@ -7,11 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityCard } from '@/components/activity';
 import { Button, Icon, Text } from '@/components/ui';
 import { useActivity } from '@/lib/useActivity';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import { fontFamilies, useTheme } from '@/theme';
 
 export default function ActivityScreen() {
   const theme = useTheme();
-  const { items, loading, refreshing, error, refresh } = useActivity();
+  const { items, loading, error, refresh } = useActivity();
+  // Pull-to-refresh: spinner bound to real user gesture only.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
 
   return (
     <SafeAreaView
@@ -37,7 +40,7 @@ export default function ActivityScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={refresh}
+              onRefresh={onRefresh}
               tintColor={theme.colors.primary}
             />
           }

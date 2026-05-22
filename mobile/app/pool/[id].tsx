@@ -37,6 +37,7 @@ import {
   type PoolTabKey,
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePendingActions } from '@/lib/usePendingActions';
 import { usePoolBanter } from '@/lib/usePoolBanter';
 import { usePoolDetail } from '@/lib/usePoolDetail';
@@ -63,7 +64,11 @@ export default function PoolDetailScreen() {
     tab?: string;
     banter?: string;
   }>();
-  const { data, loading, refreshing, error, refresh } = usePoolDetail(id);
+  const { data, loading, error, refresh } = usePoolDetail(id);
+  // Pull-to-refresh: spinner bound to real user gesture only. Background
+  // refreshes (useFocusEffect, route-param changes) still call `refresh`
+  // directly without surfacing the iOS spinner.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
   // Imperative handle to the banter bottom sheet. Opening is driven
   // from two places: the BanterFab tap (live user action) and the
   // `?banter=open` deep-link param (cold-start from a push tap or any
@@ -334,7 +339,7 @@ export default function PoolDetailScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={refresh}
+                onRefresh={onRefresh}
                 tintColor={accentColor ?? theme.colors.primary}
               />
             }

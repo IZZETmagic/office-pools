@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
   type GroupStanding,
@@ -43,6 +44,11 @@ export default function MatchDetailScreen() {
     error,
     refresh,
   } = useMatchDetail(matchId);
+  // Pull-to-refresh: spinner bound to user gesture only. Previously the
+  // RefreshControl was tied to `loading`, which also flips true on the
+  // initial fetch — so opening the screen flashed the iOS pull-down circle
+  // until the request resolved.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
@@ -110,8 +116,8 @@ export default function MatchDetailScreen() {
           contentContainerStyle={{ paddingTop: 16, paddingBottom: 32, gap: 16 }}
           refreshControl={
             <RefreshControl
-              refreshing={loading}
-              onRefresh={refresh}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor={theme.colors.primary}
             />
           }

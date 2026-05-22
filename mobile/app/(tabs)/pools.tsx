@@ -26,12 +26,15 @@ import {
 } from '@/components/pools';
 import { Button, Icon, Text } from '@/components/ui';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { useManualRefresh } from '@/lib/useManualRefresh';
 import type { PoolSummary } from '@/lib/useHomeData';
 import { useTheme, withOpacity } from '@/theme';
 
 export default function PoolsScreen() {
   const theme = useTheme();
-  const { data, loading, refreshing, error, refresh, refreshIfStale } = useHomeData();
+  const { data, loading, error, refresh, refreshIfStale } = useHomeData();
+  // Pull-to-refresh: spinner bound to user gesture only.
+  const { refreshing, onRefresh } = useManualRefresh(refresh);
   const tabBarHeight = useBottomTabBarHeight();
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -166,7 +169,7 @@ export default function PoolsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={onRefresh}
             tintColor={theme.colors.primary}
           />
         }
