@@ -9,6 +9,16 @@ import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
+// expo-clipboard is an optional native module — same defensive require
+// pattern as SettingsTab. Lets the screen render in tooling where the
+// module isn't linked yet; production builds always have it.
+let Clipboard: typeof import('expo-clipboard') | null = null;
+try {
+  Clipboard = require('expo-clipboard');
+} catch {
+  Clipboard = null;
+}
+
 type PoolDetail = {
   poolId: string;
   poolName: string;
@@ -26,6 +36,7 @@ type PoolDetail = {
 };
 
 type PoolSettingsRow = {
+  // Full-tournament / progressive mode — per-match scoring.
   group_exact_score: number;
   group_correct_difference: number;
   group_correct_result: number;
@@ -36,6 +47,26 @@ type PoolSettingsRow = {
   pso_exact_score: number | null;
   pso_correct_difference: number | null;
   pso_correct_result: number | null;
+  // Bracket Picker mode — no per-match scores; everything is bonus points
+  // for correct group positions, third-place qualifiers, knockout winners,
+  // and penalty calls. Columns are nullable in the DB because non-bracket
+  // pools don't fill them in. Match the field names in
+  // lib/bracketPickerScoring.ts DEFAULTS.
+  bp_group_correct_1st: number | null;
+  bp_group_correct_2nd: number | null;
+  bp_group_correct_3rd: number | null;
+  bp_group_correct_4th: number | null;
+  bp_third_correct_qualifier: number | null;
+  bp_third_correct_eliminated: number | null;
+  bp_third_all_correct_bonus: number | null;
+  bp_r32_correct: number | null;
+  bp_r16_correct: number | null;
+  bp_qf_correct: number | null;
+  bp_sf_correct: number | null;
+  bp_third_place_match_correct: number | null;
+  bp_final_correct: number | null;
+  bp_champion_bonus: number | null;
+  bp_penalty_correct: number | null;
 };
 
 const MODE_LABEL: Record<string, string> = {
@@ -78,6 +109,12 @@ export default function PoolPreviewSheet() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pool-code tap-to-copy feedback. Flips true on tap, reverts after 2s.
+  // 2s matches the existing SettingsTab copy pattern — long enough for
+  // the user to register the green confirmation, short enough to feel
+  // snappy. Industry standard hovers in the 1.5–2s range (Slack, GitHub,
+  // Notion all sit here).
+  const [codeCopied, setCodeCopied] = useState(false);
   // Refresh the home dashboard's pool list after a successful join so the
   // new card shows up on Home and Pools tabs immediately.
   const { refresh: refreshHomeData } = useHomeData();
@@ -102,8 +139,12 @@ export default function PoolPreviewSheet() {
             .maybeSingle(),
           supabase
             .from('pool_settings')
+            // Select all bracket-picker scoring fields too so bracket pools
+            // can render the right rules in the preview. Non-bracket pools
+            // ignore the bp_* columns; bracket pools ignore the per-match
+            // columns. Cheaper to over-select than to branch the query.
             .select(
-              'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result',
+              'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct',
             )
             .eq('pool_id', id)
             .maybeSingle(),
@@ -200,6 +241,21 @@ export default function PoolPreviewSheet() {
       message: `Join my World Cup prediction pool on SportPool!\n\n${url}`,
       url,
     });
+  }
+
+  // Tap-to-copy the pool code. Silent-fail when Clipboard isn't linked
+  // (which only happens in tooling, not real builds). The visual feedback
+  // — pill turns green, label flips to "Copied" — is driven by codeCopied;
+  // it reverts after 2s on the same timeout the SettingsTab uses.
+  async function handleCopyCode() {
+    if (!detail || !Clipboard) return;
+    try {
+      await Clipboard.setStringAsync(detail.poolCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      // Ignore — copy failure is non-critical, user can long-press text instead.
+    }
   }
 
   if (loading) {
@@ -363,35 +419,56 @@ export default function PoolPreviewSheet() {
         <View style={{ gap: theme.spacing.md }}>
           <Text variant="cardTitle">Share</Text>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <View
-              style={{
+            {/* Pool code pill — tap to copy. Swaps to a green "Copied"
+                state for 2s after a successful copy. Disabled (visually
+                identical, just no press handler) when Clipboard isn't
+                linked, which only happens in tooling. */}
+            <Pressable
+              onPress={handleCopyCode}
+              disabled={!Clipboard}
+              style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
                 paddingHorizontal: theme.spacing.lg,
                 paddingVertical: theme.spacing.sm + 1,
                 borderRadius: theme.radii.pill,
-                backgroundColor: withOpacity(theme.colors.primary, 0.08),
-              }}
+                backgroundColor: codeCopied
+                  ? withOpacity(theme.colors.green, 0.16)
+                  : withOpacity(theme.colors.primary, 0.08),
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              <Icon name="doc.on.clipboard" color="primary" size={18} />
+              <Icon
+                name={codeCopied ? 'checkmark.circle.fill' : 'doc.on.clipboard'}
+                tint={codeCopied ? theme.colors.green : undefined}
+                color={codeCopied ? undefined : 'primary'}
+                size={18}
+              />
               <RNText
                 style={{
-                  fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+                  fontFamily: codeCopied
+                    ? fontFamilies.bold
+                    : Platform.OS === 'ios'
+                      ? 'Menlo-Bold'
+                      : 'monospace',
                   fontSize: 13,
                   fontWeight: '700',
-                  color: theme.colors.primary,
-                  letterSpacing: 1,
+                  color: codeCopied ? theme.colors.green : theme.colors.primary,
+                  letterSpacing: codeCopied ? 0 : 1,
                   // Android's text-measurement omits the trailing letter-spacing,
                   // so the last glyph gets clipped by the parent. Match it with
                   // a paddingRight equal to the letterSpacing value. iOS already
                   // measures the trailing space correctly so this is Android-only.
-                  ...Platform.select({ android: { paddingRight: 1 }, default: {} }),
+                  ...Platform.select({
+                    android: codeCopied ? {} : { paddingRight: 1 },
+                    default: {},
+                  }),
                 }}
               >
-                {detail.poolCode}
+                {codeCopied ? 'Copied' : detail.poolCode}
               </RNText>
-            </View>
+            </Pressable>
             <Pressable
               onPress={handleShare}
               style={({ pressed }) => ({
@@ -423,29 +500,80 @@ export default function PoolPreviewSheet() {
           <View style={{ gap: theme.spacing.md }}>
             <Text variant="cardTitle">Scoring Rules</Text>
             <View style={{ gap: theme.spacing.md }}>
-              <ScoringCard title="Group Stage">
-                <ScoreRow label="Exact Score" pts={settings.group_exact_score} />
-                <ScoreRow label="Correct Difference" pts={settings.group_correct_difference} />
-                <ScoreRow label="Correct Result" pts={settings.group_correct_result} />
-              </ScoringCard>
-              <ScoringCard title="Knockout Stage">
-                <ScoreRow label="Exact Score" pts={settings.knockout_exact_score} />
-                <ScoreRow label="Correct Difference" pts={settings.knockout_correct_difference} />
-                <ScoreRow label="Correct Result" pts={settings.knockout_correct_result} />
-              </ScoringCard>
-              {settings.pso_enabled ? (
-                <ScoringCard title="Penalty Shootout">
-                  {settings.pso_exact_score !== null ? (
-                    <ScoreRow label="Exact Score" pts={settings.pso_exact_score} />
+              {detail.predictionMode === 'bracket_picker' ? (
+                // Bracket Picker mode has no per-match scoring — points come
+                // from correct group positions, third-place predictions,
+                // knockout winners, the champion pick, and (optionally)
+                // penalty calls. Mirrors the DEFAULTS in
+                // lib/bracketPickerScoring.ts. Falls back to those defaults
+                // when the admin hasn't overridden them in pool_settings.
+                <>
+                  <ScoringCard title="Group Positions">
+                    <ScoreRow label="Correct 1st Place" pts={settings.bp_group_correct_1st ?? 4} />
+                    <ScoreRow label="Correct 2nd Place" pts={settings.bp_group_correct_2nd ?? 3} />
+                    <ScoreRow label="Correct 3rd Place" pts={settings.bp_group_correct_3rd ?? 2} />
+                    <ScoreRow label="Correct 4th Place" pts={settings.bp_group_correct_4th ?? 1} />
+                  </ScoringCard>
+                  <ScoringCard title="Third-Place Qualifiers">
+                    <ScoreRow
+                      label="Correct Qualifier"
+                      pts={settings.bp_third_correct_qualifier ?? 2}
+                    />
+                    <ScoreRow
+                      label="Correct Elimination"
+                      pts={settings.bp_third_correct_eliminated ?? 1}
+                    />
+                    <ScoreRow
+                      label="All Correct Bonus"
+                      pts={settings.bp_third_all_correct_bonus ?? 10}
+                    />
+                  </ScoringCard>
+                  <ScoringCard title="Knockout Winners">
+                    <ScoreRow label="Round of 32" pts={settings.bp_r32_correct ?? 1} />
+                    <ScoreRow label="Round of 16" pts={settings.bp_r16_correct ?? 2} />
+                    <ScoreRow label="Quarter-Final" pts={settings.bp_qf_correct ?? 4} />
+                    <ScoreRow label="Semi-Final" pts={settings.bp_sf_correct ?? 8} />
+                    <ScoreRow
+                      label="Third-Place Match"
+                      pts={settings.bp_third_place_match_correct ?? 10}
+                    />
+                    <ScoreRow label="Final" pts={settings.bp_final_correct ?? 20} />
+                  </ScoringCard>
+                  <ScoringCard title="Bonus Picks">
+                    <ScoreRow label="Champion Bonus" pts={settings.bp_champion_bonus ?? 50} />
+                    <ScoreRow label="Correct Penalty Call" pts={settings.bp_penalty_correct ?? 1} />
+                  </ScoringCard>
+                </>
+              ) : (
+                // Full-tournament and progressive modes both score per-match
+                // (exact / difference / result), so they render the same
+                // three (or four with PSO) cards.
+                <>
+                  <ScoringCard title="Group Stage">
+                    <ScoreRow label="Exact Score" pts={settings.group_exact_score} />
+                    <ScoreRow label="Correct Difference" pts={settings.group_correct_difference} />
+                    <ScoreRow label="Correct Result" pts={settings.group_correct_result} />
+                  </ScoringCard>
+                  <ScoringCard title="Knockout Stage">
+                    <ScoreRow label="Exact Score" pts={settings.knockout_exact_score} />
+                    <ScoreRow label="Correct Difference" pts={settings.knockout_correct_difference} />
+                    <ScoreRow label="Correct Result" pts={settings.knockout_correct_result} />
+                  </ScoringCard>
+                  {settings.pso_enabled ? (
+                    <ScoringCard title="Penalty Shootout">
+                      {settings.pso_exact_score !== null ? (
+                        <ScoreRow label="Exact Score" pts={settings.pso_exact_score} />
+                      ) : null}
+                      {settings.pso_correct_difference !== null ? (
+                        <ScoreRow label="Correct Difference" pts={settings.pso_correct_difference} />
+                      ) : null}
+                      {settings.pso_correct_result !== null ? (
+                        <ScoreRow label="Correct Result" pts={settings.pso_correct_result} />
+                      ) : null}
+                    </ScoringCard>
                   ) : null}
-                  {settings.pso_correct_difference !== null ? (
-                    <ScoreRow label="Correct Difference" pts={settings.pso_correct_difference} />
-                  ) : null}
-                  {settings.pso_correct_result !== null ? (
-                    <ScoreRow label="Correct Result" pts={settings.pso_correct_result} />
-                  ) : null}
-                </ScoringCard>
-              ) : null}
+                </>
+              )}
             </View>
           </View>
         ) : null}
