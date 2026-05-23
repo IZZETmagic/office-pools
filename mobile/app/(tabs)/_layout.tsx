@@ -12,14 +12,14 @@
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ChampionIcon,
-  FootballIcon,
+  FootballPitchIcon,
   Home03Icon,
   Notification01Icon,
   UserCircleIcon,
 } from '@hugeicons/core-free-icons';
 import {
   ChampionIcon as ChampionSolidIcon,
-  FootballIcon as FootballSolidIcon,
+  FootballPitchIcon as FootballPitchSolidIcon,
   Home03Icon as Home03SolidIcon,
   Notification01Icon as Notification01SolidIcon,
   UserCircleIcon as UserCircleSolidIcon,
@@ -39,7 +39,7 @@ import { fontFamilies, useTheme } from '@/theme';
 // prediction pool app.
 const HOME_ICONS = { outline: Home03Icon, solid: Home03SolidIcon };
 const POOLS_ICONS = { outline: ChampionIcon, solid: ChampionSolidIcon };
-const RESULTS_ICONS = { outline: FootballIcon, solid: FootballSolidIcon };
+const RESULTS_ICONS = { outline: FootballPitchIcon, solid: FootballPitchSolidIcon };
 const ACTIVITY_ICONS = {
   outline: Notification01Icon,
   solid: Notification01SolidIcon,
