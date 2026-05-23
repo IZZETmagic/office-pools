@@ -321,15 +321,22 @@ export function Icon({
     console.warn(`[Icon] No Hugeicons mapping for "${name}" — rendering fallback Circle.`);
   }
   const tintColor = tint ?? theme.colors[color];
+  // Critical: when rendering a solid icon, DO NOT pass strokeWidth.
+  // The @hugeicons/react-native wrapper, whenever it sees a non-undefined
+  // strokeWidth, also spreads `stroke="currentColor"` onto every path
+  // (see the wrapper's source — it builds a single `O` object containing
+  // BOTH strokeWidth and stroke, then merges it into each path's props).
+  // That means solid icons (which use `fill="currentColor"`) get an
+  // additional outline stroke layered on top of their filled body,
+  // visually fattening them. Omitting strokeWidth for solid icons keeps
+  // the wrapper's stroke-injection branch disabled.
+  const isSolid = solid && SOLID_ICON_MAP[name] !== undefined;
   return (
     <HugeiconsIcon
       icon={iconConstant}
       size={size}
       color={tintColor}
-      // strokeWidth is ignored by solid glyphs (they use `fill`), so
-      // `weight` is effectively a no-op for solid icons. Kept pass-through
-      // for outline icons; harmless on solid.
-      strokeWidth={strokeWidthFor(weight)}
+      strokeWidth={isSolid ? undefined : strokeWidthFor(weight)}
     />
   );
 }
