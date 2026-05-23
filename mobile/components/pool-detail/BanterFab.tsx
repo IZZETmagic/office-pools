@@ -1,4 +1,4 @@
-import { MessageMultiple01Icon } from '@hugeicons-pro/core-solid-rounded';
+import { MessageMultiple01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, Text as RNText, View } from 'react-native';

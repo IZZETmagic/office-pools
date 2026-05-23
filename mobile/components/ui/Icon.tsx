@@ -1,18 +1,14 @@
 // Cross-platform icon renderer powered by @hugeicons/react-native.
 // Call sites use SF Symbol names (e.g. "house.fill") for continuity with
 // the rest of the codebase; the map below translates them to Hugeicons
-// icon constants so rendering is identical on iOS and Android.
+// icon constants so rendering is identical on iOS and Android — and
+// visually matches the bottom tab bar (which is the only other surface
+// using Hugeicons directly).
 //
-// Uses the @hugeicons-pro/core-solid-rounded variant for all glyphs —
-// matches the focused state of the bottom tab bar so anywhere an icon
-// appears in app content (cards, banners, buttons, list rows) reads as
-// a solid filled shape rather than a stroked outline. The outline-only
-// free pack stays in the dep tree for the tab bar's inactive state.
-//
-// Because every glyph here is filled, the legacy `weight` and `filled`
-// props are visual no-ops — preserved for API compatibility with the
-// long tail of call sites that still pass them. New code shouldn't need
-// to set them.
+// Hugeicons free tier is stroke-only — there are no `.fill` variants
+// like SF Symbols have. The `filled` prop is preserved for API
+// compatibility but is a no-op visually; emphasis is still expressed
+// via the `weight` prop (which controls stroke width).
 
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -109,7 +105,7 @@ import {
   UserRemove01Icon,
   ViewIcon,
   WaveIcon,
-} from '@hugeicons-pro/core-solid-rounded';
+} from '@hugeicons/core-free-icons';
 
 import { type ColorToken, useTheme } from '@/theme';
 
