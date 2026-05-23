@@ -483,10 +483,23 @@ export function useHomeDataInternal() {
             totalPoints: matchPoints + bonusPoints + adjustment,
             totalEntries: entriesByPool[pool.pool_id] ?? 0,
             hasSubmittedPredictions: entries.some((e) => e.has_submitted_predictions === true),
+            // If the user has zero entries (e.g. an admin who deleted all
+            // theirs), there is literally nothing to predict, so the
+            // "predictions needed" card treatment and filter must skip
+            // this pool. Without this guard the full/bracket branch below
+            // evaluates `!(null?.has_submitted_predictions ?? false)` to
+            // true and the card lit up as "needs predictions" with nothing
+            // to actually click into. Progressive already short-circuits
+            // upstream (the progressiveNeedsPredictions map skips empty
+            // entry lists), so this guard only changes behavior for the
+            // full / bracket branch — but applying it uniformly keeps the
+            // semantics obvious to future readers.
             needsPredictions:
-              pool.prediction_mode === 'progressive'
-                ? progressiveNeedsPredictions[pool.pool_id] ?? false
-                : !(best?.has_submitted_predictions ?? false),
+              entries.length === 0
+                ? false
+                : pool.prediction_mode === 'progressive'
+                  ? progressiveNeedsPredictions[pool.pool_id] ?? false
+                  : !(best?.has_submitted_predictions ?? false),
             predictionsCompleted: bestEntryId ? predictionsByEntry[bestEntryId] ?? 0 : 0,
             // Bracket picker has a fixed 92-item slate (48 group + 12 third-place
             // + 32 knockout); pick'em modes use the tournament's match count.

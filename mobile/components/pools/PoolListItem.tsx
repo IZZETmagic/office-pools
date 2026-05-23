@@ -53,7 +53,13 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
     ? MODE_GRADIENT[pool.predictionMode] ?? MODE_GRADIENT.full_tournament
     : MODE_GRADIENT.full_tournament;
   const isAdmin = pool.role === 'admin';
-  const needsPredictions = !pool.hasSubmittedPredictions;
+  // Use the canonical needsPredictions flag from useHomeData (which
+  // accounts for prediction mode + empty entry lists), not a local
+  // recomputation. The previous `!pool.hasSubmittedPredictions` got two
+  // edge cases wrong: progressive pools where an earlier round was
+  // submitted but a new one opened, AND admin-style pools where the
+  // user has deleted all their entries.
+  const needsPredictions = pool.needsPredictions;
   const level = getLevel(pool.totalPoints);
   const progress =
     pool.predictionsTotal > 0
