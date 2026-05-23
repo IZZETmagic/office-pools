@@ -170,14 +170,28 @@ export default function PoolDetailScreen() {
     if (banterParam !== 'open') return;
     if (!data) return;
     banterDeepLinkConsumed.current = true;
-    // Defer one frame so the screen finishes its first render before
-    // the sheet animates up — avoids a flash of an empty sheet over
-    // an unrendered pool detail.
-    requestAnimationFrame(() => {
-      // eslint-disable-next-line no-console
-      console.warn('[push.deepLink] opening banter sheet, ref present?', !!banterSheetRef.current);
-      banterSheetRef.current?.open();
-    });
+    // BanterSheet wraps a gorhom BottomSheet that initializes its
+    // Reanimated internals async — calling `expand()` immediately after
+    // the BanterSheet mounts (e.g., one requestAnimationFrame) silently
+    // no-ops because the inner sheetRef isn't attached yet. The outer
+    // forwardRef IS attached so `banterSheetRef.current?.open()`
+    // returns truthy from the optional chain in useImperativeHandle,
+    // but the internal `sheetRef.current?.expand()` it wraps still
+    // sees null.
+    //
+    // Defer ~400ms to clear the gorhom mount + Reanimated bring-up
+    // window. setTimeout instead of requestAnimationFrame gives a real
+    // wall-clock delay; nesting an rAF inside also ensures the call
+    // lines up with a paint cycle so the open animation starts on a
+    // fresh frame rather than mid-tick.
+    const t = setTimeout(() => {
+      requestAnimationFrame(() => {
+        // eslint-disable-next-line no-console
+        console.warn('[push.deepLink] opening banter sheet, ref present?', !!banterSheetRef.current);
+        banterSheetRef.current?.open();
+      });
+    }, 400);
+    return () => clearTimeout(t);
   }, [banterParam, data]);
 
   const isAdmin = data?.pool.isAdmin ?? false;
