@@ -55,7 +55,7 @@ function StatCard({
         ...theme.shadows.card,
       }}
     >
-      <Icon name={icon} size={16} tint={tint} weight="regular" />
+      <Icon name={icon} size={16} tint={tint} weight="light" solid />
       <RNText
         style={{
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',

@@ -107,6 +107,15 @@ import {
   WaveIcon,
 } from '@hugeicons/core-free-icons';
 
+// Pro solid-rounded variants — opt-in via the `solid` prop. Each entry
+// here unlocks a single SF name → Pro solid mapping in SOLID_ICON_MAP
+// below. Add new ones as components migrate.
+import {
+  ChampionIcon as ChampionSolidIcon,
+  Fire03Icon as Fire03SolidIcon,
+  FlashIcon as FlashSolidIcon,
+} from '@hugeicons-pro/core-solid-rounded';
+
 import { type ColorToken, useTheme } from '@/theme';
 
 // Hugeicons icon constants are arrays of SVG path tuples. The free
@@ -121,14 +130,36 @@ type IconProps = {
   color?: ColorToken;
   /** Overrides `color` with an arbitrary hex (e.g. for branded surfaces). */
   tint?: string;
-  weight?: 'regular' | 'medium' | 'semibold' | 'bold' | 'black';
+  /**
+   * Stroke thickness for outline icons. No visual effect on `solid`
+   * icons since they use `fill` not `stroke`. Ladder: light 1.75 →
+   * regular/medium 2.0 → semibold 2.25 → bold 2.5 → black 2.8.
+   */
+  weight?: 'light' | 'regular' | 'medium' | 'semibold' | 'bold' | 'black';
   /**
    * Preserved for API compatibility with the previous Lucide-based
    * renderer. Hugeicons free tier is stroke-only so this is a visual
-   * no-op today; if a paid Hugeicons pack with solid variants lands
-   * later, the prop is ready to wire through.
+   * no-op today; for solid variants use `solid` below.
    */
   filled?: boolean;
+  /**
+   * Opt into the Hugeicons Pro solid-rounded variant. Only works for
+   * names that have a mapping in SOLID_ICON_MAP — anything else falls
+   * back to the free outline icon silently. Intentionally opt-in so we
+   * can migrate component-by-component rather than flip every glyph in
+   * the app at once.
+   */
+  solid?: boolean;
+};
+
+// Sparse SF-name → Pro solid-rounded mapping. Only entries here respect
+// the `solid` prop; other names fall through to ICON_MAP regardless.
+const SOLID_ICON_MAP: Record<string, IconConstant> = {
+  'bolt.fill': FlashSolidIcon,
+  'flame.fill': Fire03SolidIcon,
+  'trophy': ChampionSolidIcon,
+  'trophy.circle.fill': ChampionSolidIcon,
+  'trophy.fill': ChampionSolidIcon,
 };
 
 // Map SF Symbol names to Hugeicons constants. Keep alphabetised for
@@ -261,6 +292,8 @@ function strokeWidthFor(weight: IconProps['weight']): number {
       return 2.5;
     case 'semibold':
       return 2.25;
+    case 'light':
+      return 1.75;
     case 'medium':
     case 'regular':
     default:
@@ -275,10 +308,15 @@ export function Icon({
   tint,
   weight = 'regular',
   filled: _filled = false,
+  solid = false,
 }: IconProps) {
   const theme = useTheme();
-  const iconConstant = ICON_MAP[name] ?? CircleIcon;
-  if (!ICON_MAP[name] && __DEV__) {
+  // Solid mapping wins when the caller opted in AND a mapping exists.
+  // Ternary (not &&) so `false` becomes `undefined` and the `??` chain
+  // correctly cascades to ICON_MAP.
+  const iconConstant =
+    (solid ? SOLID_ICON_MAP[name] : undefined) ?? ICON_MAP[name] ?? CircleIcon;
+  if (!ICON_MAP[name] && !SOLID_ICON_MAP[name] && __DEV__) {
     // eslint-disable-next-line no-console
     console.warn(`[Icon] No Hugeicons mapping for "${name}" — rendering fallback Circle.`);
   }
@@ -288,6 +326,9 @@ export function Icon({
       icon={iconConstant}
       size={size}
       color={tintColor}
+      // strokeWidth is ignored by solid glyphs (they use `fill`), so
+      // `weight` is effectively a no-op for solid icons. Kept pass-through
+      // for outline icons; harmless on solid.
       strokeWidth={strokeWidthFor(weight)}
     />
   );
