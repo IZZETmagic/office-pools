@@ -14,13 +14,13 @@ import {
   PoolsHeader,
 } from '@/components/pools';
 import { Button, Icon, Text } from '@/components/ui';
-import { useActivity } from '@/lib/useActivity';
+import { useSharedActivity } from '@/lib/ActivityProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { fontFamilies, useTheme } from '@/theme';
 
 export default function ActivityScreen() {
   const theme = useTheme();
-  const { items, loading, error, refresh } = useActivity();
+  const { items, loading, error, refresh } = useSharedActivity();
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
   // Create / Join pool sheets — opened by the "+" button in the header.

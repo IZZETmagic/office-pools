@@ -11,14 +11,16 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 
+import { Splash } from '@/components/Splash';
+import { ActivityProvider, useSharedActivity } from '@/lib/ActivityProvider';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { HomeDataProvider } from '@/lib/HomeDataProvider';
+import { HomeDataProvider, useHomeData } from '@/lib/HomeDataProvider';
 import { PendingActionsProvider } from '@/lib/usePendingActions';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
@@ -90,13 +92,10 @@ function InnerLayout() {
   // listeners no-op when no notification has been tapped.
   usePushNotificationHandlers();
 
-  useEffect(() => {
-    if (!loading) {
-      SplashScreen.hideAsync().catch(() => {
-        /* ignore */
-      });
-    }
-  }, [loading]);
+  // Native splash → custom Splash hand-off happens inside the Splash
+  // component (it calls SplashScreen.hideAsync() on mount). That keeps the
+  // hand-off coupled to the moment the custom splash is actually painted,
+  // avoiding any blank-frame flash.
 
   useEffect(() => {
     if (loading) return;
@@ -108,13 +107,17 @@ function InnerLayout() {
     }
   }, [session, loading, segments, router]);
 
-  if (loading) return null;
+  // Note: no `if (loading) return null;` here — the tree mounts immediately
+  // so HomeDataProvider + ActivityProvider can start prefetching beneath the
+  // splash overlay. The auth routing useEffect above redirects under the
+  // splash, so by the time it fades, the correct stack is already mounted.
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
+      <ActivityProvider>
       <PendingActionsProvider>
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -175,11 +178,51 @@ function InnerLayout() {
         />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+        <SplashOverlay />
       </PendingActionsProvider>
+      </ActivityProvider>
       </HomeDataProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
     </KeyboardProvider>
     </GestureHandlerRootView>
   );
+}
+
+// Branded splash overlay. Stays mounted (over the rest of the tree) until
+// HomeData + Activity have hydrated and a 1.2s minimum-floor has elapsed,
+// then fades out and unmounts. Sibling to <Stack> so the tabs mount and
+// prefetch behind the splash from frame zero.
+const SPLASH_MIN_MS = 1200;
+
+function SplashOverlay() {
+  const preloadComplete = useSplashGate();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+  return (
+    <Splash
+      preloadComplete={preloadComplete}
+      onDismissed={() => setDismissed(true)}
+    />
+  );
+}
+
+function useSplashGate(): boolean {
+  const { session, loading: authLoading } = useAuth();
+  const { loading: homeLoading } = useHomeData();
+  const { loading: activityLoading } = useSharedActivity();
+  const [minElapsed, setMinElapsed] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!minElapsed) return false;
+  if (authLoading) return false;
+  // Unauthenticated launch: no data to prefetch — fade out so the user
+  // lands on /(auth)/sign-in immediately after the 1.2s floor.
+  if (!session) return true;
+  return !homeLoading && !activityLoading;
 }
