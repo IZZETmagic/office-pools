@@ -160,34 +160,23 @@ export default function PoolDetailScreen() {
   // through the screen doesn't re-open the sheet on every focus.
   const banterDeepLinkConsumed = useRef(false);
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.warn('[push.deepLink] pool/[id] effect fired', {
-      banterParam,
-      hasData: !!data,
-      consumed: banterDeepLinkConsumed.current,
-    });
     if (banterDeepLinkConsumed.current) return;
     if (banterParam !== 'open') return;
     if (!data) return;
     banterDeepLinkConsumed.current = true;
     // BanterSheet wraps a gorhom BottomSheet that initializes its
     // Reanimated internals async — calling `expand()` immediately after
-    // the BanterSheet mounts (e.g., one requestAnimationFrame) silently
-    // no-ops because the inner sheetRef isn't attached yet. The outer
-    // forwardRef IS attached so `banterSheetRef.current?.open()`
-    // returns truthy from the optional chain in useImperativeHandle,
-    // but the internal `sheetRef.current?.expand()` it wraps still
-    // sees null.
+    // the BanterSheet mounts silently no-ops because the inner sheetRef
+    // isn't attached yet (the outer forwardRef IS, so the optional
+    // chain in useImperativeHandle returns truthy, but the wrapped
+    // sheetRef.current?.expand() still sees null).
     //
-    // Defer ~400ms to clear the gorhom mount + Reanimated bring-up
-    // window. setTimeout instead of requestAnimationFrame gives a real
-    // wall-clock delay; nesting an rAF inside also ensures the call
-    // lines up with a paint cycle so the open animation starts on a
-    // fresh frame rather than mid-tick.
+    // 400ms setTimeout + nested rAF clears the bring-up window AND
+    // aligns the open animation with the next paint frame. The user
+    // is already mid-cold-start transition (splash → home → pool) so
+    // the delay reads as a deliberate animation, not a hang.
     const t = setTimeout(() => {
       requestAnimationFrame(() => {
-        // eslint-disable-next-line no-console
-        console.warn('[push.deepLink] opening banter sheet, ref present?', !!banterSheetRef.current);
         banterSheetRef.current?.open();
       });
     }, 400);
