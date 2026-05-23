@@ -5,7 +5,8 @@ import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'r
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Text } from '@/components/ui';
+import { Button, ConfirmDialog, Text } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 import {
   CountdownHero,
   EmptyHome,
@@ -27,15 +28,22 @@ import {
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { MatchSummary, PoolSummary } from '@/lib/useHomeData';
 import { useManualRefresh } from '@/lib/useManualRefresh';
+import { useNotificationPrompt } from '@/lib/useNotificationPrompt';
 import { useTheme } from '@/theme';
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const { user } = useAuth();
   const { data, loading, error, refresh, refreshIfStale } = useHomeData();
   // Pull-to-refresh: spinner is bound to user gesture only. Background
   // refreshes (focus, realtime, stale) trigger via `refresh` directly and
   // don't surface the OS-level spinner.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
+  // One-shot notification soft-ask. Surfaces a custom ConfirmDialog the
+  // first time the user lands here with permission still 'undetermined'.
+  // Tapping "Enable" triggers the OS prompt; tapping "Not now" dismisses
+  // permanently (persisted in SecureStore). See useNotificationPrompt.
+  const notificationPrompt = useNotificationPrompt({ enabled: !!user });
   const tabBarHeight = useBottomTabBarHeight();
   const initialFocus = useRef(true);
   // Create/Join action sheet opened from the "+" in HomeHeader. Picking
@@ -189,6 +197,24 @@ export default function HomeScreen() {
         }}
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
+
+      {/* Notification soft-ask. shouldPrompt only flips true the FIRST
+          time a signed-in user lands here with OS permission still
+          'undetermined' — once dismissed (either choice) the SecureStore
+          flag prevents it from showing again on subsequent app launches. */}
+      <ConfirmDialog
+        visible={notificationPrompt.shouldPrompt}
+        title="Get notified about your pools?"
+        description="Turn on notifications and we'll ping you when new banter lands, your pools earn badges, deadlines get close, and matches finish."
+        confirmLabel="Enable Notifications"
+        cancelLabel="Not now"
+        onConfirm={() => {
+          void notificationPrompt.enable();
+        }}
+        onCancel={() => {
+          void notificationPrompt.dismiss();
+        }}
+      />
     </SafeAreaView>
   );
 }
