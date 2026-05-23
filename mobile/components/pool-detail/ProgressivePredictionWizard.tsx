@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GroupCollapsibleSection, MatchPredictionRow, ThirdPlaceTable } from '@/components/pool-detail';
+import { usePoolSettings } from '@/lib/usePoolSettings';
 import { Icon, Text } from '@/components/ui';
 import { submitRoundPredictions } from '@/lib/api';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
@@ -102,6 +103,11 @@ export function ProgressivePredictionWizard({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data: roundsData, refresh: refreshRounds } = usePoolRounds(poolId);
+  // Pool's PSO setting drives whether knockout rows surface penalty score
+  // inputs when the user predicts a tie. Falls back to false while
+  // settings are loading — better to hide the inputs than to flash them.
+  const { settings: poolSettings } = usePoolSettings(poolId);
+  const psoEnabled = poolSettings?.psoEnabled ?? false;
   const { submissions, refresh: refreshSubmissions } = useEntryRoundSubmissions(
     data.entry.entryId,
   );
@@ -288,6 +294,7 @@ export function ProgressivePredictionWizard({
             onChange={effectiveUpdatePrediction}
             disabled={!canEdit}
             isFinalsRound={currentRound === 'final' || currentRound === 'third_place'}
+            psoEnabled={psoEnabled}
           />
         )}
       </ScrollView>
@@ -568,6 +575,7 @@ function KnockoutStageContent({
   onChange,
   disabled,
   isFinalsRound,
+  psoEnabled,
 }: {
   matches: Match[];
   predictions: Map<string, ScoreEntry>;
@@ -575,6 +583,9 @@ function KnockoutStageContent({
   onChange: (matchId: string, patch: Partial<ScoreEntry>) => void;
   disabled: boolean;
   isFinalsRound: boolean;
+  /** Whether the pool admin enabled PSO scoring. Threaded down so the
+   *  row can show penalty inputs only when the user predicts a tie. */
+  psoEnabled: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -626,6 +637,12 @@ function KnockoutStageContent({
               onHomeChange={(n) => onChange(m.match_id, { home: n })}
               onAwayChange={(n) => onChange(m.match_id, { away: n })}
               disabled={disabled}
+              psoEnabled={psoEnabled}
+              isKnockout
+              homePso={pred?.homePso ?? null}
+              awayPso={pred?.awayPso ?? null}
+              onHomePsoChange={(n) => onChange(m.match_id, { homePso: n })}
+              onAwayPsoChange={(n) => onChange(m.match_id, { awayPso: n })}
             />
           </View>
         );

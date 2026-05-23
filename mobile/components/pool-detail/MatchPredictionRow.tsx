@@ -19,6 +19,22 @@ type Props = {
   onHomeChange: (n: number) => void;
   onAwayChange: (n: number) => void;
   disabled?: boolean;
+  /**
+   * Optional Penalty Shootout (PSO) inputs. Surface a second score row
+   * below the main row when ALL of:
+   *   - psoEnabled is true (pool admin turned on PSO scoring),
+   *   - isKnockout is true (group-stage draws don't go to penalties),
+   *   - homeScore === awayScore and both are non-null (tie after 90/120
+   *     minutes is the only path to a shootout in real life).
+   * If those are false the PSO fields render nothing and the row is
+   * visually identical to before.
+   */
+  psoEnabled?: boolean;
+  isKnockout?: boolean;
+  homePso?: number | null;
+  awayPso?: number | null;
+  onHomePsoChange?: (n: number) => void;
+  onAwayPsoChange?: (n: number) => void;
 };
 
 export function MatchPredictionRow({
@@ -29,16 +45,31 @@ export function MatchPredictionRow({
   onHomeChange,
   onAwayChange,
   disabled,
+  psoEnabled,
+  isKnockout,
+  homePso,
+  awayPso,
+  onHomePsoChange,
+  onAwayPsoChange,
 }: Props) {
   const theme = useTheme();
   const isComplete = homeScore !== null && awayScore !== null;
+  const isTied = isComplete && homeScore === awayScore;
+  // Only surface PSO inputs when the admin opted into PSO scoring, the
+  // match is in the knockout phase, AND the user has predicted a tie.
+  // A tie is the only path to a shootout in real knockout play, so the
+  // inputs only become relevant in that scenario.
+  const showPso =
+    !!psoEnabled &&
+    !!isKnockout &&
+    isTied &&
+    !!onHomePsoChange &&
+    !!onAwayPsoChange;
 
   return (
     <View
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm,
+        gap: showPso ? theme.spacing.xs : 0,
         paddingVertical: theme.spacing.sm,
         paddingHorizontal: theme.spacing.md,
         backgroundColor: isComplete
@@ -48,19 +79,73 @@ export function MatchPredictionRow({
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <TeamColumn team={home} align="right" />
-      <TapScoreField value={homeScore} onChange={onHomeChange} disabled={disabled} />
-      <RNText
+      <View
         style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 16,
-          color: theme.colors.slate,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
         }}
       >
-        –
-      </RNText>
-      <TapScoreField value={awayScore} onChange={onAwayChange} disabled={disabled} />
-      <TeamColumn team={away} align="left" />
+        <TeamColumn team={home} align="right" />
+        <TapScoreField value={homeScore} onChange={onHomeChange} disabled={disabled} />
+        <RNText
+          style={{
+            fontFamily: fontFamilies.bold,
+            fontSize: 16,
+            color: theme.colors.slate,
+          }}
+        >
+          –
+        </RNText>
+        <TapScoreField value={awayScore} onChange={onAwayChange} disabled={disabled} />
+        <TeamColumn team={away} align="left" />
+      </View>
+      {showPso ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: theme.spacing.sm,
+            paddingTop: theme.spacing.xs,
+            marginTop: 2,
+            borderTopWidth: 1,
+            borderTopColor: withOpacity(theme.colors.primary, 0.12),
+          }}
+        >
+          <RNText
+            style={{
+              fontFamily: fontFamilies.semibold,
+              fontSize: 10,
+              letterSpacing: 1.4,
+              color: theme.colors.slate,
+              textTransform: 'uppercase',
+              marginRight: theme.spacing.xs,
+            }}
+          >
+            Penalties
+          </RNText>
+          <TapScoreField
+            value={homePso ?? null}
+            onChange={onHomePsoChange!}
+            disabled={disabled}
+          />
+          <RNText
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 14,
+              color: theme.colors.slate,
+            }}
+          >
+            –
+          </RNText>
+          <TapScoreField
+            value={awayPso ?? null}
+            onChange={onAwayPsoChange!}
+            disabled={disabled}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

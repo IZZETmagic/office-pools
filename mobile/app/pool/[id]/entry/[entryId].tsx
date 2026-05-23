@@ -23,6 +23,7 @@ import {
   type Team,
   isPredictionComplete,
 } from '@/lib/bracket/tournament';
+import { usePoolSettings } from '@/lib/usePoolSettings';
 import { usePredictions } from '@/lib/usePredictions';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -68,6 +69,11 @@ export default function PredictionWizard() {
   const adminView = viewAs === 'admin';
   const { data, loading, error, saving, submitted, predictions, bracket, updatePrediction, submit } =
     usePredictions(id, entryId);
+  // Pool's PSO setting — surfaced to the knockout stage so the row
+  // component knows whether to show penalty inputs when the user
+  // predicts a tie. Falls back to false while settings load.
+  const { settings: poolSettings } = usePoolSettings(id);
+  const psoEnabled = poolSettings?.psoEnabled ?? false;
   const [stage, setStage] = useState<WizardStage>('group');
   const [submitting, setSubmitting] = useState(false);
   const [expandAllSignal, setExpandAllSignal] = useState(1);
@@ -266,6 +272,7 @@ export default function PredictionWizard() {
             disabled={isReadOnly}
             onChange={updatePrediction}
             stage={stage as Exclude<WizardStage, 'group' | 'summary'>}
+            psoEnabled={psoEnabled}
           />
         )}
       </ScrollView>
@@ -393,6 +400,7 @@ function KnockoutStage({
   disabled,
   onChange,
   stage,
+  psoEnabled,
 }: {
   matches: Match[];
   predictions: Map<string, ScoreEntry>;
@@ -400,6 +408,9 @@ function KnockoutStage({
   disabled: boolean;
   onChange: (matchId: string, patch: Partial<ScoreEntry>) => void;
   stage: 'r32' | 'r16' | 'qf' | 'sf' | 'third_final';
+  /** Whether the pool admin enabled PSO scoring. Threaded down so the
+   *  row can show penalty inputs only when the user predicts a tie. */
+  psoEnabled: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -455,6 +466,12 @@ function KnockoutStage({
               onHomeChange={(n) => onChange(m.match_id, { home: n })}
               onAwayChange={(n) => onChange(m.match_id, { away: n })}
               disabled={disabled}
+              psoEnabled={psoEnabled}
+              isKnockout
+              homePso={pred?.homePso ?? null}
+              awayPso={pred?.awayPso ?? null}
+              onHomePsoChange={(n) => onChange(m.match_id, { homePso: n })}
+              onAwayPsoChange={(n) => onChange(m.match_id, { awayPso: n })}
             />
           </View>
         );
