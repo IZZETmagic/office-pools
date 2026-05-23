@@ -582,7 +582,7 @@ function SummaryStage({
           borderColor: withOpacity(theme.colors.accent, 0.3),
         }}
       >
-        <Icon name="trophy.fill" color="accent" size={32} />
+        <Icon name="trophy.fill" color="accent" size={32} solid />
         <Text variant="sectionHeader" align="center">
           {champion?.country_name ?? 'TBD'}
         </Text>
