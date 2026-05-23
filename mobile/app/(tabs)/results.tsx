@@ -348,7 +348,7 @@ export default function ResultsScreen() {
         titlePrefix="Match"
         titleAccent="Centre"
         subtitle="Where predictions meet reality"
-        showMenu={false}
+        onMenuPress={() => createJoinSheetRef.current?.open()}
       />
       <ResultsFilterBar
         mode={filterMode}
