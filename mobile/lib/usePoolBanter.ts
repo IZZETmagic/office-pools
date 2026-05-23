@@ -695,6 +695,39 @@ export function usePoolBanter(poolId: string | undefined) {
     };
   }, [poolId, hydrateSenders, decorate, replyRefFromMessage]);
 
+  // Realtime sync of unread count across separate hook instances. The
+  // BanterSheet and the pool detail screen each call usePoolBanter
+  // independently, so their `unreadCount` states aren't shared. When the
+  // sheet's markAsRead updates pool_members.last_read_at, the pool
+  // detail's BanterFab would otherwise keep showing the stale count
+  // until next render. Subscribing here means any UPDATE to my own
+  // pool_members row (from any sheet, any device) triggers a re-fetch
+  // in every mounted instance of this hook, including the one driving
+  // the FAB.
+  useEffect(() => {
+    if (!poolId || !appUserId) return;
+    const channel = supabase
+      .channel(`pool-banter-read-${poolId}-${appUserId}-${Math.random().toString(36).slice(2, 8)}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pool_members',
+          filter: `pool_id=eq.${poolId}`,
+        },
+        (payload) => {
+          const row = payload.new as { user_id?: string } | null;
+          if (row?.user_id !== appUserId) return;
+          void fetchUnread();
+        },
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [poolId, appUserId, fetchUnread]);
+
   return {
     messages,
     members,
