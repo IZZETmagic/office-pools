@@ -14,7 +14,7 @@
 
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { useAuth } from './auth';
@@ -70,6 +70,12 @@ function handleResponse(response: Notifications.NotificationResponse) {
 
 export function usePushNotificationHandlers() {
   const { user } = useAuth();
+  // Tracks whether we've already consumed the cold-start push response.
+  // Gating effect (2) on `user` means it'll re-run when auth resolves
+  // (user goes from null → User on app launch); without this ref the
+  // effect would route again on every subsequent auth state change too
+  // (e.g. token refresh).
+  const coldStartConsumed = useRef(false);
 
   // 1. Foreground display config — install once at app boot.
   useEffect(() => {
@@ -79,17 +85,31 @@ export function usePushNotificationHandlers() {
   // 2. Cold-start tap: app was killed, user tapped the notification → app
   // opened. `getLastNotificationResponseAsync` returns the response that
   // triggered the launch (or null on normal launches).
+  //
+  // Gated on `user` being non-null because the root layout decides
+  // (auth) vs (tabs) routing as soon as auth resolves; if we route to
+  // /pool/[id] BEFORE that decision settles, the layout's router.replace
+  // either stomps our push or thrashes the stack and the deep-link gets
+  // eaten. Waiting for `user` ensures we only navigate once the tabs
+  // group is mounted as the root, so router.push lands cleanly on top.
+  //
+  // 150ms additional defer covers the gap between auth resolving and
+  // the layout finishing its router.replace('/(tabs)') — long enough
+  // to win the race, short enough to feel like instant navigation
+  // from the user's perspective (they're still seeing the splash /
+  // first frame).
   useEffect(() => {
-    let mounted = true;
+    if (!user || coldStartConsumed.current) return;
+    coldStartConsumed.current = true;
+    let cancelled = false;
     void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!mounted || !response) return;
-      // Defer one tick so the router has its first stack mounted before push.
-      setTimeout(() => handleResponse(response), 0);
+      if (cancelled || !response) return;
+      setTimeout(() => handleResponse(response), 150);
     });
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   // 3. Warm tap: app is foregrounded or backgrounded when the user taps the
   // notification.
