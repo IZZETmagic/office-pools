@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# npm auth — holds the Hugeicons Pro license token. Never commit.
+.npmrc
+
 # typescript
 *.tsbuildinfo
 

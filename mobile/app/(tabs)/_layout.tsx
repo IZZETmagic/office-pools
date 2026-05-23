@@ -1,10 +1,13 @@
-// JS-rendered tab bar via Expo Router's <Tabs>. Tab icons use Hugeicons'
-// free set — soft-rounded stroke style across all glyphs. The free tier
-// doesn't include filled variants, so we signal the active tab via a
-// thicker strokeWidth instead of fill (color also changes to primary,
-// handled by tabBarActiveTintColor below). If we ever buy the Pro icon
-// pack with bulk/duotone variants, the active state can switch to a
-// true filled icon then.
+// JS-rendered tab bar via Expo Router's <Tabs>. Tab icons swap variants
+// based on focus:
+//   - Inactive tab → stroke icon from @hugeicons/core-free-icons
+//     (soft-rounded outlines, slate tint)
+//   - Active tab   → solid icon from @hugeicons-pro/core-solid-rounded
+//     (filled glyph, primary tint)
+// The two icon families share the same naming convention so the swap is
+// just a different module import — no per-tab logic. iOS/Android system
+// tab bars typically do this same outline-to-filled swap on focus, and
+// our purchase of the Pro pack lets us match that pattern natively.
 
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -14,6 +17,13 @@ import {
   Notification01Icon,
   UserCircleIcon,
 } from '@hugeicons/core-free-icons';
+import {
+  ChampionIcon as ChampionSolidIcon,
+  FootballIcon as FootballSolidIcon,
+  Home03Icon as Home03SolidIcon,
+  Notification01Icon as Notification01SolidIcon,
+  UserCircleIcon as UserCircleSolidIcon,
+} from '@hugeicons-pro/core-solid-rounded';
 import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
@@ -23,14 +33,20 @@ import { useHomeData } from '@/lib/HomeDataProvider';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { fontFamilies, useTheme } from '@/theme';
 
-// Per-tab icon constant. Hugeicons doesn't have a literal Trophy in its
-// free set, so the Pools tab uses Champion (a podium with a winner) —
-// thematically aligned for a prediction pool app.
-const HOME_ICON = Home03Icon;
-const POOLS_ICON = ChampionIcon;
-const RESULTS_ICON = FootballIcon;
-const ACTIVITY_ICON = Notification01Icon; // closest free Hugeicons equivalent to a bell
-const PROFILE_ICON = UserCircleIcon;
+// Per-tab icon pair: outline for inactive, solid for active. Hugeicons
+// doesn't have a literal Trophy in either set, so the Pools tab uses
+// Champion (a podium with a winner) — thematically aligned for a
+// prediction pool app.
+const HOME_ICONS = { outline: Home03Icon, solid: Home03SolidIcon };
+const POOLS_ICONS = { outline: ChampionIcon, solid: ChampionSolidIcon };
+const RESULTS_ICONS = { outline: FootballIcon, solid: FootballSolidIcon };
+const ACTIVITY_ICONS = {
+  outline: Notification01Icon,
+  solid: Notification01SolidIcon,
+};
+const PROFILE_ICONS = { outline: UserCircleIcon, solid: UserCircleSolidIcon };
+
+type IconPair = { outline: typeof Home03Icon; solid: typeof Home03Icon };
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -45,13 +61,35 @@ export default function TabLayout() {
   const poolsTabHasIndicator =
     totalUnread > 0 || (pending !== null && pending.totalIndicator > 0);
 
-  // All tab icons render at the same stroke weight (2.5). The only
-  // active-state signal is the color tint (primary on focus, slate
-  // otherwise) handled by tabBarActiveTintColor below.
-  function renderTabIcon(icon: typeof Home03Icon, hasDot = false) {
-    return ({ color, size }: { color: string; size: number; focused: boolean }) => (
-      <View style={{ width: size + 8, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <HugeiconsIcon icon={icon} color={color} size={size} strokeWidth={2.5} />
+  // Picks the outline icon for inactive tabs and the solid icon for the
+  // focused tab. strokeWidth only matters for the outline variant — solid
+  // icons render as filled glyphs and ignore it. Both variants honor the
+  // `color` tint (primary on focus, slate otherwise) injected by Tabs via
+  // tabBarActiveTintColor / tabBarInactiveTintColor below.
+  function renderTabIcon(icons: IconPair, hasDot = false) {
+    return ({
+      color,
+      size,
+      focused,
+    }: {
+      color: string;
+      size: number;
+      focused: boolean;
+    }) => (
+      <View
+        style={{
+          width: size + 8,
+          height: size,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <HugeiconsIcon
+          icon={focused ? icons.solid : icons.outline}
+          color={color}
+          size={size}
+          strokeWidth={focused ? undefined : 2.5}
+        />
         {hasDot ? <NotificationDot size="md" top={-2} right={-2} /> : null}
       </View>
     );
@@ -112,35 +150,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: renderTabIcon(HOME_ICON),
+          tabBarIcon: renderTabIcon(HOME_ICONS),
         }}
       />
       <Tabs.Screen
         name="pools"
         options={{
           title: 'Pools',
-          tabBarIcon: renderTabIcon(POOLS_ICON, poolsTabHasIndicator),
+          tabBarIcon: renderTabIcon(POOLS_ICONS, poolsTabHasIndicator),
         }}
       />
       <Tabs.Screen
         name="results"
         options={{
           title: 'Results',
-          tabBarIcon: renderTabIcon(RESULTS_ICON),
+          tabBarIcon: renderTabIcon(RESULTS_ICONS),
         }}
       />
       <Tabs.Screen
         name="activity"
         options={{
           title: 'Activity',
-          tabBarIcon: renderTabIcon(ACTIVITY_ICON),
+          tabBarIcon: renderTabIcon(ACTIVITY_ICONS),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: renderTabIcon(PROFILE_ICON),
+          tabBarIcon: renderTabIcon(PROFILE_ICONS),
         }}
       />
     </Tabs>
