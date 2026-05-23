@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, Text as RNText, View } from 'react-native';
 
@@ -38,12 +39,27 @@ export function TapScoreField({ value, onChange, disabled }: Props) {
 
   function tap() {
     if (disabled) return;
+    // Light haptic on every tap — gives the score field the same "snappy"
+    // feel as a physical stepper. Fires before onChange so the tactile
+    // response lines up with the visual update (state batching defers the
+    // re-render by a frame anyway).
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
+      /* haptics unavailable on simulator / older devices */
+    });
     const next = ((value ?? -1) + 1) % 16;
     onChange(next);
   }
 
   function longPressReset() {
     if (disabled) return;
+    // Heavier double-pulse haptic on long-press reset. iOS Warning
+    // notification pattern is a built-in two-tap rhythm that feels
+    // distinctly different from the single Light impact used on tap —
+    // signals "you just did the bigger action" without needing to read
+    // the screen. On Android the same call maps to a pattern vibration.
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
+      /* haptics unavailable */
+    });
     onChange(0);
   }
 
