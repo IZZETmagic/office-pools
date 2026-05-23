@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -12,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GroupCollapsibleSection, MatchPredictionRow, ThirdPlaceTable } from '@/components/pool-detail';
 import { usePoolSettings } from '@/lib/usePoolSettings';
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { submitRoundPredictions } from '@/lib/api';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
@@ -142,6 +141,14 @@ export function ProgressivePredictionWizard({
   const [submitting, setSubmitting] = useState(false);
   const [expandAllSignal, setExpandAllSignal] = useState(1);
   const [justSubmittedRound, setJustSubmittedRound] = useState<RoundKey | null>(null);
+  // Submit dialog state — replaces previous Alert.alert calls with our
+  // own ConfirmDialog primitive so the look matches the rest of the app.
+  type SubmitDialog =
+    | { kind: 'none' }
+    | { kind: 'incomplete' }
+    | { kind: 'confirm' }
+    | { kind: 'error'; message: string };
+  const [submitDialog, setSubmitDialog] = useState<SubmitDialog>({ kind: 'none' });
 
   // Auto-advance once the just-submitted round shows up in fresh submissions
   useEffect(() => {
@@ -198,35 +205,25 @@ export function ProgressivePredictionWizard({
   function handleSubmit() {
     if (!canEdit) return;
     if (!roundComplete) {
-      Alert.alert('Not yet', 'Fill in every match before submitting this round.');
+      setSubmitDialog({ kind: 'incomplete' });
       return;
     }
-    Alert.alert(
-      `Submit ${ROUND_LABELS[currentRound]}?`,
-      `Once submitted, your ${ROUND_LABELS[currentRound]} predictions cannot be changed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          style: 'destructive',
-          onPress: async () => {
-            setSubmitting(true);
-            try {
-              await submitRoundPredictions(poolId, data.entry.entryId, currentRound);
-              await Promise.all([refreshSubmissions(), refreshRounds()]);
-              setJustSubmittedRound(currentRound);
-            } catch (err) {
-              Alert.alert(
-                "Couldn't submit",
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            } finally {
-              setSubmitting(false);
-            }
-          },
-        },
-      ],
-    );
+    setSubmitDialog({ kind: 'confirm' });
+  }
+
+  async function confirmSubmit() {
+    setSubmitDialog({ kind: 'none' });
+    setSubmitting(true);
+    try {
+      await submitRoundPredictions(poolId, data.entry.entryId, currentRound);
+      await Promise.all([refreshSubmissions(), refreshRounds()]);
+      setJustSubmittedRound(currentRound);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setTimeout(() => setSubmitDialog({ kind: 'error', message }), 100);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -306,6 +303,35 @@ export function ProgressivePredictionWizard({
         submitting={submitting}
         isSubmitted={isSubmitted}
         onSubmit={handleSubmit}
+      />
+
+      {/* Submit dialogs — see SubmitDialog union above. */}
+      <ConfirmDialog
+        visible={submitDialog.kind === 'incomplete'}
+        title="Not yet"
+        description="Fill in every match before submitting this round."
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'confirm'}
+        title={`Submit ${ROUND_LABELS[currentRound]}?`}
+        description={`Once submitted, your ${ROUND_LABELS[currentRound]} predictions cannot be changed.`}
+        confirmLabel="Submit"
+        cancelLabel="Cancel"
+        destructive
+        busy={submitting}
+        onConfirm={confirmSubmit}
+        onCancel={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'error'}
+        title="Couldn't submit"
+        description={
+          submitDialog.kind === 'error' ? submitDialog.message : undefined
+        }
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
       />
     </View>
   );

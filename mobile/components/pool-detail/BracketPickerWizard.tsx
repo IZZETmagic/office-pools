@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -21,7 +20,7 @@ import {
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import type {
   BPGroupRanking,
   BPKnockoutPick,
@@ -149,29 +148,34 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false }: Props
   // Admin view forces a locked state on every editable surface.
   const submitted = rawSubmitted || readOnly;
   const [submitting, setSubmitting] = useState(false);
+  // Custom in-app submit dialogs replacing Alert.alert. Same pattern as
+  // the full-tournament wizard: a pre-flight "fill everything in" check,
+  // a destructive confirmation, and a follow-up error if the server
+  // rejects the submit. Single ConfirmDialog instance per state.
+  type SubmitDialog =
+    | { kind: 'none' }
+    | { kind: 'incomplete' }
+    | { kind: 'confirm' }
+    | { kind: 'error'; message: string };
+  const [submitDialog, setSubmitDialog] = useState<SubmitDialog>({ kind: 'none' });
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!completedStages.has('review')) {
-      Alert.alert('Not yet', 'Complete every stage before submitting.');
+      setSubmitDialog({ kind: 'incomplete' });
       return;
     }
-    Alert.alert(
-      'Submit bracket?',
-      "Once submitted, you can't change your picks.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          style: 'destructive',
-          onPress: async () => {
-            setSubmitting(true);
-            const result = await submit();
-            setSubmitting(false);
-            if (result.error) Alert.alert("Couldn't submit", result.error);
-          },
-        },
-      ],
-    );
+    setSubmitDialog({ kind: 'confirm' });
+  }
+
+  async function confirmSubmit() {
+    setSubmitting(true);
+    const result = await submit();
+    setSubmitting(false);
+    setSubmitDialog({ kind: 'none' });
+    if (result.error) {
+      const message = result.error;
+      setTimeout(() => setSubmitDialog({ kind: 'error', message }), 100);
+    }
   }
 
   const counts = useMemo(
@@ -434,6 +438,35 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false }: Props
           onSubmit={handleSubmit}
         />
       ) : null}
+
+      {/* Submit dialogs — see SubmitDialog union above. */}
+      <ConfirmDialog
+        visible={submitDialog.kind === 'incomplete'}
+        title="Not yet"
+        description="Complete every stage before submitting."
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'confirm'}
+        title="Submit bracket?"
+        description="Once submitted, you can't change your picks."
+        confirmLabel="Submit"
+        cancelLabel="Cancel"
+        destructive
+        busy={submitting}
+        onConfirm={confirmSubmit}
+        onCancel={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'error'}
+        title="Couldn't submit"
+        description={
+          submitDialog.kind === 'error' ? submitDialog.message : undefined
+        }
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
+      />
     </View>
   );
 }

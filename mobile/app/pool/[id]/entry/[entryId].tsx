@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -14,7 +14,7 @@ import {
   WIZARD_STAGES,
   type WizardStage,
 } from '@/components/pool-detail';
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
   GROUP_LETTERS,
@@ -77,6 +77,16 @@ export default function PredictionWizard() {
   const [stage, setStage] = useState<WizardStage>('group');
   const [submitting, setSubmitting] = useState(false);
   const [expandAllSignal, setExpandAllSignal] = useState(1);
+  // Submit-flow dialog state. Replaces the previous Alert.alert calls
+  // ("Not yet" pre-flight check, the confirm prompt, the error after a
+  // failed submit) with our own ConfirmDialog so the look matches the
+  // rest of the app instead of the OS native alert.
+  type SubmitDialog =
+    | { kind: 'none' }
+    | { kind: 'incomplete' }
+    | { kind: 'confirm' }
+    | { kind: 'error'; message: string };
+  const [submitDialog, setSubmitDialog] = useState<SubmitDialog>({ kind: 'none' });
 
   const stageMatches = useMemo<Match[]>(() => {
     if (!data) return [];
@@ -163,31 +173,27 @@ export default function PredictionWizard() {
   const totalCount = data.matches.length;
   const pickedCount = data.matches.filter((m) => isPredictionComplete(predictions.get(m.match_id))).length;
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!allComplete) {
-      Alert.alert('Not yet', 'Fill in every match before submitting.');
+      setSubmitDialog({ kind: 'incomplete' });
       return;
     }
-    Alert.alert(
-      'Submit predictions?',
-      "You won't be able to edit them after this.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          onPress: async () => {
-            setSubmitting(true);
-            const result = await submit();
-            setSubmitting(false);
-            if (result.error) {
-              Alert.alert("Couldn't submit", result.error);
-            } else {
-              router.back();
-            }
-          },
-        },
-      ],
-    );
+    setSubmitDialog({ kind: 'confirm' });
+  }
+
+  async function confirmSubmit() {
+    setSubmitting(true);
+    const result = await submit();
+    setSubmitting(false);
+    setSubmitDialog({ kind: 'none' });
+    if (result.error) {
+      // Defer to the next tick so the confirm dialog finishes animating
+      // out before the error dialog animates in — avoids a visual stutter.
+      const message = result.error;
+      setTimeout(() => setSubmitDialog({ kind: 'error', message }), 100);
+    } else {
+      router.back();
+    }
   }
 
   return (
@@ -284,6 +290,40 @@ export default function PredictionWizard() {
         canSubmit={!isReadOnly && allComplete}
         canAdvance={isReadOnly || currentStageComplete}
         submitting={submitting}
+      />
+
+      {/* Custom in-app dialogs replacing the previous Alert.alert calls.
+          Three states surface through the same ConfirmDialog primitive:
+          a pre-flight "fill everything in" reminder, the destructive
+          submit confirmation, and a follow-up error dialog if the
+          server rejected the submit. Only one is visible at a time —
+          guarded by submitDialog.kind. */}
+      <ConfirmDialog
+        visible={submitDialog.kind === 'incomplete'}
+        title="Not yet"
+        description="Fill in every match before submitting."
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'confirm'}
+        title="Submit predictions?"
+        description="You won't be able to edit them after this."
+        confirmLabel="Submit"
+        cancelLabel="Cancel"
+        busy={submitting}
+        destructive
+        onConfirm={confirmSubmit}
+        onCancel={() => setSubmitDialog({ kind: 'none' })}
+      />
+      <ConfirmDialog
+        visible={submitDialog.kind === 'error'}
+        title="Couldn't submit"
+        description={
+          submitDialog.kind === 'error' ? submitDialog.message : undefined
+        }
+        confirmLabel="OK"
+        onConfirm={() => setSubmitDialog({ kind: 'none' })}
       />
     </SafeAreaView>
   );
