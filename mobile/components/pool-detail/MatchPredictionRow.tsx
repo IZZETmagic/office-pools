@@ -101,11 +101,16 @@ export function MatchPredictionRow({
         <TeamColumn team={away} align="left" />
       </View>
       {showPso ? (
+        // Mirror the primary row's column layout so the PSO score boxes land
+        // directly under the main score boxes:
+        //   [flex:1 spacer w/ label][TapScoreField][–][TapScoreField][flex:1 spacer]
+        // The "Penalties" label sits in the left spacer, right-aligned to hug
+        // the home-side PSO box — same edge where the home country name sits
+        // on the row above.
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
             gap: theme.spacing.sm,
             paddingTop: theme.spacing.xs,
             marginTop: 2,
@@ -113,18 +118,19 @@ export function MatchPredictionRow({
             borderTopColor: withOpacity(theme.colors.primary, 0.12),
           }}
         >
-          <RNText
-            style={{
-              fontFamily: fontFamilies.semibold,
-              fontSize: 10,
-              letterSpacing: 1.4,
-              color: theme.colors.slate,
-              textTransform: 'uppercase',
-              marginRight: theme.spacing.xs,
-            }}
-          >
-            Penalties
-          </RNText>
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <RNText
+              style={{
+                fontFamily: fontFamilies.semibold,
+                fontSize: 10,
+                letterSpacing: 1.4,
+                color: theme.colors.slate,
+                textTransform: 'uppercase',
+              }}
+            >
+              Penalties
+            </RNText>
+          </View>
           <TapScoreField
             value={homePso ?? null}
             onChange={onHomePsoChange!}
@@ -144,6 +150,7 @@ export function MatchPredictionRow({
             onChange={onAwayPsoChange!}
             disabled={disabled}
           />
+          <View style={{ flex: 1 }} />
         </View>
       ) : null}
     </View>
