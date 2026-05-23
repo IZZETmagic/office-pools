@@ -160,6 +160,12 @@ export default function PoolDetailScreen() {
   // through the screen doesn't re-open the sheet on every focus.
   const banterDeepLinkConsumed = useRef(false);
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.warn('[push.deepLink] pool/[id] effect fired', {
+      banterParam,
+      hasData: !!data,
+      consumed: banterDeepLinkConsumed.current,
+    });
     if (banterDeepLinkConsumed.current) return;
     if (banterParam !== 'open') return;
     if (!data) return;
@@ -167,7 +173,11 @@ export default function PoolDetailScreen() {
     // Defer one frame so the screen finishes its first render before
     // the sheet animates up — avoids a flash of an empty sheet over
     // an unrendered pool detail.
-    requestAnimationFrame(() => banterSheetRef.current?.open());
+    requestAnimationFrame(() => {
+      // eslint-disable-next-line no-console
+      console.warn('[push.deepLink] opening banter sheet, ref present?', !!banterSheetRef.current);
+      banterSheetRef.current?.open();
+    });
   }, [banterParam, data]);
 
   const isAdmin = data?.pool.isAdmin ?? false;

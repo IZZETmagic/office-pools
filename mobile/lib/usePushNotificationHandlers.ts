@@ -62,10 +62,30 @@ function routeFor(
 
 function handleResponse(response: Notifications.NotificationResponse) {
   const data = response?.notification?.request?.content?.data;
+  // DEBUG: temporary diagnostic to confirm what the iOS / Android push
+  // delivery is actually populating. The Metro terminal should see this
+  // every time the user taps a push. Remove once deep-link routing is
+  // verified working.
+  // eslint-disable-next-line no-console
+  console.warn('[push.tap] handler fired', {
+    hasResponse: !!response,
+    contentData: data,
+    dataType: data && typeof data === 'object' ? (data as Record<string, unknown>).type : undefined,
+    dataPoolId:
+      data && typeof data === 'object' ? (data as Record<string, unknown>).pool_id : undefined,
+    rawContent: response?.notification?.request?.content,
+  });
   const target = routeFor(data as Record<string, unknown> | null | undefined);
+  // eslint-disable-next-line no-console
+  console.warn('[push.tap] routeFor result', target);
   if (!target) return;
-  // `router.push` with typed routes accepts the pathname + params shape directly.
-  router.push({ pathname: target.pathname as never, params: target.params });
+  // Use router.navigate over router.push — navigate is more forgiving
+  // when there's overlapping route state from the cold-start auth
+  // routing; push can create duplicate stack entries. Both should end
+  // up at the same pool detail screen.
+  router.navigate({ pathname: target.pathname as never, params: target.params });
+  // eslint-disable-next-line no-console
+  console.warn('[push.tap] navigated to', target.pathname, target.params);
 }
 
 export function usePushNotificationHandlers() {
