@@ -41,6 +41,9 @@ export type PoolSummary = {
   predictionsTotal: number;
   role: string;
   joinedAt: string;
+  /** Mirrors pools.is_private. Drives the "non-admin members of a
+   *  private pool can't share" gate on the card's share button. */
+  isPrivate: boolean;
   formResults: FormResult[];
   // Full prediction accuracy aggregates for the best entry — drives the
   // Profile tab's per-pool stats and the aggregated rings. `null` if the
@@ -184,7 +187,7 @@ export function useHomeDataInternal() {
             joined_at,
             pools!inner(
               pool_id, pool_name, pool_code, status, prediction_deadline,
-              prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id
+              prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
             ),
             pool_entries(
               entry_id, match_points, bonus_points, current_rank,
@@ -212,6 +215,7 @@ export function useHomeDataInternal() {
             brand_color: string | null;
             brand_logo_url: string | null;
             tournament_id: string;
+            is_private: boolean | null;
           };
           pool_entries: Array<{
             entry_id: string;
@@ -509,6 +513,7 @@ export function useHomeDataInternal() {
                 : tournamentMatchCount[pool.tournament_id] ?? 0,
             role: row.role,
             joinedAt: row.joined_at,
+            isPrivate: !!pool.is_private,
             formResults: bestEntryId ? formByEntry[bestEntryId] ?? [] : [],
             accuracyStats: bestEntryId ? accuracyByEntry[bestEntryId] ?? null : null,
             unreadBanterCount: unreadByPool[pool.pool_id] ?? 0,

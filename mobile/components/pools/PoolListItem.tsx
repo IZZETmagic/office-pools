@@ -75,9 +75,22 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
     });
   }
 
+  // Non-admin members of a private pool can't share its invite — only
+  // the pool admin can. Public pools are shareable by anyone (the join
+  // code already isn't a secret since the pool is discoverable).
+  const canShareInvite = !pool.isPrivate || pool.role === 'admin';
+
   function showContextMenu() {
     if (Platform.OS !== 'ios') return;
-    const actions = ['Share Invite', 'View Leaderboard', 'Make Predictions', 'Cancel'];
+    // Dynamic action list: drop "Share Invite" when the current user
+    // doesn't have permission so the index handler downshifts the other
+    // actions to compensate.
+    const actions = canShareInvite
+      ? ['Share Invite', 'View Leaderboard', 'Make Predictions', 'Cancel']
+      : ['View Leaderboard', 'Make Predictions', 'Cancel'];
+    const indices = canShareInvite
+      ? { share: 0, leaderboard: 1, predictions: 2 }
+      : { share: -1, leaderboard: 0, predictions: 1 };
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: pool.poolName,
@@ -85,14 +98,15 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
         cancelButtonIndex: actions.length - 1,
       },
       (i) => {
+        if (i === indices.share) {
+          shareInvite();
+          return;
+        }
         switch (i) {
-          case 0:
-            shareInvite();
-            break;
-          case 1:
+          case indices.leaderboard:
             Alert.alert('Coming soon', 'Pool leaderboard ships in a future update.');
             break;
-          case 2:
+          case indices.predictions:
             Alert.alert('Coming soon', 'Make predictions ships in a future update.');
             break;
         }

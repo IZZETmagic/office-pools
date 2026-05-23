@@ -144,7 +144,7 @@ export function PoolDetailHeader({ pool }: PoolDetailHeaderProps) {
             </RNText>
           </View>
 
-          {pool.status === 'open' ? (
+          {pool.status === 'open' && (!pool.isPrivate || pool.isAdmin) ? (
             <Pressable
               onPress={handleShare}
               hitSlop={12}
@@ -272,7 +272,7 @@ export function PoolDetailHeader({ pool }: PoolDetailHeaderProps) {
         >
           <Icon name="chevron.left" color="ink" size={16} weight="semibold" />
         </Pressable>
-        {pool.status === 'open' ? (
+        {pool.status === 'open' && (!pool.isPrivate || pool.isAdmin) ? (
           <Pressable
             onPress={handleShare}
             hitSlop={12}
