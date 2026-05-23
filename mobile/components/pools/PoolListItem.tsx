@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNText, View } from 'react-native';
 
-import { Icon, NotificationDot, Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { getLevel } from '@/lib/levels';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { FormResult, PoolSummary } from '@/lib/useHomeData';
@@ -39,13 +39,15 @@ function brandHex(hex: string | null): string | null {
 export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   const theme = useTheme();
   const pending = usePendingActionsOptional();
-  // Unified per-pool indicator. The card shows a single red dot if EITHER
-  // banter has unread messages OR the pool has any unacknowledged pending
-  // actions (badge unlocks, deadline warnings, level ups). The banter
-  // floating action button INSIDE the pool detail keeps its numeric count
-  // — only this card-level callout consolidates everything into a dot.
-  const hasNonBanterIndicator = pending?.poolHasAny?.(pool.poolId) === true;
-  const hasIndicator = pool.unreadBanterCount > 0 || hasNonBanterIndicator;
+  // Unified per-pool notification count. Combines unread banter messages
+  // with unacknowledged pending actions (badge unlocks, level ups,
+  // deadline warnings) into a single "things to do for this pool" number.
+  // Renders as a small red pill on the card. Displays `99+` past two
+  // digits so the badge stays compact.
+  const banterUnread = pool.unreadBanterCount;
+  const pendingActions = pending?.poolPendingCount?.(pool.poolId) ?? 0;
+  const totalCount = banterUnread + pendingActions;
+  const countLabel = totalCount > 99 ? '99+' : String(totalCount);
   const brandColor = brandHex(pool.brandColor);
   const isBranded = Boolean(pool.brandName && brandColor);
   const modeLabel = pool.predictionMode ? MODE_LABEL[pool.predictionMode] ?? 'Pool' : 'Pool';
@@ -178,7 +180,30 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
               <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
                 {pool.poolName}
               </Text>
-              {hasIndicator ? <NotificationDot size="md" /> : null}
+              {totalCount > 0 ? (
+                <View
+                  style={{
+                    minWidth: 22,
+                    height: 20,
+                    paddingHorizontal: 6,
+                    borderRadius: 10,
+                    backgroundColor: theme.colors.red,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <RNText
+                    style={{
+                      fontFamily: fontFamilies.bold,
+                      fontSize: 11,
+                      color: '#FFFFFF',
+                      includeFontPadding: false,
+                    }}
+                  >
+                    {countLabel}
+                  </RNText>
+                </View>
+              ) : null}
             </View>
             <View
               style={{

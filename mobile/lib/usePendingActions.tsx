@@ -77,6 +77,12 @@ type PendingActionsValue = {
   /** Pool ID → unread banter count for that pool. Used by the banter FAB existing badge. */
   poolBanterUnread: (poolId: string) => number;
   /**
+   * Pool ID → total unacknowledged pending actions for that pool (summed
+   * across all action_types). Excludes banter unread — combine with
+   * `poolBanterUnread(poolId)` for a full "things to do" count.
+   */
+  poolPendingCount: (poolId: string) => number;
+  /**
    * For a given (pool_id, action_type, reference_id), returns the pending
    * action id whose `completed_at` is still NULL — i.e. the cell still has a
    * red dot. Returns null if there's no pending cell for that reference.
@@ -361,6 +367,15 @@ export function PendingActionsProvider({ children }: { children: ReactNode }) {
     [summary],
   );
 
+  const poolPendingCount = useCallback(
+    (poolId: string) => {
+      const types = summary.pending_by_pool_type[poolId];
+      if (!types) return 0;
+      return Object.values(types).reduce((sum, n) => sum + n, 0);
+    },
+    [summary],
+  );
+
   const cellPendingId = useCallback(
     (poolId: string, actionType: PendingActionType, referenceId: string) => {
       const poolMap = summary.cells_by_pool_type[poolId];
@@ -380,6 +395,7 @@ export function PendingActionsProvider({ children }: { children: ReactNode }) {
       poolHasAny,
       poolHasPending,
       poolBanterUnread,
+      poolPendingCount,
       cellPendingId,
       markPoolActionsAcknowledged,
       markActionComplete,
@@ -391,6 +407,7 @@ export function PendingActionsProvider({ children }: { children: ReactNode }) {
       poolHasAny,
       poolHasPending,
       poolBanterUnread,
+      poolPendingCount,
       cellPendingId,
       markPoolActionsAcknowledged,
       markActionComplete,
