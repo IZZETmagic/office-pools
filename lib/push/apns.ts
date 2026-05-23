@@ -131,14 +131,25 @@ export async function sendPushNotification(
     if (typeof payload.badge === 'number') {
       aps.badge = payload.badge
     }
-    const body = JSON.stringify({
+    // expo-notifications on iOS populates the in-app
+    // `notification.request.content.data` field from userInfo["body"]
+    // — NOT from the top level of the APNs payload. If we spread our
+    // custom { type, pool_id, ... } into userInfo's root (alongside
+    // `aps`), expo-notifications can't see them and content.data
+    // ends up null on the device, breaking every push deep-link.
+    //
+    // Nesting payload.data under a "body" key so the SDK picks it up.
+    // The Swift app (pre-Expo) reads userInfo directly so it was fine
+    // either way — we noticed this only after the Expo dev client
+    // started consuming pushes.
+    const requestBody = JSON.stringify({
       aps,
-      ...(payload.data ?? {}),
+      body: payload.data ?? {},
     })
 
     console.log(`[APNs] Sending to ${host}, token ${deviceToken.slice(0, 8)}..., topic=${topic}, sandbox=${sandbox}`)
 
-    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, body, topic)
+    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, requestBody, topic)
 
     if (statusCode === 200) {
       console.log(`[APNs] Success for token ${deviceToken.slice(0, 8)}...`)
