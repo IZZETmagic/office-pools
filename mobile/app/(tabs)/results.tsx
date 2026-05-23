@@ -12,7 +12,13 @@ import {
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PoolsHeader } from '@/components/pools';
+import {
+  JoinPoolSheet,
+  type JoinPoolSheetHandle,
+  PoolCreateJoinSheet,
+  type PoolCreateJoinSheetHandle,
+  PoolsHeader,
+} from '@/components/pools';
 import {
   GroupPickerSheet,
   type GroupPickerSheetHandle,
@@ -135,6 +141,12 @@ export default function ResultsScreen() {
   const teamSheetRef = useRef<TeamPickerSheetHandle | null>(null);
   const groupSheetRef = useRef<GroupPickerSheetHandle | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+  // Create / Join pool sheet refs — opened by the "+" button in the
+  // header. Same pattern as the Home and Pools tabs so the user can
+  // create or join a pool from any primary tab without first navigating
+  // back to one of the pool-centric screens.
+  const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
+  const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
 
   // Per-tab stale-refresh on focus — consistent with home + pools.
   const refreshIfStaleRef = useRef(refreshIfStale);
@@ -284,7 +296,7 @@ export default function ResultsScreen() {
           titlePrefix="Match"
           titleAccent="Centre"
           subtitle="Where predictions meet reality"
-          showMenu={false}
+          onMenuPress={() => createJoinSheetRef.current?.open()}
         />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.colors.primary} />
@@ -303,7 +315,7 @@ export default function ResultsScreen() {
           titlePrefix="Match"
           titleAccent="Centre"
           subtitle="Where predictions meet reality"
-          showMenu={false}
+          onMenuPress={() => createJoinSheetRef.current?.open()}
         />
         <View
           style={{
@@ -424,6 +436,13 @@ export default function ResultsScreen() {
         groups={availableGroups}
         onSelect={handleGroupPicked}
       />
+      <PoolCreateJoinSheet
+        ref={createJoinSheetRef}
+        onJoinPress={() => {
+          setTimeout(() => joinPoolSheetRef.current?.open(), 250);
+        }}
+      />
+      <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
   );
 }

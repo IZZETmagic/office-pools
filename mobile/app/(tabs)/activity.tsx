@@ -1,10 +1,18 @@
 // Port of ios/OfficePools/Views/Activity/ActivityView.swift.
 // Profile button intentionally omitted — profile UI is a separate task.
 
+import { useRef } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityCard } from '@/components/activity';
+import {
+  JoinPoolSheet,
+  type JoinPoolSheetHandle,
+  PoolCreateJoinSheet,
+  type PoolCreateJoinSheetHandle,
+  PoolsHeader,
+} from '@/components/pools';
 import { Button, Icon, Text } from '@/components/ui';
 import { useActivity } from '@/lib/useActivity';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -15,13 +23,23 @@ export default function ActivityScreen() {
   const { items, loading, error, refresh } = useActivity();
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
+  // Create / Join pool sheets — opened by the "+" button in the header.
+  // Same pattern as the Home and Pools tabs so the user can create or
+  // join a pool from any primary tab.
+  const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
+  const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
 
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
       style={{ flex: 1, backgroundColor: theme.colors.snow }}
     >
-      <Header />
+      <PoolsHeader
+        titlePrefix="Your"
+        titleAccent="Feed"
+        subtitle="Don't miss a beat"
+        onMenuPress={() => createJoinSheetRef.current?.open()}
+      />
 
       {loading && items.length === 0 ? (
         <SkeletonState />
@@ -50,34 +68,15 @@ export default function ActivityScreen() {
           ))}
         </ScrollView>
       )}
-    </SafeAreaView>
-  );
-}
 
-function Header() {
-  const theme = useTheme();
-  const titleStyle = {
-    fontFamily: fontFamilies.black,
-    fontSize: 32,
-    lineHeight: 36,
-  } as const;
-  return (
-    <View
-      style={{
-        paddingHorizontal: theme.spacing.xl,
-        paddingTop: theme.spacing.xl,
-        paddingBottom: theme.spacing.md,
-        backgroundColor: theme.colors.snow,
-      }}
-    >
-      <View style={{ flexDirection: 'row' }}>
-        <RNText style={[titleStyle, { color: theme.colors.ink }]}>Your</RNText>
-        <RNText style={[titleStyle, { color: theme.colors.primary }]}>Feed</RNText>
-      </View>
-      <Text variant="body" color="slate" style={{ fontFamily: fontFamilies.semibold }}>
-        Don&apos;t miss a beat
-      </Text>
-    </View>
+      <PoolCreateJoinSheet
+        ref={createJoinSheetRef}
+        onJoinPress={() => {
+          setTimeout(() => joinPoolSheetRef.current?.open(), 250);
+        }}
+      />
+      <JoinPoolSheet ref={joinPoolSheetRef} />
+    </SafeAreaView>
   );
 }
 

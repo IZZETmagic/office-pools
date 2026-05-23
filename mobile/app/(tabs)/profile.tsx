@@ -4,7 +4,7 @@
 // account deletion route through their existing handlers / endpoints.
 
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,13 @@ import {
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  JoinPoolSheet,
+  type JoinPoolSheetHandle,
+  PoolCreateJoinSheet,
+  type PoolCreateJoinSheetHandle,
+  PoolsHeader,
+} from '@/components/pools';
 import { Icon, Text } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
@@ -47,6 +54,9 @@ export default function ProfileScreen() {
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
   const tabBarHeight = useBottomTabBarHeight();
+  // Create / Join pool sheets — opened by the "+" button in the header.
+  const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
+  const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
 
   const pools = data?.pools ?? [];
   const totalPoints = useMemo(() => pools.reduce((s, p) => s + p.totalPoints, 0), [pools]);
@@ -67,7 +77,12 @@ export default function ProfileScreen() {
       edges={['top', 'left', 'right']}
       style={{ flex: 1, backgroundColor: theme.colors.snow }}
     >
-      <Header />
+      <PoolsHeader
+        titlePrefix="Your"
+        titleAccent="Profile"
+        subtitle="Stats, settings & more"
+        onMenuPress={() => createJoinSheetRef.current?.open()}
+      />
       <ScrollView
         contentContainerStyle={{
           paddingTop: theme.spacing.md,
@@ -124,34 +139,15 @@ export default function ProfileScreen() {
 
         <VersionFooter />
       </ScrollView>
-    </SafeAreaView>
-  );
-}
 
-function Header() {
-  const theme = useTheme();
-  const titleStyle = {
-    fontFamily: fontFamilies.black,
-    fontSize: 32,
-    lineHeight: 36,
-  } as const;
-  return (
-    <View
-      style={{
-        paddingHorizontal: theme.spacing.xl,
-        paddingTop: theme.spacing.xl,
-        paddingBottom: theme.spacing.md,
-        backgroundColor: theme.colors.snow,
-      }}
-    >
-      <View style={{ flexDirection: 'row' }}>
-        <RNText style={[titleStyle, { color: theme.colors.ink }]}>Your</RNText>
-        <RNText style={[titleStyle, { color: theme.colors.primary }]}>Profile</RNText>
-      </View>
-      <Text variant="body" color="slate" style={{ fontFamily: fontFamilies.semibold }}>
-        Stats, settings & more
-      </Text>
-    </View>
+      <PoolCreateJoinSheet
+        ref={createJoinSheetRef}
+        onJoinPress={() => {
+          setTimeout(() => joinPoolSheetRef.current?.open(), 250);
+        }}
+      />
+      <JoinPoolSheet ref={joinPoolSheetRef} />
+    </SafeAreaView>
   );
 }
 
