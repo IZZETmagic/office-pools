@@ -1,15 +1,19 @@
-// Read-only "About this pool" tab visible to all members. The home for
-// non-admin self-leave; admins also land here for the same Leave Pool
-// action (distinct from the admin-only "Stop Participating" in Settings
-// — Leave severs the pool_members row entirely and triggers a
-// pool_left activity card, Stop Participating just deletes pool_entries
-// while preserving admin role).
+// Read-only "About this pool" tab visible to all members. Mirrors the
+// information displayed on the web (app/pools/[pool_id]/PoolInfoTab.tsx)
+// — same data fields, mobile chrome. Sections in order:
+//   1. About (description, if set)
+//   2. Deadlines (per-round for progressive, single + status for others)
+//   3. Entries & Participants (mode, entries-per-player, max, totals)
+//   4. Fees & Prize Pool (only when entry_fee > 0; includes per-entry
+//      Paid/Unpaid status for the current user's own entries)
+//   5. Pool Details (status badge + created date)
+//   6. Danger Zone (Leave Pool — mobile-only, web doesn't have this here)
 //
-// Sole-admin guard: client-side disable + tooltip when the user is the
-// only admin in the pool. Server-side check in /api/pools/[id]/leave
-// is still authoritative and surfaces as a ConfirmDialog error if
-// somehow bypassed (e.g. another admin demoted between client-render
-// and request).
+// Sole-admin guard on Leave: client-side disable + tooltip when the user
+// is the only admin in the pool. Server-side check in
+// /api/pools/[id]/leave is still authoritative and surfaces as a
+// ConfirmDialog error if somehow bypassed (e.g. another admin demoted
+// between client-render and request).
 
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -20,7 +24,9 @@ import { leavePool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useMemberRoster } from '@/lib/useMemberRoster';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
-import { fontFamilies, useTheme } from '@/theme';
+import { usePoolEntries } from '@/lib/usePoolEntries';
+import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 const MODE_LABEL: Record<string, string> = {
   full_tournament: 'Full Tournament',
@@ -44,6 +50,16 @@ export function PoolInfoTab({ pool }: Props) {
   const adminCount = members.filter((m) => m.role === 'admin').length;
   const isSoleAdmin = pool.isAdmin && adminCount <= 1;
 
+  // Current user's own entries — drives the per-entry Paid/Unpaid badges
+  // in the Fees & Prize Pool card. Only used when entry_fee > 0 so this
+  // hook is harmless to call unconditionally.
+  const { entries: userEntries } = usePoolEntries(pool.poolId);
+
+  // Round states only matter for progressive pools — the hook is called
+  // unconditionally so the order of hooks stays stable, but its output
+  // is gated by the render-time isProgressive branch.
+  const { data: roundsData } = usePoolRounds(pool.poolId);
+
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
@@ -56,23 +72,10 @@ export function PoolInfoTab({ pool }: Props) {
     setLeaveBusy(true);
     try {
       await leavePool(pool.poolId);
-      // Recalculate so remaining members' ranks settle after the
-      // leaver's entries cascade out. Fire-and-forget; the redirect
-      // doesn't wait on it.
       void fetch(`/api/pools/${pool.poolId}/recalculate`, { method: 'POST' });
-      // Refresh dashboard FIRST so the pool card is already gone by
-      // the time we land on the tabs root. Same pattern handleDelete
-      // in SettingsTab uses.
       void refreshHomeData();
       router.replace('/(tabs)');
-      // No need to close the confirm dialog or surface a success
-      // toast — the user is navigated away. The pool_left activity
-      // card (fired by the server endpoint via pool_membership_events)
-      // is the durable record of the action on their activity feed.
     } catch (err) {
-      // PostgrestError-shaped errors don't pass instanceof Error, so
-      // probe for .message on a plain object too. Matches the
-      // hardened extractor in handleStopParticipating.
       const message =
         err instanceof Error
           ? err.message
@@ -87,13 +90,20 @@ export function PoolInfoTab({ pool }: Props) {
     }
   }
 
-  // Mode + deadline display helpers
-  const modeLabel = pool.predictionMode
+  const isProgressive = pool.predictionMode === 'progressive';
+  const modeLabelText = pool.predictionMode
     ? MODE_LABEL[pool.predictionMode] ?? pool.predictionMode
     : '—';
-  const deadlineLabel = pool.predictionDeadline
-    ? formatDeadline(pool.predictionDeadline)
-    : 'Not set';
+  const entryFee = pool.entryFee ?? 0;
+  const currency = pool.entryFeeCurrency || 'USD';
+  const showFeesCard = entryFee > 0;
+
+  // For non-progressive pools we compute past-deadline locally so we can
+  // surface an Open / Closed badge alongside the single deadline. Mirrors
+  // the web component's `isPastDeadline` prop.
+  const isPastDeadline = pool.predictionDeadline
+    ? new Date(pool.predictionDeadline).getTime() < Date.now()
+    : false;
 
   return (
     <View
@@ -104,22 +114,193 @@ export function PoolInfoTab({ pool }: Props) {
         gap: theme.spacing.lg,
       }}
     >
+      {/* About — description only, hidden when no description set */}
+      {pool.description ? (
+        <Card>
+          <Caption>About</Caption>
+          <RNText
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 14,
+              lineHeight: 20,
+              color: theme.colors.ink,
+            }}
+          >
+            {pool.description}
+          </RNText>
+        </Card>
+      ) : null}
+
+      {/* Deadlines */}
       <Card>
-        <Caption>About</Caption>
-        <View style={{ gap: theme.spacing.md }}>
-          <Field label="Pool Name" value={pool.poolName} />
-          {pool.description ? (
-            <Field label="Description" value={pool.description} multiline />
-          ) : null}
-          <Field label="Prediction Mode" value={modeLabel} />
-          <Field
-            label="Max Entries per User"
+        <Caption>Deadlines</Caption>
+        <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
+          When predictions lock
+        </RNText>
+        {isProgressive && roundsData && roundsData.rounds.length > 0 ? (
+          <View style={{ marginTop: theme.spacing.sm, gap: theme.spacing.xs }}>
+            {roundsData.rounds.map((rs) => (
+              <View
+                key={rs.round_key}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: withOpacity(theme.colors.slate, 0.08),
+                }}
+              >
+                <RNText
+                  style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
+                >
+                  {roundLabel(rs.round_key)}
+                </RNText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <RNText
+                    style={{
+                      fontFamily: fontFamilies.regular,
+                      fontSize: 11,
+                      color: theme.colors.slate,
+                    }}
+                  >
+                    {rs.deadline ? formatDeadline(rs.deadline) : 'No deadline'}
+                  </RNText>
+                  <RoundStateBadge state={rs.state} />
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : pool.predictionDeadline ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            <RNText
+              style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
+            >
+              {formatDeadline(pool.predictionDeadline)}
+            </RNText>
+            <Badge tone={isPastDeadline ? 'neutral' : 'green'}>
+              {isPastDeadline ? 'Closed' : 'Open'}
+            </Badge>
+          </View>
+        ) : (
+          <RNText
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 14,
+              color: theme.colors.silver,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            No deadline set
+          </RNText>
+        )}
+      </Card>
+
+      {/* Entries & Participants */}
+      <Card>
+        <Caption>Entries & Participants</Caption>
+        <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
+          Pool size and entry limits
+        </RNText>
+        <View style={{ marginTop: theme.spacing.sm }}>
+          <InfoRow label="Prediction mode">
+            <Badge tone="blue">{modeLabelText}</Badge>
+          </InfoRow>
+          <InfoRow
+            label="Entries per player"
             value={String(pool.maxEntriesPerUser)}
           />
-          <Field label="Prediction Deadline" value={deadlineLabel} />
+          <InfoRow
+            label="Max participants"
+            value={pool.maxParticipants ? String(pool.maxParticipants) : 'Unlimited'}
+          />
+          <InfoRow label="Total members" value={String(pool.memberCount)} />
+          <InfoRow label="Total entries" value={String(pool.totalEntries)} />
         </View>
       </Card>
 
+      {/* Fees & Prize Pool — only when entry_fee > 0 */}
+      {showFeesCard ? (
+        <Card>
+          <Caption>Fees & Prize Pool</Caption>
+          <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
+            Entry costs and total pot
+          </RNText>
+          <View style={{ marginTop: theme.spacing.sm }}>
+            <InfoRow label="Entry fee" value={formatFee(entryFee, currency)} />
+            <InfoRow
+              label="Total prize pool"
+              value={formatFee(entryFee * pool.totalEntries, currency)}
+            />
+          </View>
+          {userEntries.length > 0 ? (
+            <View
+              style={{
+                marginTop: theme.spacing.md,
+                paddingTop: theme.spacing.sm,
+                borderTopWidth: 1,
+                borderTopColor: withOpacity(theme.colors.slate, 0.08),
+                gap: 6,
+              }}
+            >
+              <RNText
+                style={{
+                  fontFamily: fontFamilies.bold,
+                  fontSize: 12,
+                  color: theme.colors.ink,
+                  marginBottom: 2,
+                }}
+              >
+                Your Fee Status
+              </RNText>
+              {userEntries.map((entry) => (
+                <View
+                  key={entry.entryId}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 4,
+                  }}
+                >
+                  <RNText
+                    style={{
+                      fontFamily: fontFamilies.medium,
+                      fontSize: 13,
+                      color: theme.colors.slate,
+                    }}
+                  >
+                    {entry.entryName}
+                  </RNText>
+                  <Badge tone={entry.feePaid ? 'green' : 'amber'}>
+                    {entry.feePaid ? 'Paid' : 'Unpaid'}
+                  </Badge>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {/* Pool Details */}
+      <Card>
+        <Caption>Pool Details</Caption>
+        <View style={{ marginTop: theme.spacing.sm }}>
+          <InfoRow label="Status">
+            <Badge tone={statusTone(pool.status)}>{statusLabel(pool.status)}</Badge>
+          </InfoRow>
+          <InfoRow label="Created" value={formatCreated(pool.createdAt)} />
+        </View>
+      </Card>
+
+      {/* Danger Zone — Leave Pool (mobile-only) */}
       <Card>
         <RNText
           style={{
@@ -177,7 +358,7 @@ function Card({ children }: { children: React.ReactNode }) {
         backgroundColor: theme.colors.surface,
         borderRadius: theme.radii.lg,
         padding: theme.spacing.lg,
-        gap: 10,
+        gap: 8,
         ...theme.shadows.card,
       }}
     >
@@ -203,39 +384,109 @@ function Caption({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Field({
+// Single line: muted label on the left, bold value (or arbitrary node) on
+// the right. The value-node branch lets callers slot a Badge in for
+// status-style rows.
+function InfoRow({
   label,
   value,
-  multiline,
+  children,
 }: {
   label: string;
-  value: string;
-  multiline?: boolean;
+  value?: string;
+  children?: React.ReactNode;
 }) {
   const theme = useTheme();
   return (
-    <View style={{ gap: 4 }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: withOpacity(theme.colors.slate, 0.08),
+      }}
+    >
       <RNText
-        style={{
-          fontFamily: fontFamilies.medium,
-          fontSize: 12,
-          color: theme.colors.slate,
-        }}
+        style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
       >
         {label}
       </RNText>
+      {children ? (
+        children
+      ) : (
+        <RNText
+          style={{ fontFamily: fontFamilies.bold, fontSize: 13, color: theme.colors.ink }}
+        >
+          {value ?? '—'}
+        </RNText>
+      )}
+    </View>
+  );
+}
+
+// Pill badge — color-coded by tone. Matches the visual language of the
+// web component's Badge but rendered locally so we don't depend on the
+// gigantic web Badge component or pull tailwind in.
+type BadgeTone = 'green' | 'amber' | 'blue' | 'neutral';
+function Badge({ tone, children }: { tone: BadgeTone; children: React.ReactNode }) {
+  const theme = useTheme();
+  const palette: Record<BadgeTone, { bg: string; fg: string }> = {
+    green: { bg: withOpacity(theme.colors.green, 0.15), fg: theme.colors.green },
+    amber: { bg: withOpacity(theme.colors.amber, 0.18), fg: theme.colors.amber },
+    blue: { bg: withOpacity(theme.colors.primary, 0.14), fg: theme.colors.primary },
+    neutral: { bg: withOpacity(theme.colors.slate, 0.14), fg: theme.colors.slate },
+  };
+  const { bg, fg } = palette[tone];
+  return (
+    <View
+      style={{
+        backgroundColor: bg,
+        borderRadius: theme.radii.pill,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
       <RNText
         style={{
-          fontFamily: fontFamilies.semibold,
-          fontSize: 15,
-          color: theme.colors.ink,
-          lineHeight: multiline ? 21 : undefined,
+          fontFamily: fontFamilies.bold,
+          fontSize: 11,
+          color: fg,
+          letterSpacing: 0.3,
         }}
       >
-        {value}
+        {children}
       </RNText>
     </View>
   );
+}
+
+// Maps a pool_round_states.state to one of our four tones + label. Used
+// only for the per-round rows in progressive pool deadline listings.
+function RoundStateBadge({ state }: { state: string }) {
+  const tone: BadgeTone =
+    state === 'open' ? 'green'
+    : state === 'in_progress' ? 'amber'
+    : state === 'completed' ? 'blue'
+    : 'neutral';
+  const label =
+    state === 'in_progress'
+      ? 'In Progress'
+      : state.charAt(0).toUpperCase() + state.slice(1);
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+function statusTone(status: string): BadgeTone {
+  if (status === 'open' || status === 'active') return 'green';
+  if (status === 'upcoming') return 'blue';
+  if (status === 'closed') return 'amber';
+  return 'neutral';
+}
+
+function statusLabel(status: string): string {
+  if (status === 'open' || status === 'active') return 'Open';
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 // Leave row variant of DangerRow with built-in disabled state for the
@@ -302,11 +553,11 @@ function LeaveRow({
   );
 }
 
+// --- Formatters -------------------------------------------------------
+
 function formatDeadline(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  // Localised long-form so the user can verify their timezone matches
-  // expectations. e.g. "Jun 11, 2026 at 8:00 PM".
   const date = d.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -319,3 +570,25 @@ function formatDeadline(iso: string): string {
   return `${date} at ${time}`;
 }
 
+function formatCreated(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatFee(amount: number, currency: string): string {
+  // Intl.NumberFormat with the currency style handles symbol placement
+  // and decimal precision per locale automatically (e.g. $1.00 vs 1,00 €).
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+  } catch {
+    // Fallback if the currency code is invalid (shouldn't happen — the
+    // server validates on save — but cheap insurance).
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}

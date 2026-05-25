@@ -29,6 +29,15 @@ export type PoolDetailInfo = {
   memberCount: number;
   isAdmin: boolean;
   currentUserId: string | null;
+  // Added for Pool Info tab parity with the web. createdAt powers the
+  // "Created" row; entryFee + currency drive the Fees & Prize Pool card
+  // (skipped entirely when fee is 0); totalEntries is the count of
+  // pool_entries across all members for the same card's prize-pool math
+  // AND the "Total entries" row in Entries & Participants.
+  createdAt: string | null;
+  entryFee: number | null;
+  entryFeeCurrency: string | null;
+  totalEntries: number;
 };
 
 export type PoolDetailData = {
@@ -60,7 +69,7 @@ export function usePoolDetail(poolId: string | undefined) {
             supabase
               .from('pools')
               .select(
-                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, max_participants, max_entries_per_user, is_private, admin_user_id',
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency',
               )
               .eq('pool_id', poolId)
               .maybeSingle(),
@@ -70,10 +79,16 @@ export function usePoolDetail(poolId: string | undefined) {
         if (poolErr) throw poolErr;
         if (!pool) throw new Error('Pool not found.');
 
-        const { count: memberCount } = await supabase
-          .from('pool_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('pool_id', poolId);
+        const [{ count: memberCount }, { count: entryCount }] = await Promise.all([
+          supabase
+            .from('pool_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('pool_id', poolId),
+          supabase
+            .from('pool_entries')
+            .select('*', { count: 'exact', head: true })
+            .eq('pool_id', poolId),
+        ]);
 
         const poolRow = pool as {
           pool_id: string;
@@ -91,6 +106,9 @@ export function usePoolDetail(poolId: string | undefined) {
           max_entries_per_user: number;
           is_private: boolean | null;
           admin_user_id: string;
+          created_at: string | null;
+          entry_fee: number | null;
+          entry_fee_currency: string | null;
         };
         const currentUserId = (userData as { user_id: string } | null)?.user_id ?? null;
 
@@ -113,6 +131,10 @@ export function usePoolDetail(poolId: string | undefined) {
             memberCount: memberCount ?? 0,
             isAdmin: currentUserId !== null && poolRow.admin_user_id === currentUserId,
             currentUserId,
+            createdAt: poolRow.created_at,
+            entryFee: poolRow.entry_fee,
+            entryFeeCurrency: poolRow.entry_fee_currency,
+            totalEntries: entryCount ?? 0,
           },
           leaderboard: lb.entries ?? [],
           awards: lb.awards ?? [],

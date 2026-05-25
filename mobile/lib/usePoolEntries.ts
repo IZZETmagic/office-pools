@@ -11,6 +11,9 @@ export type PoolEntry = {
   hasSubmittedPredictions: boolean;
   totalPoints: number;
   predictionsSubmittedAt: string | null;
+  /** Mirrors pool_entries.fee_paid. Drives the per-entry Paid / Unpaid
+   *  badge in PoolInfoTab's Fees & Prize Pool card. */
+  feePaid: boolean;
 };
 
 export function usePoolEntries(poolId: string | undefined) {
@@ -58,7 +61,7 @@ export function usePoolEntries(poolId: string | undefined) {
       const { data: entryRows, error: entryErr } = await supabase
         .from('pool_entries')
         .select(
-          'entry_id, entry_name, entry_number, has_submitted_predictions, total_points, predictions_submitted_at',
+          'entry_id, entry_name, entry_number, has_submitted_predictions, total_points, predictions_submitted_at, fee_paid',
         )
         .eq('member_id', mId)
         .order('entry_number', { ascending: true });
@@ -72,6 +75,7 @@ export function usePoolEntries(poolId: string | undefined) {
           has_submitted_predictions: boolean;
           total_points: number | null;
           predictions_submitted_at: string | null;
+          fee_paid: boolean | null;
         }>).map((r) => ({
           entryId: r.entry_id,
           entryName: r.entry_name,
@@ -79,6 +83,7 @@ export function usePoolEntries(poolId: string | undefined) {
           hasSubmittedPredictions: r.has_submitted_predictions,
           totalPoints: r.total_points ?? 0,
           predictionsSubmittedAt: r.predictions_submitted_at,
+          feePaid: !!r.fee_paid,
         })),
       );
     } catch (err) {
