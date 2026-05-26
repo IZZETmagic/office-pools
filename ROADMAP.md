@@ -206,6 +206,8 @@ Index of all deferred work items. Detail lives in `memory/project_backlog_*.md` 
 | Activity tab — surface XP gains in the feed (e.g. "Submitted predictions +100 XP — Entry A in Pool X") | `memory/project_backlog_activity_tab_xp.md` | ✅ Phase 3b.0 — v1 shipped with Activity tab port (match XP, bonus XP, badge XP); deep-link to Form → Level Runway still TODO |
 | Members tab admin actions — view entry, unlock, adjust points (all 3 prediction modes) | `memory/project_backlog_admin_member_actions.md` | Phase 3b.1 (batch with other mobile admin polish) |
 | Pool Info tab + non-admin Leave Pool surface + Stop-Participating iOS bug fix (open question: merge Scoring into Pool Info?) | `memory/project_backlog_pool_info_tab.md` | Phase 3b.1 (batch with other mobile polish) |
+| Perfect group bonus scoring config (Carson, May 2026 user feedback) | `memory/project_backlog_scoring_perfect_group.md` | Phase 3c.3 (with pool template scoring redesign) |
+| Penalty-prediction scoring redesign — "Goes to penalties" bonus is gameable (George, May 2026 user feedback) | `memory/project_backlog_scoring_penalty_redesign.md` | Phase 3c.3 (with pool template scoring redesign); interim workaround: admins set `bp_penalty_correct = 0` |
 | Multi-sport: data model abstraction | `memory/project_backlog_data_model.md` | Phase 3c.1 |
 | Multi-sport: sports data ingestion | `memory/project_backlog_sports_data.md` | Phase 3c.2 |
 | Multi-sport: pool template system | `memory/project_backlog_pool_templates.md` | Phase 3c.3 |
@@ -218,6 +220,8 @@ Index of all deferred work items. Detail lives in `memory/project_backlog_*.md` 
 | Item | Memory file | Notes |
 | --- | --- | --- |
 | Match day recap email rewrite | `memory/project_backlog_emails.md` | v0 for per-competition cadence; revisit as part of Phase 3c.4 or earlier if needed |
+| Project dashboard in super admin (visual of all open ROADMAP.md items; possibly Supabase-backed `roadmap_items` table) | `memory/project_backlog_project_dashboard.md` | Not gated on anything; good downtime project. Ideally lands before Phase 3c so multi-sport planning has a real surface. |
+| Creative pool name award / hall of names (admin-curated, v1 = pool-card badge) | `memory/project_backlog_creative_pool_names.md` | Lowest priority on the board. No dependencies. Could share super admin surface with the project dashboard item. |
 
 ## Adding a new backlog item
 

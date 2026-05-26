@@ -77,14 +77,19 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
 }
 
 /**
- * Fetches every match for every tournament the user has a pool in, plus a
- * realtime subscription that surgically updates rows on `matches` UPDATE
- * events (no full refetch). Mirrors iOS `ResultsViewModel`.
+ * Internal hook — fetches every match for every tournament the user has a
+ * pool in, plus a realtime subscription that surgically updates rows on
+ * `matches` UPDATE events (no full refetch). Mirrors iOS `ResultsViewModel`.
  *
  * Tournament IDs come from `HomeDataProvider`'s cached pools, so this hook
  * doesn't re-query memberships — it just fans out one query per tournament.
+ *
+ * IMPORTANT: don't call this directly from screens. Use `useTournamentMatches`
+ * from `TournamentMatchesProvider` instead — it shares one fetch across the
+ * whole app and lets the splash gate wait on the load so the Results tab
+ * doesn't flash a loading spinner on first visit.
  */
-export function useTournamentMatches() {
+export function useTournamentMatchesInternal() {
   const { data: homeData } = useHomeData();
   const tournamentIds = useMemo(() => {
     const set = new Set<string>();

@@ -144,6 +144,12 @@ export default function TabLayout() {
           borderTopWidth: 0, // we render our own segmented border above
         },
         tabBarLabelStyle: { fontFamily: fontFamilies.semibold, fontSize: 11 },
+        // Mount all five tab screens in JS upfront (behind the splash)
+        // rather than lazily on first focus. Pairs with enableScreens(false)
+        // in app/_layout.tsx so that by the time the splash dismisses,
+        // every tab is fully mounted and measured — tab switches are a
+        // pure visibility flip with no perceivable mount work.
+        lazy: false,
       }}
     >
       <Tabs.Screen

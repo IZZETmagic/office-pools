@@ -16,11 +16,32 @@ import { LogBox, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
+import { enableScreens } from 'react-native-screens';
+
+// Fix for the "screen pops bigger then snaps to correct size on first tab
+// visit" jump. react-native-screens (the default for react-navigation)
+// manages native UIViewController lifecycle for each screen, and on iOS the
+// first time an inactive tab's screen is attached to the window it briefly
+// renders at full window dimensions before the layout pass accounts for
+// safe-area insets + the tab bar height — visible as a first-focus pop.
+// Disabling it makes navigation use plain RN Views, so every tab is just a
+// flex child measured once at JS mount time (behind the splash). Tried
+// less-invasive fixes first — Reanimated `entering` wrappers on each tab,
+// detachInactiveScreens={false} on the navigator — neither helped because
+// the jump is at the native screen-attachment layer, not in JS. The
+// trade-off is the loss of native screen freeze/detach optimizations, but
+// for a 5-tab app with light screens that's negligible.
+enableScreens(false);
 
 import { Splash } from '@/components/Splash';
 import { ActivityProvider, useSharedActivity } from '@/lib/ActivityProvider';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { HomeDataProvider, useHomeData } from '@/lib/HomeDataProvider';
+import {
+  TournamentMatchesProvider,
+  useTournamentMatches,
+} from '@/lib/TournamentMatchesProvider';
 import { PendingActionsProvider } from '@/lib/usePendingActions';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
@@ -113,10 +134,24 @@ function InnerLayout() {
   // splash, so by the time it fades, the correct stack is already mounted.
 
   return (
+    // SafeAreaProvider with `initialMetrics` so safe-area insets are
+    // correct from frame zero. expo-router's outer SafeAreaProvider passes
+    // `initialMetrics={undefined}` on native, which makes the first frame
+    // paint with insets at 0 and then jump down by the notch height once
+    // the native safe-area module reports back. Our nested provider wins
+    // for everything below; expo-router's outer one is harmless.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <GestureHandlerRootView style={{ flex: 1 }}>
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
+      {/* TournamentMatchesProvider lives inside HomeDataProvider because
+          the internal hook reads tournament IDs from home data (one query
+          per tournament the user has a pool in). Mounting it here fires
+          the matches fetch as soon as home data resolves; combined with
+          the splash gate waiting on its loading state, Results renders
+          fully on first paint instead of flashing a loading spinner. */}
+      <TournamentMatchesProvider>
       <ActivityProvider>
       <PendingActionsProvider>
         <Stack>
@@ -181,18 +216,22 @@ function InnerLayout() {
         <SplashOverlay />
       </PendingActionsProvider>
       </ActivityProvider>
+      </TournamentMatchesProvider>
       </HomeDataProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
     </KeyboardProvider>
     </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
 // Branded splash overlay. Stays mounted (over the rest of the tree) until
-// HomeData + Activity have hydrated and a 1.2s minimum-floor has elapsed,
-// then fades out and unmounts. Sibling to <Stack> so the tabs mount and
-// prefetch behind the splash from frame zero.
+// HomeData + Activity + Tournament Matches have hydrated and a 1.2s
+// minimum-floor has elapsed, then fades out and unmounts. Sibling to
+// <Stack> so the tabs mount and prefetch behind the splash from frame
+// zero. The floor gives the entrance animation (scale-in + bob) time to
+// play out so the brand identity registers.
 const SPLASH_MIN_MS = 1200;
 
 function SplashOverlay() {
@@ -212,6 +251,10 @@ function useSplashGate(): boolean {
   const { session, loading: authLoading } = useAuth();
   const { loading: homeLoading } = useHomeData();
   const { loading: activityLoading } = useSharedActivity();
+  // Wait on the tournament matches fetch so Results renders fully on
+  // first paint (matching Home/Pools/Activity covered by homeLoading +
+  // activityLoading).
+  const { loading: matchesLoading } = useTournamentMatches();
   const [minElapsed, setMinElapsed] = useState(false);
 
   useEffect(() => {
@@ -224,5 +267,5 @@ function useSplashGate(): boolean {
   // Unauthenticated launch: no data to prefetch — fade out so the user
   // lands on /(auth)/sign-in immediately after the 1.2s floor.
   if (!session) return true;
-  return !homeLoading && !activityLoading;
+  return !homeLoading && !activityLoading && !matchesLoading;
 }

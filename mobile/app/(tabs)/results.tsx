@@ -9,7 +9,6 @@ import {
   Text as RNText,
   View,
 } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -32,10 +31,11 @@ import {
 } from '@/components/results';
 import { Text } from '@/components/ui';
 import { useManualRefresh } from '@/lib/useManualRefresh';
-import {
-  useTournamentMatches,
-  type ResultsMatch,
-} from '@/lib/useTournamentMatches';
+// useTournamentMatches now comes from the shared provider mounted at root
+// (lib/TournamentMatchesProvider.tsx) so first-visit Results renders with
+// data already loaded — no more empty-state + arrival jump.
+import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
+import { type ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // ---- Section model ----
@@ -126,11 +126,6 @@ function roundSections(matchList: ResultsMatch[]): MatchSection[] {
 
 export default function ResultsScreen() {
   const theme = useTheme();
-  // The bottom tab bar is translucent
-  // and overlays scroll content. This hook returns its actual rendered
-  // height for the current device — iOS ~83 (49 tab bar + safe area), Android
-  // ~56dp + bottom safe area — so the last match clears the tab bar.
-  const tabBarHeight = useBottomTabBarHeight();
   const { matches, loading, error, refresh, refreshIfStale } =
     useTournamentMatches();
   // Pull-to-refresh: spinner driven by real user-pull gesture only.
@@ -365,7 +360,7 @@ export default function ResultsScreen() {
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: tabBarHeight + 12,
+          paddingBottom: 24,
           gap: 12,
         }}
         refreshControl={

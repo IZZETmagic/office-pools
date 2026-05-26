@@ -2,7 +2,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ConfirmDialog, Text } from '@/components/ui';
@@ -44,7 +43,6 @@ export default function HomeScreen() {
   // Tapping "Enable" triggers the OS prompt; tapping "Not now" dismisses
   // permanently (persisted in SecureStore). See useNotificationPrompt.
   const notificationPrompt = useNotificationPrompt({ enabled: !!user });
-  const tabBarHeight = useBottomTabBarHeight();
   const initialFocus = useRef(true);
   // Create/Join action sheet opened from the "+" in HomeHeader. Picking
   // "Join with Code" closes this one and opens JoinPoolSheet below.
@@ -66,25 +64,28 @@ export default function HomeScreen() {
     }, []),
   );
 
-  if (loading && !data) {
-    return (
-      <SafeAreaView
-        edges={['top', 'left', 'right']}
-        style={{ flex: 1, backgroundColor: theme.colors.snow }}
-      >
+  const pools = data?.pools ?? [];
+  const hasPools = pools.length > 0;
+  const poolsNeedingPredictions = pools.filter((p) => p.needsPredictions);
+  const inviteTarget =
+    pools.find((p) => p.role === 'admin' && p.memberCount < 4) ?? null;
+
+  return (
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={{ flex: 1, backgroundColor: theme.colors.snow }}
+    >
+      <HomeHeader
+        fullName={data?.fullName ?? null}
+        onMenuPress={() => createJoinSheetRef.current?.open()}
+      />
+      {/* Loading / error states sit below the header so the header
+          doesn't pop in when data lands. */}
+      {loading && !data ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <SafeAreaView
-        edges={['top', 'left', 'right']}
-        style={{ flex: 1, backgroundColor: theme.colors.snow }}
-      >
+      ) : error && !data ? (
         <View
           style={{
             flex: 1,
@@ -102,30 +103,16 @@ export default function HomeScreen() {
           </Text>
           <Button title="Try Again" onPress={refresh} />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  const pools = data?.pools ?? [];
-  const hasPools = pools.length > 0;
-  const poolsNeedingPredictions = pools.filter((p) => p.needsPredictions);
-  const inviteTarget =
-    pools.find((p) => p.role === 'admin' && p.memberCount < 4) ?? null;
-
-  return (
-    <SafeAreaView
-      edges={['top', 'left', 'right']}
-      style={{ flex: 1, backgroundColor: theme.colors.snow }}
-    >
-      <HomeHeader
-        fullName={data?.fullName ?? null}
-        onMenuPress={() => createJoinSheetRef.current?.open()}
-      />
+      ) : (
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.xl,
           paddingTop: theme.spacing.md,
-          paddingBottom: tabBarHeight + theme.spacing.xl,
+          // Tab bar isn't position:'absolute' (see (tabs)/_layout.tsx
+          // tabBarStyle), so content already sits above it — no need
+          // for useBottomTabBarHeight() padding (which would return 0
+          // until the custom tab bar's onLayout fires and then jump).
+          paddingBottom: theme.spacing.xl,
           gap: theme.spacing.xl,
         }}
         refreshControl={
@@ -185,6 +172,7 @@ export default function HomeScreen() {
         ) : null}
 
       </ScrollView>
+      )}
 
       {/* Create/Join action sheet — opened by tapping the "+" in HomeHeader.
           Picking "Join with Code" closes this and opens JoinPoolSheet

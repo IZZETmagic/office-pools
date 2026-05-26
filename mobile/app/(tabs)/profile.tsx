@@ -18,7 +18,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -53,7 +52,6 @@ export default function ProfileScreen() {
   const { data, refresh } = useHomeData();
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
-  const tabBarHeight = useBottomTabBarHeight();
   // Create / Join pool sheets — opened by the "+" button in the header.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
   const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
@@ -86,7 +84,7 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={{
           paddingTop: theme.spacing.md,
-          paddingBottom: tabBarHeight + theme.spacing.xl,
+          paddingBottom: theme.spacing.xl,
           gap: theme.spacing.xl,
         }}
         refreshControl={

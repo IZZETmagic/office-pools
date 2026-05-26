@@ -2,7 +2,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -35,7 +34,6 @@ export default function PoolsScreen() {
   const { data, loading, error, refresh, refreshIfStale } = useHomeData();
   // Pull-to-refresh: spinner bound to user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
-  const tabBarHeight = useBottomTabBarHeight();
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   // Tab-focus refresh only re-fetches if the cached data is stale (>30s),
@@ -84,46 +82,6 @@ export default function PoolsScreen() {
 
   const visiblePools = useMemo(() => applyFilters(allPools, filters), [allPools, filters]);
 
-  if (loading && !data) {
-    return (
-      <SafeAreaView
-        edges={['top', 'left', 'right']}
-        style={{ flex: 1, backgroundColor: theme.colors.snow }}
-      >
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <SafeAreaView
-        edges={['top', 'left', 'right']}
-        style={{ flex: 1, backgroundColor: theme.colors.snow }}
-      >
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: theme.spacing.xl,
-            gap: theme.spacing.lg,
-          }}
-        >
-          <Text variant="sectionHeader" align="center">
-            Couldn&apos;t load pools
-          </Text>
-          <Text variant="body" color="slate" align="center">
-            {error}
-          </Text>
-          <Button title="Try Again" onPress={refresh} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const isMyPools = tab === 'my-pools';
   const hasAnyPools = allPools.length > 0;
 
@@ -142,6 +100,33 @@ export default function PoolsScreen() {
         showMenu={isMyPools}
         onMenuPress={() => createJoinSheetRef.current?.open()}
       />
+      {/* Loading / error states live below the header so the header
+          doesn't pop in when data lands. Segment + filter bar are also
+          gated so they don't flash before there's anything to filter. */}
+      {loading && !data ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      ) : error && !data ? (
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: theme.spacing.xl,
+            gap: theme.spacing.lg,
+          }}
+        >
+          <Text variant="sectionHeader" align="center">
+            Couldn&apos;t load pools
+          </Text>
+          <Text variant="body" color="slate" align="center">
+            {error}
+          </Text>
+          <Button title="Try Again" onPress={refresh} />
+        </View>
+      ) : (
+        <>
       <PoolsSegment active={tab} onChange={setTab} />
       {isMyPools && hasAnyPools ? (
         <PoolsFilterBar
@@ -162,7 +147,10 @@ export default function PoolsScreen() {
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.xl,
           paddingTop: theme.spacing.md,
-          paddingBottom: tabBarHeight + theme.spacing.xl,
+          // Tab bar isn't position:'absolute' so content already sits
+          // above it — no useBottomTabBarHeight() (would jump from 0 to
+          // ~83 once the custom tab bar measures).
+          paddingBottom: theme.spacing.xl,
           gap: theme.spacing.md,
           flexGrow: 1,
         }}
@@ -192,6 +180,8 @@ export default function PoolsScreen() {
           <DiscoverList search={discoverSearch} mode={discoverMode} />
         )}
       </ScrollView>
+        </>
+      )}
 
       {/* Filter picker sheet — mounted as a sibling of the ScrollView at
           the screen root so the @gorhom/bottom-sheet positions itself

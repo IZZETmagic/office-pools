@@ -1,8 +1,8 @@
 // Branded landing screen shown while the app prefetches Home + Pools +
-// Activity data on cold launch. Mirrors the iOS Swift SplashView in
-// timing (0.5s entrance, 1.5s bob, 0.4s dot cycle, 0.4s fade-out) and
-// in two-tone "SportPool" wordmark, scaled up for the Expo build and
-// rendered in Nunito.
+// Activity + Tournament Matches data on cold launch. Mirrors the iOS Swift
+// SplashView in timing (0.5s entrance, 1.5s bob, 0.4s dot cycle, 0.4s
+// fade-out) and in two-tone "SportPool" wordmark, scaled up for the Expo
+// build and rendered in Nunito.
 
 import { ChampionIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
