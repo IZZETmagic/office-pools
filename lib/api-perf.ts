@@ -47,26 +47,12 @@ async function logPerfEntry(
 ) {
   try {
     const supabase = await createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    let userId: string | null = null
-    if (user) {
-      const { data } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq('auth_user_id', user.id)
-        .single()
-      userId = data?.user_id ?? null
-    }
-
     await supabase.from('api_perf_log').insert({
       endpoint,
       method,
       status_code: statusCode,
       response_time_ms: responseTimeMs,
-      user_id: userId,
+      user_id: null,
     })
   } catch {
     // Silently ignore - perf logging should never break API responses
