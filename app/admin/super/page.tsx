@@ -149,10 +149,16 @@ export default async function SuperAdminPage() {
       .order('match_number', { ascending: true }),
 
     // All users
+    // .range() override is required: PostgREST applies a default max-rows
+    // cap of 1000, which silently truncates the users table once the user
+    // count crosses that threshold (Stats card under-counts; UsersTab loses
+    // rows entirely). 99999 gives ample headroom until we add server-side
+    // pagination to UsersTab.
     supabase
       .from('users')
       .select('user_id, auth_user_id, email, username, full_name, is_super_admin, is_active, created_at, last_login')
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .range(0, 99999),
 
     // All pools with member counts and admin info
     supabase
