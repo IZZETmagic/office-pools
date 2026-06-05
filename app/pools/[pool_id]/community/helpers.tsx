@@ -196,6 +196,15 @@ export function generateSystemEvents(
     ? (completedMatches[0].completed_at || completedMatches[0].match_date)
     : matches[0]?.match_date || '2026-01-01T00:00:00Z'
 
+  // Map match_number → completion timestamp so badge unlocks can be dated to the
+  // match in which they were actually earned (EarnedBadge.earnedAt is a match number).
+  const matchDateByNumber = new Map<number, string>()
+  for (const m of matches) {
+    if (m.is_completed) {
+      matchDateByNumber.set(m.match_number, m.completed_at || m.match_date)
+    }
+  }
+
   // 3. Streak alerts — members with 5+ streaks
   for (const [userId, memberLevel] of memberLevels) {
     const member = members.find(m => m.user_id === userId)
@@ -203,15 +212,17 @@ export function generateSystemEvents(
     const name = member.users.full_name || member.users.username
 
     // Check for On Fire badge (5-match streak indicator)
-    const hasOnFire = memberLevel.badges.some(b => b.id === 'on_fire')
-    if (hasOnFire) {
+    const onFire = memberLevel.badges.find(b => b.id === 'on_fire')
+    if (onFire) {
+      const streakTimestamp =
+        (onFire.earnedAt !== undefined && matchDateByNumber.get(onFire.earnedAt)) || latestCompletedDate
       events.push({
         id: `streak-${userId}`,
         event_type: 'streak_alert',
         emoji: '🔥',
         content: `${name} is on a hot streak! Can anyone stop them?`,
         highlighted_name: name,
-        timestamp: latestCompletedDate,
+        timestamp: streakTimestamp,
       })
     }
   }
@@ -223,13 +234,15 @@ export function generateSystemEvents(
     const name = member.users.full_name || member.users.username
 
     for (const badge of memberLevel.badges.slice(0, 2)) { // Max 2 badges per member
+      const badgeTimestamp =
+        (badge.earnedAt !== undefined && matchDateByNumber.get(badge.earnedAt)) || latestCompletedDate
       events.push({
         id: `badge-${userId}-${badge.id}`,
         event_type: 'badge_unlock',
         emoji: '🏆',
         content: `${name} just unlocked the ${badge.emoji} ${badge.name} badge!`,
         highlighted_name: name,
-        timestamp: latestCompletedDate,
+        timestamp: badgeTimestamp,
       })
     }
   }
