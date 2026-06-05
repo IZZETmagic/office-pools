@@ -270,13 +270,21 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const [pendingFlexBadgesOpen, setPendingFlexBadgesOpen] = useState(false);
   const [pendingSharePredictionOpen, setPendingSharePredictionOpen] = useState(false);
 
+  // First-use race: useImperativeHandle commits BEFORE gorhom's
+  // <BottomSheet> finishes its own internal setup, so on the very
+  // first pick the .open() call lands on a not-yet-ready sheet and
+  // silently no-ops — which is what made the user have to tap the
+  // action twice. Defer the open by one frame so gorhom is ready.
+  // The standalone banter screen uses the same rAF pattern (and
+  // doesn't repro the bug) because it always mounts the sheet.
   useEffect(() => {
     if (
       flexBadgesMounted &&
       pendingFlexBadgesOpen &&
       flexBadgesSheetRef.current
     ) {
-      flexBadgesSheetRef.current.open();
+      const handle = flexBadgesSheetRef.current;
+      requestAnimationFrame(() => handle.open());
       setPendingFlexBadgesOpen(false);
     }
   }, [flexBadgesMounted, pendingFlexBadgesOpen]);
@@ -287,7 +295,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       pendingSharePredictionOpen &&
       sharePredictionSheetRef.current
     ) {
-      sharePredictionSheetRef.current.open();
+      const handle = sharePredictionSheetRef.current;
+      requestAnimationFrame(() => handle.open());
       setPendingSharePredictionOpen(false);
     }
   }, [sharePredictionMounted, pendingSharePredictionOpen]);
