@@ -136,19 +136,55 @@ async function handleGET(
   // zero-state response (with full badge + level metadata) so the Form tab
   // can render its structure with placeholders. Matches the score-prediction
   // analytics route's behaviour.
+  //
+  // BUT — two BP badges depend only on submission, not on match results:
+  //   • bp_full_bracket  — every group/third-place/knockout slot filled
+  //   • bp_quick_draw    — submitted within 24h of pool creation
+  // These should unlock the moment the user finishes their bracket,
+  // even pre-tournament. The remaining nine all require completed
+  // matches to evaluate, so they stay locked until results come in.
   const completedMatches = matches.filter((m: any) => m.is_completed)
   if (completedMatches.length === 0) {
     const firstLevel = LEVELS[0]
     const secondLevel = LEVELS[1] ?? null
+
+    const submissionBadges: typeof BP_BADGE_DEFINITIONS = []
+    const fullBracketSubmitted =
+      groupRankings.length >= 48 &&
+      thirdPlaceRankings.length >= 12 &&
+      knockoutPicks.length >= 32
+    if (fullBracketSubmitted) {
+      const def = BP_BADGE_DEFINITIONS.find(b => b.id === 'bp_full_bracket')
+      if (def) submissionBadges.push(def)
+    }
+    if (entry.predictions_submitted_at && pool.created_at) {
+      const submitted = new Date(entry.predictions_submitted_at).getTime()
+      const created = new Date(pool.created_at).getTime()
+      if (submitted - created <= 24 * 60 * 60 * 1000) {
+        const def = BP_BADGE_DEFINITIONS.find(b => b.id === 'bp_quick_draw')
+        if (def) submissionBadges.push(def)
+      }
+    }
+    const earnedBadgesPayload = submissionBadges.map(b => ({
+      id: b.id,
+      emoji: b.emoji,
+      name: b.name,
+      xp_bonus: b.xpBonus,
+      condition: b.condition,
+      rarity: b.rarity,
+      tier: b.tier,
+    }))
+    const totalBadgeXP = submissionBadges.reduce((sum, b) => sum + b.xpBonus, 0)
+
     return NextResponse.json({
       xp: {
-        total_xp: 0,
+        total_xp: totalBadgeXP,
         total_group_base_xp: 0,
         total_group_bonus_xp: 0,
         total_third_place_xp: 0,
         total_knockout_base_xp: 0,
         total_knockout_bonus_xp: 0,
-        total_badge_xp: 0,
+        total_badge_xp: totalBadgeXP,
         current_level: {
           level: firstLevel.level,
           name: firstLevel.name,
@@ -164,7 +200,7 @@ async function handleGET(
         xp_to_next_level: secondLevel?.xpRequired ?? 0,
         level_progress: 0,
         bonus_events: [],
-        earned_badges: [],
+        earned_badges: earnedBadgesPayload,
         all_badges: BP_BADGE_DEFINITIONS.map(b => ({
           id: b.id,
           emoji: b.emoji,
