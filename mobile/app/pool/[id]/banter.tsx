@@ -44,7 +44,12 @@ import {
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { Icon, Text } from '@/components/ui';
-import { fetchLeaderboard, type LeaderboardEntry } from '@/lib/api';
+import { fetchLeaderboard, type BadgeInfo, type LeaderboardEntry } from '@/lib/api';
+import {
+  buildFlexBadgeOptions,
+  buildFlexBadgePayload,
+  loadFlexBadges,
+} from '@/lib/flexBadges';
 import {
   detectMentionQuery,
   parseMentionSegments,
@@ -244,64 +249,6 @@ export default function BanterScreen() {
     }
   }
 
-  type BadgeOption = {
-    key: string;
-    label: string;
-    emoji: string;
-    show: (entry: LeaderboardEntry) => boolean;
-    build: (entry: LeaderboardEntry) => {
-      content: string;
-      metadata: Record<string, unknown>;
-    };
-  };
-
-  const BADGE_OPTIONS: BadgeOption[] = [
-    {
-      key: 'bullseye',
-      label: 'Bullseye',
-      emoji: '🎯',
-      show: (e) => e.exact_count > 0,
-      build: (e) => ({
-        content: `🎯 Bullseye — ${e.exact_count} exact ${e.exact_count === 1 ? 'pick' : 'picks'}!`,
-        metadata: {
-          badge_type: 'bullseye',
-          badge_label: 'Bullseye',
-          badge_count: e.exact_count,
-          badge_description: `${e.exact_count} exact ${e.exact_count === 1 ? 'pick' : 'picks'}`,
-        },
-      }),
-    },
-    {
-      key: 'hot_streak',
-      label: 'Hot streak',
-      emoji: '🔥',
-      show: (e) => e.current_streak?.type === 'hot' && e.current_streak.length > 0,
-      build: (e) => ({
-        content: `🔥 Hot streak — ${e.current_streak.length} in a row!`,
-        metadata: {
-          badge_type: 'hot_streak',
-          badge_label: 'Hot streak',
-          badge_count: e.current_streak.length,
-          badge_description: `${e.current_streak.length} ${e.current_streak.length === 1 ? 'pick' : 'picks'} in a row`,
-        },
-      }),
-    },
-    {
-      key: 'underdog',
-      label: 'Underdog',
-      emoji: '🎰',
-      show: (e) => e.contrarian_wins > 0,
-      build: (e) => ({
-        content: `🎰 Underdog — ${e.contrarian_wins} contrarian ${e.contrarian_wins === 1 ? 'win' : 'wins'}!`,
-        metadata: {
-          badge_type: 'underdog',
-          badge_label: 'Underdog',
-          badge_count: e.contrarian_wins,
-          badge_description: `${e.contrarian_wins} contrarian ${e.contrarian_wins === 1 ? 'win' : 'wins'}`,
-        },
-      }),
-    },
-  ];
 
   async function sendBadgeFlex(payload: {
     content: string;
@@ -329,6 +276,8 @@ export default function BanterScreen() {
     };
   }
 
+  const earnedBadgesRef = useRef<BadgeInfo[]>([]);
+
   async function flexBadges() {
     if (!id || !banter.appUserId) return;
     let own: LeaderboardEntry | undefined;
@@ -349,20 +298,14 @@ export default function BanterScreen() {
       return;
     }
     ownEntryRef.current = own;
-    const available = BADGE_OPTIONS.filter((opt) => opt.show(own as LeaderboardEntry));
-    const totalBadges = own.exact_count;
-    const allDescription =
-      totalBadges === 0
-        ? `Level ${own.level} · ${own.level_name}`
-        : `${totalBadges} ${totalBadges === 1 ? 'badge' : 'badges'} · Level ${own.level}`;
+    const ctx = await loadFlexBadges(id, banter.appUserId);
+    if (!ctx) return;
+    earnedBadgesRef.current = ctx.earnedBadges;
+    const totalBadges = ctx.earnedBadges.length;
+    const allDescription = `${totalBadges} ${totalBadges === 1 ? 'badge' : 'badges'} · Level ${own.level}`;
     const options: FlexBadgeOption[] = [
       { key: 'all', emoji: '🏆', label: 'Flex all badges', description: allDescription },
-      ...available.map((opt) => ({
-        key: opt.key,
-        emoji: opt.emoji,
-        label: opt.label,
-        description: describeBadgeOption(opt, own as LeaderboardEntry),
-      })),
+      ...buildFlexBadgeOptions(ctx.earnedBadges),
     ];
     setFlexOptions(options);
     requestAnimationFrame(() => flexSheetRef.current?.open());
@@ -375,8 +318,8 @@ export default function BanterScreen() {
       void sendBadgeFlex(flexAllPayload(own));
       return;
     }
-    const opt = BADGE_OPTIONS.find((o) => o.key === key);
-    if (opt) void sendBadgeFlex(opt.build(own));
+    const badge = earnedBadgesRef.current.find((b) => b.id === key);
+    if (badge) void sendBadgeFlex(buildFlexBadgePayload(badge));
   }
 
   const quickActions: QuickAction[] = [
@@ -963,22 +906,6 @@ async function fetchSharablePredictions(
     return b.matchNumber - a.matchNumber;
   });
   return out;
-}
-
-function describeBadgeOption(
-  opt: { key: string },
-  e: LeaderboardEntry,
-): string {
-  switch (opt.key) {
-    case 'bullseye':
-      return `${e.exact_count} exact ${e.exact_count === 1 ? 'pick' : 'picks'}`;
-    case 'hot_streak':
-      return `${e.current_streak.length} ${e.current_streak.length === 1 ? 'pick' : 'picks'} in a row`;
-    case 'underdog':
-      return `${e.contrarian_wins} contrarian ${e.contrarian_wins === 1 ? 'win' : 'wins'}`;
-    default:
-      return '';
-  }
 }
 
 function EmptyState() {

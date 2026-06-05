@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
+import { badgeIcon } from './badge-icons';
 import { Icon, Text } from '@/components/ui';
 import type {
   BadgeInfo,
@@ -375,27 +377,10 @@ function XPStatColumn({
 // Bracket Badges section
 // =============================================================
 
-type BPBadgeIconSpec = { ios: string; emoji: string };
-
-const BP_BADGE_ICONS: Record<string, BPBadgeIconSpec> = {
-  bp_cartographer: { ios: 'map.fill', emoji: '🗺️' },
-  bp_world_map: { ios: 'globe', emoji: '🌍' },
-  bp_bracket_prophet: { ios: 'eye.fill', emoji: '👁️' },
-  bp_architect: { ios: 'building.2.fill', emoji: '🏛️' },
-  bp_sniper: { ios: 'scope', emoji: '🎯' },
-  bp_final_four: { ios: 'trophy.fill', emoji: '🏆' },
-  bp_perfect_bracket: { ios: 'star.fill', emoji: '⭐' },
-  bp_upset_specialist: { ios: 'exclamationmark.triangle.fill', emoji: '⚠️' },
-  bp_group_guardian: { ios: 'shield.fill', emoji: '🛡️' },
-  bp_quick_draw: { ios: 'bolt.fill', emoji: '⚡' },
-  bp_full_bracket: { ios: 'checklist', emoji: '✅' },
-};
-
-const BP_FALLBACK_ICON: BPBadgeIconSpec = { ios: 'star.fill', emoji: '⭐' };
-
-function bpBadgeIcon(id: string): BPBadgeIconSpec {
-  return BP_BADGE_ICONS[id] ?? BP_FALLBACK_ICON;
-}
+// Bracket-picker badge icons live in the shared `./badge-icons` map
+// alongside the full/progressive badges. BPFormTab uses the same
+// `badgeIcon()` helper as FormTab so PNG medallions and SF-symbol
+// fallbacks stay in lockstep across the two surfaces.
 
 function useRarityColor(rarity: string): string {
   const theme = useTheme();
@@ -487,12 +472,12 @@ function BPBadgeCell({
 }) {
   const theme = useTheme();
   const color = useRarityColor(badge.rarity);
-  const icon = bpBadgeIcon(badge.id);
+  const icon = badgeIcon(badge.id);
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: 64,
+        width: 80,
         alignItems: 'center',
         gap: theme.spacing.xs,
         opacity: pressed ? 0.7 : 1,
@@ -500,18 +485,26 @@ function BPBadgeCell({
     >
       <View
         style={{
-          width: 44,
-          height: 44,
+          width: 64,
+          height: 64,
           borderRadius: theme.radii.pill,
-          backgroundColor: earned ? withOpacity(color, 0.15) : theme.colors.mist,
+          backgroundColor: earned && icon.png
+            ? 'transparent'
+            : earned
+              ? withOpacity(color, 0.15)
+              : theme.colors.mist,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         {earned ? (
-          <Icon name={icon.ios} size={18} tint={color} weight="semibold" />
+          icon.png ? (
+            <Image source={icon.png} style={{ width: 64, height: 64 }} resizeMode="contain" />
+          ) : (
+            <Icon name={icon.ios} size={26} tint={color} weight="semibold" />
+          )
         ) : (
-          <Icon name="lock.fill" size={14} tint={theme.colors.slate} weight="semibold" />
+          <Icon name="lock.fill" size={20} tint={theme.colors.slate} weight="semibold" />
         )}
       </View>
       <RNText

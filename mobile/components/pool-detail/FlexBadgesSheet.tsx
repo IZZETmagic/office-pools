@@ -4,10 +4,12 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Image, Pressable, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+
+import { badgeIcon } from './badge-icons';
 
 export type FlexBadgeOption = {
   key: string;
@@ -40,7 +42,7 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
   }));
 
   const snapPoints = useMemo<(string | number)[]>(() => {
-    const rowHeight = 64;
+    const rowHeight = 72;
     const headerHeight = 56;
     const padding = 24 + insets.bottom;
     const height = headerHeight + rowHeight * options.length + padding;
@@ -92,7 +94,9 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
           </RNText>
         </View>
         <View style={{ gap: theme.spacing.xs }}>
-          {options.map((opt, i) => (
+          {options.map((opt, i) => {
+            const png = badgeIcon(opt.key).png;
+            return (
             <Pressable
               key={opt.key}
               onPress={() => handlePick(opt.key)}
@@ -108,7 +112,13 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
                 borderTopColor: withOpacity(theme.colors.silver, 0.4),
               })}
             >
-              <RNText style={{ fontSize: 22 }}>{opt.emoji}</RNText>
+              {png ? (
+                <Image source={png} style={{ width: 48, height: 48 }} resizeMode="contain" />
+              ) : (
+                <View style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+                  <RNText style={{ fontSize: 28 }}>{opt.emoji}</RNText>
+                </View>
+              )}
               <View style={{ flex: 1, gap: 2 }}>
                 <RNText
                   numberOfLines={1}
@@ -132,7 +142,8 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
                 </RNText>
               </View>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       </BottomSheetView>
     </BottomSheet>

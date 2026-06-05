@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -613,7 +614,7 @@ function BadgeCell({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: 64,
+        width: 80,
         alignItems: 'center',
         gap: 4,
         opacity: pressed ? 0.7 : 1,
@@ -621,18 +622,22 @@ function BadgeCell({
     >
       <View
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: earned ? withOpacity(color, 0.15) : theme.colors.mist,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: earned && icon.png ? 'transparent' : earned ? withOpacity(color, 0.15) : theme.colors.mist,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         {earned ? (
-          <Icon name={icon.ios} size={18} tint={color} weight="semibold" />
+          icon.png ? (
+            <Image source={icon.png} style={{ width: 64, height: 64 }} resizeMode="contain" />
+          ) : (
+            <Icon name={icon.ios} size={26} tint={color} weight="semibold" />
+          )
         ) : (
-          <Icon name="lock.fill" size={14} tint={theme.colors.slate} weight="semibold" />
+          <Icon name="lock.fill" size={20} tint={theme.colors.slate} weight="semibold" />
         )}
         {hasPendingDot ? <NotificationDot size="sm" top={-2} right={-2} /> : null}
       </View>

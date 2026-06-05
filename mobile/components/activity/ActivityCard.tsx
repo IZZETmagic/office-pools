@@ -1,7 +1,8 @@
 // Port of ios/OfficePools/Views/Activity/ActivityCardView.swift.
 
-import { Text as RNText, View } from 'react-native';
+import { Image, Text as RNText, View } from 'react-native';
 
+import { badgeIconByName } from '@/components/pool-detail/badge-icons';
 import { Icon, Text } from '@/components/ui';
 import type {
   ActivityColorKey,
@@ -32,6 +33,20 @@ export function ActivityCard({ item }: ActivityCardProps) {
   const fg = iconFg(theme, colorKey);
   const poolName = readPoolName(item);
 
+  // For badge_earned items, swap the colored emoji chip for the badge's
+  // PNG medallion when we can resolve one from the badge name. Falls
+  // through to the existing chip+emoji path otherwise (so unknown
+  // names — e.g. a freshly-added badge whose mapping hasn't shipped
+  // yet — still render something).
+  const badgePng =
+    item.activityType === 'badge_earned'
+      ? badgeIconByName(
+          ((item.metadata as { badge_name?: unknown } | null)?.badge_name as
+            | string
+            | undefined) ?? '',
+        )?.png ?? null
+      : null;
+
   return (
     <View
       style={{
@@ -56,18 +71,23 @@ export function ActivityCard({ item }: ActivityCardProps) {
         }}
       />
 
-      {/* Icon circle */}
+      {/* Icon circle. badge_earned items with a resolvable PNG render
+          the medallion directly with a transparent background so the
+          trophy is the visual anchor; everything else keeps the
+          colored emoji/SF-symbol chip. */}
       <View
         style={{
           width: 38,
           height: 38,
           borderRadius: 19,
-          backgroundColor: bg,
+          backgroundColor: badgePng ? 'transparent' : bg,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        {isEmoji ? (
+        {badgePng ? (
+          <Image source={badgePng} style={{ width: 38, height: 38 }} resizeMode="contain" />
+        ) : isEmoji ? (
           <RNText style={{ fontSize: 16 }}>{iconName}</RNText>
         ) : (
           <Icon name={iconName as never} tint={fg} size={15} weight="semibold" />

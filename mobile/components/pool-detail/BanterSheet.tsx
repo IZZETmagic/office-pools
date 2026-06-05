@@ -77,6 +77,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
 import { fetchLeaderboard, type LeaderboardEntry } from '@/lib/api';
+import {
+  buildFlexBadgeOptions,
+  buildFlexBadgePayload,
+  loadFlexBadges,
+} from '@/lib/flexBadges';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import {
@@ -1999,126 +2004,39 @@ async function sendStandings(poolId: string, sendMessage: SendMessage) {
   }
 }
 
-type BadgeOption = {
-  key: string;
-  label: string;
-  emoji: string;
-  show: (e: LeaderboardEntry) => boolean;
-  build: (e: LeaderboardEntry) => { content: string; metadata: Record<string, unknown> };
-};
-
-const BADGE_OPTIONS: BadgeOption[] = [
-  {
-    key: 'bullseye',
-    label: 'Bullseye',
-    emoji: '🎯',
-    show: (e) => e.exact_count > 0,
-    build: (e) => ({
-      content: `🎯 Bullseye — ${e.exact_count} exact ${e.exact_count === 1 ? 'pick' : 'picks'}!`,
-      metadata: {
-        badge_type: 'bullseye',
-        badge_label: 'Bullseye',
-        badge_count: e.exact_count,
-        badge_description: `${e.exact_count} exact ${e.exact_count === 1 ? 'pick' : 'picks'}`,
-      },
-    }),
-  },
-  {
-    key: 'hot_streak',
-    label: 'Hot streak',
-    emoji: '🔥',
-    show: (e) => e.current_streak?.type === 'hot' && e.current_streak.length > 0,
-    build: (e) => ({
-      content: `🔥 Hot streak — ${e.current_streak.length} in a row!`,
-      metadata: {
-        badge_type: 'hot_streak',
-        badge_label: 'Hot streak',
-        badge_count: e.current_streak.length,
-        badge_description: `${e.current_streak.length} ${e.current_streak.length === 1 ? 'pick' : 'picks'} in a row`,
-      },
-    }),
-  },
-  {
-    key: 'underdog',
-    label: 'Underdog',
-    emoji: '🎰',
-    show: (e) => e.contrarian_wins > 0,
-    build: (e) => ({
-      content: `🎰 Underdog — ${e.contrarian_wins} contrarian ${e.contrarian_wins === 1 ? 'win' : 'wins'}!`,
-      metadata: {
-        badge_type: 'underdog',
-        badge_label: 'Underdog',
-        badge_count: e.contrarian_wins,
-        badge_description: `${e.contrarian_wins} contrarian ${e.contrarian_wins === 1 ? 'win' : 'wins'}`,
-      },
-    }),
-  },
-];
-
-// "Flex badges" — fetches the leaderboard, finds the caller's entry,
-// filters BADGE_OPTIONS to ones they qualify for, and invokes
-// `onReady` with the picker options. Caller is responsible for
-// opening the sheet once options are in state.
+// "Flex badges" — loads the caller's earned badges via
+// fetchEntryAnalytics and invokes `onReady` with one picker option
+// per earned badge. Caller is responsible for opening the sheet
+// once options are in state.
 async function openFlexBadges(
   poolId: string,
   appUserId: string,
   onReady: (options: FlexBadgeOption[]) => void,
 ) {
-  try {
-    const lb = await fetchLeaderboard(poolId);
-    const myEntry = (lb.entries ?? []).find((e) => e.user_id === appUserId);
-    if (!myEntry) {
-      Alert.alert('Not in this pool', "You don't have an entry to flex from.");
-      return;
-    }
-    const available = BADGE_OPTIONS.filter((b) => b.show(myEntry));
-    if (available.length === 0) {
-      Alert.alert('No badges to flex yet', "Keep going — you'll earn some soon!");
-      return;
-    }
-    onReady(
-      available.map(({ key, emoji, label }) => ({
-        key,
-        emoji,
-        label,
-        description: 'Tap to flex this badge',
-      })),
-    );
-  } catch (err) {
-    Alert.alert(
-      "Couldn't load badges",
-      err instanceof Error ? err.message : 'Unknown error',
-    );
-  }
+  const ctx = await loadFlexBadges(poolId, appUserId);
+  if (!ctx) return;
+  onReady(buildFlexBadgeOptions(ctx.earnedBadges));
 }
 
-// Re-fetches the leaderboard (vs caching the entry from openFlexBadges)
-// so a freshly-earned exact pick or a lifted streak is reflected if
-// the user dawdles between opening the sheet and picking.
+// Re-loads earned badges (vs caching from openFlexBadges) so a
+// freshly-unlocked badge is reflected if the user dawdles between
+// opening the sheet and picking.
 async function sendFlexBadge(
   poolId: string,
   appUserId: string,
   badgeKey: string,
   sendMessage: SendMessage,
 ) {
-  try {
-    const lb = await fetchLeaderboard(poolId);
-    const myEntry = (lb.entries ?? []).find((e) => e.user_id === appUserId);
-    if (!myEntry) return;
-    const opt = BADGE_OPTIONS.find((b) => b.key === badgeKey);
-    if (!opt) return;
-    const { content, metadata } = opt.build(myEntry);
-    const result = await sendMessage(content, {
-      messageType: 'badge_flex',
-      metadata,
-    });
-    if (result.error) Alert.alert("Couldn't flex badge", result.error);
-  } catch (err) {
-    Alert.alert(
-      "Couldn't flex badge",
-      err instanceof Error ? err.message : 'Unknown error',
-    );
-  }
+  const ctx = await loadFlexBadges(poolId, appUserId);
+  if (!ctx) return;
+  const badge = ctx.earnedBadges.find((b) => b.id === badgeKey);
+  if (!badge) return;
+  const { content, metadata } = buildFlexBadgePayload(badge);
+  const result = await sendMessage(content, {
+    messageType: 'badge_flex',
+    metadata,
+  });
+  if (result.error) Alert.alert("Couldn't flex badge", result.error);
 }
 
 // Fetches the caller's complete-score predictions for played matches

@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -154,83 +155,16 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
               transform: [{ translateY }],
             }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}
-            >
-              <View
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: theme.radii.pill,
-                  backgroundColor: earned
-                    ? withOpacity(color, 0.15)
-                    : theme.colors.mist,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {earned ? (
-                  <Icon name={icon.ios} size={28} tint={color} weight="semibold" />
-                ) : (
-                  <Icon name="lock.fill" size={22} tint={theme.colors.slate} weight="semibold" />
-                )}
-              </View>
-
-              <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.bold,
-                    fontSize: 18,
-                    color: earned ? theme.colors.ink : theme.colors.slate,
-                  }}
-                  numberOfLines={2}
-                >
-                  {badge.name}
-                </RNText>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-                  <View
-                    style={{
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: theme.spacing.xxs,
-                      borderRadius: theme.radii.pill,
-                      backgroundColor: withOpacity(color, 0.15),
-                    }}
-                  >
-                    <RNText
-                      style={{
-                        fontFamily: fontFamilies.bold,
-                        fontSize: 10,
-                        color,
-                        letterSpacing: 0.4,
-                      }}
-                    >
-                      {badge.rarity.toUpperCase()}
-                    </RNText>
-                  </View>
-                  {badge.tier ? (
-                    <RNText
-                      style={{
-                        fontFamily: fontFamilies.semibold,
-                        fontSize: 11,
-                        color: theme.colors.slate,
-                      }}
-                    >
-                      {badge.tier}
-                    </RNText>
-                  ) : null}
-                </View>
-              </View>
-
+            <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
               <Pressable
                 onPress={handleClose}
                 hitSlop={theme.spacing.md}
                 accessibilityLabel="Close"
                 accessibilityRole="button"
                 style={({ pressed }) => ({
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
                   width: 32,
                   height: 32,
                   borderRadius: theme.radii.pill,
@@ -238,21 +172,92 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: pressed ? 0.6 : 1,
+                  zIndex: 1,
                 })}
               >
                 <Icon name="xmark" size={12} tint={theme.colors.ink} weight="semibold" />
               </Pressable>
+
+              <View
+                style={{
+                  width: 128,
+                  height: 128,
+                  borderRadius: 64,
+                  backgroundColor: earned && icon.png
+                    ? 'transparent'
+                    : earned
+                      ? withOpacity(color, 0.15)
+                      : theme.colors.mist,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {earned ? (
+                  icon.png ? (
+                    <Image source={icon.png} style={{ width: 128, height: 128 }} resizeMode="contain" />
+                  ) : (
+                    <Icon name={icon.ios} size={52} tint={color} weight="semibold" />
+                  )
+                ) : (
+                  <Icon name="lock.fill" size={40} tint={theme.colors.slate} weight="semibold" />
+                )}
+              </View>
+
+              <RNText
+                style={{
+                  fontFamily: fontFamilies.bold,
+                  fontSize: 20,
+                  color: earned ? theme.colors.ink : theme.colors.slate,
+                  textAlign: 'center',
+                }}
+                numberOfLines={2}
+              >
+                {badge.name}
+              </RNText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                <View
+                  style={{
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xxs,
+                    borderRadius: theme.radii.pill,
+                    backgroundColor: withOpacity(color, 0.15),
+                  }}
+                >
+                  <RNText
+                    style={{
+                      fontFamily: fontFamilies.bold,
+                      fontSize: 10,
+                      color,
+                      letterSpacing: 0.4,
+                    }}
+                  >
+                    {badge.rarity.toUpperCase()}
+                  </RNText>
+                </View>
+                {badge.tier ? (
+                  <RNText
+                    style={{
+                      fontFamily: fontFamilies.semibold,
+                      fontSize: 11,
+                      color: theme.colors.slate,
+                    }}
+                  >
+                    {badge.tier}
+                  </RNText>
+                ) : null}
+              </View>
             </View>
 
-            {/* XP bonus row */}
+            {/* XP bonus pill */}
             <View
               style={{
+                alignSelf: 'center',
                 flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                gap: theme.spacing.sm,
                 paddingHorizontal: theme.spacing.md,
-                paddingVertical: theme.spacing.sm,
-                borderRadius: theme.radii.md,
+                paddingVertical: theme.spacing.xs,
+                borderRadius: theme.radii.pill,
                 backgroundColor: withOpacity(theme.colors.accent, 0.08),
                 borderWidth: theme.borders.standard,
                 borderColor: withOpacity(theme.colors.accent, 0.2),
@@ -270,7 +275,7 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
               <RNText
                 style={{
                   fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: '800',
                   color: theme.colors.accent,
                   fontVariant: ['tabular-nums'],
@@ -281,13 +286,22 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
             </View>
 
             {/* Condition */}
-            <View style={{ gap: theme.spacing.xs }}>
+            <View
+              style={{
+                gap: theme.spacing.xs,
+                padding: theme.spacing.md,
+                borderRadius: theme.radii.md,
+                backgroundColor: withOpacity(theme.colors.primary, 0.06),
+                borderWidth: theme.borders.standard,
+                borderColor: withOpacity(theme.colors.primary, 0.15),
+              }}
+            >
               <RNText
                 style={{
                   fontFamily: fontFamilies.semibold,
                   fontSize: 11,
                   letterSpacing: 0.6,
-                  color: theme.colors.slate,
+                  color: theme.colors.primary,
                   textTransform: 'uppercase',
                 }}
               >
@@ -305,37 +319,6 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
               </RNText>
             </View>
 
-            {/* Status pill */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: theme.spacing.xs,
-                paddingVertical: theme.spacing.sm,
-                borderRadius: theme.radii.md,
-                backgroundColor: earned
-                  ? withOpacity(theme.colors.green, 0.12)
-                  : withOpacity(theme.colors.slate, 0.08),
-              }}
-            >
-              <Icon
-                name={earned ? 'checkmark.seal.fill' : 'lock.fill'}
-                size={12}
-                tint={earned ? theme.colors.green : theme.colors.slate}
-                weight="semibold"
-              />
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 12,
-                  color: earned ? theme.colors.green : theme.colors.slate,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {earned ? 'EARNED' : 'LOCKED'}
-              </RNText>
-            </View>
           </Animated.View>
         </View>
       </Modal>
