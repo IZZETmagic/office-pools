@@ -39,6 +39,7 @@ type ModalState =
   | { type: 'demote'; member: MemberData }
   | { type: 'remove'; member: MemberData }
   | { type: 'unlock_predictions'; member: MemberData; entry?: EntryData }
+  | { type: 'delete_entry'; member: MemberData }
 
 export function MembersTab({
   pool,
@@ -221,6 +222,29 @@ export function MembersTab({
     setLoading(false)
     setModal({ type: 'none' })
     setRemoveConfirmed(false)
+  }
+
+  async function handleDeleteEntry(member: MemberData, entry: EntryData) {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/pools/${pool.pool_id}/entries/${entry.entry_id}/delete`,
+        { method: 'POST' },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || `Delete failed (${res.status})`)
+      }
+      // Recalc ranks/points after the entry disappears.
+      await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+      showToast(`Deleted entry "${entry.entry_name}".`, 'success')
+      await refreshMembers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete entry')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAdjustPoints(member: MemberData, targetEntry?: EntryData) {
@@ -538,6 +562,9 @@ export function MembersTab({
                       case 'unlock_predictions':
                         setModal({ type: 'unlock_predictions', member })
                         break
+                      case 'delete_entry':
+                        setModal({ type: 'delete_entry', member })
+                        break
                     }
                   }}
                   className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
@@ -546,6 +573,7 @@ export function MembersTab({
                   <option value="view_predictions">View Predictions</option>
                   <option value="adjust_points">Adjust Points</option>
                   {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
+                  {(member.entries || []).length > 0 && <option value="delete_entry">Delete Entry</option>}
                   {member.role === 'player' && <option value="promote">Promote</option>}
                   {member.role === 'admin' && adminCount > 1 && <option value="demote">Demote</option>}
                   {member.role === 'player' && <option value="remove">Remove</option>}
@@ -675,6 +703,9 @@ export function MembersTab({
                               case 'unlock_predictions':
                                 setModal({ type: 'unlock_predictions', member })
                                 break
+                              case 'delete_entry':
+                                setModal({ type: 'delete_entry', member })
+                                break
                             }
                           }}
                           className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
@@ -687,6 +718,9 @@ export function MembersTab({
                           </option>
                           <option value="adjust_points">Adjust Points</option>
                           {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
+                          {(member.entries || []).length > 0 && (
+                            <option value="delete_entry">Delete Entry…</option>
+                          )}
                           {member.role === 'player' && (
                             <option value="promote">Promote to Admin</option>
                           )}
@@ -831,6 +865,21 @@ export function MembersTab({
           onClose={() => setModal({ type: 'none' })}
           isProgressive={isProgressive}
           predictions={predictions}
+        />
+      )}
+
+      {/* Delete Entry Modal */}
+      {modal.type === 'delete_entry' && (
+        <DeleteEntryModal
+          member={modal.member}
+          loading={loading}
+          error={error}
+          onDelete={(entry) => handleDeleteEntry(modal.member, entry)}
+          onClose={() => {
+            setModal({ type: 'none' })
+            setError(null)
+          }}
+          getEntryTotalPoints={getEntryTotalPoints}
         />
       )}
 
@@ -1819,6 +1868,125 @@ function AdjustPointsModal({
             loadingText="Saving..."
           >
             Confirm Adjustment
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================
+// DELETE ENTRY MODAL
+// =============================================
+//
+// Lists the member's entries with a per-row Delete button. The ≥1-entry
+// rule is mirrored client-side so non-admin members can't have their
+// last entry deleted from here — to fully remove a non-admin player,
+// the admin uses "Remove from Pool" instead. Pool admins (the target
+// member's role) can be emptied to zero.
+
+function DeleteEntryModal({
+  member,
+  loading,
+  error,
+  onDelete,
+  onClose,
+  getEntryTotalPoints,
+}: {
+  member: MemberData
+  loading: boolean
+  error: string | null
+  onDelete: (entry: EntryData) => void
+  onClose: () => void
+  getEntryTotalPoints: (entry: EntryData) => number
+}) {
+  const entries = (member.entries || []).slice().sort(
+    (a, b) => a.entry_number - b.entry_number,
+  )
+  const [confirmingEntryId, setConfirmingEntryId] = useState<string | null>(null)
+  const targetIsAdmin = member.role === 'admin'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+        <h3 className="text-lg font-bold text-danger-600 mb-1">Delete Entry</h3>
+        <p className="text-sm text-neutral-600 mb-3">
+          Pick an entry to delete from{' '}
+          <span className="font-bold">{member.users.username}</span>.
+        </p>
+        {!targetIsAdmin && (
+          <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 mb-3">
+            <p className="text-xs text-neutral-600">
+              Players need at least one entry. To take {member.users.username}{' '}
+              out of the pool entirely, use Remove from Pool.
+            </p>
+          </div>
+        )}
+        {error && <Alert variant="error" className="mb-3">{error}</Alert>}
+
+        <div className="space-y-2 mb-4">
+          {entries.length === 0 && (
+            <p className="text-sm text-neutral-500">No entries to delete.</p>
+          )}
+          {entries.map((entry) => {
+            const isLast = entries.length === 1
+            const blocked = !targetIsAdmin && isLast
+            const isConfirming = confirmingEntryId === entry.entry_id
+            return (
+              <div
+                key={entry.entry_id}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-neutral-200"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-900 truncate">
+                    {entry.entry_name}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {getEntryTotalPoints(entry)} pts ·{' '}
+                    {entry.has_submitted_predictions ? 'Submitted' : 'Pending'}
+                  </p>
+                </div>
+                {blocked ? (
+                  <span
+                    className="text-xs text-neutral-500"
+                    title="Players must keep at least one entry"
+                  >
+                    Last entry
+                  </span>
+                ) : isConfirming ? (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setConfirmingEntryId(null)}
+                      disabled={loading}
+                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => onDelete(entry)}
+                      disabled={loading}
+                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50"
+                    >
+                      {loading ? 'Deleting…' : 'Confirm'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingEntryId(entry.entry_id)}
+                    disabled={loading}
+                    className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-danger-50 text-danger-700 hover:bg-danger-100 transition disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="flex justify-end">
+          <Button variant="gray" onClick={onClose} disabled={loading}>
+            Done
           </Button>
         </div>
       </div>

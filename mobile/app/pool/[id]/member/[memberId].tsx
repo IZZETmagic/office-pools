@@ -15,7 +15,7 @@ import {
   type AdjustPointsSheetHandle,
 } from '@/components/pool-detail/AdjustPointsSheet';
 import { Icon, Text } from '@/components/ui';
-import { notifyMemberRemoved } from '@/lib/api';
+import { deleteEntry, notifyMemberRemoved } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
 import { usePoolDetail } from '@/lib/usePoolDetail';
@@ -69,6 +69,46 @@ export default function MemberDetailScreen() {
                 "Couldn't unlock entry",
                 err instanceof Error ? err.message : 'Unknown error',
               );
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleDeleteEntry(entry: MemberEntry) {
+    if (!member || !id) return;
+    const isLast = member.entries.length <= 1;
+    if (!member.isAdmin && isLast) {
+      // Mirrors the server-side guard — non-admins must keep ≥1 entry.
+      // The UI hides the button in this case; this is a defensive
+      // fallback if state races us.
+      Alert.alert(
+        "Can't delete last entry",
+        `Players need at least one entry. To take ${member.fullName} out of the pool, use Remove Member.`,
+      );
+      return;
+    }
+    Alert.alert(
+      'Delete entry',
+      `Delete "${entry.entryName}"? This removes the entry, its predictions, and its scores. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await deleteEntry(id, entry.entryId);
+              await refresh();
+            } catch (err) {
+              Alert.alert(
+                "Couldn't delete entry",
+                err instanceof Error ? err.message : 'Unknown error',
+              );
+            } finally {
+              setBusy(false);
             }
           },
         },
@@ -189,6 +229,7 @@ export default function MemberDetailScreen() {
             entries={member.entries}
             poolId={id}
             currentUserIsAdmin={currentUserIsAdmin}
+            targetIsAdmin={member.isAdmin}
             unlockedEntryIds={unlockedEntryIds}
             onAdjustPoints={(entry) =>
               adjustSheetRef.current?.open({
@@ -198,6 +239,7 @@ export default function MemberDetailScreen() {
               })
             }
             onUnlockEntry={handleUnlockEntry}
+            onDeleteEntry={handleDeleteEntry}
           />
         ) : null}
         {currentUserIsAdmin && poolData?.pool.currentUserId !== member.userId ? (
@@ -365,18 +407,25 @@ function EntriesCard({
   entries,
   poolId,
   currentUserIsAdmin,
+  targetIsAdmin,
   unlockedEntryIds,
   onAdjustPoints,
   onUnlockEntry,
+  onDeleteEntry,
 }: {
   entries: MemberEntry[];
   poolId: string;
   currentUserIsAdmin: boolean;
+  targetIsAdmin: boolean;
   unlockedEntryIds: Set<string>;
   onAdjustPoints: (entry: MemberEntry) => void;
   onUnlockEntry: (entry: MemberEntry) => void;
+  onDeleteEntry: (entry: MemberEntry) => void;
 }) {
   const theme = useTheme();
+  // Hide the Delete button on a non-admin's sole entry — players must
+  // keep at least one. Pool admins can be emptied to zero.
+  const canDeleteAny = targetIsAdmin || entries.length > 1;
   return (
     <View
       style={{
@@ -403,9 +452,11 @@ function EntriesCard({
             entry={entry}
             poolId={poolId}
             currentUserIsAdmin={currentUserIsAdmin}
+            canDelete={canDeleteAny}
             optimisticallyUnlocked={unlockedEntryIds.has(entry.entryId)}
             onAdjustPoints={() => onAdjustPoints(entry)}
             onUnlock={() => onUnlockEntry(entry)}
+            onDelete={() => onDeleteEntry(entry)}
           />
         </View>
       ))}
@@ -417,16 +468,20 @@ function EntryRow({
   entry,
   poolId,
   currentUserIsAdmin,
+  canDelete,
   optimisticallyUnlocked,
   onAdjustPoints,
   onUnlock,
+  onDelete,
 }: {
   entry: MemberEntry;
   poolId: string;
   currentUserIsAdmin: boolean;
+  canDelete: boolean;
   optimisticallyUnlocked: boolean;
   onAdjustPoints: () => void;
   onUnlock: () => void;
+  onDelete: () => void;
 }) {
   const theme = useTheme();
   const effectivelySubmitted = entry.hasSubmittedPredictions && !optimisticallyUnlocked;
@@ -506,6 +561,15 @@ function EntryRow({
               iconEmoji="🔓"
               color={theme.colors.red}
               onPress={onUnlock}
+            />
+          ) : null}
+          {canDelete ? (
+            <AdminEntryAction
+              label="Delete"
+              iconIos="trash.fill"
+              iconEmoji="🗑️"
+              color={theme.colors.red}
+              onPress={onDelete}
             />
           ) : null}
         </View>

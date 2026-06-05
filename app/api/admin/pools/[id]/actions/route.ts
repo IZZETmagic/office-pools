@@ -745,11 +745,11 @@ export async function POST(
 
       const adminSupabase = createAdminClient()
 
-      // Get entry info for audit
+      // Get entry info for audit (and the target's role for the guard below)
       const { data: entry } = await supabase
         .from('pool_entries')
         .select(
-          'entry_name, member_id, pool_members!inner(pool_id, user_id)'
+          'entry_name, member_id, pool_members!inner(pool_id, user_id, role)'
         )
         .eq('entry_id', entry_id)
         .single()
@@ -762,6 +762,25 @@ export async function POST(
       const entryPoolId = (entry as any)?.pool_members?.pool_id
       if (entryPoolId !== id) {
         return NextResponse.json({ error: 'Entry does not belong to this pool' }, { status: 400 })
+      }
+
+      // Sole-entry guard: non-admin members must keep ≥1 entry so they
+      // remain players (no watchers). Mirrors the same rule enforced in
+      // /api/pools/:pool_id/entries/:entry_id/delete. To fully kick a
+      // non-admin, the super admin should use remove_member instead.
+      const targetRole = (entry as any)?.pool_members?.role
+      const targetMemberId = entry.member_id
+      if (targetRole !== 'admin') {
+        const { count } = await adminSupabase
+          .from('pool_entries')
+          .select('entry_id', { count: 'exact', head: true })
+          .eq('member_id', targetMemberId)
+        if ((count ?? 0) <= 1) {
+          return NextResponse.json(
+            { error: "Can't delete this player's last entry. Use Remove Member to take them out of the pool." },
+            { status: 400 },
+          )
+        }
       }
 
       // Cascade delete entry data (FK-safe order)
