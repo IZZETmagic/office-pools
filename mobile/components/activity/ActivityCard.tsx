@@ -33,19 +33,26 @@ export function ActivityCard({ item }: ActivityCardProps) {
   const fg = iconFg(theme, colorKey);
   const poolName = readPoolName(item);
 
-  // For badge_earned items, swap the colored emoji chip for the badge's
-  // PNG medallion when we can resolve one from the badge name. Falls
-  // through to the existing chip+emoji path otherwise (so unknown
-  // names — e.g. a freshly-added badge whose mapping hasn't shipped
-  // yet — still render something).
-  const badgePng =
-    item.activityType === 'badge_earned'
-      ? badgeIconByName(
-          ((item.metadata as { badge_name?: unknown } | null)?.badge_name as
+  // Badge unlocks surface as xp_gain rows with source: 'badge' (synthesized
+  // in mobile/lib/useActivity.ts), not as the legacy 'badge_earned' type —
+  // so look for the xp_gain+badge shape first and read the badge name from
+  // metadata.label. We also keep a 'badge_earned' fallback for any
+  // server-side rows that might land later, where the name lives at
+  // metadata.badge_name. Falls through to the standard chip when we can't
+  // resolve a PNG (e.g. a freshly-renamed badge whose mapping hasn't
+  // shipped) so the row still renders something.
+  const badgeName: string | null =
+    item.activityType === 'xp_gain' &&
+    (item.metadata as { source?: unknown } | null)?.source === 'badge'
+      ? (((item.metadata as { label?: unknown } | null)?.label as
+          | string
+          | undefined) ?? null)
+      : item.activityType === 'badge_earned'
+        ? (((item.metadata as { badge_name?: unknown } | null)?.badge_name as
             | string
-            | undefined) ?? '',
-        )?.png ?? null
-      : null;
+            | undefined) ?? null)
+        : null;
+  const badgePng = badgeName ? (badgeIconByName(badgeName)?.png ?? null) : null;
 
   return (
     <View
