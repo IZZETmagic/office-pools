@@ -1,5 +1,6 @@
-import { Text as RNText, View } from 'react-native';
+import { Image, Text as RNText, View } from 'react-native';
 
+import { badgeIcon } from './badge-icons';
 import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -273,6 +274,8 @@ function BadgeBody({
   const badgeCount = numberField(metadata, ['badge_count', 'badgeCount']);
   const badgeLabel = stringField(metadata, ['badge_label', 'badgeLabel']);
   const badgeDescription = stringField(metadata, ['badge_description', 'badgeDescription']);
+  const badgeType = stringField(metadata, ['badge_type', 'badgeType']);
+  const badgeRarity = stringField(metadata, ['badge_rarity', 'badgeRarity']);
   const level = numberField(metadata, ['level']);
   const levelName = stringField(metadata, ['level_name', 'levelName']);
 
@@ -291,6 +294,80 @@ function BadgeBody({
     );
   }
 
+  // Specific-badge flex (e.g. "Sharpshooter") carries `badge_type` (the
+  // canonical id like "sharpshooter" / "bp_full_bracket") so we can
+  // resolve the PNG medallion. "Flex all" messages have no badge_type
+  // and fall through to the legacy XP-number-chip layout.
+  const png = badgeType ? badgeIcon(badgeType).png : null;
+
+  if (png) {
+    return (
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <Image source={png} style={{ width: 128, height: 128 }} resizeMode="contain" />
+        <RNText
+          numberOfLines={2}
+          style={{
+            fontFamily: fontFamilies.bold,
+            fontSize: 18,
+            color: theme.colors.ink,
+            textAlign: 'center',
+          }}
+        >
+          {badgeLabel ?? 'Badge'}
+        </RNText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {badgeRarity ? (
+            <View
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 999,
+                backgroundColor: withOpacity(accent, 0.15),
+              }}
+            >
+              <RNText
+                style={{
+                  fontFamily: fontFamilies.bold,
+                  fontSize: 10,
+                  color: accent,
+                  letterSpacing: 0.4,
+                }}
+              >
+                {badgeRarity.toUpperCase()}
+              </RNText>
+            </View>
+          ) : null}
+          <RNText
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 13,
+              color: theme.colors.accent,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            +{badgeCount} XP
+          </RNText>
+        </View>
+        {badgeDescription ? (
+          <RNText
+            numberOfLines={2}
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 12,
+              color: theme.colors.slate,
+              textAlign: 'center',
+              marginTop: 2,
+            }}
+          >
+            {badgeDescription}
+          </RNText>
+        ) : null}
+      </View>
+    );
+  }
+
+  // Legacy / Flex-all path: no per-badge artwork, render the XP/badge
+  // count in a colored chip alongside a title + subtitle.
   const isSpecific = !!badgeLabel;
   const badgeNoun = badgeCount === 1 ? 'badge' : 'badges';
   const title = isSpecific ? badgeLabel : `${badgeCount} ${badgeNoun} earned`;
