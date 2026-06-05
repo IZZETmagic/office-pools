@@ -10,7 +10,12 @@
 
 import { Alert } from 'react-native';
 
-import { fetchEntryAnalytics, fetchLeaderboard, type BadgeInfo } from './api';
+import {
+  fetchBracketAnalytics,
+  fetchEntryAnalytics,
+  fetchLeaderboard,
+  type BadgeInfo,
+} from './api';
 import { badgeIcon } from '@/components/pool-detail/badge-icons';
 import type { FlexBadgeOption } from '@/components/pool-detail/FlexBadgesSheet';
 
@@ -22,6 +27,7 @@ export type FlexBadgeContext = {
 export async function loadFlexBadges(
   poolId: string,
   appUserId: string,
+  predictionMode: string | null | undefined,
 ): Promise<FlexBadgeContext | null> {
   try {
     const lb = await fetchLeaderboard(poolId);
@@ -30,7 +36,14 @@ export async function loadFlexBadges(
       Alert.alert('Not in this pool', "You don't have an entry to flex from.");
       return null;
     }
-    const analytics = await fetchEntryAnalytics(poolId, myEntry.entry_id);
+    // BP pools score via a different XP system and live on a separate
+    // analytics endpoint. Routing here keeps the helper mode-aware so
+    // the BanterSheet flex picker shows the user's real bp_* badges
+    // instead of an always-empty full-mode response.
+    const analytics =
+      predictionMode === 'bracket_picker'
+        ? await fetchBracketAnalytics(poolId, myEntry.entry_id)
+        : await fetchEntryAnalytics(poolId, myEntry.entry_id);
     const earned = analytics.xp?.earned_badges ?? [];
     if (earned.length === 0) {
       Alert.alert('No badges to flex yet', "Keep going — you'll earn some soon!");

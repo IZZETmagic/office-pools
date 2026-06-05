@@ -78,7 +78,11 @@ export default function BanterScreen() {
   const insets = useSafeAreaInsets();
   const { id, poolName } = useLocalSearchParams<{ id: string; poolName?: string }>();
   const banter = usePoolBanter(id);
-  const { clearPoolUnread } = useHomeData();
+  const { clearPoolUnread, data: homeData } = useHomeData();
+  // Mode routes loadFlexBadges() to the BP vs full/progressive
+  // analytics endpoint — without it BP users see an empty picker.
+  const predictionMode =
+    homeData?.pools.find((p) => p.poolId === id)?.predictionMode ?? null;
   const [text, setText] = useState('');
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -298,7 +302,7 @@ export default function BanterScreen() {
       return;
     }
     ownEntryRef.current = own;
-    const ctx = await loadFlexBadges(id, banter.appUserId);
+    const ctx = await loadFlexBadges(id, banter.appUserId, predictionMode);
     if (!ctx) return;
     earnedBadgesRef.current = ctx.earnedBadges;
     const totalBadges = ctx.earnedBadges.length;

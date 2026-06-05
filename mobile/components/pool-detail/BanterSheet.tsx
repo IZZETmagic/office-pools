@@ -155,7 +155,13 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
   const banter = usePoolBanter(poolId);
-  const { clearPoolUnread } = useHomeData();
+  const { clearPoolUnread, data: homeData } = useHomeData();
+  // Routing key for the flex-badge picker. BP pools score on a
+  // different endpoint so loadFlexBadges() needs to know which one
+  // to hit — without this, BP users see an empty picker even when
+  // they have bp_* badges earned.
+  const predictionMode =
+    homeData?.pools.find((p) => p.poolId === poolId)?.predictionMode ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Keyboard-aware bottom padding. `progress` animates 0 → 1 as the
@@ -428,7 +434,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       if (key === 'standings') {
         await sendStandings(poolId, banter.sendMessage);
       } else if (key === 'flex') {
-        await openFlexBadges(poolId, banter.appUserId, (opts) => {
+        await openFlexBadges(poolId, banter.appUserId, predictionMode, (opts) => {
           // Set options + mark mounted + mark pending-open. The
           // useEffect above invokes flexBadgesSheetRef.open() once
           // both `mounted` and `pendingOpen` are true (and the ref
@@ -446,7 +452,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         });
       }
     },
-    [poolId, banter.appUserId, banter.sendMessage],
+    [poolId, banter.appUserId, banter.sendMessage, predictionMode],
   );
 
   // Fired from inside FlexBadgesSheet when a badge is picked. We need
@@ -455,9 +461,9 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const handlePickFlexBadge = useCallback(
     async (key: string) => {
       if (!poolId || !banter.appUserId) return;
-      await sendFlexBadge(poolId, banter.appUserId, key, banter.sendMessage);
+      await sendFlexBadge(poolId, banter.appUserId, predictionMode, key, banter.sendMessage);
     },
-    [poolId, banter.appUserId, banter.sendMessage],
+    [poolId, banter.appUserId, banter.sendMessage, predictionMode],
   );
 
   // Fired from inside SharePredictionSheet. Predictions are already
@@ -2011,9 +2017,10 @@ async function sendStandings(poolId: string, sendMessage: SendMessage) {
 async function openFlexBadges(
   poolId: string,
   appUserId: string,
+  predictionMode: string | null | undefined,
   onReady: (options: FlexBadgeOption[]) => void,
 ) {
-  const ctx = await loadFlexBadges(poolId, appUserId);
+  const ctx = await loadFlexBadges(poolId, appUserId, predictionMode);
   if (!ctx) return;
   onReady(buildFlexBadgeOptions(ctx.earnedBadges));
 }
@@ -2024,10 +2031,11 @@ async function openFlexBadges(
 async function sendFlexBadge(
   poolId: string,
   appUserId: string,
+  predictionMode: string | null | undefined,
   badgeKey: string,
   sendMessage: SendMessage,
 ) {
-  const ctx = await loadFlexBadges(poolId, appUserId);
+  const ctx = await loadFlexBadges(poolId, appUserId, predictionMode);
   if (!ctx) return;
   const badge = ctx.earnedBadges.find((b) => b.id === badgeKey);
   if (!badge) return;
