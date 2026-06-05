@@ -190,12 +190,6 @@ export function generateSystemEvents(
     }
   }
 
-  // Use latest completed match date as a stable reference timestamp
-  // (avoids hydration mismatch from new Date() differing between server & client)
-  const latestCompletedDate = completedMatches.length > 0
-    ? (completedMatches[0].completed_at || completedMatches[0].match_date)
-    : matches[0]?.match_date || '2026-01-01T00:00:00Z'
-
   // Map match_number → completion timestamp so badge unlocks can be dated to the
   // match in which they were actually earned (EarnedBadge.earnedAt is a match number).
   const matchDateByNumber = new Map<number, string>()
@@ -203,6 +197,21 @@ export function generateSystemEvents(
     if (m.is_completed) {
       matchDateByNumber.set(m.match_number, m.completed_at || m.match_date)
     }
+  }
+
+  // Per-user fallback timestamp for badges with no `earnedAt` (e.g. Lightning Rod,
+  // Stadium Regular — earned by submitting predictions, not by match results).
+  // Use the earliest non-null predictions_submitted_at across the member's entries.
+  const submittedAtByUser = new Map<string, string>()
+  for (const member of members) {
+    let earliest: string | null = null
+    for (const entry of member.entries ?? []) {
+      const t = entry.predictions_submitted_at
+      if (t && (!earliest || new Date(t).getTime() < new Date(earliest).getTime())) {
+        earliest = t
+      }
+    }
+    if (earliest) submittedAtByUser.set(member.user_id, earliest)
   }
 
   // 3. Streak alerts — members with 5+ streaks
@@ -215,15 +224,18 @@ export function generateSystemEvents(
     const onFire = memberLevel.badges.find(b => b.id === 'on_fire')
     if (onFire) {
       const streakTimestamp =
-        (onFire.earnedAt !== undefined && matchDateByNumber.get(onFire.earnedAt)) || latestCompletedDate
-      events.push({
-        id: `streak-${userId}`,
-        event_type: 'streak_alert',
-        emoji: '🔥',
-        content: `${name} is on a hot streak! Can anyone stop them?`,
-        highlighted_name: name,
-        timestamp: streakTimestamp,
-      })
+        onFire.earnedAt !== undefined ? matchDateByNumber.get(onFire.earnedAt) : undefined
+      // Streak only makes sense once matches have completed; skip if we have no real date.
+      if (streakTimestamp) {
+        events.push({
+          id: `streak-${userId}`,
+          event_type: 'streak_alert',
+          emoji: '🔥',
+          content: `${name} is on a hot streak! Can anyone stop them?`,
+          highlighted_name: name,
+          timestamp: streakTimestamp,
+        })
+      }
     }
   }
 
@@ -234,8 +246,14 @@ export function generateSystemEvents(
     const name = member.users.full_name || member.users.username
 
     for (const badge of memberLevel.badges.slice(0, 2)) { // Max 2 badges per member
-      const badgeTimestamp =
-        (badge.earnedAt !== undefined && matchDateByNumber.get(badge.earnedAt)) || latestCompletedDate
+      // Prefer the match the badge was earned in (match-result badges);
+      // fall back to the member's earliest predictions_submitted_at for
+      // submission-based badges (Lightning Rod, Stadium Regular, etc.).
+      const matchTimestamp =
+        badge.earnedAt !== undefined ? matchDateByNumber.get(badge.earnedAt) : undefined
+      const badgeTimestamp = matchTimestamp || submittedAtByUser.get(userId)
+      // Skip if we still have no real timestamp — better than showing a future date.
+      if (!badgeTimestamp) continue
       events.push({
         id: `badge-${userId}-${badge.id}`,
         event_type: 'badge_unlock',
