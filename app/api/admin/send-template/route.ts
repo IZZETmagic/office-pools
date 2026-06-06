@@ -16,6 +16,8 @@ import {
   readyToJoinTemplate,
   pastPredictorHypeTemplate,
   bracketFixTemplate,
+  poolAdminFeedbackSurveyTemplate,
+  playerFeedbackSurveyTemplate,
 } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { querySegment, type SegmentKey, SEGMENT_KEYS } from '@/lib/email/segments'
@@ -37,6 +39,8 @@ type TemplateType =
   | 'support_reply'
   | 'custom'
   | 'bracket_fix'
+  | 'pool_admin_feedback_survey'
+  | 'player_feedback_survey'
 
 // =============================================================
 // GET /api/admin/send-template
@@ -179,6 +183,12 @@ export async function POST(request: NextRequest) {
       break
     case 'bracket_fix':
       result = await handleBracketFix(supabase)
+      break
+    case 'pool_admin_feedback_survey':
+      result = await handleSimpleGrowthTemplate(supabase, 'pool_admins', poolAdminFeedbackSurveyTemplate)
+      break
+    case 'player_feedback_survey':
+      result = await handleSimpleGrowthTemplate(supabase, 'past_predictors', playerFeedbackSurveyTemplate)
       break
     default:
       return NextResponse.json({ error: `Unknown template: ${body.template}` }, { status: 400 })

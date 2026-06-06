@@ -22,12 +22,14 @@ type TemplateKey =
   | 'support_reply'
   | 'custom'
   | 'bracket_fix'
+  | 'pool_admin_feedback_survey'
+  | 'player_feedback_survey'
 
 type TemplateDef = {
   key: TemplateKey
   label: string
   description: string
-  category: 'smart' | 'pool' | 'growth' | 'support' | 'custom' | 'incident'
+  category: 'smart' | 'pool' | 'growth' | 'support' | 'custom' | 'incident' | 'survey'
   icon: string
   recipientNote: string
 }
@@ -112,6 +114,22 @@ const TEMPLATES: TemplateDef[] = [
     category: 'incident',
     icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
     recipientNote: 'Auto-detected: entries whose R16+ picks were reset',
+  },
+  {
+    key: 'pool_admin_feedback_survey',
+    label: 'Pool Admin Feedback Survey',
+    description: 'Post-tournament survey to every pool admin asking what worked, what didn\'t, and whether they\'d run another. Links to the Tally form.',
+    category: 'survey',
+    icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z',
+    recipientNote: 'Auto-detected: all pool admins',
+  },
+  {
+    key: 'player_feedback_survey',
+    label: 'Player Feedback Survey',
+    description: 'Post-tournament survey to everyone who submitted predictions — favorite moment, biggest frustration, and what sport they\'d want next. Links to the Tally form.',
+    category: 'survey',
+    icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z',
+    recipientNote: 'Auto-detected: users who submitted predictions',
   },
   {
     key: 'past_predictor_hype',
@@ -280,6 +298,8 @@ export function TemplatesTab() {
       case 'ready_to_join':
       case 'past_predictor_hype':
       case 'bracket_fix':
+      case 'pool_admin_feedback_survey':
+      case 'player_feedback_survey':
         return base
       case 'deadline_reminder':
         return { ...base, pool_id: poolId }
@@ -314,6 +334,8 @@ export function TemplatesTab() {
       case 'ready_to_join':
       case 'past_predictor_hype':
       case 'bracket_fix':
+      case 'pool_admin_feedback_survey':
+      case 'player_feedback_survey':
         return true
       case 'deadline_reminder':
         return !!poolId
@@ -546,6 +568,28 @@ export function TemplatesTab() {
             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 sp-radius-sm p-4">
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 Sends one personalized email per affected entry. Recipients are auto-detected: entries that had bracket-picker R16+ picks (now reset) or full-tournament-mode score predictions for R16, QF, SF, third-place, or final matches. Their group-stage and Round of 32 picks are preserved.
+              </p>
+            </div>
+          )}
+
+          {/* Feedback survey templates — auto-detected recipients, no config */}
+          {selectedTemplate === 'pool_admin_feedback_survey' && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 sp-radius-sm p-4 space-y-2">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Sends the post-tournament admin feedback survey to every pool admin. Each email links to the Tally form (currently <code className="font-mono text-xs">https://tally.so/r/Y59YEN</code>).
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Survey URL is hard-coded in <code className="font-mono">lib/email/templates.ts</code> — update <code className="font-mono">POOL_ADMIN_FEEDBACK_SURVEY_URL</code> there if the form is republished under a new ID.
+              </p>
+            </div>
+          )}
+          {selectedTemplate === 'player_feedback_survey' && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 sp-radius-sm p-4 space-y-2">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Sends the post-tournament player feedback survey to everyone who has submitted predictions. Each email links to the Tally form (currently <code className="font-mono text-xs">https://tally.so/r/RGjJKK</code>).
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Survey URL is hard-coded in <code className="font-mono">lib/email/templates.ts</code> — update <code className="font-mono">PLAYER_FEEDBACK_SURVEY_URL</code> there if the form is republished under a new ID.
               </p>
             </div>
           )}

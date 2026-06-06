@@ -1013,6 +1013,69 @@ export function pastPredictorHypeTemplate(params: {
   }
 }
 
+// --- Post-Tournament Feedback Surveys ---
+// TODO: confirm these URLs after publishing the Tally forms.
+// Tally form IDs persist from draft → publish, so once published the
+// public URL is https://tally.so/r/<formId>. Update if a form is re-created.
+const POOL_ADMIN_FEEDBACK_SURVEY_URL = 'https://tally.so/r/Y59YEN'
+const PLAYER_FEEDBACK_SURVEY_URL = 'https://tally.so/r/RGjJKK'
+
+export function poolAdminFeedbackSurveyTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName } = params
+  return {
+    subject: 'How was running your World Cup pool? (3-min survey)',
+    html: baseTemplate({
+      preheader: 'Six short questions on what worked, what didn\'t, and what we should build next.',
+      heading: 'Help shape what comes next',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Thanks for running a pool this tournament — it doesn't happen without admins like you doing the legwork. Now that the dust has settled, I'd love your honest take.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Six short questions, about three minutes. The answers shape what gets built before the next tournament — and which sports we tackle next.</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li>What took the most work?</li>
+          <li>What worked well?</li>
+          <li>What was confusing or broken?</li>
+          <li>Would you run another pool with us?</li>
+        </ul>
+        <p style="color:#525252;line-height:1.6;margin:0;">Wild ideas, complaints, and kind words all welcome.</p>
+      `,
+      ctaText: 'Take the survey',
+      ctaUrl: POOL_ADMIN_FEEDBACK_SURVEY_URL,
+    }),
+  }
+}
+
+export function playerFeedbackSurveyTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName } = params
+  return {
+    subject: 'How was your World Cup? (2-min survey)',
+    html: baseTemplate({
+      preheader: 'Five short questions on your favorite moment, biggest frustration, and what\'s next.',
+      heading: 'What did you think?',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Thanks for playing this tournament. Hopefully you had as much fun making picks as we had building it.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Five short questions, about two minutes. Your answers help us decide what to fix, what to keep, and which tournament to do next.</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li>Favorite moment?</li>
+          <li>Biggest frustration?</li>
+          <li>Would you play again?</li>
+          <li>What sport would you want next?</li>
+        </ul>
+        <p style="color:#525252;line-height:1.6;margin:0;">Honest feedback is the best gift you can give a small team. Thanks in advance.</p>
+      `,
+      ctaText: 'Take the survey',
+      ctaUrl: PLAYER_FEEDBACK_SURVEY_URL,
+    }),
+  }
+}
+
 // --- Community Templates ---
 
 export function pointsAdjustedTemplate(params: {
