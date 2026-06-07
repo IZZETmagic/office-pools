@@ -55,10 +55,11 @@ export function PoolInfoTab({ pool }: Props) {
   // hook is harmless to call unconditionally.
   const { entries: userEntries } = usePoolEntries(pool.poolId);
 
-  // Round states only matter for progressive pools — the hook is called
-  // unconditionally so the order of hooks stays stable, but its output
-  // is gated by the render-time isProgressive branch.
-  const { data: roundsData } = usePoolRounds(pool.poolId);
+  const isProgressive = pool.predictionMode === 'progressive';
+
+  // The rounds endpoint 400s for non-progressive pools, so pass undefined
+  // to make the hook a no-op outside progressive mode.
+  const { data: roundsData } = usePoolRounds(isProgressive ? pool.poolId : undefined);
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -90,7 +91,6 @@ export function PoolInfoTab({ pool }: Props) {
     }
   }
 
-  const isProgressive = pool.predictionMode === 'progressive';
   const modeLabelText = pool.predictionMode
     ? MODE_LABEL[pool.predictionMode] ?? pool.predictionMode
     : '—';

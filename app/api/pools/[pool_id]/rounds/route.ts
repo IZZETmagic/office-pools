@@ -78,32 +78,51 @@ async function handleGET(
     }
   }
 
-  // For admins: get submission counts per round
+  // For admins: get submission counts per round + per-entry submission map
+  // for the currently-open round (drives the Members tab Submitted/Pending
+  // badge in a round-aware way).
   let adminStats: Record<string, { total_entries: number; submitted_entries: number }> = {}
+  let currentOpenRoundKey: string | null = null
+  let currentRoundEntrySubmissions: Record<string, boolean> | null = null
+
   if (membership.role === 'admin') {
-    // Get total entries in this pool
+    const openRound = (roundStates ?? []).find(rs => rs.state === 'open')
+    currentOpenRoundKey = openRound?.round_key ?? null
+
+    const { data: poolMemberIds } = await supabase
+      .from('pool_members')
+      .select('member_id')
+      .eq('pool_id', pool_id)
+
     const { data: allEntries } = await supabase
       .from('pool_entries')
       .select('entry_id')
-      .in(
-        'member_id',
-        (await supabase.from('pool_members').select('member_id').eq('pool_id', pool_id)).data?.map(m => m.member_id) ?? []
-      )
+      .in('member_id', poolMemberIds?.map(m => m.member_id) ?? [])
 
     const totalEntries = allEntries?.length ?? 0
+    const entryIds = (allEntries ?? []).map(e => e.entry_id)
 
-    // Get submission counts per round
     if (totalEntries > 0) {
-      const entryIds = allEntries!.map(e => e.entry_id)
       const { data: allSubmissions } = await supabase
         .from('entry_round_submissions')
-        .select('round_key, has_submitted')
+        .select('round_key, has_submitted, entry_id')
         .in('entry_id', entryIds)
-        .eq('has_submitted', true)
 
       for (const roundKey of ROUND_KEYS) {
-        const submitted = (allSubmissions ?? []).filter(s => s.round_key === roundKey).length
+        const submitted = (allSubmissions ?? []).filter(
+          s => s.round_key === roundKey && s.has_submitted
+        ).length
         adminStats[roundKey] = { total_entries: totalEntries, submitted_entries: submitted }
+      }
+
+      if (currentOpenRoundKey) {
+        const map: Record<string, boolean> = Object.fromEntries(entryIds.map(id => [id, false]))
+        for (const sub of allSubmissions ?? []) {
+          if (sub.round_key === currentOpenRoundKey) {
+            map[sub.entry_id] = !!sub.has_submitted
+          }
+        }
+        currentRoundEntrySubmissions = map
       }
     }
   }
@@ -133,6 +152,12 @@ async function handleGET(
   return NextResponse.json({
     mode: 'progressive',
     rounds,
+    ...(membership.role === 'admin'
+      ? {
+          current_open_round_key: currentOpenRoundKey,
+          current_round_entry_submissions: currentRoundEntrySubmissions,
+        }
+      : {}),
   })
 }
 

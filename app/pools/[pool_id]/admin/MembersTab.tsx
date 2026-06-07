@@ -20,6 +20,15 @@ import {
 import { resolveFullBracket } from '@/lib/bracketResolver'
 import { resolveFullBracketFromPicks } from '@/lib/bracketPickerResolver'
 
+type MemberBadgeStatus = 'submitted' | 'partial' | 'pending' | 'awaiting'
+
+function StatusBadge({ status }: { status: MemberBadgeStatus }) {
+  if (status === 'submitted') return <Badge variant="green">Submitted</Badge>
+  if (status === 'partial') return <Badge variant="yellow">Partial</Badge>
+  if (status === 'pending') return <Badge variant="yellow">Pending</Badge>
+  return <Badge variant="gray">Awaiting round</Badge>
+}
+
 type MembersTabProps = {
   pool: PoolData
   members: MemberData[]
@@ -76,6 +85,42 @@ export function MembersTab({
   const adminCount = members.filter((m) => m.role === 'admin').length
   const isProgressive = pool.prediction_mode === 'progressive'
 
+  // Progressive pools submit per-round, so the member-row badge reflects
+  // the currently-open round, not the legacy `has_submitted_predictions`
+  // flag. `null` open-round key = no round currently open (between rounds /
+  // pre-tournament). `roundsLoaded` gates rendering so we don't flash an
+  // "Awaiting round" badge before the fetch resolves.
+  const [currentOpenRoundKey, setCurrentOpenRoundKey] = useState<string | null>(null)
+  const [currentRoundSubmissions, setCurrentRoundSubmissions] = useState<Record<string, boolean>>({})
+  const [roundsLoaded, setRoundsLoaded] = useState(!isProgressive)
+
+  useEffect(() => {
+    if (!isProgressive) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/pools/${pool.pool_id}/rounds`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        setCurrentOpenRoundKey(data.current_open_round_key ?? null)
+        setCurrentRoundSubmissions(data.current_round_entry_submissions ?? {})
+      } catch {
+        // Non-fatal: badges fall back to a neutral state.
+      } finally {
+        if (!cancelled) setRoundsLoaded(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isProgressive, pool.pool_id])
+
+  // True iff the entry has submitted predictions for the currently-open
+  // round. Used only when isProgressive && currentOpenRoundKey is set.
+  const isEntrySubmittedForCurrentRound = (entryId: string): boolean =>
+    currentRoundSubmissions[entryId] === true
+
   // For progressive mode, an entry is "unlockable" if it has any predictions (round submissions exist per-round)
   // For other modes, check has_submitted_predictions
   const hasUnlockableEntries = (member: MemberData) =>
@@ -83,6 +128,29 @@ export function MembersTab({
       e.has_submitted_predictions ||
       (isProgressive && predictions.some(p => p.entry_id === e.entry_id))
     )
+
+  // Resolved badge tier for a member row:
+  // - 'submitted' : all of the member's entries are submitted (for the current round in progressive mode)
+  // - 'partial'   : some but not all
+  // - 'pending'   : none submitted (or, in progressive mode, no open round and no legacy submissions)
+  // - 'awaiting'  : progressive pool with no currently-open round → neutral "no action needed" state
+  const memberStatus = (member: MemberData): 'submitted' | 'partial' | 'pending' | 'awaiting' => {
+    const entries = member.entries || []
+    if (entries.length === 0) return 'pending'
+
+    if (isProgressive) {
+      if (!currentOpenRoundKey) return 'awaiting'
+      const submittedCount = entries.filter(e => isEntrySubmittedForCurrentRound(e.entry_id)).length
+      if (submittedCount === entries.length) return 'submitted'
+      if (submittedCount > 0) return 'partial'
+      return 'pending'
+    }
+
+    const submittedCount = entries.filter(e => e.has_submitted_predictions).length
+    if (submittedCount === entries.length) return 'submitted'
+    if (submittedCount > 0) return 'partial'
+    return 'pending'
+  }
 
   // Get the true total points for an entry (client-side computed match + bonus, falling back to pool_entries)
   function getEntryTotalPoints(entry: EntryData): number {
@@ -507,18 +575,23 @@ export function MembersTab({
               {/* Entries badges for multi-entry members */}
               {(member.entries || []).length > 1 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {(member.entries || []).map(entry => (
-                    <span
-                      key={entry.entry_id}
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        entry.has_submitted_predictions
-                          ? 'bg-success-50 text-success-700'
-                          : 'bg-neutral-100 text-neutral-500'
-                      }`}
-                    >
-                      {entry.entry_name}
-                    </span>
-                  ))}
+                  {(member.entries || []).map(entry => {
+                    const submitted = isProgressive
+                      ? currentOpenRoundKey !== null && isEntrySubmittedForCurrentRound(entry.entry_id)
+                      : entry.has_submitted_predictions
+                    return (
+                      <span
+                        key={entry.entry_id}
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          submitted
+                            ? 'bg-success-50 text-success-700'
+                            : 'bg-neutral-100 text-neutral-500'
+                        }`}
+                      >
+                        {entry.entry_name}
+                      </span>
+                    )
+                  })}
                 </div>
               )}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
@@ -526,13 +599,7 @@ export function MembersTab({
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
                   </Badge>
-                  {(member.entries || []).every(e => e.has_submitted_predictions) ? (
-                    <Badge variant="green">Submitted</Badge>
-                  ) : (member.entries || []).some(e => e.has_submitted_predictions) ? (
-                    <Badge variant="yellow">Partial</Badge>
-                  ) : (
-                    <Badge variant="yellow">Pending</Badge>
-                  )}
+                  {roundsLoaded && <StatusBadge status={memberStatus(member)} />}
                 </div>
                 <select
                   defaultValue=""
@@ -645,13 +712,7 @@ export function MembersTab({
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex flex-col items-center gap-1">
-                        {(member.entries || []).every(e => e.has_submitted_predictions) ? (
-                          <Badge variant="green">Submitted</Badge>
-                        ) : (member.entries || []).some(e => e.has_submitted_predictions) ? (
-                          <Badge variant="yellow">Partial</Badge>
-                        ) : (
-                          <Badge variant="yellow">Pending</Badge>
-                        )}
+                        {roundsLoaded && <StatusBadge status={memberStatus(member)} />}
                         {(member.entries || []).length > 1 && (
                           <span className="text-xs text-neutral-500">{(member.entries || []).length} entries</span>
                         )}
