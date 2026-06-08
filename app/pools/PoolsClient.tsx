@@ -33,6 +33,8 @@ type PoolData = {
   has_submitted_predictions: boolean
   joined_at: string
   memberCount: number
+  totalEntries: number
+  hasScoringStarted: boolean
   form: ('exact' | 'winner_gd' | 'winner' | 'miss')[]
   currentRoundLabel?: string | null
   brand_name?: string | null
@@ -706,11 +708,20 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Rank */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
-                                    <div className="flex items-baseline gap-1.5">
-                                      <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
-                                        #{pool.current_rank ?? 0}
+                                    {pool.hasScoringStarted && pool.current_rank != null ? (
+                                      <div className="flex items-baseline gap-1">
+                                        <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                          #{pool.current_rank}
+                                        </p>
+                                        <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                                          of {pool.totalEntries}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                                        —
                                       </p>
-                                    </div>
+                                    )}
                                   </div>
                                   <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
                                   {/* Level */}
@@ -844,11 +855,20 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Rank */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
-                                    <div className="flex items-baseline gap-1.5">
-                                      <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
-                                        #{pool.current_rank ?? 0}
+                                    {pool.hasScoringStarted && pool.current_rank != null ? (
+                                      <div className="flex items-baseline gap-1">
+                                        <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                          #{pool.current_rank}
+                                        </p>
+                                        <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                                          of {pool.totalEntries}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                                        —
                                       </p>
-                                    </div>
+                                    )}
                                   </div>
                                   <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
                                   {/* Level */}

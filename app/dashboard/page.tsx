@@ -148,6 +148,29 @@ export default async function DashboardPage() {
 
   const conductData: MatchConductData[] = (conductRes ?? []) as MatchConductData[]
 
+  // STEP 4d: Determine which pools have started scoring. Signal: any entry
+  // in the pool has total_points > 0. This mirrors recalculatePool's gate
+  // at lib/scoring/core.ts:222 (scores fire for live OR completed matches
+  // with non-null _ft scores), so the dashboard card flips on at the same
+  // instant the leaderboard does — including the first live-scored match,
+  // not only after full-time. Pre-tournament every entry is at 0 points
+  // and stored current_rank is stale/sparse, so we hide rank entirely.
+  const poolIdsForScoring = Array.from(
+    new Set((userPools ?? []).map((m: any) => m.pools.pool_id))
+  )
+  const hasScoringByPool = new Map<string, boolean>()
+  if (poolIdsForScoring.length > 0) {
+    const { data: scoringRows } = await supabase
+      .from('pool_entries')
+      .select('pool_members!inner(pool_id)')
+      .in('pool_members.pool_id', poolIdsForScoring)
+      .gt('total_points', 0)
+    for (const row of (scoringRows ?? []) as Array<{ pool_members: { pool_id: string } | { pool_id: string }[] }>) {
+      const pm = Array.isArray(row.pool_members) ? row.pool_members[0] : row.pool_members
+      if (pm?.pool_id) hasScoringByPool.set(pm.pool_id, true)
+    }
+  }
+
   // STEP 5: Enrich each pool with calculated points (match + bonus), member count, match counts
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
@@ -158,6 +181,16 @@ export default async function DashboardPage() {
         .from('pool_members')
         .select('*', { count: 'exact', head: true })
         .eq('pool_id', pool.pool_id)
+
+      // Get total entries count (drives the "Rank X of Y" denominator —
+      // pools can have multi-entry members, so entry count is the correct
+      // basis for a leaderboard position, not member count). pool_entries
+      // has no pool_id column — it links via member_id → pool_members, so
+      // we filter on the joined pool_members.pool_id.
+      const { count: totalEntries } = await supabase
+        .from('pool_entries')
+        .select('entry_id, pool_members!inner(pool_id)', { count: 'exact', head: true })
+        .eq('pool_members.pool_id', pool.pool_id)
 
       // Get total matches count
       const { count: totalMatchesCount } = await supabase
@@ -270,12 +303,23 @@ export default async function DashboardPage() {
         match_points: matchPoints,
         bonus_points: bonusPoints,
         total_points: matchPoints + bonusPoints + adjustment,
-        current_rank: bestEntry?.current_rank ?? null,
+        // "Best position" across all of this user's entries in the pool.
+        // Picks the lowest non-null current_rank so a user with one entry
+        // at #4 and another at #10 sees #4, regardless of which entry has
+        // the higher point total.
+        current_rank: (() => {
+          const ranks = entries
+            .map((e: any) => e.current_rank)
+            .filter((r: number | null | undefined): r is number => r != null)
+          return ranks.length > 0 ? Math.min(...ranks) : null
+        })(),
         has_submitted_predictions: anySubmitted,
         predictions_submitted_at: bestEntry?.predictions_submitted_at ?? null,
         predictions_last_saved_at: bestEntry?.predictions_last_saved_at ?? null,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
+        totalEntries: totalEntries ?? 0,
+        hasScoringStarted: hasScoringByPool.get(pool.pool_id) ?? false,
         totalMatches: totalMatchesCount ?? 0,
         completedMatches: normalizedMatches.filter((m: any) => m.is_completed).length,
         predictedMatches: entryPredCounts[defaultEntryId] || 0,

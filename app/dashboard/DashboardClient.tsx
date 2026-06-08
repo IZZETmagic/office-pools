@@ -41,6 +41,8 @@ type PoolCardData = {
   predictions_last_saved_at: string | null
   joined_at: string
   memberCount: number
+  totalEntries: number
+  hasScoringStarted: boolean
   totalMatches: number
   completedMatches: number
   predictedMatches: number
@@ -437,10 +439,20 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
       <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
         <div>
           <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Rank</p>
-          <p className="text-lg font-bold text-neutral-900 dark:text-white leading-tight">
-            {pool.current_rank ?? '--'}
-          </p>
-          <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">/{pool.memberCount}</p>
+          {pool.hasScoringStarted && pool.current_rank != null ? (
+            <>
+              <p className="text-lg font-bold text-neutral-900 dark:text-white leading-tight">
+                {pool.current_rank}
+              </p>
+              <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">
+                of {pool.totalEntries}
+              </p>
+            </>
+          ) : (
+            <p className="text-lg font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+              —
+            </p>
+          )}
         </div>
         <div className="text-center">
           <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Level</p>
@@ -547,9 +559,20 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
             {/* Rank */}
             <div className="flex-1 py-3 px-3">
               <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
-              <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
-                #{pool.current_rank ?? 0}
-              </p>
+              {pool.hasScoringStarted && pool.current_rank != null ? (
+                <div className="flex items-baseline gap-1">
+                  <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                    #{pool.current_rank}
+                  </p>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                    of {pool.totalEntries}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                  —
+                </p>
+              )}
             </div>
             <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
             {/* Level */}
