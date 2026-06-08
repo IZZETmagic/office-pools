@@ -94,6 +94,23 @@ export function MembersTab({
   const [currentRoundSubmissions, setCurrentRoundSubmissions] = useState<Record<string, boolean>>({})
   const [roundsLoaded, setRoundsLoaded] = useState(!isProgressive)
 
+  // Re-runnable so mutations (e.g. Unlock Predictions) can refresh the
+  // round-aware badge instead of leaving it stale until remount.
+  async function refreshRoundSubmissions() {
+    if (!isProgressive) return
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/rounds`)
+      if (!res.ok) return
+      const data = await res.json()
+      setCurrentOpenRoundKey(data.current_open_round_key ?? null)
+      setCurrentRoundSubmissions(data.current_round_entry_submissions ?? {})
+    } catch {
+      // Non-fatal: badges fall back to a neutral state.
+    } finally {
+      setRoundsLoaded(true)
+    }
+  }
+
   useEffect(() => {
     if (!isProgressive) return
     let cancelled = false
@@ -432,7 +449,7 @@ export function MembersTab({
 
       const entryLabel = specificEntry ? specificEntry.entry_name : 'all entries'
       showToast(`Predictions unlocked for ${member.users.username} (${entryLabel}). They can now edit and resubmit.`, 'success')
-      await refreshMembers()
+      await Promise.all([refreshMembers(), refreshRoundSubmissions()])
     } catch (err: any) {
       setError(err.message || 'Failed to unlock predictions')
     }

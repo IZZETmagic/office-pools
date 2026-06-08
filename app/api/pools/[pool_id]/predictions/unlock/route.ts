@@ -88,20 +88,28 @@ async function handlePOST(
     }
   }
 
-  // Log the unlock action for audit trail
-  await supabase
+  // Log the unlock action for audit trail. Column names must match the
+  // admin_audit_log schema (performed_by / target_user_id / performed_at);
+  // earlier this used legacy field names and the insert was silently
+  // failing on every call.
+  const targetUserId = (entry as any).pool_members?.user_id ?? null
+  const { error: auditError } = await supabase
     .from('admin_audit_log')
     .insert({
-      pool_id: pool_id,
-      admin_user_id: userData.user_id,
-      target_member_id: entry.member_id,
       action: 'unlock_predictions',
+      performed_by: userData.user_id,
+      pool_id: pool_id,
+      target_user_id: targetUserId,
+      summary: `Unlocked predictions for entry ${entry.entry_name || entryId}`,
       details: {
         entry_id: entryId,
+        entry_name: entry.entry_name || null,
         reason: body.reason || null,
-        timestamp: new Date().toISOString(),
       },
     })
+  if (auditError) {
+    console.error('[unlock-predictions] audit log insert failed:', auditError)
+  }
 
   // Send notification email to the entry owner (fire-and-forget)
   const entryOwnerUserId = (entry as any).pool_members?.user_id
