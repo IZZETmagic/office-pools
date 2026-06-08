@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsUnlockedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -46,7 +47,15 @@ async function handlePOST(
     return NextResponse.json({ error: 'Entry not found in this pool' }, { status: 404 })
   }
 
-  const { error: updateError } = await supabase
+  // Admin role has already been verified above with the RLS-gated user
+  // client. The mutations below need to bypass RLS because
+  // entry_round_submissions only grants pool admins SELECT (not UPDATE),
+  // so the user client silently no-ops the update and the endpoint
+  // returns success while changing nothing. Use the service-role client
+  // (same pattern as rounds/[key]/state and admin/pools/[id]/actions).
+  const adminSupabase = createAdminClient()
+
+  const { error: updateError } = await adminSupabase
     .from('pool_entries')
     .update({
       has_submitted_predictions: false,
@@ -76,7 +85,7 @@ async function handlePOST(
     const openRoundKeys = (openRounds ?? []).map(r => r.round_key)
 
     if (openRoundKeys.length > 0) {
-      await supabase
+      const { error: ersError } = await adminSupabase
         .from('entry_round_submissions')
         .update({
           has_submitted: false,
@@ -85,6 +94,9 @@ async function handlePOST(
         })
         .eq('entry_id', entryId)
         .in('round_key', openRoundKeys)
+      if (ersError) {
+        return NextResponse.json({ error: ersError.message }, { status: 500 })
+      }
     }
   }
 
@@ -93,7 +105,7 @@ async function handlePOST(
   // earlier this used legacy field names and the insert was silently
   // failing on every call.
   const targetUserId = (entry as any).pool_members?.user_id ?? null
-  const { error: auditError } = await supabase
+  const { error: auditError } = await adminSupabase
     .from('admin_audit_log')
     .insert({
       action: 'unlock_predictions',
