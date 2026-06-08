@@ -85,14 +85,25 @@ async function handlePATCH(request: NextRequest) {
   if (auth.error) return auth.error
   const { supabase, userData: authUserData } = auth.data
 
-  // Fetch email needed for Resend API
-  const { data: userEmail } = await supabase
+  // Fetch profile needed for Resend contact sync + topics PATCH
+  const { data: userProfile } = await supabase
     .from('users')
-    .select('email')
+    .select('email, username, full_name')
     .eq('user_id', authUserData.user_id)
     .single()
 
-  if (!userEmail) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!userProfile) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  // Ensure the Resend contact exists before issuing the topics PATCH.
+  // Without this, users whose contact was never synced (e.g. signed up
+  // before topics shipped, or PATCH fires before GET) get a 4xx from
+  // Resend that surfaces here as a 500. syncContactToResend is idempotent.
+  const nameParts = (userProfile.full_name || '').split(' ')
+  await syncContactToResend({
+    email: userProfile.email,
+    firstName: nameParts[0] || userProfile.username,
+    lastName: nameParts.slice(1).join(' ') || undefined,
+  })
 
   const { topicKey, enabled } = await request.json() as {
     topicKey: TopicKey
@@ -111,7 +122,7 @@ async function handlePATCH(request: NextRequest) {
   try {
     // Update topic subscription via Resend REST API
     const res = await fetch(
-      `https://api.resend.com/contacts/${encodeURIComponent(userEmail.email)}/topics`,
+      `https://api.resend.com/contacts/${encodeURIComponent(userProfile.email)}/topics`,
       {
         method: 'PATCH',
         headers: {
