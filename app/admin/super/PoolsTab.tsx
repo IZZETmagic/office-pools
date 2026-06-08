@@ -38,6 +38,11 @@ type PoolMember = {
     entry_name: string
     entry_number: number
     has_submitted_predictions: boolean
+    // Round-aware submission status overlaid by /api/admin/pools/[id]:
+    // for progressive pools this reflects the currently-open round's
+    // entry_round_submissions row; for non-progressive it mirrors
+    // has_submitted_predictions. Prefer this over the legacy flag for UI.
+    is_submitted: boolean
     predictions_submitted_at: string | null
     total_points: number
     point_adjustment: number
@@ -1191,7 +1196,7 @@ function PoolDetailSheet({
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <span className="sp-text-ink font-medium sp-body">{entries.length}</span>
                           <span className="sp-text-slate text-xs ml-1">
-                            ({entries.filter((e) => e.has_submitted_predictions).length} submitted)
+                            ({entries.filter((e) => e.is_submitted).length} submitted)
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap font-medium sp-text-ink sp-body">
@@ -1265,7 +1270,7 @@ function PoolDetailSheet({
                     (m.pool_entries || []).map((entry) => {
                       const username = m.users?.username || 'Unknown'
                       const entryActions = [
-                        ...(entry.has_submitted_predictions
+                        ...(entry.is_submitted
                           ? [{
                               label: 'Unlock Predictions',
                               onClick: () => setActionModal({
@@ -1311,8 +1316,8 @@ function PoolDetailSheet({
                             {username}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <Badge variant={entry.has_submitted_predictions ? 'green' : 'gray'}>
-                              {entry.has_submitted_predictions ? 'Submitted' : 'Pending'}
+                            <Badge variant={entry.is_submitted ? 'green' : 'gray'}>
+                              {entry.is_submitted ? 'Submitted' : 'Pending'}
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap sp-text-ink sp-body">

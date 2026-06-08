@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
@@ -87,10 +88,51 @@ export async function GET(
     return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
   }
 
-  // Compute aggregate stats
+  // Overlay a round-aware `is_submitted` on every entry. The legacy
+  // `has_submitted_predictions` flag is only ever set by the all-at-once
+  // submission flow, so for progressive pools every entry was being
+  // misreported as Pending. For progressive pools we look at
+  // entry_round_submissions for the currently-open round; for everything
+  // else we just mirror the legacy flag.
   const members = membersRes.data || []
   const allEntries = members.flatMap((m: any) => m.pool_entries || [])
-  const submittedCount = allEntries.filter((e: any) => e.has_submitted_predictions).length
+  const isProgressive = (poolRes.data as any).prediction_mode === 'progressive'
+  const openRound = isProgressive
+    ? (roundStatesRes.data || []).find((rs: any) => rs.state === 'open')
+    : null
+  const submittedEntryIds = new Set<string>()
+
+  if (openRound && allEntries.length > 0) {
+    // entry_round_submissions only grants SELECT to entry owners and to
+    // pool admins of the entry's pool. Super admins who aren't members
+    // of the pool get filtered to zero rows under RLS, so use the
+    // service-role client (the route is already gated by
+    // requireSuperAdmin above).
+    const adminSupabase = createAdminClient()
+    const entryIds = allEntries.map((e: any) => e.entry_id)
+    const { data: roundSubs } = await adminSupabase
+      .from('entry_round_submissions')
+      .select('entry_id, has_submitted')
+      .eq('round_key', openRound.round_key)
+      .in('entry_id', entryIds)
+    for (const sub of roundSubs ?? []) {
+      if ((sub as any).has_submitted) submittedEntryIds.add((sub as any).entry_id)
+    }
+  }
+
+  const computeIsSubmitted = (e: any): boolean =>
+    isProgressive ? submittedEntryIds.has(e.entry_id) : !!e.has_submitted_predictions
+
+  for (const m of members as any[]) {
+    if (Array.isArray(m.pool_entries)) {
+      m.pool_entries = m.pool_entries.map((e: any) => ({
+        ...e,
+        is_submitted: computeIsSubmitted(e),
+      }))
+    }
+  }
+
+  const submittedCount = allEntries.filter(computeIsSubmitted).length
 
   // Fetch users NOT in this pool for "Add Member" action
   const memberUserIds = members.map((m: any) => m.user_id).filter(Boolean)
