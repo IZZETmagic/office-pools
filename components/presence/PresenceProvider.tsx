@@ -230,6 +230,12 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // poolId → member user_id → display identity. Built as a side effect
+  // of polling; lets the postgres_changes fast-path (below) resolve an
+  // incoming presence row to "which interested pools show this user,
+  // and under what name" without an extra query per event.
+  const rosterRef = useRef<Map<string, Map<string, { username: string; full_name: string }>>>(new Map())
+
   const fetchPoolPresence = useCallback(async (poolId: string) => {
     const supabase = supabaseRef.current
     const { data, error } = await supabase
@@ -241,9 +247,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     const cutoff = Date.now() - ONLINE_WINDOW_MS
     const selfId = identityRef.current?.user_id
     const online: PresenceUser[] = []
+    const roster = new Map<string, { username: string; full_name: string }>()
     for (const row of data as any[]) {
       const user = Array.isArray(row.users) ? row.users[0] : row.users
       if (!user) continue
+      roster.set(user.user_id, {
+        username: user.username ?? '',
+        full_name: user.full_name ?? '',
+      })
       const presence = Array.isArray(user.user_presence) ? user.user_presence[0] : user.user_presence
       if (!presence?.is_active) continue
       if (Date.parse(presence.last_seen_at) < cutoff) continue
@@ -259,6 +270,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         active_pool_id: presence.active_pool_id ?? null,
       })
     }
+    rosterRef.current.set(poolId, roster)
     setOnlineByPool(prev => {
       const next = new Map(prev)
       next.set(poolId, online)
@@ -281,6 +293,74 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interestedPoolsKey, fetchAllInterested])
+
+  // ---- Realtime fast-path: presence rows pushed from the database ----
+  // Sub-second dot updates layered ON TOP of the polling floor. This is
+  // not the old peer-presence-channel problem coming back: the database
+  // is the source of truth and these events are just notifications of
+  // committed writes (RLS-gated to rows this user can read). If the
+  // socket goes stale the only consequence is latency degrading to the
+  // POLL_MS floor — the data on screen can never be wrong because of a
+  // dead socket.
+  useEffect(() => {
+    if (!identity || interestedPools.length === 0) return
+    const supabase = supabaseRef.current
+
+    const channel = supabase
+      .channel('user-presence-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_presence' },
+        (payload) => {
+          const row = payload.new as {
+            user_id?: string
+            last_seen_at?: string
+            active_pool_id?: string | null
+            is_active?: boolean
+          } | null
+          if (!row?.user_id || !row.last_seen_at) return
+          if (row.user_id === identityRef.current?.user_id) return
+
+          const fresh =
+            !!row.is_active && Date.parse(row.last_seen_at) > Date.now() - ONLINE_WINDOW_MS
+
+          setOnlineByPool(prev => {
+            let changed = false
+            const next = new Map(prev)
+            // A user can appear in several interested pools; update each
+            // roster the event's user belongs to.
+            for (const poolId of interestCountsRef.current.keys()) {
+              const member = rosterRef.current.get(poolId)?.get(row.user_id!)
+              if (!member) continue
+              const list = next.get(poolId) ?? []
+              const idx = list.findIndex(u => u.user_id === row.user_id)
+              if (fresh) {
+                const entry: PresenceUser = {
+                  user_id: row.user_id!,
+                  username: member.username,
+                  full_name: member.full_name,
+                  online_at: row.last_seen_at!,
+                  is_typing: false,
+                  active_pool_id: row.active_pool_id ?? null,
+                }
+                next.set(poolId, idx >= 0 ? list.map((u, i) => (i === idx ? entry : u)) : [...list, entry])
+                changed = true
+              } else if (idx >= 0) {
+                next.set(poolId, list.filter(u => u.user_id !== row.user_id))
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity, interestedPoolsKey])
 
   // ---- Tab lifecycle ----
   useEffect(() => {
