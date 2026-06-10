@@ -58,7 +58,33 @@ type EditableState = {
   maxEntries: number;
   maxParticipants: number;
   deadline: Date;
+  // Fee tracking is implicit on entry_fee > 0 (matches the web's
+  // semantics and the existing Pool Info card gate). The toggle below
+  // is purely UX sugar: ON exposes the amount + currency editors and
+  // saves the parsed amount; OFF clears entry_fee back to null on
+  // save, which also hides the Fees tab from the admin tab bar.
+  feesEnabled: boolean;
+  // Kept as a string while editing so partial input ("12.") is valid
+  // mid-typing — only parsed to a number at save time.
+  entryFee: string;
+  entryFeeCurrency: string;
 };
+
+// Mirrors the web SettingsTab currency dropdown options. Display label
+// is the ISO code + symbol; the value stored in pools.entry_fee_currency
+// is the bare ISO code.
+const CURRENCY_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: 'USD', label: 'USD ($)' },
+  { code: 'EUR', label: 'EUR (€)' },
+  { code: 'GBP', label: 'GBP (£)' },
+  { code: 'CAD', label: 'CAD (C$)' },
+  { code: 'AUD', label: 'AUD (A$)' },
+  { code: 'MXN', label: 'MXN ($)' },
+  { code: 'BRL', label: 'BRL (R$)' },
+  { code: 'JPY', label: 'JPY (¥)' },
+  { code: 'CHF', label: 'CHF (Fr)' },
+  { code: 'BMD', label: 'BMD ($)' },
+];
 
 const JOIN_URL_BASE = 'https://sportpool.io/join/';
 
@@ -84,6 +110,9 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       maxEntries: pool.maxEntriesPerUser,
       maxParticipants: pool.maxParticipants ?? 0,
       deadline: pool.predictionDeadline ? new Date(pool.predictionDeadline) : new Date(),
+      feesEnabled: (pool.entryFee ?? 0) > 0,
+      entryFee: pool.entryFee != null && pool.entryFee > 0 ? String(pool.entryFee) : '',
+      entryFeeCurrency: pool.entryFeeCurrency || 'USD',
     }),
     [pool],
   );
@@ -106,10 +135,26 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   const [stopParticipatingSummary, setStopParticipatingSummary] = useState<string | null>(
     null,
   );
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const [stopParticipatingError, setStopParticipatingError] = useState<string | null>(
     null,
   );
 
+  // Parse the in-progress fee string to its numeric form (or null when
+  // empty / NaN) so the dirty check matches what handleSave will actually
+  // persist — typing "12." vs "12" both round to 12 and shouldn't read
+  // as a change. Currency only matters when fees are enabled.
+  const editFeeNum = (() => {
+    const n = parseFloat(edit.entryFee);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  const initialFeeNum = (() => {
+    const n = parseFloat(initial.entryFee);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  const editEffectiveFee = edit.feesEnabled ? editFeeNum : null;
+  const initialEffectiveFee = initial.feesEnabled ? initialFeeNum : null;
   const hasChanges =
     edit.name !== initial.name ||
     edit.description !== initial.description ||
@@ -117,7 +162,9 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
     edit.isPrivate !== initial.isPrivate ||
     edit.maxEntries !== initial.maxEntries ||
     edit.maxParticipants !== initial.maxParticipants ||
-    edit.deadline.getTime() !== initial.deadline.getTime();
+    edit.deadline.getTime() !== initial.deadline.getTime() ||
+    editEffectiveFee !== initialEffectiveFee ||
+    (editEffectiveFee !== null && edit.entryFeeCurrency !== initial.entryFeeCurrency);
 
   async function handleCopy(kind: 'code' | 'link') {
     if (!Clipboard) {
@@ -145,6 +192,12 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         max_entries_per_user: edit.maxEntries,
         max_participants: edit.maxParticipants > 0 ? edit.maxParticipants : null,
         prediction_deadline: edit.deadline.toISOString(),
+        // Implicit toggle: a positive entry_fee means fee tracking is on;
+        // null means it's off (Fees tab hides, Pool Info card hides). The
+        // currency is always persisted so re-enabling later remembers
+        // the admin's last choice.
+        entry_fee: editEffectiveFee,
+        entry_fee_currency: edit.entryFeeCurrency,
       };
       const { error } = await supabase.from('pools').update(updates).eq('pool_id', pool.poolId);
       if (error) throw error;
@@ -261,32 +314,21 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   }
 
   function handleArchive() {
-    Alert.alert(
-      'Archive Pool',
-      "Members can still view results but no new predictions or changes will be allowed. You can reactivate later.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('pools')
-                .update({ status: 'completed' })
-                .eq('pool_id', pool.poolId);
-              if (error) throw error;
-              onSaved?.();
-            } catch (err) {
-              Alert.alert(
-                "Couldn't archive",
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            }
-          },
-        },
-      ],
-    );
+    setShowArchiveConfirm(true);
+  }
+
+  async function performArchive() {
+    setShowArchiveConfirm(false);
+    try {
+      const { error } = await supabase
+        .from('pools')
+        .update({ status: 'completed' })
+        .eq('pool_id', pool.poolId);
+      if (error) throw error;
+      onSaved?.();
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : 'Unknown error');
+    }
   }
 
   return (
@@ -570,6 +612,55 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       {/* Scoring Configuration */}
       <ScoringConfigCard onPress={onOpenScoring} />
 
+      {/* Entry Fees — explicit toggle on top of the entry_fee column.
+          Disabled clears the fee on save and hides the Fees tab in the
+          pool detail; enabled exposes the amount + currency editors. */}
+      <Card>
+        <Caption>Entry Fees</Caption>
+        <RNText
+          style={{
+            fontFamily: fontFamilies.regular,
+            fontSize: 12,
+            color: theme.colors.slate,
+          }}
+        >
+          Track per-entry fees and payments. When off, the Fees tab is hidden and no fee info shows on the pool.
+        </RNText>
+        <SegmentedPicker
+          value={edit.feesEnabled ? 'on' : 'off'}
+          options={[
+            { value: 'off', label: 'Disabled' },
+            { value: 'on', label: 'Enabled' },
+          ]}
+          onChange={(v) => setEdit({ ...edit, feesEnabled: v === 'on' })}
+        />
+        {edit.feesEnabled ? (
+          <>
+            <FieldRow label="Fee per entry">
+              <FeeAmountInput
+                value={edit.entryFee}
+                onChange={(v) => setEdit({ ...edit, entryFee: v })}
+                currency={edit.entryFeeCurrency}
+              />
+            </FieldRow>
+            <FieldRow label="Currency">
+              <CurrencyPicker
+                value={edit.entryFeeCurrency}
+                onChange={(v) => setEdit({ ...edit, entryFeeCurrency: v })}
+              />
+            </FieldRow>
+            {editFeeNum !== null ? (
+              <InfoBox>
+                Each entry will cost{' '}
+                {formatFeeForPreview(editFeeNum, edit.entryFeeCurrency)}. Track payments in the Fees tab.
+              </InfoBox>
+            ) : (
+              <InfoBox>Enter an amount above to start tracking fees.</InfoBox>
+            )}
+          </>
+        ) : null}
+      </Card>
+
       {/* Danger Zone */}
       <Card>
         <RNText
@@ -666,6 +757,26 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         confirmLabel="OK"
         destructive
         onConfirm={() => setStopParticipatingError(null)}
+      />
+
+      <ConfirmDialog
+        visible={showArchiveConfirm}
+        title="Archive Pool"
+        description="Members can still view results but no new predictions or changes will be allowed. You can reactivate later."
+        cancelLabel="Cancel"
+        confirmLabel="Archive"
+        destructive
+        onCancel={() => setShowArchiveConfirm(false)}
+        onConfirm={() => void performArchive()}
+      />
+
+      <ConfirmDialog
+        visible={archiveError !== null}
+        title="Couldn't archive"
+        description={archiveError ?? ''}
+        confirmLabel="OK"
+        destructive
+        onConfirm={() => setArchiveError(null)}
       />
     </View>
   );
@@ -1447,4 +1558,152 @@ function formatDeadline(d: Date): string {
     minute: '2-digit',
     hour12: true,
   });
+}
+
+// Numeric input restricted to currency-amount shapes. Strips anything
+// other than digits and a single decimal, so partial input like "12."
+// stays valid mid-type but garbage characters never reach state.
+// Mirrors the web Settings tab's <Input type="number" step="0.01"> —
+// just done in JS because RN's TextInput numeric keyboards still allow
+// stray taps on some Android IMEs.
+function FeeAmountInput({
+  value,
+  onChange,
+  currency,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  currency: string;
+}) {
+  const theme = useTheme();
+  const symbol = currencySymbol(currency);
+  function sanitize(v: string): string {
+    // Allow digits and at most one decimal point. Drop leading zeros
+    // only when followed by another digit (so "0" and "0.5" still work).
+    const cleaned = v.replace(/[^0-9.]/g, '');
+    const firstDot = cleaned.indexOf('.');
+    if (firstDot === -1) return cleaned;
+    return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.mist,
+        borderRadius: theme.radii.sm,
+        paddingHorizontal: theme.spacing.md,
+        gap: 6,
+      }}
+    >
+      <RNText
+        style={{
+          fontFamily: fontFamilies.semibold,
+          fontSize: 14,
+          color: theme.colors.slate,
+        }}
+      >
+        {symbol}
+      </RNText>
+      <TextInput
+        value={value}
+        onChangeText={(v) => onChange(sanitize(v))}
+        placeholder="0.00"
+        placeholderTextColor={theme.colors.slate}
+        keyboardType="decimal-pad"
+        inputMode="decimal"
+        style={{
+          flex: 1,
+          fontFamily: fontFamilies.regular,
+          fontSize: 14,
+          color: theme.colors.ink,
+          paddingVertical: 10,
+        }}
+      />
+    </View>
+  );
+}
+
+// Horizontal pill row of supported currencies. Compact enough that all
+// 10 options stay in scroll reach without a modal — matches the visual
+// language of the QuickDeadlineButton row above.
+function CurrencyPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+      }}
+    >
+      {CURRENCY_OPTIONS.map((opt) => {
+        const active = opt.code === value;
+        return (
+          <Pressable
+            key={opt.code}
+            onPress={() => onChange(opt.code)}
+            style={({ pressed }) => ({
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: theme.radii.pill,
+              backgroundColor: active
+                ? theme.colors.primary
+                : withOpacity(theme.colors.primary, 0.1),
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <RNText
+              style={{
+                fontFamily: fontFamilies.bold,
+                fontSize: 11,
+                color: active ? '#FFFFFF' : theme.colors.primary,
+                letterSpacing: 0.3,
+              }}
+            >
+              {opt.label}
+            </RNText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function currencySymbol(code: string): string {
+  // Cheap, locale-independent symbol lookup — keeps the prefix glyph
+  // honest for the 10 codes we actually offer without hauling in a
+  // full Intl resolution dance.
+  switch (code) {
+    case 'EUR':
+      return '€';
+    case 'GBP':
+      return '£';
+    case 'JPY':
+      return '¥';
+    case 'CHF':
+      return 'Fr';
+    case 'BRL':
+      return 'R$';
+    case 'CAD':
+      return 'C$';
+    case 'AUD':
+      return 'A$';
+    default:
+      return '$';
+  }
+}
+
+function formatFeeForPreview(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
 }

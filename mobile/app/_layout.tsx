@@ -38,13 +38,19 @@ import { Splash } from '@/components/Splash';
 import { ActivityProvider, useSharedActivity } from '@/lib/ActivityProvider';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { HomeDataProvider, useHomeData } from '@/lib/HomeDataProvider';
+import { PresenceProvider } from '@/lib/PresenceProvider';
 import {
   TournamentMatchesProvider,
   useTournamentMatches,
 } from '@/lib/TournamentMatchesProvider';
 import { PendingActionsProvider } from '@/lib/usePendingActions';
 import { initSentry, Sentry } from '@/lib/sentry';
+import {
+  markNotificationsPrompted,
+  useOnboardingProgress,
+} from '@/lib/useOnboardingProgress';
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
+import { usePushPermission } from '@/lib/usePushPermission';
 import { usePushTokenRegistration } from '@/lib/usePushTokenRegistration';
 
 // Crash + error reporting. Module-scope init runs once per JS context — Fast
@@ -62,6 +68,13 @@ LogBox.ignoreLogs([
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* splash may have already auto-hidden */
 });
+
+// iOS-only: crossfade the native splash out instead of cutting. Combined
+// with the JS Splash painting the same PNG at the same size on a solid
+// #0B0F1A background, the hand-off reads as one continuous screen — the
+// trophy stays put while the native layer dissolves under the JS layer.
+// No-op on Android (`fade` is iOS-only per expo-splash-screen types).
+SplashScreen.setOptions({ fade: true, duration: 200 });
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -103,6 +116,12 @@ function InnerLayout() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const {
+    loading: onboardingLoading,
+    seen: onboardingSeen,
+    notificationsPrompted,
+  } = useOnboardingProgress();
+  const { status: pushPermissionStatus } = usePushPermission();
 
   // Watches auth + push permission; registers/unregisters the APNs device
   // token with the backend. No-op until both are ready.
@@ -119,14 +138,60 @@ function InnerLayout() {
   // avoiding any blank-frame flash.
 
   useEffect(() => {
-    if (loading) return;
-    const inAuthGroup = segments[0] === '(auth)';
-    if (!session && !inAuthGroup) {
-      router.replace('/(auth)/sign-in');
-    } else if (session && inAuthGroup) {
+    // Hold routing until every input the state machine reads has resolved.
+    // The splash overlay covers this; once everything's ready we route
+    // exactly once into the correct destination before splash fades.
+    if (loading || onboardingLoading || pushPermissionStatus === null) return;
+
+    const group = segments[0];
+    const sub = segments[1];
+
+    // 1) First-launch pre-auth slides. Only shown when:
+    //    - user has no session AND
+    //    - they haven't completed the slides yet
+    //    Once they sign in (or have an existing session from another
+    //    install), the slides are skipped entirely — by design.
+    if (!session && !onboardingSeen) {
+      const onSlides = group === '(onboarding)' && sub !== 'notifications';
+      if (!onSlides) router.replace('/(onboarding)');
+      return;
+    }
+
+    // 2) Unauthed past the slides — standard sign-in.
+    if (!session) {
+      if (group !== '(auth)') router.replace('/(auth)/sign-in');
+      return;
+    }
+
+    // 3) Authed but haven't been shown the post-auth notifications screen.
+    //    Fires for fresh sign-ups AND for existing users on their first
+    //    launch after this feature ships. If push perm is already granted,
+    //    silently mark prompted so we never bother them again.
+    if (!notificationsPrompted) {
+      if (pushPermissionStatus === 'granted') {
+        void markNotificationsPrompted();
+        return;
+      }
+      const onNotifications = group === '(onboarding)' && sub === 'notifications';
+      if (!onNotifications) router.replace('/(onboarding)/notifications');
+      return;
+    }
+
+    // 4) Fully onboarded. If we're stuck inside (auth) or (onboarding) for
+    //    any reason, bounce into the app.
+    if (group === '(auth)' || group === '(onboarding)') {
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments, router]);
+  }, [
+    session,
+    loading,
+    onboardingLoading,
+    onboardingSeen,
+    notificationsPrompted,
+    pushPermissionStatus,
+    segments,
+    router,
+  ]);
 
   // Note: no `if (loading) return null;` here — the tree mounts immediately
   // so HomeDataProvider + ActivityProvider can start prefetching beneath the
@@ -145,6 +210,12 @@ function InnerLayout() {
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
+      {/* PresenceProvider publishes app-wide online presence to the
+          per-pool Supabase presence channels the web Banter UI reads.
+          Inside HomeDataProvider because it needs the user's pool list
+          + identity from home data. Publisher-only — no mobile UI reads
+          presence yet. */}
+      <PresenceProvider>
       {/* TournamentMatchesProvider lives inside HomeDataProvider because
           the internal hook reads tournament IDs from home data (one query
           per tournament the user has a pool in). Mounting it here fires
@@ -157,6 +228,7 @@ function InnerLayout() {
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen
           name="create-pool"
           options={{ presentation: 'modal', headerShown: false }}
@@ -211,12 +283,20 @@ function InnerLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="notification-settings"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <SplashOverlay />
       </PendingActionsProvider>
       </ActivityProvider>
       </TournamentMatchesProvider>
+      </PresenceProvider>
       </HomeDataProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
@@ -255,6 +335,12 @@ function useSplashGate(): boolean {
   // first paint (matching Home/Pools/Activity covered by homeLoading +
   // activityLoading).
   const { loading: matchesLoading } = useTournamentMatches();
+  // The onboarding gate reads both flags + push permission to decide
+  // routing. Holding splash until they resolve guarantees the user lands
+  // on the right screen (slides / notifications / tabs) instead of
+  // flashing the wrong one for a frame.
+  const { loading: onboardingLoading } = useOnboardingProgress();
+  const { status: pushPermissionStatus } = usePushPermission();
   const [minElapsed, setMinElapsed] = useState(false);
 
   useEffect(() => {
@@ -263,9 +349,10 @@ function useSplashGate(): boolean {
   }, []);
 
   if (!minElapsed) return false;
-  if (authLoading) return false;
+  if (authLoading || onboardingLoading || pushPermissionStatus === null) return false;
   // Unauthenticated launch: no data to prefetch — fade out so the user
-  // lands on /(auth)/sign-in immediately after the 1.2s floor.
+  // lands on /(auth)/sign-in (or the pre-auth slides) immediately after
+  // the 1.2s floor.
   if (!session) return true;
   return !homeLoading && !activityLoading && !matchesLoading;
 }

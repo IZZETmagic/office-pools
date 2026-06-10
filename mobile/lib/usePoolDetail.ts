@@ -84,10 +84,17 @@ export function usePoolDetail(poolId: string | undefined) {
             .from('pool_members')
             .select('*', { count: 'exact', head: true })
             .eq('pool_id', poolId),
+          // pool_entries has no pool_id column — pool scoping lives on
+          // pool_members. Inner-join through pool_members so PostgREST
+          // applies the filter; head:true skips payload, count:exact
+          // still returns the row count.
           supabase
             .from('pool_entries')
-            .select('*', { count: 'exact', head: true })
-            .eq('pool_id', poolId),
+            .select('entry_id, pool_members!inner(pool_id)', {
+              count: 'exact',
+              head: true,
+            })
+            .eq('pool_members.pool_id', poolId),
         ]);
 
         const poolRow = pool as {

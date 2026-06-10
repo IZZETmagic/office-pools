@@ -1,12 +1,15 @@
 // Branded landing screen shown while the app prefetches Home + Pools +
-// Activity + Tournament Matches data on cold launch. Mirrors the iOS Swift
-// SplashView in timing (0.5s entrance, 1.5s bob, 0.4s dot cycle, 0.4s
-// fade-out) and in two-tone "SportPool" wordmark, scaled up for the Expo
-// build and rendered in Nunito.
+// Activity + Tournament Matches data on cold launch. Solid #0B0F1A
+// background matches the native splash's `backgroundColor` in app.json
+// so the native→JS hand-off has no color jump. Trophy is the Hugeicons
+// ChampionIcon (vector, naturally backgroundless) rendered in the gold
+// accent. Two-tone "SportPool" wordmark in Nunito. Timing: 0.5s entrance,
+// 1.5s bob, 0.4s dot cycle, 0.4s exit fade.
+
+const SPLASH_BG = '#0B0F1A';
 
 import { ChampionIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -38,7 +41,7 @@ function hideNativeSplash() {
 
 export function Splash({ preloadComplete, onDismissed }: Props) {
   const theme = useTheme();
-  const opacity = useSharedValue(0);
+  const fadeIn = useSharedValue(0);
   const scale = useSharedValue(0.8);
   const bobY = useSharedValue(0);
   const rootOpacity = useSharedValue(1);
@@ -49,7 +52,7 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
   useEffect(() => {
     hideNativeSplash();
 
-    opacity.value = withTiming(1, {
+    fadeIn.value = withTiming(1, {
       duration: 500,
       easing: Easing.out(Easing.ease),
     });
@@ -68,7 +71,7 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
         true,
       ),
     );
-  }, [opacity, scale, bobY]);
+  }, [fadeIn, scale, bobY]);
 
   // Dot cycle: phase bounces 0 → 1 → 2 → 1 → 0, matching the Swift timer.
   useEffect(() => {
@@ -95,13 +98,13 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
     );
   }, [preloadComplete, rootOpacity, onDismissed]);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: fadeIn.value,
     transform: [{ scale: scale.value }, { translateY: bobY.value }],
   }));
 
-  const wordmarkStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+  const fadeInStyle = useAnimatedStyle(() => ({
+    opacity: fadeIn.value,
   }));
 
   const rootStyle = useAnimatedStyle(() => ({
@@ -111,17 +114,11 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
   return (
     <Animated.View
       pointerEvents={preloadComplete ? 'none' : 'auto'}
-      style={[StyleSheet.absoluteFill, rootStyle]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: SPLASH_BG }, rootStyle]}
     >
       <StatusBar style="light" />
-      <LinearGradient
-        colors={[theme.colors.midnight, '#111827']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
       <View style={styles.center}>
-        <Animated.View style={logoStyle}>
+        <Animated.View style={iconStyle}>
           <HugeiconsIcon
             icon={ChampionIcon}
             size={128}
@@ -129,12 +126,12 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
             strokeWidth={1.25}
           />
         </Animated.View>
-        <Animated.View style={[styles.wordmark, wordmarkStyle]}>
+        <Animated.View style={[styles.wordmark, fadeInStyle]}>
           <Text style={[styles.word, { color: '#FFFFFF' }]}>Sport</Text>
           <Text style={[styles.word, { color: theme.colors.primary }]}>Pool</Text>
         </Animated.View>
       </View>
-      <View style={styles.dots}>
+      <Animated.View style={[styles.dots, fadeInStyle]}>
         {[0, 1, 2].map((i) => (
           <View
             key={i}
@@ -148,7 +145,7 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
             ]}
           />
         ))}
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 }

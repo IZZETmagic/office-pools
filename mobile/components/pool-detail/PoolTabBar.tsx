@@ -44,6 +44,7 @@ export type PoolTabKey =
   | 'info'
   | 'rounds'
   | 'members'
+  | 'fees'
   | 'settings';
 
 type TabDef = {
@@ -64,6 +65,7 @@ const ALL_TABS: TabDef[] = [
   { key: 'info', label: 'Info', icon: 'info.circle.fill' },
   { key: 'rounds', label: 'Rounds', icon: 'calendar.badge.clock' },
   { key: 'members', label: 'Members', icon: 'person.3.fill' },
+  { key: 'fees', label: 'Fees', icon: 'dollarsign.circle.fill' },
   { key: 'settings', label: 'Settings', icon: 'gearshape.fill' },
 ];
 
@@ -72,6 +74,12 @@ type PoolTabBarProps = {
   onChange: (tab: PoolTabKey) => void;
   isAdmin: boolean;
   isProgressive: boolean;
+  /**
+   * Whether the pool has fee tracking turned on. Admin-only Fees tab is
+   * gated on this — when the admin disables fee tracking in Settings
+   * (entry_fee cleared to null), the tab disappears on next render.
+   */
+  feesEnabled: boolean;
   /**
    * Current fractional page offset of the swipe pager (0 = first page, 1 = second, etc).
    * Wired as a Reanimated SharedValue so the pool detail screen can write
@@ -93,9 +101,14 @@ type PoolTabBarProps = {
   poolId?: string;
 };
 
-export function getVisiblePoolTabs(isAdmin: boolean, isProgressive: boolean): PoolTabKey[] {
+export function getVisiblePoolTabs(
+  isAdmin: boolean,
+  isProgressive: boolean,
+  feesEnabled: boolean,
+): PoolTabKey[] {
   return ALL_TABS.filter((t) => {
     if (t.key === 'rounds') return isAdmin && isProgressive;
+    if (t.key === 'fees') return isAdmin && feesEnabled;
     if (t.key === 'members' || t.key === 'settings') return isAdmin;
     return true;
   }).map((t) => t.key);
@@ -106,6 +119,7 @@ export function PoolTabBar({
   onChange,
   isAdmin,
   isProgressive,
+  feesEnabled,
   pageOffset,
   accentColor,
   poolId,
@@ -113,7 +127,7 @@ export function PoolTabBar({
   const theme = useTheme();
   const pending = usePendingActionsOptional();
   const { width: screenWidth } = useWindowDimensions();
-  const visible = getVisiblePoolTabs(isAdmin, isProgressive);
+  const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled);
   const tabs = ALL_TABS.filter((t) => visible.includes(t.key));
 
   // Per-tab dot predicate. Form tab surfaces badge unlocks + level ups;

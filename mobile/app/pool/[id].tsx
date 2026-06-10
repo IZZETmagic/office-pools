@@ -22,6 +22,7 @@ import {
   BanterSheet,
   type BanterSheetHandle,
   BPFormTab,
+  FeesTab,
   FormTab,
   LeaderboardTab,
   MembersTab,
@@ -37,6 +38,7 @@ import {
   type PoolTabKey,
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
+import { useReportActivePool } from '@/lib/PresenceProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePendingActions } from '@/lib/usePendingActions';
 import { usePoolBanter } from '@/lib/usePoolBanter';
@@ -54,6 +56,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
   'info',
   'rounds',
   'members',
+  'fees',
   'settings',
 ];
 
@@ -65,6 +68,9 @@ export default function PoolDetailScreen() {
     banter?: string;
   }>();
   const { data, loading, error, refresh } = usePoolDetail(id);
+  // Publish "viewing this pool" to app-wide presence — web Banter UIs
+  // show this member with an in-this-pool (vs online-elsewhere) dot.
+  useReportActivePool(id);
   // Pull-to-refresh: spinner bound to real user gesture only. Background
   // refreshes (useFocusEffect, route-param changes) still call `refresh`
   // directly without surfacing the iOS spinner.
@@ -185,6 +191,10 @@ export default function PoolDetailScreen() {
 
   const isAdmin = data?.pool.isAdmin ?? false;
   const isProgressive = data?.pool.predictionMode === 'progressive';
+  // Implicit toggle: fee tracking is "on" iff the admin has set a
+  // positive entry fee in Settings. Drives both the Fees tab visibility
+  // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
+  const feesEnabled = (data?.pool.entryFee ?? 0) > 0;
   const rawBrandColor = data?.pool.brandColor ?? null;
   const accentColor = rawBrandColor
     ? rawBrandColor.startsWith('#')
@@ -192,8 +202,8 @@ export default function PoolDetailScreen() {
       : `#${rawBrandColor}`
     : null;
   const visibleTabs = useMemo(
-    () => getVisiblePoolTabs(isAdmin, isProgressive),
-    [isAdmin, isProgressive],
+    () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled),
+    [isAdmin, isProgressive, feesEnabled],
   );
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
@@ -297,6 +307,8 @@ export default function PoolDetailScreen() {
         return <RoundsTab poolId={pool.poolId} />;
       case 'members':
         return <MembersTab poolId={pool.poolId} />;
+      case 'fees':
+        return <FeesTab pool={pool} />;
       case 'settings':
         return (
           <SettingsTab
@@ -329,6 +341,7 @@ export default function PoolDetailScreen() {
         onChange={handleTabTap}
         isAdmin={pool.isAdmin}
         isProgressive={!!isProgressive}
+        feesEnabled={feesEnabled}
         pageOffset={pageOffset}
         accentColor={accentColor}
         poolId={pool.poolId}

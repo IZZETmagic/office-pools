@@ -9,6 +9,7 @@ export { FlexBadgesSheet, type FlexBadgeOption, type FlexBadgesSheetHandle } fro
 export { QuickActionsMenu, type QuickAction } from './QuickActionsMenu';
 export { REACTION_EMOJIS, ReactionPicker } from './ReactionPicker';
 export { ReactionPills } from './ReactionPills';
+export { FeesTab } from './FeesTab';
 export { FormTab } from './FormTab';
 export { MembersTab } from './MembersTab';
 export { ProgressivePredictionWizard } from './ProgressivePredictionWizard';
