@@ -83,24 +83,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: 'That username is already taken.' };
         }
 
+        // The chosen username/full name ride inside the signup call as
+        // auth metadata; the handle_new_user trigger creates the profile
+        // row with them atomically. (Previously the trigger inserted an
+        // email-prefix placeholder that this client patched afterwards —
+        // signups exploded whenever the placeholder collided with an
+        // existing username, and a failed patch stranded the user on a
+        // name they never picked.)
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              username,
+              full_name: fullName,
+            },
+          },
         });
         if (authError) return { error: authError.message };
         if (!authData.user) return { error: 'Sign up failed. Please try again.' };
-
-        const { error: profileError } = await supabase
-          .from('users')
-          .update({ username, full_name: fullName })
-          .eq('auth_user_id', authData.user.id);
-
-        if (profileError) {
-          if (profileError.code === '23505' && profileError.message?.includes('username')) {
-            return { error: 'That username was just taken. Please choose another.' };
-          }
-          return { error: 'Profile setup failed. Please contact support.' };
-        }
 
         return {};
       },

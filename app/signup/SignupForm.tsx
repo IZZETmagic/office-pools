@@ -78,9 +78,21 @@ export function SignupForm() {
       return
     }
 
+    // The chosen username/full name ride inside the signup call as auth
+    // metadata; the handle_new_user trigger creates the profile row with
+    // them atomically. (Previously the trigger inserted an email-prefix
+    // placeholder that the client patched afterwards — signups exploded
+    // whenever the placeholder collided with an existing username, and a
+    // failed patch stranded the user on a name they never picked.)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username,
+          full_name: fullName,
+        },
+      },
     })
 
     if (authError) {
@@ -90,25 +102,6 @@ export function SignupForm() {
     }
 
     if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          username,
-          full_name: fullName,
-        })
-        .eq('auth_user_id', authData.user.id)
-
-      if (profileError) {
-        // Check if it's a unique constraint violation
-        if (profileError.code === '23505' && profileError.message?.includes('username')) {
-          setError('That username was just taken. Please choose another.')
-          setUsernameStatus('taken')
-          setLoading(false)
-          return
-        }
-        console.error('Profile update error:', profileError)
-      }
-
       // Log terms agreement (non-blocking — don't prevent signup if this fails)
       try {
         await fetch('/api/terms-agreement', {
