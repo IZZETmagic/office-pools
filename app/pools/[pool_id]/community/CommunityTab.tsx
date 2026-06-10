@@ -27,7 +27,7 @@ import { SharePredictionModal } from './SharePredictionModal'
 import { TypingIndicator } from './TypingIndicator'
 import { DesktopSidebar } from './DesktopSidebar'
 import { OnlineMembersStrip } from './OnlineMembersStrip'
-import { usePresence } from './usePresence'
+import { usePoolPresence } from '@/components/presence/PresenceProvider'
 import { formatDayHeader, generateSystemEvents } from './helpers'
 import { computeFullXPBreakdown } from '../analytics/xpSystem'
 import type { EarnedBadge } from '../analytics/xpSystem'
@@ -103,12 +103,9 @@ export function CommunityTab({
   // =====================
   // PRESENCE
   // =====================
-  const currentMember = useMemo(() => members.find(m => m.user_id === currentUserId), [members, currentUserId])
-  const { onlineUsers, typingUsers, setIsTyping } = usePresence(poolId, {
-    user_id: currentUserId,
-    username: currentMember?.users.username ?? '',
-    full_name: currentMember?.users.full_name ?? '',
-  })
+  // Tracking happens app-wide in PresenceProvider (root layout); this is
+  // a read-only view of this pool's channel plus the typing setter.
+  const { onlineUsers, typingUsers, setIsTyping } = usePoolPresence(poolId)
 
   // =====================
   // MEMBER LEVEL COMPUTATION (memoized)
@@ -1226,7 +1223,7 @@ export function CommunityTab({
           {/* Left: Chat Panel */}
           <div className={`flex-1 min-w-0 flex flex-col min-h-0 ${mobileChat ? 'w-full' : ''}`}>
             {/* Mobile Online Strip */}
-            <OnlineMembersStrip members={members} onlineUsers={onlineUsers} currentUserId={currentUserId} />
+            <OnlineMembersStrip members={members} onlineUsers={onlineUsers} currentUserId={currentUserId} poolId={poolId} />
 
             {/* Chat area */}
             <div
@@ -1273,6 +1270,7 @@ export function CommunityTab({
               matches={matches}
               allPredictions={allPredictions}
               onlineUsers={onlineUsers}
+              poolId={poolId}
               systemEvents={systemEvents}
               computedScoreMap={computedScoreMap}
             />

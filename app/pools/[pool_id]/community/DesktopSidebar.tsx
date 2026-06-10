@@ -10,7 +10,12 @@ type OnlineUser = {
   user_id: string
   username: string
   full_name: string
+  active_pool_id?: string | null
 }
+
+// Presence is app-wide: 'here' = viewing this pool right now, 'app' =
+// online elsewhere in the app, 'offline' = not in the app at all.
+type PresenceState = 'here' | 'app' | 'offline'
 
 type DesktopSidebarProps = {
   members: MemberData[]
@@ -19,6 +24,7 @@ type DesktopSidebarProps = {
   matches: MatchData[]
   allPredictions: PredictionData[]
   onlineUsers: OnlineUser[]
+  poolId: string
   systemEvents: SystemEvent[]
   computedScoreMap: Map<string, number>
 }
@@ -29,12 +35,12 @@ type DesktopSidebarProps = {
 function MemberRow({
   member,
   level,
-  isOnline,
+  presence,
   animation,
 }: {
   member: MemberData
   level: MemberWithLevel | undefined
-  isOnline: boolean
+  presence: PresenceState
   animation: 'came-online' | 'went-offline' | null
 }) {
   const animStyle = animation === 'came-online'
@@ -43,18 +49,24 @@ function MemberRow({
     ? { animation: 'slideInDown 500ms ease-out, glowGrey 1s ease-out' }
     : undefined
 
+  const dotClass =
+    presence === 'here' ? 'bg-success-500'
+    : presence === 'app' ? 'bg-warning-400'
+    : 'bg-neutral-300 dark:bg-neutral-600'
+
   return (
     <div
-      className={`flex items-center gap-2 rounded-lg px-1 -mx-1 ${!isOnline ? 'opacity-45' : ''}`}
+      className={`flex items-center gap-2 rounded-lg px-1 -mx-1 ${presence === 'offline' ? 'opacity-45' : ''}`}
       style={animStyle}
     >
       <div className="relative shrink-0">
         <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
           {getInitials(member.users.full_name, member.users.username)}
         </div>
-        <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-surface ${
-          isOnline ? 'bg-success-500' : 'bg-neutral-300 dark:bg-neutral-600'
-        }`} />
+        <div
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-surface ${dotClass}`}
+          title={presence === 'here' ? 'In this pool' : presence === 'app' ? 'Online in the app' : undefined}
+        />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium text-neutral-900 dark:text-neutral-100 truncate">{member.users.full_name || member.users.username}</p>
@@ -74,14 +86,23 @@ function OnlineMembersSection({
   memberLevels,
   onlineUsers,
   currentUserId,
+  poolId,
 }: {
   members: MemberData[]
   memberLevels: Map<string, MemberWithLevel>
   onlineUsers: OnlineUser[]
   currentUserId: string
+  poolId: string
 }) {
-  // Include current user — usePresence excludes yourself from onlineUsers
+  // Include current user — presence excludes yourself from onlineUsers
   const onlineIds = new Set([...onlineUsers.map(u => u.user_id), currentUserId])
+
+  // Green = viewing this pool right now; amber = online elsewhere in the
+  // app. The current user is always "here" (they're looking at this pool).
+  const inPoolIds = new Set([
+    ...onlineUsers.filter(u => u.active_pool_id === poolId).map(u => u.user_id),
+    currentUserId,
+  ])
 
   // Track presence transitions
   const prevOnlineIdsRef = useRef<Set<string>>(onlineIds)
@@ -184,7 +205,7 @@ function OnlineMembersSection({
                 key={m.user_id}
                 member={m}
                 level={memberLevels.get(m.user_id)}
-                isOnline
+                presence={inPoolIds.has(m.user_id) ? 'here' : 'app'}
                 animation={getAnimation(m.user_id)}
               />
             ))}
@@ -218,7 +239,7 @@ function OnlineMembersSection({
                     key={m.user_id}
                     member={m}
                     level={memberLevels.get(m.user_id)}
-                    isOnline={false}
+                    presence="offline"
                     animation={getAnimation(m.user_id)}
                   />
                 ))}
@@ -462,6 +483,7 @@ export function DesktopSidebar({
   matches,
   allPredictions,
   onlineUsers,
+  poolId,
   systemEvents,
   computedScoreMap,
 }: DesktopSidebarProps) {
@@ -475,6 +497,7 @@ export function DesktopSidebar({
         memberLevels={memberLevels}
         onlineUsers={onlineUsers}
         currentUserId={currentUserId}
+        poolId={poolId}
       />
       <MatchdayPulseSection
         matches={matches}

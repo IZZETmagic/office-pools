@@ -6,6 +6,7 @@ import Footer from "@/components/ui/Footer";
 
 import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PresenceProvider } from "@/components/presence/PresenceProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,8 +95,13 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ToastProvider>
-            {children}
-            <Footer />
+            {/* App-wide presence: no-ops for anonymous visitors (local
+                session check only — no network), so it's safe on
+                marketing pages too. */}
+            <PresenceProvider>
+              {children}
+              <Footer />
+            </PresenceProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>
