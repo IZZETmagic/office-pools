@@ -27,8 +27,22 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 // "typing…" state (and vice versa). Banter UI calls setIsTyping(poolId,
 // bool) from context.
 //
-// Lifecycle: Page Visibility API. Hidden tab → untrack (so an overnight
-// background tab doesn't show as online forever); visible → re-track.
+// Lifecycle: Page Visibility API with a grace period. A tab hidden for
+// 60s untracks (so an overnight background tab doesn't show as online
+// forever), but brief hides — switching tabs or windows, including
+// macOS occlusion marking a fully-covered window hidden — don't flap
+// presence. Resuming (visibilitychange, focus, or pageshow — the iOS
+// Safari page-restore signal) re-tracks immediately and again at 2s/5s
+// to outlast the socket reconnect. A genuinely closed tab still drops
+// offline fast regardless: the websocket dies with the tab and the
+// server expires its presence.
+//
+// Re-tracking is keyed off shouldBeOnlineRef (not raw visibilityState)
+// and also runs in the channel subscribe callback: after a hidden tab's
+// throttled socket drops and rejoins, SUBSCRIBED fires again and we
+// re-assert presence — without this, a track() issued at the moment of
+// visibilitychange can race a still-reconnecting socket and silently
+// no-op, leaving the user offline until they navigate or type.
 //
 // Cost: presence lives in Supabase's realtime layer (in-memory) — no
 // Postgres IO. All channels multiplex over one websocket per tab.
@@ -72,6 +86,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const identityRef = useRef<Identity | null>(null)
   identityRef.current = identity
 
+  // Whether this client should currently count as online. True while the
+  // tab is visible and through the 60s hide grace period — see the
+  // lifecycle notes in the header comment.
+  const shouldBeOnlineRef = useRef(
+    typeof document === 'undefined' ? true : document.visibilityState === 'visible'
+  )
+  const untrackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Current pool from the route — /pools/{id}/... → that pool, anywhere
   // else in the app → null ("online, not in a specific pool").
   const pathname = usePathname()
@@ -95,7 +117,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const trackAll = useCallback(() => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    if (!shouldBeOnlineRef.current) return
     for (const [poolId, channel] of channelsRef.current) {
       const payload = buildPayload(poolId)
       if (payload) void channel.track(payload)
@@ -188,11 +210,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
           })
         })
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-              const payload = buildPayload(poolId)
-              if (payload) void channel.track(payload)
-            }
+          // Fires on the initial join AND again after every automatic
+          // rejoin (socket drop while backgrounded → reconnect). The
+          // rejoin re-track here is what actually restores presence
+          // after iOS Safari resumes a suspended page — a track() at
+          // the moment of the resume event races the dead socket.
+          if (status === 'SUBSCRIBED' && shouldBeOnlineRef.current) {
+            const payload = buildPayload(poolId)
+            if (payload) void channel.track(payload)
           }
         })
 
@@ -223,17 +248,62 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     trackAll()
   }, [activePoolId, trackAll])
 
-  // ---- Page Visibility: hidden → offline, visible → online ----
+  // ---- Tab lifecycle: grace-period offline on hide, robust resume ----
   useEffect(() => {
-    function onVisibilityChange() {
-      if (document.visibilityState === 'hidden') {
-        untrackAll()
-      } else {
-        trackAll()
+    const clearUntrackTimer = () => {
+      if (untrackTimerRef.current) {
+        clearTimeout(untrackTimerRef.current)
+        untrackTimerRef.current = null
       }
     }
+
+    // Resume signals: visibilitychange→visible (tab/app switch back),
+    // focus (window-level switches that never report hidden), and
+    // pageshow (Safari restoring a suspended/bfcached page). track()
+    // is idempotent, so firing on all three is safe. The delayed
+    // retries cover the dead-socket race: a resumed page's websocket
+    // takes a moment to reconnect, and a track() issued before the
+    // rejoin completes is silently dropped. (The SUBSCRIBED callback
+    // also re-tracks on rejoin; the retries are belt-and-braces for
+    // resumes where no rejoin event fires.)
+    let retryTimers: ReturnType<typeof setTimeout>[] = []
+    const resume = () => {
+      clearUntrackTimer()
+      shouldBeOnlineRef.current = true
+      trackAll()
+      for (const t of retryTimers) clearTimeout(t)
+      retryTimers = [2000, 5000].map(ms => setTimeout(trackAll, ms))
+    }
+
+    // Hide: wait 60s before going offline so brief tab/window/app
+    // switches don't flap presence. A closed tab goes offline fast
+    // regardless — its socket dies and the server expires the presence.
+    const hide = () => {
+      clearUntrackTimer()
+      untrackTimerRef.current = setTimeout(() => {
+        shouldBeOnlineRef.current = false
+        untrackAll()
+      }, 60_000)
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        hide()
+      } else {
+        resume()
+      }
+    }
+
     document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', resume)
+    window.addEventListener('pageshow', resume)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', resume)
+      window.removeEventListener('pageshow', resume)
+      clearUntrackTimer()
+      for (const t of retryTimers) clearTimeout(t)
+    }
   }, [trackAll, untrackAll])
 
   // ---- Typing indicator (single track() owner — see header comment) ----
