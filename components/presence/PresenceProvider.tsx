@@ -89,6 +89,10 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const shouldBeOnlineRef = useRef(
     typeof document === 'undefined' ? true : document.visibilityState === 'visible'
   )
+  // When the tab went hidden — drives the resume strategy (cheap
+  // re-track after a quick flip vs full channel rebuild after a
+  // suspension; see the lifecycle effect).
+  const hiddenAtRef = useRef<number | null>(null)
 
   // Current pool from the route — /pools/{id}/... → that pool, anywhere
   // else in the app → null ("online, not in a specific pool").
@@ -174,51 +178,70 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // ---- Channels: one per pool membership ----
+  const joinPool = useCallback((poolId: string) => {
+    const supabase = supabaseRef.current
+    const id = identityRef.current
+    if (!id || channelsRef.current.has(poolId)) return
+
+    const channel = supabase.channel(`pool-presence-${poolId}`, {
+      config: { presence: { key: id.user_id } },
+    })
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<PresenceUser>()
+        const users: PresenceUser[] = []
+        for (const presences of Object.values(state)) {
+          if (presences.length > 0) {
+            const p = presences[0] as unknown as PresenceUser
+            // Exclude self — consumers add the current user back
+            // (matches the original usePresence contract).
+            if (p.user_id !== identityRef.current?.user_id) users.push(p)
+          }
+        }
+        setOnlineByPool(prev => {
+          const next = new Map(prev)
+          next.set(poolId, users)
+          return next
+        })
+      })
+      .subscribe((status) => {
+        // Fires on the initial join AND again after every automatic
+        // rejoin (socket drop while backgrounded → reconnect).
+        if (status === 'SUBSCRIBED' && shouldBeOnlineRef.current) {
+          const payload = buildPayload(poolId)
+          if (payload) void channel.track(payload)
+        }
+      })
+
+    channelsRef.current.set(poolId, channel)
+  }, [buildPayload])
+
+  // Tear down and re-join every presence channel. The nuclear resume
+  // option for iOS Safari's zombie sockets: after a suspension the
+  // WebSocket object can still report itself open while the underlying
+  // connection is long dead, so track() pushes (and their retries)
+  // vanish without an error until the heartbeat timeout fires 30-60s
+  // later. Removing every channel closes the socket outright (supabase
+  // disconnects when the last channel goes) and re-joining brings up a
+  // fresh connection; the SUBSCRIBED callback then re-tracks presence.
+  const rebuildAllChannels = useCallback(() => {
+    const supabase = supabaseRef.current
+    const poolIds = [...channelsRef.current.keys()]
+    for (const channel of channelsRef.current.values()) {
+      void supabase.removeChannel(channel)
+    }
+    channelsRef.current.clear()
+    for (const poolId of poolIds) joinPool(poolId)
+  }, [joinPool])
+
   const poolIdsKey = poolIds.join(',')
   useEffect(() => {
     if (!identity || poolIds.length === 0) return
     const supabase = supabaseRef.current
     const channels = channelsRef.current
 
-    for (const poolId of poolIds) {
-      if (channels.has(poolId)) continue
-
-      const channel = supabase.channel(`pool-presence-${poolId}`, {
-        config: { presence: { key: identity.user_id } },
-      })
-
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState<PresenceUser>()
-          const users: PresenceUser[] = []
-          for (const presences of Object.values(state)) {
-            if (presences.length > 0) {
-              const p = presences[0] as unknown as PresenceUser
-              // Exclude self — consumers add the current user back
-              // (matches the original usePresence contract).
-              if (p.user_id !== identity.user_id) users.push(p)
-            }
-          }
-          setOnlineByPool(prev => {
-            const next = new Map(prev)
-            next.set(poolId, users)
-            return next
-          })
-        })
-        .subscribe((status) => {
-          // Fires on the initial join AND again after every automatic
-          // rejoin (socket drop while backgrounded → reconnect). The
-          // rejoin re-track here is what actually restores presence
-          // after iOS Safari resumes a suspended page — a track() at
-          // the moment of the resume event races the dead socket.
-          if (status === 'SUBSCRIBED' && shouldBeOnlineRef.current) {
-            const payload = buildPayload(poolId)
-            if (payload) void channel.track(payload)
-          }
-        })
-
-      channels.set(poolId, channel)
-    }
+    for (const poolId of poolIds) joinPool(poolId)
 
     // Drop channels for pools we're no longer in.
     for (const [poolId, channel] of channels) {
@@ -235,7 +258,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       channels.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity, poolIdsKey, buildPayload])
+  }, [identity, poolIdsKey, joinPool])
 
   // ---- Re-track when the active pool changes (route navigation) ----
   useEffect(() => {
@@ -249,22 +272,33 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     // Resume signals: visibilitychange→visible (tab/app switch back),
     // focus (window-level switches that never report hidden), and
     // pageshow (Safari restoring a suspended/bfcached page). track()
-    // is idempotent, so firing on all three is safe. The delayed
-    // retries cover the dead-socket race: a resumed page's websocket
-    // takes a moment to reconnect, and a track() issued before the
-    // rejoin completes is silently dropped. (The SUBSCRIBED callback
-    // also re-tracks on rejoin; the retries are belt-and-braces for
-    // resumes where no rejoin event fires.)
+    // is idempotent, so firing on all three is safe.
+    //
+    // Strategy depends on how long we were hidden. A quick flip
+    // (<20s): the socket is almost certainly still alive — just
+    // re-track, with 2s/5s retries in case a reconnect was in flight.
+    // A long hide (>20s, e.g. Safari backgrounded on iOS): assume the
+    // socket is a zombie — it can report itself open while the
+    // connection died in suspension, swallowing every track() push
+    // without an error — and rebuild the channels on a fresh
+    // connection instead (see rebuildAllChannels).
     let retryTimers: ReturnType<typeof setTimeout>[] = []
     const resume = () => {
+      const hiddenMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0
+      hiddenAtRef.current = null
       shouldBeOnlineRef.current = true
-      trackAll()
       for (const t of retryTimers) clearTimeout(t)
-      retryTimers = [2000, 5000].map(ms => setTimeout(trackAll, ms))
+      if (hiddenMs > 20_000) {
+        rebuildAllChannels()
+      } else {
+        trackAll()
+        retryTimers = [2000, 5000].map(ms => setTimeout(trackAll, ms))
+      }
     }
 
     const hide = () => {
       for (const t of retryTimers) clearTimeout(t)
+      hiddenAtRef.current = Date.now()
       shouldBeOnlineRef.current = false
       untrackAll()
     }
@@ -286,7 +320,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('pageshow', resume)
       for (const t of retryTimers) clearTimeout(t)
     }
-  }, [trackAll, untrackAll])
+  }, [trackAll, untrackAll, rebuildAllChannels])
 
   // ---- Typing indicator (single track() owner — see header comment) ----
   const setIsTyping = useCallback((poolId: string, typing: boolean) => {
