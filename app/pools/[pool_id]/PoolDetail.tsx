@@ -608,11 +608,13 @@ export function PoolDetail({
           if (!updatedEntryId || !entryIds.has(updatedEntryId)) return
 
           // Debounce: wait 2s after last update before refreshing
-          // (gives time for all entries to finish writing)
+          // (gives time for all entries to finish writing), plus 0-8s of
+          // random jitter so a goal doesn't make every connected client
+          // refresh in the same second (thundering herd on the server)
           if (debounceTimer) clearTimeout(debounceTimer)
           debounceTimer = setTimeout(() => {
             router.refresh()
-          }, 2000)
+          }, 2000 + Math.random() * 8000)
         }
       )
       .subscribe((status) => {
