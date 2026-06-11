@@ -227,21 +227,27 @@ async function handle(request: NextRequest) {
   }
 
   // Recalculate leaderboards on ANY score change (live or final). The recalc
-  // is idempotent and reads match_scores in one pass per pool, so running it
-  // every minute during a live match is fine. Skipped when nothing changed.
+  // is idempotent. Batched: each recalc fans out ~12 queries plus a
+  // match_scores delete+insert per entry, so an unbounded Promise.all across
+  // every pool slams the DB with thousands of concurrent queries exactly when
+  // live-match traffic peaks. Batch size keeps the full sweep comfortably
+  // under the 1-minute cron interval. Skipped when nothing changed.
   if (scoresChanged || newlyCompleted.length > 0) {
     const { data: pools } = await admin
       .from('pools')
       .select('pool_id')
       .eq('tournament_id', tournamentId)
     if (pools) {
-      await Promise.all(pools.map(async (p) => {
-        try {
-          await recalculatePool({ poolId: p.pool_id })
-        } catch (e) {
-          errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
-        }
-      }))
+      const RECALC_BATCH_SIZE = 25
+      for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
+        await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
+          try {
+            await recalculatePool({ poolId: p.pool_id })
+          } catch (e) {
+            errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
+          }
+        }))
+      }
     }
   }
 
