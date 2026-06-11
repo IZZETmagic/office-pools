@@ -12,6 +12,7 @@ export type OurMatchRow = {
   away_score_pso: number | null
   live_minute: number | null
   live_period: string | null
+  winner_team_id: string | null
   data_source: 'api' | 'manual'
 }
 
@@ -88,7 +89,10 @@ export function fixtureToMatchUpdate(
   const period = mapPeriod(fixture.fixture.status.short)
   if (period !== current.live_period) next.live_period = period
 
-  // Winner derivation for knockout: when match newly final, prefer PSO winner else FT.
+  // Winner derivation for knockout: when match final, prefer PSO winner else FT.
+  // Diffed against current like every other field — an unconditional write here
+  // made every sync of an already-completed match register as a phantom change
+  // (and a realtime `matches` event) for the whole 4h live window.
   if (newIsCompleted) {
     let winnerExt: number | null = null
     if (psoH !== null && psoA !== null && psoH !== psoA) {
@@ -97,7 +101,7 @@ export function fixtureToMatchUpdate(
       winnerExt = newHome > newAway ? fixture.teams.home.id : fixture.teams.away.id
     }
     const winnerTeamId = winnerExt !== null ? opts.teamIdByExternal.get(winnerExt) ?? null : null
-    next.winner_team_id = winnerTeamId
+    if (winnerTeamId !== current.winner_team_id) next.winner_team_id = winnerTeamId
   }
 
   // If only `last_synced_at` would be written, treat as no-op.

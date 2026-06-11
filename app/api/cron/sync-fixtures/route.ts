@@ -73,7 +73,7 @@ async function handle(request: NextRequest) {
   // Find matches potentially live right now
   const { data: ourMatches, error: matchErr } = await admin
     .from('matches')
-    .select('match_id, match_number, stage, match_date, home_team_id, away_team_id, status, is_completed, home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, data_source, external_match_id')
+    .select('match_id, match_number, stage, match_date, home_team_id, away_team_id, status, is_completed, home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, winner_team_id, data_source, external_match_id')
     .eq('tournament_id', tournamentId)
     .not('external_match_id', 'is', null)
     .order('match_date', { ascending: true })
@@ -232,22 +232,63 @@ async function handle(request: NextRequest) {
   // every pool slams the DB with thousands of concurrent queries exactly when
   // live-match traffic peaks. Batch size keeps the full sweep comfortably
   // under the 1-minute cron interval. Skipped when nothing changed.
-  if (scoresChanged || newlyCompleted.length > 0) {
-    const { data: pools } = await admin
-      .from('pools')
-      .select('pool_id')
-      .eq('tournament_id', tournamentId)
-    if (pools) {
-      const RECALC_BATCH_SIZE = 25
-      for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
-        await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
-          try {
-            await recalculatePool({ poolId: p.pool_id })
-          } catch (e) {
-            errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
+  //
+  // Overlap guard: a lease in sync_settings (acquired atomically via RPC, TTL
+  // so a crashed run can't deadlock us) ensures at most one sweep is ever in
+  // flight — overlapping sweeps compounding under load is what melted the DB
+  // after the opening match. A run that *can't* get the lease sets
+  // sweep_pending instead of dropping the work, and the next run picks it up
+  // even if no new score change occurred (a dropped final-whistle sweep means
+  // unscored matches).
+  let sweepPending = false
+  if (!scoresChanged && newlyCompleted.length === 0) {
+    const { data: pendingRow } = await admin
+      .from('sync_settings')
+      .select('setting_value')
+      .eq('setting_key', 'sweep_pending')
+      .maybeSingle()
+    sweepPending = pendingRow?.setting_value === true
+  }
+
+  let sweepNote: string | null = null
+  if (scoresChanged || newlyCompleted.length > 0 || sweepPending) {
+    const { data: gotLock, error: lockErr } = await admin.rpc('try_acquire_sweep_lock', { p_ttl_seconds: 600 })
+    if (lockErr) {
+      errors.push({ stage: 'sweep_lock', message: lockErr.message })
+    }
+    if (gotLock === true) {
+      try {
+        const { data: pools } = await admin
+          .from('pools')
+          .select('pool_id')
+          .eq('tournament_id', tournamentId)
+        if (pools) {
+          const RECALC_BATCH_SIZE = 25
+          for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
+            await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
+              try {
+                await recalculatePool({ poolId: p.pool_id })
+              } catch (e) {
+                errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
+              }
+            }))
           }
-        }))
+        }
+        await admin
+          .from('sync_settings')
+          .update({ setting_value: false, updated_at: nowIso })
+          .eq('setting_key', 'sweep_pending')
+        if (sweepPending) sweepNote = 'ran sweep deferred from a previous run'
+      } finally {
+        await admin.rpc('release_sweep_lock')
       }
+    } else {
+      // Another sweep is in flight — defer instead of dropping.
+      await admin
+        .from('sync_settings')
+        .update({ setting_value: true, updated_at: nowIso })
+        .eq('setting_key', 'sweep_pending')
+      sweepNote = 'sweep skipped: another sweep in flight (deferred via sweep_pending)'
     }
   }
 
@@ -258,7 +299,10 @@ async function handle(request: NextRequest) {
     fixturesSeen,
     fixturesChanged,
     fixturesSkippedManual,
-    notes: newlyCompleted.length > 0 ? `cascade fired for ${newlyCompleted.length} match(es)` : null,
+    notes: [
+      newlyCompleted.length > 0 ? `cascade fired for ${newlyCompleted.length} match(es)` : null,
+      sweepNote,
+    ].filter(Boolean).join('; ') || null,
   })
 }
 
