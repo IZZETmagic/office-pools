@@ -130,7 +130,9 @@ async function handlePOST(
     return NextResponse.json({ error: 'Predictions are locked' }, { status: 403 })
   }
 
-  // Save all bracket picks atomically via RPC (prevents race conditions on concurrent auto-saves)
+  // Save all bracket picks atomically via RPC. The function takes a per-entry
+  // advisory xact lock, so overlapping auto-saves serialize (last writer wins)
+  // instead of colliding on the unique constraints and 500ing.
   const { error: rpcError } = await supabase.rpc('save_bracket_picks', {
     p_entry_id: entry_id,
     p_group_rankings: (group_rankings ?? []).map((r: { team_id: string; group_letter: string; predicted_position: number }) => ({
