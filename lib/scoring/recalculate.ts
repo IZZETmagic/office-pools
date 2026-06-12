@@ -144,7 +144,45 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       return { success: false, poolId, predictionMode: pool.prediction_mode, entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: 'Failed to fetch entries' }
     }
 
-    const submittedEntries = entries.filter((e: any) => e.has_submitted_predictions)
+    // Determine which entries count as "submitted".
+    //
+    // full_tournament / bracket_picker: the legacy
+    // has_submitted_predictions flag, set by the all-at-once submit flow.
+    //
+    // progressive: submission lives per-round in entry_round_submissions,
+    // and the manual round-submit flow deliberately never sets the legacy
+    // flag — only the deadline auto-submit sweep does. Filtering on the
+    // flag alone made manual submitters invisible to scoring (group-stage
+    // day 1: 99 entries across 21 pools stuck on 0 points while
+    // auto-submitted entries scored fine). An entry counts as submitted
+    // once it has submitted any round.
+    let submittedEntries = entries.filter((e: any) => e.has_submitted_predictions)
+    if (pool.prediction_mode === 'progressive') {
+      const allEntryIds = entries.map((e: any) => e.entry_id)
+      const roundSubmittedIds = new Set<string>()
+      const ersPageSize = 1000
+      let ersOffset = 0
+      let ersHasMore = true
+      while (ersHasMore) {
+        const { data: page } = await adminClient
+          .from('entry_round_submissions')
+          .select('id, entry_id')
+          .in('entry_id', allEntryIds)
+          .eq('has_submitted', true)
+          .order('id', { ascending: true })
+          .range(ersOffset, ersOffset + ersPageSize - 1)
+        if (!page || page.length === 0) {
+          ersHasMore = false
+        } else {
+          for (const r of page) roundSubmittedIds.add((r as any).entry_id)
+          ersOffset += page.length
+          if (page.length < ersPageSize) ersHasMore = false
+        }
+      }
+      submittedEntries = entries.filter(
+        (e: any) => e.has_submitted_predictions || roundSubmittedIds.has(e.entry_id)
+      )
+    }
 
     // 4. Route to the appropriate calculator
     let result: ScoringResult
