@@ -202,7 +202,9 @@ async function handleGET(
         predictions_locked: false,
         auto_submitted: false,
         predictions_last_saved_at: null,
-        total_points: e.total_points ?? 0,
+        // total_points (the DB column) is dead legacy — serve the scored
+        // total here so API consumers reading this field get real points
+        total_points: e.scored_total_points ?? 0,
         point_adjustment: e.point_adjustment ?? 0,
         adjustment_reason: null,
         current_rank: e.current_rank,

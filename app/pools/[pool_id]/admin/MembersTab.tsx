@@ -171,7 +171,7 @@ export function MembersTab({
 
   // Get the true total points for an entry (client-side computed match + bonus, falling back to pool_entries)
   function getEntryTotalPoints(entry: EntryData): number {
-    return computedEntryTotals.get(entry.entry_id) ?? entry.total_points
+    return computedEntryTotals.get(entry.entry_id) ?? entry.scored_total_points ?? 0
   }
 
   // Helper: get best entry stats for a member (using true total including bonus)
