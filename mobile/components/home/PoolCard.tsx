@@ -128,7 +128,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-            {pool.currentRank !== null ? (
+            {pool.hasScoringStarted && pool.currentRank !== null ? (
               <>
                 <RNText
                   style={{
@@ -142,7 +142,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
                   #{pool.currentRank}
                 </RNText>
                 <Text variant="body" color="slate">
-                  of {pool.totalEntries || pool.memberCount}
+                  of {pool.totalEntries}
                 </Text>
               </>
             ) : (
@@ -155,7 +155,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
                   lineHeight: 36,
                 }}
               >
-                --
+                —
               </RNText>
             )}
           </View>

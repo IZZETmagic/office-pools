@@ -235,7 +235,11 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
               gap: theme.spacing.sm,
             }}
           >
-            <StatBlock label="Rank" value={pool.currentRank !== null ? `#${pool.currentRank}` : '—'} />
+            <RankBlock
+              currentRank={pool.currentRank}
+              totalEntries={pool.totalEntries}
+              hasScoringStarted={pool.hasScoringStarted}
+            />
             <Divider />
             <StatBlock label="Points" value={pool.totalPoints.toLocaleString()} />
             <Divider />
@@ -307,6 +311,54 @@ function StatBlock({ label, value }: { label: string; value: string }) {
       </RNText>
       <Text variant="detail" color="slate">
         {label}
+      </Text>
+    </View>
+  );
+}
+
+// Same shape as StatBlock but the rank value is split into the user's
+// position (their best entry rank) and the pool's total entry count, so
+// the card reads "#4 of 30" instead of just "#4". The "of N" sits on
+// the same baseline as the rank number, smaller and muted.
+function RankBlock({
+  currentRank,
+  totalEntries,
+  hasScoringStarted,
+}: {
+  currentRank: number | null;
+  totalEntries: number;
+  hasScoringStarted: boolean;
+}) {
+  const theme = useTheme();
+  const showRank = hasScoringStarted && currentRank !== null && totalEntries > 0;
+  return (
+    <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+        <RNText
+          style={{
+            fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+            fontSize: 13,
+            fontWeight: '700',
+            color: showRank ? theme.colors.ink : theme.colors.slate,
+          }}
+        >
+          {showRank ? `#${currentRank}` : '—'}
+        </RNText>
+        {showRank ? (
+          <RNText
+            style={{
+              fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+              fontSize: 10,
+              fontWeight: '600',
+              color: theme.colors.slate,
+            }}
+          >
+            of {totalEntries}
+          </RNText>
+        ) : null}
+      </View>
+      <Text variant="detail" color="slate">
+        Rank
       </Text>
     </View>
   );

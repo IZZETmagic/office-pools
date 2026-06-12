@@ -28,6 +28,11 @@ export type PoolSummary = {
   currentRank: number | null;
   totalPoints: number;
   totalEntries: number;
+  // True once the pool's tournament has at least one completed match —
+  // i.e. scoring has started. Pre-tournament every entry has 0 points
+  // and the stored current_rank values are sparse/inconsistent, so the
+  // card hides the rank KPI until this flips true.
+  hasScoringStarted: boolean;
   hasSubmittedPredictions: boolean;
   // Whether the user still has something to predict in this pool. Mirrors
   // the iOS `HomeViewModel.needsPredictions` calc: for full / bracket pools
@@ -191,7 +196,7 @@ export function useHomeDataInternal() {
             ),
             pool_entries(
               entry_id, match_points, bonus_points, current_rank,
-              has_submitted_predictions, point_adjustment, total_points
+              has_submitted_predictions, point_adjustment, scored_total_points
             )
           `,
           )
@@ -224,7 +229,7 @@ export function useHomeDataInternal() {
             current_rank: number | null;
             has_submitted_predictions: boolean | null;
             point_adjustment: number | null;
-            total_points: number | null;
+            scored_total_points: number | null;
           }>;
         }>;
 
@@ -235,6 +240,7 @@ export function useHomeDataInternal() {
         const initialsByPool: Record<string, string[]> = {};
         const entriesByPool: Record<string, number> = {};
         const tournamentMatchCount: Record<string, number> = {};
+        const tournamentCompletedCount: Record<string, number> = {};
         const unreadByPool: Record<string, number> = {};
 
         const { data: memberReads } = await supabase
@@ -266,10 +272,13 @@ export function useHomeDataInternal() {
               .map((u) => initialsOf(u?.full_name));
           }),
           ...poolIds.map(async (pid) => {
+            // pool_entries has no pool_id column — link via pool_members
+            // (member_id FK). Counts every entry in the pool, which is the
+            // denominator behind the "Rank X of Y" KPI on the dashboard.
             const { count } = await supabase
               .from('pool_entries')
-              .select('*', { count: 'exact', head: true })
-              .eq('pool_id', pid);
+              .select('entry_id, pool_members!inner(pool_id)', { count: 'exact', head: true })
+              .eq('pool_members.pool_id', pid);
             entriesByPool[pid] = count ?? 0;
           }),
           ...tournamentIds.map(async (tid) => {
@@ -278,6 +287,17 @@ export function useHomeDataInternal() {
               .select('*', { count: 'exact', head: true })
               .eq('tournament_id', tid);
             tournamentMatchCount[tid] = count ?? 0;
+          }),
+          ...tournamentIds.map(async (tid) => {
+            // Drives the dashboard's "show rank KPI?" gate. Scoring
+            // hasn't started until at least one match has flipped
+            // is_completed = true; before that, rank is noise.
+            const { count } = await supabase
+              .from('matches')
+              .select('*', { count: 'exact', head: true })
+              .eq('tournament_id', tid)
+              .eq('is_completed', true);
+            tournamentCompletedCount[tid] = count ?? 0;
           }),
           ...poolIds.map(async (pid) => {
             const lastReadAt = lastReadByPool[pid];
@@ -307,9 +327,15 @@ export function useHomeDataInternal() {
           if (row.pools.prediction_mode !== 'progressive') continue;
           const entries = row.pool_entries ?? [];
           if (entries.length === 0) continue;
-          const best = entries.reduce((a, b) =>
-            (b.total_points ?? 0) > (a.total_points ?? 0) ? b : a,
-          );
+          // Same best-entry rule as the cards: lowest rank, ties on scored
+          // points (total_points is a dead legacy column — always 0)
+          const best = entries.reduce((a, b) => {
+            const aRank = a.current_rank ?? Number.MAX_SAFE_INTEGER;
+            const bRank = b.current_rank ?? Number.MAX_SAFE_INTEGER;
+            if (bRank < aRank) return b;
+            if (bRank === aRank && (b.scored_total_points ?? 0) > (a.scored_total_points ?? 0)) return b;
+            return a;
+          });
           progressivePoolIds.push(row.pools.pool_id);
           bestEntryByProgressivePool[row.pools.pool_id] = best.entry_id;
         }
@@ -457,11 +483,21 @@ export function useHomeDataInternal() {
         const allPools: PoolSummary[] = rows.map((row) => {
           const pool = row.pools;
           const entries = row.pool_entries ?? [];
+          // "Best" = the entry holding the user's best (lowest) leaderboard
+          // rank, so the card's points describe the same entry as its rank.
+          // Unranked entries sort last; ties break on scored points. Replaces
+          // best-by-total_points — a legacy column v2 scoring never writes
+          // (0 for every entry), which silently degenerated to "first entry
+          // returned" and showed an arbitrary entry's numbers.
           const best =
             entries.length > 0
-              ? entries.reduce((a, b) =>
-                  (b.total_points ?? 0) > (a.total_points ?? 0) ? b : a,
-                )
+              ? entries.reduce((a, b) => {
+                  const aRank = a.current_rank ?? Number.MAX_SAFE_INTEGER;
+                  const bRank = b.current_rank ?? Number.MAX_SAFE_INTEGER;
+                  if (bRank < aRank) return b;
+                  if (bRank === aRank && (b.scored_total_points ?? 0) > (a.scored_total_points ?? 0)) return b;
+                  return a;
+                })
               : null;
 
           const matchPoints = best?.match_points ?? 0;
@@ -483,9 +519,19 @@ export function useHomeDataInternal() {
             tournamentId: pool.tournament_id,
             memberCount: counts[pool.pool_id] ?? 0,
             memberInitials: initialsByPool[pool.pool_id] ?? [],
-            currentRank: best?.current_rank ?? null,
+            // "Best position" across all of this user's entries in the pool —
+            // lowest non-null current_rank. A user with entries at #4 and #10
+            // sees #4 on the pool card, independent of which entry has the
+            // higher total point count.
+            currentRank: (() => {
+              const ranks = entries
+                .map((e) => e.current_rank)
+                .filter((r): r is number => r != null);
+              return ranks.length > 0 ? Math.min(...ranks) : null;
+            })(),
             totalPoints: matchPoints + bonusPoints + adjustment,
             totalEntries: entriesByPool[pool.pool_id] ?? 0,
+            hasScoringStarted: (tournamentCompletedCount[pool.tournament_id] ?? 0) > 0,
             hasSubmittedPredictions: entries.some((e) => e.has_submitted_predictions === true),
             // If the user has zero entries (e.g. an admin who deleted all
             // theirs), there is literally nothing to predict, so the
