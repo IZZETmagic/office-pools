@@ -146,11 +146,29 @@ async function handlePUT(
       })
   }
 
-  // Update last saved timestamp on pool_entries
+  // Update the entry: last-saved timestamp + the legacy submitted flag.
+  // Half the app (Results tab, Form tab, prediction modals, mobile)
+  // decides "submitted or not" from has_submitted_predictions, and
+  // historically only the deadline auto-submit sweep set it for
+  // progressive entries — manual round submitters showed "not
+  // submitted" everywhere despite scoring correctly (June 12 incident).
+  // Setting it here restores the flag's invariant: true once the entry
+  // has submitted anything.
   await supabase
     .from('pool_entries')
-    .update({ predictions_last_saved_at: now })
+    .update({
+      predictions_last_saved_at: now,
+      has_submitted_predictions: true,
+    })
     .eq('entry_id', entryId)
+
+  // predictions_submitted_at is a rank tiebreaker — set it only on the
+  // entry's first-ever submission; later rounds keep the original time.
+  await supabase
+    .from('pool_entries')
+    .update({ predictions_submitted_at: now })
+    .eq('entry_id', entryId)
+    .is('predictions_submitted_at', null)
 
   // Send confirmation email (fire-and-forget)
   const roundName = ROUND_LABELS[roundKey as RoundKey] ?? roundKey
