@@ -138,6 +138,8 @@ async function handleGET(
         .from('predictions')
         .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
         .in('entry_id', entryIds)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (!page || page.length === 0) {
@@ -240,6 +242,8 @@ async function handleGET(
         .from('match_scores')
         .select('entry_id, match_id, match_number, stage, score_type, total_points')
         .in('entry_id', allEntryIds)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
         .range(offset, offset + pageSize - 1)
       if (!page || page.length === 0) {
         hasMore = false

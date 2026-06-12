@@ -177,6 +177,8 @@ export default async function PoolPage({
         .from('bonus_scores')
         .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
         .in('entry_id', allEntryIds)
+        .order('entry_id', { ascending: true })
+        .order('bonus_id', { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (!page || page.length === 0) {
@@ -200,6 +202,8 @@ export default async function PoolPage({
         .from('match_scores')
         .select('*')
         .eq('pool_id', pool_id)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (msError) {
@@ -317,6 +321,8 @@ export default async function PoolPage({
         .from('predictions')
         .select('*')
         .in('entry_id', allEntryIds)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (!page || page.length === 0) {
