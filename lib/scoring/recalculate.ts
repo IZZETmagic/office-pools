@@ -162,10 +162,16 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       let hasMore = true
 
       while (hasMore) {
+        // Stable sort is load-bearing: offset pagination without ORDER BY is
+        // nondeterministic under concurrent writes — page seams silently
+        // dropped entries' predictions, scoring them as if they predicted
+        // nothing (108 entries in large pools after match 1).
         const { data: page } = await adminClient
           .from('predictions')
           .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
           .in('entry_id', entryIds)
+          .order('entry_id', { ascending: true })
+          .order('match_id', { ascending: true })
           .range(offset, offset + pageSize - 1)
 
         if (!page || page.length === 0) {
