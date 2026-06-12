@@ -61,7 +61,7 @@ export function usePoolEntries(poolId: string | undefined) {
       const { data: entryRows, error: entryErr } = await supabase
         .from('pool_entries')
         .select(
-          'entry_id, entry_name, entry_number, has_submitted_predictions, total_points, predictions_submitted_at, fee_paid',
+          'entry_id, entry_name, entry_number, has_submitted_predictions, scored_total_points, predictions_submitted_at, fee_paid',
         )
         .eq('member_id', mId)
         .order('entry_number', { ascending: true });
@@ -73,7 +73,7 @@ export function usePoolEntries(poolId: string | undefined) {
           entry_name: string;
           entry_number: number;
           has_submitted_predictions: boolean;
-          total_points: number | null;
+          scored_total_points: number | null;
           predictions_submitted_at: string | null;
           fee_paid: boolean | null;
         }>).map((r) => ({
@@ -81,7 +81,7 @@ export function usePoolEntries(poolId: string | undefined) {
           entryName: r.entry_name,
           entryNumber: r.entry_number,
           hasSubmittedPredictions: r.has_submitted_predictions,
-          totalPoints: r.total_points ?? 0,
+          totalPoints: r.scored_total_points ?? 0,
           predictionsSubmittedAt: r.predictions_submitted_at,
           feePaid: !!r.fee_paid,
         })),

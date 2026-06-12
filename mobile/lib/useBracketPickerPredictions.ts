@@ -74,7 +74,7 @@ export function useBracketPickerPredictions(
           supabase
             .from('pool_entries')
             .select(
-              'entry_id, entry_name, entry_number, has_submitted_predictions, total_points',
+              'entry_id, entry_name, entry_number, has_submitted_predictions, scored_total_points',
             )
             .eq('entry_id', entryId)
             .single(),
@@ -146,7 +146,7 @@ export function useBracketPickerPredictions(
         entry_name: string;
         entry_number: number;
         has_submitted_predictions: boolean;
-        total_points: number | null;
+        scored_total_points: number | null;
       };
 
       setData({
@@ -165,7 +165,7 @@ export function useBracketPickerPredictions(
           entryName: entry.entry_name,
           entryNumber: entry.entry_number,
           hasSubmittedPredictions: entry.has_submitted_predictions,
-          totalPoints: entry.total_points ?? 0,
+          totalPoints: entry.scored_total_points ?? 0,
         },
         groupRankings: picks.groupRankings,
         thirdPlaceRankings: picks.thirdPlaceRankings,
