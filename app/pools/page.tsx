@@ -75,7 +75,7 @@ export default async function PoolsPage() {
       .from('pool_entries')
       .select('pool_members!inner(pool_id)')
       .in('pool_members.pool_id', poolIdsForScoring)
-      .gt('total_points', 0)
+      .gt('scored_total_points', 0)
     for (const row of (scoringRows ?? []) as Array<{ pool_members: { pool_id: string } | { pool_id: string }[] }>) {
       const pm = Array.isArray(row.pool_members) ? row.pool_members[0] : row.pool_members
       if (pm?.pool_id) hasScoringByPool.set(pm.pool_id, true)
