@@ -593,6 +593,18 @@ export function PoolDetail({
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+    // Server-side filter so realtime only evaluates/delivers THIS pool's
+    // entry updates to this client (unfiltered, every client received every
+    // pool_entries change app-wide — fan-out scaled with viewer count).
+    // Realtime in-filters have practical size limits, so very large pools
+    // fall back to unfiltered + client-side check (the `entryIds.has` guard
+    // below stays as the correctness filter either way).
+    const entryIdList = Array.from(entryIds)
+    const serverFilter =
+      entryIdList.length > 0 && entryIdList.length <= 100
+        ? `entry_id=in.(${entryIdList.join(',')})`
+        : undefined
+
     const channel = supabase
       .channel(`pool-scores-${pool.pool_id}`)
       .on(
@@ -601,6 +613,7 @@ export function PoolDetail({
           event: 'UPDATE',
           schema: 'public',
           table: 'pool_entries',
+          ...(serverFilter ? { filter: serverFilter } : {}),
         },
         (payload) => {
           // Only refresh if the updated entry belongs to this pool

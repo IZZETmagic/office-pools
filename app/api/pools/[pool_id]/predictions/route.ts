@@ -255,35 +255,36 @@ async function handlePOST(
   }
 
   const insertedIds: { match_id: string; prediction_id: string }[] = []
+  let predicted = 0
 
+  // Single round-trip: upsert + last-saved timestamp + prediction count via
+  // the save_predictions_batch RPC. This is the hottest write path in the
+  // app — the previous three sequential calls per auto-save are what buried
+  // the DB during the opening-day pick rush. SECURITY INVOKER, so RLS
+  // enforces ownership exactly as it did for the separate statements.
   if (toUpsert.length > 0) {
-    const { data: upserted, error: upsertError } = await supabase
-      .from('predictions')
-      .upsert(toUpsert, { onConflict: 'entry_id,match_id' })
-      .select('match_id, prediction_id')
+    const { data: saved, error: saveError } = await supabase.rpc('save_predictions_batch', {
+      p_entry_id: entryId,
+      p_predictions: toUpsert,
+    })
 
-    if (upsertError) {
-      return NextResponse.json({ error: upsertError.message }, { status: 500 })
+    if (saveError) {
+      return NextResponse.json({ error: saveError.message }, { status: 500 })
     }
-    if (upserted) insertedIds.push(...upserted)
+    insertedIds.push(...((saved?.inserted ?? []) as { match_id: string; prediction_id: string }[]))
+    predicted = saved?.predicted ?? 0
+  } else {
+    const { count } = await supabase
+      .from('predictions')
+      .select('*', { count: 'exact', head: true })
+      .eq('entry_id', entryId)
+    predicted = count ?? 0
   }
-
-  // Update last saved timestamp on pool_entries
-  await supabase
-    .from('pool_entries')
-    .update({ predictions_last_saved_at: new Date().toISOString() })
-    .eq('entry_id', entryId)
-
-  // Get updated prediction count
-  const { count: predicted } = await supabase
-    .from('predictions')
-    .select('*', { count: 'exact', head: true })
-    .eq('entry_id', entryId)
 
   return NextResponse.json({
     saved: true,
     insertedIds,
-    progress: { predicted: predicted ?? 0 },
+    progress: { predicted },
     lastSaved: new Date().toISOString(),
   })
 }

@@ -126,6 +126,7 @@ async function handle(request: NextRequest) {
   let fixturesSkippedManual = 0
   const newlyCompleted: Array<{ match_id: string; stage: string }> = []
   let scoresChanged = false  // any FT or PSO score moved this run → triggers live leaderboard recalc
+  const changedMatchIds = new Set<string>()  // which matches' scores moved (drives the per-match recalc hint)
 
   // Process candidates that have a corresponding fixture today
   for (const ours of candidates) {
@@ -177,6 +178,7 @@ async function handle(request: NextRequest) {
         update.away_score_pso !== undefined
       ) {
         scoresChanged = true
+        changedMatchIds.add(ours.match_id)
       }
     }
 
@@ -258,6 +260,16 @@ async function handle(request: NextRequest) {
     }
     if (gotLock === true) {
       try {
+        // Per-match hint: when exactly one match's score moved during a live
+        // update (the common case — one goal), scope the match_scores rewrite
+        // to that match. Completions, multi-match runs, and deferred catch-up
+        // sweeps always do the full rewrite — they're the consistency
+        // authority (bonuses, cascades, missed work).
+        const singleChangedMatchId =
+          newlyCompleted.length === 0 && !sweepPending && changedMatchIds.size === 1
+            ? [...changedMatchIds][0]
+            : undefined
+
         const { data: pools } = await admin
           .from('pools')
           .select('pool_id')
@@ -267,7 +279,7 @@ async function handle(request: NextRequest) {
           for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
             await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
               try {
-                await recalculatePool({ poolId: p.pool_id })
+                await recalculatePool({ poolId: p.pool_id, matchId: singleChangedMatchId })
               } catch (e) {
                 errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
               }

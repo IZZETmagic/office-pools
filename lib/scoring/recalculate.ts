@@ -137,7 +137,7 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     const memberIds = poolMembers.map((m: any) => m.member_id)
     const { data: entries } = await adminClient
       .from('pool_entries')
-      .select('entry_id, member_id, has_submitted_predictions, point_adjustment, predictions_submitted_at')
+      .select('entry_id, member_id, has_submitted_predictions, point_adjustment, predictions_submitted_at, match_points, bonus_points, scored_total_points, current_rank')
       .in('member_id', memberIds)
 
     if (!entries) {
@@ -220,14 +220,23 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       }
     }
 
-    // 5. Build submission time lookup for rank tiebreaker
+    // 5. Build submission time lookup for rank tiebreaker, plus current
+    // totals so the write step can skip entries whose values didn't change
+    // (every skipped UPDATE is a realtime event that never fans out).
     const submissionTimeMap = new Map<string, string | null>()
+    const currentTotals = new Map<string, CurrentEntryTotals>()
     for (const e of entries as any[]) {
       submissionTimeMap.set(e.entry_id, e.predictions_submitted_at ?? null)
+      currentTotals.set(e.entry_id, {
+        match_points: e.match_points ?? null,
+        bonus_points: e.bonus_points ?? null,
+        scored_total_points: e.scored_total_points ?? null,
+        current_rank: e.current_rank ?? null,
+      })
     }
 
     // 6. Write results to database (shadow-write for Phase 1)
-    const writeResult = await writeScoresToDB(adminClient, poolId, result, submissionTimeMap)
+    const writeResult = await writeScoresToDB(adminClient, poolId, result, submissionTimeMap, currentTotals, options.matchId)
 
     // 7. Fire match-completion pushes (prediction_result + matchday MVP +
     // streak milestones). Fire-and-forget — if push fan-out fails or hangs,
@@ -345,13 +354,32 @@ async function calculateBracketPickerMode(
 
 // ----- Database write (Phase 1: shadow-write) -----
 
+type CurrentEntryTotals = {
+  match_points: number | null
+  bonus_points: number | null
+  scored_total_points: number | null
+  current_rank: number | null
+}
+
 async function writeScoresToDB(
   adminClient: any,
   poolId: string,
   result: ScoringResult,
   submissionTimeMap: Map<string, string | null>,
+  currentTotals?: Map<string, CurrentEntryTotals>,
+  onlyMatchId?: string,
 ): Promise<{ matchScoresWritten: number; bonusScoresWritten: number }> {
-  const { matchScores, bonusScores, entryTotals } = result
+  const { matchScores: allMatchScores, bonusScores, entryTotals } = result
+
+  // Live-update optimization: when the caller knows exactly one match's
+  // score moved, scope the match_scores rewrite to that match. Totals,
+  // ranks, and bonus_scores still come from the full computation, so the
+  // table stays globally consistent — we just skip rewriting rows that
+  // cannot have changed. Full rewrites (no onlyMatchId) remain the
+  // authority for settings changes, resets, and completion cascades.
+  const matchScores = onlyMatchId
+    ? allMatchScores.filter(ms => ms.match_id === onlyMatchId)
+    : allMatchScores
 
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
@@ -361,17 +389,20 @@ async function writeScoresToDB(
   const allEntryIds = [...new Set(entryTotals.map(t => t.entry_id))]
 
   if (allEntryIds.length > 0) {
-    // Delete all existing match_scores for pool entries in parallel batches
+    // Delete existing match_scores for pool entries in parallel batches
+    // (scoped to the single match when onlyMatchId is set)
     const deleteMatchBatchSize = 100
     const deleteMatchBatches: string[][] = []
     for (let i = 0; i < allEntryIds.length; i += deleteMatchBatchSize) {
       deleteMatchBatches.push(allEntryIds.slice(i, i + deleteMatchBatchSize))
     }
     await Promise.all(
-      deleteMatchBatches.map(batch =>
-        adminClient.from('match_scores').delete().in('entry_id', batch)
+      deleteMatchBatches.map(batch => {
+        let del = adminClient.from('match_scores').delete().in('entry_id', batch)
+        if (onlyMatchId) del = del.eq('match_id', onlyMatchId)
+        return del
           .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete match_scores batch:`, error) })
-      )
+      })
     )
   }
 
@@ -479,10 +510,25 @@ async function writeScoresToDB(
       rankMap.set(curr.entry_id, isTied ? rankMap.get(prev.entry_id)! : i + 1)
     }
 
-    // Write new totals + new current_rank
+    // Write new totals + new current_rank. Skip entries whose stored values
+    // already match — every skipped UPDATE is one less WAL row for realtime
+    // to evaluate against every subscribed client, and one less pointless
+    // client refresh.
+    const changedTotals = entryTotals.filter(totals => {
+      const cur = currentTotals?.get(totals.entry_id)
+      if (!cur) return true
+      const newRank = rankMap.get(totals.entry_id) ?? null
+      return (
+        cur.match_points !== totals.match_points ||
+        cur.bonus_points !== totals.bonus_points ||
+        cur.scored_total_points !== totals.total_points ||
+        cur.current_rank !== newRank
+      )
+    })
+
     const batchSize = 50
-    for (let i = 0; i < entryTotals.length; i += batchSize) {
-      const batch = entryTotals.slice(i, i + batchSize)
+    for (let i = 0; i < changedTotals.length; i += batchSize) {
+      const batch = changedTotals.slice(i, i + batchSize)
       const updatePromises = batch.map(totals => {
         const newRank = rankMap.get(totals.entry_id) ?? null
         return adminClient
