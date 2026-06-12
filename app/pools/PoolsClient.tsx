@@ -11,6 +11,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber, formatTimeAgo } from '@/lib/format'
+import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 
 // =====================
@@ -30,6 +31,7 @@ type PoolData = {
   role: string
   total_points: number
   current_rank: number | null
+  highest_level: number
   has_submitted_predictions: boolean
   joined_at: string
   memberCount: number
@@ -171,19 +173,6 @@ function getPoolStatusText(pool: PoolData): string {
   if (pool.current_rank && pool.current_rank <= 3) return 'On the podium!'
   if (pool.current_rank) return 'Keep climbing!'
   return `${formatNumber(pool.total_points)} pts`
-}
-
-function getLevel(points: number): { level: number; name: string } {
-  if (points >= 5000) return { level: 10, name: 'Legend' }
-  if (points >= 4000) return { level: 9, name: 'Master' }
-  if (points >= 3000) return { level: 8, name: 'Expert' }
-  if (points >= 2500) return { level: 7, name: 'Strategist' }
-  if (points >= 2000) return { level: 6, name: 'Tactician' }
-  if (points >= 1500) return { level: 5, name: 'Competitor' }
-  if (points >= 1000) return { level: 4, name: 'Contender' }
-  if (points >= 500) return { level: 3, name: 'Amateur' }
-  if (points >= 100) return { level: 2, name: 'Beginner' }
-  return { level: 1, name: 'Rookie' }
 }
 
 function getModeName(mode: string): string {
@@ -694,7 +683,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Stats grid */}
                             {(() => {
-                              const level = getLevel(pool.total_points ?? 0)
+                              const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
                                 <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mb-3 overflow-hidden">
                                   {/* Points */}
@@ -841,7 +830,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Stats row */}
                             {(() => {
-                              const level = getLevel(pool.total_points ?? 0)
+                              const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
                                 <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-3 overflow-hidden">
                                   {/* Points */}

@@ -61,37 +61,59 @@ export async function detectAndPushBadgesForPool(poolId: string): Promise<void> 
   const poolName = (pool as { pool_name: string }).pool_name
   if (!tournamentId) return
 
-  // 2. All entries with their user_id via member_id join.
-  const { data: rawEntries } = await adminClient
-    .from('pool_entries')
-    .select('entry_id, entry_name, member_id, pool_members:pool_members!pool_entries_member_id_fkey(member_id, user_id)')
+  // 2. All entries with their user_id. pool_entries has NO pool_id column —
+  // entries link to pools through pool_members — so fetch members first, then
+  // entries by member_id (the same shape recalculatePool uses). The original
+  // version filtered pool_entries by pool_id directly: PostgREST rejected it
+  // on every call, and the swallowed error made this whole pipeline a silent
+  // no-op since it shipped (entry_xp_state never seeded, badge/level-up
+  // pushes never fired). Errors are checked loudly now for the same reason.
+  const { data: members, error: membersErr } = await adminClient
+    .from('pool_members')
+    .select('member_id, user_id')
     .eq('pool_id', poolId)
+  if (membersErr) {
+    console.error('[badges] failed to fetch pool_members for', poolId, membersErr.message)
+    return
+  }
+  const userByMember = new Map<string, string>(
+    ((members ?? []) as Array<{ member_id: string; user_id: string }>).map((m) => [m.member_id, m.user_id]),
+  )
+  if (userByMember.size === 0) return
+
+  const { data: rawEntries, error: entriesErr } = await adminClient
+    .from('pool_entries')
+    .select('entry_id, entry_name, member_id')
+    .in('member_id', [...userByMember.keys()])
+  if (entriesErr) {
+    console.error('[badges] failed to fetch pool_entries for', poolId, entriesErr.message)
+    return
+  }
   type EntryRow = {
     entry_id: string
     entry_name: string
     member_id: string
-    pool_members:
-      | { member_id: string; user_id: string }
-      | Array<{ member_id: string; user_id: string }>
-      | null
   }
-  const entries = (rawEntries ?? []) as unknown as EntryRow[]
+  const entries = (rawEntries ?? []) as EntryRow[]
 
   // 3. Total entries in pool (used for top_dog gating).
   const totalEntries = entries.length
 
   // 4. Matches for the tournament (for stage/group_letter lookups).
-  const { data: rawMatches } = await adminClient
+  const { data: rawMatches, error: matchesErr } = await adminClient
     .from('matches')
     .select('match_id, match_number, stage, group_letter')
     .eq('tournament_id', tournamentId)
+  if (matchesErr) {
+    console.error('[badges] failed to fetch matches for', poolId, matchesErr.message)
+    return
+  }
   const matches = (rawMatches ?? []) as MatchRow[]
 
   // 5. Process each entry. Settle in parallel; ignore individual failures.
   await Promise.allSettled(
     entries.map((e) => {
-      const pm = Array.isArray(e.pool_members) ? e.pool_members[0] : e.pool_members
-      const userId = pm?.user_id
+      const userId = userByMember.get(e.member_id)
       if (!userId) return Promise.resolve()
       return detectAndPushBadgesForEntry({
         adminClient,

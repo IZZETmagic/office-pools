@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { resolveEntryLevel } from '@/lib/entryLevel'
+import { pickBestEntry } from '@/lib/bestEntry'
 import { DashboardClient } from './DashboardClient'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
@@ -171,6 +173,23 @@ export default async function DashboardPage() {
     }
   }
 
+  // Per-entry XP level (real XP system, same as the in-pool Form tab) so cards
+  // can show the user's HIGHEST level across their entries. Batched by entry_id;
+  // entries without an entry_xp_state row default to level 1 (Rookie).
+  const xpEntryIds = (userPools ?? []).flatMap((m: any) =>
+    ((m.pool_entries || []) as any[]).map((e: any) => e.entry_id)
+  )
+  const levelByEntry = new Map<string, number>()
+  if (xpEntryIds.length > 0) {
+    const { data: xpRows } = await supabase
+      .from('entry_xp_state')
+      .select('entry_id, current_level')
+      .in('entry_id', xpEntryIds)
+    for (const row of (xpRows ?? []) as Array<{ entry_id: string; current_level: number | null }>) {
+      levelByEntry.set(row.entry_id, row.current_level ?? 1)
+    }
+  }
+
   // STEP 5: Enrich each pool with calculated points (match + bonus), member count, match counts
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
@@ -212,11 +231,10 @@ export default async function DashboardPage() {
         away_team: Array.isArray(match.away_team) ? match.away_team[0] ?? null : match.away_team,
       }))
 
-      // Get entries for this member
+      // Get entries for this member. "Best" = lowest leaderboard rank, so the
+      // card's rank, points, and form dots all describe the same entry.
       const entries = ((m as any).pool_entries || []) as any[]
-      const bestEntry = entries.length > 0
-        ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
-        : null
+      const bestEntry = pickBestEntry(entries)
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
 
@@ -303,15 +321,22 @@ export default async function DashboardPage() {
         match_points: matchPoints,
         bonus_points: bonusPoints,
         total_points: matchPoints + bonusPoints + adjustment,
-        // "Best position" across all of this user's entries in the pool.
-        // Picks the lowest non-null current_rank so a user with one entry
-        // at #4 and another at #10 sees #4, regardless of which entry has
-        // the higher point total.
-        current_rank: (() => {
-          const ranks = entries
-            .map((e: any) => e.current_rank)
-            .filter((r: number | null | undefined): r is number => r != null)
-          return ranks.length > 0 ? Math.min(...ranks) : null
+        // Best (lowest) rank across all of this user's entries — the card
+        // shows the user's best leaderboard position, and points/form above
+        // come from this same entry (bestEntry = lowest rank by construction).
+        current_rank: defaultEntry?.current_rank ?? null,
+        // Highest XP level across all of this user's entries — matches the
+        // in-pool Form tab (scored snapshot if present, else live pre-tournament
+        // submission-badge level). Defaults to 1.
+        highest_level: (() => {
+          const levels = entries.map((e: any) =>
+            resolveEntryLevel({
+              snapshotLevel: levelByEntry.get(e.entry_id) ?? null,
+              predictionCount: entryPredCounts[e.entry_id] || 0,
+              totalMatches: totalMatchesCount ?? 0,
+            })
+          )
+          return levels.length > 0 ? Math.max(...levels) : 1
         })(),
         has_submitted_predictions: anySubmitted,
         predictions_submitted_at: bestEntry?.predictions_submitted_at ?? null,

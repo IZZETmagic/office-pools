@@ -9,6 +9,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
+import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 
@@ -36,6 +37,7 @@ type PoolCardData = {
   bonus_points: number
   total_points: number
   current_rank: number | null
+  highest_level: number
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_last_saved_at: string | null
@@ -157,18 +159,6 @@ function getPoolStatusText(pool: PoolCardData): string {
   return `${formatNumber(pool.total_points)} pts`
 }
 
-function getLevel(points: number): { level: number; name: string } {
-  if (points >= 5000) return { level: 10, name: 'Legend' }
-  if (points >= 4000) return { level: 9, name: 'Master' }
-  if (points >= 3000) return { level: 8, name: 'Expert' }
-  if (points >= 2500) return { level: 7, name: 'Strategist' }
-  if (points >= 2000) return { level: 6, name: 'Tactician' }
-  if (points >= 1500) return { level: 5, name: 'Competitor' }
-  if (points >= 1000) return { level: 4, name: 'Contender' }
-  if (points >= 500) return { level: 3, name: 'Amateur' }
-  if (points >= 100) return { level: 2, name: 'Beginner' }
-  return { level: 1, name: 'Rookie' }
-}
 
 function getModeName(mode: string): string {
   switch (mode) {
@@ -397,7 +387,7 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 // =====================
 function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  const level = getLevel(pool.total_points ?? 0)
+  const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (
@@ -490,7 +480,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
 function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?: number; unreadCount: number }) {
   const deadline = formatDeadline(pool.prediction_deadline)
   const statusText = getPoolStatusText(pool)
-  const level = getLevel(pool.total_points ?? 0)
+  const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (

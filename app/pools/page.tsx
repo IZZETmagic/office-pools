@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { resolveEntryLevel } from '@/lib/entryLevel'
+import { pickBestEntry } from '@/lib/bestEntry'
 import { PoolsClient } from './PoolsClient'
 
 export default async function PoolsPage() {
@@ -80,6 +82,50 @@ export default async function PoolsPage() {
     }
   }
 
+  // Per-entry XP level (the real XP system, same as the in-pool Form tab) so
+  // cards can show the user's HIGHEST level across their entries. Batched into
+  // one query keyed by entry_id. entry_xp_state is populated during scoring;
+  // entries without a row default to level 1 (Rookie).
+  const allEntryIds = (userPools ?? []).flatMap((m: any) =>
+    ((m.pool_entries || []) as any[]).map((e: any) => e.entry_id)
+  )
+  const levelByEntry = new Map<string, number>()
+  if (allEntryIds.length > 0) {
+    const { data: xpRows } = await supabase
+      .from('entry_xp_state')
+      .select('entry_id, current_level')
+      .in('entry_id', allEntryIds)
+    for (const row of (xpRows ?? []) as Array<{ entry_id: string; current_level: number | null }>) {
+      levelByEntry.set(row.entry_id, row.current_level ?? 1)
+    }
+  }
+
+  // For entries WITHOUT a scored snapshot we compute the pre-tournament level
+  // live (submission badges), which needs each entry's prediction count and the
+  // tournament's match count. Only fetch counts for entries that need them.
+  const entriesNeedingCount = allEntryIds.filter((id: string) => !levelByEntry.has(id))
+  const predCountByEntry = new Map<string, number>()
+  if (entriesNeedingCount.length > 0) {
+    const { data: predRows } = await supabase
+      .from('predictions')
+      .select('entry_id')
+      .in('entry_id', entriesNeedingCount)
+    for (const row of (predRows ?? []) as Array<{ entry_id: string }>) {
+      predCountByEntry.set(row.entry_id, (predCountByEntry.get(row.entry_id) ?? 0) + 1)
+    }
+  }
+  const matchCountByTournament = new Map<string, number>()
+  const tournamentIds = Array.from(
+    new Set((userPools ?? []).map((m: any) => m.pools.tournament_id).filter(Boolean))
+  )
+  for (const tid of tournamentIds) {
+    const { count } = await supabase
+      .from('matches')
+      .select('*', { count: 'exact', head: true })
+      .eq('tournament_id', tid)
+    matchCountByTournament.set(tid as string, count ?? 0)
+  }
+
   // Enrich pools with member counts and stored v2 scores
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
@@ -102,9 +148,9 @@ export default async function PoolsPage() {
 
       // Get entries for this member
       const entries = ((m as any).pool_entries || []) as any[]
-      const bestEntry = entries.length > 0
-        ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
-        : null
+      // "Best" = lowest leaderboard rank, so the card's rank, points, and
+      // form dots all describe the same entry.
+      const bestEntry = pickBestEntry(entries)
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
 
@@ -167,12 +213,23 @@ export default async function PoolsPage() {
         match_points: matchPoints,
         bonus_points: bonusPoints,
         total_points: matchPoints + bonusPoints,
-        // Best (lowest) rank across all of this user's entries in the pool.
-        current_rank: (() => {
-          const ranks = entries
-            .map((e: any) => e.current_rank)
-            .filter((r: number | null | undefined): r is number => r != null)
-          return ranks.length > 0 ? Math.min(...ranks) : null
+        // Best (lowest) rank across all of this user's entries — the card
+        // shows the user's best leaderboard position, and points/form above
+        // come from this same entry (bestEntry = lowest rank by construction).
+        current_rank: defaultEntry?.current_rank ?? null,
+        // Highest XP level across all of this user's entries — matches the
+        // in-pool Form tab (scored snapshot if present, else live pre-tournament
+        // submission-badge level). Defaults to 1.
+        highest_level: (() => {
+          const totalMatches = matchCountByTournament.get(pool.tournament_id) ?? 0
+          const levels = entries.map((e: any) =>
+            resolveEntryLevel({
+              snapshotLevel: levelByEntry.get(e.entry_id) ?? null,
+              predictionCount: predCountByEntry.get(e.entry_id) ?? 0,
+              totalMatches,
+            })
+          )
+          return levels.length > 0 ? Math.max(...levels) : 1
         })(),
         has_submitted_predictions: anySubmitted,
         joined_at: m.joined_at,
