@@ -24,7 +24,7 @@ type DbRow = {
     | { full_name: string | null; username: string | null }
     | Array<{ full_name: string | null; username: string | null }>
     | null;
-  pool_entries: Array<{ entry_id: string; total_points: number | null }> | null;
+  pool_entries: Array<{ entry_id: string; scored_total_points: number | null }> | null;
 };
 
 export function useMemberRoster(poolId: string | undefined) {
@@ -40,7 +40,7 @@ export function useMemberRoster(poolId: string | undefined) {
       const { data, error: err } = await supabase
         .from('pool_members')
         .select(
-          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, total_points)',
+          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, scored_total_points)',
         )
         .eq('pool_id', poolId);
       if (err) throw err;
@@ -48,8 +48,10 @@ export function useMemberRoster(poolId: string | undefined) {
       const list: RosterMember[] = rows.map((r) => {
         const user = Array.isArray(r.users) ? r.users[0] : r.users;
         const entries = r.pool_entries ?? [];
+        // scored_total_points is the column the scorer maintains —
+        // total_points is a dead legacy column (0 for every entry)
         const bestPoints = entries.reduce(
-          (max, e) => Math.max(max, e.total_points ?? 0),
+          (max, e) => Math.max(max, e.scored_total_points ?? 0),
           0,
         );
         return {
