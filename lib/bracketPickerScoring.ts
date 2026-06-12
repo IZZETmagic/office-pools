@@ -13,7 +13,7 @@ export type MatchWithResult = Match & {
 
 export type BPScoreBreakdown = {
   groupPoints: number
-  groupDetails: { group_letter: string; team_id: string; position: number; correct: boolean; points: number }[]
+  groupDetails: { group_letter: string; team_id: string; position: number; correct: boolean; points: number; provisional: boolean }[]
   thirdPlacePoints: number
   thirdPlaceDetails: { team_id: string; group_letter: string; predicted_qualifies: boolean; actually_qualifies: boolean; correct: boolean; points: number }[]
   thirdPlaceAllCorrectBonus: number
@@ -82,6 +82,17 @@ export function calculateBracketPickerPoints(params: {
   actualThirdPlaceQualifierTeamIds: Set<string>
   completedMatches: MatchWithResult[]
   settings: SettingsData
+  /**
+   * Live provisional group scoring (kill switch: sync_settings key
+   * `bp_provisional_scoring`). When true, group ORDER points are scored
+   * against the CURRENT standings for any group with ≥1 completed match —
+   * points appear from matchday 1 and can move (up or down) until the group
+   * completes, at which point they become final and identical to the gated
+   * behavior. Third-place qualifier points and perfect-group bonuses stay
+   * gated on true completion regardless. Backout: flip the flag off and run
+   * one sweep — the gate below reverts every provisional point.
+   */
+  provisionalGroups?: boolean
 }): BPScoreBreakdown {
   const {
     groupRankings,
@@ -91,6 +102,7 @@ export function calculateBracketPickerPoints(params: {
     actualThirdPlaceQualifierTeamIds,
     completedMatches,
     settings,
+    provisionalGroups = false,
   } = params
 
   // Build a quick lookup: match_id -> completed match
@@ -121,13 +133,24 @@ export function calculateBracketPickerPoints(params: {
     }
   }
 
+  // Groups eligible for group-ORDER scoring. Default: fully completed groups
+  // only. Provisional mode adds any group with at least one completed match —
+  // groups with zero games played never score in either mode.
+  const scorableGroups = new Set(completedGroups)
+  if (provisionalGroups) {
+    for (const [letter, counts] of groupMatchCounts) {
+      if (counts.completed >= 1) scorableGroups.add(letter)
+    }
+  }
+
   const groupDetails: BPScoreBreakdown['groupDetails'] = []
 
   for (const ranking of groupRankings) {
     const { group_letter, team_id, predicted_position } = ranking
 
-    // Only score groups that are fully completed
-    if (!completedGroups.has(group_letter)) continue
+    // Score completed groups always; partially-played groups only in
+    // provisional mode (zero-game groups never score)
+    if (!scorableGroups.has(group_letter)) continue
 
     const standings = actualGroupStandings.get(group_letter)
     if (!standings) continue
@@ -146,6 +169,9 @@ export function calculateBracketPickerPoints(params: {
       position: predicted_position,
       correct,
       points,
+      // Live-scored group still in progress — points can change until the
+      // group completes
+      provisional: !completedGroups.has(group_letter),
     })
   }
 

@@ -377,6 +377,18 @@ async function calculateBracketPickerMode(
     knockoutPicks: knockoutPicksByEntry.get(e.entry_id) || [],
   }))
 
+  // Live provisional group scoring kill switch. Defaults FALSE on any read
+  // problem — failing closed reverts to the original fully-completed-groups
+  // behavior. Backout: set sync_settings.bp_provisional_scoring = false and
+  // run one sweep; the scoring gate reverts every provisional point.
+  const { data: provisionalSetting } = await adminClient
+    .from('sync_settings')
+    .select('setting_value')
+    .eq('setting_key', 'bp_provisional_scoring')
+    .maybeSingle()
+  const provisionalGroups =
+    provisionalSetting?.setting_value === true || provisionalSetting?.setting_value === 'true'
+
   const input: BracketPickerInput = {
     poolId,
     tournamentId,
@@ -385,6 +397,7 @@ async function calculateBracketPickerMode(
     teams,
     conductData: conduct,
     entries: bpEntries,
+    provisionalGroups,
   }
 
   return calculateBracketPicker(input)

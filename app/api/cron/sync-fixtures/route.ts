@@ -270,11 +270,19 @@ async function handle(request: NextRequest) {
             ? [...changedMatchIds][0]
             : undefined
 
-        const { data: pools } = await admin
+        const { data: allPools } = await admin
           .from('pools')
-          .select('pool_id')
+          .select('pool_id, prediction_mode')
           .eq('tournament_id', tournamentId)
-        if (pools) {
+        // Bracket scoring (group order / qualifiers / knockout picks) cannot
+        // change from a live in-progress scoreline — only from completed
+        // matches. Skip bracket pools on live-only sweeps; they're included
+        // whenever a match completed or a deferred sweep is catching up.
+        const liveOnlySweep = newlyCompleted.length === 0 && !sweepPending
+        const pools = (allPools ?? []).filter(
+          (p) => !liveOnlySweep || p.prediction_mode !== 'bracket_picker'
+        )
+        {
           const RECALC_BATCH_SIZE = 25
           for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
             await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {

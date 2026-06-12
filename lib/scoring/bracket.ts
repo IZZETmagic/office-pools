@@ -36,6 +36,8 @@ export type BracketPickerInput = {
   teams: TeamData[]
   conductData: ConductData[]
   entries: BPEntryWithPicks[]
+  /** Live provisional group scoring — see calculateBracketPickerPoints. */
+  provisionalGroups?: boolean
 }
 
 // ----- Helpers -----
@@ -180,6 +182,7 @@ export function calculateBracketPicker(input: BracketPickerInput): ScoringResult
       actualThirdPlaceQualifierTeamIds,
       completedMatches: bpMatches,
       settings: settings as SettingsData,
+      provisionalGroups: input.provisionalGroups,
     })
 
     // Convert breakdown to BonusScoreRows
@@ -197,7 +200,7 @@ export function calculateBracketPicker(input: BracketPickerInput): ScoringResult
         related_group_letter: d.group_letter,
         related_match_id: null,
         points_earned: d.points,
-        description: `Group ${d.group_letter} ${posLabel} position: ${correctness} predicted ${teamName}`,
+        description: `Group ${d.group_letter} ${posLabel} position: ${correctness} predicted ${teamName}${d.provisional ? ' (live — group in progress)' : ''}`,
       })
     }
 

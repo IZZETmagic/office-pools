@@ -61,6 +61,17 @@ async function handlePOST(
       return NextResponse.json({ error: 'Pool is not in bracket picker mode' }, { status: 400 })
     }
 
+    // Live provisional group scoring kill switch — mirrors recalculatePool so
+    // this preview path always agrees with the sweep-written leaderboard.
+    // Fails closed (false) if the setting is missing or unreadable.
+    const { data: provisionalSetting } = await adminClient
+      .from('sync_settings')
+      .select('setting_value')
+      .eq('setting_key', 'bp_provisional_scoring')
+      .maybeSingle()
+    const provisionalGroups =
+      provisionalSetting?.setting_value === true || provisionalSetting?.setting_value === 'true'
+
     // 4. Fetch all needed data in parallel (use adminClient to bypass RLS for cross-user reads)
     const [
       { data: matches, error: matchesErr },
@@ -313,7 +324,8 @@ async function handlePOST(
         continue
       }
 
-      // Calculate bracket picker points
+      // Calculate bracket picker points (provisionalGroups mirrors the sweep
+      // path in recalculatePool so previews match the leaderboard)
       const breakdown = calculateBracketPickerPoints({
         groupRankings,
         thirdPlaceRankings,
@@ -322,6 +334,7 @@ async function handlePOST(
         actualThirdPlaceQualifierTeamIds,
         completedMatches: allMatches,
         settings,
+        provisionalGroups,
       })
 
       // Group ranking details — include all positions (correct and incorrect)
