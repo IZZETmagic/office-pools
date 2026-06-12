@@ -28,6 +28,7 @@ type LeaderboardTabProps = {
   allBPGroupRankings?: BPGroupRanking[]
   allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
   allBPKnockoutPicks?: BPKnockoutPick[]
+  bpProvisionalScoring?: boolean
 }
 
 // =============================================
@@ -64,6 +65,7 @@ export function LeaderboardTab({
   allBPGroupRankings = [],
   allBPThirdPlaceRankings = [],
   allBPKnockoutPicks = [],
+  bpProvisionalScoring = false,
 }: LeaderboardTabProps) {
   const isMultiEntry = maxEntriesPerUser > 1
 
@@ -256,6 +258,7 @@ export function LeaderboardTab({
         actualThirdPlaceQualifierTeamIds,
         completedMatches: bpMatches,
         settings: poolSettings as any,
+        provisionalGroups: bpProvisionalScoring,
       })
 
       // Convert breakdown to BonusScoreData[] (same format the API stores)
@@ -383,7 +386,7 @@ export function LeaderboardTab({
     }
 
     return map
-  }, [predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, matches, tournamentTeams, conductData, poolSettings])
+  }, [predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, matches, tournamentTeams, conductData, poolSettings, bpProvisionalScoring])
 
   // Compute bracket picker accuracy stats per entry
   const bpStatsMap = useMemo(() => {

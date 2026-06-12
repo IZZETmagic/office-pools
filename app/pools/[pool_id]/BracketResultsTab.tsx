@@ -61,6 +61,7 @@ type BracketResultsTabProps = {
   allBPGroupRankings: BPGroupRanking[]
   allBPThirdPlaceRankings: BPThirdPlaceRanking[]
   allBPKnockoutPicks: BPKnockoutPick[]
+  bpProvisionalScoring?: boolean
 }
 
 // =============================================
@@ -795,6 +796,7 @@ export function BracketResultsTab({
   allBPGroupRankings,
   allBPThirdPlaceRankings,
   allBPKnockoutPicks,
+  bpProvisionalScoring = false,
 }: BracketResultsTabProps) {
   const [selectedEntryId, setSelectedEntryId] = useState(currentEntryId)
   const showEntrySelector = userEntries.length > 1
@@ -997,6 +999,7 @@ export function BracketResultsTab({
       actualThirdPlaceQualifierTeamIds: actualThirdQualifierIds,
       completedMatches,
       settings,
+      provisionalGroups: bpProvisionalScoring,
     })
 
     // Sum groupDetails by group_letter
@@ -1010,7 +1013,7 @@ export function BracketResultsTab({
         ? breakdown.thirdPlacePoints + breakdown.thirdPlaceAllCorrectBonus
         : null,
     }
-  }, [hasAnyCompletedGroupMatch, groupRankings, thirdPlaceRankings, knockoutPicks, matches, actualGroupStandings, actualRankedThirds, settings])
+  }, [hasAnyCompletedGroupMatch, groupRankings, thirdPlaceRankings, knockoutPicks, matches, actualGroupStandings, actualRankedThirds, settings, bpProvisionalScoring])
 
   // If no predictions submitted
   if (!isSubmitted && groupRankings.length === 0) {

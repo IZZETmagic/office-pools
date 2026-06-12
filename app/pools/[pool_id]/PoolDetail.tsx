@@ -127,6 +127,9 @@ type PoolDetailProps = {
   allBPGroupRankings?: BPGroupRanking[]
   allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
   allBPKnockoutPicks?: BPKnockoutPick[]
+  /** Live provisional bracket group scoring flag (sync_settings) — keeps
+   * client-side bracket score computations consistent with stored totals. */
+  bpProvisionalScoring?: boolean
 }
 
 // =====================
@@ -158,6 +161,7 @@ export function PoolDetail({
   bpThirdPlaceRankings = [],
   bpKnockoutPicks = [],
   bpEntryProgressMap: initialBPEntryProgressMap = {},
+  bpProvisionalScoring = false,
   allBPGroupRankings = [],
   allBPThirdPlaceRankings = [],
   allBPKnockoutPicks = [],
@@ -1263,6 +1267,7 @@ export function PoolDetail({
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
+                bpProvisionalScoring={bpProvisionalScoring}
               />
             )}
 
@@ -1604,6 +1609,7 @@ export function PoolDetail({
                 allBPGroupRankings={allBPGroupRankings}
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
+                bpProvisionalScoring={bpProvisionalScoring}
               />
             )}
 

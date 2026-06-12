@@ -343,9 +343,21 @@ export default async function PoolPage({
 
   const psoEnabled = settings?.pso_enabled ?? true
 
+  // Live provisional bracket scoring kill switch — client-side bracket score
+  // computations (LeaderboardTab, BracketResultsTab) must agree with the
+  // sweep-written totals on the cards. Fails closed (false) when unreadable.
+  const { data: bpProvisionalRow } = await adminClient
+    .from('sync_settings')
+    .select('setting_value')
+    .eq('setting_key', 'bp_provisional_scoring')
+    .maybeSingle()
+  const bpProvisionalScoring =
+    bpProvisionalRow?.setting_value === true || bpProvisionalRow?.setting_value === 'true'
+
   return (
     <PoolDetail
       pool={pool}
+      bpProvisionalScoring={bpProvisionalScoring}
       members={members}
       matches={matches}
       settings={settings}
