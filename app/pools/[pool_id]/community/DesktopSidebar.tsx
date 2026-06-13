@@ -5,6 +5,17 @@ import { Card } from '@/components/ui/Card'
 import type { MemberData, MatchData, PredictionData } from '../types'
 import type { MemberWithLevel, SystemEvent } from './types'
 import { getInitials, getLevelPillClasses, getRankTitle, formatMessageTime } from './helpers'
+import { LocalTime } from '@/components/LocalTime'
+
+// "Tomorrow" when the kickoff falls on the viewer's next local calendar day,
+// otherwise a short local date. Runs client-side (via LocalTime) so it reflects
+// the viewer's timezone.
+function matchDayLabel(d: Date): string {
+  const now = new Date()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const isTomorrow = d.getDate() === tomorrow.getDate() && d.getMonth() === tomorrow.getMonth()
+  return isTomorrow ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 type OnlineUser = {
   user_id: string
@@ -339,19 +350,14 @@ function MatchdayPulseSection({
           {upcomingMatches.map(match => {
             const homeName = match.home_team?.country_code ?? match.home_team_placeholder ?? '???'
             const awayName = match.away_team?.country_code ?? match.away_team_placeholder ?? '???'
-            const matchDate = new Date(match.match_date)
-            const now = new Date()
-            const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-            const isTomorrow = matchDate.getDate() === tomorrow.getDate() && matchDate.getMonth() === tomorrow.getMonth()
-            const dateLabel = isTomorrow ? 'Tomorrow' : matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
             return (
               <div key={match.match_id} className="flex items-center justify-between py-1">
                 <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
                   {homeName} vs {awayName}
                 </span>
-                <span className="text-[10px] font-medium text-primary-600 dark:text-primary-400" suppressHydrationWarning>
-                  {dateLabel}
+                <span className="text-[10px] font-medium text-primary-600 dark:text-primary-400">
+                  <LocalTime iso={match.match_date} format={matchDayLabel} />
                 </span>
               </div>
             )

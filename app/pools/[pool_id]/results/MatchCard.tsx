@@ -3,6 +3,7 @@
 import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
+import { LocalTime } from '@/components/LocalTime'
 import type { MatchScoreData } from '../types'
 
 // =============================================
@@ -50,8 +51,7 @@ function getStageLabel(stage: string, groupLetter: string | null): string {
   return STAGE_LABELS[stage] || stage
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
+function formatDate(d: Date): string {
   const month = d.toLocaleString('en-US', { month: 'short' })
   const day = d.getDate()
   const hour = d.getHours()
@@ -294,8 +294,8 @@ export function MatchCard({
             <span className="italic">No prediction</span>
           ) : null}
         </div>
-        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2" suppressHydrationWarning>
-          {formatDate(match.match_date)}
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2">
+          <LocalTime iso={match.match_date} format={formatDate} />
         </span>
       </div>
     </div>
