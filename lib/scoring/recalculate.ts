@@ -316,6 +316,38 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
 
 // ----- Bracket picker data fetching -----
 
+// Fetch every row of a per-entry table across all entries, paginating
+// past PostgREST's 1000-row response cap. Ordered by (entry_id, id) so
+// page boundaries are deterministic under concurrent writes.
+async function fetchAllByEntry(
+  adminClient: any,
+  table: string,
+  entryIds: string[],
+): Promise<any[]> {
+  if (entryIds.length === 0) return []
+  const out: any[] = []
+  const pageSize = 1000
+  let offset = 0
+  for (;;) {
+    const { data: page, error } = await adminClient
+      .from(table)
+      .select('*')
+      .in('entry_id', entryIds)
+      .order('entry_id', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+    if (error) {
+      console.error(`[scoring] Failed to fetch ${table} page at offset ${offset}:`, error)
+      break
+    }
+    if (!page || page.length === 0) break
+    out.push(...page)
+    if (page.length < pageSize) break
+    offset += page.length
+  }
+  return out
+}
+
 async function calculateBracketPickerMode(
   adminClient: any,
   poolId: string,
@@ -328,23 +360,18 @@ async function calculateBracketPickerMode(
 ): Promise<ScoringResult> {
   const entryIds = submittedEntries.map((e: any) => e.entry_id)
 
-  const [
-    { data: allGroupRankings },
-    { data: allThirdPlaceRankings },
-    { data: allKnockoutPicks },
-  ] = await Promise.all([
-    adminClient
-      .from('bracket_picker_group_rankings')
-      .select('*')
-      .in('entry_id', entryIds),
-    adminClient
-      .from('bracket_picker_third_place_rankings')
-      .select('*')
-      .in('entry_id', entryIds),
-    adminClient
-      .from('bracket_picker_knockout_picks')
-      .select('*')
-      .in('entry_id', entryIds),
+  // Paginate every per-entry fetch. A single bracket entry carries ~48
+  // group-ranking rows (plus third-place and knockout rows), so any pool
+  // past ~20 entries blows through PostgREST's 1000-row response cap. An
+  // unpaginated .in() silently returned only the first page, leaving every
+  // entry beyond the cap with no predictions — scored as if they'd
+  // predicted nothing (the June 12 bracket zero-points incident: large
+  // pools scored only their first ~20 entries). Stable ORDER BY so page
+  // seams are deterministic; mirrors the predictions fetch above.
+  const [allGroupRankings, allThirdPlaceRankings, allKnockoutPicks] = await Promise.all([
+    fetchAllByEntry(adminClient, 'bracket_picker_group_rankings', entryIds),
+    fetchAllByEntry(adminClient, 'bracket_picker_third_place_rankings', entryIds),
+    fetchAllByEntry(adminClient, 'bracket_picker_knockout_picks', entryIds),
   ])
 
   // Group by entry
