@@ -184,18 +184,17 @@ function KnockoutMatchCard({
   // PSO validation: scores can't be tied
   const psoTied = prediction?.homePso != null && prediction?.awayPso != null && prediction.homePso === prediction.awayPso
 
-  // Format date/time in AST (UTC-4)
+  // Render in the viewer's own timezone (match_date is a UTC instant). The
+  // zone abbreviation is shown so a user always knows which clock they're on.
   const matchDate = new Date(match.match_date)
   const dateStr = matchDate.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
-    timeZone: 'Atlantic/Bermuda',
   })
   const timeStr = matchDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'Atlantic/Bermuda',
     timeZoneName: 'short',
   })
 
