@@ -251,14 +251,16 @@ export function computeBonusXP(
       actualResult === 'home' ? cm.homeWinPct
         : actualResult === 'draw' ? cm.drawPct
           : cm.awayWinPct
-    if (resultPct < 25) {
+    // crowd pcts are 0–1 fractions, so the threshold is 0.25 (was 25, which
+    // made this always true → Upset Caller fired on every exact score)
+    if (resultPct < 0.25) {
       events.push({
         type: 'upset_caller',
         label: 'Upset Caller',
         emoji: '🤯',
         xp: 40,
         matchNumber: pr.matchNumber,
-        detail: `Exact score on an upset (only ${Math.round(resultPct)}% predicted this result)`,
+        detail: `Exact score on an upset (only ${Math.round(resultPct * 100)}% predicted this result)`,
       })
     }
   }
@@ -409,11 +411,14 @@ export function computeEarnedBadges(
       actualResult === 'home' ? cm.homeWinPct
         : actualResult === 'draw' ? cm.drawPct
           : cm.awayWinPct
-    if (resultPct < 25) {
+    // crowd pcts are 0–1 fractions, so the threshold is 0.25 (was 25, which
+    // made this always true → Dark Horse awarded to ~everyone)
+    if (resultPct < 0.25) {
       const badge = BADGE_DEFINITIONS.find(b => b.id === 'dark_horse')!
       earned.push({ ...badge, earnedAt: pr.matchNumber })
       break // only award once
     }
+
   }
 
   // 🧊 Ice Breaker — end a cold streak of 5+ misses
