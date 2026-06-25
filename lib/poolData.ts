@@ -91,6 +91,7 @@ export type PoolSharedData = {
 export async function fetchAllPages<T>(
   label: string,
   run: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  throwOnError = false,
 ): Promise<T[]> {
   const out: T[] = []
   const pageSize = 1000
@@ -98,14 +99,16 @@ export async function fetchAllPages<T>(
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data: page, error } = await run(offset, offset + pageSize - 1)
-    // Match the EXISTING page.tsx behaviour exactly: log and stop on error,
-    // returning what we have (today renders partial rather than erroring). This
-    // keeps this caching change provably zero-behaviour. NOTE for the cache
-    // flip (Phase 1b/enable): before turning the cache ON, harden this so a
-    // partial/errored result is NOT cached for the TTL (e.g. throw so
-    // unstable_cache skips caching). Tracked in SCALE_PLAN.
     if (error) {
       console.error(`[poolData] ${label} page@${offset} error:`, error.message)
+      // throwOnError=true for CACHED fetches (getPoolDataUncached): throwing
+      // means unstable_cache never stores a partial/errored result for the TTL
+      // — the request just retries. throwOnError=false (default) preserves the
+      // prior swallow-and-return-partial behaviour for uncached per-viewer
+      // callers (page.tsx / bracket-analytics), which render partial today.
+      if (throwOnError) {
+        throw new Error(`getPoolData ${label} failed at offset ${offset}: ${error.message}`)
+      }
       break
     }
     if (!page || page.length === 0) break
@@ -116,7 +119,7 @@ export async function fetchAllPages<T>(
   return out
 }
 
-export async function getPoolDataUncached(poolId: string): Promise<PoolSharedData> {
+export async function getPoolDataUncached(poolId: string, throwOnFetchError = false): Promise<PoolSharedData> {
   const admin = createAdminClient()
 
   // Pool, members(+users+entries), settings, teams — small, pool-wide.
@@ -188,7 +191,8 @@ export async function getPoolDataUncached(poolId: string): Promise<PoolSharedDat
           .in('match_id', matchIds)
           .order('match_id', { ascending: true })
           .range(from, to),
-      )
+      throwOnFetchError,
+    )
     : []
 
   // The heavy, per-pool, all-entries pulls — all paginated, all admin client.
@@ -202,7 +206,8 @@ export async function getPoolDataUncached(poolId: string): Promise<PoolSharedDat
             .order('entry_id', { ascending: true })
             .order('bonus_id', { ascending: true })
             .range(from, to),
-        )
+        throwOnFetchError,
+      )
       : Promise.resolve([]),
     fetchAllPages<MatchScoreData>('match_scores', (from, to) =>
       admin
@@ -212,6 +217,7 @@ export async function getPoolDataUncached(poolId: string): Promise<PoolSharedDat
         .order('entry_id', { ascending: true })
         .order('match_id', { ascending: true })
         .range(from, to),
+    throwOnFetchError,
     ),
     allEntryIds.length
       ? fetchAllPages<PredictionData>('predictions', (from, to) =>
@@ -222,7 +228,8 @@ export async function getPoolDataUncached(poolId: string): Promise<PoolSharedDat
             .order('entry_id', { ascending: true })
             .order('match_id', { ascending: true })
             .range(from, to),
-        )
+        throwOnFetchError,
+      )
       : Promise.resolve([]),
   ])
 
@@ -250,7 +257,10 @@ export async function getPoolDataUncached(poolId: string): Promise<PoolSharedDat
 // calls revalidateTag(`pool-data-${poolId}`) to refresh on score change.
 export function getPoolDataCached(poolId: string): Promise<PoolSharedData> {
   return unstable_cache(
-    () => getPoolDataUncached(poolId),
+    // throwOnFetchError=true: never cache a partial/errored result (a thrown
+    // error isn't cached — the request just retries). The uncached fallback
+    // path keeps the prior swallow-partial behaviour (default false).
+    () => getPoolDataUncached(poolId, true),
     ['pool-shared-data', poolId],
     { tags: [poolCacheTag(poolId)], revalidate: POOL_CACHE_TTL_SECONDS },
   )()
