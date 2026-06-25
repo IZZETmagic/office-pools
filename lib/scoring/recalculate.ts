@@ -13,6 +13,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fanOutResultPushes } from '@/lib/push/match-results'
 import { detectAndPushBadgesForPool } from '@/lib/push/badges'
+import { invalidatePoolCache } from '@/lib/poolData'
 import type {
   ScoringResult,
   MatchScoreRow,
@@ -291,6 +292,11 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     void detectAndPushBadgesForPool(poolId).catch((err) =>
       console.error(`[scoring] badge fan-out failed for pool ${poolId}:`, err),
     )
+
+    // Refresh this pool's cached leaderboard now that its scores changed
+    // (SCALE_PLAN Phase 1b). Safe no-op when caching is off / outside a request
+    // context; can never affect scoring (see invalidatePoolCache).
+    invalidatePoolCache(poolId)
 
     return {
       success: true,
