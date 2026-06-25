@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PoolDetail } from './PoolDetail'
-import { getPoolData } from '@/lib/poolData'
+import { getPoolData, fetchAllPages } from '@/lib/poolData'
 import type {
   ExistingPrediction,
   PoolRoundState,
@@ -136,14 +136,19 @@ export default async function PoolPage({
       bpKnockoutPicks = (kpRes.data ?? []) as BPKnockoutPick[]
     }
     if (allEntryIds.length > 0) {
-      const [grAllRes, tpAllRes, kpAllRes] = await Promise.all([
-        supabase.from('bracket_picker_group_rankings').select('*').in('entry_id', allEntryIds),
-        supabase.from('bracket_picker_third_place_rankings').select('*').in('entry_id', allEntryIds),
-        supabase.from('bracket_picker_knockout_picks').select('*').in('entry_id', allEntryIds),
+      // PAGINATED — large bracket pools exceed PostgREST's 1000-row cap, which
+      // truncated this fetch and gave ADMIN viewers (who can read all entries)
+      // wrong provisional standings. Non-admins are RLS-scoped to their own
+      // picks (well under 1000), so they are unaffected. Stored/official scores
+      // were already correct (the sweep paginates); this fixes the live overlay.
+      ;[allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks] = await Promise.all([
+        fetchAllPages<BPGroupRanking>('bp_group_all', (from, to) =>
+          supabase.from('bracket_picker_group_rankings').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
+        fetchAllPages<BPThirdPlaceRanking>('bp_third_all', (from, to) =>
+          supabase.from('bracket_picker_third_place_rankings').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
+        fetchAllPages<BPKnockoutPick>('bp_knockout_all', (from, to) =>
+          supabase.from('bracket_picker_knockout_picks').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
       ])
-      allBPGroupRankings = (grAllRes.data ?? []) as BPGroupRanking[]
-      allBPThirdPlaceRankings = (tpAllRes.data ?? []) as BPThirdPlaceRanking[]
-      allBPKnockoutPicks = (kpAllRes.data ?? []) as BPKnockoutPick[]
       for (const row of [...allBPGroupRankings, ...allBPThirdPlaceRankings, ...allBPKnockoutPicks]) {
         if (userEntryIds.includes(row.entry_id)) {
           bpEntryProgressMap[row.entry_id] = (bpEntryProgressMap[row.entry_id] || 0) + 1

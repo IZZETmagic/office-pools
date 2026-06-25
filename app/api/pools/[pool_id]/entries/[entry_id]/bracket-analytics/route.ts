@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllPages } from '@/lib/poolData'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, TeamData, MatchData } from '@/app/pools/[pool_id]/types'
@@ -337,14 +338,15 @@ async function handleGET(
     if (submittedEntryIds.size >= 2) {
       const allEntryIds = [...submittedEntryIds]
 
-      const [
-        { data: allGroupRankings },
-        { data: allThirdPlaceRankings },
-        { data: allKnockoutPicks },
-      ] = await Promise.all([
-        adminClient.from('bracket_picker_group_rankings').select('*').in('entry_id', allEntryIds),
-        adminClient.from('bracket_picker_third_place_rankings').select('*').in('entry_id', allEntryIds),
-        adminClient.from('bracket_picker_knockout_picks').select('*').in('entry_id', allEntryIds),
+      // Paginated — large bracket pools exceed PostgREST's 1000-row cap; the
+      // old unpaginated .in() truncated the pool comparison data.
+      const [allGroupRankings, allThirdPlaceRankings, allKnockoutPicks] = await Promise.all([
+        fetchAllPages<BPGroupRanking>('bp_group_all', (from, to) =>
+          adminClient.from('bracket_picker_group_rankings').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
+        fetchAllPages<BPThirdPlaceRanking>('bp_third_all', (from, to) =>
+          adminClient.from('bracket_picker_third_place_rankings').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
+        fetchAllPages<BPKnockoutPick>('bp_knockout_all', (from, to) =>
+          adminClient.from('bracket_picker_knockout_picks').select('*').in('entry_id', allEntryIds).order('entry_id', { ascending: true }).range(from, to)),
       ])
 
       const rankedThirds = completedStandingsMap.size >= 12

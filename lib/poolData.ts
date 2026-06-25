@@ -88,7 +88,7 @@ export type PoolSharedData = {
 // preserve exactly what each member sees today.
 
 // Paginate any select to defeat PostgREST's 1000-row silent cap.
-async function fetchAllPages<T>(
+export async function fetchAllPages<T>(
   label: string,
   run: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
 ): Promise<T[]> {
