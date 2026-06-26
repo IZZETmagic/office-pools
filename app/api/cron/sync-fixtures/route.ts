@@ -14,6 +14,7 @@ import {
 } from '@/lib/integrations/apiFootball/mappers'
 import type { ApiFootballFixture } from '@/lib/integrations/apiFootball/types'
 import { recalculatePool } from '@/lib/scoring/recalculate'
+import { snapshotPoolRanks } from '@/lib/scoring/snapshotRanks'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,12 @@ async function handle(request: NextRequest) {
     return finishRun(admin, { startedAt, errors, triggeredBy })
   }
 
+  // Pre-run live state, from the DB snapshot above (before this run's updates).
+  // Used to detect the start of a new matchday for the rank snapshot below —
+  // the automated equivalent of MatchesTab's "no other match currently live"
+  // guard on the manual set-match-live path.
+  const someMatchAlreadyLive = (ourMatches || []).some((m) => m.status === 'live')
+
   const candidates = (ourMatches || []).filter((m) => {
     const t = new Date(m.match_date).getTime()
     return t - LIVE_WINDOW_BEFORE_MS <= now && now <= t + LIVE_WINDOW_AFTER_MS
@@ -127,6 +134,7 @@ async function handle(request: NextRequest) {
   const newlyCompleted: Array<{ match_id: string; stage: string }> = []
   let scoresChanged = false  // any FT or PSO score moved this run → triggers live leaderboard recalc
   const changedMatchIds = new Set<string>()  // which matches' scores moved (drives the per-match recalc hint)
+  let anyNewlyLive = false  // a match transitioned scheduled→live this run (drives the rank snapshot)
 
   // Process candidates that have a corresponding fixture today
   for (const ours of candidates) {
@@ -156,6 +164,10 @@ async function handle(request: NextRequest) {
     const update = fixtureToMatchUpdate(fixture, ours as OurMatchRow, { now: nowIso, teamIdByExternal })
     const wasCompleted = !!ours.is_completed
     const becomesCompleted = isFinalStatus(fixture.fixture.status.short)
+    // Detect a scheduled→live transition (kickoff) for the matchday rank snapshot.
+    if (ours.status !== 'live' && isLiveStatus(fixture.fixture.status.short)) {
+      anyNewlyLive = true
+    }
 
     if (update) {
       const { error: updErr } = await admin
@@ -225,6 +237,27 @@ async function handle(request: NextRequest) {
       } catch (e) {
         errors.push({ stage: 'advance_teams', message: errMsg(e), details: { match_id: m.match_id } })
       }
+    }
+  }
+
+  // Rank snapshot — automated parity with the manual "set match live" path
+  // (MatchesTab → /api/pools/snapshot-ranks). When a new matchday's first match
+  // goes live and nothing was live before this run, snapshot current_rank →
+  // previous_rank so the leaderboard movement (▲/▼) arrows measure per-matchday
+  // movement. MUST run before the recalc below, so the baseline is the rank as
+  // it stood at the end of the previous matchday, not after this run's recalc
+  // moves it. Wrapped so a failure can never break the sync or the sweep.
+  if (anyNewlyLive && !someMatchAlreadyLive) {
+    try {
+      const { data: snapPools } = await admin
+        .from('pools')
+        .select('pool_id')
+        .eq('tournament_id', tournamentId)
+      const snapPoolIds = (snapPools ?? []).map((p) => p.pool_id)
+      const snapped = await snapshotPoolRanks(admin, snapPoolIds)
+      console.log(`[sync-fixtures] rank snapshot: ${snapped} entries across ${snapPoolIds.length} pools`)
+    } catch (e) {
+      errors.push({ stage: 'snapshot_ranks', message: errMsg(e) })
     }
   }
 
