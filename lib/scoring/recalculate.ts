@@ -482,7 +482,10 @@ async function writeScoresToDB(
     }
     await Promise.all(
       deleteMatchBatches.map(batch => {
-        let del = adminClient.from('match_scores').delete().in('entry_id', batch)
+        // T-0018 / D-014: scope delete by pool_id. Prevents a future schema evolution
+        // (entry_id reuse, join-table refactor) from turning a single-pool recalc into
+        // a cross-pool match_scores wipe. Same scoping for bonus_scores deferred post-WC.
+        let del = adminClient.from('match_scores').delete().eq('pool_id', poolId).in('entry_id', batch)
         if (onlyMatchId) del = del.eq('match_id', onlyMatchId)
         return del
           .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete match_scores batch:`, error) })
