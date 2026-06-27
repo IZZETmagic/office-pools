@@ -211,6 +211,28 @@ Most of this is **already built** (`entry_xp_state` backfilled 4,872/4,872; cron
   (cache wrapper stays; only the query inside changes — minimal rework, as promised).
 - ☐ **3.5** Apply the analytics-cron hardening already drafted (`drafts/2026-06-20_analytics_cron_hardening.sql`)
   before relying on the cron for freshness.
+- ☐ **3.6** **Leaderboard as a single RPC (the efficient-API change)** — replace the multi-query + paginate +
+  client-compute pattern with ONE Postgres function returning the finished, column-scoped leaderboard.
+  Grounded in Supabase docs reviewed 2026-06-25 (Database Functions, Views/Materialized Views, RLS perf):
+  - **Use an RPC (database function), not a materialized view.** A function "resolves to a single SQL
+    statement," called via `supabase.rpc('get_pool_leaderboard', { p_pool_id })`. We deliberately do NOT use a
+    materialized view: the docs warn an MV "is not a solution to inefficient queries" and needs manual
+    `refresh` (staleness). Our precompute is already event-driven (the sweep writes `entry_xp_state` /
+    `pool_entries` on score change) — that's a *better* materialization than a periodically-refreshed MV. The
+    RPC just **reads the already-stored values + does the final ordering/assembly** — it does NOT recompute.
+  - **Shape:** `create function get_pool_leaderboard(p_pool_id uuid) returns table(... only the columns the
+    leaderboard renders ...) language sql stable`. One request replaces ~16 paginated prediction pulls + the
+    separate match_scores/bonus/members round-trips, and ships only needed columns (cuts egress + bytes).
+  - **Perf per the docs:** filter by `p_pool_id` (don't rely on implicit RLS), ensure indexes exist on the
+    join/filter columns (pool_members.pool_id, pool_entries.member_id, entry_xp_state.entry_id), minimize joins
+    / prefer `IN`/`ANY` over joins where possible.
+  - **Security:** an RPC can bypass RLS (`security definer`). We call it **server-side with the service role**
+    and the page already enforces the membership check, so access control stays at the page layer — acceptable
+    and deliberate. Do NOT expose a security-definer variant in an exposed schema for anon/authenticated.
+  - **Caching composes:** the cached `getPoolData` calls this RPC (one tiny cached call per pool) — Layer 2 +
+    this = small payload, cached, fetched rarely. Knocks out inefficiencies #1–#4 from the API-efficiency review
+    (raw-row pulls, pagination, SELECT *, multi-round-trip) in one change.
+  - Bracket pools: the per-viewer `allBP*` stays separate (RLS is per-viewer) — the RPC covers the shared path.
 
 **Supabase traps:** #1 (the small reads are <1000/pool but verify), #8 (numeric rounding parity), #5 (cron lock).
 
@@ -289,6 +311,34 @@ until Phase 3 parity is proven and you sign off.** Every phase leaves the previo
 
 ---
 
+## 6b. Scalability requirements (design to 10×+, not just today's load)
+
+Target horizon: multi-sport / EPL / Showdown (ROADMAP) → assume 10–100× current pools & users.
+**Core invariant:** cost must scale with *changes*, not *viewers* or *pools-viewed*. Hold the CLAUDE.md
+principle absolutely — compute once (sweep) → store → read (RPC) → cache. No per-view compute, ever.
+
+**Read side — scales (handled by this plan):**
+- Caching decouples DB read load from viewer count (N viewers of a pool → 1 shared copy).
+- Read-model RPC (3.6) = one small, indexed, column-scoped read per pool view, independent of pool size.
+- Ceiling: Vercel cache/transfer — high headroom, not a near-term limit.
+
+**Write side — the REAL frontier (NOT solved by caching; next investment):**
+- **Sweep fan-out:** one score change rescoring every affected pool. Fine at ~450; the ceiling at thousands.
+  Make recompute **targeted** (only the entries/matches the result changed, not whole pools), **bounded +
+  batched** (watermark + per-run cap + lock — started in the analytics cron), and **queue-based** if needed.
+- **Invalidation fan-out / thundering herd:** a goal invalidates many pools → mass RPC re-populate as viewers
+  return. RPC is cheap; monitor and consider staggered/lazy invalidation at scale.
+
+**Realtime — frontier:** connection count + WAL-decode CPU grow with concurrent users (already ~58 CPU-hrs).
+Layer 3 (narrow/debounce/cap subscriptions) is the scaling work; consider fewer broadcast channels.
+
+**Connections:** serverless must use the Supabase pooler (Supavisor, transaction mode), not direct — verify.
+
+**Multi-competition:** the data-model abstraction (ROADMAP backlog) is required to scale across sports/seasons.
+
+**Gate:** load-test at **target** scale (simulate 10× pools/viewers + match-rate score changes) before
+committing to a compute tier. Do NOT extrapolate a tier decision from calm-window readings.
+
 ## 7. Decisions log (append as we go)
 
 - 2026-06-25 — Root cause confirmed via pg_stat_statements (predictions pull = 6.7M calls / ~89 hrs CPU).
@@ -326,6 +376,54 @@ until Phase 3 parity is proven and you sign off.** Every phase leaves the previo
   DEFERRED correctness items (separate, Ryan-timed — they CHANGE visible standings, so not bundled): (a) bracket
   all-entries 1000-row truncation for ADMIN viewers of ~13 large pools; (b) the pre-existing quirk that non-admin
   bracket viewers see provisional scoring only for their own entry, stored for others.
+- 2026-06-25 — **Bracket truncation FIXED (commit d21146a).** Both read-path all-entries bracket fetches
+  (leaderboard page.tsx + mobile bracket-analytics route) now paginate via exported `fetchAllPages`. Investigation
+  confirmed: STORED/official scores were already correct (authoritative `recalculatePool` paginates; the admin
+  `calculate` route's unpaginated intermediate calc is harmless — overwritten by `recalculatePool` at its end,
+  so NOT fixed/touched). Audited PASS. Visible change: ONLY admin viewers of ~13 >1000-row pools (standings
+  self-correct); non-admins + small pools unchanged. STILL OPEN (the "quirk", needs decision): non-admin bracket
+  viewers see client-provisional scoring only for their OWN entry (RLS) and stored for others — durable fix is to
+  compute provisional bracket scoring SERVER-SIDE in the sweep + store it (then everyone reads the same value AND
+  it becomes cacheable). Bigger change, Ryan-timed.
+- 2026-06-25 14:34 UTC — **CACHE FLIPPED ON in production** (`pool_cache_enabled=true`). Deploys live:
+  caching foundation + 1b invalidation + truncation fix + partial-cache hardening (commits 0559354, d21146a,
+  b263ba6 on master). Verified in calm window: the heavy leaderboard predictions pull (39.6ms query, the #1
+  pre-cache DB cost at 231,972s) has stayed **FLAT** since the flip across ~11 manual loads + live traffic —
+  cache is absorbing leaderboard loads. Pick'em pools (Road to Glory, Net Asset Value) render correctly with
+  cache on. Measurement caveat: global pg_stat counter is confounded by live traffic so per-click isolation
+  isn't clean; the flat heavy-query trend + correct rendering is the signal. STILL TO DO: live-eyeball one
+  bracket + one progressive pool (cover all 3 modes); then the real test is the heavy-pull rate staying flat
+  during tonight's matches. Instant off-switch: set pool_cache_enabled=false (no deploy). Baseline for match
+  comparison: heavy pull (39.6ms variant) = 5,858,858 calls at flip time.
+- 2026-06-25 ~16:11 UTC — **Cache flip VERIFIED across all 3 modes (calm window).** Pick'em (Road to Glory,
+  Net Asset Value) + Progressive (Football Daddies): clean **0 heavy-pull delta** on repeated refreshes +
+  correct render. Bracket (Ryan's 4-entry pool): correct render (counter inconclusive for bracket — fast/empty
+  predictions query excluded by filter + match_scores counter confounded by concurrent traffic; mechanism
+  proven via identical getPoolData code path). Heavy leaderboard predictions pull (39.6ms variant) has stayed
+  FLAT (~7,486,303) for >1.5h since flip. No visual regressions reported. Caching staying ON.
+  **NEXT = the real test: tonight's matches** — monitor heavy-pull + match_scores RATE vs pre-cache history
+  (unconfounded under load). If it holds + DB CPU comfortable → Phase 2 (drop XL→Medium). Off-switch:
+  pool_cache_enabled=false (instant, no deploy).
+- 2026-06-25 20:16 UTC — **CACHE FLIPPED OFF mid-match (pool_cache_enabled=false) — real regression found.**
+  Through 3 goals + growing crowd the heavy predictions pull stayed FLAT at 0 (load protection PROVEN). BUT:
+  live in-progress match scores were STALE in the UI (showed 0-0 while DB had Ecuador 1-1 `live`, updated 32s
+  prior). ROOT CAUSE: the fast-changing `matches` live-score data is bundled into the cached `getPoolData`
+  blob, and our invalidation only fires on FINAL scoring (recalculatePool), not on live-score ticks (sync-
+  fixtures) — so live scores went stale up to TTL (or longer). Standings/points were NEVER wrong (final
+  scoring invalidates correctly) — display-only regression. Off-switch worked instantly; back to stable XL
+  status quo. **FIX (before re-enabling): separate fast-changing data from the cache** — keep static
+  predictions/bonus cached, but fetch live `matches` scores fresh (uncached or very-short-TTL) per request,
+  since invalidating-on-every-tick would just restore the load. Then re-verify + re-enable in a calm window.
+  Lesson: only cache data that changes at the rate you can afford to invalidate; live scores ≠ static picks.
+- 2026-06-26 ~02:01 UTC — **CACHE IS ON in production again** (`pool_cache_enabled=true`) — reconciling the
+  log with reality: the previous entry left it OFF, but prod now reads `true`. The stale-live-score fix
+  (separate fast-changing `matches` scores out of the cached `getPoolData` blob) is **still NOT in the code**
+  — `matches` remains bundled in `getPoolDataUncached` and invalidation only fires on final scoring
+  (`recalculatePool`), not on live ticks (`sync-fixtures`). Surfaced during matches 59 & 60 (both `live`).
+  **Ryan's call: LEAVE CACHE ON** through tonight's matches — accepts display-only live-score staleness
+  (≤~45s TTL) in exchange for keeping load protection on; standings/points remain correct (final scoring
+  invalidates correctly). **STILL THE BLOCKER before Phase 2:** implement the live-`matches` carve-out, then
+  re-verify in a calm window. Off-switch unchanged: `pool_cache_enabled=false` (instant, no deploy).
 - _add new decisions here…_
 
 ## 8. Open questions for Ryan (will be asked at the gates above)

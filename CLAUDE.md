@@ -4,6 +4,10 @@
 
 Ryan is a beginner at the engineering side and relies on Claude to be the expert. When he proposes an approach or reasons out loud, **evaluate it on the merits and push back when it's wrong, incomplete, or optimises for the wrong goal** — even if he sounds confident. Agreeing reflexively, flip-flopping to match his latest message, or validating a plan to be agreeable is a failure. State the trade-off, give a clear recommendation with the reason, and name the one fact that would change the call. Being straight is more valuable than being agreeable.
 
+## Verify before you assert
+
+Do not state a diagnosis, root cause, or "what's happening" as fact until it's been checked against the actual data/code. When a cause isn't yet confirmed, say so plainly ("I haven't verified this yet — checking") and go check **before** presenting a conclusion. A confident wrong answer is worse than "let me confirm," because it makes Ryan do the work of doubting you. Especially during live incidents: read the DB/code first, form the conclusion second. If a measurement or metric is the basis for a claim, confirm the metric measures what you think it does before relying on it.
+
 ## Read this first: `ROADMAP.md`
 
 `ROADMAP.md` at the repo root is the single source of truth for project state — roadmap, backlog, tech debt, and risks/dependencies. **Consult it before:**
@@ -35,6 +39,14 @@ When something material to the project changes (new feature decided, debt resolv
 - One calculation → one stored result → many cheap reads. If two surfaces show the "same" number, they must read the **same column**, not each run their own calculation.
 
 **Current state (in flight):** the leaderboard tab, form/analytics tab, and the APIs behind them still recompute analytics on read (the violation we're removing). The fix — precompute into `entry_xp_state`, keep fresh via the `analytics-sweep` cron, then flip the read path — is tracked in `memory/project_backlog_leaderboard_precompute.md`. Match points and ranks already follow this principle (computed by the scoring sweep, stored on `pool_entries`, read directly). Bracket-pool analytics are a separate precompute still to build. When adding any new displayed value, follow this principle from the start: compute it in the sweep/cron, store it, read it.
+
+## Database work: consult the Supabase docs first
+
+**Before implementing any database work, check the official Supabase docs for the current, recommended approach — do not rely on memorized APIs.** Claude's training data on Supabase (SQL patterns, RLS, migrations, Edge Functions, cron, queues, storage, performance/indexing, client libraries) can be stale, and a confidently-wrong API call costs more than a 30-second lookup. "Database work" means: schema changes/migrations, RLS policies, query or index design, Edge Functions, crons/queues, storage buckets, realtime, and any Supabase client-library usage.
+
+- Prefer the **`search_docs` MCP tool** (Supabase, connected to project `ujthamlehjyubbzxbnes`) to pull the relevant doc section directly; fall back to `WebFetch` on a specific `supabase.com/docs/...` URL.
+- For diagnosing live issues, lead with `get_advisors`, `get_logs`, and `list_tables` against the actual project before proposing a fix (consistent with "verify before you assert").
+- Goal is the most effective/streamlined approach for what we need — confirm it against the docs, then implement. Cite the doc when the approach is non-obvious.
 
 ## Working on this project
 
