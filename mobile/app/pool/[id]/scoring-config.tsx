@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { recalculatePool } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { usePoolSettings, type PoolSettings } from '@/lib/usePoolSettings';
@@ -248,6 +247,7 @@ function ScoreScoringConfigBody({ poolId }: { poolId: string }) {
   const [initial, setInitial] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const id = poolId;
 
   useEffect(() => {
@@ -267,18 +267,7 @@ function ScoreScoringConfigBody({ poolId }: { poolId: string }) {
   }
 
   function handleReset() {
-    Alert.alert(
-      'Reset to Defaults',
-      "This will reset all scoring values to their defaults. You'll still need to save to apply changes.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => setEdit(DEFAULTS),
-        },
-      ],
-    );
+    setShowResetConfirm(true);
   }
 
   async function handleSave() {
@@ -447,6 +436,20 @@ function ScoreScoringConfigBody({ poolId }: { poolId: string }) {
       {hasChanges || message ? (
         <SaveBar saving={saving} message={message} hasChanges={hasChanges} onSave={handleSave} />
       ) : null}
+
+      <ConfirmDialog
+        visible={showResetConfirm}
+        title="Reset to Defaults"
+        description="This will reset all scoring values to their defaults. You'll still need to save to apply changes."
+        cancelLabel="Cancel"
+        confirmLabel="Reset"
+        destructive
+        onCancel={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          setEdit(DEFAULTS);
+          setShowResetConfirm(false);
+        }}
+      />
     </View>
   );
 }
@@ -808,6 +811,7 @@ function BPScoringConfigBody({ poolId }: { poolId: string }) {
   const [initial, setInitial] = useState<BPEditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -826,18 +830,7 @@ function BPScoringConfigBody({ poolId }: { poolId: string }) {
   }
 
   function handleReset() {
-    Alert.alert(
-      'Reset to Defaults',
-      "This will reset bracket scoring values to their defaults. You'll still need to save to apply changes.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => setEdit(BP_DEFAULTS),
-        },
-      ],
-    );
+    setShowResetConfirm(true);
   }
 
   async function handleSave() {
@@ -1016,6 +1009,20 @@ function BPScoringConfigBody({ poolId }: { poolId: string }) {
       {hasChanges || message ? (
         <SaveBar saving={saving} message={message} hasChanges={hasChanges} onSave={handleSave} />
       ) : null}
+
+      <ConfirmDialog
+        visible={showResetConfirm}
+        title="Reset to Defaults"
+        description="This will reset bracket scoring values to their defaults. You'll still need to save to apply changes."
+        cancelLabel="Cancel"
+        confirmLabel="Reset"
+        destructive
+        onCancel={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          setEdit(BP_DEFAULTS);
+          setShowResetConfirm(false);
+        }}
+      />
     </View>
   );
 }

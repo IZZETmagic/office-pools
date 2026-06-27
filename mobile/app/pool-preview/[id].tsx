@@ -43,10 +43,36 @@ type PoolSettingsRow = {
   knockout_exact_score: number;
   knockout_correct_difference: number;
   knockout_correct_result: number;
+  // Round multipliers (full/progressive only). Applied on top of the
+  // per-match knockout scores for each round.
+  round_32_multiplier: number;
+  round_16_multiplier: number;
+  quarter_final_multiplier: number;
+  semi_final_multiplier: number;
+  third_place_multiplier: number;
+  final_multiplier: number;
   pso_enabled: boolean;
   pso_exact_score: number | null;
   pso_correct_difference: number | null;
   pso_correct_result: number | null;
+  // Bonus points (full/progressive). Each is nullable + zero-by-default;
+  // we only render rows the admin actually set to a positive value, so
+  // the Bonus Points card shrinks to just the rules that are in play.
+  bonus_group_winner_and_runnerup: number | null;
+  bonus_group_winner_only: number | null;
+  bonus_group_runnerup_only: number | null;
+  bonus_both_qualify_swapped: number | null;
+  bonus_one_qualifies_wrong_position: number | null;
+  bonus_all_16_qualified: number | null;
+  bonus_12_15_qualified: number | null;
+  bonus_8_11_qualified: number | null;
+  bonus_correct_bracket_pairing: number | null;
+  bonus_match_winner_correct: number | null;
+  bonus_champion_correct: number | null;
+  bonus_second_place_correct: number | null;
+  bonus_third_place_correct: number | null;
+  bonus_best_player_correct: number | null;
+  bonus_top_scorer_correct: number | null;
   // Bracket Picker mode — no per-match scores; everything is bonus points
   // for correct group positions, third-place qualifiers, knockout winners,
   // and penalty calls. Columns are nullable in the DB because non-bracket
@@ -144,7 +170,7 @@ export default function PoolPreviewSheet() {
             // ignore the bp_* columns; bracket pools ignore the per-match
             // columns. Cheaper to over-select than to branch the query.
             .select(
-              'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct',
+              'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, round_32_multiplier, round_16_multiplier, quarter_final_multiplier, semi_final_multiplier, third_place_multiplier, final_multiplier, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bonus_group_winner_and_runnerup, bonus_group_winner_only, bonus_group_runnerup_only, bonus_both_qualify_swapped, bonus_one_qualifies_wrong_position, bonus_all_16_qualified, bonus_12_15_qualified, bonus_8_11_qualified, bonus_correct_bracket_pairing, bonus_match_winner_correct, bonus_champion_correct, bonus_second_place_correct, bonus_third_place_correct, bonus_best_player_correct, bonus_top_scorer_correct, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct',
             )
             .eq('pool_id', id)
             .maybeSingle(),
@@ -558,6 +584,14 @@ export default function PoolPreviewSheet() {
                     <ScoreRow label="Exact Score" pts={settings.knockout_exact_score} />
                     <ScoreRow label="Correct Difference" pts={settings.knockout_correct_difference} />
                     <ScoreRow label="Correct Result" pts={settings.knockout_correct_result} />
+                    <ScoringDivider />
+                    <ScoringSubheader title="Round Multipliers" />
+                    <MultiplierRow label="Round of 32" value={settings.round_32_multiplier} />
+                    <MultiplierRow label="Round of 16" value={settings.round_16_multiplier} />
+                    <MultiplierRow label="Quarter Final" value={settings.quarter_final_multiplier} />
+                    <MultiplierRow label="Semi Final" value={settings.semi_final_multiplier} />
+                    <MultiplierRow label="3rd Place" value={settings.third_place_multiplier} />
+                    <MultiplierRow label="Final" value={settings.final_multiplier} />
                   </ScoringCard>
                   {settings.pso_enabled ? (
                     <ScoringCard title="Penalty Shootout">
@@ -572,6 +606,20 @@ export default function PoolPreviewSheet() {
                       ) : null}
                     </ScoringCard>
                   ) : null}
+                  {(() => {
+                    // Only render rules the admin actually set to a
+                    // positive value. Keeps the card terse on pools that
+                    // only use a handful of bonuses (most of them).
+                    const rows = collectBonusRows(settings);
+                    if (rows.length === 0) return null;
+                    return (
+                      <ScoringCard title="Bonus Points">
+                        {rows.map((r) => (
+                          <ScoreRow key={r.label} label={r.label} pts={r.pts} />
+                        ))}
+                      </ScoringCard>
+                    );
+                  })()}
                 </>
               )}
             </View>
@@ -766,4 +814,94 @@ function ScoreRow({ label, pts }: { label: string; pts: number }) {
       </RNText>
     </View>
   );
+}
+
+function MultiplierRow({ label, value }: { label: string; value: number }) {
+  const theme = useTheme();
+  // Whole-number multipliers render as "×2"; fractional ones as "×1.5"
+  // so the admin's exact configured value is visible (matches the
+  // in-pool ScoringTab's MultiplierRow).
+  const display = value === Math.floor(value) ? `×${value}` : `×${value.toFixed(1)}`;
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 2,
+      }}
+    >
+      <Text variant="body" color="slate">
+        {label}
+      </Text>
+      <RNText
+        style={{
+          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+          fontSize: 13,
+          fontWeight: '700',
+          color: theme.colors.ink,
+        }}
+      >
+        {display}
+      </RNText>
+    </View>
+  );
+}
+
+function ScoringDivider() {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        height: 0.5,
+        backgroundColor: withOpacity(theme.colors.silver, 0.5),
+        marginVertical: 4,
+      }}
+    />
+  );
+}
+
+function ScoringSubheader({ title }: { title: string }) {
+  const theme = useTheme();
+  return (
+    <RNText
+      style={{
+        fontFamily: fontFamilies.bold,
+        fontSize: 11,
+        color: theme.colors.slate,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        marginTop: 2,
+      }}
+    >
+      {title}
+    </RNText>
+  );
+}
+
+// Mirrors collectBonusRows in ScoringTab — surfaces only rules the
+// admin set to a positive value, so the Bonus Points card shrinks
+// to just what's actually in play for this pool.
+type BonusRow = { label: string; pts: number };
+function collectBonusRows(s: PoolSettingsRow): BonusRow[] {
+  const rows: BonusRow[] = [];
+  const push = (label: string, v: number | null) => {
+    if (v !== null && v !== undefined && v > 0) rows.push({ label, pts: v });
+  };
+  push('Winner & Runner-up', s.bonus_group_winner_and_runnerup);
+  push('Winner Only', s.bonus_group_winner_only);
+  push('Runner-up Only', s.bonus_group_runnerup_only);
+  push('Both Qualify (Swapped)', s.bonus_both_qualify_swapped);
+  push('One Qualifies (Wrong Pos)', s.bonus_one_qualifies_wrong_position);
+  push('All 16 Qualified', s.bonus_all_16_qualified);
+  push('12-15 Qualified', s.bonus_12_15_qualified);
+  push('8-11 Qualified', s.bonus_8_11_qualified);
+  push('Correct Bracket Pairing', s.bonus_correct_bracket_pairing);
+  push('Match Winner Correct', s.bonus_match_winner_correct);
+  push('Champion Correct', s.bonus_champion_correct);
+  push('2nd Place Correct', s.bonus_second_place_correct);
+  push('3rd Place Correct', s.bonus_third_place_correct);
+  push('Top Scorer Correct', s.bonus_top_scorer_correct);
+  push('Best Player Correct', s.bonus_best_player_correct);
+  return rows;
 }

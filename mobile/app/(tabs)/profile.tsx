@@ -3,6 +3,7 @@
 // notification prefs, danger zone. Sign-out is wired; edit profile and
 // account deletion route through their existing handlers / endpoints.
 
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -13,7 +14,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Switch,
   Text as RNText,
   TextInput,
   View,
@@ -27,28 +27,20 @@ import {
   type PoolCreateJoinSheetHandle,
   PoolsHeader,
 } from '@/components/pools';
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
-import { fetchNotificationPrefs, updateNotificationPref, deleteAccount, fetchPushPrefs, updatePushPref } from '@/lib/api';
+import { deleteAccount } from '@/lib/api';
 import type { PoolSummary } from '@/lib/useHomeData';
+import { useIsSuperAdmin } from '@/lib/useIsSuperAdmin';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { supabase } from '@/lib/supabase';
-import { usePushPermission, type PushPermissionStatus } from '@/lib/usePushPermission';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
-
-const NOTIF_OPTIONS: Array<{ key: string; label: string; desc: string; icon: string }> = [
-  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave pool, invitations', icon: 'person.3.fill' },
-  { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
-  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Results and points earned', icon: 'sportscourt.fill' },
-  { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings', icon: 'chart.bar.fill' },
-  { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed', icon: 'gearshape.fill' },
-  { key: 'COMMUNITY', label: 'Community & Mentions', desc: '@mentions in pool chat', icon: 'bubble.left.and.bubble.right.fill' },
-];
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
+  const { isSuperAdmin } = useIsSuperAdmin();
   const { data, refresh } = useHomeData();
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
@@ -125,11 +117,9 @@ export default function ProfileScreen() {
 
         <SecuritySection />
 
-        <PushNotificationsSection />
+        <NotificationsEntry />
 
-        <PushPreferencesSection />
-
-        <NotificationsSection />
+        {isSuperAdmin && <DevPlaygroundsEntry />}
 
         <LegalSection />
 
@@ -954,355 +944,97 @@ function LabeledInput({
   );
 }
 
-function PushNotificationsSection() {
+function DevPlaygroundsEntry() {
   const theme = useTheme();
-  const { status, request, openSettings } = usePushPermission();
-
-  const { label, ctaLabel, onCtaPress, statusBadge } = pushSectionState(
-    status,
-    request,
-    openSettings,
-    theme,
-  );
-
+  const router = useRouter();
   return (
-    <SectionWrapper title="Push Notifications">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
+    <SectionWrapper title="Developer">
+      <Pressable
+        onPress={() => router.push('/showdown-reveal-playground')}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm + 4,
+          padding: theme.spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radii.lg,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
         <View
           style={{
-            flexDirection: 'row',
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            backgroundColor: theme.colors.primaryLight,
             alignItems: 'center',
-            gap: theme.spacing.sm + 4,
-            paddingHorizontal: theme.spacing.md - 2,
-            paddingVertical: theme.spacing.sm + 2,
+            justifyContent: 'center',
           }}
         >
-          <View
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              backgroundColor: theme.colors.primaryLight,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="bell.fill" tint={theme.colors.primary} size={13} weight="semibold" />
-          </View>
-          <View style={{ flex: 1, gap: 1 }}>
-            <RNText
-              style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
-            >
-              Push Notifications
-            </RNText>
-            <RNText
-              style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
-            >
-              {label}
-            </RNText>
-          </View>
-          {statusBadge}
-          {onCtaPress ? (
-            <Pressable
-              onPress={onCtaPress}
-              hitSlop={8}
-              style={({ pressed }) => ({
-                paddingHorizontal: theme.spacing.sm + 2,
-                paddingVertical: 6,
-                borderRadius: theme.radii.pill,
-                backgroundColor: withOpacity(theme.colors.primary, 0.12),
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.semibold,
-                  fontSize: 13,
-                  color: theme.colors.primary,
-                }}
-              >
-                {ctaLabel}
-              </RNText>
-            </Pressable>
-          ) : null}
+          <Icon name="arrow.triangle.branch" tint={theme.colors.primary} size={14} weight="semibold" />
         </View>
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function pushSectionState(
-  status: PushPermissionStatus | null,
-  request: () => Promise<PushPermissionStatus>,
-  openSettings: () => Promise<void>,
-  theme: ReturnType<typeof useTheme>,
-): {
-  label: string;
-  ctaLabel: string | null;
-  onCtaPress: (() => void) | null;
-  statusBadge: React.ReactNode;
-} {
-  if (status === null) {
-    return { label: 'Checking…', ctaLabel: null, onCtaPress: null, statusBadge: null };
-  }
-  if (status === 'granted') {
-    return {
-      label: 'Receiving push notifications',
-      ctaLabel: null,
-      onCtaPress: null,
-      statusBadge: (
-        <Icon name="checkmark.circle.fill" tint={theme.colors.green} size={20} weight="regular" />
-      ),
-    };
-  }
-  if (status === 'denied') {
-    return {
-      label: 'Disabled — open Settings to re-enable',
-      ctaLabel: 'Settings',
-      onCtaPress: () => void openSettings(),
-      statusBadge: null,
-    };
-  }
-  // undetermined
-  return {
-    label: 'Get alerts for mentions, results & deadlines',
-    ctaLabel: 'Enable',
-    onCtaPress: () => void request(),
-    statusBadge: null,
-  };
-}
-
-const PUSH_PREF_OPTIONS: Array<{ key: string; label: string; desc: string; icon: string }> = [
-  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave a pool, invitations', icon: 'person.3.fill' },
-  { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
-  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Per-match outcomes, matchday recaps', icon: 'sportscourt.fill' },
-  { key: 'LEADERBOARD', label: 'Leaderboard', desc: 'Rank changes and shake-ups', icon: 'chart.bar.fill' },
-  { key: 'ADMIN', label: 'Admin Alerts', desc: 'Settings changed, points adjusted', icon: 'gearshape.fill' },
-  { key: 'COMMUNITY', label: 'Community', desc: '@mentions and pool chat', icon: 'bubble.left.and.bubble.right.fill' },
-  { key: 'GAMIFICATION', label: 'Achievements', desc: 'Badges, level-ups, streaks, MVP', icon: 'rosette' },
-];
-
-function PushPreferencesSection() {
-  const theme = useTheme();
-  const { status } = usePushPermission();
-  const [prefs, setPrefs] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
-  const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-
-  // Only meaningful when push permission is granted — otherwise the toggles
-  // would be misleading (the OS would suppress everything regardless).
-  const enabled = status === 'granted';
-
-  useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    fetchPushPrefs()
-      .then((res) => {
-        if (cancelled) return;
-        setPrefs(res.preferences);
-      })
-      .catch((err) => console.warn('[profile] failed to load push prefs', err))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-
-  async function handleToggle(key: string) {
-    const next = !(prefs[key] ?? true);
-    setUpdatingKey(key);
-    setPrefs((p) => ({ ...p, [key]: next })); // optimistic
-    try {
-      await updatePushPref(key, next);
-    } catch (err) {
-      setPrefs((p) => ({ ...p, [key]: !next })); // revert
-      console.warn('[profile] push pref toggle failed', err);
-    } finally {
-      setUpdatingKey(null);
-    }
-  }
-
-  if (!enabled) {
-    // Permission isn't granted — hiding the section avoids implying the
-    // toggles do anything. Users opt in via the section above first.
-    return null;
-  }
-
-  return (
-    <SectionWrapper title="Push Categories">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {loading ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.xl,
-            }}
+        <View style={{ flex: 1, gap: 1 }}>
+          <RNText
+            style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
           >
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <RNText
-              style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
-            >
-              Loading preferences...
-            </RNText>
-          </View>
-        ) : (
-          PUSH_PREF_OPTIONS.map((opt, idx) => (
-            <View key={opt.key}>
-              <NotificationRow
-                option={opt}
-                enabled={prefs[opt.key] ?? true}
-                updating={updatingKey === opt.key}
-                onToggle={() => handleToggle(opt.key)}
-              />
-              {idx < PUSH_PREF_OPTIONS.length - 1 ? <Divider /> : null}
-            </View>
-          ))
-        )}
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function NotificationsSection() {
-  const theme = useTheme();
-  const [prefs, setPrefs] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
-  const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchNotificationPrefs()
-      .then((res) => {
-        if (cancelled) return;
-        setPrefs(res.preferences);
-      })
-      .catch((err) => {
-        console.warn('[profile] failed to load notification prefs', err);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleToggle(key: string) {
-    const next = !(prefs[key] ?? true);
-    setUpdatingKey(key);
-    setPrefs((p) => ({ ...p, [key]: next })); // optimistic
-    try {
-      await updateNotificationPref(key, next);
-    } catch (err) {
-      setPrefs((p) => ({ ...p, [key]: !next })); // revert
-      console.warn('[profile] toggle failed', err);
-    } finally {
-      setUpdatingKey(null);
-    }
-  }
-
-  return (
-    <SectionWrapper title="Email Notifications">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {loading ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.xl,
-            }}
+            Showdown reveal playground
+          </RNText>
+          <RNText
+            style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
           >
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <RNText
-              style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
-            >
-              Loading preferences...
-            </RNText>
-          </View>
-        ) : (
-          NOTIF_OPTIONS.map((opt, idx) => (
-            <View key={opt.key}>
-              <NotificationRow
-                option={opt}
-                enabled={prefs[opt.key] ?? true}
-                updating={updatingKey === opt.key}
-                onToggle={() => handleToggle(opt.key)}
-              />
-              {idx < NOTIF_OPTIONS.length - 1 ? <Divider /> : null}
-            </View>
-          ))
-        )}
-      </View>
+            Scrub the 4s tunnel walk-out beat by beat
+          </RNText>
+        </View>
+        <Icon name="chevron.right" tint={theme.colors.slate} size={12} weight="semibold" />
+      </Pressable>
     </SectionWrapper>
   );
 }
 
-function NotificationRow({
-  option,
-  enabled,
-  updating,
-  onToggle,
-}: {
-  option: { key: string; label: string; desc: string; icon: string };
-  enabled: boolean;
-  updating: boolean;
-  onToggle: () => void;
-}) {
+function NotificationsEntry() {
   const theme = useTheme();
+  const router = useRouter();
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm + 4,
-        paddingHorizontal: theme.spacing.md - 2,
-        paddingVertical: theme.spacing.sm + 2,
-      }}
-    >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: theme.colors.primaryLight,
+    <SectionWrapper title="Notifications">
+      <Pressable
+        onPress={() => router.push('/notification-settings')}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-        }}
+          gap: theme.spacing.sm + 4,
+          padding: theme.spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radii.lg,
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
-        <Icon name={option.icon as never} tint={theme.colors.primary} size={13} weight="semibold" />
-      </View>
-      <View style={{ flex: 1, gap: 1 }}>
-        <RNText
-          style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            backgroundColor: theme.colors.primaryLight,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          {option.label}
-        </RNText>
-        <RNText
-          style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
-        >
-          {option.desc}
-        </RNText>
-      </View>
-      {updating ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-      ) : (
-        <Switch
-          value={enabled}
-          onValueChange={onToggle}
-          trackColor={{ false: theme.colors.mist, true: theme.colors.primary }}
-        />
-      )}
-    </View>
+          <Icon name="bell.fill" tint={theme.colors.primary} size={14} weight="semibold" />
+        </View>
+        <View style={{ flex: 1, gap: 1 }}>
+          <RNText
+            style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
+          >
+            Notification Settings
+          </RNText>
+          <RNText
+            style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
+          >
+            Push, email & category preferences
+          </RNText>
+        </View>
+        <Icon name="chevron.right" tint={theme.colors.slate} size={12} weight="semibold" />
+      </Pressable>
+    </SectionWrapper>
   );
 }
 
@@ -1393,15 +1125,30 @@ function LegalRow({
 
 function DangerZone({ onSignOut }: { onSignOut: () => void | Promise<void> }) {
   const theme = useTheme();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function performDelete() {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      await supabase.auth.signOut();
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete account';
+      setShowDeleteConfirm(false);
+      setDeleteError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <View style={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.md - 2 }}>
       <Pressable
-        onPress={() => {
-          Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign Out', style: 'destructive', onPress: () => onSignOut() },
-          ]);
-        }}
+        onPress={() => setShowSignOutConfirm(true)}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
@@ -1438,28 +1185,7 @@ function DangerZone({ onSignOut }: { onSignOut: () => void | Promise<void> }) {
       </Pressable>
 
       <Pressable
-        onPress={() => {
-          Alert.alert(
-            'Delete Account',
-            'This is permanent. All your predictions, scores, and pool memberships will be permanently deleted.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                  try {
-                    await deleteAccount();
-                    await supabase.auth.signOut();
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : 'Failed to delete account';
-                    Alert.alert('Delete failed', msg);
-                  }
-                },
-              },
-            ],
-          );
-        }}
+        onPress={() => setShowDeleteConfirm(true)}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
@@ -1496,6 +1222,41 @@ function DangerZone({ onSignOut }: { onSignOut: () => void | Promise<void> }) {
         </View>
         <Icon name="chevron.right" tint={theme.colors.slate} size={12} weight="semibold" />
       </Pressable>
+
+      <ConfirmDialog
+        visible={showSignOutConfirm}
+        title="Sign Out"
+        description="Are you sure you want to sign out?"
+        cancelLabel="Cancel"
+        confirmLabel="Sign Out"
+        destructive
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={() => {
+          setShowSignOutConfirm(false);
+          void onSignOut();
+        }}
+      />
+
+      <ConfirmDialog
+        visible={showDeleteConfirm}
+        title="Delete Account"
+        description="This is permanent. All your predictions, scores, and pool memberships will be permanently deleted."
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => void performDelete()}
+      />
+
+      <ConfirmDialog
+        visible={deleteError !== null}
+        title="Delete failed"
+        description={deleteError ?? ''}
+        confirmLabel="OK"
+        destructive
+        onConfirm={() => setDeleteError(null)}
+      />
     </View>
   );
 }

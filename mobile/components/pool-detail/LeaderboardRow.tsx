@@ -38,11 +38,16 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         // over the tint over elevation created a visible "double container"
         // ring. Android values are also bumped a notch (~15% bg, ~40%
         // border, 2pt) so the row reads as clearly distinct against the
-        // surrounding white rows; iOS achieves the same visual punch with
-        // its softer alpha values thanks to platform shadow/tint rendering.
+        // surrounding rows; iOS achieves the same visual punch with its
+        // softer alpha values thanks to platform shadow/tint rendering.
+        // Dark mode gets its own pre-blend over the dark surface — the
+        // light-mode hex was blended over white and looked near-white on
+        // dark backgrounds.
         backgroundColor: isCurrentUser
           ? Platform.OS === 'android'
-            ? '#E2E6FA' // primary @ 15% pre-blended over white
+            ? theme.mode === 'dark'
+              ? '#25304F' // primary(dark) @ 15% pre-blended over surface(dark)
+              : '#E2E6FA' // primary @ 15% pre-blended over white
             : withOpacity(theme.colors.primary, 0.08)
           : theme.colors.surface,
         borderWidth: isCurrentUser
@@ -52,7 +57,9 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
           : 0,
         borderColor: isCurrentUser
           ? Platform.OS === 'android'
-            ? '#B1BDF1' // primary @ 40% pre-blended over white
+            ? theme.mode === 'dark'
+              ? '#354A83' // primary(dark) @ 40% pre-blended over surface(dark)
+              : '#B1BDF1' // primary @ 40% pre-blended over white
             : withOpacity(theme.colors.primary, 0.25)
           : 'transparent',
         opacity: pressed ? 0.85 : 1,
