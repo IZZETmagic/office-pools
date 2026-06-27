@@ -69,3 +69,8 @@ mobile/android/
 mobile/dist/
 mobile/.env*.local
 firebase-debug.log
+.github-push-token
+
+# leftover node_modules snapshot + image backups
+mobile/.doomed_node_modules_*/
+*.bak
