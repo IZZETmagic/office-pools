@@ -16,6 +16,8 @@ type BPXPProgressSectionProps = {
   bpXpBreakdown: BPXPBreakdown
   teams: TeamData[]
   bpPoolComparison: BPPoolComparison | null
+  /** Pre-tournament: render holding states for sections that have no data yet. */
+  preTournament?: boolean
 }
 
 // =============================================
@@ -788,10 +790,73 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
 }
 
 // =============================================
+// HOLDING STATES (pre-tournament)
+// =============================================
+
+function BPYouVsPoolHolding() {
+  return (
+    <div
+      className="relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+      style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
+    >
+      <div className="relative z-10 p-[18px]">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+          You vs The Pool
+        </h4>
+        <div className="flex items-center justify-around mb-6">
+          <div className="text-center">
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#3b82f6' }}>You</div>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#3b82f6' }}>—</div>
+          </div>
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[#1c2333]"
+            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
+          >
+            <span className="text-[11px] font-extrabold" style={{ color: '#64748b' }}>VS</span>
+          </div>
+          <div className="text-center">
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#8b5cf6' }}>Pool Avg</div>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#94a3b8' }}>—</div>
+          </div>
+        </div>
+        <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
+          Group, knockout and third-place accuracy vs the pool will populate as results land.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function BPPoolWideStatsHolding() {
+  return (
+    <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default">
+      <div className="p-[18px]">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+          Pool-Wide Stats
+        </h4>
+        <div className="flex items-center justify-around mb-[18px]">
+          <div className="text-center">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">—</div>
+            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>Avg Pool Accuracy</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">0</div>
+            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>Picks Scored</div>
+          </div>
+        </div>
+        <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
+          The pool&apos;s favorite champion and accuracy will appear once results start landing.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// =============================================
 // MAIN COMPONENT
 // =============================================
 
-export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: BPXPProgressSectionProps) {
+export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison, preTournament = false }: BPXPProgressSectionProps) {
   const [showRoadmap, setShowRoadmap] = useState(false)
 
   return (
@@ -803,12 +868,17 @@ export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: 
       <BPBadgeGrid earnedBadges={bpXpBreakdown.earnedBadges} />
 
       {/* You vs The Pool + Pool Stats (side by side on desktop) */}
-      {bpPoolComparison && (
+      {bpPoolComparison ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <BPYouVsPoolSection comparison={bpPoolComparison} />
           <BPPoolWideStatsSection comparison={bpPoolComparison} teams={teams} />
         </div>
-      )}
+      ) : preTournament ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <BPYouVsPoolHolding />
+          <BPPoolWideStatsHolding />
+        </div>
+      ) : null}
 
       {/* Bonus Events */}
       <BonusEventsSection bonusEvents={bpXpBreakdown.bonusEvents} />

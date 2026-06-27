@@ -18,6 +18,8 @@ type XPProgressSectionProps = {
   poolStats: PoolWideStats
   entryPredictions: PredictionData[]
   predictionResults: PredictionResult[]
+  /** Pre-tournament: render holding states for sections that have no data yet. */
+  preTournament?: boolean
 }
 
 // =============================================
@@ -424,13 +426,15 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
 // HOT & COLD STREAKS
 // =============================================
 
-function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
+function HotColdStreaksSection({ streaks, preTournament = false }: { streaks: StreakData; preTournament?: boolean }) {
   const { currentStreak, longestHotStreak, longestColdStreak } = streaks
   const currentHot = currentStreak.type === 'hot' ? currentStreak.length : 0
   const currentCold = currentStreak.type === 'cold' ? currentStreak.length : 0
   const isCurrentlyCold = currentStreak.type === 'cold'
 
-  if (longestHotStreak === 0 && longestColdStreak === 0) return null
+  // Pre-tournament: render the cards at 0 as holding values. Otherwise hide
+  // entirely until there's a streak to show.
+  if (!preTournament && longestHotStreak === 0 && longestColdStreak === 0) return null
 
   return (
     <div style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}>
@@ -561,7 +565,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
 // TOURNAMENT RUN (JOURNEY PATH)
 // =============================================
 
-function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crowdData: CrowdMatch[] }) {
+function TournamentRunSection({ matchXP, crowdData, preTournament = false }: { matchXP: MatchXP[]; crowdData: CrowdMatch[]; preTournament?: boolean }) {
   const sorted = [...matchXP].sort((a, b) => b.matchNumber - a.matchNumber)
   const crowdMap = useMemo(() => new Map(crowdData.map(c => [c.matchId, c])), [crowdData])
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number; matchId: string } | null>(null)
@@ -581,7 +585,53 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
     )
   }, [])
 
-  if (sorted.length === 0) return null
+  if (sorted.length === 0) {
+    if (!preTournament) return null
+    // Holding state — header + explanatory copy + the tier legend.
+    return (
+      <div
+        className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+        style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
+      >
+        <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+              <span>🏃</span>
+              <span>Your Tournament Run</span>
+            </h4>
+            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              Awaiting kickoff
+            </span>
+          </div>
+        </div>
+        <div className="px-4 sm:px-5 py-6 text-center">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            Your match-by-match journey will appear here as fixtures complete. Each pick earns a tier — exact score, winner&nbsp;+&nbsp;goal difference, correct result, or miss.
+          </p>
+        </div>
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5">
+          <div className="border-t border-neutral-200 dark:border-neutral-700 pt-3">
+            <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
+              {JOURNEY_LEGEND.map((item) => (
+                <div key={item.label} className="flex items-center gap-1.5">
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: item.color,
+                      boxShadow: item.glow ? `0 0 6px ${hexWithAlpha(item.color, 0.27)}` : 'none',
+                    }}
+                  />
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -741,9 +791,47 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
 // YOU VS THE CROWD
 // =============================================
 
-function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
+function YouVsCrowdSection({ crowdData, preTournament = false }: { crowdData: CrowdMatch[]; preTournament?: boolean }) {
   const matchesWithPred = crowdData.filter(m => m.userPredictedResult !== null)
-  if (matchesWithPred.length === 0) return null
+  if (matchesWithPred.length === 0) {
+    if (!preTournament) return null
+    // Holding state — VS faceoff with placeholder values + copy.
+    return (
+      <div
+        className="relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+        style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
+      >
+        <div className="relative z-10 p-[18px]">
+          <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+            You vs The Crowd
+          </h4>
+          <div className="flex items-center justify-around mb-6">
+            <div className="text-center">
+              <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#3b82f6' }}>
+                You
+              </div>
+              <div className="text-[32px] font-extrabold leading-none" style={{ color: '#3b82f6' }}>—</div>
+            </div>
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[#1c2333]"
+              style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
+            >
+              <span className="text-[11px] font-extrabold" style={{ color: '#64748b' }}>VS</span>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#8b5cf6' }}>
+                Pool Avg
+              </div>
+              <div className="text-[32px] font-extrabold leading-none" style={{ color: '#94a3b8' }}>—</div>
+            </div>
+          </div>
+          <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
+            Stats vs the pool average will populate as matches complete.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // --- User stats ---
   const userCorrect = matchesWithPred.filter(m => m.userWasCorrect).length
@@ -942,10 +1030,39 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
 // POOL-WIDE STATS
 // =============================================
 
-export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }) {
+export function PoolWideStatsSection({ poolStats, preTournament = false }: { poolStats: PoolWideStats; preTournament?: boolean }) {
   const { mostPredictable, leastPredictable, avgPoolAccuracy, totalCompletedMatches, totalEntries } = poolStats
 
-  if (totalCompletedMatches === 0) return null
+  if (totalCompletedMatches === 0) {
+    if (!preTournament) return null
+    // Holding state — competitor count is real, the rest fills in once scored.
+    return (
+      <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default">
+        <div className="p-[18px]">
+          <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+            Pool-Wide Stats
+          </h4>
+          <div className="flex items-center justify-around mb-[18px]">
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">—</div>
+              <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>Avg Pool Accuracy</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">{totalEntries}</div>
+              <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>Competitors</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">0</div>
+              <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>Matches Scored</div>
+            </div>
+          </div>
+          <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
+            Most-predictable matches and biggest upsets will appear once results start landing.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // Cap to 3 items per list
   const topPredictable = mostPredictable.slice(0, 3)
@@ -1574,7 +1691,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
 // MAIN COMPONENT
 // =============================================
 
-export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, entryPredictions, predictionResults }: XPProgressSectionProps) {
+export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, entryPredictions, predictionResults, preTournament = false }: XPProgressSectionProps) {
   const [showRoadmap, setShowRoadmap] = useState(false)
 
   return (
@@ -1586,15 +1703,15 @@ export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, 
       <XPBadgeGrid earnedBadges={xpBreakdown.earnedBadges} />
 
       {/* Hot & Cold Streaks */}
-      <HotColdStreaksSection streaks={streaks} />
+      <HotColdStreaksSection streaks={streaks} preTournament={preTournament} />
 
       {/* Tournament Run — Journey Path */}
-      <TournamentRunSection matchXP={xpBreakdown.matchXP} crowdData={crowdData} />
+      <TournamentRunSection matchXP={xpBreakdown.matchXP} crowdData={crowdData} preTournament={preTournament} />
 
       {/* You vs The Crowd + Pool-Wide Stats (side by side on desktop) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <YouVsCrowdSection crowdData={crowdData} />
-        <PoolWideStatsSection poolStats={poolStats} />
+        <YouVsCrowdSection crowdData={crowdData} preTournament={preTournament} />
+        <PoolWideStatsSection poolStats={poolStats} preTournament={preTournament} />
       </div>
 
       {/* Match Results */}

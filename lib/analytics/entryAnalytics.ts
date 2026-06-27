@@ -251,8 +251,11 @@ export async function writePoolEntryAnalytics(admin: Admin, poolId: string): Pro
   for (let i = 0; i < rows.length; i += 100) {
     const batch = rows.slice(i, i + 100)
     const { error } = await admin.from('entry_xp_state').upsert(batch, { onConflict: 'entry_id' })
-    if (error) console.error(`[entryAnalytics] upsert error pool ${poolId}:`, error.message)
-    else written += batch.length
+    // THROW on failure — the cron relies on this rejecting so a pool whose write
+    // failed is NOT counted as succeeded and stays behind the watermark for retry.
+    // (Swallowing the error here let the watermark advance past unsaved pools.)
+    if (error) throw new Error(`entry_xp_state upsert failed for pool ${poolId}: ${error.message}`)
+    written += batch.length
   }
   return written
 }

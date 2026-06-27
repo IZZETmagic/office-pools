@@ -59,63 +59,104 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true, reason: 'analytics_sweep_enabled=false' })
   }
 
-  // Last run watermark.
-  const { data: lastRunRow } = await admin
-    .from('sync_settings')
-    .select('setting_value')
-    .eq('setting_key', 'analytics_last_run_at')
-    .maybeSingle()
-  const lastRun = (lastRunRow?.setting_value as string) || '1970-01-01T00:00:00Z'
+  // Concurrency lock — skip if another run holds it. Without this, overlapping
+  // runs (1-min schedule, up to 120s runtime) both read the same watermark and
+  // race the blind upsert. TTL (150s) is deliberately > maxDuration (120s): a
+  // live run's lease therefore can never expire while it's still running, so no
+  // successor can acquire mid-run and the unconditional release in finally only
+  // ever clears THIS run's own lease. On a hard crash the TTL is the backstop
+  // (next run waits at most ~30s past maxDuration). (Audit #5 + re-audit NEW-1.)
+  const { data: gotLock } = await admin.rpc('try_acquire_analytics_lock', { p_ttl_seconds: 150 })
+  if (gotLock !== true) {
+    return NextResponse.json({ ok: true, skipped: true, reason: 'another analytics run in flight' })
+  }
 
-  // Which pools changed since last run? Entries rescored since lastRun →
-  // their member_ids → pool_ids.
-  const { data: changedEntries } = await admin
-    .from('pool_entries')
-    .select('member_id')
-    .gt('last_rank_update', lastRun)
-  const changedMemberIds = Array.from(
-    new Set(((changedEntries ?? []) as Array<{ member_id: string }>).map((e) => e.member_id)),
-  )
+  try {
+    // Last run watermark.
+    const { data: lastRunRow } = await admin
+      .from('sync_settings')
+      .select('setting_value')
+      .eq('setting_key', 'analytics_last_run_at')
+      .maybeSingle()
+    const lastRun = (lastRunRow?.setting_value as string) || '1970-01-01T00:00:00Z'
+    const lastRunMs = new Date(lastRun).getTime()
 
-  let poolIds: string[] = []
-  if (changedMemberIds.length > 0) {
-    const { data: memberRows } = await admin
-      .from('pool_members')
-      .select('pool_id')
-      .in('member_id', changedMemberIds)
-    poolIds = Array.from(
-      new Set(((memberRows ?? []) as Array<{ pool_id: string }>).map((m) => m.pool_id)),
+    const setWatermark = async (ts: string) =>
+      admin.from('sync_settings').upsert(
+        { setting_key: 'analytics_last_run_at', setting_value: ts },
+        { onConflict: 'setting_key' },
+      )
+
+    // Detect changed pools via a server-side aggregate: DISTINCT changed pools
+    // with their newest change, oldest-first, capped to MAX_POOLS_PER_RUN.
+    // Aggregating in SQL (not fetching per-entry rows) removes the PostgREST
+    // 1000-row cap that previously truncated bursts and caused missed pools
+    // (audit #1/#2), and compares timestamps as real timestamptz (audit #6).
+    const MAX_POOLS_PER_RUN = 60
+    const { data: changedPools, error: detectErr } = await admin.rpc(
+      'get_changed_analytics_pools',
+      { p_since: lastRun, p_limit: MAX_POOLS_PER_RUN },
     )
-  }
+    if (detectErr) {
+      return NextResponse.json({ ok: false, error: `detect failed: ${detectErr.message}` }, { status: 500 })
+    }
+    const pools = (changedPools ?? []) as Array<{ pool_id: string; newest_change: string }>
 
-  // Stamp the new watermark up front (so a slow run doesn't double-process the
-  // same window next tick; at-least-once is fine — recompute is idempotent).
-  await admin
-    .from('sync_settings')
-    .upsert({ setting_key: 'analytics_last_run_at', setting_value: startedAt }, { onConflict: 'setting_key' })
+    if (pools.length === 0) {
+      await setWatermark(startedAt) // fully caught up
+      return NextResponse.json({ ok: true, pools: 0, note: 'no pools changed since last run' })
+    }
 
-  if (poolIds.length === 0) {
-    return NextResponse.json({ ok: true, pools: 0, note: 'no pools changed since last run' })
-  }
+    // If we got a full page, MORE changed pools may exist beyond the cap → we
+    // are NOT caught up; advance only over completed work.
+    const cappedMore = pools.length === MAX_POOLS_PER_RUN
 
-  // Recompute changed pools in batches (bounded concurrency).
-  const errors: Array<{ pool_id: string; message: string }> = []
-  let written = 0
-  const BATCH = 10
-  for (let i = 0; i < poolIds.length; i += BATCH) {
-    const batch = poolIds.slice(i, i + BATCH)
-    const results = await Promise.allSettled(batch.map((pid) => writePoolEntryAnalytics(admin, pid)))
-    results.forEach((r, idx) => {
-      if (r.status === 'fulfilled') written += r.value
-      else errors.push({ pool_id: batch[idx], message: String(r.reason?.message ?? r.reason) })
+    // Process (bounded concurrency). writePoolEntryAnalytics THROWS on write
+    // failure, so a rejected pool is not marked succeeded → not skipped.
+    const succeeded = new Set<string>()
+    const errors: Array<{ pool_id: string; message: string }> = []
+    let written = 0
+    const BATCH = 10
+    for (let i = 0; i < pools.length; i += BATCH) {
+      const batch = pools.slice(i, i + BATCH)
+      const results = await Promise.allSettled(batch.map((p) => writePoolEntryAnalytics(admin, p.pool_id)))
+      results.forEach((r, idx) => {
+        const p = batch[idx]
+        if (r.status === 'fulfilled') { succeeded.add(p.pool_id); written += r.value }
+        else errors.push({ pool_id: p.pool_id, message: String(r.reason?.message ?? r.reason) })
+      })
+    }
+
+    // Advance the watermark over the contiguous run of successes (oldest-first,
+    // epoch comparison). Stop at the first pool that failed/wasn't done → it and
+    // everything after is retried next run (never skipped). Only jump to
+    // startedAt when we got the COMPLETE change set (not a full page) AND it all
+    // succeeded. Minus a 2s overlap so timestamp ties can't slip the > filter.
+    const SAFETY_LAG_MS = 2000
+    let safeMs = lastRunMs
+    for (const p of pools) {
+      if (succeeded.has(p.pool_id)) safeMs = new Date(p.newest_change).getTime()
+      else break
+    }
+    const caughtUp = !cappedMore && errors.length === 0 && succeeded.size === pools.length
+    const newWatermarkMs = caughtUp ? new Date(startedAt).getTime() : safeMs - SAFETY_LAG_MS
+    let newWatermark = lastRun
+    if (newWatermarkMs > lastRunMs) {
+      newWatermark = new Date(newWatermarkMs).toISOString()
+      await setWatermark(newWatermark)
+    }
+
+    return NextResponse.json({
+      ok: true,
+      startedAt,
+      pools_changed: pools.length,
+      pools_succeeded: succeeded.size,
+      capped_more: cappedMore,
+      entries_written: written,
+      watermark_advanced_to: newWatermark,
+      errors,
     })
+  } finally {
+    await admin.rpc('release_analytics_lock')
   }
-
-  return NextResponse.json({
-    ok: true,
-    startedAt,
-    pools_processed: poolIds.length,
-    entries_written: written,
-    errors,
-  })
 }

@@ -100,6 +100,12 @@ export function AnalyticsTab({
 
   const isBracketPicker = predictionMode === 'bracket_picker'
 
+  // Pre-tournament: no matches have been scored yet. Instead of bailing to a
+  // single "coming soon" card (web's old behaviour), we mirror the mobile app
+  // and render the full Form skeleton with zeroed "holding" values + copy that
+  // explains what will populate once results land.
+  const preTournament = completedMatches.length === 0
+
   // =============================================
   // COMPUTED ANALYTICS (memoized)
   // =============================================
@@ -138,7 +144,11 @@ export function AnalyticsTab({
   // =============================================
 
   const xpBreakdown = useMemo(() => {
-    if (isBracketPicker || !isEntrySubmitted || predictionResults.length === 0) return null
+    if (isBracketPicker) return null
+    // Pre-tournament we always build the breakdown so the holding skeleton can
+    // render (computeFullXPBreakdown returns Rookie / 0 XP for empty results).
+    // Otherwise keep the original gating: only for submitted entries with scores.
+    if (!preTournament && (!isEntrySubmitted || predictionResults.length === 0)) return null
 
     const entryRank = selectedEntry?.current_rank ?? null
 
@@ -151,7 +161,7 @@ export function AnalyticsTab({
       entryRank,
       totalMatches: matches.length,
     })
-  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry])
+  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry, preTournament])
 
   // =============================================
   // BRACKET PICKER XP SYSTEM (memoized)
@@ -258,9 +268,15 @@ export function AnalyticsTab({
 
   // Compute bracket picker XP breakdown
   const bpXpBreakdown = useMemo(() => {
-    if (!isBracketPicker || !isEntrySubmitted) return null
-    if (selectedBPGroupRankings.length === 0 && selectedBPKnockoutPicks.length === 0) return null
-    if (completedMatches.length === 0) return null
+    if (!isBracketPicker) return null
+    // Pre-tournament we always build the breakdown so the holding skeleton can
+    // render (computeFullBPXPBreakdown returns Rookie / 0 XP for empty inputs).
+    // Otherwise keep the original gating: submitted + has picks + scored matches.
+    if (!preTournament) {
+      if (!isEntrySubmitted) return null
+      if (selectedBPGroupRankings.length === 0 && selectedBPKnockoutPicks.length === 0) return null
+      if (completedMatches.length === 0) return null
+    }
 
     // Actual third-place qualifier team IDs (top 8 from ranked thirds)
     const actualThirdPlaceQualifierTeamIds = new Set(
@@ -282,7 +298,7 @@ export function AnalyticsTab({
   }, [
     isBracketPicker, isEntrySubmitted, selectedBPGroupRankings, selectedBPThirdPlaceRankings,
     selectedBPKnockoutPicks, actualGroupStandings, actualRankedThirds, bpCompletedMatches,
-    matches, teams, completedMatches, selectedEntry, poolCreatedAt,
+    matches, teams, completedMatches, selectedEntry, poolCreatedAt, preTournament,
   ])
 
   // =============================================
@@ -324,26 +340,10 @@ export function AnalyticsTab({
   ])
 
   // =============================================
-  // EMPTY STATE
+  // RENDER
+  // Pre-tournament renders the same skeleton with zeroed "holding" values
+  // (see `preTournament` above) instead of bailing to an empty state.
   // =============================================
-
-  if (completedMatches.length === 0) {
-    return (
-      <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-8 text-center">
-        <div className="text-4xl mb-3">
-          <svg className="w-12 h-12 mx-auto text-neutral-300 dark:text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">
-          Analytics Coming Soon
-        </h3>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Analytics will appear once matches start being played and results come in.
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-8">
@@ -365,8 +365,18 @@ export function AnalyticsTab({
         </div>
       )}
 
-      {/* Entry not submitted warning */}
-      {!isEntrySubmitted && !isBracketPicker && (
+      {/* Pre-tournament preview banner */}
+      {preTournament && (
+        <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
+          <p className="text-sm text-primary-800 dark:text-primary-300">
+            The tournament hasn&apos;t kicked off yet — here&apos;s a preview of your Form. Levels, badges, streaks and stats fill in as matches are played.
+          </p>
+        </div>
+      )}
+
+      {/* Entry not submitted warning (only mid-tournament; pre-tournament we show
+          the holding skeleton regardless of submission) */}
+      {!preTournament && !isEntrySubmitted && !isBracketPicker && (
         <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-xl p-4">
           <p className="text-sm text-warning-800 dark:text-warning-300">
             Submit your predictions to see your XP progression, accuracy breakdown, streaks, and crowd comparison.
@@ -376,7 +386,7 @@ export function AnalyticsTab({
       )}
 
       {/* Bracket picker: not submitted warning */}
-      {isBracketPicker && !isEntrySubmitted && (
+      {!preTournament && isBracketPicker && !isEntrySubmitted && (
         <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-xl p-4">
           <p className="text-sm text-warning-800 dark:text-warning-300">
             Submit your bracket to see your XP progression, group accuracy, knockout picks, and badge progress.
@@ -389,7 +399,7 @@ export function AnalyticsTab({
       {xpBreakdown && (
         <div>
           <SectionHeader emoji="⚡" title="XP Progression" />
-          <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} />
+          <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} preTournament={preTournament} />
         </div>
       )}
 
@@ -397,7 +407,7 @@ export function AnalyticsTab({
       {bpXpBreakdown && (
         <div>
           <SectionHeader emoji="⚡" title="XP Progression" />
-          <BPXPProgressSection bpXpBreakdown={bpXpBreakdown} teams={teams} bpPoolComparison={bpPoolComparison} />
+          <BPXPProgressSection bpXpBreakdown={bpXpBreakdown} teams={teams} bpPoolComparison={bpPoolComparison} preTournament={preTournament} />
         </div>
       )}
 

@@ -9,6 +9,7 @@ import { withPerfLogging } from '@/lib/api-perf'
 import { matchScoresToPredictionResults, computeStreaks, computeCrowdPredictions } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, computeLevel } from '@/app/pools/[pool_id]/analytics/xpSystem'
+import { getLevelName } from '@/lib/levelNames'
 import type { MatchData, PredictionData, MemberData } from '@/app/pools/[pool_id]/types'
 
 // =============================================================
@@ -265,6 +266,39 @@ async function handleGET(
   const leaderboard: LeaderboardEntryResponse[] = []
   const entryPredResultsMap = new Map<string, PredictionResult[]>()
 
+  // Read-path flip (M4): when enabled, serve analytics (form/streak/hit/exact/
+  // level/xp/crowd) from the precomputed entry_xp_state columns instead of
+  // recomputing per entry. Master backout = flip this flag false (no deploy).
+  // Per-entry fallback below: any entry without a populated column live-computes,
+  // so bracket pools / un-backfilled entries are handled automatically.
+  const { data: readFlagRow } = await adminClient
+    .from('sync_settings')
+    .select('setting_value')
+    .eq('setting_key', 'analytics_read_from_columns')
+    .maybeSingle()
+  const readFromColumns = readFlagRow?.setting_value === true || readFlagRow?.setting_value === 'true'
+
+  const xpByEntry = new Map<string, any>()
+  if (readFromColumns) {
+    const xpEntryIds = entries.map((e: any) => e.entry_id)
+    const pageSize = 1000
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: xpRows } = await adminClient
+        .from('entry_xp_state')
+        .select('entry_id, total_xp, current_level, last_five, current_streak, hit_rate, total_completed, exact_count, contrarian_wins, crowd_agreement_pct, analytics_updated_at')
+        .in('entry_id', xpEntryIds)
+        .order('entry_id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (!xpRows || xpRows.length === 0) { hasMore = false } else {
+        for (const r of xpRows as any[]) xpByEntry.set(r.entry_id, r)
+        offset += xpRows.length
+        if (xpRows.length < pageSize) hasMore = false
+      }
+    }
+  }
+
   for (const entry of entries) {
     const member = memberMap.get(entry.member_id)
     if (!member) continue
@@ -293,78 +327,106 @@ async function handleGET(
       matchPoints = entry.match_points ?? 0
       bonusPoints = entry.bonus_points ?? 0
 
-      // --- Analytics computation ---
-      try {
-        // Build PredictionData[] for this entry
-        const entryPreds: PredictionData[] = predictions.map((p: any) => ({
-          prediction_id: p.prediction_id || '',
-          entry_id: p.entry_id,
-          match_id: p.match_id,
-          predicted_home_score: p.predicted_home_score,
-          predicted_away_score: p.predicted_away_score,
-          predicted_home_pso: p.predicted_home_pso ?? null,
-          predicted_away_pso: p.predicted_away_pso ?? null,
-          predicted_winner_team_id: p.predicted_winner_team_id ?? null,
-        }))
+      // predResults (cheap — maps stored match_scores) is needed for the
+      // matchday-MVP calc downstream regardless of read path.
+      const entryMatchScores = matchScoresByEntry.get(entry.entry_id) || []
+      const predResults = matchScoresToPredictionResults(entryMatchScores)
+      entryPredResultsMap.set(entry.entry_id, predResults)
 
-        const entryMatchScores = matchScoresByEntry.get(entry.entry_id) || []
-        const predResults = matchScoresToPredictionResults(entryMatchScores)
+      const col = readFromColumns ? xpByEntry.get(entry.entry_id) : null
 
-        // Store for matchday MVP calculation
-        entryPredResultsMap.set(entry.entry_id, predResults)
+      if (col && col.analytics_updated_at != null) {
+        // READ PATH — analytics from precomputed columns (skips the expensive
+        // per-entry computeCrowdPredictions / computeFullXPBreakdown). level_name
+        // derived from level via the shared mapping (single source of truth).
+        // Pad/truncate to exactly 5 (matches the live path) so a null/legacy
+        // column can't yield a wrong-length array the UI indexes into.
+        const lf = (Array.isArray(col.last_five) ? [...col.last_five] : []) as typeof last_five
+        while (lf.length < 5) lf.unshift('no_pick')
+        last_five = lf.slice(-5) as typeof last_five
+        const cs = col.current_streak
+        current_streak = (cs && typeof cs.type === 'string' && typeof cs.length === 'number')
+          ? cs
+          : { type: 'none', length: 0 }
+        hit_rate = col.hit_rate != null ? Number(col.hit_rate) : 0
+        total_completed = col.total_completed ?? 0
+        exact_count = col.exact_count ?? 0
+        level = col.current_level ?? 1
+        level_name = getLevelName(level)
+        total_xp = col.total_xp ?? 0
+        contrarian_wins = col.contrarian_wins ?? 0
+        crowd_agreement_pct = col.crowd_agreement_pct != null ? Number(col.crowd_agreement_pct) : 0
+      } else {
+        // FALLBACK — live compute (flag off, or no/stale column e.g. bracket /
+        // not-yet-backfilled). Unchanged from the original behavior.
+        try {
+          const entryPreds: PredictionData[] = predictions.map((p: any) => ({
+            prediction_id: p.prediction_id || '',
+            entry_id: p.entry_id,
+            match_id: p.match_id,
+            predicted_home_score: p.predicted_home_score,
+            predicted_away_score: p.predicted_away_score,
+            predicted_home_pso: p.predicted_home_pso ?? null,
+            predicted_away_pso: p.predicted_away_pso ?? null,
+            predicted_winner_team_id: p.predicted_winner_team_id ?? null,
+          }))
 
-        const streaks = computeStreaks(predResults)
+          const streaks = computeStreaks(predResults)
 
-        const crowdData = computeCrowdPredictions(
-          normalizedMatches as MatchData[],
-          allPredsTyped as PredictionData[],
-          entryPreds as PredictionData[],
-          membersWithEntries,
-        )
+          const crowdData = computeCrowdPredictions(
+            normalizedMatches as MatchData[],
+            allPredsTyped as PredictionData[],
+            entryPreds as PredictionData[],
+            membersWithEntries,
+          )
 
-        const xpBreakdown = computeFullXPBreakdown({
-          predictionResults: predResults,
-          matches: normalizedMatches as MatchData[],
-          crowdData,
-          streaks,
-          entryPredictions: entryPreds as PredictionData[],
-          entryRank: entry.current_rank,
-          totalMatches: normalizedMatches.length,
-        })
+          const xpBreakdown = computeFullXPBreakdown({
+            predictionResults: predResults,
+            matches: normalizedMatches as MatchData[],
+            crowdData,
+            streaks,
+            entryPredictions: entryPreds as PredictionData[],
+            entryRank: entry.current_rank,
+            totalMatches: normalizedMatches.length,
+          })
 
-        // last_five: take last 5 from predResults, map to type, pad with 'no_pick' if needed
-        const lastFiveResults = predResults.slice(-5)
-        last_five = lastFiveResults.map(r => r.type as 'exact' | 'winner_gd' | 'winner' | 'miss')
-        while (last_five.length < 5) {
-          last_five.unshift('no_pick')
+          // last_five: take last 5 from predResults, map to type, pad with 'no_pick' if needed
+          const lastFiveResults = predResults.slice(-5)
+          last_five = lastFiveResults.map(r => r.type as 'exact' | 'winner_gd' | 'winner' | 'miss')
+          while (last_five.length < 5) {
+            last_five.unshift('no_pick')
+          }
+
+          // current_streak
+          current_streak = streaks.currentStreak
+
+          // hit_rate: non-miss / total * 100, rounded to 2dp to MATCH the stored
+          // column (numeric(5,2)) so flag-on (column) and flag-off (live) return
+          // identical values — strict read-path parity.
+          total_completed = predResults.length
+          const nonMiss = predResults.filter(r => r.type !== 'miss').length
+          hit_rate = total_completed > 0 ? Math.round((nonMiss / total_completed) * 10000) / 100 : 0
+
+          // exact_count
+          exact_count = predResults.filter(r => r.type === 'exact').length
+
+          // level and XP
+          level = xpBreakdown.currentLevel.level
+          level_name = xpBreakdown.currentLevel.name
+          total_xp = xpBreakdown.totalXP
+
+          // contrarian_wins: count of crowdData where userIsContrarian && userWasCorrect
+          contrarian_wins = crowdData.filter(c => c.userIsContrarian && c.userWasCorrect).length
+
+          // crowd_agreement_pct: !contrarian / total * 100, rounded to 2dp to
+          // match the stored numeric(5,2) column (parity with flag-on).
+          const crowdTotal = crowdData.filter(c => c.userPredictedResult !== null).length
+          const agreements = crowdData.filter(c => !c.userIsContrarian && c.userPredictedResult !== null).length
+          crowd_agreement_pct = crowdTotal > 0 ? Math.round((agreements / crowdTotal) * 10000) / 100 : 0
+        } catch (_e) {
+          // If analytics helpers fail, we still return basic leaderboard data
+          // Analytics fields remain at their defaults
         }
-
-        // current_streak
-        current_streak = streaks.currentStreak
-
-        // hit_rate: non-miss / total * 100
-        total_completed = predResults.length
-        const nonMiss = predResults.filter(r => r.type !== 'miss').length
-        hit_rate = total_completed > 0 ? (nonMiss / total_completed) * 100 : 0
-
-        // exact_count
-        exact_count = predResults.filter(r => r.type === 'exact').length
-
-        // level and XP
-        level = xpBreakdown.currentLevel.level
-        level_name = xpBreakdown.currentLevel.name
-        total_xp = xpBreakdown.totalXP
-
-        // contrarian_wins: count of crowdData where userIsContrarian && userWasCorrect
-        contrarian_wins = crowdData.filter(c => c.userIsContrarian && c.userWasCorrect).length
-
-        // crowd_agreement_pct: count of !userIsContrarian / total * 100
-        const crowdTotal = crowdData.filter(c => c.userPredictedResult !== null).length
-        const agreements = crowdData.filter(c => !c.userIsContrarian && c.userPredictedResult !== null).length
-        crowd_agreement_pct = crowdTotal > 0 ? (agreements / crowdTotal) * 100 : 0
-      } catch (_e) {
-        // If analytics helpers fail, we still return basic leaderboard data
-        // Analytics fields remain at their defaults
       }
     }
 
