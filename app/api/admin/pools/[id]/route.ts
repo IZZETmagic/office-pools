@@ -8,7 +8,10 @@ export async function GET(
 ) {
   const auth = await requireSuperAdmin()
   if (auth.error) return auth.error
-  const { supabase } = auth.data
+  // Super admins may inspect ANY pool, including ones they aren't a member of.
+  // The route is gated by requireSuperAdmin above, so read through the
+  // service-role client to bypass per-member RLS on pools / round states / etc.
+  const supabase = createAdminClient()
   const { id } = await params
 
   // Run all queries in parallel

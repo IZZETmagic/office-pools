@@ -146,7 +146,8 @@ async function handlePOST(
     }
 
     case 'complete': {
-      if (roundState.state !== 'in_progress' && roundState.state !== 'open') {
+      // A super-admin override can mark a round complete from any state.
+      if (!override && roundState.state !== 'in_progress' && roundState.state !== 'open') {
         return NextResponse.json({ error: `Cannot complete round in '${roundState.state}' state` }, { status: 400 })
       }
       updateData = {
@@ -158,7 +159,8 @@ async function handlePOST(
     }
 
     case 'extend_deadline': {
-      if (roundState.state !== 'open' && roundState.state !== 'in_progress') {
+      // A super-admin override can change the deadline regardless of state.
+      if (!override && roundState.state !== 'open' && roundState.state !== 'in_progress') {
         return NextResponse.json({ error: `Cannot extend deadline for round in '${roundState.state}' state` }, { status: 400 })
       }
       if (!deadline) {

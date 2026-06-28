@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SuperAdminDashboard } from './SuperAdminDashboard'
 
@@ -165,10 +165,15 @@ export default async function SuperAdminPage() {
     redirect('/dashboard?error=super_admin_required')
   }
 
-  // STEP 3: Fetch all data in parallel
+  // STEP 3: Fetch all data in parallel.
+  // Read through the service-role client so the dashboard shows EVERY pool/user,
+  // not just rows the signed-in super admin happens to be a member of (RLS would
+  // otherwise filter pools/users to the admin's own memberships). The page is
+  // already gated by the is_super_admin check above.
+  const admin = createAdminClient()
   const [matchesRes, usersRes, poolsRes, auditRes, subscriptionsRes] = await Promise.all([
     // All matches with team names
-    supabase
+    admin
       .from('matches')
       .select(
         `
@@ -182,10 +187,10 @@ export default async function SuperAdminPage() {
 
     // All users — paginated (Supabase hard-caps each response at 1000 rows
     // server-side; see fetchAllUsers above).
-    fetchAllUsers(supabase),
+    fetchAllUsers(admin),
 
     // All pools with member counts and admin info
-    supabase
+    admin
       .from('pools')
       .select(
         `
@@ -198,7 +203,7 @@ export default async function SuperAdminPage() {
       .order('created_at', { ascending: false }),
 
     // Audit logs
-    supabase
+    admin
       .from('admin_audit_log')
       .select(
         `
@@ -212,7 +217,7 @@ export default async function SuperAdminPage() {
       .limit(100),
 
     // Subscription periods
-    supabase
+    admin
       .from('subscription_periods')
       .select('*')
       .order('provider', { ascending: true })
