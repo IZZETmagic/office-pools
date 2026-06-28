@@ -86,7 +86,6 @@ export function ProgressivePredictionWizard({
   poolId,
   data,
   predictions,
-  bracket,
   updatePrediction,
   saving,
   readOnly = false,
@@ -287,7 +286,6 @@ export function ProgressivePredictionWizard({
           <KnockoutStageContent
             matches={stageMatches}
             predictions={predictions}
-            bracket={bracket}
             onChange={effectiveUpdatePrediction}
             disabled={!canEdit}
             isFinalsRound={currentRound === 'final' || currentRound === 'third_place'}
@@ -597,7 +595,6 @@ function GroupStageContent({
 function KnockoutStageContent({
   matches,
   predictions,
-  bracket,
   onChange,
   disabled,
   isFinalsRound,
@@ -605,7 +602,6 @@ function KnockoutStageContent({
 }: {
   matches: Match[];
   predictions: Map<string, ScoreEntry>;
-  bracket: BracketResult | null;
   onChange: (matchId: string, patch: Partial<ScoreEntry>) => void;
   disabled: boolean;
   isFinalsRound: boolean;
@@ -618,7 +614,6 @@ function KnockoutStageContent({
     <View style={{ gap: theme.spacing.md }}>
       {matches.map((m) => {
         const pred = predictions.get(m.match_id);
-        const resolved = bracket?.knockoutTeamMap.get(m.match_number);
         const isFinal = m.stage === 'final';
         return (
           <View
@@ -640,23 +635,26 @@ function KnockoutStageContent({
               </View>
             ) : null}
             <MatchPredictionRow
+              // Progressive pools predict the ACTUAL fixtures, so always show the
+              // real assigned teams (set by the advance-teams flow), falling back
+              // to the placeholder ("Winner Match N") only until teams are known.
+              // Never derive from the member's predicted bracket — that would show
+              // a different matchup than the one the score is saved against.
               home={{
                 countryName:
-                  resolved?.home?.country_name ??
                   m.home_team?.country_name ??
                   m.home_team_placeholder ??
                   'TBD',
-                flagUrl: resolved?.home?.flag_url ?? m.home_team?.flag_url ?? null,
-                subtitle: resolved?.home ? null : m.home_team_placeholder,
+                flagUrl: m.home_team?.flag_url ?? null,
+                subtitle: m.home_team ? null : m.home_team_placeholder,
               }}
               away={{
                 countryName:
-                  resolved?.away?.country_name ??
                   m.away_team?.country_name ??
                   m.away_team_placeholder ??
                   'TBD',
-                flagUrl: resolved?.away?.flag_url ?? m.away_team?.flag_url ?? null,
-                subtitle: resolved?.away ? null : m.away_team_placeholder,
+                flagUrl: m.away_team?.flag_url ?? null,
+                subtitle: m.away_team ? null : m.away_team_placeholder,
               }}
               homeScore={pred?.home ?? null}
               awayScore={pred?.away ?? null}
