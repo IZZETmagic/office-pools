@@ -839,6 +839,7 @@ export function MembersTab({
             teams={teams}
             onClose={() => setModal({ type: 'none' })}
             getEntryTotalPoints={getEntryTotalPoints}
+            isProgressive={pool.prediction_mode === 'progressive'}
           />
         )
       )}
@@ -1026,6 +1027,7 @@ function ViewPredictionsModal({
   teams,
   onClose,
   getEntryTotalPoints,
+  isProgressive,
 }: {
   member: MemberData
   initialEntry?: EntryData
@@ -1034,6 +1036,7 @@ function ViewPredictionsModal({
   teams: TeamData[]
   onClose: () => void
   getEntryTotalPoints: (entry: EntryData) => number
+  isProgressive: boolean
 }) {
   const entries = (member.entries || []).sort((a, b) => a.entry_number - b.entry_number)
   const hasMultipleEntries = entries.length > 1
@@ -1182,13 +1185,28 @@ function ViewPredictionsModal({
 
   // Resolve team name for a match
   function getTeamName(match: MatchData, side: 'home' | 'away'): string {
+    // Progressive pools predict the ACTUAL fixtures round-by-round, so always
+    // show the real assigned teams (mirrors the member wizard's
+    // resolveMatchesFromActual). Resolving knockout teams from the member's
+    // predicted bracket — as the classic path below does — would show different
+    // matchups than the member actually predicted.
+    if (isProgressive) {
+      const teamObj = side === 'home' ? match.home_team : match.away_team
+      if (teamObj?.country_name) return teamObj.country_name
+      const teamId = side === 'home' ? match.home_team_id : match.away_team_id
+      if (teamId) {
+        const t = teams.find((t) => t.team_id === teamId)
+        if (t) return t.country_name
+      }
+      return 'TBD'
+    }
     // Group stage: use actual team names
     if (match.stage === 'group') {
       return side === 'home'
         ? match.home_team?.country_name || 'TBD'
         : match.away_team?.country_name || 'TBD'
     }
-    // Knockout: resolve from member's predictions
+    // Knockout (classic mode): resolve from member's predicted bracket
     const resolved = knockoutTeamMap.get(match.match_number)
     if (resolved) {
       const team = side === 'home' ? resolved.home : resolved.away
@@ -1308,8 +1326,10 @@ function ViewPredictionsModal({
                 )
               })}
 
-              {/* Champion highlight */}
-              {champion && (
+              {/* Champion highlight — only meaningful for full-bracket modes.
+                  Progressive members predict round-by-round, so a bracket-
+                  resolved "champion" from partial predictions is misleading. */}
+              {!isProgressive && champion && (
                 <div className="mt-2 text-center p-4 rounded-2xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-50 border border-accent-100">
                   <div className="text-3xl mb-1">&#127942;</div>
                   <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-0.5">
