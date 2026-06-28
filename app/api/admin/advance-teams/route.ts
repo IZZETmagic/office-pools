@@ -168,6 +168,13 @@ async function advanceGroupToR32(
 
     if (Object.keys(updates).length > 0) {
       await supabase.from('matches').update(updates).eq('match_id', r32Match.match_id)
+      // Keep the in-memory matches array in sync with the DB write. The same
+      // array is handed to checkProgressiveRoundCompletion() right after this,
+      // which decides whether to open round_32 by reading home/away_team_id off
+      // these objects. Without this, those reads see stale nulls and the next
+      // round never auto-opens (group gets marked completed, R32 stays locked).
+      // Mirrors advanceKnockoutWinner(), which already updates its local copy.
+      Object.assign(r32Match, updates)
     }
   }
 
@@ -405,13 +412,19 @@ async function checkProgressiveRoundCompletion(
 
       if (!nextRoundState || nextRoundState.state !== 'locked') continue
 
-      // Check if next round's matches have teams assigned
+      // Check if next round's matches have teams assigned. Read fresh from the
+      // DB rather than the passed-in `matches` array: that array can be stale
+      // (e.g. advanceGroupToR32 writes R32 teams to the DB in the same request),
+      // and a stale read here leaves the round permanently locked.
       const nextStages = ROUND_MATCH_STAGES[nextRound] ?? []
-      const nextMatches = matches.filter((m: any) =>
-        nextStages.includes(m.stage) && m.tournament_id === pool.tournament_id
-      )
+      const { data: nextMatches } = await supabase
+        .from('matches')
+        .select('match_id, home_team_id, away_team_id, match_date')
+        .eq('tournament_id', pool.tournament_id)
+        .in('stage', nextStages)
+        .order('match_date', { ascending: true })
 
-      const allTeamsAssigned = nextMatches.length > 0 && nextMatches.every(
+      const allTeamsAssigned = !!nextMatches && nextMatches.length > 0 && nextMatches.every(
         (m: any) => m.home_team_id && m.away_team_id
       )
 
