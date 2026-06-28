@@ -22,20 +22,43 @@ async function handlePOST(
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
 
-  // Verify admin role
-  const { data: membership } = await supabase
-    .from('pool_members')
-    .select('member_id, role')
-    .eq('pool_id', pool_id)
-    .eq('user_id', userData.user_id)
-    .single()
+  const isSuperAdmin = userData.is_super_admin === true
 
-  if (!membership || membership.role !== 'admin') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  const body = await request.json()
+  const { action, deadline, override: overrideRaw, notify } = body as {
+    action: 'open' | 'close' | 'complete' | 'extend_deadline'
+    deadline?: string
+    override?: boolean
+    notify?: boolean
   }
 
-  // Verify pool is progressive
-  const { data: pool } = await supabase
+  // A super-admin override lets a super admin force a round's state (e.g. to undo
+  // an accidental "complete"), bypassing the normal gating. Only honoured for
+  // actual super admins; ordinary pool admins must satisfy the usual rules.
+  const override = isSuperAdmin && overrideRaw === true
+
+  // Verify admin role. Super admins are allowed through even if they are not a
+  // member of the pool, so they can fix any pool from the Super Admin dashboard.
+  if (!isSuperAdmin) {
+    const { data: membership } = await supabase
+      .from('pool_members')
+      .select('member_id, role')
+      .eq('pool_id', pool_id)
+      .eq('user_id', userData.user_id)
+      .single()
+
+    if (!membership || membership.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+  }
+
+  // Super admins act through the service-role client so RLS doesn't block them
+  // on pools they aren't a member of. Pool admins keep their RLS-scoped client.
+  const db = isSuperAdmin ? createAdminClient() : supabase
+
+  // Verify pool is progressive (round states — and this override — only apply to
+  // progressive pools).
+  const { data: pool } = await db
     .from('pools')
     .select('prediction_mode, pool_name, tournament_id')
     .eq('pool_id', pool_id)
@@ -46,7 +69,7 @@ async function handlePOST(
   }
 
   // Get current round state
-  const { data: roundState } = await supabase
+  const { data: roundState } = await db
     .from('pool_round_states')
     .select('*')
     .eq('pool_id', pool_id)
@@ -57,37 +80,36 @@ async function handlePOST(
     return NextResponse.json({ error: 'Round not found' }, { status: 404 })
   }
 
-  const body = await request.json()
-  const { action, deadline } = body as {
-    action: 'open' | 'close' | 'complete' | 'extend_deadline'
-    deadline?: string
-  }
-
   const now = new Date().toISOString()
   let updateData: Record<string, any> = { updated_at: now }
 
   switch (action) {
     case 'open': {
-      if (roundState.state !== 'locked') {
-        return NextResponse.json({ error: `Cannot open round in '${roundState.state}' state` }, { status: 400 })
-      }
+      // A super-admin override skips the normal gating (round must be 'locked'
+      // and all knockout teams assigned). A deadline is still required so the
+      // round can't be left open indefinitely.
+      if (!override) {
+        if (roundState.state !== 'locked') {
+          return NextResponse.json({ error: `Cannot open round in '${roundState.state}' state` }, { status: 400 })
+        }
 
-      // For knockout rounds, verify all teams are assigned
-      if (round_key !== 'group') {
-        const stages = ROUND_MATCH_STAGES[round_key as RoundKey] ?? []
-        const { data: roundMatches } = await supabase
-          .from('matches')
-          .select('match_id, home_team_id, away_team_id')
-          .eq('tournament_id', pool.tournament_id)
-          .in('stage', stages)
+        // For knockout rounds, verify all teams are assigned
+        if (round_key !== 'group') {
+          const stages = ROUND_MATCH_STAGES[round_key as RoundKey] ?? []
+          const { data: roundMatches } = await db
+            .from('matches')
+            .select('match_id, home_team_id, away_team_id')
+            .eq('tournament_id', pool.tournament_id)
+            .in('stage', stages)
 
-        const unassigned = (roundMatches ?? []).filter(
-          m => !m.home_team_id || !m.away_team_id
-        )
-        if (unassigned.length > 0) {
-          return NextResponse.json({
-            error: `Cannot open round: ${unassigned.length} match(es) don't have teams assigned yet`,
-          }, { status: 400 })
+          const unassigned = (roundMatches ?? []).filter(
+            m => !m.home_team_id || !m.away_team_id
+          )
+          if (unassigned.length > 0) {
+            return NextResponse.json({
+              error: `Cannot open round: ${unassigned.length} match(es) don't have teams assigned yet`,
+            }, { status: 400 })
+          }
         }
       }
 
@@ -101,18 +123,24 @@ async function handlePOST(
         deadline,
         opened_at: now,
         opened_by: userData.user_id,
+        // When overriding a closed/completed round back to open, clear the
+        // terminal timestamps so the row stays consistent.
+        ...(override ? { completed_at: null, closed_at: null } : {}),
       }
       break
     }
 
     case 'close': {
-      if (roundState.state !== 'open') {
+      // A super-admin override can close (lock) a round from any state.
+      if (!override && roundState.state !== 'open') {
         return NextResponse.json({ error: `Cannot close round in '${roundState.state}' state` }, { status: 400 })
       }
       updateData = {
         ...updateData,
         state: 'locked',
         closed_at: now,
+        // Clear a terminal "completed" stamp if we're overriding back to locked.
+        ...(override ? { completed_at: null } : {}),
       }
       break
     }
@@ -148,7 +176,7 @@ async function handlePOST(
   }
 
   // Apply state change
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from('pool_round_states')
     .update(updateData)
     .eq('id', roundState.id)
@@ -157,8 +185,26 @@ async function handlePOST(
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  // Send notifications for round open
-  if (action === 'open') {
+  // Record super-admin overrides in the audit trail for traceability.
+  if (override) {
+    await db.from('admin_audit_log').insert({
+      action: `round_state_override_${action}`,
+      performed_by: userData.user_id,
+      pool_id,
+      details: {
+        round_key,
+        previous_state: roundState.state,
+        new_state: updateData.state ?? roundState.state,
+        new_deadline: deadline ?? null,
+        notified: action === 'open' && notify === true,
+      },
+      summary: `Super-admin override: ${action} ${round_key} for pool ${pool.pool_name}`,
+    })
+  }
+
+  // Send notifications for round open. For a super-admin override we stay silent
+  // by default (it's usually a fix, not a fresh round) unless notify is set.
+  if (action === 'open' && (!override || notify === true)) {
     sendRoundOpenNotifications(pool_id, pool.pool_name, round_key as RoundKey, deadline!).catch(console.error)
   }
 
@@ -168,7 +214,7 @@ async function handlePOST(
     if (nextRound) {
       // Check if next round matches have teams assigned
       const stages = ROUND_MATCH_STAGES[nextRound] ?? []
-      const { data: nextMatches } = await supabase
+      const { data: nextMatches } = await db
         .from('matches')
         .select('match_id, home_team_id, away_team_id, match_date')
         .eq('tournament_id', pool.tournament_id)
@@ -182,7 +228,7 @@ async function handlePOST(
         const firstMatchDate = new Date(nextMatches[0].match_date)
         const defaultDeadline = new Date(firstMatchDate.getTime() - 2 * 60 * 60 * 1000).toISOString()
 
-        await supabase
+        await db
           .from('pool_round_states')
           .update({
             state: 'open',

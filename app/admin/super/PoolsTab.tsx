@@ -855,6 +855,153 @@ function DropdownMenu({
 // =============================================
 // POOL DETAIL SHEET
 // =============================================
+// Convert an ISO timestamp to a value for <input type="datetime-local"> (local time).
+function toDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Super-admin-only control to force a progressive pool's round open or closed,
+// bypassing the normal gating (used to recover from e.g. an accidental
+// "complete"). Members are NOT emailed unless "Email members" is ticked.
+function RoundOverrideControl({
+  poolId,
+  round,
+  onRefresh,
+}: {
+  poolId: string
+  round: RoundState
+  onRefresh: () => void
+}) {
+  const { showToast } = useToast()
+  const [mode, setMode] = useState<'none' | 'open' | 'close'>('none')
+  const [deadline, setDeadline] = useState('')
+  const [notify, setNotify] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(action: 'open' | 'close') {
+    if (action === 'open' && !deadline) {
+      showToast('Pick a picks deadline first', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/pools/${poolId}/rounds/${round.round_key}/state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          override: true,
+          ...(action === 'open' ? { deadline: new Date(deadline).toISOString(), notify } : {}),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Failed to ${action} round`)
+      showToast(
+        `${ROUND_LABELS[round.round_key] || round.round_key} ${action === 'open' ? 'opened' : 'closed'}`,
+        'success',
+      )
+      setMode('none')
+      onRefresh()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : `Failed to ${action} round`, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const canOpen = round.state !== 'open'
+  const canClose = round.state !== 'locked'
+
+  return (
+    <div className="mt-2 pt-2 space-y-1.5" style={{ borderTop: '1px solid var(--sp-silver)' }}>
+      {mode === 'none' && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {canOpen && (
+            <button
+              onClick={() => {
+                setDeadline(round.deadline ? toDatetimeLocalValue(round.deadline) : '')
+                setMode('open')
+              }}
+              className="text-[11px] font-medium hover:underline sp-body"
+              style={{ color: 'var(--sp-primary)' }}
+            >
+              Force open (override)
+            </button>
+          )}
+          {canClose && (
+            <button
+              onClick={() => setMode('close')}
+              className="text-[11px] font-medium hover:underline sp-body sp-text-slate"
+            >
+              Force close (override)
+            </button>
+          )}
+        </div>
+      )}
+
+      {mode === 'open' && (
+        <div className="space-y-1.5">
+          <input
+            type="datetime-local"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className="w-full text-[11px] sp-radius-sm px-2 py-1 sp-bg-surface sp-text-ink"
+            style={{ border: '1px solid var(--sp-silver)' }}
+          />
+          <label className="flex items-center gap-1.5 text-[11px] sp-text-slate sp-body">
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            Email members
+          </label>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => submit('open')}
+              disabled={saving}
+              className="text-[11px] font-medium px-2 py-1 sp-radius-sm sp-body"
+              style={{ backgroundColor: 'var(--sp-primary)', color: 'white', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Opening…' : 'Confirm open'}
+            </button>
+            <button
+              onClick={() => setMode('none')}
+              disabled={saving}
+              className="text-[11px] font-medium px-2 py-1 sp-radius-sm sp-text-slate sp-body"
+              style={{ border: '1px solid var(--sp-silver)' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'close' && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] sp-text-slate sp-body">Lock predictions for this round?</p>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => submit('close')}
+              disabled={saving}
+              className="text-[11px] font-medium px-2 py-1 sp-radius-sm sp-text-ink sp-body"
+              style={{ border: '1px solid var(--sp-silver)', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Closing…' : 'Confirm close'}
+            </button>
+            <button
+              onClick={() => setMode('none')}
+              disabled={saving}
+              className="text-[11px] font-medium px-2 py-1 sp-radius-sm sp-text-slate sp-body"
+              style={{ border: '1px solid var(--sp-silver)' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PoolDetailSheet({
   detail,
   onBack,
@@ -1059,6 +1206,9 @@ function PoolDetailSheet({
                   <div className="text-[11px] sp-text-slate sp-body">
                     Completed: {formatDateTime(rs.completed_at)}
                   </div>
+                )}
+                {pool.prediction_mode === 'progressive' && (
+                  <RoundOverrideControl poolId={pool.pool_id} round={rs} onRefresh={onRefresh} />
                 )}
               </div>
             ))}
