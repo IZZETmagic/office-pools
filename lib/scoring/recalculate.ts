@@ -31,6 +31,7 @@ import { calculateFullTournament } from './full'
 import { calculateProgressive } from './progressive'
 import { calculateBracketPicker, type BracketPickerInput } from './bracket'
 import type { BPEntryWithPicks } from './types'
+import { diffRows, matchScoreKey, matchScoreValue, bonusScoreKey, bonusScoreValue } from './diffWrite'
 
 // ----- Public API -----
 
@@ -468,85 +469,34 @@ async function writeScoresToDB(
   let matchScoresWritten = 0
   let bonusScoresWritten = 0
 
-  // Write match_scores — delete existing for all entries then bulk insert
-  // (mirrors bonus_scores pattern to ensure stale rows from reset/scheduled matches are removed)
   const allEntryIds = [...new Set(entryTotals.map(t => t.entry_id))]
 
-  if (allEntryIds.length > 0) {
-    // Delete existing match_scores for pool entries in parallel batches
-    // (scoped to the single match when onlyMatchId is set)
-    const deleteMatchBatchSize = 100
-    const deleteMatchBatches: string[][] = []
-    for (let i = 0; i < allEntryIds.length; i += deleteMatchBatchSize) {
-      deleteMatchBatches.push(allEntryIds.slice(i, i + deleteMatchBatchSize))
-    }
-    await Promise.all(
-      deleteMatchBatches.map(batch => {
-        // T-0018 / D-014: scope delete by pool_id. Prevents a future schema evolution
-        // (entry_id reuse, join-table refactor) from turning a single-pool recalc into
-        // a cross-pool match_scores wipe. Same scoping for bonus_scores deferred post-WC.
-        let del = adminClient.from('match_scores').delete().eq('pool_id', poolId).in('entry_id', batch)
-        if (onlyMatchId) del = del.eq('match_id', onlyMatchId)
-        return del
-          .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete match_scores batch:`, error) })
-      })
-    )
-  }
+  // B1 — change-only writes (gated by sync_settings.scoring_diff_writes_enabled).
+  // When ON, write only the match_scores / bonus_scores rows whose MEANINGFUL
+  // values changed instead of deleting and re-inserting every row. Stored values
+  // come out identical except metadata (id, calculated_at) — parity-tested — so
+  // we skip the no-op churn that makes completion sweeps run for minutes.
+  // SAFETY: ANY failure in the diff path (read or write) falls back to the legacy
+  // delete-all + insert-all path. Legacy is idempotent, so it reconciles any
+  // partial diff writes to the correct final state — B1 is strictly
+  // no-worse-than-legacy under failure. pool_entries totals (further down) are
+  // already diff-gated.
+  const useDiffWrites = await isDiffWritesEnabled(adminClient)
 
-  if (matchScores.length > 0) {
-    // Insert fresh match_scores in parallel batches
-    const batchSize = 500
-    const matchBatches: MatchScoreRow[][] = []
-    for (let i = 0; i < matchScores.length; i += batchSize) {
-      matchBatches.push(matchScores.slice(i, i + batchSize))
+  if (useDiffWrites) {
+    try {
+      matchScoresWritten = await diffWriteMatchScores(adminClient, poolId, matchScores, allEntryIds, onlyMatchId)
+      bonusScoresWritten = await diffWriteBonusScores(adminClient, bonusScores)
+    } catch (err) {
+      console.error(`[scoring] diff-write failed for pool ${poolId}; falling back to legacy delete+insert:`, err)
+      const legacy = await legacyWriteScores(adminClient, poolId, matchScores, bonusScores, allEntryIds, onlyMatchId)
+      matchScoresWritten = legacy.matchScoresWritten
+      bonusScoresWritten = legacy.bonusScoresWritten
     }
-    const matchResults = await Promise.all(
-      matchBatches.map(batch =>
-        adminClient
-          .from('match_scores')
-          .insert(batch)
-          .then(({ error }: { error: any }) => {
-            if (error) { console.error(`[scoring] Failed to insert match_scores batch:`, error); return 0 }
-            return batch.length
-          })
-      )
-    )
-    matchScoresWritten = matchResults.reduce((sum, n) => sum + n, 0)
-  }
-
-  // Write bonus_scores — delete existing then bulk insert (in parallel batches)
-  if (bonusScores.length > 0) {
-    const affectedEntryIds = [...new Set(bonusScores.map(bs => bs.entry_id))]
-
-    // Delete all existing bonus_scores for affected entries in parallel
-    const deleteBatchSize = 100
-    const deleteBatches: string[][] = []
-    for (let i = 0; i < affectedEntryIds.length; i += deleteBatchSize) {
-      deleteBatches.push(affectedEntryIds.slice(i, i + deleteBatchSize))
-    }
-    await Promise.all(
-      deleteBatches.map(batch =>
-        adminClient.from('bonus_scores').delete().in('entry_id', batch)
-          .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete bonus_scores batch:`, error) })
-      )
-    )
-
-    // Insert new bonus_scores in parallel batches
-    const insertBatchSize = 500
-    const insertBatches: BonusScoreRow[][] = []
-    for (let i = 0; i < bonusScores.length; i += insertBatchSize) {
-      insertBatches.push(bonusScores.slice(i, i + insertBatchSize))
-    }
-    const bonusResults = await Promise.all(
-      insertBatches.map(batch =>
-        adminClient.from('bonus_scores').insert(batch)
-          .then(({ error }: { error: any }) => {
-            if (error) { console.error(`[scoring] Failed to insert bonus_scores batch:`, error); return 0 }
-            return batch.length
-          })
-      )
-    )
-    bonusScoresWritten = bonusResults.reduce((sum, n) => sum + n, 0)
+  } else {
+    const legacy = await legacyWriteScores(adminClient, poolId, matchScores, bonusScores, allEntryIds, onlyMatchId)
+    matchScoresWritten = legacy.matchScoresWritten
+    bonusScoresWritten = legacy.bonusScoresWritten
   }
 
   // Update entry totals + current_rank on pool_entries
@@ -636,6 +586,245 @@ async function writeScoresToDB(
       })
       await Promise.all(updatePromises)
     }
+  }
+
+  return { matchScoresWritten, bonusScoresWritten }
+}
+
+// =============================================================
+// B1 — change-only (diff) write path
+// =============================================================
+// Reached only when sync_settings.scoring_diff_writes_enabled is true.
+// Produces a stored state with IDENTICAL MEANINGFUL VALUES to the legacy
+// delete-all+insert-all path (parity-tested via
+// lib/scoring/__tests__/diffWrite.test.ts) — metadata columns (id,
+// calculated_at) may differ on unchanged rows, which is harmless and in fact
+// more accurate (an unchanged row keeps the timestamp of when it was actually
+// scored). Only the rows that changed are written.
+
+// Module-level cache for the kill switch. A full sweep calls recalculatePool
+// ~600× and re-reading sync_settings each time is 600 needless reads; cache for
+// 15s so a flip still takes effect within a sweep or two. Failures are not
+// cached (so a transient read error can't pin us off).
+let _diffFlagCache: { value: boolean; at: number } | null = null
+const DIFF_FLAG_TTL_MS = 15_000
+
+/** Read the B1 kill switch (cached). Fails safe to FALSE → legacy path. */
+async function isDiffWritesEnabled(adminClient: any): Promise<boolean> {
+  const now = Date.now()
+  if (_diffFlagCache && now - _diffFlagCache.at < DIFF_FLAG_TTL_MS) return _diffFlagCache.value
+  try {
+    const { data } = await adminClient
+      .from('sync_settings')
+      .select('setting_value')
+      .eq('setting_key', 'scoring_diff_writes_enabled')
+      .maybeSingle()
+    const value = data?.setting_value === true || data?.setting_value === 'true'
+    _diffFlagCache = { value, at: now }
+    return value
+  } catch {
+    return false
+  }
+}
+
+/** Sequential batches — bounds concurrency (calmer than unbounded Promise.all). */
+async function inBatches<T>(items: T[], size: number, fn: (batch: T[]) => Promise<void>): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await fn(items.slice(i, i + size))
+  }
+}
+
+/**
+ * Fetch existing rows for a set of entries, chunking the entry_id list
+ * (URL-length safety) AND paginating each chunk past PostgREST's 1000-row
+ * cap. Throws on any read error — a partial read would corrupt the diff
+ * (missing existing rows look "new" → duplicate-key, or compute wrong
+ * deletes), so we'd rather skip this pool's update this run and let the
+ * next sweep retry than write a corrupt state.
+ */
+async function fetchExistingForEntries(
+  adminClient: any,
+  table: string,
+  selectCols: string,
+  pkCol: string,
+  entryIds: string[],
+  extraFilter: ((q: any) => any) | null,
+): Promise<any[]> {
+  const out: any[] = []
+  const entryChunk = 100
+  for (let i = 0; i < entryIds.length; i += entryChunk) {
+    const chunk = entryIds.slice(i, i + entryChunk)
+    const pageSize = 1000
+    let offset = 0
+    for (;;) {
+      let q = adminClient.from(table).select(selectCols).in('entry_id', chunk)
+      if (extraFilter) q = extraFilter(q)
+      q = q.order('entry_id', { ascending: true }).order(pkCol, { ascending: true }).range(offset, offset + pageSize - 1)
+      const { data: page, error } = await q
+      if (error) {
+        console.error(`[scoring] diff: failed reading existing ${table} (offset ${offset}):`, error)
+        throw error
+      }
+      if (!page || page.length === 0) break
+      out.push(...page)
+      if (page.length < pageSize) break
+      offset += page.length
+    }
+  }
+  return out
+}
+
+const MATCH_SCORE_COLS =
+  'id, entry_id, match_id, pool_id, match_number, stage, score_type, base_points, multiplier, ' +
+  'pso_points, total_points, teams_match, predicted_home_score, predicted_away_score, ' +
+  'actual_home_score, actual_away_score, predicted_home_pso, predicted_away_pso, ' +
+  'actual_home_pso, actual_away_pso, predicted_home_team_id, predicted_away_team_id'
+
+/**
+ * Diff-write match_scores. Scope mirrors the legacy delete EXACTLY:
+ * pool_id = poolId, entry_id in entryIds, and match_id = onlyMatchId when set.
+ * Upserts changed+new rows on the existing (entry_id, match_id) unique key;
+ * deletes stored rows whose key is no longer computed (reset/removed matches).
+ */
+async function diffWriteMatchScores(
+  adminClient: any,
+  poolId: string,
+  computed: MatchScoreRow[],
+  entryIds: string[],
+  onlyMatchId?: string,
+): Promise<number> {
+  if (entryIds.length === 0) return 0 // parity: legacy skips when no entries
+
+  const existing = await fetchExistingForEntries(
+    adminClient, 'match_scores', MATCH_SCORE_COLS, 'id', entryIds,
+    (q: any) => { let f = q.eq('pool_id', poolId); if (onlyMatchId) f = f.eq('match_id', onlyMatchId); return f },
+  )
+
+  const d = diffRows<MatchScoreRow, any>(computed, existing, matchScoreKey, matchScoreValue, (r) => r.id)
+
+  // Upsert changed+new first (rows stay present for concurrent readers), then
+  // delete stale (disjoint key set). Throw on any error so writeScoresToDB falls
+  // back to the idempotent legacy path rather than reporting a phantom success.
+  const upserts = [...d.toInsert, ...d.toUpdate.map(u => u.row)]
+  await inBatches(upserts, 500, async (batch) => {
+    const { error } = await adminClient.from('match_scores').upsert(batch, { onConflict: 'entry_id,match_id' })
+    if (error) { console.error('[scoring] diff: match_scores upsert failed:', error); throw error }
+  })
+  await inBatches(d.toDeleteIds, 100, async (ids) => {
+    const { error } = await adminClient.from('match_scores').delete().in('id', ids)
+    if (error) { console.error('[scoring] diff: match_scores stale-delete failed:', error); throw error }
+  })
+  return upserts.length
+}
+
+const BONUS_SCORE_COLS =
+  'bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description'
+
+/**
+ * Diff-write bonus_scores. Scope mirrors the legacy delete EXACTLY:
+ * only entries that have computed bonus rows (affectedEntryIds). Changed+new
+ * rows are upserted on the natural-key unique index (migration
+ * 2026-06-29_bonus_scores_natural_key_unique.sql) — batched, symmetric with
+ * match_scores, no per-row updates. Stale rows deleted by bonus_id. Throws on
+ * any error → caller falls back to the legacy path (also covers the case where
+ * the unique index has not been applied yet).
+ */
+async function diffWriteBonusScores(adminClient: any, computed: BonusScoreRow[]): Promise<number> {
+  if (computed.length === 0) return 0 // parity: legacy only acts when bonusScores.length > 0
+
+  const affectedEntryIds = [...new Set(computed.map(b => b.entry_id))]
+  const existing = await fetchExistingForEntries(
+    adminClient, 'bonus_scores', BONUS_SCORE_COLS, 'bonus_id', affectedEntryIds, null,
+  )
+
+  const d = diffRows<BonusScoreRow, any>(computed, existing, bonusScoreKey, bonusScoreValue, (r) => r.bonus_id)
+
+  const upserts = [...d.toInsert, ...d.toUpdate.map(u => u.row)]
+  await inBatches(upserts, 500, async (batch) => {
+    const { error } = await adminClient.from('bonus_scores').upsert(batch, {
+      onConflict: 'entry_id,bonus_type,related_group_letter,related_match_id',
+    })
+    if (error) { console.error('[scoring] diff: bonus_scores upsert failed:', error); throw error }
+  })
+  await inBatches(d.toDeleteIds, 100, async (ids) => {
+    const { error } = await adminClient.from('bonus_scores').delete().in('bonus_id', ids)
+    if (error) { console.error('[scoring] diff: bonus_scores stale-delete failed:', error); throw error }
+  })
+  return upserts.length
+}
+
+// =============================================================
+// Legacy write path (delete-all + insert-all)
+// =============================================================
+// The original, proven path. Used directly when the flag is OFF, and as the
+// idempotent fallback when the diff path throws. Behaviour is verbatim from the
+// pre-B1 code, so flag-off == exactly today's production behaviour.
+async function legacyWriteScores(
+  adminClient: any,
+  poolId: string,
+  matchScores: MatchScoreRow[],
+  bonusScores: BonusScoreRow[],
+  allEntryIds: string[],
+  onlyMatchId?: string,
+): Promise<{ matchScoresWritten: number; bonusScoresWritten: number }> {
+  let matchScoresWritten = 0
+  let bonusScoresWritten = 0
+
+  // Write match_scores — delete existing for all entries then bulk insert.
+  if (allEntryIds.length > 0) {
+    const deleteMatchBatchSize = 100
+    const deleteMatchBatches: string[][] = []
+    for (let i = 0; i < allEntryIds.length; i += deleteMatchBatchSize) {
+      deleteMatchBatches.push(allEntryIds.slice(i, i + deleteMatchBatchSize))
+    }
+    await Promise.all(
+      deleteMatchBatches.map(batch => {
+        // T-0018 / D-014: scope delete by pool_id (prevents a cross-pool wipe).
+        let del = adminClient.from('match_scores').delete().eq('pool_id', poolId).in('entry_id', batch)
+        if (onlyMatchId) del = del.eq('match_id', onlyMatchId)
+        return del.then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete match_scores batch:`, error) })
+      })
+    )
+  }
+  if (matchScores.length > 0) {
+    const batchSize = 500
+    const matchBatches: MatchScoreRow[][] = []
+    for (let i = 0; i < matchScores.length; i += batchSize) matchBatches.push(matchScores.slice(i, i + batchSize))
+    const matchResults = await Promise.all(
+      matchBatches.map(batch =>
+        adminClient.from('match_scores').insert(batch).then(({ error }: { error: any }) => {
+          if (error) { console.error(`[scoring] Failed to insert match_scores batch:`, error); return 0 }
+          return batch.length
+        })
+      )
+    )
+    matchScoresWritten = matchResults.reduce((sum, n) => sum + n, 0)
+  }
+
+  // Write bonus_scores — delete existing for affected entries then bulk insert.
+  if (bonusScores.length > 0) {
+    const affectedEntryIds = [...new Set(bonusScores.map(bs => bs.entry_id))]
+    const deleteBatchSize = 100
+    const deleteBatches: string[][] = []
+    for (let i = 0; i < affectedEntryIds.length; i += deleteBatchSize) deleteBatches.push(affectedEntryIds.slice(i, i + deleteBatchSize))
+    await Promise.all(
+      deleteBatches.map(batch =>
+        adminClient.from('bonus_scores').delete().in('entry_id', batch)
+          .then(({ error }: { error: any }) => { if (error) console.error(`[scoring] Failed to delete bonus_scores batch:`, error) })
+      )
+    )
+    const insertBatchSize = 500
+    const insertBatches: BonusScoreRow[][] = []
+    for (let i = 0; i < bonusScores.length; i += insertBatchSize) insertBatches.push(bonusScores.slice(i, i + insertBatchSize))
+    const bonusResults = await Promise.all(
+      insertBatches.map(batch =>
+        adminClient.from('bonus_scores').insert(batch).then(({ error }: { error: any }) => {
+          if (error) { console.error(`[scoring] Failed to insert bonus_scores batch:`, error); return 0 }
+          return batch.length
+        })
+      )
+    )
+    bonusScoresWritten = bonusResults.reduce((sum, n) => sum + n, 0)
   }
 
   return { matchScoresWritten, bonusScoresWritten }
