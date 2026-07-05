@@ -34,7 +34,7 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
       user_id,
       pool_entries(
         entry_name,
-        total_points,
+        scored_total_points,
         current_rank,
         previous_rank
       )
@@ -42,7 +42,11 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
     .eq('pool_id', poolId)
 
   const allEntries = (members || []).flatMap((m: any) => m.pool_entries || [])
-  const entriesWithPoints = allEntries.filter((e: any) => (e.total_points ?? 0) > 0)
+  // `scored_total_points` is the canonical scored total maintained by the
+  // scoring pipeline (lib/scoring/recalculate.ts) and already includes any
+  // point_adjustment. The old `total_points` column is dead legacy (stays 0),
+  // so reading it made this board always fall back to the mock/preview.
+  const entriesWithPoints = allEntries.filter((e: any) => (e.scored_total_points ?? 0) > 0)
 
   if (entriesWithPoints.length < 3) {
     const namedEntries = allEntries.filter((e: any) => typeof e.entry_name === 'string' && e.entry_name.trim().length > 0)
@@ -53,11 +57,11 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
 
     const previewPlayers: LeaderboardPlayer[] = namedEntries
       .slice()
-      .sort((a: any, b: any) => (b.total_points ?? 0) - (a.total_points ?? 0))
+      .sort((a: any, b: any) => (b.scored_total_points ?? 0) - (a.scored_total_points ?? 0))
       .map((e: any, idx: number) => ({
         rank: idx + 1,
         name: e.entry_name,
-        points: e.total_points ?? 0,
+        points: e.scored_total_points ?? 0,
         move: 0,
         exact: 0,
         correct: 0,
@@ -80,7 +84,7 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
       entries.push({
         rank: currentRank,
         name: entryName,
-        points: entry.total_points ?? 0,
+        points: entry.scored_total_points ?? 0,
         move: previousRank - currentRank,
         exact: 0,
         correct: 0,

@@ -219,7 +219,7 @@ export default function SargassoSeaLandingPage({ players, memberCount, isMock }:
                         </div>
                       </td>
                       <td className="text-right px-4 py-3">
-                        <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points}</span>
+                        <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points.toLocaleString('en-US')}</span>
                       </td>
                     </tr>
                   ))}

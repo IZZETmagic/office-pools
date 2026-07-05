@@ -51,15 +51,17 @@ export async function getLeaderboard(): Promise<{ players: LeaderboardPlayer[]; 
       users!inner(username, full_name),
       pool_entries(
         entry_name,
-        total_points,
+        scored_total_points,
         current_rank,
         previous_rank
       )
     `)
     .eq('pool_id', POOL_CONFIG.poolId)
 
-  // Count entries with actual points
-  const entriesWithPoints = (members || []).flatMap((m: any) => m.pool_entries || []).filter((e: any) => (e.total_points ?? 0) > 0)
+  // Count entries with actual points. `scored_total_points` is the canonical
+  // scored total (lib/scoring/recalculate.ts); the legacy `total_points` column
+  // is dead (stays 0), so reading it forced this board into the mock branch.
+  const entriesWithPoints = (members || []).flatMap((m: any) => m.pool_entries || []).filter((e: any) => (e.scored_total_points ?? 0) > 0)
 
   // Use mock data if no real scored entries exist yet
   if (entriesWithPoints.length < 3) {
@@ -77,7 +79,7 @@ export async function getLeaderboard(): Promise<{ players: LeaderboardPlayer[]; 
       entries.push({
         rank: currentRank,
         name: entry.entry_name || (member as any).users?.username || 'Unknown',
-        points: entry.total_points ?? 0,
+        points: entry.scored_total_points ?? 0,
         move: previousRank - currentRank,
         exact: 0,
         correct: 0,

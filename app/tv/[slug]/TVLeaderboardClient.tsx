@@ -197,7 +197,7 @@ export function TVLeaderboardClient({
                           <td className="text-center px-4 py-3 text-sm text-white/50 tabular-nums hidden sm:table-cell">{p.exact}</td>
                           <td className="text-center px-4 py-3 text-sm text-white/50 tabular-nums hidden sm:table-cell">{p.correct}</td>
                           <td className="text-center px-4 py-3 text-sm text-white/50 tabular-nums hidden sm:table-cell">{p.bonus}</td>
-                          <td className="text-right px-4 py-3 text-lg font-extrabold tabular-nums">{p.points}</td>
+                          <td className="text-right px-4 py-3 text-lg font-extrabold tabular-nums">{p.points.toLocaleString('en-US')}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -283,7 +283,7 @@ function PodiumCard({ player, place }: { player: LeaderboardPlayer; place: 1 | 2
         {player.name}
       </div>
       <div className={`${config.pointsSize} font-black tracking-tight`} style={{ color: config.pointsColor }}>
-        {player.points}
+        {player.points.toLocaleString('en-US')}
       </div>
       <div className="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">points</div>
     </div>

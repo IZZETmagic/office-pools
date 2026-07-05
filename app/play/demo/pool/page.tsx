@@ -163,7 +163,7 @@ function LeaderboardTab() {
                 <td className="text-center px-3 py-2.5 text-sm text-neutral-500 tabular-nums hidden sm:table-cell">{p.exact}</td>
                 <td className="text-center px-3 py-2.5 text-sm text-neutral-500 tabular-nums hidden sm:table-cell">{p.correct}</td>
                 <td className="text-right px-3 py-2.5">
-                  <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points}</span>
+                  <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points.toLocaleString('en-US')}</span>
                   <Movement move={p.move} />
                 </td>
               </tr>
@@ -405,7 +405,7 @@ function PodiumCard({ player, place }: { player: typeof PODIUM[0]; place: 1 | 2 
     <div className={`text-center rounded-xl border ${config.border} ${config.bg} ${config.size} min-w-[100px] sm:min-w-[150px]`}>
       <div className="text-xl sm:text-2xl mb-0.5">{config.medal}</div>
       <div className={`text-xs sm:text-sm font-bold ${config.nameColor} truncate`}>{player.name}</div>
-      <div className="text-lg sm:text-xl font-black text-neutral-900 tabular-nums">{player.points}</div>
+      <div className="text-lg sm:text-xl font-black text-neutral-900 tabular-nums">{player.points.toLocaleString('en-US')}</div>
       <div className="text-[10px] text-neutral-400 uppercase tracking-wider">points</div>
       {player.awards?.map((a) => (
         <span key={a} className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">
