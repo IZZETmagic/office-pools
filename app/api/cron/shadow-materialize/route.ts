@@ -65,15 +65,21 @@ async function handle(request: NextRequest) {
   }
   const poolIds: string[] = (changed ?? []).map((r: { pool_id: string }) => r.pool_id)
 
+  // Completed matches whose predictions were edited since the watermark (the
+  // ...024 edge — a locked-match prediction change): these need a shadow MATCH
+  // re-score, which refreshing bonus inputs alone would miss.
+  const { data: changedM } = await admin.rpc('shadow_matches_needing_rescore', { p_since: watermark })
+  const matchIds: string[] = (changedM ?? []).map((r: { match_id: string }) => r.match_id)
+
   const advanceWatermark = async () =>
     admin.from('sync_settings').upsert(
       { setting_key: 'shadow_materialize_watermark', setting_value: runIso, updated_at: runIso },
       { onConflict: 'setting_key' },
     )
 
-  if (poolIds.length === 0) {
+  if (poolIds.length === 0 && matchIds.length === 0) {
     await advanceWatermark()
-    return NextResponse.json({ ok: true, changedPools: 0, note: 'nothing to materialize' })
+    return NextResponse.json({ ok: true, changedPools: 0, changedMatches: 0, note: 'nothing to materialize' })
   }
 
   const batch = poolIds.slice(0, CAP)
@@ -86,11 +92,12 @@ async function handle(request: NextRequest) {
     const brackets = await backfillResolvedBrackets(admin, tournamentId, { poolIds: batch })
     const bonus = await backfillBonusInputs(admin, tournamentId, { poolIds: batch })
 
-    // 2) Re-score those pools from the fresh inputs (both RPCs are scoped + change-only).
-    const { error: bonErr } = await admin.rpc('shadow_calculate_bonuses', { p_pool_ids: batch })
-    if (bonErr) throw new Error(`shadow_calculate_bonuses: ${bonErr.message}`)
-    const { error: finErr } = await admin.rpc('shadow_finalize_totals', { p_pool_ids: batch })
-    if (finErr) throw new Error(`shadow_finalize_totals: ${finErr.message}`)
+    // 2) Apply all shadow writes under ONE advisory lock shared with the score
+    //    worker (shadow_process_queue) so the two writers never overlap: re-score
+    //    changed completed matches, then rescore + finalize the batch's pools
+    //    (all scoped + change-only).
+    const { error: applyErr } = await admin.rpc('shadow_apply_changes', { p_match_ids: matchIds, p_pool_ids: batch })
+    if (applyErr) throw new Error(`shadow_apply_changes: ${applyErr.message}`)
 
     // Advance the watermark ONLY when the whole changed set was processed; a
     // deferred remainder is re-detected (and re-processed) on the next run.
@@ -99,6 +106,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       changedPools: poolIds.length,
+      changedMatches: matchIds.length,
       processed: batch.length,
       deferred,
       brackets,
