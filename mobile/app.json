@@ -67,7 +67,8 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan pool QR codes.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
