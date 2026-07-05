@@ -69,3 +69,6 @@ mobile/android/
 mobile/dist/
 mobile/.env*.local
 firebase-debug.log
+
+# One-off notifier send-receipts (runtime state, not source)
+scripts/*.sent
