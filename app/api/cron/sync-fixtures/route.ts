@@ -315,8 +315,36 @@ async function handle(request: NextRequest) {
   // sweep_pending instead of dropping the work, and the next run picks it up
   // even if no new score change occurred (a dropped final-whistle sweep means
   // unscored matches).
+  // ---------------------------------------------------------------
+  // Fix #1 — time-boxed, resumable sweep (flag: sweep_time_box_enabled)
+  // ---------------------------------------------------------------
+  // ROOT CAUSE of the completion-crash: a match-completion sweep recomputes ALL
+  // pools (incl. the heavy bracket pools) and on Medium can run 2-4 min — longer
+  // than the 60s cron interval. Runs then stack/defer and pin the DB at ~100%
+  // for ~20 min = outage (observed in sync_runs: 78s→268s sweeps after a
+  // completion). This bounds each run to a wall-clock budget: process pools until
+  // the budget is hit, persist the REMAINING pool_ids to a cursor, and let the
+  // next run continue. No single run exceeds the interval → no pileup. Every pool
+  // is still recomputed (correctness preserved), just spread across runs — a pool
+  // may lag a run during a heavy completion (site stays up vs. crashes).
+  // Also trims the 600s lock TTL (a hung run shouldn't block for 10 min).
+  // Flag OFF → byte-for-byte today's behaviour (the `else` branches below).
+  const { data: tbRow } = await admin
+    .from('sync_settings').select('setting_value').eq('setting_key', 'sweep_time_box_enabled').maybeSingle()
+  const timeBox = tbRow?.setting_value === true || tbRow?.setting_value === 'true'
+  const SWEEP_BUDGET_MS = 40_000
+  const lockTtl = timeBox ? 180 : 600
+
+  // Cursor = pools still to process from a previous time-boxed run.
+  let cursorPoolIds: string[] = []
+  if (timeBox) {
+    const { data: curRow } = await admin
+      .from('sync_settings').select('setting_value').eq('setting_key', 'sweep_cursor').maybeSingle()
+    if (Array.isArray(curRow?.setting_value)) cursorPoolIds = curRow.setting_value as string[]
+  }
+
   let sweepPending = false
-  if (!scoresChanged && newlyCompleted.length === 0) {
+  if (!scoresChanged && newlyCompleted.length === 0 && cursorPoolIds.length === 0) {
     const { data: pendingRow } = await admin
       .from('sync_settings')
       .select('setting_value')
@@ -326,20 +354,23 @@ async function handle(request: NextRequest) {
   }
 
   let sweepNote: string | null = null
-  if (scoresChanged || newlyCompleted.length > 0 || sweepPending) {
-    const { data: gotLock, error: lockErr } = await admin.rpc('try_acquire_sweep_lock', { p_ttl_seconds: 600 })
+  if (scoresChanged || newlyCompleted.length > 0 || sweepPending || cursorPoolIds.length > 0) {
+    const { data: gotLock, error: lockErr } = await admin.rpc('try_acquire_sweep_lock', { p_ttl_seconds: lockTtl })
     if (lockErr) {
       errors.push({ stage: 'sweep_lock', message: lockErr.message })
     }
     if (gotLock === true) {
       try {
+        // A fresh score change/completion supersedes any in-progress drain.
+        const freshChange = scoresChanged || newlyCompleted.length > 0
+        const draining = !freshChange && (sweepPending || cursorPoolIds.length > 0)
+
         // Per-match hint: when exactly one match's score moved during a live
         // update (the common case — one goal), scope the match_scores rewrite
-        // to that match. Completions, multi-match runs, and deferred catch-up
-        // sweeps always do the full rewrite — they're the consistency
-        // authority (bonuses, cascades, missed work).
+        // to that match. Completions, multi-match runs, and deferred/drain
+        // sweeps always do the full rewrite — they're the consistency authority.
         const singleChangedMatchId =
-          newlyCompleted.length === 0 && !sweepPending && changedMatchIds.size === 1
+          newlyCompleted.length === 0 && !draining && changedMatchIds.size === 1
             ? [...changedMatchIds][0]
             : undefined
 
@@ -347,31 +378,49 @@ async function handle(request: NextRequest) {
           .from('pools')
           .select('pool_id, prediction_mode')
           .eq('tournament_id', tournamentId)
-        // Bracket scoring (group order / qualifiers / knockout picks) cannot
-        // change from a live in-progress scoreline — only from completed
-        // matches. Skip bracket pools on live-only sweeps; they're included
-        // whenever a match completed or a deferred sweep is catching up.
-        const liveOnlySweep = newlyCompleted.length === 0 && !sweepPending
-        const pools = (allPools ?? []).filter(
+        // Bracket scoring cannot change from a live in-progress scoreline — only
+        // from completed matches. Skip bracket pools on live-only sweeps; include
+        // them on completions and on any deferred/drain catch-up.
+        const liveOnlySweep = newlyCompleted.length === 0 && !draining
+        let pools = (allPools ?? []).filter(
           (p) => !liveOnlySweep || p.prediction_mode !== 'bracket_picker'
         )
-        {
-          const RECALC_BATCH_SIZE = 25
-          for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
-            await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
-              try {
-                await recalculatePool({ poolId: p.pool_id, matchId: singleChangedMatchId })
-              } catch (e) {
-                errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
-              }
-            }))
-          }
+        // Pure drain (no fresh change): restrict to the cursor's remaining pools.
+        if (timeBox && draining && cursorPoolIds.length > 0) {
+          const remain = new Set(cursorPoolIds)
+          pools = pools.filter((p) => remain.has(p.pool_id))
         }
-        await admin
-          .from('sync_settings')
-          .update({ setting_value: false, updated_at: nowIso })
-          .eq('setting_key', 'sweep_pending')
-        if (sweepPending) sweepNote = 'ran sweep deferred from a previous run'
+
+        const startMs = Date.now()
+        const processed = new Set<string>()
+        const RECALC_BATCH_SIZE = 25
+        for (let i = 0; i < pools.length; i += RECALC_BATCH_SIZE) {
+          if (timeBox && Date.now() - startMs > SWEEP_BUDGET_MS) break
+          await Promise.all(pools.slice(i, i + RECALC_BATCH_SIZE).map(async (p) => {
+            try {
+              await recalculatePool({ poolId: p.pool_id, matchId: singleChangedMatchId })
+              processed.add(p.pool_id)
+            } catch (e) {
+              errors.push({ stage: 'recalculate', message: errMsg(e), details: { pool_id: p.pool_id } })
+            }
+          }))
+        }
+
+        if (timeBox) {
+          // Persist the remainder so the next run resumes instead of redoing all.
+          const remaining = pools.filter((p) => !processed.has(p.pool_id)).map((p) => p.pool_id)
+          await admin.from('sync_settings').update({ setting_value: remaining, updated_at: nowIso }).eq('setting_key', 'sweep_cursor')
+          await admin.from('sync_settings').update({ setting_value: remaining.length > 0, updated_at: nowIso }).eq('setting_key', 'sweep_pending')
+          sweepNote = remaining.length > 0
+            ? `time-boxed: ${processed.size} pools done, ${remaining.length} deferred to next run`
+            : (draining ? 'drained deferred sweep' : null)
+        } else {
+          await admin
+            .from('sync_settings')
+            .update({ setting_value: false, updated_at: nowIso })
+            .eq('setting_key', 'sweep_pending')
+          if (sweepPending) sweepNote = 'ran sweep deferred from a previous run'
+        }
       } finally {
         await admin.rpc('release_sweep_lock')
       }
