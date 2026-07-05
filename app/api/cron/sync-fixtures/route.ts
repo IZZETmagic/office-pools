@@ -15,6 +15,7 @@ import {
 import type { ApiFootballFixture } from '@/lib/integrations/apiFootball/types'
 import { recalculatePool } from '@/lib/scoring/recalculate'
 import { snapshotPoolRanks } from '@/lib/scoring/snapshotRanks'
+import { linkKnockoutFixtures } from '@/lib/integrations/apiFootball/linkKnockoutFixtures'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,45 @@ async function handle(request: NextRequest) {
 
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
+
+  // --- Auto-link knockout fixtures whose bracket teams have paired ----------
+  // Replaces the manual per-round scripts/map-knockout-fixtures.ts. Rate-limited
+  // (a not-yet-published fixture must not re-fetch the season feed every minute)
+  // and lead-time bounded (leadDays: only look within ~2 days of kickoff, when the
+  // api-football fixture reliably exists). Auto-links ONLY when exactly one
+  // candidate matches; anything ambiguous is surfaced as an error, never guessed.
+  // Runs before the fetch below so a freshly-linked match is score-synced this run.
+  const KNOCKOUT_LINK_INTERVAL_MS = 15 * 60 * 1000
+  const { data: linkRow } = await admin
+    .from('sync_settings')
+    .select('setting_value')
+    .eq('setting_key', 'knockout_link_last_attempt')
+    .maybeSingle()
+  const lastLinkAttempt = linkRow?.setting_value ? new Date(linkRow.setting_value as string).getTime() : 0
+  if (now - lastLinkAttempt >= KNOCKOUT_LINK_INTERVAL_MS) {
+    // Stamp first so a repeated failure can't hammer the api every minute.
+    await admin
+      .from('sync_settings')
+      .upsert({ setting_key: 'knockout_link_last_attempt', setting_value: nowIso, updated_at: nowIso }, { onConflict: 'setting_key' })
+    try {
+      const link = await linkKnockoutFixtures(admin, { tournamentId, league, season, commit: true, leadDays: 2 })
+      if (link.linked.length > 0) {
+        console.log(
+          `[sync-fixtures] auto-linked ${link.linked.length} knockout fixture(s): ` +
+            link.linked.map((l) => `#${l.match_number} ${l.label}→${l.external_match_id}`).join(', ')
+        )
+      }
+      for (const a of link.ambiguous) {
+        errors.push({
+          stage: 'link_knockout_ambiguous',
+          message: `#${a.match_number} ${a.label}: ${a.candidates} candidate fixtures — manual link needed`,
+          details: a,
+        })
+      }
+    } catch (e) {
+      errors.push({ stage: 'link_knockout', message: errMsg(e) })
+    }
+  }
 
   // Find matches potentially live right now
   const { data: ourMatches, error: matchErr } = await admin
