@@ -32,6 +32,7 @@ import { calculateProgressive } from './progressive'
 import { calculateBracketPicker, type BracketPickerInput } from './bracket'
 import type { BPEntryWithPicks } from './types'
 import { diffRows, matchScoreKey, matchScoreValue, bonusScoreKey, bonusScoreValue } from './diffWrite'
+import { syncShadowResolvedBracketsPiggyback } from './shadowBrackets'
 
 // ----- Public API -----
 
@@ -257,6 +258,15 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
         result = calculateProgressive(input)
       } else {
         result = calculateFullTournament(input)
+        // Piggyback (knockout shadow phase): keep shadow_resolved_brackets fresh.
+        // Env-gated OFF (SHADOW_BRACKETS_ENABLED) so it adds ZERO cost to live
+        // scoring until deliberately enabled, and fire-and-forget so a failure can
+        // never affect the recalc — same pattern as the push fan-outs below.
+        if (process.env.SHADOW_BRACKETS_ENABLED === 'true') {
+          void syncShadowResolvedBracketsPiggyback(
+            adminClient, poolId, normalizedMatches, teamsData, conduct, entriesWithPredictions,
+          ).catch((err) => console.error(`[scoring] shadow bracket sync failed for pool ${poolId}:`, err))
+        }
       }
     }
 
