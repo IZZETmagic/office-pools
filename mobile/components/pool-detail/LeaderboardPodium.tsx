@@ -200,7 +200,7 @@ function PodiumColumn({
           {entry.total_points.toLocaleString()}
         </RNText>
         <Text variant="detail" color="slate" align="center">
-          {entry.match_points} + {entry.bonus_points}
+          {entry.match_points.toLocaleString()} + {entry.bonus_points.toLocaleString()}
         </Text>
         <Text variant="detail" color="slate" align="center" numberOfLines={1}>
           {entry.exact_count} exact · {Math.round(entry.hit_rate)}%

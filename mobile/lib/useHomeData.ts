@@ -81,9 +81,13 @@ export type MatchSummary = {
   stage: string | null;
   matchDate: string;
   status: string;
+  statusDetail: string | null;
+  originalMatchDate: string | null;
   venue: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  liveMinute: number | null;
+  livePeriod: string | null;
   homeTeam: MatchTeam | null;
   awayTeam: MatchTeam | null;
   homeTeamPlaceholder: string | null;
@@ -138,9 +142,13 @@ function normalizeMatch(row: Record<string, unknown>): MatchSummary {
     stage: (row.stage as string | null) ?? null,
     matchDate: row.match_date as string,
     status: row.status as string,
+    statusDetail: (row.status_detail as string | null) ?? null,
+    originalMatchDate: (row.original_match_date as string | null) ?? null,
     venue: (row.venue as string | null) ?? null,
     homeScore: (row.home_score_ft as number | null) ?? null,
     awayScore: (row.away_score_ft as number | null) ?? null,
+    liveMinute: (row.live_minute as number | null) ?? null,
+    livePeriod: (row.live_period as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
     homeTeamPlaceholder: (row.home_team_placeholder as string | null) ?? null,
@@ -149,8 +157,8 @@ function normalizeMatch(row: Record<string, unknown>): MatchSummary {
 }
 
 const MATCH_SELECT = `
-  match_id, match_number, stage, match_date, status, venue,
-  home_score_ft, away_score_ft,
+  match_id, match_number, stage, match_date, status, status_detail, original_match_date, venue,
+  home_score_ft, away_score_ft, live_minute, live_period,
   home_team_placeholder, away_team_placeholder,
   home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
   away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
@@ -700,6 +708,67 @@ export function useHomeDataInternal() {
       void load('refresh');
     }
   }, [load]);
+
+  // Realtime: keep the home live card (score + game clock) current without a
+  // full dashboard refetch. Mirrors the Results tab — subscribe to `matches`
+  // UPDATE and surgically patch the match wherever it's shown (liveMatches /
+  // nextMatch / upcoming), preserving the joined team data the payload omits.
+  // A status transition (kickoff / final) re-buckets the match, which a field
+  // patch can't express — fall back to a full refresh there.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('home-live-matches')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'matches' },
+        (payload) => {
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row) return;
+          const id = row.match_id as string | undefined;
+          if (!id) return;
+          setData((prev) => {
+            if (!prev) return prev;
+            const current =
+              prev.liveMatches.find((m) => m.matchId === id) ??
+              prev.upcomingMatches.find((m) => m.matchId === id) ??
+              (prev.nextMatch?.matchId === id ? prev.nextMatch : null);
+            if (!current) return prev;
+            // Kickoff / final flips the bucket this match belongs to — refetch.
+            const nextStatus = (row.status as string | null) ?? current.status;
+            if (nextStatus !== current.status) {
+              void refreshRef.current();
+              return prev;
+            }
+            const patch = (m: MatchSummary): MatchSummary =>
+              m.matchId !== id
+                ? m
+                : {
+                    ...m,
+                    matchDate: (row.match_date as string) ?? m.matchDate,
+                    homeScore: (row.home_score_ft as number | null) ?? null,
+                    awayScore: (row.away_score_ft as number | null) ?? null,
+                    liveMinute: (row.live_minute as number | null) ?? null,
+                    livePeriod: (row.live_period as string | null) ?? null,
+                    statusDetail: (row.status_detail as string | null) ?? null,
+                    originalMatchDate: (row.original_match_date as string | null) ?? null,
+                  };
+            return {
+              ...prev,
+              liveMatches: prev.liveMatches.map(patch),
+              upcomingMatches: prev.upcomingMatches.map(patch),
+              nextMatch: prev.nextMatch ? patch(prev.nextMatch) : prev.nextMatch,
+            };
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [user]);
 
   // Surgical update for new banter messages — increments the unread count
   // for ONE pool without re-fetching the entire dashboard. This is what the

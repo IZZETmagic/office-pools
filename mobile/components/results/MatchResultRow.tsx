@@ -1,6 +1,8 @@
 import { Image } from 'expo-image';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus';
+import { displayTeamName } from '@/lib/teamNames';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -24,11 +26,11 @@ function matchTime(iso: string): string {
 }
 
 function homeDisplayName(match: ResultsMatch): string {
-  return match.homeTeam?.countryName ?? match.homeTeamPlaceholder ?? 'Home';
+  return displayTeamName(match.homeTeam?.countryName ?? match.homeTeamPlaceholder ?? 'Home');
 }
 
 function awayDisplayName(match: ResultsMatch): string {
-  return match.awayTeam?.countryName ?? match.awayTeamPlaceholder ?? 'Away';
+  return displayTeamName(match.awayTeam?.countryName ?? match.awayTeamPlaceholder ?? 'Away');
 }
 
 function FlagView({ url, size = 26 }: { url: string | null | undefined; size?: number }) {
@@ -61,6 +63,9 @@ export function MatchResultRow({ match, onPress }: Props) {
   const theme = useTheme();
   const isLive = match.status === 'live';
   const isFinished = match.status === 'completed';
+  const badge = getMatchStatusBadge(match);
+  const statusColor = badge ? (badge.tone === 'red' ? theme.colors.red : theme.colors.amber) : null;
+  const liveClock = isLive ? getLiveClock(match) : null;
 
   return (
     <Pressable
@@ -68,91 +73,116 @@ export function MatchResultRow({ match, onPress }: Props) {
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
         paddingHorizontal: 14,
-        paddingVertical: 12,
+        paddingVertical: 16,
         backgroundColor: pressed ? withOpacity(theme.colors.ink, 0.04) : 'transparent',
       })}
     >
-      {/* Home: name then flag, right-aligned */}
+      {/* Match status — absolutely positioned so it's fully separate from the
+          teams/score row below and can never shift them off-centre. */}
       <View
         style={{
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 8,
+          position: 'absolute',
+          left: 14,
+          top: 0,
+          bottom: 0,
+          justifyContent: 'center',
         }}
       >
-        <RNText
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 14,
-            color: theme.colors.ink,
-            flexShrink: 1,
-            textAlign: 'right',
-          }}
-        >
-          {homeDisplayName(match)}
-        </RNText>
-        <FlagView url={match.homeTeam?.flagUrl} />
+        {isLive ? (
+          liveClock ? (
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 12,
+                color: theme.colors.red,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {liveClock}
+            </RNText>
+          ) : (
+            <View
+              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.red }}
+            />
+          )
+        ) : isFinished ? (
+          <RNText
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 11,
+              color: theme.colors.slate,
+              letterSpacing: 0.3,
+            }}
+          >
+            FT
+          </RNText>
+        ) : null}
       </View>
 
-      {/* Center: time / score / LIVE */}
-      <View style={{ width: 74, alignItems: 'center' }}>
-        {isLive ? (
-          <View style={{ alignItems: 'center', gap: 3 }}>
-            <View style={{ flexDirection: 'row', gap: 3 }}>
-              <RNText
-                style={{
-                  fontFamily: MONO_BOLD,
-                  fontSize: 15,
-                  color: theme.colors.ink,
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {match.homeScoreFt ?? 0}
-              </RNText>
-              <RNText
-                style={{
-                  fontFamily: MONO_BOLD,
-                  fontSize: 15,
-                  color: theme.colors.slate,
-                }}
-              >
-                -
-              </RNText>
-              <RNText
-                style={{
-                  fontFamily: MONO_BOLD,
-                  fontSize: 15,
-                  color: theme.colors.ink,
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {match.awayScoreFt ?? 0}
-              </RNText>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <View
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 2.5,
-                  backgroundColor: theme.colors.red,
-                }}
-              />
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 9,
-                  color: theme.colors.red,
-                  letterSpacing: 0.3,
-                }}
-              >
-                LIVE
-              </RNText>
-            </View>
+      {/* Home name — fixed width, right-aligned toward the score */}
+      <RNText
+        numberOfLines={1}
+        style={{
+          width: 84,
+          textAlign: 'right',
+          fontFamily: fontFamilies.medium,
+          fontSize: 14,
+          color: theme.colors.ink,
+        }}
+      >
+        {homeDisplayName(match)}
+      </RNText>
+      <FlagView url={match.homeTeam?.flagUrl} />
+
+      {/* Center: score / time / status badge */}
+      <View style={{ width: 58, alignItems: 'center' }}>
+        {badge?.hidesCountdown ? (
+          <RNText
+            numberOfLines={1}
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 9,
+              letterSpacing: 0.3,
+              textTransform: 'uppercase',
+              color: statusColor ?? theme.colors.slate,
+            }}
+          >
+            {badge.label}
+          </RNText>
+        ) : isLive ? (
+          <View style={{ flexDirection: 'row', gap: 3 }}>
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 15,
+                color: theme.colors.ink,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {match.homeScoreFt ?? 0}
+            </RNText>
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 15,
+                color: theme.colors.slate,
+              }}
+            >
+              -
+            </RNText>
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 15,
+                color: theme.colors.ink,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {match.awayScoreFt ?? 0}
+            </RNText>
           </View>
         ) : isFinished ? (
           <View style={{ alignItems: 'center', gap: 2 }}>
@@ -199,6 +229,30 @@ export function MatchResultRow({ match, onPress }: Props) {
               </RNText>
             ) : null}
           </View>
+        ) : badge ? (
+          <View style={{ alignItems: 'center', gap: 2 }}>
+            <RNText
+              numberOfLines={1}
+              style={{
+                fontFamily: fontFamilies.bold,
+                fontSize: 9,
+                letterSpacing: 0.3,
+                textTransform: 'uppercase',
+                color: statusColor ?? theme.colors.slate,
+              }}
+            >
+              {badge.label}
+            </RNText>
+            <RNText
+              style={{
+                fontFamily: fontFamilies.medium,
+                fontSize: 12,
+                color: theme.colors.slate,
+              }}
+            >
+              {matchTime(match.matchDate)}
+            </RNText>
+          </View>
         ) : (
           <RNText
             style={{
@@ -212,28 +266,20 @@ export function MatchResultRow({ match, onPress }: Props) {
         )}
       </View>
 
-      {/* Away: flag then name, left-aligned */}
-      <View
+      {/* Away name — fixed width, left-aligned toward the score */}
+      <FlagView url={match.awayTeam?.flagUrl} />
+      <RNText
+        numberOfLines={1}
         style={{
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
+          width: 84,
+          textAlign: 'left',
+          fontFamily: fontFamilies.medium,
+          fontSize: 14,
+          color: theme.colors.ink,
         }}
       >
-        <FlagView url={match.awayTeam?.flagUrl} />
-        <RNText
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 14,
-            color: theme.colors.ink,
-            flexShrink: 1,
-          }}
-        >
-          {awayDisplayName(match)}
-        </RNText>
-      </View>
+        {awayDisplayName(match)}
+      </RNText>
     </Pressable>
   );
 }

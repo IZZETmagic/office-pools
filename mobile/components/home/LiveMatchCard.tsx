@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { getLiveClock } from '@/lib/matchStatus';
+import { formatStageLabel } from '@/lib/stage';
 import type { MatchSummary } from '@/lib/useHomeData';
 import { useTheme, withOpacity } from '@/theme';
 
@@ -11,6 +13,7 @@ type LiveMatchCardProps = {
 
 export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
   const theme = useTheme();
+  const clock = getLiveClock(match);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
@@ -62,6 +65,18 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
             >
               LIVE
             </RNText>
+            {clock ? (
+              <RNText
+                style={{
+                  fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.6)',
+                  letterSpacing: 0.5,
+                }}
+              >
+                · {clock}
+              </RNText>
+            ) : null}
           </View>
           {match.stage ? (
             <RNText
@@ -73,7 +88,7 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
                 textTransform: 'uppercase',
               }}
             >
-              {match.stage}
+              {formatStageLabel(match.stage)}
             </RNText>
           ) : null}
         </View>

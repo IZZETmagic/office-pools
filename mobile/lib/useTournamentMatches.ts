@@ -12,6 +12,8 @@ export type ResultsMatch = {
   groupLetter: string | null;
   matchDate: string;
   status: string;
+  statusDetail: string | null;
+  originalMatchDate: string | null;
   venue: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
@@ -19,6 +21,8 @@ export type ResultsMatch = {
   awayScoreFt: number | null;
   homeScorePso: number | null;
   awayScorePso: number | null;
+  liveMinute: number | null;
+  livePeriod: string | null;
   homeTeamPlaceholder: string | null;
   awayTeamPlaceholder: string | null;
   homeTeam: ResultsTeam | null;
@@ -32,9 +36,9 @@ export type ResultsTeam = {
 };
 
 const MATCH_SELECT = `
-  match_id, match_number, stage, group_letter, match_date, status, venue,
+  match_id, match_number, stage, group_letter, match_date, status, status_detail, original_match_date, venue,
   home_team_id, away_team_id,
-  home_score_ft, away_score_ft, home_score_pso, away_score_pso,
+  home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period,
   home_team_placeholder, away_team_placeholder,
   home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
   away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
@@ -62,6 +66,8 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     groupLetter: (row.group_letter as string | null) ?? null,
     matchDate: (row.match_date as string) ?? '',
     status: (row.status as string) ?? 'scheduled',
+    statusDetail: (row.status_detail as string | null) ?? null,
+    originalMatchDate: (row.original_match_date as string | null) ?? null,
     venue: (row.venue as string | null) ?? null,
     homeTeamId: (row.home_team_id as string | null) ?? null,
     awayTeamId: (row.away_team_id as string | null) ?? null,
@@ -69,6 +75,8 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     awayScoreFt: (row.away_score_ft as number | null) ?? null,
     homeScorePso: (row.home_score_pso as number | null) ?? null,
     awayScorePso: (row.away_score_pso as number | null) ?? null,
+    liveMinute: (row.live_minute as number | null) ?? null,
+    livePeriod: (row.live_period as string | null) ?? null,
     homeTeamPlaceholder: (row.home_team_placeholder as string | null) ?? null,
     awayTeamPlaceholder: (row.away_team_placeholder as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),

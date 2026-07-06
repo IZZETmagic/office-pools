@@ -145,7 +145,7 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
           {entry.total_points.toLocaleString()}
         </RNText>
         <Text variant="detail" color="slate">
-          {entry.match_points} + {entry.bonus_points}
+          {entry.match_points.toLocaleString()} + {entry.bonus_points.toLocaleString()}
         </Text>
         <Text variant="detail" color="slate">
           {entry.exact_count} exact · {Math.round(entry.hit_rate)}%

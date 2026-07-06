@@ -526,7 +526,7 @@ function BPBadgeCell({
           fontVariant: ['tabular-nums'],
         }}
       >
-        +{badge.xp_bonus} XP
+        +{badge.xp_bonus.toLocaleString()} XP
       </RNText>
     </Pressable>
   );

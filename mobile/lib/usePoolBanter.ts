@@ -137,6 +137,16 @@ export function parseMentionSegments(
   return out;
 }
 
+// Broadcast-from-database payload envelope. The DB trigger sends
+// `realtime.send({ record: <row> }, ...)`; the client `.on('broadcast')`
+// callback receives it under `.payload`. We also accept a top-level `record`
+// defensively in case a client version delivers it un-nested — either way we
+// get the row (or undefined if the shape is unexpected).
+function broadcastRecord<T>(msg: unknown): T | undefined {
+  const m = msg as { payload?: { record?: T }; record?: T } | undefined;
+  return m?.payload?.record ?? m?.record;
+}
+
 export function usePoolBanter(poolId: string | undefined) {
   const { user: authUser } = useAuth();
   const [appUserId, setAppUserId] = useState<string | null>(null);
@@ -150,6 +160,15 @@ export function usePoolBanter(poolId: string | undefined) {
   const [reactions, setReactions] = useState<Map<string, ReactionAggregate[]>>(new Map());
   const userCacheRef = useRef<Map<string, DbUserRow>>(new Map());
   const messageIdsRef = useRef<Set<string>>(new Set());
+  // Scroll-up pagination. `hasMore` gates whether another older page can
+  // be fetched; `loadingOlder` guards against overlapping fetches and
+  // drives the top spinner. Refs mirror both so `loadOlder` can stay a
+  // stable callback and read the latest values without stale closures.
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const loadingOlderRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const messagesRef = useRef<BanterMessage[]>([]);
 
   const fetchAppUserId = useCallback(async () => {
     if (!authUser) {
@@ -286,7 +305,11 @@ export function usePoolBanter(poolId: string | undefined) {
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
       if (fetchErr) throw fetchErr;
-      const rows = ((data as DbMessageRow[] | null) ?? []).slice().reverse();
+      const raw = (data as DbMessageRow[] | null) ?? [];
+      // A full page implies there may be older messages to page in later.
+      hasMoreRef.current = raw.length === PAGE_SIZE;
+      setHasMore(hasMoreRef.current);
+      const rows = raw.slice().reverse();
       await hydrateSenders(rows);
       // Build a lookup of every parent message any row in this page
       // is replying to, including parents that live OUTSIDE this
@@ -307,6 +330,61 @@ export function usePoolBanter(poolId: string | undefined) {
       console.warn('[usePoolBanter.load]', err);
     } finally {
       setLoading(false);
+    }
+  }, [poolId, hydrateSenders, decorate, replyRefFromParentRow, buildParentLookup]);
+
+  // Page in the previous PAGE_SIZE messages older than the oldest one we
+  // currently hold, using a keyset cursor on created_at. Safe to call
+  // speculatively from onScroll: it no-ops when a fetch is already in
+  // flight or when we've reached the start of the conversation.
+  const loadOlder = useCallback(async () => {
+    if (!poolId) return;
+    if (loadingOlderRef.current || !hasMoreRef.current) return;
+    // messages are chronological (oldest-first); the first non-optimistic
+    // row is our cursor. tmp- rows have no server created_at, so skip them.
+    const oldest = messagesRef.current.find((m) => !m.messageId.startsWith('tmp-'));
+    if (!oldest) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('pool_messages')
+        .select(
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+        )
+        .eq('pool_id', poolId)
+        .lt('created_at', oldest.createdAt)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (fetchErr) throw fetchErr;
+      const older = ((data as DbMessageRow[] | null) ?? []).slice().reverse();
+      // A short page means we've reached the beginning of history.
+      if (older.length < PAGE_SIZE) {
+        hasMoreRef.current = false;
+        setHasMore(false);
+      }
+      if (older.length === 0) return;
+      await hydrateSenders(older);
+      const parentLookup = await buildParentLookup(older);
+      const decorated = older.map((row) => {
+        const parent = row.reply_to_message_id
+          ? parentLookup.get(row.reply_to_message_id)
+          : null;
+        return decorate(row, replyRefFromParentRow(parent));
+      });
+      // Prepend, de-duping by id so a boundary row sharing the cursor's
+      // created_at (or one a realtime insert already added) can't double up.
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.messageId));
+        const fresh = decorated.filter((m) => !existing.has(m.messageId));
+        if (fresh.length === 0) return prev;
+        return [...fresh, ...prev];
+      });
+    } catch (err) {
+      console.warn('[usePoolBanter.loadOlder]', err);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
     }
   }, [poolId, hydrateSenders, decorate, replyRefFromParentRow, buildParentLookup]);
 
@@ -606,6 +684,7 @@ export function usePoolBanter(poolId: string | undefined) {
   }, [fetchUnread, messages.length]);
 
   useEffect(() => {
+    messagesRef.current = messages;
     const ids = messages.map((m) => m.messageId).filter((id) => !id.startsWith('tmp-'));
     messageIdsRef.current = new Set(ids);
     void loadReactions(ids);
@@ -613,84 +692,85 @@ export function usePoolBanter(poolId: string | undefined) {
 
   useEffect(() => {
     if (!poolId) return;
-    const channelName = `pool-banter-${poolId}-${Math.random().toString(36).slice(2, 10)}`;
+    let active = true;
+    // Realtime via Broadcast-from-database (see
+    // lib/migrations/022_banter_realtime_broadcast.sql). The old
+    // `postgres_changes` CDC subscription was timing out under load
+    // (PostgresCdcRls create_subscription), so new messages never arrived live
+    // — you had to re-enter the pool to re-fetch. The DB now broadcasts each
+    // message/reaction change to the private `pool:{id}` topic; no
+    // per-subscriber CDC subscription, so it sidesteps that bottleneck.
     const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pool_messages', filter: `pool_id=eq.${poolId}` },
-        async (payload) => {
-          const row = payload.new as DbMessageRow;
-          await hydrateSenders([row]);
-          setMessages((prev) => {
-            if (prev.some((m) => m.messageId === row.message_id)) return prev;
-            const withoutOptimistic = prev.filter(
-              (m) => !(m.messageId.startsWith('tmp-') && m.content === row.content && m.userId === row.user_id),
-            );
-            // postgres_changes payloads don't carry FK joins — resolve
-            // the parent from the current messages list. If the parent
-            // is older than our PAGE_SIZE window or otherwise missing,
-            // replyTo lands as null and the bubble renders without a
-            // quote pill (acceptable degradation).
-            const replyTo = row.reply_to_message_id
-              ? replyRefFromMessage(
-                  withoutOptimistic.find((m) => m.messageId === row.reply_to_message_id),
-                )
-              : null;
-            return [...withoutOptimistic, decorate(row, replyTo)];
-          });
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pool_message_reactions' },
-        (payload) => {
-          const row = payload.new as DbReactionRow;
-          if (!messageIdsRef.current.has(row.message_id)) return;
-          setReactions((prev) => {
-            const next = new Map(prev);
-            const arr = (next.get(row.message_id) ?? []).map((r) => ({
-              ...r,
-              userIds: [...r.userIds],
-            }));
-            const idx = arr.findIndex((r) => r.emoji === row.emoji);
-            if (idx >= 0) {
-              if (arr[idx].userIds.includes(row.user_id)) return prev;
-              arr[idx].count += 1;
-              arr[idx].userIds.push(row.user_id);
-            } else {
-              arr.push({ emoji: row.emoji, count: 1, userIds: [row.user_id] });
-            }
-            next.set(row.message_id, arr);
-            return next;
-          });
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'pool_message_reactions' },
-        (payload) => {
-          const row = payload.old as DbReactionRow;
-          if (!messageIdsRef.current.has(row.message_id)) return;
-          setReactions((prev) => {
-            const arr = (prev.get(row.message_id) ?? []).map((r) => ({
-              ...r,
-              userIds: [...r.userIds],
-            }));
-            const idx = arr.findIndex((r) => r.emoji === row.emoji);
-            if (idx < 0) return prev;
-            arr[idx].count -= 1;
-            arr[idx].userIds = arr[idx].userIds.filter((id) => id !== row.user_id);
-            if (arr[idx].count <= 0) arr.splice(idx, 1);
-            const next = new Map(prev);
-            if (arr.length === 0) next.delete(row.message_id);
-            else next.set(row.message_id, arr);
-            return next;
-          });
-        },
-      )
-      .subscribe();
+      .channel(`pool:${poolId}`, { config: { private: true } })
+      .on('broadcast', { event: 'message_insert' }, async (msg) => {
+        const row = broadcastRecord<DbMessageRow>(msg);
+        if (!row) return;
+        await hydrateSenders([row]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.messageId === row.message_id)) return prev;
+          const withoutOptimistic = prev.filter(
+            (m) => !(m.messageId.startsWith('tmp-') && m.content === row.content && m.userId === row.user_id),
+          );
+          // Broadcast payloads don't carry FK joins — resolve the parent from
+          // the current messages list. If the parent is older than our
+          // PAGE_SIZE window or otherwise missing, replyTo lands as null and
+          // the bubble renders without a quote pill (acceptable degradation).
+          const replyTo = row.reply_to_message_id
+            ? replyRefFromMessage(
+                withoutOptimistic.find((m) => m.messageId === row.reply_to_message_id),
+              )
+            : null;
+          return [...withoutOptimistic, decorate(row, replyTo)];
+        });
+      })
+      .on('broadcast', { event: 'reaction_insert' }, (msg) => {
+        const row = broadcastRecord<DbReactionRow>(msg);
+        if (!row || !messageIdsRef.current.has(row.message_id)) return;
+        setReactions((prev) => {
+          const next = new Map(prev);
+          const arr = (next.get(row.message_id) ?? []).map((r) => ({
+            ...r,
+            userIds: [...r.userIds],
+          }));
+          const idx = arr.findIndex((r) => r.emoji === row.emoji);
+          if (idx >= 0) {
+            if (arr[idx].userIds.includes(row.user_id)) return prev;
+            arr[idx].count += 1;
+            arr[idx].userIds.push(row.user_id);
+          } else {
+            arr.push({ emoji: row.emoji, count: 1, userIds: [row.user_id] });
+          }
+          next.set(row.message_id, arr);
+          return next;
+        });
+      })
+      .on('broadcast', { event: 'reaction_delete' }, (msg) => {
+        const row = broadcastRecord<DbReactionRow>(msg);
+        if (!row || !messageIdsRef.current.has(row.message_id)) return;
+        setReactions((prev) => {
+          const arr = (prev.get(row.message_id) ?? []).map((r) => ({
+            ...r,
+            userIds: [...r.userIds],
+          }));
+          const idx = arr.findIndex((r) => r.emoji === row.emoji);
+          if (idx < 0) return prev;
+          arr[idx].count -= 1;
+          arr[idx].userIds = arr[idx].userIds.filter((id) => id !== row.user_id);
+          if (arr[idx].count <= 0) arr.splice(idx, 1);
+          const next = new Map(prev);
+          if (arr.length === 0) next.delete(row.message_id);
+          else next.set(row.message_id, arr);
+          return next;
+        });
+      });
+    // Private channels require the realtime socket to carry the user's JWT;
+    // setAuth() is async, so subscribe only after it resolves (and only if the
+    // effect is still mounted).
+    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
+      if (active) channel.subscribe();
+    });
     return () => {
+      active = false;
       void channel.unsubscribe();
     };
   }, [poolId, hydrateSenders, decorate, replyRefFromMessage]);
@@ -741,5 +821,8 @@ export function usePoolBanter(poolId: string | undefined) {
     markAsRead,
     toggleReaction,
     refresh: load,
+    loadOlder,
+    loadingOlder,
+    hasMore,
   };
 }

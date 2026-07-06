@@ -221,7 +221,7 @@ function ProfileCard({
                   color: theme.colors.primary,
                 }}
               >
-                {totalPoints} pts
+                {totalPoints.toLocaleString()} pts
               </RNText>
             </View>
           ) : null}

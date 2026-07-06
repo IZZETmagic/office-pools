@@ -273,7 +273,7 @@ function DetailRow({ item }: { item: ActivityItem }) {
           <RNText
             style={{ fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.accent }}
           >
-            {m.match_points} pts
+            {m.match_points.toLocaleString()} pts
           </RNText>
           <RNText
             style={{ fontFamily: fontFamilies.medium, fontSize: 12, color: theme.colors.slate }}
@@ -317,7 +317,7 @@ function DetailRow({ item }: { item: ActivityItem }) {
       return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.ink }}>
-            +{m.points} pts
+            +{m.points.toLocaleString()} pts
           </RNText>
           {chips.map((c) => (
             <View
@@ -351,7 +351,7 @@ function DetailRow({ item }: { item: ActivityItem }) {
             }}
           >
             {positive ? '+' : ''}
-            {m.xp_delta} XP
+            {m.xp_delta.toLocaleString()} XP
           </RNText>
           <RNText
             numberOfLines={1}

@@ -1,5 +1,7 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   Platform,
@@ -11,7 +13,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { Icon, Text } from '@/components/ui';
+import { formatStageLabel } from '@/lib/stage';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
@@ -52,16 +56,49 @@ export default function MatchDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
-      {/* Full-bleed blue header band — extends behind the status bar. The
-          status-bar safe-area inset is added as paddingTop here (not by a
-          parent SafeAreaView) so the tint actually fills it. Contains the
-          back button row and (once loaded) the teams/score header content. */}
-      <View
-        style={{
-          paddingTop: insets.top,
-          backgroundColor: withOpacity(theme.colors.primary, 0.08),
-        }}
+      <StatusBar style="light" animated />
+      {/* Full-bleed dark gradient header band — matches the dashboard's live /
+          upcoming cards. Extends behind the status bar; the safe-area inset is
+          added as paddingTop here so the gradient fills it. Contains the back
+          button row and (once loaded) the teams/score header content. */}
+      <LinearGradient
+        colors={['#0F0F1A', '#1A1830']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ paddingTop: insets.top, overflow: 'hidden' }}
       >
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: 160,
+            height: 160,
+            borderRadius: 80,
+            backgroundColor: withOpacity(theme.colors.primary, 0.06),
+            shadowColor: theme.colors.primary,
+            shadowOpacity: 0.5,
+            shadowRadius: 50,
+            shadowOffset: { width: 0, height: 0 },
+            top: -40,
+            right: -50,
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: 120,
+            height: 120,
+            borderRadius: 60,
+            backgroundColor: withOpacity(theme.colors.accent, 0.05),
+            shadowColor: theme.colors.accent,
+            shadowOpacity: 0.4,
+            shadowRadius: 40,
+            shadowOffset: { width: 0, height: 0 },
+            bottom: -30,
+            left: -40,
+          }}
+        />
         <View
           style={{
             flexDirection: 'row',
@@ -78,17 +115,17 @@ export default function MatchDetailScreen() {
               width: 36,
               height: 36,
               borderRadius: 18,
-              backgroundColor: withOpacity(theme.colors.ink, 0.06),
+              backgroundColor: 'rgba(255,255,255,0.12)',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
+            <Icon name="chevron.left" size={16} tint="#FFFFFF" weight="semibold" />
           </Pressable>
         </View>
         {match ? <MatchHeader match={match} /> : null}
-      </View>
+      </LinearGradient>
 
       {loading && !match ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -158,27 +195,7 @@ function awayDisplayName(match: ResultsMatch): string {
 }
 
 function stageLabel(match: ResultsMatch): string {
-  const label = (() => {
-    if (match.groupLetter) return `Group ${match.groupLetter}`;
-    switch (match.stage) {
-      case 'round_32':
-      case 'round_of_32':
-        return 'Round of 32';
-      case 'round_16':
-      case 'round_of_16':
-        return 'Round of 16';
-      case 'quarter_final':
-        return 'Quarter Finals';
-      case 'semi_final':
-        return 'Semi Finals';
-      case 'third_place':
-        return 'Third Place';
-      case 'final':
-        return 'Final';
-      default:
-        return match.stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-  })();
+  const label = match.groupLetter ? `Group ${match.groupLetter}` : formatStageLabel(match.stage);
   return `${label} · Match #${match.matchNumber}`;
 }
 
@@ -206,7 +223,7 @@ function formattedShortDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function FlagView({ url, size = 56 }: { url: string | null | undefined; size?: number }) {
+function FlagView({ url, size = 64 }: { url: string | null | undefined; size?: number }) {
   const theme = useTheme();
   const w = size;
   const h = Math.round(size * 0.67);
@@ -241,20 +258,20 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
         // extension. This view is just the teams/score content laid out
         // inside that band.
         paddingHorizontal: 20,
-        paddingTop: 4,
-        paddingBottom: 20,
+        paddingTop: 24,
+        paddingBottom: 24,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {/* Home team */}
-        <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+        <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
           <FlagView url={match.homeTeam?.flagUrl} />
           <RNText
             numberOfLines={2}
             style={{
               fontFamily: fontFamilies.semibold,
-              fontSize: 14,
-              color: theme.colors.ink,
+              fontSize: 16,
+              color: '#FFFFFF',
               textAlign: 'center',
             }}
           >
@@ -263,7 +280,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
         </View>
 
         {/* Center: score / time / LIVE / PSO */}
-        <View style={{ width: 110, alignItems: 'center', gap: 4 }}>
+        <View style={{ width: 124, alignItems: 'center', gap: 4 }}>
           {isLive ? (
             <>
               <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
@@ -296,7 +313,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
                   style={{
                     fontFamily: fontFamilies.medium,
                     fontSize: 11,
-                    color: theme.colors.primary,
+                    color: theme.colors.accent,
                   }}
                 >
                   ({match.homeScorePso}-{match.awayScorePso} PSO)
@@ -306,7 +323,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
                 style={{
                   fontFamily: fontFamilies.medium,
                   fontSize: 10,
-                  color: theme.colors.slate,
+                  color: 'rgba(255,255,255,0.55)',
                 }}
               >
                 Full Time
@@ -317,8 +334,8 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
               <RNText
                 style={{
                   fontFamily: fontFamilies.bold,
-                  fontSize: 22,
-                  color: theme.colors.ink,
+                  fontSize: 26,
+                  color: '#FFFFFF',
                 }}
               >
                 {formattedTime(match.matchDate)}
@@ -327,7 +344,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
                 style={{
                   fontFamily: fontFamilies.medium,
                   fontSize: 11,
-                  color: theme.colors.slate,
+                  color: 'rgba(255,255,255,0.55)',
                 }}
               >
                 {formattedShortDate(match.matchDate)}
@@ -337,14 +354,14 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
         </View>
 
         {/* Away team */}
-        <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+        <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
           <FlagView url={match.awayTeam?.flagUrl} />
           <RNText
             numberOfLines={2}
             style={{
               fontFamily: fontFamilies.semibold,
-              fontSize: 14,
-              color: theme.colors.ink,
+              fontSize: 16,
+              color: '#FFFFFF',
               textAlign: 'center',
             }}
           >
@@ -352,30 +369,31 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
           </RNText>
         </View>
       </View>
+
+      <MatchStatusBadge match={match} style={{ marginTop: 12 }} />
     </View>
   );
 }
 
 function ScoreRow({ home, away }: { home: number; away: number }) {
-  const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <RNText
         style={{
           fontFamily: MONO_BOLD,
-          fontSize: 28,
-          color: theme.colors.ink,
+          fontSize: 34,
+          color: '#FFFFFF',
           fontVariant: ['tabular-nums'],
         }}
       >
         {home}
       </RNText>
-      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 28, color: theme.colors.slate }}>-</RNText>
+      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 34, color: 'rgba(255,255,255,0.4)' }}>-</RNText>
       <RNText
         style={{
           fontFamily: MONO_BOLD,
-          fontSize: 28,
-          color: theme.colors.ink,
+          fontSize: 34,
+          color: '#FFFFFF',
           fontVariant: ['tabular-nums'],
         }}
       >
@@ -407,17 +425,18 @@ function MatchInfoCard({ match }: { match: ResultsMatch }) {
         overflow: 'hidden',
       }}
     >
-      {rows.map((r, i) => (
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
+        <Text variant="cardTitle">Match Facts</Text>
+      </View>
+      {rows.map((r) => (
         <View key={r.icon}>
-          {i > 0 ? (
-            <View
-              style={{
-                height: 0.5,
-                marginHorizontal: 14,
-                backgroundColor: withOpacity(theme.colors.mist, 0.5),
-              }}
-            />
-          ) : null}
+          <View
+            style={{
+              height: 0.5,
+              marginHorizontal: 14,
+              backgroundColor: withOpacity(theme.colors.mist, 0.5),
+            }}
+          />
           <View
             style={{
               flexDirection: 'row',
@@ -918,7 +937,7 @@ function BracketGroupPositionsCard({
       >
         <Text variant="cardTitle">Predicted Group Finish</Text>
         <Text variant="detail" color="slate">
-          {total} {total === 1 ? 'pick' : 'picks'}
+          {total.toLocaleString()} {total === 1 ? 'pick' : 'picks'}
         </Text>
       </View>
 
@@ -1272,7 +1291,7 @@ function PredictionRow({ match, info }: { match: ResultsMatch; info: MatchPredic
                   color: pts > 0 ? theme.colors.green : theme.colors.slate,
                 }}
               >
-                +{pts} pts
+                +{pts.toLocaleString()} pts
               </RNText>
             ) : null}
           </>

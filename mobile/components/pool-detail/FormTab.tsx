@@ -400,7 +400,7 @@ function XPStatColumn({
           fontVariant: ['tabular-nums'],
         }}
       >
-        {value}
+        {value.toLocaleString()}
       </RNText>
       <RNText
         style={{
@@ -660,7 +660,7 @@ function BadgeCell({
           fontVariant: ['tabular-nums'],
         }}
       >
-        +{badge.xp_bonus} XP
+        +{badge.xp_bonus.toLocaleString()} XP
       </RNText>
     </Pressable>
   );

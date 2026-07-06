@@ -7,10 +7,12 @@ type Props = {
   aggregates: ReactionAggregate[];
   currentUserId: string | null;
   isOwn: boolean;
-  onToggle: (emoji: string) => void;
+  // Tapping any pill opens the "who reacted" sheet for the whole message
+  // (adding/removing your own reaction is done via the long-press picker).
+  onPress: () => void;
 };
 
-export function ReactionPills({ aggregates, currentUserId, isOwn, onToggle }: Props) {
+export function ReactionPills({ aggregates, currentUserId, isOwn, onPress }: Props) {
   const theme = useTheme();
   if (aggregates.length === 0) return null;
 
@@ -22,9 +24,15 @@ export function ReactionPills({ aggregates, currentUserId, isOwn, onToggle }: Pr
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 4,
-        marginTop: 4,
+        // Lift the reactions up onto the bubble's bottom edge (iMessage /
+        // WhatsApp style) and hug the bubble's near corner — left edge for
+        // received, right edge for own — instead of floating in a gap below.
+        // Received no longer needs the 34px avatar offset: ReactionPills already
+        // renders inside the post-avatar bubble column, so it was over-indented.
+        marginTop: -6,
         justifyContent: isOwn ? 'flex-end' : 'flex-start',
-        paddingLeft: isOwn ? 0 : 34,
+        paddingLeft: isOwn ? 0 : 10,
+        paddingRight: isOwn ? 10 : 0,
       }}
     >
       {sorted.map((a) => {
@@ -32,7 +40,7 @@ export function ReactionPills({ aggregates, currentUserId, isOwn, onToggle }: Pr
         return (
           <Pressable
             key={a.emoji}
-            onPress={() => onToggle(a.emoji)}
+            onPress={onPress}
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
@@ -43,10 +51,12 @@ export function ReactionPills({ aggregates, currentUserId, isOwn, onToggle }: Pr
               backgroundColor: reacted
                 ? withOpacity(theme.colors.primary, 0.14)
                 : theme.colors.mist,
-              borderWidth: 1,
-              borderColor: reacted
-                ? withOpacity(theme.colors.primary, 0.4)
-                : 'transparent',
+              // Outline ring the colour of the chat background (snow) so the
+              // pill reads as "cut out" and pops off the message bubble it
+              // overlaps — near-white in light mode, near-black in dark. Reacted
+              // state stays legible via the tinted fill + blue count below.
+              borderWidth: 2,
+              borderColor: theme.colors.snow,
               opacity: pressed ? 0.7 : 1,
             })}
           >

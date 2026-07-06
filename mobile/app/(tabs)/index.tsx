@@ -67,8 +67,19 @@ export default function HomeScreen() {
   const pools = data?.pools ?? [];
   const hasPools = pools.length > 0;
   const poolsNeedingPredictions = pools.filter((p) => p.needsPredictions);
+  // Hide the "Share Invite" card once the pool's tournament is underway —
+  // predictions are locked by then, so there's no point inviting new members.
+  // "Started" = the prediction deadline (first kickoff) has passed, or scoring
+  // has already begun.
+  const now = Date.now();
   const inviteTarget =
-    pools.find((p) => p.role === 'admin' && p.memberCount < 4) ?? null;
+    pools.find((p) => {
+      if (p.role !== 'admin' || p.memberCount >= 4) return false;
+      const tournamentStarted =
+        p.hasScoringStarted ||
+        (p.predictionDeadline != null && Date.parse(p.predictionDeadline) <= now);
+      return !tournamentStarted;
+    }) ?? null;
 
   return (
     <SafeAreaView

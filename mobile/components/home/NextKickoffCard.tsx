@@ -2,6 +2,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { MatchStatusBadge } from '@/components/MatchStatusBadge';
+import { getMatchStatusBadge } from '@/lib/matchStatus';
+import { formatStageLabel } from '@/lib/stage';
 import type { MatchSummary } from '@/lib/useHomeData';
 import { useTheme, withOpacity } from '@/theme';
 
@@ -34,6 +37,8 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
     month: 'short',
     day: 'numeric',
   });
+
+  const badge = getMatchStatusBadge(match);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
@@ -103,7 +108,7 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
                 textTransform: 'uppercase',
               }}
             >
-              {match.stage}
+              {formatStageLabel(match.stage)}
             </RNText>
           ) : null}
         </View>
@@ -120,21 +125,28 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
             code={match.homeTeam?.countryCode ?? match.homeTeamPlaceholder ?? '?'}
           />
 
-          <View style={{ alignItems: 'center', gap: 2 }}>
-            <Countdown
-              parts={
-                under24h
-                  ? [
-                      { value: hours, label: 'H' },
-                      { value: minutes, label: 'M' },
-                      { value: seconds, label: 'S' },
-                    ]
-                  : [
-                      { value: days, label: 'D' },
-                      { value: hours, label: 'H' },
-                    ]
-              }
-            />
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            {badge?.hidesCountdown ? (
+              <MatchStatusBadge match={match} />
+            ) : (
+              <>
+                {badge ? <MatchStatusBadge match={match} style={{ marginBottom: 2 }} /> : null}
+                <Countdown
+                  parts={
+                    under24h
+                      ? [
+                          { value: hours, label: 'H' },
+                          { value: minutes, label: 'M' },
+                          { value: seconds, label: 'S' },
+                        ]
+                      : [
+                          { value: days, label: 'D' },
+                          { value: hours, label: 'H' },
+                        ]
+                  }
+                />
+              </>
+            )}
             <RNText
               style={{
                 fontFamily: 'Nunito_500Medium',

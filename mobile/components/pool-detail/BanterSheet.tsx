@@ -37,6 +37,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   forwardRef,
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -46,6 +47,7 @@ import {
   useState,
 } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Keyboard,
   Platform,
@@ -64,6 +66,7 @@ import {
   type BubbleProps,
   GiftedChat,
   InputToolbar,
+  MessageText,
   Send,
   type IMessage,
 } from 'react-native-gifted-chat';
@@ -101,6 +104,11 @@ import {
 import { QuickActionsMenu, type QuickAction } from './QuickActionsMenu';
 import { ReactionPicker } from './ReactionPicker';
 import { ReactionPills } from './ReactionPills';
+import {
+  ReactionsSheet,
+  type ReactionsSheetHandle,
+  type ReactorGroup,
+} from './ReactionsSheet';
 import {
   SharePredictionSheet,
   type PredictionOption,
@@ -147,6 +155,70 @@ type Props = {
 // Without memo, every parent re-render reconciles through this whole
 // component and tanks the swipe animation. Props are referentially
 // stable strings so the default shallow equality is correct.
+// Android keyboard avoidance for the sheet. Under edge-to-edge (Android 15+)
+// the OS won't resize (`adjustResize` is a no-op), and neither the manual
+// `paddingBottom` (Reanimated doesn't re-flow layout props on Android) nor
+// KeyboardAvoidingView (its self-layout measurement is wrong inside the
+// pan-animated gorhom sheet) moved the composer. But keyboard-controller DOES
+// report the keyboard height here (verified on device: height ≈ -336 when
+// open), so we drive a manual `behavior="position"`: translate the whole chat
+// block up by that height with a TRANSFORM — no layout re-flow needed, same
+// mechanism as the (working) iOS overlay lift. iOS keeps its wrapper-padding
+// path → passthrough. Module-scope (stable identity) so it never remounts.
+function KeyboardLift({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const { height, progress } = useReanimatedKeyboardAnimation();
+  const liftStyle = useAnimatedStyle(() => ({
+    // translateY = keyboard lift (`height`, negative when open) MINUS the bottom
+    // safe-area inset while the keyboard is DOWN — that inset term ramps to 0 as
+    // the keyboard opens (the open keyboard already covers the nav bar). So the
+    // composer clears the nav-bar / gesture area at rest and sits just above the
+    // keyboard when typing. All values are live/per-device — no fixed offsets.
+    transform: [
+      { translateY: height.value - insets.bottom * (1 - progress.value) },
+    ],
+  }));
+  if (Platform.OS !== 'android') return <>{children}</>;
+  return <Animated.View style={[{ flex: 1 }, liftStyle]}>{children}</Animated.View>;
+}
+
+const MS_PER_DAY = 86400000;
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// Relative day label for chat date separators: "Today" / "Yesterday", else
+// "D MMMM" (same year) or "D MMMM YYYY" — matches gifted-chat's own date format
+// but adds the Yesterday case its Day component omits (its calendar branch only
+// fires for today, so yesterday would otherwise show the bare date).
+function formatDayLabel(createdAt: string | number | Date): string {
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const now = new Date();
+  const d = new Date(createdAt);
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / MS_PER_DAY);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  const label = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? label : `${label} ${d.getFullYear()}`;
+}
+
+// Non-breaking spaces appended to the END of a bubble's text to reserve inline
+// room for the WhatsApp-style timestamp that overlays the text's end. Because
+// they're part of the text, they only affect the LAST line (or wrap onto a
+// fresh line when the last line is full) — upper lines keep full width. Widen/
+// narrow this run if the time overlaps the text or leaves too big a gap.
+const TIME_RESERVE_SPACES = ' ' + String.fromCharCode(0xa0).repeat(11);
+
+// "3:16 PM"-style send time for the timestamp inside each message bubble.
+function formatMessageTime(createdAt: string | number | Date): string {
+  return new Date(createdAt).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function BanterSheet(
   { poolId, poolName },
   ref,
@@ -192,7 +264,17 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const sheetClosingSV = useSharedValue(0);
   const frozenPaddingSV = useSharedValue(0);
 
+  // Platform-split keyboard handling. iOS lifts the composer via the manual
+  // `wrapperPaddingStyle` padding below (driven by keyboard-controller). Android
+  // can't use that reliably, and OS `adjustResize` is broken under edge-to-edge,
+  // so there the chat is wrapped in <KeyboardLift> (KeyboardAvoidingView); the
+  // manual padding + overlay transforms are no-ops on Android (see below).
+  const isAndroid = Platform.OS === 'android';
+
   const wrapperPaddingStyle = useAnimatedStyle(() => {
+    // Android lifts the composer via <KeyboardLift> (KeyboardAvoidingView), not
+    // this manual padding — so it's a no-op on Android.
+    if (isAndroid) return {};
     if (sheetClosingSV.value === 1) {
       return { paddingBottom: frozenPaddingSV.value };
     }
@@ -220,15 +302,20 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   //
   //   - closed: 0 - 34*1 = -34           (overlay rides above the safe-area inset)
   //   - open:   -300 - 34*0 = -300       (overlay rides 300pt up, matches keyboard rise)
-  const overlayKeyboardTransform = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateY:
-          keyboardHeight.value -
-          insets.bottom * (1 - keyboardProgress.value),
-      },
-    ],
-  }));
+  const overlayKeyboardTransform = useAnimatedStyle(() => {
+    // Android: <KeyboardLift> translates the whole chat block (incl. these
+    // overlays) with the keyboard, so no manual per-overlay translate is needed.
+    if (isAndroid) return {};
+    return {
+      transform: [
+        {
+          translateY:
+            keyboardHeight.value -
+            insets.bottom * (1 - keyboardProgress.value),
+        },
+      ],
+    };
+  });
 
   // Imperative open/close — same pattern the other gorhom sheets in
   // the app use (JoinPoolSheet, PoolCreateJoinSheet, etc.).
@@ -408,6 +495,37 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // turn would re-render every BanterBubble, defeating the
   // pull-out we just did for tab-switch jitter.
   const toggleReaction = banter.toggleReaction;
+  const reactionsSheetRef = useRef<ReactionsSheetHandle | null>(null);
+
+  // Tapping a reaction pill opens the "who reacted" sheet. We resolve the
+  // aggregates' userIds → member names + avatar colours here (BanterSheet owns
+  // the roster + avatar helpers) and hand the sheet a ready-to-render list.
+  const handleShowReactors = useCallback(
+    (aggs: ReactionAggregate[]) => {
+      const memberById = new Map(banter.members.map((m) => [m.userId, m] as const));
+      const groups: ReactorGroup[] = [...aggs]
+        .sort((a, b) => b.count - a.count)
+        .map((agg) => ({
+          emoji: agg.emoji,
+          count: agg.count,
+          reactors: agg.userIds.map((uid) => {
+            const member = memberById.get(uid);
+            const name = member ? member.fullName || member.username : 'Someone';
+            return {
+              userId: uid,
+              name,
+              initials: getInitials(name),
+              gradient:
+                AVATAR_GRADIENTS[hashUserIdToIndex(uid, AVATAR_GRADIENTS.length)],
+              isYou: uid === banter.appUserId,
+            };
+          }),
+        }));
+      reactionsSheetRef.current?.open(groups);
+    },
+    [banter.members, banter.appUserId],
+  );
+
   const handleToggleReaction = useCallback(
     (messageId: string, emoji: string) => {
       void toggleReaction(messageId, emoji);
@@ -686,10 +804,15 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         // the live keyboard-aware padding is in effect from frame 0.
         onAnimate={(_fromIndex, toIndex) => {
           if (toIndex < 0) {
-            frozenPaddingSV.value =
-              -keyboardHeight.value +
-              insets.bottom * (1 - keyboardProgress.value);
-            sheetClosingSV.value = 1;
+            // iOS-only: freeze the keyboard-aware padding for the close so the
+            // composer doesn't bob while the sheet slides down. Android has no
+            // manual padding (OS-driven), so there's nothing to freeze.
+            if (Platform.OS === 'ios') {
+              frozenPaddingSV.value =
+                -keyboardHeight.value +
+                insets.bottom * (1 - keyboardProgress.value);
+              sheetClosingSV.value = 1;
+            }
             Keyboard.dismiss();
             setMentionQuery(null);
             setQuickActionsOpen(false);
@@ -721,14 +844,16 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
             borderBottomWidth: 0.5,
             borderBottomColor: withOpacity(theme.colors.silver, 0.6),
             backgroundColor: theme.colors.snow,
+            // On Android the KeyboardLift slides the chat up behind this header
+            // (behavior="position"); zIndex/elevation keep the header on top so
+            // the chat is occluded, matching the full-screen banter route.
+            zIndex: 10,
+            elevation: 10,
           }}
         >
           <View style={{ flex: 1 }}>
             <Text variant="cardTitle" numberOfLines={1}>
               {poolName ?? 'Banter'}
-            </Text>
-            <Text variant="detail" color="slate">
-              {banter.messages.length} {banter.messages.length === 1 ? 'message' : 'messages'}
             </Text>
           </View>
           <Pressable
@@ -754,6 +879,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
             the user. Every open of the sheet shows an already-laid-
             out chat, no jitter. State (composer draft, scroll
             position) persists across open/close cycles. */}
+        {/* Android: KeyboardLift (KeyboardAvoidingView) lifts the chat +
+            composer + overlays above the keyboard as one block. iOS: passthrough
+            (the manual wrapperPaddingStyle above does the lift). */}
+        <KeyboardLift>
         <GiftedChat
           messages={giftedMessages}
           onSend={(msgs) => void handleSend(msgs)}
@@ -764,6 +893,29 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           user={me}
           textInputProps={{ placeholder: 'Banter' }}
           maxComposerHeight={120}
+          // Scroll-up pagination. The list is inverted, so gifted-chat's
+          // onEndReached fires at the TOP (oldest); with
+          // isInfiniteScrollEnabled it auto-calls onPress there, paging in
+          // the previous 50 via the shared usePoolBanter.loadOlder().
+          // isAvailable/isLoading come straight from the hook's
+          // hasMore/loadingOlder.
+          loadEarlierMessagesProps={{
+            isAvailable: banter.hasMore,
+            isLoading: banter.loadingOlder,
+            isInfiniteScrollEnabled: true,
+            onPress: () => {
+              void banter.loadOlder();
+            },
+          }}
+          // Quiet auto-loading feel: only a small spinner while a page is
+          // in flight — no default blue "Load earlier messages" pill.
+          renderLoadEarlier={(earlierProps) =>
+            earlierProps.isLoading ? (
+              <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                <ActivityIndicator color={theme.colors.primary} />
+              </View>
+            ) : null
+          }
           // We own the avatar slot for every received message. With
           // `isAvatarVisibleForEveryMessage={true}` gifted-chat calls
           // `renderAvatar` on every row (instead of just last-of-group),
@@ -929,6 +1081,30 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               );
             },
           }}
+          // Date separators — custom label (Today / Yesterday / "5 July"),
+          // rendered as a subtle on-theme light pill instead of gifted-chat's
+          // default heavy dark chip. gifted-chat's Day only maps "Today", so we
+          // compute the label ourselves (formatDayLabel).
+          renderDay={(dayProps) =>
+            dayProps.createdAt == null ? null : (
+              <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 24 }}>
+                <View
+                  style={{
+                    backgroundColor: withOpacity(theme.colors.ink, 0.06),
+                    borderRadius: 12,
+                    paddingVertical: 5,
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  <RNText
+                    style={{ color: theme.colors.ink, fontSize: 14, fontWeight: '700' }}
+                  >
+                    {formatDayLabel(dayProps.createdAt)}
+                  </RNText>
+                </View>
+              </View>
+            )
+          }
           renderAvatar={(avatarProps) => {
             // No avatar slot on the sent (right) side.
             if (avatarProps.position === 'right') return null;
@@ -941,8 +1117,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               />
             );
           }}
-          // Disable gifted-chat's internal KAV — gorhom owns the
-          // keyboard via the BottomSheetTextInput we render below.
+          // Disable gifted-chat's internal KAV — keyboard avoidance is ours:
+          // Android via <KeyboardLift> (keyboard-controller KeyboardAvoidingView),
+          // iOS via the manual wrapper padding. GiftedChat's own KAV must stay
+          // off so it doesn't fight either path.
           keyboardAvoidingViewProps={{ enabled: false }}
           // Bubble styling — match the app's theme. Sent bubbles
           // (right side) use `theme.colors.primary` with white text;
@@ -965,7 +1143,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               }
               currentUserId={banter.appUserId}
               onLongPress={handleBubbleLongPress}
-              onToggleReaction={handleToggleReaction}
+              onShowReactors={handleShowReactors}
             />
           )}
           // -------------------------------------------------------
@@ -1037,13 +1215,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               />
             </Pressable>
           )}
-          // Custom composer using a plain RN TextInput (not gorhom's
-          // BottomSheetTextInput). The sheet is locked at insets.top
-          // and we DON'T want gorhom to do any keyboard handling on
-          // focus — our animated paddingBottom on the wrapper is the
-          // sole driver of composer-rise. BottomSheetTextInput would
-          // dispatch keyboard-state events to the parent sheet that
-          // can introduce a second source of motion.
+          // Plain RN TextInput on both platforms. We deliberately do NOT use
+          // gorhom's BottomSheetTextInput — routing keyboard state through the
+          // sheet adds a second source of motion. The lift comes from the manual
+          // wrapper padding (iOS) or <KeyboardLift> / KeyboardAvoidingView (Android).
           //
           // The TextInput sits inside a pill-shaped View
           // (theme.colors.mist background, borderRadius: 20). The
@@ -1214,6 +1389,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
             onDismiss={() => setQuickActionsOpen(false)}
           />
         </Animated.View>
+        </KeyboardLift>
         {/* Full Unicode emoji keyboard. Renders as a portaled modal
             (rn-emoji-keyboard handles its own portal), so it
             appears on top of the banter sheet without needing
@@ -1233,6 +1409,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           enableSearchBar
           categoryPosition="top"
         />
+        <ReactionsSheet ref={reactionsSheetRef} />
         {/* Inner picker sheets — both plain gorhom BottomSheets.
             Gated on `sheetOpen` (the banter sheet's own open state)
             so they don't mount EVERY banter open/close — that was
@@ -1493,7 +1670,7 @@ type BanterBubbleProps = {
     geom: { x: number; y: number; w: number; h: number },
     position: 'left' | 'right',
   ) => void;
-  onToggleReaction: (messageId: string, emoji: string) => void;
+  onShowReactors: (aggregates: ReactionAggregate[]) => void;
 };
 
 function BanterBubble({
@@ -1501,7 +1678,7 @@ function BanterBubble({
   aggregates,
   currentUserId,
   onLongPress,
-  onToggleReaction,
+  onShowReactors,
 }: BanterBubbleProps) {
   const theme = useTheme();
   const msg = bubbleProps.currentMessage as BanterIMessage | undefined;
@@ -1537,7 +1714,7 @@ function BanterBubble({
       onLongPress(String(msg._id), { x, y, w, h }, bubbleProps.position);
     });
   };
-  const handleToggle = (emoji: string) => onToggleReaction(String(msg._id), emoji);
+  const handleShowReactors = () => onShowReactors(aggregates);
 
   const nameLabel = showName ? (
     <RNText
@@ -1623,16 +1800,9 @@ function BanterBubble({
                 lineHeight: 22,
               },
             }}
-            // gifted-chat's Bubble renders a "bottom" container
-            // inside the wrapper that holds username + time + ticks.
-            // We suppress time via `renderTime` and have no username,
-            // but the container View is still mounted with
-            // `paddingBottom: 5, paddingHorizontal: 10` baked into
-            // gifted-chat's stylesheet (Bubble/styles.js:bottom).
-            // Those 5pt of empty space push the visible text UP
-            // inside the bubble. Zeroing the padding here collapses
-            // the empty container so the message reads vertically
-            // centered in the bubble.
+            // Time is rendered INSIDE the message text (renderMessageText,
+            // WhatsApp-style) rather than in this bottom container, so collapse
+            // the empty bottom container to keep the text vertically centered.
             bottomContainerStyle={{
               left: { paddingHorizontal: 0, paddingBottom: 0 },
               right: { paddingHorizontal: 0, paddingBottom: 0 },
@@ -1659,6 +1829,44 @@ function BanterBubble({
                 },
               },
             }}
+            // WhatsApp-style inline timestamp. We append a run of non-breaking
+            // spaces to the END of the message text (TIME_RESERVE_SPACES) so it
+            // reserves the time's width INLINE — only on the last line, or by
+            // carrying the "end" onto a fresh line when the last line is full.
+            // The visible time is then absolutely positioned bottom-right over
+            // that reserved space. Result: short msg → time shares the line;
+            // wrapped msg with a short last line → time right-aligned on it;
+            // full last line → time drops to its own line; upper lines keep full
+            // width. Kept gifted-chat's MessageText so @mention/link parsing
+            // still works (the spaces are appended after, so mentions are safe).
+            renderMessageText={(mtProps) => {
+              const msg = mtProps.currentMessage;
+              const created = msg?.createdAt;
+              const own = mtProps.position === 'right';
+              const reserved =
+                msg == null || created == null
+                  ? msg
+                  : { ...msg, text: `${msg.text}${TIME_RESERVE_SPACES}` };
+              return (
+                <View style={{ position: 'relative' }}>
+                  <MessageText {...mtProps} currentMessage={reserved} />
+                  {created == null ? null : (
+                    <RNText
+                      style={{
+                        position: 'absolute',
+                        right: 4,
+                        bottom: 2,
+                        fontSize: 11,
+                        fontFamily: fontFamilies.medium,
+                        color: own ? 'rgba(255,255,255,0.7)' : theme.colors.slate,
+                      }}
+                    >
+                      {formatMessageTime(created)}
+                    </RNText>
+                  )}
+                </View>
+              );
+            }}
             renderTime={() => null}
           />
         )}
@@ -1669,7 +1877,7 @@ function BanterBubble({
         aggregates={aggregates}
         currentUserId={currentUserId}
         isOwn={isOwn}
-        onToggle={handleToggle}
+        onPress={handleShowReactors}
       />
     </View>
   );
@@ -2000,7 +2208,7 @@ async function sendStandings(poolId: string, sendMessage: SendMessage) {
       points: e.total_points,
     }));
     const leader = top5[0];
-    const content = `📊 Current standings — ${leader.name} leads with ${leader.points} pts!`;
+    const content = `📊 Current standings — ${leader.name} leads with ${leader.points.toLocaleString()} pts!`;
     const result = await sendMessage(content, {
       messageType: 'standings_drop',
       metadata: {

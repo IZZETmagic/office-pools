@@ -211,6 +211,24 @@ function synth(
 }
 
 /**
+ * Guard against non-unique activity ids reaching the list as React keys. The
+ * server id for synthesized events is `type-poolId-createdAt`, which collides
+ * when a user has two entries in one pool whose ranks change at the same
+ * snapshot timestamp (two distinct `rank_change` events, same id). Keep every
+ * event but suffix duplicates so keys stay unique. Server-side, the id also
+ * folds in entry_id — this is defense-in-depth so the feed can never crash on a
+ * duplicate key regardless of what the endpoint returns.
+ */
+function ensureUniqueActivityIds(items: ActivityItem[]): void {
+  const seen = new Map<string, number>();
+  for (const it of items) {
+    const n = (seen.get(it.activityId) ?? 0) + 1;
+    seen.set(it.activityId, n);
+    if (n > 1) it.activityId = `${it.activityId}#${n}`;
+  }
+}
+
+/**
  * Build the Activity feed.
  *
  * V1 architecture: server-side endpoint produces the "cheap" events
@@ -250,6 +268,8 @@ async function fetchActivity(appUserId: string): Promise<ActivityItem[]> {
 
   // Newest first
   items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+
+  ensureUniqueActivityIds(items);
   return items;
 }
 

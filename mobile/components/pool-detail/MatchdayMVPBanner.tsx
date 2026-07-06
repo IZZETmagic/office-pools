@@ -27,7 +27,7 @@ export function MatchdayMVPBanner({ mvp }: { mvp: MatchdayMvp }) {
           Matchday MVP
         </Text>
         <Text variant="body">
-          {name} scored {mvp.match_points} pts on Match {mvp.match_number}
+          {name} scored {mvp.match_points.toLocaleString()} pts on Match {mvp.match_number}
         </Text>
       </View>
     </View>

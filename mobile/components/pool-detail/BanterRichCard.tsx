@@ -230,7 +230,7 @@ function StandingsRow({
             color: isLeader ? '#FFFFFF' : theme.colors.slate,
           }}
         >
-          {entry.rank}
+          {entry.rank.toLocaleString()}
         </RNText>
       </View>
       <RNText
@@ -253,7 +253,7 @@ function StandingsRow({
           fontVariant: ['tabular-nums'],
         }}
       >
-        {entry.points} pts
+        {entry.points.toLocaleString()} pts
       </RNText>
     </View>
   );

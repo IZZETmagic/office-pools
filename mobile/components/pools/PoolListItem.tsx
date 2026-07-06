@@ -353,7 +353,7 @@ function RankBlock({
               color: theme.colors.slate,
             }}
           >
-            of {totalEntries}
+            of {totalEntries.toLocaleString()}
           </RNText>
         ) : null}
       </View>

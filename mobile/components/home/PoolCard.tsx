@@ -142,7 +142,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
                   #{pool.currentRank}
                 </RNText>
                 <Text variant="body" color="slate">
-                  of {pool.totalEntries}
+                  of {pool.totalEntries.toLocaleString()}
                 </Text>
               </>
             ) : (
@@ -177,7 +177,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
                 accent={accentGradient[1]}
               />
               <Text variant="caption" color="slate">
-                {pool.totalPoints} pts
+                {pool.totalPoints.toLocaleString()} pts
               </Text>
             </View>
           </View>

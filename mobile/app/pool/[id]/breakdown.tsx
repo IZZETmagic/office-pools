@@ -358,7 +358,7 @@ function SummaryCell({
   signed?: boolean;
 }) {
   const theme = useTheme();
-  const display = signed && value > 0 ? `+${value}` : `${value}`;
+  const display = signed && value > 0 ? `+${value.toLocaleString()}` : `${value.toLocaleString()}`;
   return (
     <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
       <RNText
@@ -659,7 +659,7 @@ function StageCard({
             fontVariant: ['tabular-nums'],
           }}
         >
-          {stageTotal} pts
+          {stageTotal.toLocaleString()} pts
         </RNText>
       </View>
 
@@ -805,7 +805,7 @@ function MatchRow({ result }: { result: BreakdownMatchResult }) {
             fontVariant: ['tabular-nums'],
           }}
         >
-          {result.total_points > 0 ? `+${result.total_points}` : '0'}
+          {result.total_points > 0 ? `+${result.total_points.toLocaleString()}` : '0'}
         </RNText>
       </View>
 
@@ -1029,7 +1029,7 @@ function BonusCategoryCard({
             fontVariant: ['tabular-nums'],
           }}
         >
-          {subtotal} pts
+          {subtotal.toLocaleString()} pts
         </RNText>
       </View>
 
@@ -1085,7 +1085,7 @@ function BonusCategoryCard({
                 fontVariant: ['tabular-nums'],
               }}
             >
-              {e.points_earned > 0 ? `+${e.points_earned}` : '0'}
+              {e.points_earned > 0 ? `+${e.points_earned.toLocaleString()}` : '0'}
             </RNText>
           </View>
         ))}

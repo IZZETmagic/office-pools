@@ -231,7 +231,7 @@ export default function BanterScreen() {
         points: e.total_points,
       }));
       const leader = top5[0];
-      const content = `📊 Current standings — ${leader.name} leads with ${leader.points} pts!`;
+      const content = `📊 Current standings — ${leader.name} leads with ${leader.points.toLocaleString()} pts!`;
       const metadata: Record<string, unknown> = {
         leader_user_id: leader.user_id,
         leader_name: leader.name,
@@ -531,6 +531,10 @@ export default function BanterScreen() {
           // onLongPress / Pressable.onPress) work normally and the keyboard
           // stays put; only taps that fall through still dismiss it.
           keyboardShouldPersistTaps="handled"
+          // Keep the currently-visible messages pinned in place when we
+          // prepend an older page at the top, instead of the list visibly
+          // jumping. Reliable on iOS + Android under the New Architecture.
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onContentSizeChange={(_w, h) => {
             if (h === 0 || banter.messages.length === 0) return;
             if (!stuckToBottomRef.current) return;
@@ -544,6 +548,18 @@ export default function BanterScreen() {
             stuckToBottomRef.current = distance < 80;
             const shouldShow = distance > 240;
             if (shouldShow !== showScrollDown) setShowScrollDown(shouldShow);
+            // Near the top → page in the previous batch. Gate on the
+            // initial scroll-to-bottom having happened so we don't fire on
+            // first mount; loadOlder() itself no-ops while a fetch is in
+            // flight or once history is exhausted.
+            if (
+              hadInitialContentRef.current &&
+              contentOffset.y < 120 &&
+              banter.hasMore &&
+              !banter.loadingOlder
+            ) {
+              void banter.loadOlder();
+            }
           }}
           scrollEventThrottle={64}
         >
@@ -579,6 +595,21 @@ export default function BanterScreen() {
             )
           )}
         </ScrollView>
+
+        {banter.loadingOlder ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+            }}
+          >
+            <ActivityIndicator color={theme.colors.primary} />
+          </View>
+        ) : null}
 
         {showScrollDown ? (
           <Pressable

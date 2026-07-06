@@ -512,7 +512,7 @@ function EntryRow({
             fontVariant: ['tabular-nums'],
           }}
         >
-          {entry.totalPoints} pts
+          {entry.totalPoints.toLocaleString()} pts
         </RNText>
         <StatusPill
           label={effectivelySubmitted ? 'Submitted' : 'Pending'}
