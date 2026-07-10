@@ -42,7 +42,7 @@ async function main() {
     try {
       const result = await recalculatePool({ poolId })
       const ms = Date.now() - start
-      console.log(JSON.stringify({ poolId, ms, ...result }))
+      console.log(JSON.stringify({ ...result, poolId, ms }))
     } catch (e: any) {
       console.log(JSON.stringify({ poolId, error: e?.message || String(e) }))
     }
