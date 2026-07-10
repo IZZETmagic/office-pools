@@ -5,6 +5,7 @@ export type OurMatchRow = {
   home_team_id: string | null
   away_team_id: string | null
   status: string | null
+  status_detail: string | null
   is_completed: boolean | null
   home_score_ft: number | null
   away_score_ft: number | null
@@ -18,6 +19,7 @@ export type OurMatchRow = {
 
 export type MatchUpdatePayload = {
   status?: 'scheduled' | 'live' | 'completed' | 'cancelled'
+  status_detail?: MatchStatusDetail | null
   is_completed?: boolean
   completed_at?: string | null
   home_score_ft?: number | null
@@ -30,7 +32,10 @@ export type MatchUpdatePayload = {
   last_synced_at?: string
 }
 
-const LIVE_STATUSES: ApiFootballStatusShort[] = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT', 'LIVE']
+// 'SUSP' (suspended) is kept in the live bucket: it only happens after kickoff, so a
+// suspended match must stay coarse='live' rather than regress to 'scheduled'. The
+// specific "Suspended" reason is carried by mapStatusDetail below.
+const LIVE_STATUSES: ApiFootballStatusShort[] = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT', 'LIVE', 'SUSP']
 const FINAL_STATUSES: ApiFootballStatusShort[] = ['FT', 'AET', 'PEN']
 const CANCELLED_STATUSES: ApiFootballStatusShort[] = ['CANC', 'ABD', 'WO']
 
@@ -39,6 +44,40 @@ function mapStatus(short: ApiFootballStatusShort): 'scheduled' | 'live' | 'compl
   if (LIVE_STATUSES.includes(short)) return 'live'
   if (CANCELLED_STATUSES.includes(short)) return 'cancelled'
   return 'scheduled'
+}
+
+/** The precise abnormal reason to surface in the UI, in parallel with the coarse `status`. */
+export type MatchStatusDetail =
+  | 'postponed'
+  | 'tbd'
+  | 'suspended'
+  | 'interrupted'
+  | 'cancelled'
+  | 'abandoned'
+  | 'awarded'
+  | 'walkover'
+
+/**
+ * Map an api-football short code to the specific reason we badge in the UI, or null for
+ * normal scheduled/live/final states. Owned exclusively by the live sync — it is written
+ * authoritatively every run (and cleared to null when a match resumes to normal play).
+ *
+ * NOTE: 'delayed' is intentionally NOT produced here. A delay is a *kickoff-time move*, not
+ * a fixture status; the schedule reconcile pass records it via `original_match_date` and the
+ * client derives the "Delayed" badge from that — keeping this column free of reconcile writes.
+ */
+export function mapStatusDetail(short: ApiFootballStatusShort): MatchStatusDetail | null {
+  switch (short) {
+    case 'PST': return 'postponed'
+    case 'TBD': return 'tbd'
+    case 'SUSP': return 'suspended'
+    case 'INT': return 'interrupted'
+    case 'CANC': return 'cancelled'
+    case 'ABD': return 'abandoned'
+    case 'AWD': return 'awarded'
+    case 'WO': return 'walkover'
+    default: return null
+  }
 }
 
 function mapPeriod(short: ApiFootballStatusShort): string | null {
@@ -68,6 +107,12 @@ export function fixtureToMatchUpdate(
 
   const newStatus = mapStatus(fixture.fixture.status.short)
   if (newStatus !== current.status) next.status = newStatus
+
+  // Precise reason (postponed/suspended/…) alongside the coarse status. Diffed like every
+  // other field; writing null here is intentional — it clears the badge when a suspended or
+  // interrupted match resumes to normal play. Never touches `original_match_date` (reconcile).
+  const newDetail = mapStatusDetail(fixture.fixture.status.short)
+  if (newDetail !== (current.status_detail ?? null)) next.status_detail = newDetail
 
   const newIsCompleted = newStatus === 'completed'
   if (newIsCompleted !== !!current.is_completed) next.is_completed = newIsCompleted

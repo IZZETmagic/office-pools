@@ -85,8 +85,14 @@ type AdjustmentRow = {
   created_at: string
 }
 
-function makeId(type: ActivityType, poolId: string | null, createdAt: string): string {
-  return `${type}-${poolId ?? 'none'}-${createdAt}`
+function makeId(
+  type: ActivityType,
+  poolId: string | null,
+  createdAt: string,
+  discriminator?: string,
+): string {
+  const base = `${type}-${poolId ?? 'none'}-${createdAt}`
+  return discriminator ? `${base}-${discriminator}` : base
 }
 
 function escapeRegex(s: string): string {
@@ -111,9 +117,10 @@ function synth(
   poolId: string | null,
   createdAt: string,
   metadata: Record<string, unknown> | null,
+  idDiscriminator?: string,
 ): ActivityItem {
   return {
-    activity_id: makeId(type, poolId, createdAt),
+    activity_id: makeId(type, poolId, createdAt, idDiscriminator),
     pool_id: poolId,
     activity_type: type,
     title,
@@ -437,6 +444,7 @@ async function handleGET(
               poolId,
               e.last_rank_update,
               meta,
+              e.entry_id,
             ),
           )
         } else {
@@ -455,6 +463,7 @@ async function handleGET(
               poolId,
               e.last_rank_update,
               meta,
+              e.entry_id,
             ),
           )
         }
