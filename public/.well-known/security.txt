@@ -1,0 +1,9 @@
+Contact: mailto:security@sportpool.io
+Preferred-Languages: en
+Canonical: https://sportpool.io/.well-known/security.txt
+
+# Sportpool does not operate a paid bug bounty program.
+# We appreciate responsible disclosure of legitimate, demonstrable
+# vulnerabilities and will acknowledge reports, but we do not pay
+# bounties and will not respond to mass-emailed scanner output or
+# requests for payment.
