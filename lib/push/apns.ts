@@ -286,6 +286,16 @@ export async function sendPushToUser(
   payload: PushPayload,
   category?: PushCategory,
 ): Promise<{ sent: number; total: number }> {
+  // Delivery kill-switch. A process that sets SUPPRESS_PUSH_DELIVERY=true (e.g.
+  // a bulk historical re-score) runs all detection + entry_xp_state snapshot
+  // bookkeeping but delivers ZERO pushes — so a mass recalc never spams users,
+  // and never defers a badge-diff flood to the next live recalc either. The
+  // deployed app never sets it, so live scoring is unaffected. This is the sole
+  // delivery choke point (sendPushToUsers delegates here).
+  if (process.env.SUPPRESS_PUSH_DELIVERY === 'true') {
+    return { sent: 0, total: 0 }
+  }
+
   const allowed = await filterByCategoryOptIn([userId], category)
   if (allowed.length === 0) return { sent: 0, total: 0 }
 
