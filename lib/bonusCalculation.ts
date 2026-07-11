@@ -7,7 +7,7 @@ import {
   GROUP_LETTERS,
   getKnockoutWinner,
 } from './tournament'
-import { resolveFullBracket, buildActualResultsMap, type BracketResult } from './bracketResolver'
+import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from './bracketResolver'
 import { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // Extended match type that includes actual result fields (from DB query)
@@ -64,15 +64,15 @@ export function calculateAllBonusPoints(params: {
   // Build actual results map from completed matches
   const actualResultsMap = buildActualResultsMap(matches)
 
-  // Resolve the member's predicted bracket
-  const predictedBracket = resolveFullBracket({
+  // Resolve the member's predicted bracket (prediction-only — no conduct)
+  const predictedBracket = resolvePredictedBracket({
     matches,
     predictionMap: memberPredictions,
     teams,
   })
 
-  // Resolve the actual bracket from completed match results
-  const actualBracket = resolveFullBracket({
+  // Resolve the actual bracket from completed match results (conduct applies)
+  const actualBracket = resolveActualBracket({
     matches,
     predictionMap: actualResultsMap,
     teams,

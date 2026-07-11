@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -211,7 +211,7 @@ async function handlePOST(
     totalBonusPoints += bonusEntries.reduce((sum, e) => sum + e.points_earned, 0)
 
     // Compute group predictions rows (pure computation)
-    const bracket = resolveFullBracket({ matches: normalizedMatches, predictionMap, teams: teamsData })
+    const bracket = resolvePredictedBracket({ matches: normalizedMatches, predictionMap, teams: teamsData })
 
     for (const letter of GROUP_LETTERS) {
       const standings = bracket.allGroupStandings.get(letter)

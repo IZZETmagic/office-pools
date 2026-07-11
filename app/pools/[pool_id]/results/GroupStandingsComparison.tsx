@@ -14,7 +14,7 @@ import {
   type Team,
   type MatchConductData,
 } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import type { MatchData, TeamData, ExistingPrediction, BonusScoreData } from '../types'
 import type { PoolSettings } from './points'
 
@@ -446,10 +446,10 @@ export function GroupStandingsComparison({
   const tournamentMatches = useMemo(() => toTournamentMatches(matches), [matches])
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
-  // Build predicted standings via resolveFullBracket
+  // Build predicted standings via resolvePredictedBracket
   const predictedStandingsMap = useMemo(() => {
     const predictionMap = buildPredictionMap(userPredictions)
-    const bracket = resolveFullBracket({
+    const bracket = resolvePredictedBracket({
       matches: tournamentMatches,
       predictionMap,
       teams: tournamentTeams,

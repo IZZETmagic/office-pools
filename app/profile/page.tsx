@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ProfilePage from './ProfilePage'
-// resolveFullBracket is used for enriching knockout predictions with team names (display only)
-import { resolveFullBracket } from '@/lib/bracketResolver'
+// resolvePredictedBracket is used for enriching knockout predictions with team names (display only)
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 
 export default async function ProfileServerPage() {
@@ -254,11 +254,12 @@ export default async function ProfileServerPage() {
     }
 
     // Resolve bracket for knockout team matching
-    const bracket = resolveFullBracket({
+    // Display-only: the user's predicted knockout team names. Prediction-only
+    // resolution (no conduct) so these names match how the picks are scored.
+    const bracket = resolvePredictedBracket({
       matches: normalizedMatches,
       predictionMap,
       teams,
-      conductData,
     })
 
     // Enrich predictions with predicted knockout team names (full_tournament only)

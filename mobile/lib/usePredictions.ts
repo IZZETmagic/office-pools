@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
-import { resolveFullBracket, type BracketResult } from './bracket/bracketResolver';
+import { resolvePredictedBracket, type BracketResult } from './bracket/bracketResolver';
 import type { Match, PredictionMap, ScoreEntry, Team, MatchConductData } from './bracket/tournament';
 import { supabase } from './supabase';
 
@@ -138,11 +138,10 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
         });
       }
 
-      const bracket = resolveFullBracket({
+      const bracket = resolvePredictedBracket({
         matches: normalizedMatches,
         predictionMap: initialPreds,
         teams: normalizedTeams,
-        conductData: conduct,
       });
 
       const pool = poolRow as {
@@ -209,11 +208,10 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
 
   const bracket = useMemo(() => {
     if (!data) return null;
-    return resolveFullBracket({
+    return resolvePredictedBracket({
       matches: data.matches,
       predictionMap: localPredictions,
       teams: data.teams,
-      conductData: data.conductData,
     });
   }, [data, localPredictions]);
 

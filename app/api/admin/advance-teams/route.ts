@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolveFullBracket, buildActualResultsMap } from '@/lib/bracketResolver'
+import { buildActualResultsMap } from '@/lib/bracketResolver'
 import { resolveAllR32Matches, GROUP_LETTERS, calculateGroupStandings, ROUND_MATCH_STAGES, ROUND_ORDER, ROUND_LABELS } from '@/lib/tournament'
 import type { Team, MatchConductData, RoundKey } from '@/lib/tournament'
 import {

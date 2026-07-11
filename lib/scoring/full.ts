@@ -19,7 +19,7 @@ import type {
 } from './types'
 import { computeMatchScore, checkKnockoutTeamsMatch } from './core'
 import { buildPredictionMap, toTeams, buildPredictionLookup } from './helpers'
-import { resolveFullBracket, buildActualResultsMap } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import { calculateAllBonusPoints } from '@/lib/bonusCalculation'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -67,12 +67,14 @@ export function calculateFullTournament(input: ScoringInput): ScoringResult {
     const predictionMap = buildPredictionMap(entry.predictions)
     const predLookup = buildPredictionLookup(entry.predictions)
 
-    // Resolve this entry's predicted bracket
-    const bracket = resolveFullBracket({
+    // Resolve this entry's predicted bracket. Conduct is intentionally NOT
+    // passed: a predicted table has no cards, so a perfect tie falls through
+    // to FIFA ranking — matching display/bonuses, which is the fix for the
+    // knockout tie-break scoring bug.
+    const bracket = resolvePredictedBracket({
       matches: bonusMatches as any,
       predictionMap,
       teams: teamsArr,
-      conductData: conduct,
     })
 
     // Score each completed match

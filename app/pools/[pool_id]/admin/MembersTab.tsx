@@ -17,7 +17,7 @@ import {
   type Team,
   GROUP_LETTERS,
 } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import { resolveFullBracketFromPicks } from '@/lib/bracketPickerResolver'
 
 type MemberBadgeStatus = 'submitted' | 'partial' | 'pending' | 'awaiting'
@@ -1095,7 +1095,7 @@ function ViewPredictionsModal({
 
   // Resolve full bracket from this member's predictions
   const bracket = useMemo(() => {
-    return resolveFullBracket({
+    return resolvePredictedBracket({
       matches: tournamentMatches,
       predictionMap,
       teams: tournamentTeams,

@@ -6,7 +6,7 @@ import type { ResultMatch } from './results/MatchCard'
 import type { PoolSettings } from './results/points'
 import type { MatchData, TeamData, ExistingPrediction, EntryData, MemberData, PredictionData, BonusScoreData, MatchScoreData } from './types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 
 type ResultsTabProps = {
   matches: MatchData[]
@@ -143,14 +143,13 @@ export function ResultsTab({
       away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: m.away_team.flag_url ?? null } : null,
     }))
 
-    const bracket = resolveFullBracket({
+    const bracket = resolvePredictedBracket({
       matches: bracketMatches,
       predictionMap: bracketPredictionMap,
       teams,
-      conductData,
     })
     return bracket.knockoutTeamMap
-  }, [matches, bracketPredictionMap, teams, conductData])
+  }, [matches, bracketPredictionMap, teams])
 
   // Transform MatchData[] into ResultMatch[] (re-derives when predictions/entry changes)
   const resultMatches: ResultMatch[] = useMemo(() => matches.map((m) => {

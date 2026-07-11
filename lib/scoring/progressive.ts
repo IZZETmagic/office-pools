@@ -24,7 +24,7 @@ import type {
 } from './types'
 import { computeMatchScore, checkKnockoutTeamsMatch } from './core'
 import { buildPredictionMap, toTeams, buildPredictionLookup } from './helpers'
-import { resolveFullBracket, buildActualResultsMap } from '@/lib/bracketResolver'
+import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap } from '@/lib/bracketResolver'
 import { calculateAllBonusPoints } from '@/lib/bonusCalculation'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -49,7 +49,7 @@ export function calculateProgressive(input: ScoringInput): ScoringResult {
 
   // Build actual results bracket (used for bonus calculation)
   const actualResultsMap = buildActualResultsMap(matches as any)
-  const actualBracket = resolveFullBracket({
+  const actualBracket = resolveActualBracket({
     matches: matches as any,
     predictionMap: actualResultsMap,
     teams: teamsArr,
@@ -78,7 +78,7 @@ export function calculateProgressive(input: ScoringInput): ScoringResult {
     const predLookup = buildPredictionLookup(entry.predictions)
 
     // Resolve the user's predicted bracket (for group standings bonuses)
-    const predictedBracket = resolveFullBracket({
+    const predictedBracket = resolvePredictedBracket({
       matches: matches as any,
       predictionMap,
       teams: teamsArr,

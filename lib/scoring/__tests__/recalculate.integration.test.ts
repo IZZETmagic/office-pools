@@ -207,14 +207,18 @@ vi.mock('@/lib/bonusCalculation', () => ({
   calculateAllBonusPoints: () => [],
 }))
 
-vi.mock('@/lib/bracketResolver', () => ({
-  resolveFullBracket: () => ({
+vi.mock('@/lib/bracketResolver', () => {
+  const stubBracket = () => ({
     knockoutTeamMap: new Map(),
     groupTables: new Map(),
     thirdPlaceRanking: [],
-  }),
-  buildActualResultsMap: () => new Map(),
-}))
+  })
+  return {
+    resolvePredictedBracket: stubBracket,
+    resolveActualBracket: stubBracket,
+    buildActualResultsMap: () => new Map(),
+  }
+})
 
 import { recalculatePool } from '../recalculate'
 

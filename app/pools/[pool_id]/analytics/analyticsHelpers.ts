@@ -1,7 +1,7 @@
 import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings, type PointsResult } from '../results/points'
 import type { MatchData, PredictionData, TeamData, MemberData, MatchScoreData } from '../types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 
 // =============================================
 // TYPES
@@ -176,7 +176,8 @@ function buildKnockoutTeamMap(
     away_team: m.away_team ? { country_name: m.away_team.country_name, flag_url: m.away_team.flag_url ?? null } : null,
   }))
 
-  const bracket = resolveFullBracket({ matches: bracketMatches, predictionMap: predMap, teams, conductData })
+  // Predicted knockout slots for one entry — prediction-only (no conduct).
+  const bracket = resolvePredictedBracket({ matches: bracketMatches, predictionMap: predMap, teams })
   return bracket.knockoutTeamMap
 }
 

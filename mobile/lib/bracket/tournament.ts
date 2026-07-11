@@ -297,39 +297,56 @@ export function calculateGroupStandings(
 }
 
 // =============================================
-// TIEBREAKER SORTING
+// TIEBREAKER SORTING  (FIFA World Cup 2026 order)
 // =============================================
+// Ranking within a group follows the official FIFA order:
+//   1. Points (all group matches)
+//   2. Goal difference (all group matches)
+//   3. Goals scored (all group matches)
+//   -- teams still equal on 1–3 are separated among themselves by: --
+//   4. Head-to-head points
+//   5. Head-to-head goal difference
+//   6. Head-to-head goals scored
+//   7. Fair-play / conduct score (ACTUAL results only; predictions carry none)
+//   8. FIFA ranking points (deterministic stand-in for FIFA's drawing of lots)
+//
+// IMPORTANT: head-to-head is applied AFTER overall GD/GF (FIFA order), NOT
+// before it (UEFA order). Conduct is only populated when actual card data is
+// supplied, so a prediction-derived table never uses it and falls straight
+// through to (8) — keeping display, scoring, and bonuses in agreement.
+//
+// Kept byte-identical to lib/tournament.ts (web). Change both together.
+
+/** Overall ranking criteria 1–3: points, then goal difference, then goals for. */
+function compareOverall(a: GroupStanding, b: GroupStanding): number {
+  if (b.points !== a.points) return b.points - a.points
+  if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference
+  if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor
+  return 0
+}
 
 function sortStandings(
   standings: GroupStanding[],
   groupMatches: Match[],
   predictions: PredictionMap
 ): GroupStanding[] {
-  // First sort by points desc, then GD desc, then GF desc, then FIFA ranking desc
-  const sorted = [...standings].sort((a, b) => {
-    // 1. Total points
-    if (b.points !== a.points) return b.points - a.points
-    return 0
-  })
+  // 1–3: overall points, goal difference, goals scored.
+  const sorted = [...standings].sort(compareOverall)
 
-  // Now handle tied groups via head-to-head
+  // 4+: within each block of teams still level on 1–3, break the tie among
+  // ONLY those teams (head-to-head → conduct → FIFA ranking).
   const result: GroupStanding[] = []
   let i = 0
   while (i < sorted.length) {
-    // Find teams with same points
     let j = i + 1
-    while (j < sorted.length && sorted[j].points === sorted[i].points) {
+    while (j < sorted.length && compareOverall(sorted[i], sorted[j]) === 0) {
       j++
     }
 
     if (j - i === 1) {
-      // No tie
       result.push(sorted[i])
     } else {
-      // Tied group: resolve with head-to-head
-      const tiedTeams = sorted.slice(i, j)
-      const resolved = resolveH2HTiebreaker(tiedTeams, groupMatches, predictions)
-      result.push(...resolved)
+      result.push(...resolveH2HTiebreaker(sorted.slice(i, j), groupMatches, predictions))
     }
     i = j
   }
@@ -378,25 +395,23 @@ function resolveH2HTiebreaker(
     }
   }
 
+  // Teams entering here are already equal on overall points/GD/GF (criteria
+  // 1–3), so only the head-to-head + fallbacks below can separate them.
   return [...tiedTeams].sort((a, b) => {
     const aH2H = h2hStats.get(a.team_id)!
     const bH2H = h2hStats.get(b.team_id)!
 
-    // 1. H2H points
+    // 4. Head-to-head points
     if (bH2H.points !== aH2H.points) return bH2H.points - aH2H.points
-    // 2. H2H goal difference
+    // 5. Head-to-head goal difference
     if (bH2H.gd !== aH2H.gd) return bH2H.gd - aH2H.gd
-    // 3. H2H goals scored
+    // 6. Head-to-head goals scored
     if (bH2H.gf !== aH2H.gf) return bH2H.gf - aH2H.gf
-    // 4. Overall goal difference (already on standings)
-    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference
-    // 5. Overall goals scored
-    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor
-    // 6. Team conduct score (Fair Play: higher/closer to 0 is better)
+    // 7. Fair-play / conduct score — actual card data only; undefined (→ 0) for predictions
     const aConductScore = a.conductScore ?? 0
     const bConductScore = b.conductScore ?? 0
     if (bConductScore !== aConductScore) return bConductScore - aConductScore
-    // 7. FIFA ranking points
+    // 8. FIFA ranking points (deterministic stand-in for FIFA's drawing of lots)
     return b.fifa_ranking_points - a.fifa_ranking_points
   })
 }

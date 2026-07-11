@@ -16,7 +16,7 @@ import {
   isStageComplete,
   isPredictionComplete,
 } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import { GroupStageForm } from './GroupStageForm'
 import { KnockoutStageForm } from './KnockoutStageForm'
 import { SummaryView } from './SummaryView'
@@ -297,7 +297,7 @@ export default function PredictionsFlow({
   // =============================================
 
   const bracket = useMemo(() => {
-    return resolveFullBracket({ matches, predictionMap: predictions, teams })
+    return resolvePredictedBracket({ matches, predictionMap: predictions, teams })
   }, [matches, predictions, teams])
 
   const allGroupStandings = bracket.allGroupStandings

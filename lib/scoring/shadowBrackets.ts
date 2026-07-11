@@ -2,7 +2,7 @@
 // SHADOW SCORING — RESOLVED BRACKET MATERIALIZER  [knockout phase]
 // =============================================================
 // Persists each full_tournament entry's PREDICTED knockout bracket
-// (the output of the tested lib/bracketResolver.resolveFullBracket)
+// (the output of the tested lib/bracketResolver.resolvePredictedBracket)
 // into shadow_resolved_brackets, so the DB-native knockout shadow
 // scoring can LEFT JOIN it for teams_match instead of re-resolving
 // the bracket graph in SQL (Option A — keep the graph logic in TS).
@@ -14,7 +14,7 @@
 // scoring path.
 // =============================================================
 
-import { resolveFullBracket, buildActualResultsMap, type BracketResult } from '@/lib/bracketResolver'
+import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from '@/lib/bracketResolver'
 import { getKnockoutWinner } from '@/lib/tournament'
 import { buildPredictionMap, toTeams } from './helpers'
 import type { MatchWithResult, TeamData, ConductData, EntryWithPredictions } from './types'
@@ -41,11 +41,13 @@ export function resolveEntryBracketRows(
   conduct: ConductData[],
 ): ResolvedBracketRow[] {
   const predictionMap = buildPredictionMap(entry.predictions)
-  const { knockoutTeamMap } = resolveFullBracket({
+  // Predicted bracket — no conduct, mirroring full.ts so the shadow match
+  // engine stays parity-identical to production scoring. (`conduct` param is
+  // retained on the signature for the bonus/actual arms below.)
+  const { knockoutTeamMap } = resolvePredictedBracket({
     matches: matches as any,
     predictionMap,
     teams: toTeams(teams),
-    conductData: conduct as any,
   })
 
   const rows: ResolvedBracketRow[] = []
@@ -274,8 +276,9 @@ export function resolveEntryBonusRows(
   actualBracket: BracketResult,
 ): BonusMaterialization {
   const predictionMap = buildPredictionMap(entry.predictions)
-  // PREDICTED bracket WITHOUT conduct (matches bonusCalculation.ts, not full.ts)
-  const predictedBracket = resolveFullBracket({ matches: matches as any, predictionMap, teams: toTeams(teams) })
+  // PREDICTED bracket — prediction-only (no conduct). Now that full.ts also
+  // resolves predictions without conduct, the two arms agree by construction.
+  const predictedBracket = resolvePredictedBracket({ matches: matches as any, predictionMap, teams: toTeams(teams) })
   // effectivePredictedBracket knockout map: progressive uses ACTUAL teams
   const effKnockout = mode === 'progressive' ? actualBracket.knockoutTeamMap : predictedBracket.knockoutTeamMap
 
@@ -355,7 +358,7 @@ export async function writeActualSnapshot(
   conduct: ConductData[],
 ): Promise<BracketResult> {
   const actualResultsMap = buildActualResultsMap(matches as any)
-  const actualBracket = resolveFullBracket({
+  const actualBracket = resolveActualBracket({
     matches: matches as any, predictionMap: actualResultsMap, teams: toTeams(teams), conductData: conduct as any,
   })
 

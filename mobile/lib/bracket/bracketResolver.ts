@@ -31,13 +31,18 @@ function extractMatchNumber(placeholder: string | null): number | null {
 }
 
 /**
- * Resolves the full tournament bracket from a set of predictions.
+ * Shared core: computes group standings for all 12 groups, resolves R32 via
+ * Annex C, then cascades through R16, QF, SF, third-place, and final.
  *
- * Computes group standings for all 12 groups, resolves R32 via Annex C,
- * then cascades through R16, QF, SF, third-place, and final to determine
- * champion, runner-up, third place, and all 32 qualifying team IDs.
+ * INTERNAL — not exported. Callers must pick an intent-named wrapper:
+ *   - resolvePredictedBracket (from predictions; conduct intentionally absent)
+ *   - resolveActualBracket    (from real results; conduct is a real tiebreaker)
+ * This is what keeps real-world card data from ever leaking into a predicted
+ * table — the divergence behind the knockout tie-break scoring bug.
+ *
+ * Kept in sync with lib/bracketResolver.ts (web). Change both together.
  */
-export function resolveFullBracket(params: {
+function resolveBracketCore(params: {
   matches: Match[]
   predictionMap: PredictionMap
   teams: Team[]
@@ -143,6 +148,38 @@ export function resolveFullBracket(params: {
     thirdPlace: thirdPlaceWinner,
     qualifiedTeamIds,
   }
+}
+
+/**
+ * Resolve a bracket from a user's PREDICTIONS.
+ *
+ * A predicted table is a pure function of the predicted scorelines — it carries
+ * no card data, so conduct is deliberately not accepted. A perfectly tied
+ * predicted group falls through to FIFA ranking (our deterministic stand-in for
+ * FIFA's drawing of lots). Use this everywhere a bracket is derived from
+ * predictions so all paths agree.
+ */
+export function resolvePredictedBracket(params: {
+  matches: Match[]
+  predictionMap: PredictionMap
+  teams: Team[]
+}): BracketResult {
+  return resolveBracketCore(params)
+}
+
+/**
+ * Resolve the ACTUAL bracket from real match results.
+ *
+ * Real fair-play/conduct IS a FIFA group tiebreaker, so conductData is required
+ * here (pass [] only when it is genuinely unavailable).
+ */
+export function resolveActualBracket(params: {
+  matches: Match[]
+  predictionMap: PredictionMap
+  teams: Team[]
+  conductData: MatchConductData[]
+}): BracketResult {
+  return resolveBracketCore(params)
 }
 
 /**

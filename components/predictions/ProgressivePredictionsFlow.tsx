@@ -23,7 +23,6 @@ import {
   getMatchesForRound,
   type RoundKey,
 } from '@/lib/tournament'
-import { resolveFullBracket } from '@/lib/bracketResolver'
 import { resolveMatchesFromActual } from '@/lib/bracketResolver'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
 import type { SaveStatus } from './PredictionsFlow'
