@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
 import type { PoolSettings } from './results/points'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
@@ -133,6 +134,24 @@ export function AnalyticsTab({
     [matches, allPredictions, members, settings]
   )
 
+  // Permanently-earned badges (append-only badge_unlocks) for the selected
+  // entry, so an earned badge never vanishes from the trophy grid when a later
+  // recompute no longer re-derives it. Lazy client fetch (analytics isn't the
+  // default tab); RLS lets pool members read their pools' unlocks.
+  const [everEarnedBadgeIds, setEverEarnedBadgeIds] = useState<string[]>([])
+  useEffect(() => {
+    if (isBracketPicker || !selectedEntryId) { setEverEarnedBadgeIds([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await createClient()
+        .from('badge_unlocks')
+        .select('badge_id')
+        .eq('entry_id', selectedEntryId)
+      if (!cancelled) setEverEarnedBadgeIds((data ?? []).map(r => r.badge_id as string))
+    })()
+    return () => { cancelled = true }
+  }, [selectedEntryId, isBracketPicker])
+
   // =============================================
   // XP SYSTEM (memoized) — Full Tournament & Progressive
   // =============================================
@@ -150,8 +169,9 @@ export function AnalyticsTab({
       entryPredictions,
       entryRank,
       totalMatches: matches.length,
+      everEarnedBadgeIds,
     })
-  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry])
+  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry, everEarnedBadgeIds])
 
   // =============================================
   // BRACKET PICKER XP SYSTEM (memoized)

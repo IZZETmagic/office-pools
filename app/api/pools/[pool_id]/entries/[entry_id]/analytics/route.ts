@@ -222,6 +222,15 @@ async function handleGET(
     const crowdData = computeCrowdPredictions(matchesData, allPredsData, entryPredsData, membersData)
     const poolStats = computePoolWideStats(matchesData, allPredsData, membersData, settings)
     const totalEntries = membersData.reduce((sum, m) => sum + (m.entries?.length || 0), 0)
+    // Permanently-recorded unlocks (append-only badge_unlocks ledger) so an
+    // earned badge never vanishes from the display when a later recompute no
+    // longer re-derives it. computeFullXPBreakdown unions these in for display
+    // (excluding the transient top_dog), leaving XP/level on the live set.
+    const { data: unlockRows } = await adminClient
+      .from('badge_unlocks')
+      .select('badge_id')
+      .eq('entry_id', entry_id)
+
     const xpBreakdown = computeFullXPBreakdown({
       predictionResults,
       matches: matchesData,
@@ -231,6 +240,7 @@ async function handleGET(
       entryRank: entry.current_rank,
       totalMatches: matchesData.length,
       totalEntries,
+      everEarnedBadgeIds: (unlockRows ?? []).map(r => r.badge_id as string),
     })
 
     // 8. Build response in snake_case format

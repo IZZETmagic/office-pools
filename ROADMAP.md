@@ -173,8 +173,9 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Is:** Append-only record of badge unlocks so we can show "10× Lightning Rod" and per-badge timelines. (Also the persistence half of the Badge batch.)
 - **Touches:** new `badge_unlocks` table + write on badge detection + read in the badge UI.
 - ✅ **SHIPPED 2026-07-12 (capture half):** append-only `badge_unlocks` table (migration `badge_unlocks_history`; SQL `drafts/2026-07-12_badge_unlocks_history.sql`) + write in `lib/push/badges.ts` (idempotent upsert on every recalc) + one-time backfill of **15,934** existing unlocks. RLS: pool members can read their pools' unlocks.
-- **Remaining (read half):** union `badge_unlocks` into the Form-tab badge display (web + mobile) so an earned badge never disappears even if a later recompute drops it from the mutable `earned_badge_ids`.
-- **Done when:** unlocks are recorded permanently and cumulative counts render per user/entry — persistence + backfill done; display swap pending.
+- ✅ **Read half — web SHIPPED 2026-07-12:** `computeFullXPBreakdown` now takes `everEarnedBadgeIds` and unions them into the displayed badge set (display-only — XP/level stay on the live set; transient `top_dog` excluded). Wired in the web AnalyticsTab (lazy `badge_unlocks` fetch) + the entry-analytics route (so any mobile client consuming `/analytics` benefits server-side, no OTA).
+- **Remaining:** mobile surfaces that read `entry_xp_state.earned_badge_ids` directly (OTA) + bracket-picker (`bp_*`) badges (separate `computeFullBPXPBreakdown`).
+- **Done when:** unlocks recorded permanently + cumulative counts render — persistence, backfill, and the web display all done; mobile-direct + BP display pending.
 
 ### Super-admin project dashboard `Feature`
 - **Is:** A lightweight visual of this roadmap inside super admin.

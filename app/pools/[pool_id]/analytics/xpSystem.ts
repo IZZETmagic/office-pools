@@ -563,8 +563,11 @@ export function computeFullXPBreakdown(params: {
   entryRank: number | null
   totalMatches: number
   totalEntries?: number
+  /** Badge ids permanently recorded in badge_unlocks — re-surfaced for display
+   *  so an earned badge never vanishes on recompute (persistence). */
+  everEarnedBadgeIds?: string[]
 }): XPBreakdown {
-  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches, totalEntries = 1 } = params
+  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches, totalEntries = 1, everEarnedBadgeIds } = params
 
   // 1. Base XP from match predictions
   const matchXP = computeMatchXP(predictionResults, matches)
@@ -589,14 +592,31 @@ export function computeFullXPBreakdown(params: {
   )
   const totalBadgeXP = earnedBadges.reduce((sum, b) => sum + b.xpBonus, 0)
 
-  // 4. Total XP and level
+  // 4. Total XP and level (from the LIVE earned set only)
   const totalXP = totalBaseXP + totalBonusXP + totalBadgeXP
   const levelInfo = computeLevel(totalXP)
+
+  // Display-only persistence: re-surface badges recorded in badge_unlocks that
+  // the live recompute no longer re-derives, so an earned badge never vanishes.
+  // XP/level stay computed from the live set above (keep-once XP semantics are a
+  // separate concern); transient trophies (top_dog = current #1) are excluded.
+  const displayedBadges = everEarnedBadgeIds?.length
+    ? (() => {
+        const transient = new Set(['top_dog'])
+        const currentIds = new Set(earnedBadges.map(b => b.id))
+        const extra = everEarnedBadgeIds
+          .filter(id => !currentIds.has(id) && !transient.has(id))
+          .map(id => BADGE_DEFINITIONS.find(b => b.id === id))
+          .filter((b): b is BadgeDefinition => Boolean(b))
+          .map(b => ({ ...b }) as EarnedBadge)
+        return extra.length ? [...earnedBadges, ...extra] : earnedBadges
+      })()
+    : earnedBadges
 
   return {
     matchXP,
     bonusEvents,
-    earnedBadges,
+    earnedBadges: displayedBadges,
     totalBaseXP,
     totalBonusXP,
     totalBadgeXP,
