@@ -3,7 +3,7 @@
 Single source of truth for everything we want to build, fix, or decide.
 Ordered by priority (**Now → Later**), tagged by category.
 
-**Last updated:** 2026-07-12 · Full audit against the codebase — completed items moved to per-section **✅ Completed** tables; PARTIAL items annotated with what the code actually shows.
+**Last updated:** 2026-07-12 · Full audit against the codebase — completed items moved to per-section **✅ Completed** tables; PARTIAL items annotated with what the code actually shows. · **Later 2026-07-12:** post-deadline prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published** (iOS + Android).
 
 Each item has four fields:
 
@@ -65,12 +65,10 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Effort:** ~2–3 days (calm-window deploy + load test). Bracket pools need a **separate** parallel-analytics track (~2–3 days more) — they score via `bonus_scores`, not `predictions`.
 - **Done when:** backfill-vs-live parity = 0 diffs, the ~516ms leaderboard query drops to ~20ms, and a match-night load test holds on Medium compute.
 
-### Scale downgrade XL→Medium `Infra`
-- **Is:** Get off the expensive XL/4-core Supabase tier back to Medium, with zero user-visible change.
-- **Touches:** **Phase A applied** (2026-06-30): wrapped `auth.uid()` in 55 RLS policies + dropped 5 dup indexes (`drafts/2026-06-30_phaseA_rls_initplan_and_index_hygiene.sql`). **Phase B** = flip already-built flags in `sync_settings`: `sweep_time_box_enabled` (crash fix), `scoring_diff_writes_enabled` (needs index first, canary via `scripts/canary-recalc.ts`), `pool_cache_enabled` (biggest egress lever). **Phase C** = the downgrade. **Phase D** = durable (consumes the precompute item + per-pool realtime broadcast).
-- **Audit 2026-07-12:** all three Phase-B flags confirmed present in code and default-OFF (`sync-fixtures/route.ts:333`, `recalculate.ts:630`/`diffWrite.ts:12`, `poolData.ts:276`). "Phase A applied" is a prod-DB state — the repo proves the draft SQL exists, not that it was run.
-- **Effort:** ~1–2 days across calm windows + one live-day of watching CPU graphs.
-- **Done when:** running on Medium, leaderboard stays live during a match, `auth_rls_initplan` advisor = 0, and CPU headroom holds on a live match day.
+### Scale downgrade XL→Medium `Infra` — ✅ DONE 2026-07-12
+- **What happened:** Ryan downgraded XL→Medium himself as the tournament winds down. **Live-DB check 2026-07-12:** Phase-B was already 2/3 live — `pool_cache_enabled` **ON** and `scoring_diff_writes_enabled` **ON** in prod `sync_settings` (the earlier audit read the *code default* off, not the live value); only `sweep_time_box_enabled` remains off. Phase A hygiene applied 2026-06-30.
+- **Still open (folds into other items):** flip the last flag `sweep_time_box_enabled` (crash fix), and **Phase D durable** — leaderboard precompute read-path flip + per-pool realtime broadcast, which is what keeps Medium comfortable at Showdown/EPL scale. See runbook `drafts/2026-07-12_xl_to_medium_downgrade_runbook.md`.
+- **Watch:** CPU headroom / replication lag on the next live-ish window; the Phase-B flags are the rollback lever (bump compute back to XL if needed).
 
 ### Tournament IO reduction `Infra`
 - **Is:** Punch list of background-IO cuts. **Largely done** — api-perf writer trimmed, policies consolidated, sync fan-out batched, per-match recalc + RLS initplan shipped; predictions auto-save is already a single round-trip (`predictions/route.ts:260`).
@@ -91,12 +89,9 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Effort:** low urgency near-term — it's a parallel tool. The durable knockout resolver that was deferred here **landed early (2026-07-11)** as part of the tie-break bug fix (shared prediction-only resolver); `shadow_resolved_brackets` was rebuilt on it (0 backfill errors).
 - **Done when:** predicted brackets resolved once at entry submission (removing re-materialization). 🔒 No longer blocked by the tie-break bug (fixed 2026-07-11), but cutover still needs a **fresh knockout parity check** — parity hasn't been independently re-verified since the resolved-brackets rebuild.
 
-### EAS OTA pending `Mobile`
-- **Is:** Finished mobile fixes committed to master but not yet shipped to phones via `eas update`.
-- **Touches:** presence publisher (`mobile/lib/PresenceProvider.tsx`) + PoolInfoTab 400-fix + onboarding + Fees tab (`e02048d`), bundled for an Expo OTA update.
-- **Audit 2026-07-12:** the **only** mobile change since the Jul 6 "Mobile production snapshot" (`1d45297`) is the Jul 11 tie-break resolver (3 JS files: `bracketResolver.ts`, `tournament.ts`, `usePredictions.ts`); no native/config change since. `runtimeVersion` policy is `appVersion` = "1.0.0" (unchanged). So **if the last production build was ≥ Jul 6**, this is a safe JS-only OTA (~30 min) that mainly brings mobile bracket display in line with the shipped tie-break correction. Confirm the baseline with `eas update:list --branch production` / `eas build:list` before pushing.
-- **Effort:** ~30 min — it's built; just push the OTA. You control the timing.
-- **Done when:** testers' phones pull the update and the fixes are live.
+### EAS OTA pending `Mobile` — ✅ SHIPPED 2026-07-12
+- **What shipped:** production OTA of the Jul 11 tie-break resolver (`bracketResolver.ts`, `tournament.ts`, `usePredictions.ts`) to runtime `1.0.0` (last prod build 2026-07-06, unchanged runtime — verified via `eas build:list`; branch had zero prior updates). Published **native-only** (see *Mobile web-export* bug below): iOS update group `283a68d0…`, Android `5307e504…`, branch `production`.
+- **Done:** testers on the ≥ Jul 6 build pull the update; mobile bracket display now matches the shipped web tie-break correction.
 
 ## ⏭️ Next — scoring correctness & data integrity
 
@@ -107,12 +102,10 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Effort:** persistence ~1–2 days; semantic copy/logic fixes ~0.5 day; completion-gating ~0.5 day.
 - **Done when:** an earned badge never disappears across recalcs; each badge's copy matches its trigger; push and analytics never disagree.
 
-### Post-deadline prediction lock `Bug`
-- **Is:** Predictions on *completed* matches can still be edited (`predictions_locked` isn't enforced post-kickoff). Users edit picks after a match, and it causes shadow/prod scoring divergence (the recurring "...024" edge).
-- **Touches:** server-side save path `app/api/pools/[pool_id]/predictions/route.ts` + the RPC; decide the rule per mode, then enforce it.
-- ⚠️ **Audit 2026-07-12:** confirmed — the save route guards only on pool/round deadline + the `predictions_locked` flag + `has_submitted_predictions`; there is **no per-match kickoff/`is_completed` check**, so a progressive pick on an already-kicked-off match inside a still-open round saves fine.
-- **Effort:** ~0.5 day.
-- **Done when:** saves for a match past kickoff are rejected (or explicitly allowed by a stated rule) consistently across all three modes.
+### Post-deadline prediction lock `Bug` — ✅ SHIPPED 2026-07-12
+- **What shipped:** DB trigger `trg_enforce_prediction_before_kickoff` on `public.predictions` (fn `enforce_prediction_before_kickoff`) — a `BEFORE INSERT OR UPDATE` row trigger that **silently skips** (returns null) any write to a match that has kicked off (`match_date <= now()`) or is completed. Migration `prediction_kickoff_lock`; SQL in `drafts/2026-07-12_prediction_kickoff_lock.sql`.
+- **Why a DB trigger, not the route/RPC guard originally scoped:** predictions have four write paths with no shared app chokepoint — web `POST /predictions` → `save_predictions_batch` (SECURITY INVOKER), the web client's **full-set autosave** (`PredictionsFlow.tsx:377`), and **mobile's direct `.upsert()` in `usePredictions.ts` which bypasses every API route**. Only the row write is common to all. Silent-skip (not raise) is deliberate so a full-set batch still persists the still-open matches instead of failing wholesale.
+- **Verified in prod:** a write to an upcoming match persists; a write to a completed match is skipped. Pre-fix footprint: 2,599 post-kickoff writes across 478 entries (latest 2026-07-11).
 
 ### Recalc orphan-row cleanup `Bug`
 - **Is:** When an entry is un-submitted after being scored, its `match_scores` rows are left behind (11 seen in June).
@@ -400,6 +393,12 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ## 🐞 Bugs — triage (unsorted severity)
 
 > Captured from the board's "Bug" column. Severity not yet assessed — promote into the sections above as they're triaged.
+
+### Mobile web-export breaks `eas update --platform all` `Bug` `Mobile`
+- **Is:** `eas update` with its default `--platform all` fails during the **web** export's static render — `mobile/lib/supabase.ts:16` calls `expo-secure-store`'s `getItemAsync` in a Node context where the native module doesn't exist (`getValueWithKeyAsync is not a function`), aborting the export. Native iOS/Android bundles export fine. Hit during the 2026-07-12 tie-break OTA.
+- **Touches:** `mobile/lib/supabase.ts` auth-storage adapter — guard SecureStore behind `Platform.OS !== 'web'` with a web/SSR-safe fallback. Web isn't a shipped Expo surface, so the **interim workaround is `eas update --platform ios` + `--platform android`** (what shipped the tie-break OTA).
+- **Effort:** ~0.5 day.
+- **Done when:** `eas update` (all platforms) completes without the SecureStore crash.
 
 ### Align quick-chat rich cards (web vs mobile) `Bug` `Design` `Mobile`
 - **Is:** Rich cards in quick chat render differently on web vs the React Native app; they should look the same. `#BanterChat` `#Mobile`
