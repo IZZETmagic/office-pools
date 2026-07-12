@@ -4,6 +4,7 @@ import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from '.
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
 import { LocalTime } from '@/components/LocalTime'
+import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus'
 import type { MatchScoreData } from '../types'
 
 // =============================================
@@ -17,6 +18,10 @@ export type ResultMatch = {
   match_date: string
   venue: string | null
   status: string
+  status_detail: string | null
+  original_match_date: string | null
+  live_minute: number | null
+  live_period: string | null
   home_score_ft: number | null
   away_score_ft: number | null
   home_score_pso: number | null
@@ -115,6 +120,19 @@ export function MatchCard({
   const hasPsoScores =
     match.home_score_pso !== null && match.away_score_pso !== null
 
+  // Live clock ("45'" / HT / ET / PENS) and exception-status badge
+  // (Delayed / Postponed / Suspended / …), shared with mobile via lib/matchStatus.
+  const liveClock = getLiveClock({
+    status: match.status,
+    livePeriod: match.live_period,
+    liveMinute: match.live_minute,
+  })
+  const statusBadge = getMatchStatusBadge({
+    status: match.status,
+    statusDetail: match.status_detail,
+    originalMatchDate: match.original_match_date,
+  })
+
   // Knockout bracket prediction display (full_tournament only)
   const isKnockout = match.stage !== 'group'
   const showBracketTeams = predictionMode === 'full_tournament' && isKnockout &&
@@ -173,13 +191,23 @@ export function MatchCard({
         <div>
           {pointsResult ? (
             <PointsBadge result={pointsResult} />
+          ) : statusBadge ? (
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${
+                statusBadge.tone === 'red'
+                  ? 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
+                  : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+              }`}
+            >
+              {statusBadge.label}
+            </span>
           ) : isLive ? (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
               </span>
-              LIVE
+              {liveClock ?? 'LIVE'}
             </span>
           ) : isUpcoming ? (
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400">

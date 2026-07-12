@@ -122,6 +122,7 @@ export async function detectAndPushBadgesForPool(poolId: string): Promise<void> 
         poolId,
         poolName,
         userId,
+        tournamentId,
         matches,
         totalEntries,
       }).catch((err) => console.error('[badges] entry fan-out failed', e.entry_id, err))
@@ -136,10 +137,11 @@ async function detectAndPushBadgesForEntry(args: {
   poolId: string
   poolName: string
   userId: string
+  tournamentId: string
   matches: MatchRow[]
   totalEntries: number
 }): Promise<void> {
-  const { adminClient, entryId, entryName, poolId, poolName, userId, matches, totalEntries } = args
+  const { adminClient, entryId, entryName, poolId, poolName, userId, tournamentId, matches, totalEntries } = args
 
   const state = await computeBadgeState(adminClient, entryId, matches, totalEntries)
 
@@ -159,6 +161,30 @@ async function detectAndPushBadgesForEntry(args: {
     seeded: true,
     updated_at: new Date().toISOString(),
   })
+
+  // Permanent, append-only record of every badge this entry has earned. Unlike
+  // earned_badge_ids above (a mutable snapshot that shrinks when a later
+  // recompute no longer re-derives a badge), badge_unlocks never loses a badge —
+  // it's the durable "ever earned" source and the backing for cumulative counts.
+  // Recorded for ALL currently-earned badges (even on the first seed);
+  // idempotent via the (entry_id, badge_id) unique constraint.
+  if (state.earnedBadgeIds.length > 0) {
+    await adminClient
+      .from('badge_unlocks')
+      .upsert(
+        state.earnedBadgeIds.map((badgeId) => ({
+          entry_id: entryId,
+          user_id: userId,
+          pool_id: poolId,
+          tournament_id: tournamentId,
+          badge_id: badgeId,
+        })),
+        { onConflict: 'entry_id,badge_id', ignoreDuplicates: true },
+      )
+      .then(({ error }) => {
+        if (error) console.warn('[badges] badge_unlocks upsert failed', entryId, error.message)
+      })
+  }
 
   // First-run guard: don't push for badges the user "earned" on the very
   // first snapshot — they may have had them for weeks.

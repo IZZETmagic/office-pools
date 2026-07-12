@@ -100,6 +100,11 @@ export type MatchData = {
   winner_team_id: string | null
   is_completed: boolean
   completed_at: string | null
+  // Live-state columns (populated by the api-football sync; selected via `*` in poolData).
+  status_detail: string | null
+  original_match_date: string | null
+  live_minute: number | null
+  live_period: string | null
   home_team: { country_name: string; country_code: string; flag_url: string | null } | null
   away_team: { country_name: string; country_code: string; flag_url: string | null } | null
 }

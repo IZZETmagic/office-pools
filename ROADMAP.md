@@ -87,7 +87,9 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Is:** A set-based, DB-native replacement for the Node recalc, running in parallel as a validation tool (not customer-facing). Match + bonus + rank parity-verified for group + R32; fully automated via reconciler crons.
 - **Touches:** `shadow_*` tables (all 5 confirmed present: `shadow_resolved_brackets`, `shadow_score_diffs`, `shadow_match_scores`, `shadow_bonus_scores`, `shadow_entry_totals`) + RPCs, `lib/scoring/shadowBrackets.ts`, `app/api/cron/shadow-materialize/route.ts`, and reconciler **pg_cron** jobs (`drafts/2026-07-0*_shadow_*.sql`). Migration plan is read-path-first, reversible, pilot = mobile + one web pool via `shadow_read_enabled_pools`.
 - **Effort:** low urgency near-term — it's a parallel tool. The durable knockout resolver that was deferred here **landed early (2026-07-11)** as part of the tie-break bug fix (shared prediction-only resolver); `shadow_resolved_brackets` was rebuilt on it (0 backfill errors).
-- **Done when:** predicted brackets resolved once at entry submission (removing re-materialization). 🔒 No longer blocked by the tie-break bug (fixed 2026-07-11), but cutover still needs a **fresh knockout parity check** — parity hasn't been independently re-verified since the resolved-brackets rebuild.
+- ✅ **Knockout parity RE-VERIFIED clean 2026-07-12:** fresh shadow-vs-live compare showed 392 knockout mismatches that were **100% staleness** (shadow last materialized 2026-07-10 18:47, before the 2026-07-11 tie-break live recalc). A forced `shadow_apply_changes` re-materialize dropped them to **0** (69,852 knockout match-score rows agree; end-to-end totals 3,416/3,418, the 2 residuals being orphan unsubmitted-entry rows). Shadow's knockout **logic is correct**.
+- ⚠️ **New cutover blocker (operational, not correctness):** shadow's change-detection keys off *prediction/match* changes, so a **bulk LIVE re-score** (like the tie-break fix, which changed neither) leaves shadow silently stale. Wire a shadow re-materialize trigger after any bulk recalc **before** cutover.
+- **Done when:** predicted brackets resolved once at entry submission (removing re-materialization) **and** shadow auto-refreshes after bulk recalcs.
 
 ### EAS OTA pending `Mobile` — ✅ SHIPPED 2026-07-12
 - **What shipped:** production OTA of the Jul 11 tie-break resolver (`bracketResolver.ts`, `tournament.ts`, `usePredictions.ts`) to runtime `1.0.0` (last prod build 2026-07-06, unchanged runtime — verified via `eas build:list`; branch had zero prior updates). Published **native-only** (see *Mobile web-export* bug below): iOS update group `283a68d0…`, Android `5307e504…`, branch `production`.
@@ -170,9 +172,9 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### Badge unlock history `Feature`
 - **Is:** Append-only record of badge unlocks so we can show "10× Lightning Rod" and per-badge timelines. (Also the persistence half of the Badge batch.)
 - **Touches:** new `badge_unlocks` table + write on badge detection + read in the badge UI.
-- **Audit 2026-07-12:** TODO — confirmed `badge_unlocks` table absent; the `badge_unlock` grep hits are a transient `action_type` enum in `user_pending_actions`, not a ledger.
-- **Effort:** ~1–2 days.
-- **Done when:** unlocks are recorded permanently and cumulative counts render per user/entry.
+- ✅ **SHIPPED 2026-07-12 (capture half):** append-only `badge_unlocks` table (migration `badge_unlocks_history`; SQL `drafts/2026-07-12_badge_unlocks_history.sql`) + write in `lib/push/badges.ts` (idempotent upsert on every recalc) + one-time backfill of **15,934** existing unlocks. RLS: pool members can read their pools' unlocks.
+- **Remaining (read half):** union `badge_unlocks` into the Form-tab badge display (web + mobile) so an earned badge never disappears even if a later recompute drops it from the mutable `earned_badge_ids`.
+- **Done when:** unlocks are recorded permanently and cumulative counts render per user/entry — persistence + backfill done; display swap pending.
 
 ### Super-admin project dashboard `Feature`
 - **Is:** A lightweight visual of this roadmap inside super admin.
@@ -272,16 +274,16 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### Live match minutes (min / HT / FT) `Feature`
 - **Is:** Show live match state — current minute elapsed, an HT indicator at halftime, FT at full-time.
 - **Touches:** match cards/detail + live minute/status from api-football (`matches.live_minute`/`live_period` already populated).
-- ⚠️ **Audit 2026-07-12:** PARTIAL — **mobile DONE** (`getLiveClock` renders min/HT/ET/PENS + FT on `LiveMatchCard`/`MatchResultRow`/detail), **web NOT** (customer surfaces show only a "LIVE" badge; `live_minute` surfaces only in super-admin). Remaining = the web-side minute/HT/FT display.
-- **Effort:** ~1 day (web only).
-- **Done when:** live matches show the running minute, HT at halftime, and FT at full-time on **web** too.
+- ✅ **Web SHIPPED 2026-07-12:** new shared `lib/matchStatus.ts` `getLiveClock` wired into the Results `MatchCard` — renders `45'`/HT/ET/PENS with the pulsing LIVE dot. Data already flowed (poolData `select('*')`); added the fields to `MatchData`/`ResultMatch` + mapping.
+- **Remaining:** same wiring on Standings/Bracket surfaces; explicit "FT" (currently implicit via the final-score box).
+- **Done when:** live matches show the running minute, HT at halftime, and FT at full-time on **web** too — met for the Results tab.
 
 ### Match status notes (delayed / postponed / cancelled) `Feature`
 - **Is:** Surface exception statuses — delayed, postponed, cancelled, abandoned, rescheduled — instead of assuming every match kicks off on time.
 - **Touches:** match cards/detail + status detection (`matches.status_detail` + `original_match_date`; badging added in `00c4ae2`).
-- ⚠️ **Audit 2026-07-12:** PARTIAL — **mobile DONE** (full badge system in `mobile/lib/matchStatus.ts`), **web NOT** (no component reads `status_detail`). Remaining = the web-side status display.
-- **Effort:** ~1 day (web only).
-- **Done when:** a non-normal match clearly shows its exception status to users on **web** too.
+- ✅ **Web SHIPPED 2026-07-12:** `getMatchStatusBadge` (in the new shared `lib/matchStatus.ts`) wired into the Results `MatchCard` — Delayed/Postponed/Suspended/Cancelled/… render as amber/red pills. Mobile already had it.
+- **Remaining:** same wiring on Standings/Bracket surfaces.
+- **Done when:** a non-normal match clearly shows its exception status to users on **web** too — met for the Results tab.
 
 ### Key-match indicator (per player, in-pool) `Feature`
 - **Is:** Flag a player's "key" matches in a pool — e.g. a very tightly predicted match, or one where the user's pick differs from the majority — to draw attention to high-leverage games.
