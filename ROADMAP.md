@@ -174,8 +174,9 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Touches:** new `badge_unlocks` table + write on badge detection + read in the badge UI.
 - ✅ **SHIPPED 2026-07-12 (capture half):** append-only `badge_unlocks` table (migration `badge_unlocks_history`; SQL `drafts/2026-07-12_badge_unlocks_history.sql`) + write in `lib/push/badges.ts` (idempotent upsert on every recalc) + one-time backfill of **15,934** existing unlocks. RLS: pool members can read their pools' unlocks.
 - ✅ **Read half — web SHIPPED 2026-07-12:** `computeFullXPBreakdown` now takes `everEarnedBadgeIds` and unions them into the displayed badge set (display-only — XP/level stay on the live set; transient `top_dog` excluded). Wired in the web AnalyticsTab (lazy `badge_unlocks` fetch) + the entry-analytics route (so any mobile client consuming `/analytics` benefits server-side, no OTA).
-- **Remaining:** mobile surfaces that read `entry_xp_state.earned_badge_ids` directly (OTA) + bracket-picker (`bp_*`) badges (separate `computeFullBPXPBreakdown`).
-- **Done when:** unlocks recorded permanently + cumulative counts render — persistence, backfill, and the web display all done; mobile-direct + BP display pending.
+- ✅ **Mobile also covered — no OTA (verified 2026-07-12):** the mobile FormTab, banter badge-flex, and activity feed all read badges from the **same `/analytics` route** (`FormTab` → `useEntryAnalytics` → `fetchEntryAnalytics` → `data.xp.earned_badges`); grep confirms **no mobile file reads `entry_xp_state.earned_badge_ids` directly**. So the server-side union reaches mobile as soon as the deploy is live.
+- **Remaining:** bracket-picker (`bp_*`) badges only — separate `/bracket-analytics` route + `computeFullBPXPBreakdown` (web + mobile), and `bp_*` badges aren't written to `badge_unlocks` yet, so BP needs a write-path too.
+- **Done when:** unlocks recorded permanently + cumulative counts render — persistence, backfill, and the full/progressive display (web + mobile) all done; only bracket-picker display pending.
 
 ### Super-admin project dashboard `Feature`
 - **Is:** A lightweight visual of this roadmap inside super admin.
