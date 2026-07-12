@@ -21,12 +21,6 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 
 > Completed and deployed to production. Kept here for visibility, then pruned once it's old news.
 
-### Knockout tie-break scoring bug `Bug` `Scoring` — RESOLVED 2026-07-11
-- **What it was:** In `full_tournament` pools, tied *predicted* groups were scored differently than they were displayed — real-world cards leaked into predicted standings and the tiebreaker used UEFA order instead of FIFA — so a correct knockout pick could score 0. Confirmed via Eliel's ticket (correct R16 Mexico–England, scored 0).
-- **Fix:** one shared, **prediction-only**, FIFA-ordered group resolver. `resolveFullBracket` split into `resolvePredictedBracket` (no conduct — can't leak) and `resolveActualBracket`; comparator reordered to FIFA WC (points → overall GD → overall GF → H2H → conduct on actual only → FIFA ranking). All 17 call sites migrated (web + mobile). Commits `1757b99` (fix) + `fae59f1` (rollout tooling); 89 tiebreaker tests pass.
-- **Rollout:** push-suppressed recalc of 239/239 pools, 0 failures — 386 of 1,513 entries moved across 78 pools (243 up, 143 down). Eliel's provisional `+300` reversed (now earns it organically, total unchanged). Shadow re-materialized (0 errors). Correction comms sent to Eliel + the 80 affected pool admins (81/81).
-- **Loose end:** ✅ resolved — Vercel prod build confirmed green (Ryan, 2026-07-12). Fully shipped, no open threads.
-
 ### HTTP security headers + security.txt `Infra` — SHIPPED 2026-07-11
 - **What:** production HTTP hardening in `next.config.ts` `headers()` — `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: camera=()/microphone=()/geolocation=()` on all routes; `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` on everything except `/tv/*` (frame-exempt via `/((?!tv/).*)`); plus a `security.txt`. Commit `d6d6042`, verified live on sportpool.io.
 - **Watch for:** new embeddable surfaces must be added to the `/tv/*` negative-lookahead or they'll be frame-denied; `camera=()` will silently block future in-app photo *capture* (Avatars) until `camera=(self)` is allowed.
@@ -50,7 +44,7 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Is:** Knockout matches must be manually linked to the live data feed each round, or scores never sync.
 - **Touches:** `scripts/map-knockout-fixtures.ts` (writes `external_match_id` onto `matches`); the api-football sync cron reads it. Auto-link path also exists (`lib/integrations/apiFootball/linkKnockoutFixtures.ts`) but only fires once api-football publishes the fixture.
 - **Effort:** ~15–30 min per round.
-- **Done when:** every knockout match for the round has an `external_match_id` and live scores flow. Done: R32 (06-28), R16 (07-04), QF (07-07 + #100 07-12). **Pending: #102 England–Argentina (SF, Jul 15) — api-football hadn't published the fixture as of Jul 12; re-run before kickoff. #103/#104 once teams resolve.**
+- **Done when:** every knockout match for the round has an `external_match_id` and live scores flow. Done: R32 (06-28), R16 (07-04), QF (07-07 + #100 07-12), **both SFs linked 2026-07-12 (#101 France–Spain `1585131`, #102 England–Argentina `1586077`)**. Remaining: #103 (3rd place) + #104 (final) once teams resolve.
 
 ### Progressive round-open playbook `Ops`
 - **Is:** Each round opens per-pool; super-admin bulk-opens the rest and (optionally) emails members.
