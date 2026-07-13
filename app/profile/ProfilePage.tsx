@@ -337,13 +337,6 @@ const TRANSIENT_BADGE_IDS = new Set(['top_dog'])
 const ALL_BADGE_DEFS: Record<string, BadgeDefinition> = Object.fromEntries(
   [...BADGE_DEFINITIONS, ...BP_BADGE_DEFINITIONS].map(b => [b.id, b]),
 )
-const TIER_STYLES: Record<string, string> = {
-  Bronze: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300',
-  Silver: 'bg-neutral-100 border-neutral-300 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-200',
-  Gold: 'bg-yellow-50 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-300',
-  Platinum: 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-900/20 dark:border-primary-700 dark:text-primary-300',
-}
-
 type BadgeUnlockRow = { badge_id: string; unlocked_at: string; pool_name: string | null }
 
 function AchievementsSection({ userId }: { userId: string }) {
@@ -440,16 +433,14 @@ function AchievementsSection({ userId }: { userId: string }) {
               type="button"
               onClick={() => setSelectedBadgeId(id)}
               title={`${def.condition} — tap for details`}
-              className={`relative rounded-xl border p-2.5 sm:p-3 text-center transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary-400 ${TIER_STYLES[def.tier] ?? 'bg-neutral-50 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200'}`}
+              className="relative rounded-xl border border-border-default bg-surface p-2.5 sm:p-3 text-center transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary-400"
             >
-              {count > 1 && (
-                <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/80 dark:bg-black/40 text-neutral-800 dark:text-white">
-                  {count}×
-                </span>
-              )}
+              <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-neutral-900/85 text-white dark:bg-white/20 leading-none">
+                {count}×
+              </span>
               <div className="text-2xl sm:text-3xl leading-none">{def.emoji}</div>
-              <p className="text-[10px] sm:text-xs font-semibold mt-1.5 leading-tight">{def.name}</p>
-              <p className="text-[9px] sm:text-[10px] opacity-70 mt-0.5">{def.rarity}</p>
+              <p className="text-[10px] sm:text-xs font-semibold mt-1.5 leading-tight text-neutral-800 dark:text-neutral-100">{def.name}</p>
+              <p className="text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{def.rarity}</p>
             </button>
           ))}
         </div>
