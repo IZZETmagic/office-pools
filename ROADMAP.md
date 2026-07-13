@@ -277,14 +277,14 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Is:** Show live match state — current minute elapsed, an HT indicator at halftime, FT at full-time.
 - **Touches:** match cards/detail + live minute/status from api-football (`matches.live_minute`/`live_period` already populated).
 - ✅ **Web SHIPPED 2026-07-12:** new shared `lib/matchStatus.ts` `getLiveClock` wired into the Results `MatchCard` — renders `45'`/HT/ET/PENS with the pulsing LIVE dot. Data already flowed (poolData `select('*')`); added the fields to `MatchData`/`ResultMatch` + mapping.
-- **Remaining:** same wiring on Standings/Bracket surfaces; explicit "FT" (currently implicit via the final-score box).
+- ✅ **Bracket surface added 2026-07-12:** live clock + status wired into `BracketResultsTab` (knockout cells + Final/3rd-place cards), reusing `lib/matchStatus.ts`. StandingsTab intentionally skipped — it's group-stage standings and the group stage is complete (no live group matches). Remaining polish: explicit "FT" (currently implicit via the final-score box).
 - **Done when:** live matches show the running minute, HT at halftime, and FT at full-time on **web** too — met for the Results tab.
 
 ### Match status notes (delayed / postponed / cancelled) `Feature`
 - **Is:** Surface exception statuses — delayed, postponed, cancelled, abandoned, rescheduled — instead of assuming every match kicks off on time.
 - **Touches:** match cards/detail + status detection (`matches.status_detail` + `original_match_date`; badging added in `00c4ae2`).
 - ✅ **Web SHIPPED 2026-07-12:** `getMatchStatusBadge` (in the new shared `lib/matchStatus.ts`) wired into the Results `MatchCard` — Delayed/Postponed/Suspended/Cancelled/… render as amber/red pills. Mobile already had it.
-- **Remaining:** same wiring on Standings/Bracket surfaces.
+- ✅ **Bracket surface added 2026-07-12** (`BracketResultsTab` cells + Final cards). StandingsTab skipped (group stage complete).
 - **Done when:** a non-normal match clearly shows its exception status to users on **web** too — met for the Results tab.
 
 ### Key-match indicator (per player, in-pool) `Feature`

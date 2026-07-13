@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState, useMemo } from 'react'
+import { getLiveClock, getMatchStatusBadge, type MatchStatusBadge } from '@/lib/matchStatus'
 import {
   calculateGroupStandings,
   rankThirdPlaceTeams,
@@ -407,6 +408,8 @@ type BracketCellData = {
   // User's pick
   predictedWinnerSide: 'home' | 'away' | null
   pickIsCorrect: boolean | null // null = match not completed
+  liveClock: string | null // "45'" / HT / ET / PENS while live
+  statusBadge: MatchStatusBadge | null // Delayed / Postponed / etc.
 }
 
 /** Shared row styling for bracket cells and final match cards */
@@ -493,6 +496,15 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
       {data.isLive && (
         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-danger-500 animate-pulse" />
       )}
+      {data.statusBadge ? (
+        <span className={`absolute right-0.5 top-0.5 text-[8px] font-bold leading-none ${data.statusBadge.tone === 'red' ? 'text-danger-600' : 'text-warning-600'}`}>
+          {data.statusBadge.label}
+        </span>
+      ) : data.isLive && data.liveClock ? (
+        <span className="absolute right-0.5 top-0.5 text-[8px] font-bold text-danger-600 tabular-nums leading-none">
+          {data.liveClock}
+        </span>
+      ) : null}
       {!data.isLive && data.isCompleted && data.pickIsCorrect !== null && (
         <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${
           data.pickIsCorrect ? 'bg-success-500' : 'bg-danger-500'
@@ -518,9 +530,13 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
         }`}>
           {label}
         </span>
-        {data.isLive && (
-          <span className="text-xs font-bold text-danger-600 animate-pulse">LIVE</span>
-        )}
+        {data.statusBadge ? (
+          <span className={`text-xs font-bold ${data.statusBadge.tone === 'red' ? 'text-danger-600' : 'text-warning-600'}`}>
+            {data.statusBadge.label}
+          </span>
+        ) : data.isLive ? (
+          <span className="text-xs font-bold text-danger-600 animate-pulse">{data.liveClock ?? 'LIVE'}</span>
+        ) : null}
         {!data.isLive && data.isCompleted && data.pickIsCorrect !== null && (
           data.pickIsCorrect ? (
             <span className="text-xs font-bold text-success-600">&#10003; Correct</span>
@@ -619,6 +635,8 @@ function KnockoutComparison({
         actualAwayPso: null,
         isCompleted: false,
         isLive: false,
+        liveClock: null,
+        statusBadge: null,
         actualWinnerSide: null,
         predictedWinnerSide: null,
         pickIsCorrect: null,
@@ -673,6 +691,8 @@ function KnockoutComparison({
       actualAwayPso: match.away_score_pso,
       isCompleted: match.is_completed,
       isLive: match.status === 'live',
+      liveClock: getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }),
+      statusBadge: getMatchStatusBadge({ status: match.status, statusDetail: match.status_detail, originalMatchDate: match.original_match_date }),
       actualWinnerSide,
       predictedWinnerSide,
       pickIsCorrect,
