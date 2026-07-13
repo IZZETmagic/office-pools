@@ -106,6 +106,13 @@ export function CommunityTab({
   // depending on `messages` (which would tear down / re-subscribe the private
   // channel on every new message).
   const messageIdsRef = useRef<string[]>([])
+  // Full current message list + resolved reply previews, mirrored into refs so
+  // the stable `ensureReplyPreviews` helper reads the latest without stale
+  // closures (and without widening effect/callback dependency arrays).
+  const messagesRef = useRef<MessageWithReactions[]>([])
+  const replyPreviewsRef = useRef<Map<string, ReplyPreview>>(new Map())
+  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { replyPreviewsRef.current = replyPreviews }, [replyPreviews])
   const chatWrapperRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -315,6 +322,55 @@ export function CommunityTab({
     setUnseenCount(0)
   }, [])
 
+  // Keep `replyPreviews` populated for every parent referenced by the given
+  // messages' reply_to_message_id, so a reply's quote-pill renders immediately
+  // — including replies that arrive via realtime broadcast or scroll-up
+  // pagination, not just the initial page. Resolves parents from the messages
+  // in hand (or already on screen) first, then fetches any still-missing ones
+  // in one round-trip. Keyed by PARENT message_id (how the render looks it up).
+  const ensureReplyPreviews = useCallback(async (msgs: MessageWithReactions[]) => {
+    const parentIds = Array.from(
+      new Set(msgs.map(m => m.reply_to_message_id).filter((id): id is string => !!id)),
+    ).filter(id => !replyPreviewsRef.current.has(id))
+    if (parentIds.length === 0) return
+
+    const toPreview = (message_id: string, content: string, user_id: string): ReplyPreview => {
+      const author = membersRef.current.find(mm => mm.user_id === user_id)
+      return {
+        message_id,
+        content: content.slice(0, 60) + (content.length > 60 ? '...' : ''),
+        author_name: author?.users.full_name || author?.users.username || 'Unknown',
+      }
+    }
+
+    const localById = new Map(msgs.map((m): [string, MessageWithReactions] => [m.message_id, m]))
+    const resolved = new Map<string, ReplyPreview>()
+    const stillMissing: string[] = []
+    for (const id of parentIds) {
+      const parent = localById.get(id) ?? messagesRef.current.find(mm => mm.message_id === id)
+      if (parent) resolved.set(id, toPreview(parent.message_id, parent.content, parent.user_id))
+      else stillMissing.push(id)
+    }
+
+    if (stillMissing.length > 0) {
+      const { data: parents } = await supabaseRef.current
+        .from('pool_messages')
+        .select('message_id, content, user_id')
+        .in('message_id', stillMissing)
+      for (const p of parents ?? []) {
+        resolved.set(p.message_id, toPreview(p.message_id, p.content, p.user_id))
+      }
+    }
+
+    if (resolved.size > 0) {
+      setReplyPreviews(prev => {
+        const next = new Map(prev)
+        for (const [k, v] of resolved) next.set(k, v)
+        return next
+      })
+    }
+  }, [])
+
   // =====================
   // LOAD MESSAGES
   // =====================
@@ -340,30 +396,8 @@ export function CommunityTab({
         setMessages(msgs)
         setHasMore(data.length === 40)
 
-        // Load reply previews
-        const replyIds = msgs
-          .map(m => m.reply_to_message_id)
-          .filter((id): id is string => id !== null)
-
-        if (replyIds.length > 0) {
-          const { data: replyMsgs } = await supabaseRef.current
-            .from('pool_messages')
-            .select('message_id, content, user_id')
-            .in('message_id', replyIds)
-
-          if (replyMsgs) {
-            const previews = new Map<string, ReplyPreview>()
-            for (const rm of replyMsgs) {
-              const author = membersRef.current.find(m => m.user_id === rm.user_id)
-              previews.set(rm.message_id, {
-                message_id: rm.message_id,
-                content: rm.content.slice(0, 60) + (rm.content.length > 60 ? '...' : ''),
-                author_name: author?.users.full_name || author?.users.username || 'Unknown',
-              })
-            }
-            setReplyPreviews(previews)
-          }
-        }
+        // Resolve quote-pill previews for any replies on this page.
+        await ensureReplyPreviews(msgs)
       }
       setLoading(false)
       // Scroll to new messages divider if it exists, otherwise bottom
@@ -383,7 +417,7 @@ export function CommunityTab({
       })
     }
     loadMessages()
-  }, [poolId, scrollToBottom])
+  }, [poolId, scrollToBottom, ensureReplyPreviews])
 
   // =====================
   // REALTIME (Broadcast-from-database)
@@ -607,6 +641,10 @@ export function CommunityTab({
             ? prev
             : [...prev, newMsg]
         )
+
+        // Resolve the quote-pill preview for a live-arriving reply (parent is
+        // usually already on screen; falls back to a one-row fetch if not).
+        if (newMsg.reply_to_message_id) void ensureReplyPreviews([newMsg])
       })
       .on('broadcast', { event: 'reaction_insert' }, refetchReactions)
       .on('broadcast', { event: 'reaction_delete' }, refetchReactions)
@@ -622,7 +660,7 @@ export function CommunityTab({
       active = false
       supabase.removeChannel(channel)
     }
-  }, [poolId, isNearBottom, currentUserId, loadReactionsForMessages])
+  }, [poolId, isNearBottom, currentUserId, loadReactionsForMessages, ensureReplyPreviews])
 
   const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const msg = messages.find(m => m.message_id === messageId)
@@ -690,9 +728,10 @@ export function CommunityTab({
       }))
       setMessages(prev => [...older, ...prev])
       setHasMore(data.length === 40)
+      await ensureReplyPreviews(older)
     }
     setLoadingMore(false)
-  }, [loadingMore, hasMore, messages, poolId])
+  }, [loadingMore, hasMore, messages, poolId, ensureReplyPreviews])
 
   // =====================
   // SEND MESSAGE
