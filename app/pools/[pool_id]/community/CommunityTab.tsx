@@ -39,6 +39,16 @@ import type { GroupStanding, Team } from '@/lib/tournament'
 import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 import type { PinnedMessage, BadgeFlexMetadata, StandingsDropMetadata, ReactionCount } from './types'
 
+// Broadcast-from-database payload envelope. Migration 022's triggers call
+// `realtime.send({ record: <row> }, ...)`; the client `.on('broadcast')`
+// callback receives it under `.payload`. We also accept a top-level `record`
+// defensively in case a client version delivers it un-nested — either way we
+// get the row (or undefined if the shape is unexpected).
+function broadcastRecord<T>(msg: unknown): T | undefined {
+  const m = msg as { payload?: { record?: T }; record?: T } | undefined
+  return m?.payload?.record ?? m?.record
+}
+
 export function CommunityTab({
   poolId,
   poolName,
@@ -91,7 +101,11 @@ export function CommunityTab({
   useEffect(() => {
     membersRef.current = members
   }, [members])
-  const broadcastChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+  // Current on-screen message ids, mirrored into a ref so the realtime
+  // broadcast reaction handlers can refetch without the subscription effect
+  // depending on `messages` (which would tear down / re-subscribe the private
+  // channel on every new message).
+  const messageIdsRef = useRef<string[]>([])
   const chatWrapperRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -372,112 +386,15 @@ export function CommunityTab({
   }, [poolId, scrollToBottom])
 
   // =====================
-  // REALTIME SUBSCRIPTION
+  // REALTIME (Broadcast-from-database)
   // =====================
-  // =====================
-  // REALTIME VIA BROADCAST (bypasses broken CDC RLS pipeline)
-  // =====================
-  const broadcastConnectedRef = useRef(false)
-
-  useEffect(() => {
-    const supabase = supabaseRef.current
-
-    const channel = supabase
-      .channel(`pool-community-${poolId}`)
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        const msg = payload.payload as Message
-        if (!msg?.message_id) return
-
-        const newMsg: MessageWithReactions = {
-          ...msg,
-          message_type: msg.message_type ?? 'text',
-          reply_to_message_id: msg.reply_to_message_id ?? null,
-          metadata: msg.metadata ?? {},
-          reactions: [],
-        }
-        wasNearBottomRef.current = isNearBottom()
-
-        if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
-          setUnseenCount(prev => prev + 1)
-          setShowNewMessagesPill(true)
-        }
-
-        setMessages(prev =>
-          prev.some(m => m.message_id === newMsg.message_id)
-            ? prev
-            : [...prev, newMsg]
-        )
-      })
-      .subscribe((status) => {
-        broadcastConnectedRef.current = status === 'SUBSCRIBED'
-      })
-
-    broadcastChannelRef.current = channel
-
-    return () => {
-      broadcastConnectedRef.current = false
-      broadcastChannelRef.current = null
-      supabase.removeChannel(channel)
-    }
-  }, [poolId, isNearBottom, currentUserId])
-
-  // Polling fallback — catches messages from iOS (until iOS also broadcasts)
-  const latestCreatedAtRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (messages.length > 0) {
-      latestCreatedAtRef.current = messages[messages.length - 1].created_at
-    }
-  }, [messages])
-
-  useEffect(() => {
-    const supabase = supabaseRef.current
-    const POLL_INTERVAL = 5000
-
-    const poll = async () => {
-      if (!latestCreatedAtRef.current) return
-
-      try {
-        const { data, error } = await supabase
-          .from('pool_messages')
-          .select('*')
-          .eq('pool_id', poolId)
-          .gt('created_at', latestCreatedAtRef.current)
-          .order('created_at', { ascending: true })
-          .limit(20)
-
-        if (error || !data || data.length === 0) return
-
-        const newMsgs: MessageWithReactions[] = data.map(m => ({
-          ...m,
-          message_type: m.message_type ?? 'text',
-          reply_to_message_id: m.reply_to_message_id ?? null,
-          metadata: m.metadata ?? {},
-          reactions: [],
-        }))
-
-        wasNearBottomRef.current = isNearBottom()
-
-        setMessages(prev => {
-          const existing = new Set(prev.map(m => m.message_id))
-          const toAdd = newMsgs.filter(m => !existing.has(m.message_id))
-          if (toAdd.length === 0) return prev
-
-          const othersCount = toAdd.filter(m => m.user_id !== currentUserId).length
-          if (!wasNearBottomRef.current && othersCount > 0) {
-            setUnseenCount(c => c + othersCount)
-            setShowNewMessagesPill(true)
-          }
-
-          return [...prev, ...toAdd]
-        })
-      } catch {
-        // Silently ignore polling errors
-      }
-    }
-
-    const interval = setInterval(poll, POLL_INTERVAL)
-    return () => clearInterval(interval)
-  }, [poolId, isNearBottom, currentUserId])
+  // New messages AND reaction changes both arrive over a single private
+  // `pool:{id}` channel, set up in the REACTION LOADING + REALTIME effect
+  // below (it lives there because it needs loadReactionsForMessages, defined
+  // further down). The DB triggers from migration 022 fire `realtime.send(...)`
+  // on every insert/delete from ANY client (web, iOS, RN), so there's no
+  // separate message subscription, no client-to-client rebroadcast on send,
+  // and no polling fallback here anymore.
 
   // Auto-scroll when new message arrives
   useEffect(() => {
@@ -641,31 +558,71 @@ export function CommunityTab({
 
   useEffect(() => {
     const ids = messages.map(m => m.message_id)
+    messageIdsRef.current = ids
     if (ids.length > 0) loadReactionsForMessages(ids)
   }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Single Broadcast-from-database subscription for the whole banter feed —
+  // new messages and reaction changes, over one private `pool:{id}` topic.
+  // Supabase's recommended realtime approach for scalability + security: the
+  // migration-022 DB triggers `realtime.send(...)` on every insert/delete from
+  // ANY client, so this replaces both the old client-to-client message
+  // broadcast (+ 5s poll) and the `postgres_changes` reactions subscription
+  // (the CDC path that was timing out under load). Private channels require the
+  // socket to carry the user's JWT, so we setAuth() before subscribing. Reads
+  // current message ids from a ref so the channel subscribes once per pool
+  // rather than tearing down on every new message.
   useEffect(() => {
     const supabase = supabaseRef.current
+    let active = true
+
+    const refetchReactions = () => {
+      if (messageIdsRef.current.length > 0) {
+        loadReactionsForMessages(messageIdsRef.current)
+      }
+    }
+
     const channel = supabase
-      .channel(`pool-reactions-${poolId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pool_message_reactions',
-        },
-        () => {
-          const ids = messages.map(m => m.message_id)
-          loadReactionsForMessages(ids)
+      .channel(`pool:${poolId}`, { config: { private: true } })
+      .on('broadcast', { event: 'message_insert' }, (msg) => {
+        const record = broadcastRecord<Message>(msg)
+        if (!record?.message_id) return
+
+        const newMsg: MessageWithReactions = {
+          ...record,
+          message_type: record.message_type ?? 'text',
+          reply_to_message_id: record.reply_to_message_id ?? null,
+          metadata: record.metadata ?? {},
+          reactions: [],
         }
-      )
-      .subscribe()
+        wasNearBottomRef.current = isNearBottom()
+
+        if (!wasNearBottomRef.current && newMsg.user_id !== currentUserId) {
+          setUnseenCount(prev => prev + 1)
+          setShowNewMessagesPill(true)
+        }
+
+        setMessages(prev =>
+          prev.some(m => m.message_id === newMsg.message_id)
+            ? prev
+            : [...prev, newMsg]
+        )
+      })
+      .on('broadcast', { event: 'reaction_insert' }, refetchReactions)
+      .on('broadcast', { event: 'reaction_delete' }, refetchReactions)
+
+    // setAuth() is async, so subscribe only after it resolves (and only if the
+    // effect is still mounted). Without the JWT the private-channel RLS policy
+    // on realtime.messages won't authorize the topic and no events arrive.
+    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
+      if (active) channel.subscribe()
+    })
 
     return () => {
+      active = false
       supabase.removeChannel(channel)
     }
-  }, [poolId, messages.length, loadReactionsForMessages]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [poolId, isNearBottom, currentUserId, loadReactionsForMessages])
 
   const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const msg = messages.find(m => m.message_id === messageId)
@@ -778,13 +735,6 @@ export function CommunityTab({
           ? prev
           : [...prev, newMsg]
       )
-
-      // Broadcast to other clients via Realtime
-      broadcastChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'new_message',
-        payload: data,
-      })
 
       // Fire-and-forget push notification to all pool members (every message)
       fetch('/api/notifications/message', {
@@ -902,7 +852,6 @@ export function CommunityTab({
           ? prev
           : [...prev, { ...data, message_type: data.message_type ?? 'badge_flex', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
-      broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
       // Push notification for quick action
       fetch('/api/notifications/message', {
         method: 'POST',
@@ -952,7 +901,6 @@ export function CommunityTab({
           ? prev
           : [...prev, { ...data, message_type: data.message_type ?? 'standings_drop', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
       )
-      broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
       // Push notification for quick action
       fetch('/api/notifications/message', {
         method: 'POST',
@@ -1321,7 +1269,6 @@ export function CommunityTab({
                 ? prev
                 : [...prev, { ...data, message_type: data.message_type ?? 'prediction_share', reply_to_message_id: null, metadata: data.metadata ?? {}, reactions: [] }]
             )
-            broadcastChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: data })
             // Push notification for prediction share
             fetch('/api/notifications/message', {
               method: 'POST',

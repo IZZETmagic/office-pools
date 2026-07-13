@@ -336,7 +336,7 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### ✅ Completed (verified against code, 2026-07-12)
 | Item | What shipped — evidence | Note |
 |---|---|---|
-| Chat auto-refresh / live messages `Feature` | Migration `022_banter_realtime_broadcast` (AFTER-INSERT trigger → `realtime.send` to private `pool:{id}`); mobile `usePoolBanter.ts:703` broadcast channel; web `CommunityTab.tsx:386` broadcast + 5s poll fallback. Both surfaces update live. | Resolves the "back out two screens to see new messages" card. |
+| Chat auto-refresh / live messages `Feature` | Migration `022_banter_realtime_broadcast` (AFTER-INSERT trigger → `realtime.send` to private `pool:{id}`); both mobile `usePoolBanter.ts` and web `CommunityTab.tsx` subscribe to that private channel (`message_insert` + `reaction_insert`/`reaction_delete`) after `realtime.setAuth()`. Web converged onto the DB broadcast 2026-07-13 — dropped its old client-to-client rebroadcast, 5s poll, and `postgres_changes` reactions channel. Both surfaces update live. | Resolves the "back out two screens to see new messages" card. |
 
 ## 🎨 Design / UX polish — post-v1
 
