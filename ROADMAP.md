@@ -201,9 +201,8 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### Lifetime trophy tracker `Feature`
 - **Is:** Split the profile page's statistics section into its own navigable page with an achievements area — including cumulative counts of how many of each trophy/badge a user has earned. `#Achievements`
 - **Touches:** profile page (web + mobile) → a dedicated stats/achievements sub-page; reads cumulative badge counts — depends on *Badge unlock history*'s append-only table for accurate lifetime totals.
-- **Audit 2026-07-12:** TODO — profile has no achievements sub-page; gated on the (absent) `badge_unlocks` table.
-- **Effort:** ~2–3 days (gated on *Badge unlock history* for real cumulative counts).
-- **Done when:** a user can open a dedicated statistics page from their profile and see lifetime achievement/trophy counts.
+- ✅ **Web v1 SHIPPED 2026-07-12:** the `badge_unlocks` gate is now satisfied (table built + backfilled). Added a **Trophy Case** section to the profile Statistics tab (`ProfilePage.tsx` `AchievementsSection`) — reads the user's `badge_unlocks` directly (RLS-safe), renders a tier-styled grid of every badge earned with cumulative "N×" counts (full/progressive + bracket-picker; Top Dog excluded as transient). Data path verified against real users (richest = Oracle 5× / Lightning Rod 5× / Stadium Regular 5×).
+- **Remaining:** the dedicated-page split (v1 is a *section* in the Statistics tab), a per-badge "when/where earned" timeline, and mobile parity (OTA). Note: could not do a live-auth render check here (needs a logged-in session) — types + data path verified.
 
 ### Home-screen widgets `Feature` `Mobile`
 - **Is:** Widgets so users see key info without opening the app — current pool rank, upcoming-match countdown, predictions still to make, recent leaderboard movement.

@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { BADGE_DEFINITIONS, type BadgeDefinition } from '@/app/pools/[pool_id]/analytics/xpSystem'
+import { BP_BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/bracketPickerXpSystem'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
@@ -299,6 +301,7 @@ export default function ProfilePage({
                 predictions={predictions}
                 totalMatchCount={totalMatchCount}
                 playerScoresMap={playerScoresMap}
+                userId={profile.user_id}
               />
             )}
             {activeTab === 'predictions' && (
@@ -327,18 +330,113 @@ export default function ProfilePage({
 // TAB 1: STATISTICS
 // =====================
 
+// Trophy Case — lifetime cumulative badge counts from the append-only
+// badge_unlocks ledger (read directly; RLS lets a member read their own pools'
+// unlocks). Top Dog is excluded — it's a transient "held while #1" trophy.
+const TRANSIENT_BADGE_IDS = new Set(['top_dog'])
+const ALL_BADGE_DEFS: Record<string, BadgeDefinition> = Object.fromEntries(
+  [...BADGE_DEFINITIONS, ...BP_BADGE_DEFINITIONS].map(b => [b.id, b]),
+)
+const TIER_STYLES: Record<string, string> = {
+  Bronze: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300',
+  Silver: 'bg-neutral-100 border-neutral-300 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-200',
+  Gold: 'bg-yellow-50 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-300',
+  Platinum: 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-900/20 dark:border-primary-700 dark:text-primary-300',
+}
+
+function AchievementsSection({ userId }: { userId: string }) {
+  const [counts, setCounts] = useState<Map<string, number> | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await createClient()
+        .from('badge_unlocks')
+        .select('badge_id')
+        .eq('user_id', userId)
+      if (cancelled) return
+      const m = new Map<string, number>()
+      for (const row of (data ?? []) as { badge_id: string }[]) {
+        if (TRANSIENT_BADGE_IDS.has(row.badge_id)) continue
+        m.set(row.badge_id, (m.get(row.badge_id) ?? 0) + 1)
+      }
+      setCounts(m)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const earned = useMemo(() => {
+    if (!counts) return []
+    return [...counts.entries()]
+      .map(([id, count]) => ({ id, count, def: ALL_BADGE_DEFS[id] }))
+      .filter((x): x is { id: string; count: number; def: BadgeDefinition } => Boolean(x.def))
+      .sort((a, b) => b.count - a.count || a.def.name.localeCompare(b.def.name))
+  }, [counts])
+
+  const totalTrophies = earned.reduce((sum, e) => sum + e.count, 0)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+          <span>🏆</span> Trophy Case
+        </h4>
+        {counts && earned.length > 0 && (
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+            {earned.length} badge{earned.length === 1 ? '' : 's'} · {totalTrophies} earned
+          </span>
+        )}
+      </div>
+      {counts === null ? (
+        <Card>
+          <p className="text-sm text-neutral-500 py-3 text-center">Loading achievements…</p>
+        </Card>
+      ) : earned.length === 0 ? (
+        <Card>
+          <p className="text-sm text-neutral-500 py-4 text-center">
+            No trophies yet — earn badges by making great predictions.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+          {earned.map(({ id, count, def }) => (
+            <div
+              key={id}
+              title={def.condition}
+              className={`relative rounded-xl border p-2.5 sm:p-3 text-center ${TIER_STYLES[def.tier] ?? 'bg-neutral-50 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200'}`}
+            >
+              {count > 1 && (
+                <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/80 dark:bg-black/40 text-neutral-800 dark:text-white">
+                  {count}×
+                </span>
+              )}
+              <div className="text-2xl sm:text-3xl leading-none">{def.emoji}</div>
+              <p className="text-[10px] sm:text-xs font-semibold mt-1.5 leading-tight">{def.name}</p>
+              <p className="text-[9px] sm:text-[10px] opacity-70 mt-0.5">{def.rarity}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StatisticsTab({
   poolMemberships,
   memberCounts,
   predictions,
   totalMatchCount,
   playerScoresMap,
+  userId,
 }: {
   poolMemberships: PoolMembership[]
   memberCounts: Record<string, number>
   predictions: Prediction[]
   totalMatchCount: number
   playerScoresMap: Record<string, PlayerScoreEntry>
+  userId: string
 }) {
   const totalPools = poolMemberships.length
   const totalPoints = poolMemberships.reduce((sum, p) => {
@@ -477,6 +575,9 @@ function StatisticsTab({
           </div>
         </Card>
       </div>
+
+      {/* Trophy Case — lifetime badge counts across all pools */}
+      <AchievementsSection userId={userId} />
 
       {/* Points by Pool — horizontal bar chart */}
       {poolMemberships.length > 0 && (() => {
