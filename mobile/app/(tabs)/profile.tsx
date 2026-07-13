@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -28,6 +29,7 @@ import {
   PoolsHeader,
 } from '@/components/pools';
 import { Icon, Text } from '@/components/ui';
+import { badgeIcon } from '@/components/pool-detail/badge-icons';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fetchNotificationPrefs, updateNotificationPref, deleteAccount, fetchPushPrefs, updatePushPref } from '@/lib/api';
@@ -116,6 +118,8 @@ export default function ProfileScreen() {
             <AccuracySection pools={pools} />
           </>
         )}
+
+        <TrophyCaseSection />
 
         <AccountSection
           username={data?.username ?? ''}
@@ -1526,6 +1530,130 @@ function VersionFooter() {
         v1.0.0
       </RNText>
     </View>
+  );
+}
+
+// Lifetime Trophy Case — cumulative badge counts from the append-only
+// badge_unlocks ledger (reads the user's own rows; RLS self-read policy allows
+// it across all pools, even ones they've left). Reuses the mobile medallion art.
+const TRANSIENT_BADGES = new Set(['top_dog']);
+
+function formatBadgeName(id: string): string {
+  return id
+    .replace(/^bp_/, '')
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function TrophyCaseSection() {
+  const theme = useTheme();
+  const { user } = useAuth();
+  const [badges, setBadges] = useState<{ id: string; count: number }[] | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('auth_user_id', user.id)
+        .single();
+      const appUserId = (userRow as { user_id: string } | null)?.user_id;
+      if (!appUserId) {
+        if (!cancelled) setBadges([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('badge_unlocks')
+        .select('badge_id')
+        .eq('user_id', appUserId);
+      if (cancelled) return;
+      const counts = new Map<string, number>();
+      for (const row of (data ?? []) as { badge_id: string }[]) {
+        if (TRANSIENT_BADGES.has(row.badge_id)) continue;
+        counts.set(row.badge_id, (counts.get(row.badge_id) ?? 0) + 1);
+      }
+      setBadges(
+        [...counts.entries()]
+          .map(([id, count]) => ({ id, count }))
+          .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (badges === null) {
+    return (
+      <SectionWrapper title="Trophy Case">
+        <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      </SectionWrapper>
+    );
+  }
+
+  if (badges.length === 0) {
+    return (
+      <SectionWrapper title="Trophy Case">
+        <View style={{ padding: theme.spacing.xl }}>
+          <Text style={{ color: theme.colors.slate, textAlign: 'center' }}>
+            No trophies yet — earn badges by making great predictions.
+          </Text>
+        </View>
+      </SectionWrapper>
+    );
+  }
+
+  return (
+    <SectionWrapper title="Trophy Case">
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+        {badges.map(({ id, count }) => {
+          const icon = badgeIcon(id);
+          return (
+            <View
+              key={id}
+              style={{
+                width: '31%',
+                alignItems: 'center',
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.radii.md,
+                paddingVertical: theme.spacing.md,
+                paddingHorizontal: theme.spacing.sm,
+              }}
+            >
+              {icon.png ? (
+                <Image source={icon.png} resizeMode="contain" style={{ width: 44, height: 44 }} />
+              ) : (
+                <Text style={{ fontSize: 30 }}>{icon.emoji}</Text>
+              )}
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: 11, fontWeight: '600', color: theme.colors.ink, marginTop: 6, textAlign: 'center' }}
+              >
+                {formatBadgeName(id)}
+              </Text>
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: theme.radii.pill,
+                  paddingHorizontal: 5,
+                  paddingVertical: 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{count}×</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </SectionWrapper>
   );
 }
 
