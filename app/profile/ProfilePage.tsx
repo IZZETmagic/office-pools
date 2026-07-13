@@ -344,38 +344,71 @@ const TIER_STYLES: Record<string, string> = {
   Platinum: 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-900/20 dark:border-primary-700 dark:text-primary-300',
 }
 
+type BadgeUnlockRow = { badge_id: string; unlocked_at: string; pool_name: string | null }
+
 function AchievementsSection({ userId }: { userId: string }) {
-  const [counts, setCounts] = useState<Map<string, number> | null>(null)
+  const [rows, setRows] = useState<BadgeUnlockRow[] | null>(null)
+  const [selectedBadgeId, setSelectedBadgeId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      // One row per unlock, newest first, with the pool name resolved via the
+      // badge_unlocks -> pools FK. RLS: a member can read their own pools' unlocks.
       const { data } = await createClient()
         .from('badge_unlocks')
-        .select('badge_id')
+        .select('badge_id, unlocked_at, pool:pools(pool_name)')
         .eq('user_id', userId)
+        .order('unlocked_at', { ascending: false })
       if (cancelled) return
-      const m = new Map<string, number>()
-      for (const row of (data ?? []) as { badge_id: string }[]) {
-        if (TRANSIENT_BADGE_IDS.has(row.badge_id)) continue
-        m.set(row.badge_id, (m.get(row.badge_id) ?? 0) + 1)
-      }
-      setCounts(m)
+      const mapped: BadgeUnlockRow[] = (data ?? []).map((r: any) => ({
+        badge_id: r.badge_id,
+        unlocked_at: r.unlocked_at,
+        pool_name: Array.isArray(r.pool) ? (r.pool[0]?.pool_name ?? null) : (r.pool?.pool_name ?? null),
+      }))
+      setRows(mapped)
     })()
     return () => {
       cancelled = true
     }
   }, [userId])
 
-  const earned = useMemo(() => {
-    if (!counts) return []
-    return [...counts.entries()]
+  const { earned, totalTrophies } = useMemo(() => {
+    if (!rows) return { earned: [] as { id: string; count: number; def: BadgeDefinition }[], totalTrophies: 0 }
+    const counts = new Map<string, number>()
+    for (const r of rows) {
+      if (TRANSIENT_BADGE_IDS.has(r.badge_id)) continue
+      counts.set(r.badge_id, (counts.get(r.badge_id) ?? 0) + 1)
+    }
+    const list = [...counts.entries()]
       .map(([id, count]) => ({ id, count, def: ALL_BADGE_DEFS[id] }))
       .filter((x): x is { id: string; count: number; def: BadgeDefinition } => Boolean(x.def))
       .sort((a, b) => b.count - a.count || a.def.name.localeCompare(b.def.name))
-  }, [counts])
+    return { earned: list, totalTrophies: list.reduce((s, e) => s + e.count, 0) }
+  }, [rows])
 
-  const totalTrophies = earned.reduce((sum, e) => sum + e.count, 0)
+  const selectedDef = selectedBadgeId ? ALL_BADGE_DEFS[selectedBadgeId] : null
+  const selectedUnlocks = useMemo(
+    () => (selectedBadgeId && rows ? rows.filter(r => r.badge_id === selectedBadgeId) : []),
+    [selectedBadgeId, rows],
+  )
+  // Group by pool — a multi-entry pool otherwise repeats its name once per entry.
+  const groupedUnlocks = useMemo(() => {
+    const m = new Map<string, { count: number; latest: string }>()
+    for (const u of selectedUnlocks) {
+      const key = u.pool_name ?? 'A pool'
+      const cur = m.get(key)
+      if (cur) {
+        cur.count += 1
+        if (u.unlocked_at > cur.latest) cur.latest = u.unlocked_at
+      } else {
+        m.set(key, { count: 1, latest: u.unlocked_at })
+      }
+    }
+    return [...m.entries()]
+      .map(([pool, v]) => ({ pool, count: v.count, latest: v.latest }))
+      .sort((a, b) => b.count - a.count || a.pool.localeCompare(b.pool))
+  }, [selectedUnlocks])
 
   return (
     <div>
@@ -383,13 +416,13 @@ function AchievementsSection({ userId }: { userId: string }) {
         <h4 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
           <span>🏆</span> Trophy Case
         </h4>
-        {counts && earned.length > 0 && (
+        {rows && earned.length > 0 && (
           <span className="text-xs text-neutral-500 dark:text-neutral-400">
             {earned.length} badge{earned.length === 1 ? '' : 's'} · {totalTrophies} earned
           </span>
         )}
       </div>
-      {counts === null ? (
+      {rows === null ? (
         <Card>
           <p className="text-sm text-neutral-500 py-3 text-center">Loading achievements…</p>
         </Card>
@@ -402,10 +435,12 @@ function AchievementsSection({ userId }: { userId: string }) {
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
           {earned.map(({ id, count, def }) => (
-            <div
+            <button
               key={id}
-              title={def.condition}
-              className={`relative rounded-xl border p-2.5 sm:p-3 text-center ${TIER_STYLES[def.tier] ?? 'bg-neutral-50 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200'}`}
+              type="button"
+              onClick={() => setSelectedBadgeId(id)}
+              title={`${def.condition} — tap for details`}
+              className={`relative rounded-xl border p-2.5 sm:p-3 text-center transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary-400 ${TIER_STYLES[def.tier] ?? 'bg-neutral-50 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200'}`}
             >
               {count > 1 && (
                 <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/80 dark:bg-black/40 text-neutral-800 dark:text-white">
@@ -415,8 +450,57 @@ function AchievementsSection({ userId }: { userId: string }) {
               <div className="text-2xl sm:text-3xl leading-none">{def.emoji}</div>
               <p className="text-[10px] sm:text-xs font-semibold mt-1.5 leading-tight">{def.name}</p>
               <p className="text-[9px] sm:text-[10px] opacity-70 mt-0.5">{def.rarity}</p>
-            </div>
+            </button>
           ))}
+        </div>
+      )}
+
+      {/* Per-badge timeline — which pool + when each unlock happened */}
+      {selectedDef && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4"
+          onClick={() => setSelectedBadgeId(null)}
+        >
+          <div className="w-full sm:max-w-md" onClick={e => e.stopPropagation()}>
+            <Card className="max-h-[80vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-3xl leading-none">{selectedDef.emoji}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-neutral-900 dark:text-white truncate">{selectedDef.name}</p>
+                    <p className="text-xs text-neutral-500">{selectedDef.condition}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBadgeId(null)}
+                  className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 shrink-0 text-lg leading-none"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                Earned {selectedUnlocks.length}× across {groupedUnlocks.length} pool{groupedUnlocks.length === 1 ? '' : 's'}
+              </p>
+              <ul className="space-y-0">
+                {groupedUnlocks.map(g => (
+                  <li
+                    key={g.pool}
+                    className="flex items-center justify-between gap-2 text-sm py-2 border-b border-border-default last:border-0"
+                  >
+                    <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{g.pool}</span>
+                      {g.count > 1 && (
+                        <span className="text-[10px] font-bold text-neutral-500 shrink-0">×{g.count}</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-neutral-500 shrink-0">{formatDate(g.latest)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
         </div>
       )}
     </div>
