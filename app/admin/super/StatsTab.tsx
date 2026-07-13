@@ -47,6 +47,10 @@ type StatsApiResponse = {
   tableSizes: { table_name: string; row_count: number }[]
   recentAuditCount: number
   totalPoolMembers: number
+  totalPools: number
+  totalPoolAdmins: number
+  averagePoolSize: number
+  deletedAccounts: number
 }
 
 type StatsTabProps = {
@@ -346,8 +350,8 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
 
       {/* ============ OVERVIEW CARDS ============ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard icon={UsersIcon} value={totalUsers} label="Users" sub={`${activeUsers} active`} />
-        <StatCard icon={PoolsIcon} value={totalPools} label="Pools" sub={`${activePools} open`} />
+        <StatCard icon={UsersIcon} value={totalUsers} label="Users" sub={apiData ? `${activeUsers} active · ${apiData.deletedAccounts} deleted` : `${activeUsers} active`} />
+        <StatCard icon={PoolsIcon} value={totalPools} label="Pools" sub={apiData ? `${activePools} open · avg ${apiData.averagePoolSize}` : `${activePools} open`} />
         <StatCard
           icon={MatchesIcon}
           value={totalMatches}
@@ -364,7 +368,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
           icon={PredictionsIcon}
           value={apiData ? apiData.totalPredictions : '\u2014'}
           label="Predictions"
-          sub={apiData ? `${apiData.totalPoolMembers} members` : undefined}
+          sub={apiData ? `${apiData.totalPoolMembers} members · ${apiData.totalPoolAdmins} admins` : undefined}
         />
       </div>
 

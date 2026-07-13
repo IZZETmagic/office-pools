@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
     tableSizesRes,
     recentAuditRes,
     poolMembersRes,
+    poolsCountRes,
+    adminMembersRes,
+    deletedUsersRes,
   ] = await Promise.all([
     // Total entries count
     supabase.from('pool_entries').select('entry_id', { count: 'exact', head: true }),
@@ -54,6 +57,15 @@ export async function GET(request: NextRequest) {
 
     // Total pool members
     supabase.from('pool_members').select('member_id', { count: 'exact', head: true }),
+
+    // Total pools (for average pool size)
+    supabase.from('pools').select('pool_id', { count: 'exact', head: true }),
+
+    // Pool admins (admin-role memberships)
+    supabase.from('pool_members').select('member_id', { count: 'exact', head: true }).eq('role', 'admin'),
+
+    // Deleted / deactivated accounts (users.is_active = false)
+    supabase.from('users').select('user_id', { count: 'exact', head: true }).eq('is_active', false),
   ])
 
   return NextResponse.json({
@@ -67,6 +79,13 @@ export async function GET(request: NextRequest) {
     tableSizes: tableSizesRes.data ?? [],
     recentAuditCount: recentAuditRes.count ?? 0,
     totalPoolMembers: poolMembersRes.count ?? 0,
+    totalPools: poolsCountRes.count ?? 0,
+    totalPoolAdmins: adminMembersRes.count ?? 0,
+    averagePoolSize:
+      (poolsCountRes.count ?? 0) > 0
+        ? Math.round(((poolMembersRes.count ?? 0) / (poolsCountRes.count ?? 1)) * 10) / 10
+        : 0,
+    deletedAccounts: deletedUsersRes.count ?? 0,
   })
 }
 

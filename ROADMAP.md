@@ -195,9 +195,8 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### Enhanced super-admin stats `Feature`
 - **Is:** New super-admin metrics — number of pool admins, average pool size, and how many users have deleted their account. `#SuperAdmin`
 - **Touches:** the super-admin dashboard/stats page + aggregate queries over pools / members / deleted accounts.
-- **Audit 2026-07-12:** TODO — **0 of the 3** metrics exist in `app/api/admin/stats/route.ts` (raw `totalPoolMembers`/`totalPools` exist but no average; no admin-count; no deleted-account count).
-- **Effort:** ~0.5–1 day.
-- **Done when:** super admin shows admin count, average pool size, and deleted-account count, accurately.
+- ✅ **SHIPPED 2026-07-12:** added to `app/api/admin/stats/route.ts` + surfaced in `StatsTab.tsx` — pool-admin count (`role='admin'` memberships: 606), average pool size (`totalPoolMembers / totalPools`), deleted-account count (`users.is_active = false`). Shown as overview-card subtitles (Users → "N deleted", Pools → "avg N", Predictions → "N admins").
+- **Done when:** super admin shows admin count, average pool size, and deleted-account count, accurately — done.
 
 ### Lifetime trophy tracker `Feature`
 - **Is:** Split the profile page's statistics section into its own navigable page with an achievements area — including cumulative counts of how many of each trophy/badge a user has earned. `#Achievements`
