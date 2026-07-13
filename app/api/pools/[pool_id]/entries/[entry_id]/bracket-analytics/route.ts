@@ -69,7 +69,7 @@ async function handleGET(
 
   const { data: entryMember } = await adminClient
     .from('pool_members')
-    .select('member_id')
+    .select('member_id, user_id')
     .eq('member_id', entry.member_id)
     .eq('pool_id', pool_id)
     .single()
@@ -176,6 +176,19 @@ async function handleGET(
       tier: b.tier,
     }))
     const totalBadgeXP = submissionBadges.reduce((sum, b) => sum + b.xpBonus, 0)
+
+    // Persist submission-time unlocks (idempotent) so they survive recompute.
+    if (submissionBadges.length > 0 && entryMember?.user_id) {
+      await adminClient
+        .from('badge_unlocks')
+        .upsert(
+          submissionBadges.map(b => ({
+            entry_id, user_id: entryMember.user_id, pool_id, tournament_id: pool.tournament_id, badge_id: b.id,
+          })),
+          { onConflict: 'entry_id,badge_id', ignoreDuplicates: true },
+        )
+        .then(({ error }) => { if (error) console.warn('[bracket-analytics] badge_unlocks upsert failed', error.message) })
+    }
 
     return NextResponse.json({
       xp: {
@@ -312,6 +325,16 @@ async function handleGET(
       away_team: null,
     }))
 
+    // Ever-earned bp_* unlocks (append-only badge_unlocks) so an earned badge
+    // never vanishes on recompute; computeFullBPXPBreakdown unions them into the
+    // displayed set (XP/level stay on the live set).
+    const { data: bpUnlockRows } = await adminClient
+      .from('badge_unlocks')
+      .select('badge_id')
+      .eq('entry_id', entry_id)
+      .like('badge_id', 'bp_%')
+    const everEarnedBadgeIds = (bpUnlockRows ?? []).map(r => r.badge_id as string)
+
     const bpXpBreakdown = computeFullBPXPBreakdown({
       groupRankings,
       thirdPlaceRankings,
@@ -323,7 +346,23 @@ async function handleGET(
       teams: teamsData,
       submittedAt: entry.predictions_submitted_at ?? null,
       poolCreatedAt: pool.created_at,
+      everEarnedBadgeIds,
     })
+
+    // Persist currently-earned bp_* badges (idempotent). earnedBadges may
+    // already include display-only persisted ones; re-writing those is a no-op
+    // via the (entry_id, badge_id) unique constraint.
+    if (bpXpBreakdown.earnedBadges.length > 0 && entryMember?.user_id) {
+      await adminClient
+        .from('badge_unlocks')
+        .upsert(
+          bpXpBreakdown.earnedBadges.map(b => ({
+            entry_id, user_id: entryMember.user_id, pool_id, tournament_id: pool.tournament_id, badge_id: b.id,
+          })),
+          { onConflict: 'entry_id,badge_id', ignoreDuplicates: true },
+        )
+        .then(({ error }) => { if (error) console.warn('[bracket-analytics] badge_unlocks upsert failed', error.message) })
+    }
 
     // 10. Compute pool comparison (fetch all entries' bracket data)
     let poolComparison = null

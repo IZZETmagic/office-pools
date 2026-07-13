@@ -655,6 +655,9 @@ export function computeFullBPXPBreakdown(params: {
   teams: TeamData[]
   submittedAt: string | null
   poolCreatedAt: string
+  /** bp_* badge ids permanently recorded in badge_unlocks — re-surfaced for
+   *  display so an earned badge never vanishes on recompute (persistence). */
+  everEarnedBadgeIds?: string[]
 }): BPXPBreakdown {
   const {
     groupRankings,
@@ -667,6 +670,7 @@ export function computeFullBPXPBreakdown(params: {
     teams,
     submittedAt,
     poolCreatedAt,
+    everEarnedBadgeIds,
   } = params
 
   // Determine completed groups
@@ -726,9 +730,24 @@ export function computeFullBPXPBreakdown(params: {
   })
   const totalBadgeXP = earnedBadges.reduce((sum, b) => sum + b.xpBonus, 0)
 
-  // 7. Total XP and level
+  // 7. Total XP and level (from the LIVE earned set only)
   const totalXP = xpBeforeBadges + totalBadgeXP
   const levelInfo = computeLevel(totalXP)
+
+  // Display-only persistence: re-surface bp_* badges recorded in badge_unlocks
+  // that the live recompute no longer re-derives, so an earned badge never
+  // vanishes. XP/level stay on the live set above. (No transient bp_* badges.)
+  const displayedBadges = everEarnedBadgeIds?.length
+    ? (() => {
+        const currentIds = new Set(earnedBadges.map(b => b.id))
+        const extra = everEarnedBadgeIds
+          .filter(id => !currentIds.has(id))
+          .map(id => BP_BADGE_DEFINITIONS.find(b => b.id === id))
+          .filter((b): b is BadgeDefinition => Boolean(b))
+          .map(b => ({ ...b }) as EarnedBadge)
+        return extra.length ? [...earnedBadges, ...extra] : earnedBadges
+      })()
+    : earnedBadges
 
   return {
     groupXP: groupXPSummaries,
@@ -736,7 +755,7 @@ export function computeFullBPXPBreakdown(params: {
     thirdPlacePerfectBonusXP,
     knockoutXP: knockoutItems,
     bonusEvents,
-    earnedBadges,
+    earnedBadges: displayedBadges,
     totalGroupBaseXP,
     totalGroupBonusXP,
     totalThirdPlaceXP,

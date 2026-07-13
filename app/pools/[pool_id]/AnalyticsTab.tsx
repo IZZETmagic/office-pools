@@ -140,7 +140,7 @@ export function AnalyticsTab({
   // default tab); RLS lets pool members read their pools' unlocks.
   const [everEarnedBadgeIds, setEverEarnedBadgeIds] = useState<string[]>([])
   useEffect(() => {
-    if (isBracketPicker || !selectedEntryId) { setEverEarnedBadgeIds([]); return }
+    if (!selectedEntryId) { setEverEarnedBadgeIds([]); return }
     let cancelled = false
     ;(async () => {
       const { data } = await createClient()
@@ -150,7 +150,7 @@ export function AnalyticsTab({
       if (!cancelled) setEverEarnedBadgeIds((data ?? []).map(r => r.badge_id as string))
     })()
     return () => { cancelled = true }
-  }, [selectedEntryId, isBracketPicker])
+  }, [selectedEntryId])
 
   // =============================================
   // XP SYSTEM (memoized) — Full Tournament & Progressive
@@ -298,11 +298,12 @@ export function AnalyticsTab({
       teams,
       submittedAt: selectedEntry?.predictions_submitted_at ?? null,
       poolCreatedAt,
+      everEarnedBadgeIds,
     })
   }, [
     isBracketPicker, isEntrySubmitted, selectedBPGroupRankings, selectedBPThirdPlaceRankings,
     selectedBPKnockoutPicks, actualGroupStandings, actualRankedThirds, bpCompletedMatches,
-    matches, teams, completedMatches, selectedEntry, poolCreatedAt,
+    matches, teams, completedMatches, selectedEntry, poolCreatedAt, everEarnedBadgeIds,
   ])
 
   // =============================================
