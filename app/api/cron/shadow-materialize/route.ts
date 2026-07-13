@@ -63,7 +63,16 @@ async function handle(request: NextRequest) {
   if (detErr) {
     return NextResponse.json({ ok: false, stage: 'detect', error: detErr.message }, { status: 500 })
   }
-  const poolIds: string[] = (changed ?? []).map((r: { pool_id: string }) => r.pool_id)
+  const predPoolIds: string[] = (changed ?? []).map((r: { pool_id: string }) => r.pool_id)
+
+  // Pools flagged dirty by a bulk/settings/admin recalc (recalculatePool with no
+  // matchId) — a full live re-score changes scores without touching predictions or
+  // match rows, so the reconcilers never see it and shadow would drift stale.
+  const { data: dirtyRows } = await admin.from('shadow_dirty_pools').select('pool_id')
+  const dirtyIds: string[] = (dirtyRows ?? []).map((r: { pool_id: string }) => r.pool_id)
+
+  // Combined work set (prediction-changed ∪ dirty), deduped.
+  const poolIds: string[] = Array.from(new Set([...predPoolIds, ...dirtyIds]))
 
   // Completed matches whose predictions were edited since the watermark (the
   // ...024 edge — a locked-match prediction change): these need a shadow MATCH
@@ -84,6 +93,18 @@ async function handle(request: NextRequest) {
 
   const batch = poolIds.slice(0, CAP)
   const deferred = poolIds.length - batch.length
+  const dirtyInBatch = batch.filter((id) => dirtyIds.includes(id))
+
+  // A dirty pool's staleness is in its SCORES (bracket/logic changed, not inputs),
+  // so it needs its completed matches re-scored, not just its bonus inputs
+  // refreshed. shadow_score_match writes change-only, so re-scoring matches that
+  // didn't change for other pools is a cheap no-op.
+  let effMatchIds = matchIds
+  if (dirtyInBatch.length > 0) {
+    const { data: completed } = await admin
+      .from('matches').select('match_id').eq('tournament_id', tournamentId).eq('is_completed', true)
+    effMatchIds = Array.from(new Set([...matchIds, ...((completed ?? []).map((r: { match_id: string }) => r.match_id))]))
+  }
 
   try {
     // 1) Re-materialize inputs for the changed pools. Brackets FIRST (match-engine,
@@ -94,10 +115,16 @@ async function handle(request: NextRequest) {
 
     // 2) Apply all shadow writes under ONE advisory lock shared with the score
     //    worker (shadow_process_queue) so the two writers never overlap: re-score
-    //    changed completed matches, then rescore + finalize the batch's pools
+    //    changed/dirty completed matches, then rescore + finalize the batch's pools
     //    (all scoped + change-only).
-    const { error: applyErr } = await admin.rpc('shadow_apply_changes', { p_match_ids: matchIds, p_pool_ids: batch })
+    const { error: applyErr } = await admin.rpc('shadow_apply_changes', { p_match_ids: effMatchIds, p_pool_ids: batch })
     if (applyErr) throw new Error(`shadow_apply_changes: ${applyErr.message}`)
+
+    // Clear the dirty flags we just processed (deferred dirty pools remain for the
+    // next run). Only after a successful apply, so a failure retries them.
+    if (dirtyInBatch.length > 0) {
+      await admin.from('shadow_dirty_pools').delete().in('pool_id', dirtyInBatch)
+    }
 
     // Advance the watermark ONLY when the whole changed set was processed; a
     // deferred remainder is re-detected (and re-processed) on the next run.
@@ -105,8 +132,9 @@ async function handle(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      changedPools: poolIds.length,
-      changedMatches: matchIds.length,
+      changedPools: predPoolIds.length,
+      dirtyPools: dirtyIds.length,
+      changedMatches: effMatchIds.length,
       processed: batch.length,
       deferred,
       brackets,
