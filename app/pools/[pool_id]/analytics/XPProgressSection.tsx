@@ -6,6 +6,7 @@ import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from 
 import type { StreakData, CrowdMatch, PoolWideStats, PredictionResult } from './analyticsHelpers'
 import type { PredictionData } from '../types'
 import { BADGE_DEFINITIONS, LEVELS } from './xpSystem'
+import { BadgeMedallion } from '@/components/BadgeMedallion'
 
 // =============================================
 // TYPES
@@ -187,9 +188,9 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       >
-        {/* Emoji */}
-        <div className={`text-2xl sm:text-3xl mb-1.5 ${earned ? '' : 'grayscale opacity-50 dark:opacity-70'}`}>
-          {def.emoji}
+        {/* Emoji / medallion */}
+        <div className={`mb-1.5 ${earned ? '' : 'grayscale opacity-50 dark:opacity-70'}`}>
+          <BadgeMedallion id={def.id} emoji={def.emoji} size={40} className="mx-auto" />
         </div>
 
         {/* Name */}
@@ -260,9 +261,9 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
         </button>
 
         <div className="p-6 pt-8 text-center">
-          {/* Large emoji */}
-          <div className={`text-5xl mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
-            {badge.emoji}
+          {/* Large emoji / medallion */}
+          <div className={`mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
+            <BadgeMedallion id={badge.id} emoji={badge.emoji} size={72} className="mx-auto" />
           </div>
 
           {/* Badge name */}

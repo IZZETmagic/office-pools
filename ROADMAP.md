@@ -384,9 +384,10 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### On-theme trophies `Design`
 - **Is:** Redesign the Form-tab trophies/badges so they fit the app's design system — the current ones work but feel off-theme. `#Achievements`
 - **Touches:** badge/trophy visuals in the Form tab. Cross-refs *Form tab polish* + *Badge batch*.
-- **Audit 2026-07-12:** PARTIAL — v4 medallion artwork (`assets/badge-previews-v4/`) exists for the 12 full/progressive badges; `bp_*` bracket badges still fall through to SF Symbols.
-- **Effort:** ~1–2 days (design + asset pass).
-- **Done when:** trophies/badges match the design system across the Form tab.
+- ✅ **Web SHIPPED 2026-07-13:** all **23** v4 medallions (12 full/progressive + **11 `bp_*`** — the bracket art DID exist, contra the earlier "SF Symbols" note) are web-optimized into `public/badges/` (resized 160px, 588 KB total) and rendered via a shared `<BadgeMedallion>` (emoji fallback for any id without art) in the profile **Trophy Case** + the pool **analytics badge grid** (`XPProgressSection`). Web badges now match the mobile medallions instead of bare emoji.
+- **Effort:** ~1–2 days (design + asset pass) — web done; mobile already uses the medallions.
+- **Remaining:** mobile Form-tab `bp_*` fallback can now point at the real art (it exists); any badge without a medallion still shows emoji.
+- **Done when:** trophies/badges match the design system — done on web; mobile parity for `bp_*` is the tail.
 
 ### ✅ Completed (verified against code, 2026-07-12)
 | Item | What shipped — evidence | Note |

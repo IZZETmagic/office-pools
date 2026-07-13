@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { BADGE_DEFINITIONS, type BadgeDefinition } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { BP_BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/bracketPickerXpSystem'
+import { BadgeMedallion } from '@/components/BadgeMedallion'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
@@ -438,7 +439,7 @@ function AchievementsSection({ userId }: { userId: string }) {
               <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-neutral-900/85 text-white dark:bg-white/20 leading-none">
                 {count}×
               </span>
-              <div className="text-2xl sm:text-3xl leading-none">{def.emoji}</div>
+              <BadgeMedallion id={id} emoji={def.emoji} size={46} className="mx-auto" />
               <p className="text-[10px] sm:text-xs font-semibold mt-1.5 leading-tight text-neutral-800 dark:text-neutral-100">{def.name}</p>
               <p className="text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{def.rarity}</p>
             </button>
@@ -456,7 +457,7 @@ function AchievementsSection({ userId }: { userId: string }) {
             <Card className="max-h-[80vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-3xl leading-none">{selectedDef.emoji}</span>
+                  <BadgeMedallion id={selectedBadgeId ?? ''} emoji={selectedDef.emoji} size={40} />
                   <div className="min-w-0">
                     <p className="font-bold text-neutral-900 dark:text-white truncate">{selectedDef.name}</p>
                     <p className="text-xs text-neutral-500">{selectedDef.condition}</p>
