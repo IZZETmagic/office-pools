@@ -2,15 +2,16 @@ import { useRef } from 'react';
 import {
   type LayoutChangeEvent,
   Pressable,
-  ScrollView,
   Text as RNText,
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  runOnJS,
+import Animated, {
+  scrollTo,
   type SharedValue,
   useAnimatedReaction,
+  useAnimatedRef,
+  useSharedValue,
 } from 'react-native-reanimated';
 
 import { Icon, NotificationDot } from '@/components/ui';
@@ -154,51 +155,52 @@ export function PoolTabBar({
   const activeColor =
     colorDistance(proposed, theme.colors.snow) < 80 ? theme.colors.accent : proposed;
 
-  const scrollRef = useRef<ScrollView | null>(null);
-  const pillLayoutsRef = useRef<Array<{ x: number; width: number }>>([]);
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const pillLayoutsRef = useRef<{ x: number; width: number }[]>([]);
+  // Mirror of the pill layouts as a shared value so the centering worklet can
+  // read pill positions on the UI thread (a plain ref isn't worklet-readable).
+  const pillLayouts = useSharedValue<{ x: number; width: number }[]>([]);
 
   function handlePillLayout(index: number, e: LayoutChangeEvent) {
     const { x, width } = e.nativeEvent.layout;
     pillLayoutsRef.current[index] = { x, width };
+    // Fires once per pill on layout (not per frame), so copying the array to
+    // the shared value here is cheap.
+    pillLayouts.value = pillLayoutsRef.current.slice();
   }
 
-  // Helper bound to the JS thread — called from the worklet via runOnJS.
-  // Computes the target pill-row scroll position from the latest pageOffset
-  // and drives an imperative scrollTo. No setState, so PoolTabBar's render
-  // does not re-run at 60fps; only the inner ScrollView's native scroll
-  // position is being updated.
-  function syncPillScroll(offset: number) {
-    const clamped = Math.max(0, Math.min(offset, tabs.length - 1));
-    const lower = Math.floor(clamped);
-    const upper = Math.min(lower + 1, tabs.length - 1);
-    const alpha = clamped - lower;
-    const a = pillLayoutsRef.current[lower];
-    const b = pillLayoutsRef.current[upper];
-    if (!a || !b) return;
-    const centerA = a.x + a.width / 2;
-    const centerB = b.x + b.width / 2;
-    const targetCenter = centerA * (1 - alpha) + centerB * alpha;
-    const targetX = Math.max(0, targetCenter - screenWidth / 2);
-    scrollRef.current?.scrollTo({ x: targetX, animated: false });
-  }
-
-  // Subscribes to the shared pageOffset value on the UI thread; whenever it
-  // changes (and is materially different from the previous frame), hops
-  // back to the JS thread via runOnJS to call scrollTo. The hop is cheap
-  // because we're not re-rendering — just calling a ref method. The 0.005
-  // threshold filters out sub-pixel noise that would otherwise spam scrollTo
-  // calls when the pager is at rest.
+  // Keep the active pill centered as the pager swipes — entirely on the UI
+  // thread. This previously hopped to JS every frame (runOnJS → a JS
+  // scrollTo), which visibly stuttered once the strip actually had to scroll
+  // (i.e. past the first couple of tabs) whenever the JS thread was busy. The
+  // same centering math now runs inside the reaction worklet and drives
+  // Reanimated's UI-thread scrollTo, so the pills follow the content smoothly
+  // regardless of JS-thread load. The 0.005 threshold still filters sub-pixel
+  // noise so we don't spam scrollTo at rest.
   useAnimatedReaction(
     () => pageOffset?.value ?? 0,
     (current, previous) => {
       if (previous !== null && Math.abs(current - previous) < 0.005) return;
-      runOnJS(syncPillScroll)(current);
+      const layouts = pillLayouts.value;
+      const n = tabs.length;
+      const clamped = Math.max(0, Math.min(current, n - 1));
+      const lower = Math.floor(clamped);
+      const upper = Math.min(lower + 1, n - 1);
+      const alpha = clamped - lower;
+      const a = layouts[lower];
+      const b = layouts[upper];
+      if (!a || !b) return;
+      const centerA = a.x + a.width / 2;
+      const centerB = b.x + b.width / 2;
+      const targetCenter = centerA * (1 - alpha) + centerB * alpha;
+      const targetX = Math.max(0, targetCenter - screenWidth / 2);
+      scrollTo(scrollRef, targetX, 0, false);
     },
     [tabs.length, screenWidth],
   );
 
   return (
-    <ScrollView
+    <Animated.ScrollView
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -263,6 +265,6 @@ export function PoolTabBar({
           </View>
         );
       })}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
