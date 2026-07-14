@@ -2,7 +2,6 @@ import { useRef } from 'react';
 import {
   type LayoutChangeEvent,
   Pressable,
-  Text as RNText,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -11,6 +10,7 @@ import Animated, {
   type SharedValue,
   useAnimatedReaction,
   useAnimatedRef,
+  useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 
@@ -115,6 +115,97 @@ export function getVisiblePoolTabs(
   }).map((t) => t.key);
 }
 
+// One tab pill. Its active-highlight (background tint, label color, and icon)
+// is driven off the pager's `pageOffset` on the UI thread and HARD-SNAPS to
+// whichever page is nearest (Math.round) — no tween, no crossfade, just an
+// instant switch — so the highlight lands on the tab the moment you swipe to
+// it, without the JS-thread re-render lag the old React-state version had. The
+// on/off styles are exactly today's active/inactive styles, so it's visually
+// identical; it just snaps on the UI thread instead of after a React commit.
+function TabPill({
+  tab,
+  index,
+  showDot,
+  activeColor,
+  activeBg,
+  pageOffset,
+  activeIndex,
+  onPress,
+  onLayout,
+  theme,
+}: {
+  tab: TabDef;
+  index: number;
+  showDot: boolean;
+  activeColor: string;
+  activeBg: string;
+  pageOffset?: SharedValue<number>;
+  activeIndex: number;
+  onPress: () => void;
+  onLayout: (e: LayoutChangeEvent) => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const mistColor = theme.colors.mist;
+  const slateColor = theme.colors.slate;
+
+  const bgStyle = useAnimatedStyle(() => {
+    const offset = pageOffset?.value ?? activeIndex;
+    return { backgroundColor: Math.round(offset) === index ? activeBg : mistColor };
+  });
+  const labelStyle = useAnimatedStyle(() => {
+    const offset = pageOffset?.value ?? activeIndex;
+    return { color: Math.round(offset) === index ? activeColor : slateColor };
+  });
+  // Snap the active-tint icon in over the slate base icon (no fade).
+  const activeIconStyle = useAnimatedStyle(() => {
+    const offset = pageOffset?.value ?? activeIndex;
+    return { opacity: Math.round(offset) === index ? 1 : 0 };
+  });
+
+  return (
+    <View onLayout={onLayout}>
+      <Animated.View style={[{ borderRadius: theme.radii.pill, flexShrink: 0 }, bgStyle]}>
+        <Pressable
+          onPress={onPress}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.sm + 2,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <View>
+            <Icon name={tab.icon as never} color="slate" size={13} weight="semibold" />
+            <Animated.View
+              pointerEvents="none"
+              style={[{ position: 'absolute', top: 0, left: 0 }, activeIconStyle]}
+            >
+              <Icon name={tab.icon as never} tint={activeColor} size={13} weight="semibold" />
+            </Animated.View>
+            {showDot ? <NotificationDot size="sm" top={-4} right={-6} /> : null}
+          </View>
+          <Animated.Text
+            numberOfLines={1}
+            style={[
+              {
+                fontFamily: fontFamilies.bold,
+                fontSize: 13,
+                lineHeight: 16,
+                includeFontPadding: false,
+              },
+              labelStyle,
+            ]}
+          >
+            {tab.label}
+          </Animated.Text>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
 export function PoolTabBar({
   active,
   onChange,
@@ -154,6 +245,8 @@ export function PoolTabBar({
   const proposed = accentColor ?? theme.colors.primary;
   const activeColor =
     colorDistance(proposed, theme.colors.snow) < 80 ? theme.colors.accent : proposed;
+  const activeBg = withOpacity(activeColor, 0.12);
+  const activeIndex = tabs.findIndex((t) => t.key === active);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const pillLayoutsRef = useRef<{ x: number; width: number }[]>([]);
@@ -218,53 +311,21 @@ export function PoolTabBar({
         backgroundColor: theme.colors.snow,
       }}
     >
-      {tabs.map((tab, i) => {
-        const isActive = tab.key === active;
-        const showDot = tabHasIndicator(tab.key);
-        return (
-          <View key={tab.key} onLayout={(e) => handlePillLayout(i, e)}>
-            <Pressable
-              onPress={() => onChange(tab.key)}
-              style={({ pressed }) => ({
-                flexShrink: 0,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.sm,
-                paddingHorizontal: theme.spacing.lg,
-                paddingVertical: theme.spacing.sm + 2,
-                borderRadius: theme.radii.pill,
-                backgroundColor: isActive
-                  ? withOpacity(activeColor, 0.12)
-                  : theme.colors.mist,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <View>
-                <Icon
-                  name={tab.icon as never}
-                  color={isActive ? undefined : 'slate'}
-                  tint={isActive ? activeColor : undefined}
-                  size={13}
-                  weight="semibold"
-                />
-                {showDot ? <NotificationDot size="sm" top={-4} right={-6} /> : null}
-              </View>
-              <RNText
-                numberOfLines={1}
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 13,
-                  lineHeight: 16,
-                  color: isActive ? activeColor : theme.colors.slate,
-                  includeFontPadding: false,
-                }}
-              >
-                {tab.label}
-              </RNText>
-            </Pressable>
-          </View>
-        );
-      })}
+      {tabs.map((tab, i) => (
+        <TabPill
+          key={tab.key}
+          tab={tab}
+          index={i}
+          showDot={tabHasIndicator(tab.key)}
+          activeColor={activeColor}
+          activeBg={activeBg}
+          pageOffset={pageOffset}
+          activeIndex={activeIndex}
+          onPress={() => onChange(tab.key)}
+          onLayout={(e) => handlePillLayout(i, e)}
+          theme={theme}
+        />
+      ))}
     </Animated.ScrollView>
   );
 }
