@@ -1,7 +1,7 @@
 # Member Predictions Visibility — "See everyone's picks after lock"
 
 - **Date:** 2026-07-13
-- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phases 1–3 not started
+- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phases 2–3 not started
 - **Roadmap item:** `ROADMAP.md:359-364` — "Members'/all predictions after lock" (Feature, Mobile)
 - **Memory:** `project_feature_member_predictions_visibility`
 
@@ -136,17 +136,24 @@ SECURITY DEFINER function executable by `anon`/`authenticated`. Inspected — it
 policy in any meaningful way. Its advisories (mutable `search_path`, anon-executable) are
 pre-existing hygiene, tracked as a minor follow-on, not part of this feature.
 
-### Phase 1 — Reveal-gate + one server route (shared spine)
+### Phase 1 — Reveal-gate + one server route (shared spine) — BUILT 2026-07-13
 
-- `isEntryRevealable(pool, entry, { match?, roundStates? })` helper (unit-tested).
-- New `GET /api/pools/[pool_id]/entries/[entry_id]/predictions`, cloned from the
-  membership-gated `entries/[entry_id]/breakdown/route.ts`:
-  1. verify caller is a pool member,
-  2. verify entry belongs to the pool,
-  3. apply `isEntryRevealable` → `403 { locked: true }` before reveal,
-  4. return picks via `createAdminClient()`.
-  Both platforms call this for *other* people's entries. Own-entry reads keep their existing
-  path. Handles all three modes (bracket_picker reads the three bracket tables).
+- **`lib/predictions/revealGate.ts`** (pure, unit-tested — 14/14 in
+  `lib/predictions/__tests__/revealGate.test.ts`):
+  - `computeReveal(pool, roundStates, now): RevealResult` — full_tournament &
+    bracket_picker → `{revealed, scope:'all'}` once past `prediction_deadline`;
+    progressive → `{scope:'rounds', roundKeys}` for locked rounds only. Fail-safe
+    on null/unparseable deadlines.
+  - `filterRevealedPredictions(preds, reveal, matchStageById)` — drops score picks
+    whose match stage (== progressive round_key) isn't a revealed round.
+- **`GET /api/pools/[pool_id]/entries/[entry_id]/predictions`** (modeled on the
+  membership-gated breakdown route): member check → entry-in-pool check → owner
+  profile (for the "whose entry" header) → reveal gate → picks via `createAdminClient()`.
+  Owner + pool admins bypass the gate (always read in full, matching existing admin
+  capability); everyone else gets `403 {locked:true}` for unrevealed scopes. Returns
+  `predictions` for score modes / `bracketPicks` for bracket_picker. Typechecks + lints clean.
+- NOTE: not yet exercised over HTTP (no client calls it until Phase 2/3 wire one up);
+  gate logic is covered by the unit tests, auth/DB plumbing mirrors the verified breakdown route.
 
 ### Phase 2 — Mobile (un-gate + reuse viewer)
 
