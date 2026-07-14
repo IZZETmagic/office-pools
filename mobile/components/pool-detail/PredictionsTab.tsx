@@ -586,10 +586,10 @@ function MemberEntryRow({
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text variant="cardTitle" numberOfLines={1}>
-          {ownerName}
+          {entryName}
         </Text>
         <Text variant="detail" color="slate" numberOfLines={1}>
-          {entryName} · {points} pts
+          {ownerName} · {points} pts
         </Text>
       </View>
       <Icon
