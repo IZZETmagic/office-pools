@@ -288,21 +288,6 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     // 6. Write results to database (shadow-write for Phase 1)
     const writeResult = await writeScoresToDB(adminClient, poolId, result, submissionTimeMap, currentTotals, options.matchId)
 
-    // 6b. Full recompute (no single matchId) → flag the pool for shadow
-    // re-materialize. A bulk/settings/admin recalc changes live scores without
-    // touching predictions or match rows — the signals the shadow reconcilers key
-    // off — so shadow would otherwise silently drift stale until an unrelated
-    // event. Fire-and-forget + shadow-only: can never affect production scoring.
-    // (bracket_picker has no shadow coverage, so it's skipped.)
-    if (!options.matchId && pool.prediction_mode !== 'bracket_picker') {
-      void (async () => {
-        const { error } = await adminClient
-          .from('shadow_dirty_pools')
-          .upsert({ pool_id: poolId }, { onConflict: 'pool_id' })
-        if (error) console.error(`[scoring] shadow dirty-mark failed for pool ${poolId}:`, error.message)
-      })().catch((err) => console.error(`[scoring] shadow dirty-mark threw for pool ${poolId}:`, err))
-    }
-
     // 7. Fire match-completion pushes (prediction_result + matchday MVP +
     // streak milestones). Fire-and-forget — if push fan-out fails or hangs,
     // the recalc still returns success. The fan-out has its own per-match

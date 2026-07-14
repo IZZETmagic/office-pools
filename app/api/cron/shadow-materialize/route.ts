@@ -63,16 +63,7 @@ async function handle(request: NextRequest) {
   if (detErr) {
     return NextResponse.json({ ok: false, stage: 'detect', error: detErr.message }, { status: 500 })
   }
-  const predPoolIds: string[] = (changed ?? []).map((r: { pool_id: string }) => r.pool_id)
-
-  // Pools flagged dirty by a bulk/settings/admin recalc (recalculatePool with no
-  // matchId) — a full live re-score changes scores without touching predictions or
-  // match rows, so the reconcilers never see it and shadow would drift stale.
-  const { data: dirtyRows } = await admin.from('shadow_dirty_pools').select('pool_id')
-  const dirtyIds: string[] = (dirtyRows ?? []).map((r: { pool_id: string }) => r.pool_id)
-
-  // Combined work set (prediction-changed ∪ dirty), deduped.
-  const poolIds: string[] = Array.from(new Set([...predPoolIds, ...dirtyIds]))
+  const poolIds: string[] = (changed ?? []).map((r: { pool_id: string }) => r.pool_id)
 
   // Completed matches whose predictions were edited since the watermark (the
   // ...024 edge — a locked-match prediction change): these need a shadow MATCH
@@ -93,7 +84,6 @@ async function handle(request: NextRequest) {
 
   const batch = poolIds.slice(0, CAP)
   const deferred = poolIds.length - batch.length
-  const dirtyInBatch = batch.filter((id) => dirtyIds.includes(id))
 
   try {
     // 1) Re-materialize inputs for the changed pools. Brackets FIRST (match-engine,
@@ -102,38 +92,12 @@ async function handle(request: NextRequest) {
     const brackets = await backfillResolvedBrackets(admin, tournamentId, { poolIds: batch })
     const bonus = await backfillBonusInputs(admin, tournamentId, { poolIds: batch })
 
-    // 2a) Dirty pools (bulk/settings/logic re-score with no input change) need their
-    //     COMPLETED matches re-scored so the freshly-materialized brackets/settings
-    //     take. shadow_score_match runs GLOBALLY per match, so handing every completed
-    //     match to a single shadow_apply_changes call blows the statement timeout —
-    //     chunk them into small per-call batches. Change-only writes make matches that
-    //     didn't actually change a cheap no-op (only the dirty pools' refreshed
-    //     brackets produce writes).
-    if (dirtyInBatch.length > 0) {
-      const { data: completed } = await admin
-        .from('matches').select('match_id').eq('tournament_id', tournamentId).eq('is_completed', true)
-      const completedIds = (completed ?? []).map((r: { match_id: string }) => r.match_id)
-      const MATCH_CHUNK = 5
-      for (let i = 0; i < completedIds.length; i += MATCH_CHUNK) {
-        const { error } = await admin.rpc('shadow_apply_changes', {
-          p_match_ids: completedIds.slice(i, i + MATCH_CHUNK),
-          p_pool_ids: [],
-        })
-        if (error) throw new Error(`shadow_apply_changes (dirty match chunk @${i}): ${error.message}`)
-      }
-    }
-
-    // 2b) Prediction-driven match re-scores + finalize the batch's pools (bonuses +
-    //     totals) under the advisory lock shared with the score worker. Small set
-    //     (matchIds is prediction-edited completed matches; finalize is scoped).
+    // 2) Apply all shadow writes under ONE advisory lock shared with the score
+    //    worker (shadow_process_queue) so the two writers never overlap: re-score
+    //    changed completed matches, then rescore + finalize the batch's pools
+    //    (all scoped + change-only).
     const { error: applyErr } = await admin.rpc('shadow_apply_changes', { p_match_ids: matchIds, p_pool_ids: batch })
     if (applyErr) throw new Error(`shadow_apply_changes: ${applyErr.message}`)
-
-    // Clear the dirty flags we just processed (deferred dirty pools remain for the
-    // next run). Only after a successful apply, so a failure retries them.
-    if (dirtyInBatch.length > 0) {
-      await admin.from('shadow_dirty_pools').delete().in('pool_id', dirtyInBatch)
-    }
 
     // Advance the watermark ONLY when the whole changed set was processed; a
     // deferred remainder is re-detected (and re-processed) on the next run.
@@ -141,8 +105,7 @@ async function handle(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      changedPools: predPoolIds.length,
-      dirtyPools: dirtyIds.length,
+      changedPools: poolIds.length,
       changedMatches: matchIds.length,
       processed: batch.length,
       deferred,
