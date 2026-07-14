@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react
 
 import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { useMemberRoster } from '@/lib/useMemberRoster';
 import { usePoolEntries, type PoolEntry } from '@/lib/usePoolEntries';
 import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -13,6 +14,9 @@ type Props = {
   poolId: string;
   maxEntriesPerUser: number;
   predictionMode?: string | null;
+  /** Pool deadline (ISO). Drives when the "Everyone's predictions" section
+   *  unlocks for non-progressive pools. */
+  predictionDeadline?: string | null;
   /**
    * Caller's admin status in this pool. Drives the client-side
    * delete-gate: non-admins can't delete their last entry (server
@@ -31,7 +35,7 @@ const ROUND_ORDER = [
   'final',
 ];
 
-export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, isAdmin }: Props) {
+export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, predictionDeadline, isAdmin }: Props) {
   const theme = useTheme();
   const { entries, loading, error, refresh, addEntry, renameEntry, removeEntry, username } = usePoolEntries(poolId);
   const [adding, setAdding] = useState(false);
@@ -108,6 +112,36 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, isAd
       cancelled = true;
     };
   }, [isProgressive, entries]);
+
+  // "Everyone's predictions" — every OTHER entry in the pool, flattened and
+  // labelled by owner. Entry metadata (names) is pool-public; the actual picks
+  // are gated server-side and only fetched when a row is opened after lock.
+  const roster = useMemberRoster(poolId);
+  const myEntryIds = useMemo(() => new Set(entries.map((e) => e.entryId)), [entries]);
+  const otherEntries = useMemo(() => {
+    const list: { entryId: string; entryName: string; ownerName: string; points: number }[] = [];
+    for (const m of roster.members) {
+      for (const e of m.entries) {
+        if (myEntryIds.has(e.entryId)) continue;
+        list.push({ entryId: e.entryId, entryName: e.entryName, ownerName: m.fullName, points: e.scoredTotalPoints });
+      }
+    }
+    list.sort((a, b) => b.points - a.points || a.ownerName.localeCompare(b.ownerName));
+    return list;
+  }, [roster.members, myEntryIds]);
+
+  // Section unlocks once picks are locked pool-wide: past the deadline
+  // (full_tournament / bracket_picker) or any round locked (progressive).
+  const everyoneRevealed = useMemo(() => {
+    if (isProgressive) {
+      return (roundsData?.rounds ?? []).some(
+        (r) => r.state === 'locked' || r.state === 'in_progress' || r.state === 'completed',
+      );
+    }
+    if (!predictionDeadline) return false;
+    const t = new Date(predictionDeadline).getTime();
+    return !Number.isNaN(t) && Date.now() >= t;
+  }, [isProgressive, roundsData, predictionDeadline]);
 
   // Cross-platform Add Entry flow. Uses the in-app PromptDialog
   // (centered floating modal with a TextInput) so iOS and Android get
@@ -276,6 +310,37 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, isAd
           {entries.length} of {maxEntriesPerUser} entries used
         </Text>
       </View>
+
+      {otherEntries.length > 0 ? (
+        <View style={{ gap: theme.spacing.md, paddingTop: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Text variant="cardTitle">Everyone&apos;s predictions</Text>
+            {!everyoneRevealed ? <Icon name="lock.fill" color="slate" size={13} /> : null}
+          </View>
+          {!everyoneRevealed ? (
+            <Text variant="detail" color="slate">
+              Everyone&apos;s picks unlock when predictions close. Check back after the deadline.
+            </Text>
+          ) : null}
+          {otherEntries.map((e) => (
+            <MemberEntryRow
+              key={e.entryId}
+              ownerName={e.ownerName}
+              entryName={e.entryName}
+              points={e.points}
+              locked={!everyoneRevealed}
+              onPress={
+                everyoneRevealed
+                  ? () =>
+                      router.navigate(
+                        `/pool/${poolId}/entry/${e.entryId}?viewAs=member&owner=${encodeURIComponent(e.ownerName)}`,
+                      )
+                  : undefined
+              }
+            />
+          ))}
+        </View>
+      ) : null}
 
       <PromptDialog
         visible={showAddDialog}
@@ -462,6 +527,77 @@ function EntryRow({
         <Icon name="ellipsis" color="slate" size={16} weight="semibold" />
       </Pressable>
       <Icon name="chevron.right" color="slate" size={12} weight="semibold" />
+    </Pressable>
+  );
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// A single "Everyone's predictions" row — one entry, labelled by its owner.
+// Tappable only once the section is revealed (post-lock); before that it's a
+// muted, non-interactive teaser so members know the feature exists.
+function MemberEntryRow({
+  ownerName,
+  entryName,
+  points,
+  locked,
+  onPress,
+}: {
+  ownerName: string;
+  entryName: string;
+  points: number;
+  locked: boolean;
+  onPress?: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        padding: theme.spacing.lg,
+        borderRadius: theme.radii.lg,
+        backgroundColor: theme.colors.surface,
+        opacity: locked ? 0.6 : pressed ? 0.85 : 1,
+        ...theme.shadows.card,
+      })}
+    >
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: theme.radii.pill,
+          backgroundColor: withOpacity(theme.colors.primary, 0.12),
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.primary }}>
+          {initialsOf(ownerName)}
+        </RNText>
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text variant="cardTitle" numberOfLines={1}>
+          {ownerName}
+        </Text>
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {entryName} · {points} pts
+        </Text>
+      </View>
+      <Icon
+        name={locked ? 'lock.fill' : 'chevron.right'}
+        color="slate"
+        size={locked ? 13 : 12}
+        weight="semibold"
+      />
     </Pressable>
   );
 }

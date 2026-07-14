@@ -124,7 +124,12 @@ async function handleGET(
 
   if (!reveal.revealed) {
     return NextResponse.json(
-      { locked: true, prediction_mode: mode, entry: { entry_id: entry.entry_id } },
+      {
+        locked: true,
+        error: 'These predictions unlock once the pool closes for everyone.',
+        prediction_mode: mode,
+        entry: { entry_id: entry.entry_id },
+      },
       { status: 403 },
     )
   }

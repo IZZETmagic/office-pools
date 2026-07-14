@@ -285,6 +285,7 @@ export default function PoolDetailScreen() {
             poolId={pool.poolId}
             maxEntriesPerUser={pool.maxEntriesPerUser}
             predictionMode={pool.predictionMode}
+            predictionDeadline={pool.predictionDeadline}
             isAdmin={pool.isAdmin}
           />
         );

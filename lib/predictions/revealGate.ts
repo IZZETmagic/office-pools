@@ -39,8 +39,9 @@ export type RevealResult =
   | { revealed: true; scope: 'rounds'; roundKeys: string[] }
 
 // A progressive round's picks are immutable pool-wide once its state is one of
-// these, or its deadline has passed.
-const LOCKED_ROUND_STATES = new Set(['locked', 'in_progress', 'complete'])
+// these, or its deadline has passed. (DB pool_round_states.state vocabulary:
+// 'open' | 'locked' | 'in_progress' | 'completed'.)
+const LOCKED_ROUND_STATES = new Set(['locked', 'in_progress', 'completed'])
 
 /**
  * Decide which of an entry's predictions are revealable to OTHER pool members

@@ -3,6 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { supabase } from './supabase';
 
+export type RosterEntry = {
+  entryId: string;
+  entryName: string;
+  entryNumber: number;
+  scoredTotalPoints: number;
+  hasSubmitted: boolean;
+};
+
 export type RosterMember = {
   memberId: string;
   userId: string;
@@ -13,6 +21,7 @@ export type RosterMember = {
   joinedAt: string;
   entryCount: number;
   bestPoints: number;
+  entries: RosterEntry[];
 };
 
 type DbRow = {
@@ -24,7 +33,13 @@ type DbRow = {
     | { full_name: string | null; username: string | null }
     | Array<{ full_name: string | null; username: string | null }>
     | null;
-  pool_entries: Array<{ entry_id: string; scored_total_points: number | null }> | null;
+  pool_entries: {
+    entry_id: string;
+    entry_name: string | null;
+    entry_number: number | null;
+    scored_total_points: number | null;
+    has_submitted_predictions: boolean | null;
+  }[] | null;
 };
 
 export function useMemberRoster(poolId: string | undefined) {
@@ -40,7 +55,7 @@ export function useMemberRoster(poolId: string | undefined) {
       const { data, error: err } = await supabase
         .from('pool_members')
         .select(
-          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, scored_total_points)',
+          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, entry_name, entry_number, scored_total_points, has_submitted_predictions)',
         )
         .eq('pool_id', poolId);
       if (err) throw err;
@@ -54,6 +69,15 @@ export function useMemberRoster(poolId: string | undefined) {
           (max, e) => Math.max(max, e.scored_total_points ?? 0),
           0,
         );
+        const entryList: RosterEntry[] = entries
+          .map((e) => ({
+            entryId: e.entry_id,
+            entryName: e.entry_name ?? 'Entry',
+            entryNumber: e.entry_number ?? 0,
+            scoredTotalPoints: e.scored_total_points ?? 0,
+            hasSubmitted: !!e.has_submitted_predictions,
+          }))
+          .sort((a, b) => a.entryNumber - b.entryNumber);
         return {
           memberId: r.member_id,
           userId: r.user_id,
@@ -64,6 +88,7 @@ export function useMemberRoster(poolId: string | undefined) {
           joinedAt: r.joined_at,
           entryCount: entries.length,
           bestPoints,
+          entries: entryList,
         };
       });
       list.sort((a, b) => {

@@ -1,7 +1,7 @@
 # Member Predictions Visibility — "See everyone's picks after lock"
 
 - **Date:** 2026-07-13
-- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phases 2–3 not started
+- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phase 2 (mobile) BUILT — tsc/eslint clean, NOT runtime-tested (ships via OTA); Phase 3 (web) not started
 - **Roadmap item:** `ROADMAP.md:359-364` — "Members'/all predictions after lock" (Feature, Mobile)
 - **Memory:** `project_feature_member_predictions_visibility`
 
@@ -155,15 +155,36 @@ pre-existing hygiene, tracked as a minor follow-on, not part of this feature.
 - NOTE: not yet exercised over HTTP (no client calls it until Phase 2/3 wire one up);
   gate logic is covered by the unit tests, auth/DB plumbing mirrors the verified breakdown route.
 
-### Phase 2 — Mobile (un-gate + reuse viewer)
+### Phase 2 — Mobile (un-gate + reuse viewer) — BUILT 2026-07-13
 
-- Add an **"Everyone's predictions"** section to `PredictionsTab.tsx` (below "Your entries"),
-  sourced from `useMemberRoster`, rendered only when the pool is revealable.
-- Add a non-admin `viewAs=member` variant to `entry/[entryId].tsx` — same read-only render,
-  but fetch through the Phase-1 route (not the direct anon `usePredictions` read), labeled
-  "spectating," not "Admin view."
-- Add an owner name/avatar header (screen currently assumes "you").
-- Leave the admin-only Members tab untouched — this is a separate member-facing entry point.
+Ryan's UX calls: **flat list of entries** (row per entry, labelled by owner) and
+**show-it-locked** before reveal (teaser state for discoverability).
+
+- `mobile/lib/api.ts` — `fetchEntryPredictionsView(poolId, entryId)` → the Phase-1 route.
+- `usePredictions` — new `{ spectate }` option: sources picks from the route (not the
+  `predictions` table, which RLS now blocks for others) and disables all writes. Covers
+  **full_tournament + progressive** (both read this hook).
+- `useBracketPickerPredictions` + `BracketPickerWizard` — same `{ spectate }` swap → **bracket_picker**.
+- `entry/[entryId].tsx` — `viewAs=member` ⇒ spectate + read-only; `StatusLine` gains a
+  spectator variant ("Viewing X's picks"); owner name passed via the `owner` query param.
+- `useMemberRoster` — now exposes per-member `entries` (id/name/points/submitted).
+- `PredictionsTab.tsx` — "Everyone's predictions" section: flat, owner-labelled rows
+  (excludes your own entries); tappable once `everyoneRevealed`, muted "unlocks when
+  predictions close" teaser before that. Deadline threaded from `pool/[id].tsx`.
+
+**Verification:** mobile `tsc` clean on all changed files; `eslint` 0 errors; web reveal-gate
+unit tests 14/14. **NOT runtime-tested** — no simulator here; mobile ships via OTA on Ryan's
+schedule, so on-device is his gate. Eyeball especially: the section's locked→unlocked
+transition, the spectator owner header, and progressive per-round reveal.
+
+**Bug found + fixed during Phase 2:** the Phase-1 web helper (and mobile) used round state
+`'complete'`; the real DB vocabulary is `'completed'` (open/locked/in_progress/completed). Fixed
+in `lib/predictions/revealGate.ts` + its test + the mobile check — the mobile typecheck caught
+what the web tests missed.
+
+**Deferred polish:** progressive & bracket_picker spectate views don't yet show an owner-name
+banner inside their full-screen wizards (full_tournament does, via StatusLine); a fast-follow
+that needs editing those two wizards' headers.
 
 ### Phase 3 — Web (post-lock stop screen)
 

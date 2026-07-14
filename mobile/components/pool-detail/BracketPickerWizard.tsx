@@ -126,9 +126,12 @@ type Props = {
   entryId: string;
   /** Admin read-only view — disables all edits + bottom nav. */
   readOnly?: boolean;
+  /** Spectator (post-lock member view): read-only, and sources picks from the
+   *  gated view route instead of the owner-only bracket-picks endpoint. */
+  spectate?: boolean;
 };
 
-export function BracketPickerWizard({ poolId, entryId, readOnly = false }: Props) {
+export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectate = false }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [currentStage, setCurrentStage] = useState<BPStageKey>('groups');
@@ -144,9 +147,9 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false }: Props
     setAllThirdPlaceRankings,
     setKnockoutPick,
     submit,
-  } = useBracketPickerPredictions(poolId, entryId);
-  // Admin view forces a locked state on every editable surface.
-  const submitted = rawSubmitted || readOnly;
+  } = useBracketPickerPredictions(poolId, entryId, { spectate });
+  // Admin/spectator view forces a locked state on every editable surface.
+  const submitted = rawSubmitted || readOnly || spectate;
   const [submitting, setSubmitting] = useState(false);
   // Custom in-app submit dialogs replacing Alert.alert. Same pattern as
   // the full-tournament wizard: a pre-flight "fill everything in" check,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   fetchBracketPicks,
+  fetchEntryPredictionsView,
   saveBracketPicks,
   submitBracketPicks,
   type BPGroupRanking,
@@ -39,7 +40,11 @@ const SAVE_DEBOUNCE_MS = 600;
 export function useBracketPickerPredictions(
   poolId: string | undefined,
   entryId: string | undefined,
+  opts?: { spectate?: boolean },
 ) {
+  // Spectate = viewing another member's entry read-only. Picks come from the
+  // gated view route; all writes are disabled.
+  const spectate = opts?.spectate ?? false;
   const [data, setData] = useState<BracketPickerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +114,16 @@ export function useBracketPickerPredictions(
           .select(
             'match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards',
           ),
-        fetchBracketPicks(poolId, entryId),
+        spectate
+          ? fetchEntryPredictionsView(poolId, entryId).then(
+              (v) =>
+                v.bracketPicks ?? {
+                  groupRankings: [] as BPGroupRanking[],
+                  thirdPlaceRankings: [] as BPThirdPlaceRanking[],
+                  knockoutPicks: [] as BPKnockoutPick[],
+                },
+            )
+          : fetchBracketPicks(poolId, entryId),
       ]);
       if (mErr) throw mErr;
       if (tErr) throw tErr;
@@ -181,7 +195,7 @@ export function useBracketPickerPredictions(
     } finally {
       setLoading(false);
     }
-  }, [poolId, entryId]);
+  }, [poolId, entryId, spectate]);
 
   useEffect(() => {
     void load();
@@ -192,7 +206,7 @@ export function useBracketPickerPredictions(
 
   // Auto-save: any change to picks queues a debounced save
   useEffect(() => {
-    if (!poolId || !entryId || !data || submitted) return;
+    if (!poolId || !entryId || !data || submitted || spectate) return;
     if (!dirtyRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
@@ -211,43 +225,44 @@ export function useBracketPickerPredictions(
         setSaving(false);
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [poolId, entryId, data, submitted, groupRankings, thirdPlaceRankings, knockoutPicks]);
+  }, [poolId, entryId, data, submitted, spectate, groupRankings, thirdPlaceRankings, knockoutPicks]);
 
   // Mutators — each marks dirty so the auto-save effect fires.
   const setGroupForLetter = useCallback(
     (groupLetter: string, ordered: BPGroupRanking[]) => {
-      if (submitted) return;
+      if (submitted || spectate) return;
       setGroupRankings((prev) => {
         const filtered = prev.filter((r) => r.group_letter !== groupLetter);
         return [...filtered, ...ordered];
       });
       dirtyRef.current = true;
     },
-    [submitted],
+    [submitted, spectate],
   );
 
   const setAllThirdPlaceRankings = useCallback(
     (ranks: BPThirdPlaceRanking[]) => {
-      if (submitted) return;
+      if (submitted || spectate) return;
       setThirdPlaceRankings(ranks);
       dirtyRef.current = true;
     },
-    [submitted],
+    [submitted, spectate],
   );
 
   const setKnockoutPick = useCallback(
     (pick: BPKnockoutPick) => {
-      if (submitted) return;
+      if (submitted || spectate) return;
       setKnockoutPicks((prev) => {
         const filtered = prev.filter((p) => p.match_id !== pick.match_id);
         return [...filtered, pick];
       });
       dirtyRef.current = true;
     },
-    [submitted],
+    [submitted, spectate],
   );
 
   const submit = useCallback(async () => {
+    if (spectate) return { error: 'Read-only view' };
     if (!poolId || !entryId) return { error: 'Missing pool or entry id' };
     setSaving(true);
     try {
@@ -259,7 +274,7 @@ export function useBracketPickerPredictions(
     } finally {
       setSaving(false);
     }
-  }, [poolId, entryId]);
+  }, [poolId, entryId, spectate]);
 
   return {
     data,

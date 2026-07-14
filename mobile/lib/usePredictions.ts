@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { fetchEntryPredictionsView } from './api';
 import { useAuth } from './auth';
 import { resolvePredictedBracket, type BracketResult } from './bracket/bracketResolver';
 import type { Match, PredictionMap, ScoreEntry, Team, MatchConductData } from './bracket/tournament';
@@ -39,8 +40,16 @@ type DbPredictionRow = {
   predicted_winner_team_id: string | null;
 };
 
-export function usePredictions(poolId: string | undefined, entryId: string | undefined) {
+export function usePredictions(
+  poolId: string | undefined,
+  entryId: string | undefined,
+  opts?: { spectate?: boolean },
+) {
   const { user } = useAuth();
+  // Spectate = viewing another member's entry read-only. Picks come from the
+  // gated view route (RLS no longer lets non-admins read others' rows directly);
+  // all writes are disabled.
+  const spectate = opts?.spectate ?? false;
   const [data, setData] = useState<PredictionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +84,37 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
       if (!poolRow || !entryRow) throw new Error('Pool or entry not found.');
 
       const tournamentId = (poolRow as { tournament_id: string }).tournament_id;
+
+      // Own entry → read the predictions table directly (RLS permits it).
+      // Another member's entry (spectate) → go through the gated view route,
+      // which enforces the reveal gate and reads via the service role.
+      const predsPromise: PromiseLike<DbPredictionRow[]> = spectate
+        ? fetchEntryPredictionsView(poolId, entryId).then((v) =>
+            (v.predictions ?? []).map((p) => ({
+              match_id: p.match_id,
+              predicted_home_score: p.predicted_home_score,
+              predicted_away_score: p.predicted_away_score,
+              predicted_home_pso: p.predicted_home_pso,
+              predicted_away_pso: p.predicted_away_pso,
+              predicted_winner_team_id: p.predicted_winner_team_id,
+            })),
+          )
+        : supabase
+            .from('predictions')
+            .select(
+              'match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id',
+            )
+            .eq('entry_id', entryId)
+            .then(({ data, error: predErr }) => {
+              if (predErr) throw predErr;
+              return (data ?? []) as DbPredictionRow[];
+            });
+
       const [
         { data: matchRows, error: mErr },
         { data: teamRows, error: tErr },
         { data: conductRows },
-        { data: predRows, error: pErr },
+        predRows,
       ] = await Promise.all([
         supabase
           .from('matches')
@@ -95,16 +130,10 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
         supabase
           .from('match_conduct')
           .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
-        supabase
-          .from('predictions')
-          .select(
-            'match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id',
-          )
-          .eq('entry_id', entryId),
+        predsPromise,
       ]);
       if (mErr) throw mErr;
       if (tErr) throw tErr;
-      if (pErr) throw pErr;
 
       const normalizedMatches = (matchRows ?? []).map((m: unknown) => {
         const row = m as Record<string, unknown>;
@@ -128,7 +157,7 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
 
       const conduct = (conductRows ?? []) as MatchConductData[];
       const initialPreds: PredictionMap = new Map();
-      for (const p of (predRows ?? []) as DbPredictionRow[]) {
+      for (const p of predRows) {
         initialPreds.set(p.match_id, {
           home: p.predicted_home_score,
           away: p.predicted_away_score,
@@ -190,7 +219,7 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
     } finally {
       setLoading(false);
     }
-  }, [poolId, entryId, user]);
+  }, [poolId, entryId, user, spectate]);
 
   useEffect(() => {
     void load();
@@ -199,7 +228,9 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
-      if (entryId && pendingRef.current.size > 0) {
+      // Never flush pending writes in spectate mode — there are none, and the
+      // entry isn't ours to write to.
+      if (!spectate && entryId && pendingRef.current.size > 0) {
         void flushPending(entryId);
       }
     };
@@ -217,7 +248,7 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
 
   const updatePrediction = useCallback(
     (matchId: string, patch: Partial<ScoreEntry>) => {
-      if (!entryId || submitted) return;
+      if (!entryId || submitted || spectate) return;
       setLocalPredictions((prev) => {
         const next = new Map(prev);
         const current = next.get(matchId) ?? { home: null, away: null };
@@ -231,7 +262,7 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
         void flushPending(entryId);
       }, 600);
     },
-    [entryId, submitted],
+    [entryId, submitted, spectate],
   );
 
   async function flushPending(eId: string) {
@@ -266,6 +297,7 @@ export function usePredictions(poolId: string | undefined, entryId: string | und
   }
 
   async function submit() {
+    if (spectate) return { error: 'Read-only view' };
     if (!entryId) return { error: 'No entry id' };
     setSaving(true);
     try {

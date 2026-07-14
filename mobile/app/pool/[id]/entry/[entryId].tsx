@@ -61,14 +61,18 @@ const STAGE_SUBTITLE: Record<WizardStage, string> = {
 export default function PredictionWizard() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { id, entryId, viewAs } = useLocalSearchParams<{
+  const { id, entryId, viewAs, owner } = useLocalSearchParams<{
     id: string;
     entryId: string;
     viewAs?: string;
+    owner?: string;
   }>();
   const adminView = viewAs === 'admin';
+  // Spectate = a member viewing someone else's entry read-only (post-lock).
+  const spectate = viewAs === 'member';
+  const ownerName = typeof owner === 'string' ? owner : '';
   const { data, loading, error, saving, submitted, predictions, bracket, updatePrediction, submit } =
-    usePredictions(id, entryId);
+    usePredictions(id, entryId, { spectate });
   // Pool's PSO setting — surfaced to the knockout stage so the row
   // component knows whether to show penalty inputs when the user
   // predicts a tie. Falls back to false while settings load.
@@ -159,17 +163,24 @@ export default function PredictionWizard() {
         bracket={bracket}
         updatePrediction={updatePrediction}
         saving={saving}
-        readOnly={adminView}
+        readOnly={adminView || spectate}
       />
     );
   }
 
   if (data.pool.predictionMode === 'bracket_picker') {
     if (!entryId) return null;
-    return <BracketPickerWizard poolId={id} entryId={entryId} readOnly={adminView} />;
+    return (
+      <BracketPickerWizard
+        poolId={id}
+        entryId={entryId}
+        readOnly={adminView || spectate}
+        spectate={spectate}
+      />
+    );
   }
 
-  const isReadOnly = submitted || adminView;
+  const isReadOnly = submitted || adminView || spectate;
   const totalCount = data.matches.length;
   const pickedCount = data.matches.filter((m) => isPredictionComplete(predictions.get(m.match_id))).length;
 
@@ -233,6 +244,7 @@ export default function PredictionWizard() {
             picked={pickedCount}
             total={totalCount}
             adminView={adminView}
+            spectatorName={spectate ? ownerName : null}
           />
         </View>
       </View>
@@ -335,12 +347,15 @@ function StatusLine({
   picked,
   total,
   adminView = false,
+  spectatorName = null,
 }: {
   saving: boolean;
   submitted: boolean;
   picked: number;
   total: number;
   adminView?: boolean;
+  /** Non-null → spectator (member) view. Empty string → name unknown. */
+  spectatorName?: string | null;
 }) {
   const theme = useTheme();
   const iconSize = 11;
@@ -349,7 +364,11 @@ function StatusLine({
   );
   let label = `${picked} / ${total} picked`;
   let color: 'slate' | 'green' | 'primary' = 'slate';
-  if (adminView) {
+  if (spectatorName !== null) {
+    icon = <Icon name="eye.fill" color="primary" size={iconSize} />;
+    label = spectatorName ? `Viewing ${spectatorName}'s picks` : 'Viewing predictions';
+    color = 'primary';
+  } else if (adminView) {
     icon = <Icon name="eye.fill" color="primary" size={iconSize} />;
     label = `Admin view · ${picked} / ${total} picked${
       submitted ? ' · submitted' : ' · draft'

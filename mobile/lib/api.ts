@@ -78,6 +78,38 @@ export function createPool(payload: CreatePoolRequest) {
   });
 }
 
+// --- Viewing another member's predictions (post-lock, read-only) ------------
+// Backed by GET /api/pools/:poolId/entries/:entryId/predictions, which enforces
+// the reveal gate server-side. For a still-locked entry the route returns 403,
+// which apiFetch surfaces as a thrown Error with the server's message.
+export type EntryPredictionsView = {
+  entry: { entry_id: string; entry_name: string; entry_number: number; member_id: string };
+  owner: { user_id: string; full_name: string; username: string };
+  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker';
+  is_own_entry: boolean;
+  reveal: { revealed: boolean; scope?: 'all' | 'rounds'; roundKeys?: string[] };
+  predictions?: {
+    prediction_id: string;
+    match_id: string;
+    predicted_home_score: number | null;
+    predicted_away_score: number | null;
+    predicted_home_pso: number | null;
+    predicted_away_pso: number | null;
+    predicted_winner_team_id: string | null;
+  }[];
+  bracketPicks?: {
+    groupRankings: BPGroupRanking[];
+    thirdPlaceRankings: BPThirdPlaceRanking[];
+    knockoutPicks: BPKnockoutPick[];
+  };
+};
+
+export function fetchEntryPredictionsView(poolId: string, entryId: string) {
+  return apiFetch<EntryPredictionsView>(
+    `/api/pools/${poolId}/entries/${entryId}/predictions`,
+  );
+}
+
 export type LeaderboardEntry = {
   entry_id: string;
   entry_name: string;

@@ -70,7 +70,7 @@ describe('computeReveal — progressive', () => {
 
   it('reveals only locked rounds (by state)', () => {
     const rounds: RevealRoundState[] = [
-      { round_key: 'group', state: 'complete', deadline: null },
+      { round_key: 'group', state: 'completed', deadline: null },
       { round_key: 'round_32', state: 'locked', deadline: null },
       { round_key: 'round_16', state: 'open', deadline: null },
     ]
