@@ -554,3 +554,143 @@ export async function backfillBonusInputs(
 
   return summary
 }
+
+// =============================================================
+// DURABLE PREDICTED-BRACKET RECONCILER  (P1 — version-stamped, pull-based)
+// =============================================================
+// Resolves every entry whose stored predicted bracket has drifted from its
+// inputs — predictions edited, a NEW (incl. mobile, which bypasses the API)
+// submission, or an engine-version bump — and writes shadow_entry_bracket, the
+// match engine's OWN table (no shared-column clobber), then stamps
+// shadow_entry_bracket_state. Detection is `shadow_entries_needing_bracket_resolve`
+// (per-entry version diff), so nothing can slip past by writing predictions
+// directly. Idempotent; a no-op when nothing drifted. Shadow-only.
+// =============================================================
+export async function reconcileVersionedBrackets(
+  adminClient: any,
+  tournamentId: string,
+  opts?: { cap?: number },
+): Promise<{ flagged: number; resolved: number; errors: string[] }> {
+  const summary = { flagged: 0, resolved: 0, errors: [] as string[] }
+  const cap = opts?.cap ?? 500
+
+  const { data: flagged, error: detErr } = await adminClient
+    .rpc('shadow_entries_needing_bracket_resolve', { p_cap: cap })
+  if (detErr) {
+    summary.errors.push(`detect: ${detErr.message}`)
+    return summary
+  }
+  const targets = (flagged ?? []) as Array<{ entry_id: string; pool_id: string }>
+  summary.flagged = targets.length
+  if (targets.length === 0) return summary
+
+  const { data: verRow } = await adminClient
+    .from('sync_settings').select('setting_value').eq('setting_key', 'scoring_engine_version').maybeSingle()
+  const engineVersion = Number(verRow?.setting_value ?? 1)
+
+  const { data: matches } = await adminClient
+    .from('matches')
+    .select('match_id, match_number, stage, group_letter, home_team_id, away_team_id, home_team_placeholder, away_team_placeholder')
+    .eq('tournament_id', tournamentId)
+    .order('match_number', { ascending: true })
+  const { data: teams } = await adminClient
+    .from('teams')
+    .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
+    .eq('tournament_id', tournamentId)
+  const { data: conduct } = await adminClient
+    .from('match_conduct')
+    .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
+  if (!matches || !teams) {
+    summary.errors.push('failed to load matches/teams')
+    return summary
+  }
+
+  // Predictions for the flagged entries (+ per-entry watermark), paginated past
+  // PostgREST's 1000-row cap with a stable order so page seams are deterministic.
+  const ids = targets.map((t) => t.entry_id)
+  const predsByEntry = new Map<string, any[]>()
+  const wmByEntry = new Map<string, string | null>()
+  for (let i = 0; i < ids.length; i += 300) {
+    const slice = ids.slice(i, i + 300)
+    let offset = 0
+    let more = true
+    while (more) {
+      const { data: page } = await adminClient
+        .from('predictions')
+        .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, updated_at')
+        .in('entry_id', slice)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
+        .range(offset, offset + 999)
+      if (!page || page.length === 0) {
+        more = false
+      } else {
+        for (const p of page) {
+          const l = predsByEntry.get(p.entry_id) ?? []
+          l.push(p)
+          predsByEntry.set(p.entry_id, l)
+          const cur = wmByEntry.get(p.entry_id) ?? null
+          if (p.updated_at && (!cur || p.updated_at > cur)) wmByEntry.set(p.entry_id, p.updated_at)
+        }
+        offset += page.length
+        if (page.length < 1000) more = false
+      }
+    }
+  }
+
+  const nowIso = new Date().toISOString()
+  for (const t of targets) {
+    try {
+      const preds = predsByEntry.get(t.entry_id) ?? []
+      const rows = preds.length === 0 ? [] : resolveEntryBracketRows(
+        t.pool_id,
+        {
+          entry_id: t.entry_id,
+          member_id: '',
+          point_adjustment: 0,
+          predictions: preds.map((p: any) => ({
+            match_id: p.match_id,
+            predicted_home_score: p.predicted_home_score,
+            predicted_away_score: p.predicted_away_score,
+            predicted_home_pso: p.predicted_home_pso ?? null,
+            predicted_away_pso: p.predicted_away_pso ?? null,
+            predicted_winner_team_id: p.predicted_winner_team_id ?? null,
+          })),
+        },
+        matches as MatchWithResult[], teams as TeamData[], (conduct ?? []) as ConductData[],
+      )
+
+      // Own table → safe per-entry purge + insert (no bonus predicted_winner to clobber).
+      const { error: delErr } = await adminClient.from('shadow_entry_bracket').delete().eq('entry_id', t.entry_id)
+      if (delErr) throw new Error(`purge: ${delErr.message}`)
+      if (rows.length > 0) {
+        const { error: insErr } = await adminClient.from('shadow_entry_bracket').insert(
+          rows.map((r) => ({
+            entry_id: r.entry_id,
+            match_id: r.match_id,
+            predicted_home_team_id: r.predicted_home_team_id,
+            predicted_away_team_id: r.predicted_away_team_id,
+          })),
+        )
+        if (insErr) throw new Error(`insert: ${insErr.message}`)
+      }
+
+      // Stamp state LAST, so a mid-entry failure re-flags (re-resolves) next run.
+      const { error: stErr } = await adminClient.from('shadow_entry_bracket_state').upsert(
+        {
+          entry_id: t.entry_id,
+          predictions_watermark: wmByEntry.get(t.entry_id) ?? null,
+          engine_version: engineVersion,
+          resolved_at: nowIso,
+        },
+        { onConflict: 'entry_id' },
+      )
+      if (stErr) throw new Error(`stamp: ${stErr.message}`)
+      summary.resolved++
+    } catch (err: any) {
+      summary.errors.push(`entry ${t.entry_id}: ${err?.message ?? String(err)}`)
+    }
+  }
+
+  return summary
+}

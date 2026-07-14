@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth'
-import { backfillResolvedBrackets, backfillBonusInputs } from '@/lib/scoring/shadowBrackets'
+import { backfillResolvedBrackets, backfillBonusInputs, reconcileVersionedBrackets } from '@/lib/scoring/shadowBrackets'
 
 export const dynamic = 'force-dynamic'
 // Scoped runs process only the handful of pools with recent prediction activity,
@@ -51,6 +51,13 @@ async function handle(request: NextRequest) {
   const tournamentId =
     process.env.API_FOOTBALL_TOURNAMENT_ID || '00000000-0000-0000-0000-000000000001'
 
+  // Durable P1: version-driven predicted-bracket reconcile into shadow_entry_bracket
+  // (the match engine's OWN table — pull-based, catches edits, new/mobile submissions,
+  // and engine-version bumps). Runs every pass, independent of the watermark below;
+  // a no-op when nothing drifted. Shadow-only; never throws into the materialize flow.
+  const bracketReconcile = await reconcileVersionedBrackets(admin, tournamentId, { cap: 500 })
+    .catch((e) => ({ flagged: 0, resolved: 0, errors: [e instanceof Error ? e.message : String(e)] }))
+
   // Watermark = last successful materialize. Capture the run start BEFORE detection
   // so any edit landing mid-run is (idempotently) re-picked-up next run, never missed.
   const runIso = new Date().toISOString()
@@ -79,7 +86,7 @@ async function handle(request: NextRequest) {
 
   if (poolIds.length === 0 && matchIds.length === 0) {
     await advanceWatermark()
-    return NextResponse.json({ ok: true, changedPools: 0, changedMatches: 0, note: 'nothing to materialize' })
+    return NextResponse.json({ ok: true, changedPools: 0, changedMatches: 0, bracketReconcile, note: 'nothing to materialize' })
   }
 
   const batch = poolIds.slice(0, CAP)
@@ -109,6 +116,7 @@ async function handle(request: NextRequest) {
       changedMatches: matchIds.length,
       processed: batch.length,
       deferred,
+      bracketReconcile,
       brackets,
       bonus,
     })
