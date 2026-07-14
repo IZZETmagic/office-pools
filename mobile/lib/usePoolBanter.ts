@@ -160,6 +160,11 @@ export function usePoolBanter(poolId: string | undefined) {
   const [reactions, setReactions] = useState<Map<string, ReactionAggregate[]>>(new Map());
   const userCacheRef = useRef<Map<string, DbUserRow>>(new Map());
   const messageIdsRef = useRef<Set<string>>(new Set());
+  // Signature of the last set of (non-tmp) message ids we loaded reactions
+  // for. Lets the reactions effect skip a refetch when `messages` changes
+  // identity but the underlying id set hasn't (optimistic sends, reply-pill
+  // resolution, decorate updates) — those don't add reactions to fetch.
+  const reactionIdsSigRef = useRef<string>('');
   // Scroll-up pagination. `hasMore` gates whether another older page can
   // be fetched; `loadingOlder` guards against overlapping fetches and
   // drives the top spinner. Refs mirror both so `loadOlder` can stay a
@@ -687,6 +692,19 @@ export function usePoolBanter(poolId: string | undefined) {
     messagesRef.current = messages;
     const ids = messages.map((m) => m.messageId).filter((id) => !id.startsWith('tmp-'));
     messageIdsRef.current = new Set(ids);
+    // Only (re)load reactions when the SET of loaded message ids actually
+    // changes. `messages` gets a new identity on every append, optimistic
+    // send, reply-pill resolution, and decorate — but reactions for
+    // already-loaded messages are kept live incrementally by the realtime
+    // reaction_insert / reaction_delete handlers and optimistic
+    // toggleReaction. Refetching every reaction (and rebuilding the
+    // reactions Map) on each of those churns the Map identity and forces a
+    // full message-list re-render for no change. Guarding on the id
+    // signature preserves behaviour — reactions still (re)load whenever
+    // messages are added or paged in — while cutting the redundant work.
+    const idsSig = ids.join(',');
+    if (idsSig === reactionIdsSigRef.current) return;
+    reactionIdsSigRef.current = idsSig;
     void loadReactions(ids);
   }, [messages, loadReactions]);
 
