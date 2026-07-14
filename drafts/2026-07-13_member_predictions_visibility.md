@@ -1,7 +1,7 @@
 # Member Predictions Visibility — "See everyone's picks after lock"
 
 - **Date:** 2026-07-13
-- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phase 2 (mobile) BUILT — tsc/eslint clean, NOT runtime-tested (ships via OTA); Phase 3 (web) not started
+- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phase 2 (mobile) BUILT — tsc/eslint clean, NOT runtime-tested (ships via OTA); Phase 3a (web SSR gate) BUILT + typecheck-clean; Phase 3b **full_tournament** BUILT (tsc/eslint clean, NOT browser-tested) — progressive + bracket_picker web spectate still TODO. Nothing pushed/deployed yet (that's why mobile spectate 404s — the view route isn't on sportpool.io).
 - **Roadmap item:** `ROADMAP.md:359-364` — "Members'/all predictions after lock" (Feature, Mobile)
 - **Memory:** `project_feature_member_predictions_visibility`
 
@@ -186,20 +186,30 @@ what the web tests missed.
 banner inside their full-screen wizards (full_tournament does, via StatusLine); a fast-follow
 that needs editing those two wizards' headers.
 
-### Phase 3 — Web (post-lock stop screen)
+### Phase 3 — Web
 
-In `PoolDetail.tsx`:
+**3a — SSR gate — DONE 2026-07-13 (commit 554967c).** `page.tsx` filters `allPredictions`
+per-request before it reaches the `PoolDetail` client component: own entries always; others'
+picks only when `computeReveal` says revealed; admins bypass. Closes the pre-lock leak
+(`allPredictions` is admin-client-built in `getPoolData`, so RLS Phase 0 didn't cover it).
+Verified: page.tsx tsc clean; leaderboard scores come from `matchScores` (unaffected);
+crowd/last-five are post-result.
+
+**3b — post-lock stop screen — NOT STARTED.** In `PoolDetail.tsx`:
 
 | Pool | Pre-lock (unchanged) | Post-lock (new) |
 |---|---|---|
 | Single-entry | auto-shows your picks | **stop screen**: "Your entry" + "Everyone else" |
 | Multi-entry | `EntriesListView` (your entries) | same list **+ "Everyone else"** section |
 
-- Reuse `EntryDetailView` → `PredictionsFlow` (already read-only) for rendering; feed a
-  selected member's `entry_id` from the Phase-1 route.
-- Add the owner header web currently lacks.
-- `allPredictions` is already in memory for the group-stage overlay, but *other* members'
-  full picks route through the gated endpoint so the lock rule stays server-enforced.
+- Reuse `PredictionsFlow` (read-only when `isPastDeadline`) for the spectator detail + an
+  owner-name header (`EntryDetailView` is the closest wrapper but is self-oriented — likely a
+  thin spectator variant).
+- Others' entries roster: a read-only "Everyone else" list (owner-labelled, no rename/delete),
+  built from `members` + reveal state.
+- Data sourcing: **full_tournament / progressive** read others' picks straight from the (now
+  post-3a-gated) `allPredictions` — no extra fetch. **bracket_picker** needs the Phase-1 view
+  route, because `allBP*` is RLS-scoped per-viewer (non-admin sees only own).
 
 ### Recommended order
 
