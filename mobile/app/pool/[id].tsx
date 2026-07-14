@@ -101,6 +101,13 @@ export default function PoolDetailScreen() {
   const pageOffset = useSharedValue(0);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<Animated.ScrollView | null>(null);
+  // When a tab change originates from a swipe, the pager has already
+  // physically settled at the target page, so the tabIndex effect's
+  // animated scrollTo would re-animate to the spot we're already at —
+  // a visible hitch at the end of every swipe. This flag skips that one
+  // scrollTo. Pill taps and the ?tab= deep link leave it false, so they
+  // still animate the pager (and a width change still repositions).
+  const skipPagerScrollRef = useRef(false);
 
   // UI-thread scroll worklet. Writes the fractional page offset into the
   // shared value on every scroll frame without touching React, so the
@@ -208,6 +215,11 @@ export default function PoolDetailScreen() {
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
   useEffect(() => {
+    if (skipPagerScrollRef.current) {
+      // Tab change came from a swipe; the pager is already at tabIndex.
+      skipPagerScrollRef.current = false;
+      return;
+    }
     pagerRef.current?.scrollTo({ x: tabIndex * width, animated: true });
   }, [tabIndex, width]);
 
@@ -262,7 +274,12 @@ export default function PoolDetailScreen() {
   function handleMomentumScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
     const nextTab = visibleTabs[i];
-    if (nextTab && nextTab !== tab) setTab(nextTab);
+    if (nextTab && nextTab !== tab) {
+      // The pager already settled at page `i`; suppress the redundant
+      // animated scrollTo the tabIndex effect would otherwise fire.
+      skipPagerScrollRef.current = true;
+      setTab(nextTab);
+    }
   }
 
   function renderTab(key: PoolTabKey) {
