@@ -41,6 +41,7 @@ type MatchRow = {
   match_number: number
   stage: string
   group_letter: string | null
+  is_completed: boolean
 }
 
 /**
@@ -102,7 +103,7 @@ export async function detectAndPushBadgesForPool(poolId: string): Promise<void> 
   // 4. Matches for the tournament (for stage/group_letter lookups).
   const { data: rawMatches, error: matchesErr } = await adminClient
     .from('matches')
-    .select('match_id, match_number, stage, group_letter')
+    .select('match_id, match_number, stage, group_letter, is_completed')
     .eq('tournament_id', tournamentId)
   if (matchesErr) {
     console.error('[badges] failed to fetch matches for', poolId, matchesErr.message)
@@ -299,7 +300,12 @@ async function computeBadgeState(
       .maybeSingle(),
   ])
 
-  const scores = (scoreRes.data ?? []) as ScoreRow[]
+  // FORM = post-match only: trophies must never mint off a LIVE match's
+  // provisional score. match_scores carries live rows (the leaderboard uses
+  // them), so filter to completed matches before deriving any results-based
+  // badge (sharpshooter/oracle/on_fire/ice_breaker/globe_trotter/streaks).
+  const completedMatchIds = new Set(matches.filter((m) => m.is_completed).map((m) => m.match_id))
+  const scores = ((scoreRes.data ?? []) as ScoreRow[]).filter((s) => completedMatchIds.has(s.match_id))
   const predictionCount = predCountRes.count ?? 0
   const currentRank = (entryRes.data as { current_rank: number | null } | null)?.current_rank ?? null
 

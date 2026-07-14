@@ -190,6 +190,10 @@ export function CommunityTab({
       user_id: userId, username, full_name: fullName, level: 1, level_name: 'Rookie', total_xp: 0, current_rank: rank, badges: [],
     })
 
+    // FORM = post-match only: exclude live/in-progress matches so badge-flex /
+    // form cards freeze during a live game (computed once for all members).
+    const completedMatchIds = new Set(matches.filter(m => m.is_completed).map(m => m.match_id))
+
     for (const member of members) {
       const entries = member.entries ?? []
       const bestEntry = entries.length > 0
@@ -246,7 +250,7 @@ export function CommunityTab({
             continue
           }
 
-          const predResults = matchScoresToPredictionResults(entryMatchScores)
+          const predResults = matchScoresToPredictionResults(entryMatchScores, completedMatchIds)
           const streakData = computeStreaks(predResults)
           const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
 

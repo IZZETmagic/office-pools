@@ -44,6 +44,232 @@ type LeaderboardEntryResponse = {
   total_completed: number
 }
 
+// ============================================================================
+// Shared pool-wide extras — awards / superlatives / matchday_info.
+// Pure function over the assembled leaderboard; IDENTICAL output for both the
+// recompute path and the precomputed-column read path (M4). Extracted verbatim
+// from the original inline blocks so behavior is unchanged.
+// `matchesForInfo` only needs match_id/match_number/is_completed/status/match_date.
+// ============================================================================
+function computeLeaderboardExtras(
+  leaderboard: LeaderboardEntryResponse[],
+  matchesForInfo: any[],
+) {
+  // --- Awards ---
+  const awards: { type: string; emoji: string; label: string; entry_id: string }[] = []
+  if (leaderboard.length > 0) awards.push({ type: 'mvp', emoji: '🏆', label: 'MVP', entry_id: leaderboard[0].entry_id })
+  const contrarianKing = leaderboard.reduce((max, e) => (e.contrarian_wins > (max?.contrarian_wins ?? 0)) ? e : max, null as LeaderboardEntryResponse | null)
+  if (contrarianKing && contrarianKing.contrarian_wins > 0) awards.push({ type: 'contrarian', emoji: '🎲', label: 'Contrarian King', entry_id: contrarianKing.entry_id })
+  const crowdFollower = leaderboard.filter(e => e.total_completed >= 3).reduce((max, e) => (e.crowd_agreement_pct > (max?.crowd_agreement_pct ?? 0)) ? e : max, null as LeaderboardEntryResponse | null)
+  if (crowdFollower) awards.push({ type: 'crowd', emoji: '👥', label: 'Crowd Follower', entry_id: crowdFollower.entry_id })
+  const hottestEntry = leaderboard.filter(e => e.current_streak.type === 'hot' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (hottestEntry) awards.push({ type: 'hot', emoji: '🔥', label: `On Fire (${hottestEntry.current_streak.length})`, entry_id: hottestEntry.entry_id })
+  const coldestEntry = leaderboard.filter(e => e.current_streak.type === 'cold' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (coldestEntry) awards.push({ type: 'cold', emoji: '❄️', label: 'Ice Cold', entry_id: coldestEntry.entry_id })
+  const sharpshooterEntry = leaderboard.filter(e => e.exact_count > 0).sort((a, b) => b.exact_count - a.exact_count)[0]
+  if (sharpshooterEntry) awards.push({ type: 'sharpshooter', emoji: '🎯', label: 'Sharpshooter', entry_id: sharpshooterEntry.entry_id })
+
+  // --- Superlatives ---
+  const superlatives: { type: string; emoji: string; title: string; entry_id: string; name: string; detail: string }[] = []
+  const hottest = leaderboard.filter(e => e.current_streak.type === 'hot' && e.current_streak.length >= 2).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (hottest) superlatives.push({ type: 'hot', emoji: '🔥', title: 'Hottest Right Now', entry_id: hottest.entry_id, name: hottest.entry_name || hottest.full_name, detail: `${hottest.current_streak.length}-match win streak` })
+  const coldest = leaderboard.filter(e => e.current_streak.type === 'cold' && e.current_streak.length >= 2).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
+  if (coldest) superlatives.push({ type: 'cold', emoji: '❄️', title: 'Ice Cold', entry_id: coldest.entry_id, name: coldest.entry_name || coldest.full_name, detail: `${coldest.current_streak.length} misses in a row` })
+  if (contrarianKing && contrarianKing.contrarian_wins > 0) superlatives.push({ type: 'contrarian', emoji: '🎲', title: 'Contrarian King', entry_id: contrarianKing.entry_id, name: contrarianKing.entry_name || contrarianKing.full_name, detail: `${contrarianKing.contrarian_wins} contrarian wins` })
+  if (crowdFollower && crowdFollower.total_completed >= 3) superlatives.push({ type: 'crowd', emoji: '👥', title: 'Crowd Follower', entry_id: crowdFollower.entry_id, name: crowdFollower.entry_name || crowdFollower.full_name, detail: `${Math.round(crowdFollower.crowd_agreement_pct)}% consensus picks` })
+  const sharpshooter = leaderboard.filter(e => e.exact_count > 0).sort((a, b) => b.exact_count - a.exact_count)[0]
+  if (sharpshooter) superlatives.push({ type: 'sharpshooter', emoji: '🎯', title: 'Sharpshooter', entry_id: sharpshooter.entry_id, name: sharpshooter.entry_name || sharpshooter.full_name, detail: `${sharpshooter.exact_count} exact scores` })
+  const climber = leaderboard.filter(e => e.current_rank != null && e.previous_rank != null).sort((a, b) => ((b.previous_rank! - b.current_rank!) - (a.previous_rank! - a.current_rank!)))[0]
+  if (climber && climber.previous_rank! - climber.current_rank! > 0) superlatives.push({ type: 'climber', emoji: '📈', title: 'Biggest Climber', entry_id: climber.entry_id, name: climber.entry_name || climber.full_name, detail: `Up ${climber.previous_rank! - climber.current_rank!} places` })
+  const faller = leaderboard.filter(e => e.current_rank != null && e.previous_rank != null).sort((a, b) => ((a.previous_rank! - a.current_rank!) - (b.previous_rank! - b.current_rank!)))[0]
+  if (faller && faller.previous_rank! - faller.current_rank! < 0) superlatives.push({ type: 'faller', emoji: '📉', title: 'Biggest Faller', entry_id: faller.entry_id, name: faller.entry_name || faller.full_name, detail: `Down ${Math.abs(faller.previous_rank! - faller.current_rank!)} places` })
+
+  // --- Matchday Info ---
+  const completedMatches = matchesForInfo.filter(m => m.is_completed)
+  const lastCompleted = completedMatches.length > 0 ? completedMatches[completedMatches.length - 1] : null
+  const upcomingMatches = matchesForInfo.filter(m => !m.is_completed && m.status !== 'live').sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
+  const matchday_info = {
+    last_match_number: lastCompleted?.match_number ?? null,
+    next_match_date: upcomingMatches.length > 0 ? upcomingMatches[0].match_date : null,
+    completed_count: completedMatches.length,
+    total_count: matchesForInfo.length,
+  }
+
+  return { awards, superlatives, matchday_info }
+}
+
+// ============================================================================
+// M4 read-path: matchday MVP from a targeted single-match query instead of the
+// full per-entry predResults map. Only the last completed match matters.
+// ============================================================================
+async function computeMatchdayMvpFromColumns(
+  adminClient: ReturnType<typeof createAdminClient>,
+  matchesLite: any[],
+  entryIds: string[],
+  leaderboard: LeaderboardEntryResponse[],
+) {
+  const completed = matchesLite.filter(m => m.is_completed)
+  const lastCompleted = completed.length > 0 ? completed[completed.length - 1] : null
+  if (!lastCompleted || entryIds.length === 0) return null
+  const { data: rows } = await adminClient
+    .from('match_scores')
+    .select('entry_id, total_points')
+    .eq('match_id', lastCompleted.match_id)
+    .in('entry_id', entryIds)
+    .order('total_points', { ascending: false })
+    .limit(1)
+  const top = rows?.[0] as { entry_id: string; total_points: number } | undefined
+  if (!top || (top.total_points ?? 0) <= 0) return null
+  const bestEntry = leaderboard.find(e => e.entry_id === top.entry_id)
+  if (!bestEntry) return null
+  return {
+    entry_id: bestEntry.entry_id,
+    entry_name: bestEntry.entry_name,
+    full_name: bestEntry.full_name,
+    match_points: top.total_points,
+    match_number: lastCompleted.match_number,
+  }
+}
+
+// ============================================================================
+// M4 read-path: build the leaderboard payload from precomputed entry_xp_state
+// analytics columns instead of recomputing per-entry. Points/ranks stay live
+// from pool_entries; only the analytics fields come from columns. Gated by the
+// `analytics_read_from_columns` flag in handleGET — recompute path is the
+// fallback. See drafts/M4_read_path_flip.md.
+// ============================================================================
+async function buildLeaderboardPayloadFromColumns(
+  adminClient: ReturnType<typeof createAdminClient>,
+  pool_id: string,
+  pool: { tournament_id: string; prediction_mode: string },
+): Promise<{ payload: any } | { error: string; status: number }> {
+  // Lean reads: no teams / match_conduct / pool_settings, no team joins on
+  // matches (extras only need match_id/number/status/date/is_completed).
+  const [{ data: matchesLite }, { data: poolMembers }] = await Promise.all([
+    adminClient
+      .from('matches')
+      .select('match_id, match_number, is_completed, status, match_date')
+      .eq('tournament_id', pool.tournament_id)
+      .order('match_number', { ascending: true }),
+    adminClient
+      .from('pool_members')
+      .select('member_id, user_id, role, users(user_id, username, full_name)')
+      .eq('pool_id', pool_id),
+  ])
+  if (!matchesLite || !poolMembers) return { error: 'Failed to fetch pool data', status: 500 }
+
+  const memberIds = poolMembers.map((m: any) => m.member_id)
+  const { data: entries } = await adminClient
+    .from('pool_entries')
+    .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, point_adjustment, current_rank, previous_rank, match_points, bonus_points, scored_total_points')
+    .in('member_id', memberIds)
+  if (!entries) return { error: 'Failed to fetch entries', status: 500 }
+
+  const entryIds = entries.map((e: any) => e.entry_id)
+
+  // The one precomputed read that replaces the per-entry compute.
+  const xpByEntry = new Map<string, any>()
+  if (entryIds.length > 0) {
+    const { data: xpRows } = await adminClient
+      .from('entry_xp_state')
+      .select('entry_id, total_xp, current_level, last_five, current_streak, hit_rate, total_completed, exact_count, contrarian_wins, crowd_agreement_pct')
+      .in('entry_id', entryIds)
+    for (const r of xpRows ?? []) xpByEntry.set((r as any).entry_id, r)
+  }
+
+  const memberMap = new Map<string, any>()
+  for (const m of poolMembers) memberMap.set((m as any).member_id, m)
+
+  const leaderboard: LeaderboardEntryResponse[] = []
+  for (const entry of entries as any[]) {
+    const member = memberMap.get(entry.member_id)
+    if (!member) continue
+    const userInfo = (member as any).users
+    const a = xpByEntry.get(entry.entry_id)
+
+    // Analytics defaults (entries without a precomputed row — e.g. no
+    // predictions, or a just-submitted entry the sweep hasn't reached yet).
+    let last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[] = []
+    let current_streak: { type: 'hot' | 'cold' | 'none'; length: number } = { type: 'none', length: 0 }
+    let hit_rate = 0
+    let exact_count = 0
+    let level = 1
+    let level_name = 'Rookie'
+    let total_xp = 0
+    let contrarian_wins = 0
+    let crowd_agreement_pct = 0
+    let total_completed = 0
+
+    if (a) {
+      total_xp = a.total_xp ?? 0
+      const lvl = computeLevel(total_xp).currentLevel
+      level = lvl.level
+      level_name = lvl.name
+      last_five = (a.last_five ?? []) as typeof last_five
+      current_streak = (a.current_streak ?? { type: 'none', length: 0 }) as typeof current_streak
+      hit_rate = a.hit_rate ?? 0
+      exact_count = a.exact_count ?? 0
+      contrarian_wins = a.contrarian_wins ?? 0
+      crowd_agreement_pct = a.crowd_agreement_pct ?? 0
+      total_completed = a.total_completed ?? 0
+    }
+
+    const matchPoints = entry.match_points ?? 0
+    const bonusPoints = entry.bonus_points ?? 0
+    const adjustment = entry.point_adjustment ?? 0
+
+    leaderboard.push({
+      entry_id: entry.entry_id,
+      entry_name: entry.entry_name,
+      entry_number: entry.entry_number,
+      member_id: entry.member_id,
+      user_id: (member as any).user_id,
+      full_name: userInfo?.full_name ?? 'Unknown',
+      username: userInfo?.username ?? '',
+      match_points: matchPoints,
+      bonus_points: bonusPoints,
+      point_adjustment: adjustment,
+      total_points: entry.scored_total_points ?? (matchPoints + bonusPoints + adjustment),
+      current_rank: entry.current_rank,
+      previous_rank: entry.previous_rank,
+      has_submitted_predictions: entry.has_submitted_predictions,
+      last_five,
+      current_streak,
+      hit_rate,
+      exact_count,
+      level,
+      level_name,
+      total_xp,
+      contrarian_wins,
+      crowd_agreement_pct,
+      total_completed,
+    })
+  }
+
+  // Identical sort to the recompute path.
+  leaderboard.sort((a, b) => {
+    if (a.current_rank != null && b.current_rank != null) {
+      if (a.current_rank !== b.current_rank) return a.current_rank - b.current_rank
+    }
+    return b.total_points - a.total_points
+  })
+
+  const matchday_mvp = await computeMatchdayMvpFromColumns(adminClient, matchesLite, entryIds, leaderboard)
+  const { awards, superlatives, matchday_info } = computeLeaderboardExtras(leaderboard, matchesLite)
+
+  return {
+    payload: {
+      pool_id,
+      prediction_mode: pool.prediction_mode,
+      entries: leaderboard,
+      awards,
+      superlatives,
+      matchday_mvp,
+      matchday_info,
+    },
+  }
+}
+
 async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
@@ -71,14 +297,36 @@ async function handleGET(
   // (pool membership was already verified above, so this is safe)
   const adminClient = createAdminClient()
 
-  // 3. Fetch pool info
-  const { data: pool } = await adminClient
-    .from('pools')
-    .select('pool_id, tournament_id, prediction_mode')
-    .eq('pool_id', pool_id)
-    .single()
+  // 3. Fetch pool info + the M4 read-path flag together.
+  const [{ data: pool }, { data: flagRows }] = await Promise.all([
+    adminClient
+      .from('pools')
+      .select('pool_id, tournament_id, prediction_mode')
+      .eq('pool_id', pool_id)
+      .single(),
+    adminClient
+      .from('sync_settings')
+      .select('setting_key, setting_value')
+      .in('setting_key', ['analytics_read_from_columns', 'analytics_read_from_columns_pools']),
+  ])
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  // M4: serve precomputed entry_xp_state analytics instead of recomputing per
+  // request. Default OFF (missing rows → recompute, i.e. current behavior).
+  // Global bool OR a per-pool canary allowlist. See drafts/M4_read_path_flip.md.
+  {
+    const rows = (flagRows ?? []) as Array<{ setting_key: string; setting_value: unknown }>
+    const g = rows.find(r => r.setting_key === 'analytics_read_from_columns')?.setting_value
+    const globalOn = g === true || g === 'true'
+    const listRaw = rows.find(r => r.setting_key === 'analytics_read_from_columns_pools')?.setting_value
+    const canary = Array.isArray(listRaw) ? (listRaw as string[]) : []
+    if (globalOn || canary.includes(pool_id)) {
+      const res = await buildLeaderboardPayloadFromColumns(adminClient, pool_id, pool as any)
+      if ('error' in res) return NextResponse.json({ error: res.error }, { status: res.status })
+      return NextResponse.json(res.payload)
+    }
+  }
 
   // 4. Fetch all needed data in parallel
   const [
@@ -158,6 +406,13 @@ async function handleGET(
     home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
   }))
+
+  // FORM = post-match only: exclude live/in-progress matches from the per-entry
+  // form fields (match_scores has live rows — the leaderboard's points use them,
+  // the form layer must not). Points/rank above are untouched.
+  const completedMatchIds = new Set<string>(
+    normalizedMatches.filter((m: any) => m.is_completed).map((m: any) => m.match_id),
+  )
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
   const conduct: MatchConductData[] = conductData || []
@@ -308,7 +563,7 @@ async function handleGET(
         }))
 
         const entryMatchScores = matchScoresByEntry.get(entry.entry_id) || []
-        const predResults = matchScoresToPredictionResults(entryMatchScores)
+        const predResults = matchScoresToPredictionResults(entryMatchScores, completedMatchIds)
 
         // Store for matchday MVP calculation
         entryPredResultsMap.set(entry.entry_id, predResults)
@@ -405,51 +660,13 @@ async function handleGET(
     return b.total_points - a.total_points
   })
 
-  // 7. Compute pool-wide analytics data
+  // 7. Pool-wide extras (awards / superlatives / matchday_info) — shared with
+  // the M4 column read-path (buildLeaderboardPayloadFromColumns) so both paths
+  // produce byte-identical output.
+  const { awards, superlatives, matchday_info } = computeLeaderboardExtras(leaderboard, normalizedMatches)
 
-  // --- Awards ---
-  const awards: { type: string; emoji: string; label: string; entry_id: string }[] = []
-  // MVP = 1st place
-  if (leaderboard.length > 0) awards.push({ type: 'mvp', emoji: '🏆', label: 'MVP', entry_id: leaderboard[0].entry_id })
-  // Contrarian King = most contrarian_wins
-  const contrarianKing = leaderboard.reduce((max, e) => (e.contrarian_wins > (max?.contrarian_wins ?? 0)) ? e : max, null as LeaderboardEntryResponse | null)
-  if (contrarianKing && contrarianKing.contrarian_wins > 0) awards.push({ type: 'contrarian', emoji: '🎲', label: 'Contrarian King', entry_id: contrarianKing.entry_id })
-  // Crowd Follower = highest crowd_agreement_pct (min 3 completed)
-  const crowdFollower = leaderboard.filter(e => e.total_completed >= 3).reduce((max, e) => (e.crowd_agreement_pct > (max?.crowd_agreement_pct ?? 0)) ? e : max, null as LeaderboardEntryResponse | null)
-  if (crowdFollower) awards.push({ type: 'crowd', emoji: '👥', label: 'Crowd Follower', entry_id: crowdFollower.entry_id })
-  // Hot Streak = longest current hot streak >= 3 (one person only)
-  const hottestEntry = leaderboard.filter(e => e.current_streak.type === 'hot' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
-  if (hottestEntry) awards.push({ type: 'hot', emoji: '🔥', label: `On Fire (${hottestEntry.current_streak.length})`, entry_id: hottestEntry.entry_id })
-  // Cold Streak = longest current cold streak >= 3 (one person only)
-  const coldestEntry = leaderboard.filter(e => e.current_streak.type === 'cold' && e.current_streak.length >= 3).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
-  if (coldestEntry) awards.push({ type: 'cold', emoji: '❄️', label: 'Ice Cold', entry_id: coldestEntry.entry_id })
-  // Sharpshooter = most exact scores (one person only)
-  const sharpshooterEntry = leaderboard.filter(e => e.exact_count > 0).sort((a, b) => b.exact_count - a.exact_count)[0]
-  if (sharpshooterEntry) awards.push({ type: 'sharpshooter', emoji: '🎯', label: 'Sharpshooter', entry_id: sharpshooterEntry.entry_id })
-
-  // --- Superlatives ---
-  const superlatives: { type: string; emoji: string; title: string; entry_id: string; name: string; detail: string }[] = []
-  // Hottest Right Now
-  const hottest = leaderboard.filter(e => e.current_streak.type === 'hot' && e.current_streak.length >= 2).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
-  if (hottest) superlatives.push({ type: 'hot', emoji: '🔥', title: 'Hottest Right Now', entry_id: hottest.entry_id, name: hottest.entry_name || hottest.full_name, detail: `${hottest.current_streak.length}-match win streak` })
-  // Ice Cold
-  const coldest = leaderboard.filter(e => e.current_streak.type === 'cold' && e.current_streak.length >= 2).sort((a, b) => b.current_streak.length - a.current_streak.length)[0]
-  if (coldest) superlatives.push({ type: 'cold', emoji: '❄️', title: 'Ice Cold', entry_id: coldest.entry_id, name: coldest.entry_name || coldest.full_name, detail: `${coldest.current_streak.length} misses in a row` })
-  // Contrarian King
-  if (contrarianKing && contrarianKing.contrarian_wins > 0) superlatives.push({ type: 'contrarian', emoji: '🎲', title: 'Contrarian King', entry_id: contrarianKing.entry_id, name: contrarianKing.entry_name || contrarianKing.full_name, detail: `${contrarianKing.contrarian_wins} contrarian wins` })
-  // Crowd Follower
-  if (crowdFollower && crowdFollower.total_completed >= 3) superlatives.push({ type: 'crowd', emoji: '👥', title: 'Crowd Follower', entry_id: crowdFollower.entry_id, name: crowdFollower.entry_name || crowdFollower.full_name, detail: `${Math.round(crowdFollower.crowd_agreement_pct)}% consensus picks` })
-  // Sharpshooter
-  const sharpshooter = leaderboard.filter(e => e.exact_count > 0).sort((a, b) => b.exact_count - a.exact_count)[0]
-  if (sharpshooter) superlatives.push({ type: 'sharpshooter', emoji: '🎯', title: 'Sharpshooter', entry_id: sharpshooter.entry_id, name: sharpshooter.entry_name || sharpshooter.full_name, detail: `${sharpshooter.exact_count} exact scores` })
-  // Biggest Climber
-  const climber = leaderboard.filter(e => e.current_rank != null && e.previous_rank != null).sort((a, b) => ((b.previous_rank! - b.current_rank!) - (a.previous_rank! - a.current_rank!)))[0]
-  if (climber && climber.previous_rank! - climber.current_rank! > 0) superlatives.push({ type: 'climber', emoji: '📈', title: 'Biggest Climber', entry_id: climber.entry_id, name: climber.entry_name || climber.full_name, detail: `Up ${climber.previous_rank! - climber.current_rank!} places` })
-  // Biggest Faller
-  const faller = leaderboard.filter(e => e.current_rank != null && e.previous_rank != null).sort((a, b) => ((a.previous_rank! - a.current_rank!) - (b.previous_rank! - b.current_rank!)))[0]
-  if (faller && faller.previous_rank! - faller.current_rank! < 0) superlatives.push({ type: 'faller', emoji: '📉', title: 'Biggest Faller', entry_id: faller.entry_id, name: faller.entry_name || faller.full_name, detail: `Down ${Math.abs(faller.previous_rank! - faller.current_rank!)} places` })
-
-  // --- Matchday MVP ---
+  // --- Matchday MVP --- recompute path uses the per-entry predResults map it
+  // already built (the column path uses a targeted single-match query instead).
   const completedMatches = normalizedMatches.filter(m => m.is_completed)
   const lastCompleted = completedMatches.length > 0 ? completedMatches[completedMatches.length - 1] : null
   let matchday_mvp: { entry_id: string; entry_name: string; full_name: string; match_points: number; match_number: number } | null = null
@@ -467,16 +684,6 @@ async function handleGET(
     if (bestEntry && bestPoints > 0) {
       matchday_mvp = { entry_id: bestEntry.entry_id, entry_name: bestEntry.entry_name, full_name: bestEntry.full_name, match_points: bestPoints, match_number: lastCompleted.match_number }
     }
-  }
-
-  // --- Matchday Info ---
-  const completedCount = completedMatches.length
-  const upcomingMatches = normalizedMatches.filter(m => !m.is_completed && m.status !== 'live').sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
-  const matchday_info = {
-    last_match_number: lastCompleted?.match_number ?? null,
-    next_match_date: upcomingMatches.length > 0 ? upcomingMatches[0].match_date : null,
-    completed_count: completedCount,
-    total_count: normalizedMatches.length,
   }
 
   return NextResponse.json({

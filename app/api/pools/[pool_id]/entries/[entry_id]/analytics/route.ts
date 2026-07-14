@@ -215,7 +215,12 @@ async function handleGET(
       .select('entry_id, match_id, match_number, stage, score_type, total_points')
       .eq('entry_id', entry_id)
 
-    const predictionResults = matchScoresToPredictionResults((entryMatchScores || []) as any)
+    // FORM = post-match only: exclude live/in-progress matches (leaderboard uses
+    // their provisional rows, the form layer must not).
+    const completedMatchIds = new Set<string>(
+      (matchesData as any[]).filter(m => m.is_completed).map(m => m.match_id),
+    )
+    const predictionResults = matchScoresToPredictionResults((entryMatchScores || []) as any, completedMatchIds)
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)
