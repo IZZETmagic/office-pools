@@ -22,6 +22,8 @@ import { EntriesListView } from '@/components/predictions/EntriesListView'
 import { EntryDetailView } from '@/components/predictions/EntryDetailView'
 import { EveryoneElseSection } from '@/components/predictions/EveryoneElseSection'
 import { SpectatorEntryView } from '@/components/predictions/SpectatorEntryView'
+import { ProgressiveSpectatorView } from '@/components/predictions/ProgressiveSpectatorView'
+import { BracketSpectatorView } from '@/components/predictions/BracketSpectatorView'
 import { MembersTab } from './admin/MembersTab'
 import { ScoringTab } from './admin/ScoringTab'
 import { SettingsTab } from './admin/SettingsTab'
@@ -1298,9 +1300,33 @@ export function PoolDetail({
             )}
 
             {activeTab === 'predictions' && activeEntry && isProgressive && (
-              pool.max_entries_per_user > 1 ? (
-                // Multi-entry progressive: list view or detail view
+              spectatingEntry ? (
+                <ProgressiveSpectatorView
+                  ownerName={spectatingEntry.ownerName}
+                  entryName={spectatingEntry.entryName}
+                  entryId={spectatingEntry.entryId}
+                  matches={predictionsMatches}
+                  teams={teams}
+                  poolId={pool.pool_id}
+                  psoEnabled={psoEnabled}
+                  existingPredictions={allPredictions
+                    .filter(p => p.entry_id === spectatingEntry.entryId)
+                    .map(p => ({
+                      match_id: p.match_id,
+                      predicted_home_score: p.predicted_home_score,
+                      predicted_away_score: p.predicted_away_score,
+                      predicted_home_pso: p.predicted_home_pso,
+                      predicted_away_pso: p.predicted_away_pso,
+                      predicted_winner_team_id: p.predicted_winner_team_id,
+                      prediction_id: p.prediction_id,
+                    }))}
+                  roundStates={roundStates}
+                  onBack={() => setSpectatingEntry(null)}
+                />
+              ) : (pool.max_entries_per_user > 1 || isPastDeadline) ? (
+                // Multi-entry, OR post-lock stop screen for single-entry
                 predictionsView.mode === 'list' ? (
+                  <>
                   <EntriesListView
                     entries={entries}
                     poolId={pool.pool_id}
@@ -1319,6 +1345,15 @@ export function PoolDetail({
                     entryFee={pool.entry_fee}
                     entryFeeCurrency={pool.entry_fee_currency}
                   />
+                  {isPastDeadline && (
+                    <EveryoneElseSection
+                      members={members}
+                      currentUserId={currentUserId}
+                      allPredictions={allPredictions}
+                      onSelect={setSpectatingEntry}
+                    />
+                  )}
+                  </>
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
@@ -1374,9 +1409,22 @@ export function PoolDetail({
             )}
 
             {activeTab === 'predictions' && activeEntry && isBracketPicker && (
-              pool.max_entries_per_user > 1 ? (
-                // Multi-entry bracket picker: list view or detail view
+              spectatingEntry ? (
+                <BracketSpectatorView
+                  ownerName={spectatingEntry.ownerName}
+                  entryName={spectatingEntry.entryName}
+                  entryId={spectatingEntry.entryId}
+                  poolId={pool.pool_id}
+                  teams={teams}
+                  matches={predictionsMatches}
+                  settings={settings!}
+                  predictionDeadline={pool.prediction_deadline}
+                  onBack={() => setSpectatingEntry(null)}
+                />
+              ) : (pool.max_entries_per_user > 1 || isPastDeadline) ? (
+                // Multi-entry, OR post-lock stop screen for single-entry
                 predictionsView.mode === 'list' ? (
+                  <>
                   <EntriesListView
                     entries={entries}
                     poolId={pool.pool_id}
@@ -1393,6 +1441,15 @@ export function PoolDetail({
                     entryFee={pool.entry_fee}
                     entryFeeCurrency={pool.entry_fee_currency}
                   />
+                  {isPastDeadline && (
+                    <EveryoneElseSection
+                      members={members}
+                      currentUserId={currentUserId}
+                      allPredictions={allPredictions}
+                      onSelect={setSpectatingEntry}
+                    />
+                  )}
+                  </>
                 ) : loadingPredictions ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />

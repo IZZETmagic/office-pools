@@ -1,12 +1,12 @@
 'use client'
 
 import { useRef } from 'react'
-import PredictionsFlow from './PredictionsFlow'
+import ProgressivePredictionsFlow from './ProgressivePredictionsFlow'
 import { SpectatorFrame } from './SpectatorFrame'
-import type { ExistingPrediction } from '@/app/pools/[pool_id]/types'
+import type { ExistingPrediction, PoolRoundState } from '@/app/pools/[pool_id]/types'
 import type { Match, Team } from '@/lib/tournament'
 
-type SpectatorEntryViewProps = {
+type ProgressiveSpectatorViewProps = {
   ownerName: string
   entryName: string
   entryId: string
@@ -14,18 +14,20 @@ type SpectatorEntryViewProps = {
   teams: Team[]
   poolId: string
   psoEnabled: boolean
+  /** Other member's picks — already gated to revealed rounds by the SSR filter. */
   existingPredictions: ExistingPrediction[]
+  roundStates: PoolRoundState[]
   onBack: () => void
 }
 
 /**
- * Read-only view of ANOTHER member's full_tournament entry, shown after lock
- * (Phase 3b). Reuses PredictionsFlow with isPastDeadline + hasSubmitted forced
- * true, which makes every input read-only and short-circuits savePredictions —
- * so there is no way to write to an entry that isn't ours (the server would
- * reject it too).
+ * Read-only view of ANOTHER member's progressive entry (Phase 3b). Reuses
+ * ProgressivePredictionsFlow with predictionsLocked forced true → isReadOnly is
+ * always true, so no input is editable and savePredictions short-circuits. Only
+ * the rounds already locked pool-wide are present in existingPredictions (the
+ * SSR reveal filter strips the rest), so unlocked rounds simply render empty.
  */
-export function SpectatorEntryView({
+export function ProgressiveSpectatorView({
   ownerName,
   entryName,
   entryId,
@@ -34,26 +36,24 @@ export function SpectatorEntryView({
   poolId,
   psoEnabled,
   existingPredictions,
+  roundStates,
   onBack,
-}: SpectatorEntryViewProps) {
+}: ProgressiveSpectatorViewProps) {
   const noopRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
 
   return (
     <SpectatorFrame ownerName={ownerName} entryName={entryName} onBack={onBack}>
-      <PredictionsFlow
+      <ProgressivePredictionsFlow
         key={entryId}
         matches={matches}
         teams={teams}
         entryId={entryId}
         poolId={poolId}
         existingPredictions={existingPredictions}
-        isPastDeadline={true}
         psoEnabled={psoEnabled}
-        hasSubmitted={true}
-        autoSubmitted={false}
-        submittedAt={null}
-        lastSavedAt={null}
         predictionsLocked={true}
+        roundStates={roundStates}
+        roundSubmissions={[]}
         onUnsavedChangesRef={noopRef}
         onStatusChange={() => {}}
       />

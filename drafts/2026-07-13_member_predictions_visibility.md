@@ -1,7 +1,7 @@
 # Member Predictions Visibility — "See everyone's picks after lock"
 
 - **Date:** 2026-07-13
-- **Status:** Phase 0 APPLIED + verified in prod (2026-07-13); Phase 1 BUILT + unit-tested; Phase 2 (mobile) BUILT — tsc/eslint clean, NOT runtime-tested (ships via OTA); Phase 3a (web SSR gate) BUILT + typecheck-clean; Phase 3b **full_tournament** BUILT (tsc/eslint clean, NOT browser-tested) — progressive + bracket_picker web spectate still TODO. Nothing pushed/deployed yet (that's why mobile spectate 404s — the view route isn't on sportpool.io).
+- **Status:** FEATURE CODE-COMPLETE (2026-07-13). Phase 0 APPLIED + verified in prod; Phases 1–3 BUILT, tsc/eslint clean on all changed files. Phase 3b covers **all three modes** (full_tournament + progressive + bracket_picker). NOT browser-tested (web) / on-device confirmed beyond the section (mobile). Nothing pushed/deployed — that's why mobile spectate 404s (the view route isn't on sportpool.io yet). Remaining: deploy (Ryan), browser + device QA, deferred mobile owner-banner polish for progressive/bracket wizards.
 - **Roadmap item:** `ROADMAP.md:359-364` — "Members'/all predictions after lock" (Feature, Mobile)
 - **Memory:** `project_feature_member_predictions_visibility`
 
