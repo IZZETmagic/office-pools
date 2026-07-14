@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type NativeScrollEvent,
@@ -59,6 +59,27 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
   'fees',
   'settings',
 ];
+
+// Memoized tab panels + header. Switching tabs re-renders PoolDetailScreen so
+// the active-pill highlight can move — but the panel/header contents don't
+// depend on which tab is active. Without these memo boundaries every tab
+// switch re-rendered all ~9 mounted panels, and the highlight couldn't repaint
+// until that finished (up to a couple seconds on a big pool). memo() lets each
+// panel bail out when its props are unchanged (they are, across a tab switch),
+// so the switch commit stays cheap and the highlight snaps immediately. This
+// doesn't block a panel's own data updates or internal state — only the
+// redundant parent-triggered re-render.
+const MemoPoolDetailHeader = memo(PoolDetailHeader);
+const MemoLeaderboardTab = memo(LeaderboardTab);
+const MemoPredictionsTab = memo(PredictionsTab);
+const MemoFormTab = memo(FormTab);
+const MemoBPFormTab = memo(BPFormTab);
+const MemoScoringTab = memo(ScoringTab);
+const MemoPoolInfoTab = memo(PoolInfoTab);
+const MemoRoundsTab = memo(RoundsTab);
+const MemoMembersTab = memo(MembersTab);
+const MemoFeesTab = memo(FeesTab);
+const MemoSettingsTab = memo(SettingsTab);
 
 export default function PoolDetailScreen() {
   const theme = useTheme();
@@ -214,6 +235,19 @@ export default function PoolDetailScreen() {
   );
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
+  // Stable identity so the memoized Settings panel isn't re-rendered on every
+  // tab switch by a fresh inline closure. Reads pool via `data` (optional) so
+  // it can sit above the loading/error early-returns without breaking the
+  // rules of hooks.
+  const handleOpenScoring = useCallback(() => {
+    if (!data) return;
+    router.push(
+      `/pool/${data.pool.poolId}/scoring-config${
+        data.pool.predictionMode === 'bracket_picker' ? '?mode=bracket_picker' : ''
+      }`,
+    );
+  }, [data]);
+
   useEffect(() => {
     if (skipPagerScrollRef.current) {
       // Tab change came from a swipe; the pager is already at tabIndex.
@@ -286,7 +320,7 @@ export default function PoolDetailScreen() {
     switch (key) {
       case 'leaderboard':
         return (
-          <LeaderboardTab
+          <MemoLeaderboardTab
             poolId={pool.poolId}
             entries={leaderboard}
             currentUserId={pool.currentUserId}
@@ -298,7 +332,7 @@ export default function PoolDetailScreen() {
         );
       case 'predictions':
         return (
-          <PredictionsTab
+          <MemoPredictionsTab
             poolId={pool.poolId}
             maxEntriesPerUser={pool.maxEntriesPerUser}
             predictionMode={pool.predictionMode}
@@ -308,37 +342,31 @@ export default function PoolDetailScreen() {
         );
       case 'form':
         return pool.predictionMode === 'bracket_picker' ? (
-          <BPFormTab poolId={pool.poolId} />
+          <MemoBPFormTab poolId={pool.poolId} />
         ) : (
-          <FormTab poolId={pool.poolId} />
+          <MemoFormTab poolId={pool.poolId} />
         );
       case 'scoring':
         return (
-          <ScoringTab
+          <MemoScoringTab
             poolId={pool.poolId}
             predictionMode={pool.predictionMode}
           />
         );
       case 'info':
-        return <PoolInfoTab pool={pool} />;
+        return <MemoPoolInfoTab pool={pool} />;
       case 'rounds':
-        return <RoundsTab poolId={pool.poolId} />;
+        return <MemoRoundsTab poolId={pool.poolId} />;
       case 'members':
-        return <MembersTab poolId={pool.poolId} />;
+        return <MemoMembersTab poolId={pool.poolId} />;
       case 'fees':
-        return <FeesTab pool={pool} />;
+        return <MemoFeesTab pool={pool} />;
       case 'settings':
         return (
-          <SettingsTab
+          <MemoSettingsTab
             pool={pool}
             onSaved={refresh}
-            onOpenScoring={() =>
-              router.push(
-                `/pool/${pool.poolId}/scoring-config${
-                  pool.predictionMode === 'bracket_picker' ? '?mode=bracket_picker' : ''
-                }`,
-              )
-            }
+            onOpenScoring={handleOpenScoring}
           />
         );
     }
@@ -353,7 +381,7 @@ export default function PoolDetailScreen() {
           light icons so the clock/battery stay legible. Unmounts when the
           screen leaves and the root-layout's "auto" style takes over again. */}
       {accentColor ? <StatusBar style="light" animated /> : null}
-      <PoolDetailHeader pool={pool} />
+      <MemoPoolDetailHeader pool={pool} />
       <PoolTabBar
         active={tab}
         onChange={handleTabTap}
