@@ -88,6 +88,7 @@ export type MatchSummary = {
   awayScore: number | null;
   liveMinute: number | null;
   livePeriod: string | null;
+  liveAdded: number | null;
   homeTeam: MatchTeam | null;
   awayTeam: MatchTeam | null;
   homeTeamPlaceholder: string | null;
@@ -149,6 +150,7 @@ function normalizeMatch(row: Record<string, unknown>): MatchSummary {
     awayScore: (row.away_score_ft as number | null) ?? null,
     liveMinute: (row.live_minute as number | null) ?? null,
     livePeriod: (row.live_period as string | null) ?? null,
+    liveAdded: (row.live_added as number | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
     homeTeamPlaceholder: (row.home_team_placeholder as string | null) ?? null,
@@ -158,7 +160,7 @@ function normalizeMatch(row: Record<string, unknown>): MatchSummary {
 
 const MATCH_SELECT = `
   match_id, match_number, stage, match_date, status, status_detail, original_match_date, venue,
-  home_score_ft, away_score_ft, live_minute, live_period,
+  home_score_ft, away_score_ft, live_minute, live_period, live_added,
   home_team_placeholder, away_team_placeholder,
   home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
   away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
@@ -752,6 +754,7 @@ export function useHomeDataInternal() {
                     awayScore: (row.away_score_ft as number | null) ?? null,
                     liveMinute: (row.live_minute as number | null) ?? null,
                     livePeriod: (row.live_period as string | null) ?? null,
+                    liveAdded: (row.live_added as number | null) ?? null,
                     statusDetail: (row.status_detail as string | null) ?? null,
                     originalMatchDate: (row.original_match_date as string | null) ?? null,
                   };

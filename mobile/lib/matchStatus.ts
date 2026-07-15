@@ -58,23 +58,39 @@ export type LiveClockInput = {
   status?: string | null;
   livePeriod?: string | null;
   liveMinute?: number | null;
+  liveAdded?: number | null;
 };
 
 /**
- * Short live-clock token for a match: the running minute ("45'") during 1H/2H, or
- * the phase — "HT", "ET", "PENS" — otherwise. Null when the match isn't live (or has
- * no minute yet). Driven by `live_minute`/`live_period`, written by the sync.
+ * Short live-clock token for a match. Driven by `live_minute`/`live_period`/`live_added`,
+ * written by the sync:
+ *   - 1H/2H: the running minute ("67'"). At the end of a half the minute holds at
+ *     45'/90' and any stoppage is appended on top ("45+2'").
+ *   - ET (extra time): "ET" plus the running minute, which keeps counting 91'→120'
+ *     ("ET 105'"), with stoppage appended the same way ("ET 105+2'").
+ *   - HT / PENS: the phase label alone.
+ * Null when the match isn't live (or has no minute yet).
  */
 export function getLiveClock(m: LiveClockInput): string | null {
   if (m.status !== 'live') return null;
   switch (m.livePeriod) {
     case 'HT':
       return 'HT';
-    case 'ET':
-      return 'ET';
     case 'PEN':
       return 'PENS';
+    case 'ET':
+      // Extra time keeps counting up (91'→120'); show it. Null-guard the brief
+      // break between ET halves, where no running minute is reported.
+      return m.liveMinute != null ? `ET ${withStoppage(m.liveMinute, m.liveAdded)}` : 'ET';
     default:
-      return m.liveMinute != null ? `${m.liveMinute}'` : null;
+      return m.liveMinute != null ? withStoppage(m.liveMinute, m.liveAdded) : null;
   }
+}
+
+/**
+ * The minute token, with end-of-half stoppage appended when present:
+ * (45, 2) → "45+2'"; (67, null) → "67'".
+ */
+function withStoppage(minute: number, added: number | null | undefined): string {
+  return added != null && added > 0 ? `${minute}+${added}'` : `${minute}'`;
 }

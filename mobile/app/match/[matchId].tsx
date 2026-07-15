@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { Icon, Text } from '@/components/ui';
 import { formatStageLabel } from '@/lib/stage';
+import { useMatchClock } from '@/lib/useMatchClock';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
@@ -284,26 +285,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
           {isLive ? (
             <>
               <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: theme.colors.red,
-                  }}
-                />
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.bold,
-                    fontSize: 11,
-                    color: theme.colors.red,
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  LIVE
-                </RNText>
-              </View>
+              <MatchClock match={match} />
             </>
           ) : isFinished ? (
             <>
@@ -371,6 +353,37 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
       </View>
 
       <MatchStatusBadge match={match} style={{ marginTop: 12 }} />
+    </View>
+  );
+}
+
+// Live clock line for the header — a red dot + a locally-ticking MM:SS estimate
+// (see useMatchClock). Isolated as its own component so the once-a-second tick
+// re-renders only this row, not the whole header (flags, names, score). Falls
+// back to "LIVE" in the brief window before the first minute is known.
+function MatchClock({ match }: { match: ResultsMatch }) {
+  const theme = useTheme();
+  const clock = useMatchClock(match);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: theme.colors.red,
+        }}
+      />
+      <RNText
+        style={{
+          fontFamily: MONO_BOLD,
+          fontSize: 13,
+          color: '#FFFFFF',
+          letterSpacing: 0.5,
+        }}
+      >
+        {clock ?? 'LIVE'}
+      </RNText>
     </View>
   );
 }
