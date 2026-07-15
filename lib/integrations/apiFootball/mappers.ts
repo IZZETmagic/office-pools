@@ -13,6 +13,7 @@ export type OurMatchRow = {
   away_score_pso: number | null
   live_minute: number | null
   live_period: string | null
+  live_added: number | null
   winner_team_id: string | null
   data_source: 'api' | 'manual'
 }
@@ -29,6 +30,7 @@ export type MatchUpdatePayload = {
   winner_team_id?: string | null
   live_minute?: number | null
   live_period?: string | null
+  live_added?: number | null
   last_synced_at?: string
 }
 
@@ -133,6 +135,13 @@ export function fixtureToMatchUpdate(
 
   const period = mapPeriod(fixture.fixture.status.short)
   if (period !== current.live_period) next.live_period = period
+
+  // Stoppage/added minutes at the end of the current half (the clock holds at
+  // 45'/90'/105'/120' while `extra` counts the added time). Diffed and written
+  // like every other field — including back to null once the half's stoppage
+  // window ends — so it never lingers into the next period.
+  const added = fixture.fixture.status.extra ?? null
+  if (added !== current.live_added) next.live_added = added
 
   // Winner derivation for knockout: when match final, prefer PSO winner else FT.
   // Diffed against current like every other field — an unconditional write here

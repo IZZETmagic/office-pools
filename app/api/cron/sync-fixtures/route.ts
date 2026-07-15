@@ -114,7 +114,7 @@ async function handle(request: NextRequest) {
   // Find matches potentially live right now
   const { data: ourMatches, error: matchErr } = await admin
     .from('matches')
-    .select('match_id, match_number, stage, match_date, home_team_id, away_team_id, status, status_detail, is_completed, home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, winner_team_id, data_source, external_match_id')
+    .select('match_id, match_number, stage, match_date, home_team_id, away_team_id, status, status_detail, is_completed, home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, live_added, winner_team_id, data_source, external_match_id')
     .eq('tournament_id', tournamentId)
     .not('external_match_id', 'is', null)
     .order('match_date', { ascending: true })

@@ -13,6 +13,7 @@ function makeFixture(
     psoHome?: number | null
     psoAway?: number | null
     elapsed?: number | null
+    extra?: number | null
   } = {}
 ): ApiFootballFixture {
   return {
@@ -21,7 +22,7 @@ function makeFixture(
       referee: null,
       date: '2026-06-20T18:00:00+00:00',
       venue: { id: null, name: null, city: null },
-      status: { long: short, short, elapsed: opts.elapsed ?? null },
+      status: { long: short, short, elapsed: opts.elapsed ?? null, extra: opts.extra ?? null },
     },
     league: { id: 1, season: 2026, round: 'Group Stage - 1' },
     teams: {
@@ -52,6 +53,7 @@ function makeCurrent(overrides: Partial<OurMatchRow> = {}): OurMatchRow {
     away_score_pso: null,
     live_minute: null,
     live_period: null,
+    live_added: null,
     winner_team_id: null,
     data_source: 'api',
     ...overrides,
@@ -142,6 +144,39 @@ describe('fixtureToMatchUpdate — status_detail', () => {
 
   it('is a no-op (null) for an unchanged not-started fixture', () => {
     const out = fixtureToMatchUpdate(makeFixture('NS'), makeCurrent(), opts)
+    expect(out).toBeNull()
+  })
+})
+
+describe('fixtureToMatchUpdate — live_added (stoppage time)', () => {
+  it('captures end-of-first-half stoppage (elapsed holds at 45, extra counts up)', () => {
+    const out = fixtureToMatchUpdate(
+      makeFixture('1H', { elapsed: 45, extra: 2 }),
+      makeCurrent({ status: 'live', live_period: '1H', live_minute: 45, live_added: null }),
+      opts
+    )
+    expect(out).not.toBeNull()
+    expect(out!.live_added).toBe(2)
+  })
+
+  it('clears live_added back to null once the stoppage window ends', () => {
+    const out = fixtureToMatchUpdate(
+      makeFixture('2H', { elapsed: 46, extra: null }),
+      makeCurrent({ status: 'live', live_period: '2H', live_minute: 46, live_added: 3 }),
+      opts
+    )
+    expect(out).not.toBeNull()
+    expect(Object.prototype.hasOwnProperty.call(out!, 'live_added')).toBe(true)
+    expect(out!.live_added).toBeNull()
+  })
+
+  it('does not write live_added when the added time is unchanged', () => {
+    const out = fixtureToMatchUpdate(
+      makeFixture('2H', { elapsed: 90, extra: 4 }),
+      makeCurrent({ status: 'live', live_period: '2H', live_minute: 90, live_added: 4 }),
+      opts
+    )
+    // Every synced field matches current → whole update is a no-op.
     expect(out).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ export type ApiFootballFixture = {
     referee: string | null
     date: string
     venue: { id: number | null; name: string | null; city: string | null }
-    status: { long: string; short: ApiFootballStatusShort; elapsed: number | null }
+    status: { long: string; short: ApiFootballStatusShort; elapsed: number | null; extra: number | null }
   }
   league: { id: number; season: number; round: string }
   teams: {
