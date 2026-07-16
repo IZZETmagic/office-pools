@@ -91,15 +91,19 @@ function Countdown({ targetMs, accentColor, primaryColor }: { targetMs: number; 
   )
 }
 
-function TeamChip({ name, flag, align }: { name: string | null; flag: string | null; align: 'left' | 'right' }) {
+// One side of the "up next" scoreline. The flag sits on the INNER edge (next to
+// the score): home renders name→flag, away renders flag→name, giving
+// `Team A 🏳  0 - 0  🏳 Team B`.
+function TeamSide({ name, flag, side }: { name: string | null; flag: string | null; side: 'home' | 'away' }) {
+  const flagEl = flag ? (
+    <img src={flag} alt={name || ''} className="w-7 h-5 rounded-sm object-cover shadow-sm shrink-0" />
+  ) : (
+    <span className="text-lg shrink-0">&#9917;</span>
+  )
+  const nameEl = <span className="text-base sm:text-lg font-bold text-neutral-900 truncate">{name || 'TBD'}</span>
   return (
-    <div className={`flex items-center gap-2 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-      {flag ? (
-        <img src={flag} alt={name || ''} className="w-7 h-5 rounded-sm object-cover shadow-sm" />
-      ) : (
-        <span className="text-lg">&#9917;</span>
-      )}
-      <span className="text-base sm:text-lg font-bold text-neutral-900">{name || 'TBD'}</span>
+    <div className={`flex items-center gap-2 flex-1 min-w-0 ${side === 'home' ? 'justify-end' : 'justify-start'}`}>
+      {side === 'home' ? (<>{nameEl}{flagEl}</>) : (<>{flagEl}{nameEl}</>)}
     </div>
   )
 }
@@ -394,10 +398,12 @@ export default function BrandedLandingClient({
                 </span>
                 <span className="text-xs font-medium text-neutral-400">{completed} of {total} matches played</span>
               </div>
-              <div className="px-5 py-5 flex items-center justify-between gap-4">
-                <TeamChip name={nextMatch.homeTeam} flag={nextMatch.homeFlag} align="left" />
-                <span className="text-sm font-bold text-neutral-300">vs</span>
-                <TeamChip name={nextMatch.awayTeam} flag={nextMatch.awayFlag} align="right" />
+              <div className="px-5 py-5 flex items-center justify-center gap-3">
+                <TeamSide name={nextMatch.homeTeam} flag={nextMatch.homeFlag} side="home" />
+                <span className="text-lg sm:text-xl font-black text-neutral-900 tabular-nums shrink-0 px-1">
+                  {nextMatch.homeScore} - {nextMatch.awayScore}
+                </span>
+                <TeamSide name={nextMatch.awayTeam} flag={nextMatch.awayFlag} side="away" />
               </div>
               <div className="px-5 pb-5 flex flex-col items-center">
                 {nextMatch.isLiveNow ? (

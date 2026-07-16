@@ -18,6 +18,8 @@ export type NextMatch = {
   awayTeam: string | null
   homeFlag: string | null
   awayFlag: string | null
+  homeScore: number
+  awayScore: number
   kickoff: string // ISO timestamptz
   isLiveNow: boolean
 }
@@ -40,6 +42,8 @@ type MatchRow = {
   winner_team_id: string | null
   home_team_id: string | null
   away_team_id: string | null
+  home_score_ft: number | null
+  away_score_ft: number | null
   // Supabase returns a to-one embed as an object, but the generated types widen
   // it to an array in places — accept either shape.
   home_team: TeamEmbed | TeamEmbed[] | null
@@ -62,6 +66,7 @@ export async function getTournamentSummary(tournamentId: string): Promise<Tourna
     .from('matches')
     .select(`
       stage, status, is_completed, match_date, winner_team_id, home_team_id, away_team_id,
+      home_score_ft, away_score_ft,
       home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
       away_team:teams!matches_away_team_id_fkey(country_name, flag_url)
     `)
@@ -87,6 +92,8 @@ export async function getTournamentSummary(tournamentId: string): Promise<Tourna
         awayTeam: one(upcoming.away_team)?.country_name ?? null,
         homeFlag: one(upcoming.home_team)?.flag_url ?? null,
         awayFlag: one(upcoming.away_team)?.flag_url ?? null,
+        homeScore: upcoming.home_score_ft ?? 0,
+        awayScore: upcoming.away_score_ft ?? 0,
         kickoff: upcoming.match_date,
         isLiveNow: upcoming.status === 'live',
       }
