@@ -71,7 +71,7 @@ export default async function SargassoSeaPage() {
     getLeaderboardForPool(POOL_CONFIG.poolId),
     pool?.tournament_id
       ? getTournamentSummary(pool.tournament_id)
-      : Promise.resolve<TournamentSummary>({ phase: 'pre', total: 0, completed: 0, nextMatch: null, champion: null }),
+      : Promise.resolve<TournamentSummary>({ phase: 'pre', total: 0, completed: 0, nextMatch: null, champion: null, stages: [] }),
   ])
 
   return (

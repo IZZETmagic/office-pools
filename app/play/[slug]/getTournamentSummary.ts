@@ -24,13 +24,31 @@ export type NextMatch = {
   isLiveNow: boolean
 }
 
+export type StageProgress = {
+  key: string
+  label: string
+  status: 'done' | 'current' | 'upcoming'
+}
+
 export type TournamentSummary = {
   phase: 'pre' | 'live' | 'complete'
   total: number
   completed: number
   nextMatch: NextMatch | null
   champion: { name: string; flag: string | null } | null
+  // The main-path journey for the "Road to Glory" tracker (third-place omitted —
+  // it's a consolation, not on the road to the final).
+  stages: StageProgress[]
 }
+
+const ROAD_STAGES: { key: string; label: string }[] = [
+  { key: 'group', label: 'Groups' },
+  { key: 'round_32', label: 'R32' },
+  { key: 'round_16', label: 'R16' },
+  { key: 'quarter_final', label: 'QF' },
+  { key: 'semi_final', label: 'SF' },
+  { key: 'final', label: 'Final' },
+]
 
 type TeamEmbed = { country_name: string | null; flag_url: string | null }
 
@@ -111,5 +129,24 @@ export async function getTournamentSummary(tournamentId: string): Promise<Tourna
     }
   }
 
-  return { phase, total, completed, nextMatch, champion }
+  // Per-stage completion → the current stage is the earliest road stage that
+  // isn't fully played; everything before it is done, everything after upcoming.
+  const byStage = new Map<string, { total: number; completed: number }>()
+  for (const m of rows) {
+    const s = byStage.get(m.stage) ?? { total: 0, completed: 0 }
+    s.total++
+    if (m.is_completed) s.completed++
+    byStage.set(m.stage, s)
+  }
+  const currentIdx = ROAD_STAGES.findIndex((s) => {
+    const c = byStage.get(s.key)
+    return !c || c.completed < c.total
+  })
+  const stages: StageProgress[] = ROAD_STAGES.map((s, i) => ({
+    key: s.key,
+    label: s.label,
+    status: currentIdx === -1 || i < currentIdx ? 'done' : i === currentIdx ? 'current' : 'upcoming',
+  }))
+
+  return { phase, total, completed, nextMatch, champion, stages }
 }

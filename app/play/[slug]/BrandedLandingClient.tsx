@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { LeaderboardPlayer } from './getLeaderboard'
-import type { TournamentSummary } from './getTournamentSummary'
+import type { TournamentSummary, StageProgress } from './getTournamentSummary'
 
 type PoolConfig = {
   name: string
@@ -108,6 +108,80 @@ function TeamSide({ name, flag, side }: { name: string | null; flag: string | nu
   )
 }
 
+// "The Road to Glory" — a stage stepper (Groups → Final). Completed stages fill
+// with the brand accent + a check; the current stage is outlined and pulses;
+// upcoming stages are muted. Replaces the pre-tournament "How It Works" once play
+// is under way.
+function RoadTracker({
+  stages,
+  completed,
+  total,
+  accentColor,
+  primaryColor,
+}: {
+  stages: StageProgress[]
+  completed: number
+  total: number
+  accentColor: string
+  primaryColor: string
+}) {
+  return (
+    <section className="py-14 sm:py-20 bg-neutral-50">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-neutral-900 mb-2">The Road to Glory</h2>
+        <p className="text-center text-neutral-500 mb-12 text-sm">{completed} of {total} matches played</p>
+        <div className="flex items-center pb-7">
+          {stages.map((st, i) => {
+            const done = st.status === 'done'
+            const current = st.status === 'current'
+            return (
+              <Fragment key={st.key}>
+                {i > 0 && (
+                  <div
+                    className="flex-1 h-[3px] rounded-full"
+                    style={{ backgroundColor: st.status === 'upcoming' ? '#e5e5e5' : accentColor }}
+                  />
+                )}
+                <div className="relative shrink-0">
+                  <div
+                    className="relative flex items-center justify-center rounded-full"
+                    style={{
+                      width: 34,
+                      height: 34,
+                      backgroundColor: done ? accentColor : '#ffffff',
+                      border: `2px solid ${done || current ? accentColor : '#d4d4d4'}`,
+                    }}
+                  >
+                    {current && (
+                      <span
+                        className="absolute inline-flex h-full w-full rounded-full animate-ping"
+                        style={{ backgroundColor: accentColor, opacity: 0.35 }}
+                      />
+                    )}
+                    {done ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    ) : (
+                      <span className="relative rounded-full" style={{ width: 8, height: 8, backgroundColor: current ? accentColor : '#d4d4d4' }} />
+                    )}
+                  </div>
+                  <span
+                    className="absolute left-1/2 -translate-x-1/2 top-[42px] text-[11px] sm:text-xs font-semibold whitespace-nowrap"
+                    style={{ color: done || current ? primaryColor : '#a3a3a3' }}
+                  >
+                    {st.label}
+                  </span>
+                </div>
+              </Fragment>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function BrandedLandingClient({
   poolConfig,
   players,
@@ -121,7 +195,7 @@ export default function BrandedLandingClient({
 }) {
   const router = useRouter()
 
-  const { phase, total, completed, nextMatch, champion } = tournament
+  const { phase, total, completed, nextMatch, champion, stages } = tournament
   const isPre = phase === 'pre'
   const isLive = phase === 'live'
   const isComplete = phase === 'complete'
@@ -298,7 +372,7 @@ export default function BrandedLandingClient({
             <span className="font-bold text-lg text-neutral-900">{poolConfig.brandName}</span>
           </div>
           <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-neutral-500">
-            <a href="#how-it-works" className="hover:text-neutral-900 transition-colors">How It Works</a>
+            {isPre && <a href="#how-it-works" className="hover:text-neutral-900 transition-colors">How It Works</a>}
             <a href="#leaderboard" className="hover:text-neutral-900 transition-colors">Leaderboard</a>
             <a href="#prizes" className="hover:text-neutral-900 transition-colors">Prizes</a>
           </div>
@@ -440,7 +514,9 @@ export default function BrandedLandingClient({
         </section>
       )}
 
-      {/* Lead with standings once the tournament is under way. */}
+      {/* Pre-tournament walks through how to play; once it's under way that's
+          moot (bracket locked, predictions closing) and the next-match strip +
+          leaderboard already carry the story, so drop it and lead with standings. */}
       {isPre ? (
         <>
           {howItWorksSection}
@@ -449,7 +525,15 @@ export default function BrandedLandingClient({
       ) : (
         <>
           {leaderboardSection}
-          {howItWorksSection}
+          {stages.length > 0 && (
+            <RoadTracker
+              stages={stages}
+              completed={completed}
+              total={total}
+              accentColor={poolConfig.accentColor}
+              primaryColor={poolConfig.primaryColor}
+            />
+          )}
         </>
       )}
 
