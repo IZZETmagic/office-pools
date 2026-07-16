@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getLeaderboardForPool } from './getLeaderboard'
+import { getTournamentSummary } from './getTournamentSummary'
 import BrandedLandingClient from './BrandedLandingClient'
 
 export const revalidate = 60
@@ -69,14 +70,17 @@ export default async function BrandedLandingPage({
     ],
   }
 
-  const { players, memberCount: leaderboardCount, isMock } = await getLeaderboardForPool(pool.pool_id)
+  const [{ players, isMock }, tournament] = await Promise.all([
+    getLeaderboardForPool(pool.pool_id),
+    getTournamentSummary(pool.tournament_id),
+  ])
 
   return (
     <BrandedLandingClient
       poolConfig={poolConfig}
       players={players}
-      memberCount={leaderboardCount}
       isMock={isMock}
+      tournament={tournament}
     />
   )
 }
