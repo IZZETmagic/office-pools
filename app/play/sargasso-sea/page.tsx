@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getLeaderboardForPool } from '@/app/play/[slug]/getLeaderboard'
+import { getTournamentSummary, type TournamentSummary } from '@/app/play/[slug]/getTournamentSummary'
 import BrandedLandingClient from '@/app/play/[slug]/BrandedLandingClient'
 import { POOL_CONFIG } from './poolConfig'
 
@@ -66,14 +67,19 @@ export default async function SargassoSeaPage() {
     ],
   }
 
-  const { players, memberCount: leaderboardCount, isMock } = await getLeaderboardForPool(POOL_CONFIG.poolId)
+  const [{ players, isMock }, tournament] = await Promise.all([
+    getLeaderboardForPool(POOL_CONFIG.poolId),
+    pool?.tournament_id
+      ? getTournamentSummary(pool.tournament_id)
+      : Promise.resolve<TournamentSummary>({ phase: 'pre', total: 0, completed: 0, nextMatch: null, champion: null }),
+  ])
 
   return (
     <BrandedLandingClient
       poolConfig={poolConfig}
       players={players}
-      memberCount={leaderboardCount}
       isMock={isMock}
+      tournament={tournament}
     />
   )
 }
