@@ -21,6 +21,7 @@
 // ============================================================================
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getScoringSource, readEntryScoring, readMatchScores, readBonusScores } from '@/lib/scoring/readSource'
 import type {
   PoolData,
   MemberData,
@@ -180,6 +181,35 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   const teams = (teamsRes.data || []) as TeamData[]
   const allEntryIds = members.flatMap((m) => m.entries || []).map((e) => e.entry_id)
 
+  // Scoring read source (prod columns by default, or the shadow engine for pools
+  // flipped via sync_settings.shadow_read_enabled_pools). Prod mode reads the
+  // identical columns ⇒ byte-identical. A read failure falls back like the other
+  // fetches here: rethrow on the cached path (never cache partial), swallow on
+  // the uncached one.
+  const safeRead = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await p
+    } catch (e) {
+      if (throwOnFetchError) throw e
+      console.error('[poolData] read-source error:', (e as Error)?.message)
+      return fallback
+    }
+  }
+  const source = await safeRead(getScoringSource(admin, poolId, pool.prediction_mode), 'prod' as const)
+  const entryScoring = await safeRead(readEntryScoring(admin, allEntryIds, source), new Map())
+  for (const m of members) {
+    for (const e of (m.entries || [])) {
+      const s = entryScoring.get(e.entry_id)
+      if (!s) continue
+      e.match_points = s.match_points
+      e.bonus_points = s.bonus_points
+      e.point_adjustment = s.point_adjustment
+      e.scored_total_points = s.scored_total_points
+      e.current_rank = s.current_rank
+      e.previous_rank = s.previous_rank
+    }
+  }
+
   // match_conduct — scoped to this tournament's matches (was an UNFILTERED
   // whole-table pull in page.tsx; SCALE_PLAN §3 0.4). Derive match ids locally.
   const matchIds = matches.map((m) => m.match_id)
@@ -197,28 +227,8 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
 
   // The heavy, per-pool, all-entries pulls — all paginated, all admin client.
   const [bonusScores, matchScores, allPredictions] = await Promise.all([
-    allEntryIds.length
-      ? fetchAllPages<BonusScoreData>('bonus_scores', (from, to) =>
-          admin
-            .from('bonus_scores')
-            .select('bonus_id, entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description')
-            .in('entry_id', allEntryIds)
-            .order('entry_id', { ascending: true })
-            .order('bonus_id', { ascending: true })
-            .range(from, to),
-        throwOnFetchError,
-      )
-      : Promise.resolve([]),
-    fetchAllPages<MatchScoreData>('match_scores', (from, to) =>
-      admin
-        .from('match_scores')
-        .select('*')
-        .eq('pool_id', poolId)
-        .order('entry_id', { ascending: true })
-        .order('match_id', { ascending: true })
-        .range(from, to),
-    throwOnFetchError,
-    ),
+    safeRead(readBonusScores(admin, allEntryIds, source), [] as BonusScoreData[]),
+    safeRead(readMatchScores(admin, allEntryIds, source), [] as MatchScoreData[]),
     allEntryIds.length
       ? fetchAllPages<PredictionData>('predictions', (from, to) =>
           admin

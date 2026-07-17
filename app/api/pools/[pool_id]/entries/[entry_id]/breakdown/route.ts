@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
+import { getScoringSource, readMatchScores, readBonusScores, readEntryScoring } from '@/lib/scoring/readSource'
 
 // =============================================================
 // GET /api/pools/:poolId/entries/:entryId/breakdown
@@ -143,20 +144,18 @@ async function handleGET(
   // Use admin client for data queries to bypass RLS
   // (pool membership was already verified above, so this is safe)
   const adminClient = createAdminClient()
+  const source = await getScoringSource(adminClient, pool_id, pool.prediction_mode)
 
-  // 7. Fetch stored v2 scores, matches (for display names), settings, and bonus scores in parallel
+  // 7. Fetch stored scores (via the read source), matches, settings, bonuses in parallel
   const [
-    { data: matchScoresV2 },
+    matchScoresRaw,
     { data: matches },
     { data: settingsRow },
-    { data: bonusScores },
+    bonusScores,
     { data: teams },
+    entryScoring,
   ] = await Promise.all([
-    adminClient
-      .from('match_scores')
-      .select('*')
-      .eq('entry_id', entry_id)
-      .order('match_number', { ascending: true }),
+    readMatchScores(adminClient, [entry_id], source),
     adminClient
       .from('matches')
       .select('match_id, match_number, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
@@ -166,15 +165,16 @@ async function handleGET(
       .select('*')
       .eq('pool_id', pool_id)
       .single(),
-    adminClient
-      .from('bonus_scores')
-      .select('bonus_category, bonus_type, description, points_earned')
-      .eq('entry_id', entry_id),
+    readBonusScores(adminClient, [entry_id], source),
     adminClient
       .from('teams')
       .select('team_id, country_name')
       .eq('tournament_id', pool.tournament_id),
+    readEntryScoring(adminClient, [entry_id], source),
   ])
+  // The breakdown renders match rows directly, so preserve the match_number order.
+  const matchScoresV2 = matchScoresRaw.slice().sort((a, b) => a.match_number - b.match_number)
+  const entryScore = entryScoring.get(entry_id)
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
 
@@ -217,8 +217,8 @@ async function handleGET(
       actual_away_pso: score.actual_away_pso ?? null,
       predicted_home_pso: score.predicted_home_pso ?? null,
       predicted_away_pso: score.predicted_away_pso ?? null,
-      predicted_home_team: score.stage !== 'group' ? (teamNameMap.get(score.predicted_home_team_id) ?? null) : null,
-      predicted_away_team: score.stage !== 'group' ? (teamNameMap.get(score.predicted_away_team_id) ?? null) : null,
+      predicted_home_team: score.stage !== 'group' && score.predicted_home_team_id ? (teamNameMap.get(score.predicted_home_team_id) ?? null) : null,
+      predicted_away_team: score.stage !== 'group' && score.predicted_away_team_id ? (teamNameMap.get(score.predicted_away_team_id) ?? null) : null,
       teams_match: score.teams_match,
       type: score.score_type,
       base_points: score.base_points,
@@ -237,14 +237,14 @@ async function handleGET(
   }))
 
   const bonusPoints = bonusEntries.reduce((sum, b) => sum + b.points_earned, 0)
-  const adjustment = entry.point_adjustment ?? 0
+  const adjustment = entryScore?.point_adjustment ?? 0
 
   // 10. Build response
   const response: BreakdownResponse = {
     entry: {
       entry_id: entry.entry_id,
       entry_name: entry.entry_name,
-      current_rank: entry.current_rank,
+      current_rank: entryScore?.current_rank ?? null,
       point_adjustment: adjustment,
       adjustment_reason: entry.adjustment_reason ?? null,
     },

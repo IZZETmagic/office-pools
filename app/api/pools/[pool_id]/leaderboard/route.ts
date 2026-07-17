@@ -10,6 +10,7 @@ import { matchScoresToPredictionResults, computeStreaks, computeCrowdPredictions
 import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, computeLevel } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import type { MatchData, PredictionData, MemberData } from '@/app/pools/[pool_id]/types'
+import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
 
 // =============================================================
 // GET /api/pools/:poolId/leaderboard
@@ -126,8 +127,18 @@ async function handleGET(
     return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 })
   }
 
+  // Read source (prod columns by default, or the shadow engine for pools flipped
+  // via sync_settings.shadow_read_enabled_pools). Prod mode = byte-identical.
+  const source = await getScoringSource(adminClient, pool_id, pool.prediction_mode)
+
   // Fetch all predictions for all entries — paginate to avoid Supabase's 1000-row limit
   const entryIds = entries.map((e: any) => e.entry_id)
+  const scoringMap = await readEntryScoring(adminClient, entryIds, source)
+  const scoreOf = (entryId: string) =>
+    scoringMap.get(entryId) ?? {
+      match_points: 0, bonus_points: 0, point_adjustment: 0,
+      scored_total_points: 0, current_rank: null as number | null, previous_rank: null as number | null,
+    }
   const allPredictions: any[] = []
   {
     const pageSize = 1000
@@ -204,15 +215,15 @@ async function handleGET(
         predictions_last_saved_at: null,
         // total_points (the DB column) is dead legacy — serve the scored
         // total here so API consumers reading this field get real points
-        total_points: e.scored_total_points ?? 0,
-        point_adjustment: e.point_adjustment ?? 0,
+        total_points: scoreOf(e.entry_id).scored_total_points,
+        point_adjustment: scoreOf(e.entry_id).point_adjustment,
         adjustment_reason: null,
-        current_rank: e.current_rank,
-        previous_rank: e.previous_rank,
+        current_rank: scoreOf(e.entry_id).current_rank,
+        previous_rank: scoreOf(e.entry_id).previous_rank,
         last_rank_update: null,
-        match_points: e.match_points ?? 0,
-        bonus_points: e.bonus_points ?? 0,
-        scored_total_points: e.scored_total_points ?? 0,
+        match_points: scoreOf(e.entry_id).match_points,
+        bonus_points: scoreOf(e.entry_id).bonus_points,
+        scored_total_points: scoreOf(e.entry_id).scored_total_points,
         created_at: '',
         fee_paid: e.fee_paid ?? false,
         fee_paid_at: e.fee_paid_at ?? null,
@@ -232,33 +243,12 @@ async function handleGET(
     predicted_winner_team_id: p.predicted_winner_team_id ?? null,
   }))
 
-  // Fetch stored match_scores for all entries (for analytics)
-  const allEntryIds = entries.map((e: any) => e.entry_id)
+  // Stored match_scores for all entries (via the read source), grouped by entry.
   const matchScoresByEntry = new Map<string, any[]>()
-  if (allEntryIds.length > 0) {
-    const pageSize = 1000
-    let offset = 0
-    let hasMore = true
-    while (hasMore) {
-      const { data: page } = await adminClient
-        .from('match_scores')
-        .select('entry_id, match_id, match_number, stage, score_type, total_points')
-        .in('entry_id', allEntryIds)
-        .order('entry_id', { ascending: true })
-        .order('match_id', { ascending: true })
-        .range(offset, offset + pageSize - 1)
-      if (!page || page.length === 0) {
-        hasMore = false
-      } else {
-        for (const ms of page) {
-          const existing = matchScoresByEntry.get(ms.entry_id) || []
-          existing.push(ms)
-          matchScoresByEntry.set(ms.entry_id, existing)
-        }
-        offset += page.length
-        if (page.length < pageSize) hasMore = false
-      }
-    }
+  for (const ms of await readMatchScores(adminClient, entryIds, source)) {
+    const existing = matchScoresByEntry.get(ms.entry_id) || []
+    existing.push(ms)
+    matchScoresByEntry.set(ms.entry_id, existing)
   }
 
   // 5. Compute points for each entry
@@ -271,7 +261,8 @@ async function handleGET(
 
     const userInfo = (member as any).users
     const predictions = predictionsByEntry.get(entry.entry_id) || []
-    const adjustment = entry.point_adjustment ?? 0
+    const sc = scoreOf(entry.entry_id)
+    const adjustment = sc.point_adjustment
 
     let matchPoints = 0
     let bonusPoints = 0
@@ -289,9 +280,9 @@ async function handleGET(
     let total_completed = 0
 
     if (predictions.length > 0) {
-      // Read stored v2 scores (authoritative, computed by scoring engine)
-      matchPoints = entry.match_points ?? 0
-      bonusPoints = entry.bonus_points ?? 0
+      // Read stored scores (authoritative, computed by the scoring engine)
+      matchPoints = sc.match_points
+      bonusPoints = sc.bonus_points
 
       // --- Analytics computation ---
       try {
@@ -328,7 +319,7 @@ async function handleGET(
           crowdData,
           streaks,
           entryPredictions: entryPreds as PredictionData[],
-          entryRank: entry.current_rank,
+          entryRank: sc.current_rank,
           totalMatches: normalizedMatches.length,
         })
 
@@ -379,9 +370,9 @@ async function handleGET(
       match_points: matchPoints,
       bonus_points: bonusPoints,
       point_adjustment: adjustment,
-      total_points: entry.scored_total_points ?? (matchPoints + bonusPoints + adjustment),
-      current_rank: entry.current_rank,
-      previous_rank: entry.previous_rank,
+      total_points: sc.scored_total_points || (matchPoints + bonusPoints + adjustment),
+      current_rank: sc.current_rank,
+      previous_rank: sc.previous_rank,
       has_submitted_predictions: entry.has_submitted_predictions,
       last_five,
       current_streak,

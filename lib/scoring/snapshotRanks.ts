@@ -19,5 +19,14 @@ export async function snapshotPoolRanks(
   if (!poolIds || poolIds.length === 0) return 0
   const { data, error } = await admin.rpc('snapshot_pool_ranks', { p_pool_ids: poolIds })
   if (error) throw new Error(`snapshot_pool_ranks failed: ${error.message}`)
+  // Shadow mirror (Phase A Gap 2): freeze shadow final_rank -> previous_final_rank
+  // at the SAME matchday-baseline instant, so shadow-read pools show correct
+  // ▲/▼ movement. Shadow-only + best-effort — a shadow failure must never break
+  // the production snapshot.
+  try {
+    await admin.rpc('shadow_snapshot_ranks', { p_pool_ids: poolIds })
+  } catch {
+    /* shadow mirror is best-effort */
+  }
   return typeof data === 'number' ? data : 0
 }

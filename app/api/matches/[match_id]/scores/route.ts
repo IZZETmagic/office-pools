@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
+import { getScoringSource, readMatchScores } from '@/lib/scoring/readSource'
 
 // =============================================================
 // GET /api/matches/:matchId/scores?entry_ids=id1,id2,id3
@@ -59,13 +60,22 @@ async function handleGET(
   // Use admin client for data queries (pool membership was verified by entry ownership)
   const adminClient = createAdminClient()
 
-  // Fetch match_scores, teams, and group completion status in parallel
-  const [{ data: scores }, { data: teams }, { data: groupMatches }] = await Promise.all([
-    adminClient
-      .from('match_scores')
-      .select('entry_id, match_number, stage, score_type, teams_match, predicted_home_team_id, predicted_away_team_id, total_points')
-      .eq('match_number', match.match_number)
-      .in('entry_id', entryIds),
+  // Resolve the pool (for the shadow read-source switch) from the first entry —
+  // a popover's entries all belong to one pool.
+  const { data: ctx } = await adminClient
+    .from('pool_entries')
+    .select('pool_members!inner(pool_id, pools!inner(prediction_mode))')
+    .eq('entry_id', entryIds[0])
+    .maybeSingle()
+  const ctxPm = (ctx as { pool_members?: { pool_id?: string; pools?: { prediction_mode?: string } } } | null)?.pool_members
+  const poolId: string | undefined = ctxPm?.pool_id
+  const source = poolId
+    ? await getScoringSource(adminClient, poolId, ctxPm?.pools?.prediction_mode ?? 'full_tournament')
+    : 'prod'
+
+  // Fetch match_scores (via the read source), teams, and group completion status in parallel
+  const [scores, { data: teams }, { data: groupMatches }] = await Promise.all([
+    readMatchScores(adminClient, entryIds, source, { matchId: match_id }),
     adminClient
       .from('teams')
       .select('team_id, country_name')
@@ -87,7 +97,7 @@ async function handleGET(
   }
 
   // Build response entries — hide predicted teams for knockout matches until groups complete
-  const entries: MatchScoreEntryResponse[] = (scores || []).map((score: any) => {
+  const entries: MatchScoreEntryResponse[] = scores.map((score: any) => {
     const isKnockout = score.stage !== 'group'
     const showTeams = isKnockout && allGroupsComplete
     return {

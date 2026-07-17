@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { getScoringSource, readEntryScoring } from '@/lib/scoring/readSource'
 
 export type LeaderboardPlayer = {
   rank: number
@@ -28,25 +29,26 @@ const MOCK_PLAYERS: LeaderboardPlayer[] = [
 export async function getLeaderboardForPool(poolId: string): Promise<{ players: LeaderboardPlayer[]; memberCount: number; isMock: boolean }> {
   const supabase = createAdminClient()
 
-  const { data: members } = await supabase
-    .from('pool_members')
-    .select(`
-      user_id,
-      pool_entries(
-        entry_name,
-        scored_total_points,
-        current_rank,
-        previous_rank
-      )
-    `)
-    .eq('pool_id', poolId)
+  // Scoring/rank now come from the read source (prod columns, or the shadow
+  // engine for pools flipped via sync_settings.shadow_read_enabled_pools).
+  // `scored_total_points` is the canonical total (already includes any
+  // point_adjustment); the old `total_points` column is dead legacy (stays 0).
+  const [{ data: poolRow }, { data: members }] = await Promise.all([
+    supabase.from('pools').select('prediction_mode').eq('pool_id', poolId).single(),
+    supabase
+      .from('pool_members')
+      .select(`user_id, pool_entries(entry_id, entry_name)`)
+      .eq('pool_id', poolId),
+  ])
 
   const allEntries = (members || []).flatMap((m: any) => m.pool_entries || [])
-  // `scored_total_points` is the canonical scored total maintained by the
-  // scoring pipeline (lib/scoring/recalculate.ts) and already includes any
-  // point_adjustment. The old `total_points` column is dead legacy (stays 0),
-  // so reading it made this board always fall back to the mock/preview.
-  const entriesWithPoints = allEntries.filter((e: any) => (e.scored_total_points ?? 0) > 0)
+  const entryIds = allEntries.map((e: any) => e.entry_id).filter(Boolean)
+  const source = await getScoringSource(supabase, poolId, (poolRow as { prediction_mode?: string } | null)?.prediction_mode ?? 'full_tournament')
+  const scoring = await readEntryScoring(supabase, entryIds, source)
+  const sc = (id: string) =>
+    scoring.get(id) ?? { scored_total_points: 0, current_rank: null as number | null, previous_rank: null as number | null }
+
+  const entriesWithPoints = allEntries.filter((e: any) => (sc(e.entry_id).scored_total_points ?? 0) > 0)
 
   if (entriesWithPoints.length < 3) {
     const namedEntries = allEntries.filter((e: any) => typeof e.entry_name === 'string' && e.entry_name.trim().length > 0)
@@ -57,11 +59,11 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
 
     const previewPlayers: LeaderboardPlayer[] = namedEntries
       .slice()
-      .sort((a: any, b: any) => (b.scored_total_points ?? 0) - (a.scored_total_points ?? 0))
+      .sort((a: any, b: any) => (sc(b.entry_id).scored_total_points ?? 0) - (sc(a.entry_id).scored_total_points ?? 0))
       .map((e: any, idx: number) => ({
         rank: idx + 1,
         name: e.entry_name,
-        points: e.scored_total_points ?? 0,
+        points: sc(e.entry_id).scored_total_points ?? 0,
         move: 0,
         exact: 0,
         correct: 0,
@@ -79,12 +81,13 @@ export async function getLeaderboardForPool(poolId: string): Promise<{ players: 
     for (const entry of memberEntries) {
       const entryName = typeof entry.entry_name === 'string' ? entry.entry_name.trim() : ''
       if (!entryName) continue
-      const currentRank = entry.current_rank ?? 999
-      const previousRank = entry.previous_rank ?? currentRank
+      const s = sc(entry.entry_id)
+      const currentRank = s.current_rank ?? 999
+      const previousRank = s.previous_rank ?? currentRank
       entries.push({
         rank: currentRank,
         name: entryName,
-        points: entry.scored_total_points ?? 0,
+        points: s.scored_total_points ?? 0,
         move: previousRank - currentRank,
         exact: 0,
         correct: 0,

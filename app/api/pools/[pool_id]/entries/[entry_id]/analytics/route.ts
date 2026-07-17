@@ -8,6 +8,7 @@ import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import type { MatchData, PredictionData, TeamData, MemberData } from '@/app/pools/[pool_id]/types'
 import type { MatchConductData } from '@/lib/tournament'
 import { withPerfLogging } from '@/lib/api-perf'
+import { getScoringSource, readMatchScores, readEntryScoring } from '@/lib/scoring/readSource'
 
 // =============================================================
 // GET /api/pools/:poolId/entries/:entryId/analytics
@@ -50,6 +51,8 @@ async function handleGET(
     .single()
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  const source = await getScoringSource(adminClient, pool_id, pool.prediction_mode)
 
   // 5. Verify entry belongs to this pool (entry -> member -> pool)
   const { data: entry } = await adminClient
@@ -209,13 +212,13 @@ async function handleGET(
 
   // 7. Compute analytics (wrapped in try/catch so basic data still returns if helpers fail)
   try {
-    // Fetch stored match_scores for this entry
-    const { data: entryMatchScores } = await adminClient
-      .from('match_scores')
-      .select('entry_id, match_id, match_number, stage, score_type, total_points')
-      .eq('entry_id', entry_id)
+    // Stored match_scores for this entry, via the read source
+    const [entryMatchScores, entryScoringMap] = await Promise.all([
+      readMatchScores(adminClient, [entry_id], source),
+      readEntryScoring(adminClient, [entry_id], source),
+    ])
 
-    const predictionResults = matchScoresToPredictionResults((entryMatchScores || []) as any)
+    const predictionResults = matchScoresToPredictionResults(entryMatchScores)
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)
@@ -237,7 +240,7 @@ async function handleGET(
       crowdData,
       streaks,
       entryPredictions: entryPredsData,
-      entryRank: entry.current_rank,
+      entryRank: entryScoringMap.get(entry_id)?.current_rank ?? null,
       totalMatches: matchesData.length,
       totalEntries,
       everEarnedBadgeIds: (unlockRows ?? []).map(r => r.badge_id as string),

@@ -25,6 +25,7 @@ import {
   computeCrowdPredictions,
 } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown } from '@/app/pools/[pool_id]/analytics/xpSystem'
+import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
 
 export type EntryAnalyticsRow = {
   entry_id: string
@@ -53,10 +54,11 @@ export async function computePoolEntryAnalytics(
 ): Promise<EntryAnalyticsRow[]> {
   const { data: poolRow } = await admin
     .from('pools')
-    .select('tournament_id')
+    .select('tournament_id, prediction_mode')
     .eq('pool_id', poolId)
     .single()
   if (!poolRow) return []
+  const source = await getScoringSource(admin, poolId, (poolRow as { prediction_mode: string }).prediction_mode)
 
   const [{ data: matches }, { data: poolMembers }] = await Promise.all([
     admin
@@ -83,6 +85,7 @@ export async function computePoolEntryAnalytics(
   if (!entries || entries.length === 0) return []
 
   const entryIds = entries.map((e: any) => e.entry_id)
+  const scoringMap = await readEntryScoring(admin, entryIds, source)
 
   // All predictions, paginated with the SAME stable order as the route.
   const allPredictions: any[] = []
@@ -106,30 +109,12 @@ export async function computePoolEntryAnalytics(
     }
   }
 
-  // match_scores per entry, paginated.
+  // match_scores per entry, via the read source.
   const matchScoresByEntry = new Map<string, any[]>()
-  {
-    let off = 0
-    let more = true
-    while (more) {
-      const { data: page } = await admin
-        .from('match_scores')
-        .select('entry_id, match_id, match_number, stage, score_type, total_points')
-        .in('entry_id', entryIds)
-        .order('entry_id', { ascending: true })
-        .order('match_id', { ascending: true })
-        .range(off, off + 999)
-      if (!page || page.length === 0) more = false
-      else {
-        for (const ms of page) {
-          const a = matchScoresByEntry.get(ms.entry_id) || []
-          a.push(ms)
-          matchScoresByEntry.set(ms.entry_id, a)
-        }
-        off += page.length
-        if (page.length < 1000) more = false
-      }
-    }
+  for (const ms of await readMatchScores(admin, entryIds, source)) {
+    const a = matchScoresByEntry.get(ms.entry_id) || []
+    a.push(ms)
+    matchScoresByEntry.set(ms.entry_id, a)
   }
 
   const normalizedMatches = matches.map((m: any) => ({
@@ -161,12 +146,12 @@ export async function computePoolEntryAnalytics(
         entry_name: e.entry_name,
         entry_number: e.entry_number,
         has_submitted_predictions: e.has_submitted_predictions,
-        total_points: e.scored_total_points ?? 0,
-        point_adjustment: e.point_adjustment ?? 0,
-        current_rank: e.current_rank,
-        match_points: e.match_points ?? 0,
-        bonus_points: e.bonus_points ?? 0,
-        scored_total_points: e.scored_total_points ?? 0,
+        total_points: scoringMap.get(e.entry_id)?.scored_total_points ?? 0,
+        point_adjustment: scoringMap.get(e.entry_id)?.point_adjustment ?? 0,
+        current_rank: scoringMap.get(e.entry_id)?.current_rank ?? null,
+        match_points: scoringMap.get(e.entry_id)?.match_points ?? 0,
+        bonus_points: scoringMap.get(e.entry_id)?.bonus_points ?? 0,
+        scored_total_points: scoringMap.get(e.entry_id)?.scored_total_points ?? 0,
       })),
   }))
 
@@ -211,7 +196,7 @@ export async function computePoolEntryAnalytics(
       crowdData,
       streaks,
       entryPredictions: entryPreds as any,
-      entryRank: entry.current_rank,
+      entryRank: scoringMap.get(entry.entry_id)?.current_rank ?? null,
       totalMatches: normalizedMatches.length,
     })
 
