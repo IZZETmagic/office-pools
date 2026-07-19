@@ -68,21 +68,6 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
   const { poolId } = options
   const adminClient = createAdminClient()
 
-  // Production-scoring kill-switch (shadow cutover). When prod scoring is
-  // disabled, the shadow engine is the sole scorer — skip the heavy recompute
-  // entirely (this is where the CPU goes). STILL fire the side-effect pushes:
-  // in this mode they read shadow scores (see lib/push/*). Fail-safe default ON.
-  if (!(await isProdScoringEnabled(adminClient))) {
-    void fanOutResultPushes().catch((err) =>
-      console.error(`[scoring] push fan-out (shadow mode) failed for pool ${poolId}:`, err),
-    )
-    void detectAndPushBadgesForPool(poolId).catch((err) =>
-      console.error(`[scoring] badge fan-out (shadow mode) failed for pool ${poolId}:`, err),
-    )
-    invalidatePoolCache(poolId)
-    return { success: true, poolId, predictionMode: 'shadow', entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0 }
-  }
-
   try {
     // 1. Fetch pool info
     const { data: pool, error: poolError } = await adminClient
@@ -93,6 +78,22 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
 
     if (poolError || !pool) {
       return { success: false, poolId, predictionMode: 'unknown', entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: `Pool not found: ${poolError?.message}` }
+    }
+
+    // Production-scoring kill-switch (shadow cutover). When prod scoring is
+    // disabled, skip the heavy recompute — the shadow engine covers
+    // full_tournament + progressive. bracket_picker has NO shadow engine, so it
+    // KEEPS scoring here regardless of the flag. Still fire the side-effect
+    // pushes (they read shadow scores when off). Fail-safe default ON.
+    if (pool.prediction_mode !== 'bracket_picker' && !(await isProdScoringEnabled(adminClient))) {
+      void fanOutResultPushes().catch((err) =>
+        console.error(`[scoring] push fan-out (shadow mode) failed for pool ${poolId}:`, err),
+      )
+      void detectAndPushBadgesForPool(poolId).catch((err) =>
+        console.error(`[scoring] badge fan-out (shadow mode) failed for pool ${poolId}:`, err),
+      )
+      invalidatePoolCache(poolId)
+      return { success: true, poolId, predictionMode: pool.prediction_mode, entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0 }
     }
 
     // 2. Fetch all required data in parallel
