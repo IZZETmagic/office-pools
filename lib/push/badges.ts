@@ -15,6 +15,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { BADGE_DEFINITIONS, LEVELS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { sendPushToUser } from './apns'
+import { isProdScoringEnabled } from '@/lib/scoring/prodScoringFlag'
 
 type Snapshot = {
   current_level: number
@@ -282,9 +283,11 @@ async function computeBadgeState(
   matches: MatchRow[],
   totalEntries: number,
 ): Promise<BadgeState> {
+  // Shadow-cutover mode (prod scoring off): read scores from the shadow table.
+  const scoreTable = (await isProdScoringEnabled(adminClient)) ? 'match_scores' : 'shadow_match_scores'
   const [scoreRes, predCountRes, entryRes] = await Promise.all([
     adminClient
-      .from('match_scores')
+      .from(scoreTable)
       .select('match_id, match_number, stage, score_type, total_points')
       .eq('entry_id', entryId)
       .order('match_number', { ascending: true }),

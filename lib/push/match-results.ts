@@ -23,6 +23,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendPushToUser } from './apns'
+import { isProdScoringEnabled } from '@/lib/scoring/prodScoringFlag'
 
 type PendingMatch = {
   match_id: string
@@ -78,6 +79,10 @@ async function claimMatch(
 export async function fanOutResultPushes(): Promise<void> {
   const adminClient = createAdminClient()
 
+  // Shadow-cutover mode (prod scoring off): read scores from the shadow table.
+  const prodScoring = await isProdScoringEnabled(adminClient)
+  const scoreTable = prodScoring ? 'match_scores' : 'shadow_match_scores'
+
   const { data: pending } = await adminClient
     .from('matches')
     .select(
@@ -92,11 +97,26 @@ export async function fanOutResultPushes(): Promise<void> {
   const matches = (pending ?? []) as unknown as PendingMatch[]
   if (matches.length === 0) return
 
+  // Timing guard (shadow mode only): don't claim + push a completed match until
+  // the shadow reconciler has actually scored it — otherwise we'd send stale/
+  // incomplete results and burn the one-shot cursor. shadow_match_state flips
+  // is_completed=true once the reconciler finishes; retry next cycle until then.
+  let readyMatchIds: Set<string> | null = null
+  if (!prodScoring) {
+    const { data: st } = await adminClient
+      .from('shadow_match_state')
+      .select('match_id')
+      .eq('is_completed', true)
+      .in('match_id', matches.map((m) => m.match_id))
+    readyMatchIds = new Set((st ?? []).map((r) => (r as { match_id: string }).match_id))
+  }
+
   for (const match of matches) {
+    if (readyMatchIds && !readyMatchIds.has(match.match_id)) continue
     const claimed = await claimMatch(adminClient, match.match_id)
     if (!claimed) continue
     try {
-      await fanOutForMatch(adminClient, match)
+      await fanOutForMatch(adminClient, match, scoreTable)
     } catch (err) {
       console.error('[match-results] fanOutForMatch error', match.match_id, err)
     }
@@ -106,10 +126,11 @@ export async function fanOutResultPushes(): Promise<void> {
 async function fanOutForMatch(
   adminClient: ReturnType<typeof createAdminClient>,
   match: PendingMatch,
+  scoreTable: 'match_scores' | 'shadow_match_scores',
 ): Promise<void> {
-  // 1. Find all match_scores for this match across all pools.
+  // 1. Find all scores for this match across all pools (prod or shadow table).
   const { data: rawScores } = await adminClient
-    .from('match_scores')
+    .from(scoreTable)
     .select('entry_id, pool_id, total_points, score_type')
     .eq('match_id', match.match_id)
   const scores = (rawScores ?? []) as ScoreRow[]

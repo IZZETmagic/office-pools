@@ -33,6 +33,7 @@ import { calculateBracketPicker, type BracketPickerInput } from './bracket'
 import type { BPEntryWithPicks } from './types'
 import { diffRows, matchScoreKey, matchScoreValue, bonusScoreKey, bonusScoreValue } from './diffWrite'
 import { syncShadowResolvedBracketsPiggyback } from './shadowBrackets'
+import { isProdScoringEnabled } from './prodScoringFlag'
 
 // ----- Public API -----
 
@@ -66,6 +67,21 @@ export type RecalculateResult = {
 export async function recalculatePool(options: RecalculateOptions): Promise<RecalculateResult> {
   const { poolId } = options
   const adminClient = createAdminClient()
+
+  // Production-scoring kill-switch (shadow cutover). When prod scoring is
+  // disabled, the shadow engine is the sole scorer — skip the heavy recompute
+  // entirely (this is where the CPU goes). STILL fire the side-effect pushes:
+  // in this mode they read shadow scores (see lib/push/*). Fail-safe default ON.
+  if (!(await isProdScoringEnabled(adminClient))) {
+    void fanOutResultPushes().catch((err) =>
+      console.error(`[scoring] push fan-out (shadow mode) failed for pool ${poolId}:`, err),
+    )
+    void detectAndPushBadgesForPool(poolId).catch((err) =>
+      console.error(`[scoring] badge fan-out (shadow mode) failed for pool ${poolId}:`, err),
+    )
+    invalidatePoolCache(poolId)
+    return { success: true, poolId, predictionMode: 'shadow', entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0 }
+  }
 
   try {
     // 1. Fetch pool info
