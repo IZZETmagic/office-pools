@@ -4,7 +4,8 @@ import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } fr
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
-import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
@@ -29,6 +30,7 @@ type LeaderboardTabProps = {
   allBPThirdPlaceRankings?: BPThirdPlaceRanking[]
   allBPKnockoutPicks?: BPKnockoutPick[]
   bpProvisionalScoring?: boolean
+  tournamentAwards?: PodiumResult | null
 }
 
 // =============================================
@@ -66,6 +68,7 @@ export function LeaderboardTab({
   allBPThirdPlaceRankings = [],
   allBPKnockoutPicks = [],
   bpProvisionalScoring = false,
+  tournamentAwards = null,
 }: LeaderboardTabProps) {
   const isMultiEntry = maxEntriesPerUser > 1
 
@@ -931,6 +934,36 @@ export function LeaderboardTab({
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
 
+  // The selected entry's PREDICTED podium (champion/runner-up/third), derived from
+  // their bracket via the same resolver the scoring engine uses. Powers the
+  // pick-vs-actual "Tournament Podium" section in the breakdown modal. Computed
+  // lazily for the open entry only (bracket_picker has its own bp_champion path).
+  const selectedPredictedPodium = useMemo<PodiumResult | null>(() => {
+    if (!selectedEntry || predictionMode === 'bracket_picker') return null
+    const predictionMap: PredictionMap = new Map()
+    for (const p of allPredictions) {
+      if (p.entry_id !== selectedEntry.entry_id) continue
+      predictionMap.set(p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null,
+        awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      })
+    }
+    if (predictionMap.size === 0) return null
+    const podium = computeEntryPredictedPodium({
+      matches,
+      predictionMap,
+      teams: tournamentTeams,
+      conductData,
+      predictionMode,
+    })
+    const norm = (g: GroupStanding | null) =>
+      g ? { team_id: g.team_id, country_name: g.country_name, flag_url: g.flag_url ?? null } : null
+    return { champion: norm(podium.champion), runnerUp: norm(podium.runnerUp), thirdPlace: norm(podium.thirdPlace) }
+  }, [selectedEntry, allPredictions, matches, tournamentTeams, conductData, predictionMode])
+
   // === ANIMATION: Rank Shuffle (FLIP) ===
   const prevSortOrderRef = useRef<Map<string, number>>(new Map())
   const [shuffleOffsets, setShuffleOffsets] = useState<Map<string, number>>(new Map())
@@ -1678,6 +1711,8 @@ export function LeaderboardTab({
           matches={matches}
           entryMatchScores={matchScoresByEntry.get(selectedEntry.entry_id) || []}
           predictionMode={predictionMode}
+          actualPodium={tournamentAwards}
+          predictedPodium={selectedPredictedPodium}
         />
       )}
     </div>

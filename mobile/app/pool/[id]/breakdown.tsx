@@ -285,6 +285,7 @@ function Content({
       ) : null}
       {!isBP ? <MatchPointsSection results={data.match_results} /> : null}
       <BonusPointsSection entries={data.bonus_entries} isBP={isBP} />
+      {!isBP ? <PodiumSection data={data} /> : null}
       {isBP ? (
         <BPScoringRulesSection settings={data.pool_settings} />
       ) : (
@@ -923,6 +924,119 @@ function StatusCountPill({
   );
 }
 
+function PodiumSection({ data }: { data: BreakdownResponse }) {
+  const theme = useTheme();
+  const actual = data.actual_podium;
+  const predicted = data.predicted_podium;
+  const s = data.pool_settings;
+  if (!actual?.champion) return null;
+
+  const bonusByType = new Map(
+    data.bonus_entries
+      .filter((b) => b.bonus_category === 'tournament')
+      .map((b) => [b.bonus_type, b] as const),
+  );
+  const defs = [
+    { key: 'champion', label: 'Champion', medal: '🥇', cfg: s.bonus_champion_correct ?? 0, actual: actual.champion, predicted: predicted?.champion ?? null, bonusType: 'champion_correct' },
+    { key: 'runnerUp', label: 'Runner-up', medal: '🥈', cfg: s.bonus_second_place_correct ?? 0, actual: actual.runnerUp, predicted: predicted?.runnerUp ?? null, bonusType: 'second_place_correct' },
+    { key: 'thirdPlace', label: 'Third place', medal: '🥉', cfg: s.bonus_third_place_correct ?? 0, actual: actual.thirdPlace, predicted: predicted?.thirdPlace ?? null, bonusType: 'third_place_correct' },
+  ];
+  const rows = defs
+    .filter((d) => (d.cfg ?? 0) > 0)
+    .map((d) => {
+      const earned = bonusByType.get(d.bonusType)?.points_earned ?? 0;
+      const hit =
+        earned > 0 ||
+        (!!d.predicted?.team_id && !!d.actual?.team_id && d.predicted.team_id === d.actual.team_id);
+      return { ...d, earned, hit };
+    });
+  if (rows.length === 0) return null;
+  const subtotal = rows.reduce((sum, r) => sum + r.earned, 0);
+
+  return (
+    <View style={{ gap: theme.spacing.md }}>
+      <SectionHeader label="Tournament Podium" />
+      <View
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radii.lg,
+          ...theme.shadows.card,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+        >
+          <RNText style={{ ...typography.cardTitle, color: theme.colors.ink, flexShrink: 1 }} numberOfLines={1}>
+            Final Standings
+          </RNText>
+          <RNText
+            style={{
+              fontFamily: MONO_BOLD,
+              fontSize: 14,
+              fontWeight: '800',
+              color: theme.colors.amber,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {subtotal.toLocaleString()} pts
+          </RNText>
+        </View>
+        <View>
+          {rows.map((r) => (
+            <View
+              key={r.key}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+              }}
+            >
+              <RNText style={{ fontSize: 16 }}>{r.medal}</RNText>
+              <View style={{ flex: 1 }}>
+                <RNText style={{ ...typography.body, color: theme.colors.ink }}>
+                  <RNText style={{ color: theme.colors.slate }}>{r.label}: </RNText>
+                  <RNText style={{ fontFamily: fontFamilies.semibold }}>
+                    {r.actual?.country_name ?? '—'}
+                  </RNText>
+                </RNText>
+                <RNText
+                  style={{
+                    fontFamily: fontFamilies.medium,
+                    fontSize: 12,
+                    marginTop: 2,
+                    color: r.hit ? theme.colors.green : theme.colors.slate,
+                  }}
+                >
+                  {r.hit ? '✓ You called it' : `Your pick: ${r.predicted?.country_name ?? 'no pick'}`}
+                </RNText>
+              </View>
+              <RNText
+                style={{
+                  fontFamily: MONO_BOLD,
+                  fontSize: 12,
+                  fontWeight: '800',
+                  color: r.hit ? theme.colors.green : theme.colors.slate,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {r.hit ? `+${r.earned.toLocaleString()}` : '0'}
+              </RNText>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function BonusPointsSection({
   entries,
   isBP,
@@ -940,7 +1054,11 @@ function BonusPointsSection({
   const order = isBP ? BP_CATEGORY_ORDER : BONUS_CATEGORY_ORDER;
   const knownOrdered = order.filter((c) => grouped.has(c));
   const extras = [...grouped.keys()].filter((c) => !order.includes(c)).sort();
-  const orderedCategories = [...knownOrdered, ...extras];
+  // 'tournament' is shown in the dedicated PodiumSection (which also renders misses),
+  // so exclude it from the generic bonus list for classic pools.
+  const orderedCategories = [...knownOrdered, ...extras].filter(
+    (c) => isBP || c !== 'tournament',
+  );
 
   const sectionLabel = isBP ? 'Points Breakdown' : 'Bonus Points';
   const emptyTitle = isBP

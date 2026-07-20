@@ -195,6 +195,22 @@ export type PlayerScoreData = {
   total_points: number
 }
 
+// A single podium finisher (actual result OR an entry's prediction), trimmed to
+// what the points-breakdown UI needs to render a flag + name.
+export type PodiumTeam = {
+  team_id: string
+  country_name: string
+  flag_url: string | null
+}
+
+// Champion / runner-up / third place. Used for both the ACTUAL tournament result
+// (from tournament_awards) and an entry's PREDICTED podium (from the bracket).
+export type PodiumResult = {
+  champion: PodiumTeam | null
+  runnerUp: PodiumTeam | null
+  thirdPlace: PodiumTeam | null
+}
+
 export type BonusScoreData = {
   bonus_id: string
   entry_id: string

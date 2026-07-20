@@ -48,6 +48,7 @@ import type {
   BPGroupRanking,
   BPThirdPlaceRanking,
   BPKnockoutPick,
+  PodiumResult,
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 import { formatTimeAgo } from '@/lib/format'
@@ -134,6 +135,9 @@ type PoolDetailProps = {
   /** Live provisional bracket group scoring flag (sync_settings) — keeps
    * client-side bracket score computations consistent with stored totals. */
   bpProvisionalScoring?: boolean
+  /** Final podium (champion/runner-up/third) from tournament_awards; null until
+   * finalized. Feeds the pick-vs-actual "Tournament Podium" breakdown section. */
+  tournamentAwards?: PodiumResult | null
 }
 
 // =====================
@@ -169,6 +173,7 @@ export function PoolDetail({
   allBPGroupRankings = [],
   allBPThirdPlaceRankings = [],
   allBPKnockoutPicks = [],
+  tournamentAwards = null,
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -1274,6 +1279,7 @@ export function PoolDetail({
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
                 bpProvisionalScoring={bpProvisionalScoring}
+                tournamentAwards={tournamentAwards}
               />
             )}
 

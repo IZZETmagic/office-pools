@@ -32,6 +32,7 @@ import type {
   TeamData,
   MatchScoreData,
   BonusScoreData,
+  PodiumResult,
 } from '@/app/pools/[pool_id]/types'
 
 export const POOL_CACHE_TTL_SECONDS = 45
@@ -81,6 +82,9 @@ export type PoolSharedData = {
   matchScores: MatchScoreData[]
   bonusScores: BonusScoreData[]
   bpProvisionalScoring: boolean
+  // Final tournament podium (from tournament_awards), or null until finalized.
+  // Drives the "Tournament Podium" pick-vs-actual section in the points breakdown.
+  tournamentAwards: PodiumResult | null
 }
 // NOTE: the bracket_picker all-entries data (allBP*) is intentionally NOT here.
 // Its RLS makes it per-VIEWER (a non-admin member can only read their own
@@ -144,6 +148,7 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     return {
       pool: null, members: [], matches: [], settings: null, teams: [], allPredictions: [],
       conductData: [], matchScores: [], bonusScores: [], bpProvisionalScoring: false,
+      tournamentAwards: null,
     }
   }
 
@@ -255,9 +260,31 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   const bpProvisionalScoring =
     bpProvisionalRow?.setting_value === true || bpProvisionalRow?.setting_value === 'true'
 
+  // Final podium (champion/runner-up/third). Populated manually at tournament end;
+  // null until then. Names/flags resolved from the already-loaded teams list so we
+  // avoid extra joins and FK-hint coupling.
+  const { data: awardsRow } = await admin
+    .from('tournament_awards')
+    .select('champion_team_id, runner_up_team_id, third_place_team_id')
+    .eq('tournament_id', pool.tournament_id)
+    .maybeSingle()
+  const teamById = new Map(teams.map((t) => [t.team_id, t]))
+  const toPodiumTeam = (id: string | null | undefined) => {
+    if (!id) return null
+    const t = teamById.get(id)
+    return t ? { team_id: t.team_id, country_name: t.country_name, flag_url: t.flag_url ?? null } : null
+  }
+  const tournamentAwards: PodiumResult | null = awardsRow
+    ? {
+        champion: toPodiumTeam(awardsRow.champion_team_id),
+        runnerUp: toPodiumTeam(awardsRow.runner_up_team_id),
+        thirdPlace: toPodiumTeam(awardsRow.third_place_team_id),
+      }
+    : null
+
   return {
     pool, members, matches, settings, teams, allPredictions, conductData, matchScores,
-    bonusScores, bpProvisionalScoring,
+    bonusScores, bpProvisionalScoring, tournamentAwards,
   }
 }
 

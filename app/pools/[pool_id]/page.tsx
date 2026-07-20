@@ -61,7 +61,7 @@ export default async function PoolPage({
 
   const {
     members, matches, settings, teams, allPredictions, conductData, matchScores,
-    bonusScores, bpProvisionalScoring,
+    bonusScores, bpProvisionalScoring, tournamentAwards,
   } = shared
 
   // ---- PER-USER derivations on top of shared data ------------------------
@@ -198,6 +198,7 @@ export default async function PoolPage({
     <PoolDetail
       pool={pool}
       bpProvisionalScoring={bpProvisionalScoring}
+      tournamentAwards={tournamentAwards}
       members={members}
       matches={matches}
       settings={settings}

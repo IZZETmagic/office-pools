@@ -3,7 +3,7 @@
 import { useMemo, useCallback, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
-import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData } from './types'
+import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData, PodiumResult } from './types'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
 
@@ -28,6 +28,10 @@ type PointsBreakdownModalProps = {
   matches: MatchData[]
   entryMatchScores: MatchScoreData[]
   predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
+  // Actual final podium (tournament_awards) + this entry's predicted podium.
+  // Drive the always-visible "Tournament Podium" pick-vs-actual section.
+  actualPodium?: PodiumResult | null
+  predictedPodium?: PodiumResult | null
 }
 
 type MatchPointDetail = {
@@ -139,6 +143,8 @@ export function PointsBreakdownModal({
   matches,
   entryMatchScores,
   predictionMode = 'full_tournament',
+  actualPodium = null,
+  predictedPodium = null,
 }: PointsBreakdownModalProps) {
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
@@ -255,6 +261,31 @@ export function PointsBreakdownModal({
     }
     return stats
   }, [predictionMode, groupedBonuses])
+
+  // Tournament Podium (champion / runner-up / third). Always rendered once the
+  // tournament is finalized so a member who MISSED sees their pick vs the actual
+  // result (0 pts) instead of a vanished section. Only positions the pool actually
+  // scores (points > 0) are listed. bracket_picker has its own bp_champion display.
+  const podiumRows = useMemo(() => {
+    if (predictionMode === 'bracket_picker' || !actualPodium?.champion) return []
+    const bonusByType = new Map(
+      bonusScores.filter((b) => b.bonus_category === 'tournament').map((b) => [b.bonus_type, b] as const),
+    )
+    const defs = [
+      { key: 'champion', label: 'Champion', medal: '🥇', cfg: poolSettings.bonus_champion_correct ?? 0, actual: actualPodium.champion, predicted: predictedPodium?.champion ?? null, bonusType: 'champion_correct' },
+      { key: 'runnerUp', label: 'Runner-up', medal: '🥈', cfg: poolSettings.bonus_second_place_correct ?? 0, actual: actualPodium.runnerUp, predicted: predictedPodium?.runnerUp ?? null, bonusType: 'second_place_correct' },
+      { key: 'thirdPlace', label: 'Third place', medal: '🥉', cfg: poolSettings.bonus_third_place_correct ?? 0, actual: actualPodium.thirdPlace, predicted: predictedPodium?.thirdPlace ?? null, bonusType: 'third_place_correct' },
+    ]
+    return defs
+      .filter((d) => (d.cfg ?? 0) > 0)
+      .map((d) => {
+        const earned = bonusByType.get(d.bonusType)?.points_earned ?? 0
+        const hit = earned > 0 || (!!d.predicted?.team_id && !!d.actual?.team_id && d.predicted.team_id === d.actual.team_id)
+        return { ...d, earned, hit }
+      })
+  }, [predictionMode, actualPodium, predictedPodium, poolSettings, bonusScores])
+
+  const podiumSubtotal = useMemo(() => podiumRows.reduce((s, r) => s + r.earned, 0), [podiumRows])
 
   const rank = entry.current_rank
   const playerName = entry.users?.full_name || entry.users?.username || 'Unknown Player'
@@ -730,6 +761,9 @@ export function PointsBreakdownModal({
                 ) : (
                   <div className="space-y-3">
                     {BONUS_CATEGORY_ORDER.map((category) => {
+                      // 'tournament' is rendered by the dedicated Tournament Podium
+                      // section below (which also shows missed picks), so skip it here.
+                      if (category === 'tournament') return null
                       const catEntries = groupedBonuses.get(category)
                       if (!catEntries || catEntries.length === 0) return null
                       const subtotal = categorySubtotals.get(category) ?? 0
@@ -766,6 +800,48 @@ export function PointsBreakdownModal({
                   </div>
                 )}
               </div>
+
+              {/* ========================================== */}
+              {/* TOURNAMENT PODIUM (pick vs actual)         */}
+              {/* ========================================== */}
+              {podiumRows.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider mb-3 pb-2 border-b border-neutral-100 dark:border-border-default">
+                    Tournament Podium
+                  </h3>
+                  <div className="border border-neutral-200 dark:border-border-default rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-neutral-100">
+                      <span className="text-xs font-semibold text-neutral-900">Final Standings</span>
+                      <span className="text-xs font-bold text-neutral-900 flex-shrink-0">{formatNumber(podiumSubtotal)} pts</span>
+                    </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-border-default">
+                      {podiumRows.map((row) => (
+                        <div key={row.key} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="flex-shrink-0">{row.medal}</span>
+                              <span className="font-medium text-neutral-500">{row.label}:</span>
+                              <span className="font-semibold text-neutral-900">{row.actual?.country_name ?? '—'}</span>
+                            </div>
+                            <div className="mt-0.5 pl-6 text-[11px]">
+                              {row.hit ? (
+                                <span className="font-medium text-success-600">✓ You called it</span>
+                              ) : (
+                                <span className="text-neutral-400">
+                                  Your pick: <span className="text-neutral-500">{row.predicted?.country_name ?? 'no pick'}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`flex-shrink-0 font-semibold ${row.hit ? 'text-success-600' : 'text-neutral-400'}`}>
+                            {row.hit ? `+${formatNumber(row.earned)}` : '0'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* ========================================== */}
               {/* SCORING RULES REFERENCE                    */}

@@ -5,6 +5,10 @@ import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
 import { getScoringSource, readMatchScores, readBonusScores, readEntryScoring } from '@/lib/scoring/readSource'
+import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
+
+type PodiumTeamApi = { team_id: string; country_name: string; flag_url: string | null }
+type PodiumApi = { champion: PodiumTeamApi | null; runnerUp: PodiumTeamApi | null; thirdPlace: PodiumTeamApi | null }
 
 // =============================================================
 // GET /api/pools/:poolId/entries/:entryId/breakdown
@@ -81,8 +85,16 @@ type BreakdownResponse = {
     pso_exact_score: number | null
     pso_correct_difference: number | null
     pso_correct_result: number | null
+    bonus_champion_correct: number
+    bonus_second_place_correct: number
+    bonus_third_place_correct: number
   }
   prediction_mode: string
+  // Final podium (tournament_awards) + this entry's predicted podium. Null until
+  // the tournament is finalized / for bracket_picker. Powers the pick-vs-actual
+  // "Tournament Podium" section so a member who missed sees why (0 pts).
+  actual_podium: PodiumApi | null
+  predicted_podium: PodiumApi | null
 }
 
 async function handleGET(
@@ -158,7 +170,7 @@ async function handleGET(
     readMatchScores(adminClient, [entry_id], source),
     adminClient
       .from('matches')
-      .select('match_id, match_number, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
+      .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
       .eq('tournament_id', pool.tournament_id),
     adminClient
       .from('pool_settings')
@@ -168,7 +180,7 @@ async function handleGET(
     readBonusScores(adminClient, [entry_id], source),
     adminClient
       .from('teams')
-      .select('team_id, country_name')
+      .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
     readEntryScoring(adminClient, [entry_id], source),
   ])
@@ -239,6 +251,73 @@ async function handleGET(
   const bonusPoints = bonusEntries.reduce((sum, b) => sum + b.points_earned, 0)
   const adjustment = entryScore?.point_adjustment ?? 0
 
+  // 9b. Tournament podium: the entry's PREDICTED podium (via the shared resolver the
+  // scoring engine uses) vs the ACTUAL result (tournament_awards). full/progressive
+  // only — bracket_picker surfaces its champion via the bp_champion bonus row.
+  let predictedPodium: PodiumApi | null = null
+  let actualPodium: PodiumApi | null = null
+  if (pool.prediction_mode !== 'bracket_picker') {
+    const matchIds = (matches || []).map((m: any) => m.match_id)
+    const [{ data: preds }, { data: conduct }, { data: awardsRow }] = await Promise.all([
+      adminClient
+        .from('predictions')
+        .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
+        .eq('entry_id', entry_id),
+      matchIds.length
+        ? adminClient
+            .from('match_conduct')
+            .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
+            .in('match_id', matchIds)
+        : Promise.resolve({ data: [] as any[] }),
+      adminClient
+        .from('tournament_awards')
+        .select('champion_team_id, runner_up_team_id, third_place_team_id')
+        .eq('tournament_id', pool.tournament_id)
+        .maybeSingle(),
+    ])
+
+    const bracketMatches = (matches || []).map((m: any) => ({
+      ...m,
+      home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
+      away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
+    }))
+    const predictionMap = new Map<string, any>()
+    for (const p of (preds as any[]) || []) {
+      predictionMap.set(p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null,
+        awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      })
+    }
+    if (predictionMap.size > 0) {
+      const podium = computeEntryPredictedPodium({
+        matches: bracketMatches as any,
+        predictionMap,
+        teams: (teams || []) as any,
+        conductData: (conduct as any) || [],
+        predictionMode: pool.prediction_mode as 'full_tournament' | 'progressive',
+      })
+      const norm = (g: any): PodiumTeamApi | null =>
+        g ? { team_id: g.team_id, country_name: g.country_name, flag_url: g.flag_url ?? null } : null
+      predictedPodium = { champion: norm(podium.champion), runnerUp: norm(podium.runnerUp), thirdPlace: norm(podium.thirdPlace) }
+    }
+    if (awardsRow?.champion_team_id) {
+      const teamMap = new Map((teams || []).map((t: any) => [t.team_id, t]))
+      const toTeam = (id: string | null | undefined): PodiumTeamApi | null => {
+        if (!id) return null
+        const t: any = teamMap.get(id)
+        return t ? { team_id: t.team_id, country_name: t.country_name, flag_url: t.flag_url ?? null } : null
+      }
+      actualPodium = {
+        champion: toTeam(awardsRow.champion_team_id),
+        runnerUp: toTeam(awardsRow.runner_up_team_id),
+        thirdPlace: toTeam(awardsRow.third_place_team_id),
+      }
+    }
+  }
+
   // 10. Build response
   const response: BreakdownResponse = {
     entry: {
@@ -277,8 +356,13 @@ async function handleGET(
       pso_exact_score: settings.pso_enabled ? settings.pso_exact_score : null,
       pso_correct_difference: settings.pso_enabled ? settings.pso_correct_difference : null,
       pso_correct_result: settings.pso_enabled ? settings.pso_correct_result : null,
+      bonus_champion_correct: settings.bonus_champion_correct ?? 0,
+      bonus_second_place_correct: settings.bonus_second_place_correct ?? 0,
+      bonus_third_place_correct: settings.bonus_third_place_correct ?? 0,
     },
     prediction_mode: pool.prediction_mode,
+    actual_podium: actualPodium,
+    predicted_podium: predictedPodium,
   }
 
   return NextResponse.json(response)

@@ -7,7 +7,7 @@ import {
   GROUP_LETTERS,
   getKnockoutWinner,
 } from './tournament'
-import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from './bracketResolver'
+import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, resolvePredictedPodium, type BracketResult } from './bracketResolver'
 import { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // Extended match type that includes actual result fields (from DB query)
@@ -360,38 +360,11 @@ function calculateTournamentPodiumBonuses(
 ): BonusScoreEntry[] {
   const bonuses: BonusScoreEntry[] = []
 
-  // Derive predicted podium: use bracket resolution for champion/runner-up/third-place.
-  // For progressive mode, the bracket's knockoutTeamMap uses actual teams,
-  // so getKnockoutWinner on the final/third-place matches gives the correct predictions.
-  let predictedChampion = predictedBracket.champion
-  let predictedRunnerUp = predictedBracket.runnerUp
-  let predictedThirdPlace = predictedBracket.thirdPlace
-
-  // If bracket resolution didn't resolve podium (progressive mode edge case),
-  // try deriving directly from user's final/third-place predictions
-  if (!predictedChampion || !predictedRunnerUp) {
-    const finalMatch = matches.find(m => m.stage === 'final')
-    if (finalMatch) {
-      const finalTeams = predictedBracket.knockoutTeamMap.get(finalMatch.match_number)
-      if (finalTeams?.home && finalTeams?.away) {
-        const winner = getKnockoutWinner(finalMatch.match_id, memberPredictions, finalTeams.home, finalTeams.away)
-        const loser = winner?.team_id === finalTeams.home.team_id ? finalTeams.away : finalTeams.home
-        if (winner) predictedChampion = winner
-        if (loser) predictedRunnerUp = loser
-      }
-    }
-  }
-
-  if (!predictedThirdPlace) {
-    const thirdPlaceMatch = matches.find(m => m.stage === 'third_place')
-    if (thirdPlaceMatch) {
-      const thirdTeams = predictedBracket.knockoutTeamMap.get(thirdPlaceMatch.match_number)
-      if (thirdTeams?.home && thirdTeams?.away) {
-        const winner = getKnockoutWinner(thirdPlaceMatch.match_id, memberPredictions, thirdTeams.home, thirdTeams.away)
-        if (winner) predictedThirdPlace = winner
-      }
-    }
-  }
+  // Derive predicted podium (champion/runner-up/third place) from the effective
+  // predicted bracket. Shared with the points-breakdown UI via resolvePredictedPodium
+  // so scoring and display never diverge on what a member "picked".
+  const { champion: predictedChampion, runnerUp: predictedRunnerUp, thirdPlace: predictedThirdPlace } =
+    resolvePredictedPodium({ predictedBracket, matches, predictionMap: memberPredictions })
 
   // Champion
   if (tournamentAwards?.champion_team_id && predictedChampion) {

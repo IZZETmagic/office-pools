@@ -684,6 +684,10 @@ export type BreakdownPoolSettings = {
   pso_exact_score: number | null;
   pso_correct_difference: number | null;
   pso_correct_result: number | null;
+  // Tournament podium bonus values (0 = disabled for that position).
+  bonus_champion_correct?: number;
+  bonus_second_place_correct?: number;
+  bonus_third_place_correct?: number;
   // Bracket-picker settings (present once API exposes them; until then we
   // render defaults that match the web fallbacks).
   bp_group_correct_1st?: number;
@@ -725,6 +729,20 @@ export type BreakdownResponse = {
   bonus_entries: BreakdownBonusEntry[];
   pool_settings: BreakdownPoolSettings;
   prediction_mode: string;
+  actual_podium: BreakdownPodium | null;
+  predicted_podium: BreakdownPodium | null;
+};
+
+export type BreakdownPodiumTeam = {
+  team_id: string;
+  country_name: string;
+  flag_url: string | null;
+};
+
+export type BreakdownPodium = {
+  champion: BreakdownPodiumTeam | null;
+  runnerUp: BreakdownPodiumTeam | null;
+  thirdPlace: BreakdownPodiumTeam | null;
 };
 
 export function fetchBreakdown(poolId: string, entryId: string) {
