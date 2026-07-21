@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
-import { resolvePredictedBracket } from '@/lib/bracketResolver'
+import { resolvePredictedBracket, computeEntryPredictedPodium } from '@/lib/bracketResolver'
 import type { PredictionMap, Team, MatchConductData } from '@/lib/tournament'
 import { GROUP_LETTERS } from '@/lib/tournament'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -45,11 +45,23 @@ async function handlePOST(
   // 3. Fetch pool and tournament info
   const { data: pool } = await adminClient
     .from('pools')
-    .select('pool_id, tournament_id')
+    .select('pool_id, tournament_id, prediction_mode')
     .eq('pool_id', pool_id)
     .single()
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  // bracket_picker stores its picks in bracket_picker_* tables and scores them in
+  // lib/bracketPickerScoring — it never writes `predictions`. Running this route
+  // against one would delete its bonus rows and rebuild nothing.
+  // (Mirrors the guard in app/api/pools/[pool_id]/bracket-picks/calculate/route.ts.)
+  if (pool.prediction_mode === 'bracket_picker') {
+    return NextResponse.json(
+      { error: 'Use /bracket-picks/calculate for bracket_picker pools' },
+      { status: 400 }
+    )
+  }
+  const predictionMode = pool.prediction_mode as 'full_tournament' | 'progressive'
 
   // 4. Fetch all needed data in parallel (use adminClient to bypass RLS)
   const [
@@ -190,6 +202,7 @@ async function handlePOST(
       conductData: conduct,
       settings,
       tournamentAwards,
+      predictionMode,
     })
 
     // Collect bonus rows for bulk insert
@@ -229,12 +242,22 @@ async function handlePOST(
       })
     }
 
-    // Compute special predictions row (pure computation)
+    // Compute special predictions row (pure computation).
+    // Goes through the shared podium resolver, NOT the raw cascade: reading
+    // `bracket.champion` here is exactly the bug that left 97% of progressive
+    // rows in this table NULL and the rest wrong.
+    const specialPodium = computeEntryPredictedPodium({
+      matches: normalizedMatches,
+      predictionMap,
+      teams: teamsData,
+      conductData: conduct,
+      predictionMode,
+    })
     allSpecialRows.push({
       entry_id: entry.entry_id,
-      predicted_champion_team_id: bracket.champion?.team_id || null,
-      predicted_runner_up_team_id: bracket.runnerUp?.team_id || null,
-      predicted_third_place_team_id: bracket.thirdPlace?.team_id || null,
+      predicted_champion_team_id: specialPodium.champion?.team_id || null,
+      predicted_runner_up_team_id: specialPodium.runnerUp?.team_id || null,
+      predicted_third_place_team_id: specialPodium.thirdPlace?.team_id || null,
     })
   }
 

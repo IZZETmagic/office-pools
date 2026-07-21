@@ -14,6 +14,7 @@ import {
   type RoundKey,
   ROUND_MATCH_STAGES,
 } from './tournament'
+import { resolveEntryPodiumPick, type PredictedPodium, type PredictionMode } from './podium'
 
 export type BracketResult = {
   allGroupStandings: Map<string, GroupStanding[]>
@@ -267,94 +268,49 @@ export function buildActualResultsMap(matches: Match[]): PredictionMap {
   return map
 }
 
-export type PredictedPodium = {
-  champion: GroupStanding | null
-  runnerUp: GroupStanding | null
-  thirdPlace: GroupStanding | null
-}
+export type { PredictedPodium } from './podium'
 
 /**
- * The three podium finishers (champion / runner-up / third place) an entry
- * PREDICTED, derived from an already-resolved (effective) predicted bracket.
+ * One-call predicted podium for an entry — the SAME derivation the scoring
+ * engine applies, so display and points can never disagree about what a member
+ * picked.
  *
- * This is the EXACT derivation the scoring engine applies in
- * `calculateTournamentPodiumBonuses` — extracted here so that scoring AND display
- * read the podium picks from a single source of truth. Do not fork this logic.
- */
-export function resolvePredictedPodium(params: {
-  predictedBracket: BracketResult
-  matches: Match[]
-  predictionMap: PredictionMap
-}): PredictedPodium {
-  const { predictedBracket, matches, predictionMap } = params
-  let champion = predictedBracket.champion
-  let runnerUp = predictedBracket.runnerUp
-  let thirdPlace = predictedBracket.thirdPlace
-
-  // Progressive edge case: a prediction-only bracket may not resolve the podium
-  // (the user never built their own knockout tree), so fall back to the final and
-  // third-place picks over the effective (actual-team) knockout map.
-  if (!champion || !runnerUp) {
-    const finalMatch = matches.find(m => m.stage === 'final')
-    if (finalMatch) {
-      const finalTeams = predictedBracket.knockoutTeamMap.get(finalMatch.match_number)
-      if (finalTeams?.home && finalTeams?.away) {
-        const winner = getKnockoutWinner(finalMatch.match_id, predictionMap, finalTeams.home, finalTeams.away)
-        const loser = winner?.team_id === finalTeams.home.team_id ? finalTeams.away : finalTeams.home
-        if (winner) champion = winner
-        if (loser) runnerUp = loser
-      }
-    }
-  }
-
-  if (!thirdPlace) {
-    const thirdPlaceMatch = matches.find(m => m.stage === 'third_place')
-    if (thirdPlaceMatch) {
-      const thirdTeams = predictedBracket.knockoutTeamMap.get(thirdPlaceMatch.match_number)
-      if (thirdTeams?.home && thirdTeams?.away) {
-        const winner = getKnockoutWinner(thirdPlaceMatch.match_id, predictionMap, thirdTeams.home, thirdTeams.away)
-        if (winner) thirdPlace = winner
-      }
-    }
-  }
-
-  return { champion, runnerUp, thirdPlace }
-}
-
-/**
- * One-call predicted podium for an entry, matching the scoring engine exactly
- * across prediction modes:
- *   - full_tournament: the entry's own predicted bracket.
- *   - progressive: predicted bracket with the knockout map swapped to the ACTUAL
- *     fixtures (users predict against real teams) — mirrors bonusCalculation's
- *     `effectivePredictedBracket`.
- *   - bracket_picker: returns an empty podium; that mode derives its champion from
- *     the bracket_picker_knockout_picks final pick, not from this resolver.
+ * This is a thin adapter: it assembles the brackets and hands off to
+ * `resolveEntryPodiumPick` in lib/podium.ts, which owns the per-mode rules.
+ * `predictionMode` is required — a caller that does not know the mode cannot
+ * compute a correct podium, and defaulting it is what caused the incident.
  */
 export function computeEntryPredictedPodium(params: {
   matches: Match[]
   predictionMap: PredictionMap
   teams: Team[]
   conductData?: MatchConductData[]
-  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
+  predictionMode: PredictionMode
 }): PredictedPodium {
-  const { matches, predictionMap, teams, conductData = [], predictionMode = 'full_tournament' } = params
+  const { matches, predictionMap, teams, conductData = [], predictionMode } = params
   if (predictionMode === 'bracket_picker') {
     return { champion: null, runnerUp: null, thirdPlace: null }
   }
 
   const predictedBracket = resolvePredictedBracket({ matches, predictionMap, teams })
 
-  let effective = predictedBracket
-  if (predictionMode === 'progressive') {
-    const actualBracket = resolveActualBracket({
-      matches,
-      predictionMap: buildActualResultsMap(matches),
-      teams,
-      conductData,
-    })
-    effective = { ...predictedBracket, knockoutTeamMap: actualBracket.knockoutTeamMap }
-  }
+  // Progressive members predict the REAL fixtures, so their picks must be read
+  // against the actual knockout pairings rather than their own cascade.
+  const actualKnockoutTeamMap =
+    predictionMode === 'progressive'
+      ? resolveActualBracket({
+          matches,
+          predictionMap: buildActualResultsMap(matches),
+          teams,
+          conductData,
+        }).knockoutTeamMap
+      : undefined
 
-  return resolvePredictedPodium({ predictedBracket: effective, matches, predictionMap })
+  return resolveEntryPodiumPick({
+    mode: predictionMode,
+    matches,
+    predictionMap,
+    predictedBracket,
+    actualKnockoutTeamMap,
+  })
 }

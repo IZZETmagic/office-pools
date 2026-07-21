@@ -6,6 +6,7 @@ import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import { withPerfLogging } from '@/lib/api-perf'
 import { getScoringSource, readMatchScores, readBonusScores, readEntryScoring } from '@/lib/scoring/readSource'
 import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
+import { resolveActualPodium } from '@/lib/podium'
 
 type PodiumTeamApi = { team_id: string; country_name: string; flag_url: string | null }
 type PodiumApi = { champion: PodiumTeamApi | null; runnerUp: PodiumTeamApi | null; thirdPlace: PodiumTeamApi | null }
@@ -303,7 +304,12 @@ async function handleGET(
         g ? { team_id: g.team_id, country_name: g.country_name, flag_url: g.flag_url ?? null } : null
       predictedPodium = { champion: norm(podium.champion), runnerUp: norm(podium.runnerUp), thirdPlace: norm(podium.thirdPlace) }
     }
-    if (awardsRow?.champion_team_id) {
+    // Derived from the completed final / third-place matches, with the
+    // tournament_awards row as an optional admin override — same resolver the
+    // scoring engine uses, so "actual podium" here can never disagree with the
+    // podium the points were awarded against.
+    const actual = resolveActualPodium(bracketMatches, awardsRow)
+    if (actual.champion || actual.runnerUp || actual.thirdPlace) {
       const teamMap = new Map((teams || []).map((t: any) => [t.team_id, t]))
       const toTeam = (id: string | null | undefined): PodiumTeamApi | null => {
         if (!id) return null
@@ -311,9 +317,9 @@ async function handleGET(
         return t ? { team_id: t.team_id, country_name: t.country_name, flag_url: t.flag_url ?? null } : null
       }
       actualPodium = {
-        champion: toTeam(awardsRow.champion_team_id),
-        runnerUp: toTeam(awardsRow.runner_up_team_id),
-        thirdPlace: toTeam(awardsRow.third_place_team_id),
+        champion: toTeam(actual.champion),
+        runnerUp: toTeam(actual.runnerUp),
+        thirdPlace: toTeam(actual.thirdPlace),
       }
     }
   }

@@ -638,11 +638,25 @@ function resolveNonThirdSlot(
 // RESOLVE KNOCKOUT WINNERS
 // =============================================
 
+export type KnockoutResolveOptions = {
+  /**
+   * Treat a drawn prediction with no shootout and no explicit winner as "no
+   * pick" (null) instead of falling back to FIFA ranking.
+   *
+   * The ranking fallback is legitimate when CASCADING a hypothetical bracket —
+   * something has to advance. It is not legitimate when asking "who did this
+   * member pick?", because it invents an answer and the product then shows it
+   * back to them as their own choice. Podium derivation passes this.
+   */
+  requireExplicitPick?: boolean
+}
+
 export function getKnockoutWinner(
   matchId: string,
   predictions: PredictionMap,
   homeTeam: GroupStanding | null,
-  awayTeam: GroupStanding | null
+  awayTeam: GroupStanding | null,
+  options?: KnockoutResolveOptions
 ): GroupStanding | null {
   if (!homeTeam || !awayTeam) return null
   const pred = predictions.get(matchId)
@@ -664,6 +678,9 @@ export function getKnockoutWinner(
     if (pred.winnerTeamId === awayTeam.team_id) return awayTeam
   }
 
+  // Nothing was actually chosen. Callers asking what a member PICKED stop here.
+  if (options?.requireExplicitPick) return null
+
   // Fallback: FIFA ranking
   return homeTeam.fifa_ranking_points >= awayTeam.fifa_ranking_points ? homeTeam : awayTeam
 }
@@ -672,10 +689,11 @@ export function getKnockoutLoser(
   matchId: string,
   predictions: PredictionMap,
   homeTeam: GroupStanding | null,
-  awayTeam: GroupStanding | null
+  awayTeam: GroupStanding | null,
+  options?: KnockoutResolveOptions
 ): GroupStanding | null {
   if (!homeTeam || !awayTeam) return null
-  const winner = getKnockoutWinner(matchId, predictions, homeTeam, awayTeam)
+  const winner = getKnockoutWinner(matchId, predictions, homeTeam, awayTeam, options)
   if (!winner) return null
   return winner.team_id === homeTeam.team_id ? awayTeam : homeTeam
 }

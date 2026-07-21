@@ -7,7 +7,8 @@ import {
   GROUP_LETTERS,
   getKnockoutWinner,
 } from './tournament'
-import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, resolvePredictedPodium, type BracketResult } from './bracketResolver'
+import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from './bracketResolver'
+import { resolveActualPodium, resolveEntryPodiumPick, type ActualPodium, type PredictionMode } from './podium'
 import { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 
 // Extended match type that includes actual result fields (from DB query)
@@ -54,10 +55,20 @@ export function calculateAllBonusPoints(params: {
   teams: Team[]
   conductData: MatchConductData[]
   settings: PoolSettings
+  /**
+   * OPTIONAL admin override of the podium (a `tournament_awards` row). Absence is
+   * normal — the podium is derived from the completed final and third-place
+   * matches. Never gate scoring on this being present.
+   */
   tournamentAwards: TournamentAwards | null
-  predictionMode?: 'full_tournament' | 'progressive' | 'bracket_picker'
+  /**
+   * REQUIRED. Podium (and knockout-pairing) semantics differ per mode and there
+   * is no safe default: this silently defaulting to 'full_tournament' is how
+   * every progressive pool got scored with the wrong podium rules.
+   */
+  predictionMode: PredictionMode
 }): BonusScoreEntry[] {
-  const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards, predictionMode = 'full_tournament' } = params
+  const { memberId: entryId, memberPredictions, matches, teams, conductData, settings, tournamentAwards, predictionMode } = params
 
   const bonuses: BonusScoreEntry[] = []
 
@@ -80,7 +91,12 @@ export function calculateAllBonusPoints(params: {
   })
 
   // For progressive mode, build knockout team map from actual match data
-  // (users see real teams, so match winner bonus should use actual pairings)
+  // (users see real teams, so match winner bonus should use actual pairings).
+  //
+  // NOTE: this only swaps the knockout PAIRINGS. The .champion/.runnerUp/
+  // .thirdPlace fields on the spread object are still the member's cascade and
+  // are meaningless in progressive — which is why the podium below goes through
+  // resolveEntryPodiumPick with the mode rather than reading them.
   const effectivePredictedBracket = predictionMode === 'progressive'
     ? { ...predictedBracket, knockoutTeamMap: actualBracket.knockoutTeamMap }
     : predictedBracket
@@ -107,7 +123,7 @@ export function calculateAllBonusPoints(params: {
 
   // E. Tournament Podium Bonus
   bonuses.push(...calculateTournamentPodiumBonuses(
-    entryId, matches, memberPredictions, effectivePredictedBracket, tournamentAwards, settings
+    entryId, matches, memberPredictions, predictedBracket, actualBracket, tournamentAwards, settings, predictionMode
   ))
 
   return bonuses
@@ -355,20 +371,34 @@ function calculateTournamentPodiumBonuses(
   matches: MatchWithResult[],
   memberPredictions: PredictionMap,
   predictedBracket: BracketResult,
+  actualBracket: BracketResult,
   tournamentAwards: TournamentAwards | null,
-  settings: PoolSettings
+  settings: PoolSettings,
+  predictionMode: PredictionMode
 ): BonusScoreEntry[] {
   const bonuses: BonusScoreEntry[] = []
 
-  // Derive predicted podium (champion/runner-up/third place) from the effective
-  // predicted bracket. Shared with the points-breakdown UI via resolvePredictedPodium
-  // so scoring and display never diverge on what a member "picked".
+  // Who ACTUALLY finished on the podium — derived from the completed final and
+  // third-place matches, with `tournament_awards` as an optional admin override.
+  // Deriving is what makes this self-healing: for 13h41m after the 2026 final the
+  // awards table was empty and every podium bonus in the product was withheld,
+  // even though `matches` had carried the answer since the final whistle.
+  const actualPodium: ActualPodium = resolveActualPodium(matches, tournamentAwards)
+
+  // What the member PICKED — mode-dispatched, shared with the points-breakdown
+  // UI via computeEntryPredictedPodium so scoring and display cannot diverge.
   const { champion: predictedChampion, runnerUp: predictedRunnerUp, thirdPlace: predictedThirdPlace } =
-    resolvePredictedPodium({ predictedBracket, matches, predictionMap: memberPredictions })
+    resolveEntryPodiumPick({
+      mode: predictionMode,
+      matches,
+      predictionMap: memberPredictions,
+      predictedBracket,
+      actualKnockoutTeamMap: actualBracket.knockoutTeamMap,
+    })
 
   // Champion
-  if (tournamentAwards?.champion_team_id && predictedChampion) {
-    if (predictedChampion.team_id === tournamentAwards.champion_team_id) {
+  if (actualPodium.champion && predictedChampion) {
+    if (predictedChampion.team_id === actualPodium.champion) {
       const points = settings.bonus_champion_correct ?? 1000
       if (points > 0) {
         bonuses.push({
@@ -385,8 +415,8 @@ function calculateTournamentPodiumBonuses(
   }
 
   // Runner-up
-  if (tournamentAwards?.runner_up_team_id && predictedRunnerUp) {
-    if (predictedRunnerUp.team_id === tournamentAwards.runner_up_team_id) {
+  if (actualPodium.runnerUp && predictedRunnerUp) {
+    if (predictedRunnerUp.team_id === actualPodium.runnerUp) {
       const points = settings.bonus_second_place_correct ?? 25
       if (points > 0) {
         bonuses.push({
@@ -403,8 +433,8 @@ function calculateTournamentPodiumBonuses(
   }
 
   // Third place
-  if (tournamentAwards?.third_place_team_id && predictedThirdPlace) {
-    if (predictedThirdPlace.team_id === tournamentAwards.third_place_team_id) {
+  if (actualPodium.thirdPlace && predictedThirdPlace) {
+    if (predictedThirdPlace.team_id === actualPodium.thirdPlace) {
       const points = settings.bonus_third_place_correct ?? 25
       if (points > 0) {
         bonuses.push({

@@ -16,6 +16,7 @@
 
 import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from '@/lib/bracketResolver'
 import { getKnockoutWinner } from '@/lib/tournament'
+import { resolveEntryPodiumPick } from '@/lib/podium'
 import { buildPredictionMap, toTeams } from './helpers'
 import type { MatchWithResult, TeamData, ConductData, EntryWithPredictions } from './types'
 
@@ -317,28 +318,18 @@ export function resolveEntryBonusRows(
     })
   }
 
-  // Podium — bracket-derived, with progressive fallback (mirrors calculateTournamentPodiumBonuses)
-  let champ = predictedBracket.champion
-  let runner = predictedBracket.runnerUp
-  let third = predictedBracket.thirdPlace
-  if (!champ || !runner) {
-    const finalM = matches.find((mm) => mm.stage === 'final')
-    const ft = finalM ? effKnockout.get(finalM.match_number) : null
-    if (finalM && ft?.home && ft?.away) {
-      const w = getKnockoutWinner(finalM.match_id, predictionMap, ft.home, ft.away)
-      const l = w?.team_id === ft.home.team_id ? ft.away : ft.home
-      if (w) champ = w
-      if (l) runner = l
-    }
-  }
-  if (!third) {
-    const tpM = matches.find((mm) => mm.stage === 'third_place')
-    const tt = tpM ? effKnockout.get(tpM.match_number) : null
-    if (tpM && tt?.home && tt?.away) {
-      const w = getKnockoutWinner(tpM.match_id, predictionMap, tt.home, tt.away)
-      if (w) third = w
-    }
-  }
+  // Podium — the SAME function the Node engine scores with. This was previously a
+  // hand-copy of calculateTournamentPodiumBonuses' derivation and it drifted:
+  // shadow reproduced the progressive cascade bug byte-for-byte, so the parity
+  // checker (which compares the two engines' outputs) could not see it. Never
+  // re-inline this.
+  const { champion: champ, runnerUp: runner, thirdPlace: third } = resolveEntryPodiumPick({
+    mode,
+    matches,
+    predictionMap,
+    predictedBracket,
+    actualKnockoutTeamMap: effKnockout,
+  })
   const podium = {
     entry_id: entry.entry_id,
     champion_team_id: champ?.team_id ?? null,
