@@ -115,16 +115,30 @@ async function main() {
     try {
       const r = await recalculatePool({ poolId })
       if (r.success && r.entriesProcessed === 0) {
-        // Zero entries scored is legitimate for an empty pool (53 of 524 classic
-        // pools have none) and a silent failure for any pool with members. Only
-        // pay for the check on the suspicious ones.
-        const { count } = await admin
-          .from('pool_members')
-          .select('member_id', { count: 'exact', head: true })
-          .eq('pool_id', poolId)
-        if ((count ?? 0) > 0) {
+        // Zero entries scored is legitimate for an empty pool, and also for a pool
+        // whose members joined but never predicted — both are common (the 2026-07-21
+        // run hit ~20 of them). It is only a silent failure when there is something
+        // to score. So gate on PREDICTIONS existing, not on membership: an earlier
+        // version counted pool_members and cried wolf on every never-predicted pool.
+        const { data: memberRows } = await admin
+          .from('pool_members').select('member_id').eq('pool_id', poolId)
+        const memberIds = (memberRows ?? []).map((m: { member_id: string }) => m.member_id)
+        let predCount = 0
+        if (memberIds.length > 0) {
+          const { data: entryRows } = await admin
+            .from('pool_entries').select('entry_id').in('member_id', memberIds)
+          const entryIds = (entryRows ?? []).map((e: { entry_id: string }) => e.entry_id)
+          if (entryIds.length > 0) {
+            const { count } = await admin
+              .from('predictions')
+              .select('prediction_id', { count: 'exact', head: true })
+              .in('entry_id', entryIds)
+            predCount = count ?? 0
+          }
+        }
+        if (predCount > 0) {
           failed++
-          errors.push(`${poolId}: reported success but scored 0 of ${count} member(s)`)
+          errors.push(`${poolId}: reported success but scored 0 entries despite ${predCount} prediction(s)`)
           continue
         }
       }

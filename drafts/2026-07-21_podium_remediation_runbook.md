@@ -1,7 +1,24 @@
 # Podium bonus — remediation runbook
 
-**Status:** code fix landed locally, NOT deployed, NOT pushed. Nothing written to prod.
-**Owed:** 669 podium bonus rows / ~324,375 pts across ~250 progressive pools.
+**Status: ✅ COMPLETE — 2026-07-21.** Fix committed (`ea8d9da`), deployed to production,
+and the full re-score executed over all 524 classic pools. Final audit: `ADD=0 / REMOVE=0`
+on all six lines. Progressive champion 164→505, runner-up 276→493, third 26→112;
+full_tournament unchanged at 335/249/55. Landed with no comms, by decision.
+
+Post-run cleanup done: rank arrows zeroed (`snapshot_pool_ranks`, 3,998 entries), 3 phantom
+`user_pending_actions` dots cleared, `analytics_sweep_enabled` restored to true. Rollback
+snapshots `_podium_before_20260721` (1,117 rows) and `_pool_entries_before_20260721`
+(4,999 rows) left in place — drop them once you're satisfied.
+
+⚠ The run **surfaced** an unrelated live data-loss bug (it did not cause it): one pool's
+predictions had already been destroyed by the "Delete Pool" button, so the re-score
+correctly zeroed 26 members. Their displayed totals were restored from snapshot.
+See `2026-07-21_delete_pool_data_loss.md` — **that bug is still open and unmitigated.**
+
+*(Everything below is the original pre-run plan, kept for the record.)*
+**Owed at time of writing:** 669 podium bonus rows / ~324,375 pts. Note the "~250 pools"
+figure below proved wrong — the damage concentrated in **~73 pools**; 50 saw rank changes
+and 13 changed their #1.
 
 ---
 
@@ -138,7 +155,49 @@ where p.prediction_mode in ('full_tournament','progressive')
 -- EXPECT: 3 (known pre-existing orphans, unrelated to podium)
 ```
 
-### 6. Comms
+### 5b. Land it quietly (decided 2026-07-21)
+
+No comms. 13 pools change their #1 and it flips silently. For that to actually
+be quiet, three things have to be handled — otherwise the product announces the
+run on its own:
+
+**Before**
+```sql
+-- Stops the every-minute analytics sweep re-processing ~470 pools on top of the
+-- run. Zero user impact: analytics_read_from_columns is false, nothing reads it.
+update sync_settings set setting_value = 'false'::jsonb
+where setting_key = 'analytics_sweep_enabled';
+```
+Also glance at cron job 10 (`push-matchday-recap`, hourly) — the final sits at the
+edge of its 48h window. It is deduped by `push_matchday_recaps_sent`, but the run
+rewrites `match_scores`, so confirm it has already fired for the final.
+
+**After**
+```sql
+-- 1. Zero the rank arrows. current_rank moves while previous_rank stays frozen at
+--    the last matchday snapshot, so every board would show large ▲/▼ deltas and a
+--    "Biggest Climber THIS MATCHDAY" card for a tournament that ended on the 19th.
+select snapshot_pool_ranks(array(
+  select pool_id from pools where prediction_mode in ('full_tournament','progressive')
+));
+
+-- 2. Clear the phantom red dots. Badge detection writes user_pending_actions even
+--    with pushes suppressed, so members get an in-app dot + iOS app-icon bump for a
+--    notification that was never delivered. Scope to the run's window ONLY.
+delete from user_pending_actions
+where action_type in ('badge_unlock','level_up')
+  and created_at >= '<RUN_START_UTC>'
+  and completed_at is null;
+
+-- 3. Re-enable the sweep.
+update sync_settings set setting_value = 'true'::jsonb
+where setting_key = 'analytics_sweep_enabled';
+```
+
+Expect a fresh batch of `shadow_score_diffs` from job 21 — shadow's podium is
+starved, so those diffs are expected noise, not corruption.
+
+### 6. Comms — NOT being sent (decided 2026-07-21)
 
 352 members gain a champion bonus averaging ~872 pts; ranks move materially in ~250
 progressive pools. Two entries are correctly retracted by the re-score:
