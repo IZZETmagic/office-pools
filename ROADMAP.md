@@ -3,7 +3,7 @@
 Single source of truth for everything we want to build, fix, or decide.
 Ordered by priority (**Now → Later**), tagged by category.
 
-**Last updated:** 2026-07-12 · Full audit against the codebase — completed items moved to per-section **✅ Completed** tables; PARTIAL items annotated with what the code actually shows. · **Later 2026-07-12:** post-deadline prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published** (iOS + Android).
+**Last updated:** 2026-07-12 · Full audit against the codebase — completed items moved to per-section **✅ Completed** tables; PARTIAL items annotated with what the code actually shows. · **Later 2026-07-12:** post-deadline prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published** (iOS + Android). · **2026-07-19:** added *Boost banter engagement* under 💬 Social & messaging, grounded in an organic banter-usage analysis (~1,383 real messages / ~315 people; ~7% of members post, ~67% of feed is auto share-cards).
 
 Each item has four fields:
 
@@ -29,7 +29,25 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 
 ## 🔥 Now — active, can't wait
 
-> Nothing open here beyond the **recurring knockout ops** below — the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
+### "Delete Pool" destroys every member's predictions `Bug` `Data-loss` 🔥
+- **Is:** `app/pools/[pool_id]/admin/SettingsTab.tsx:232-302` runs five un-transactional PostgREST deletes from the **browser**, predictions first. An RLS asymmetry makes it catastrophic: `predictions` DELETE is `is_pool_admin(pool_id)` (an admin can delete **everyone's**) while `pool_entries` has **no** admin DELETE policy, so step 2 silently deletes only the admin's own entry and **returns no error**. Any abort after step 1 leaves the pool alive with every member's predictions gone.
+- **Impact:** **6 pools / 41 entries already destroyed**, the earliest in June — this has been happening quietly for weeks. **458 pools with an admin are one click away.** Risk is elevated post-tournament, when people tidy up pools.
+- **Also:** `app/api/account/delete/route.ts` deletes predictions/entries/memberships across all pools at lines 33-85, then only checks "are you still a pool admin?" at line 90 — a pool owner who tries to delete their account keeps the account and loses everything everywhere.
+- **Zero-deploy mitigation (verified safe, policy has one consumer):** `drop policy "Pool admins can delete predictions" on predictions;` → the button then fails loudly having destroyed nothing.
+- **Proper fix:** server-side transactional delete (single Postgres function / soft-delete), move the account-delete guard to the top, add real `ON DELETE CASCADE`, and an alarm for non-`bracket_picker` pools with submitted entries but zero predictions.
+- **Detail + full evidence:** `drafts/2026-07-21_delete_pool_data_loss.md`
+- **Status:** documented only, by decision 2026-07-21. **Not mitigated — still live.**
+
+### Post-tournament feedback surveys — send them `Ops` ⏳
+- **Is:** the two survey emails to pool admins (477) and non-admin players (3,652). Ready to fire, and time-boxed — the plan was "within ~1 week of the final."
+- **Prep done 2026-07-21:** three blockers found and fixed, none of them visible from the "✅ built" status this item carried. **(a)** Every segment in `lib/email/segments.ts` silently truncated at PostgREST's 1,000-row cap — the player survey resolved to **146 recipients out of 3,958**, and a dry run would have reported that as the audience. Now paged via `fetchAll()` (all 15 segments, not just these two). **(b)** Both Tally forms were still **DRAFT** — every CTA 404'd. Published, and the "Anything else?" box that was marked required despite reading "Optional." is now optional. **(c)** No `maxDuration` on a ~41-batch send whose idempotency key is written *before* the first email; now `300` with 600 ms inter-batch pacing.
+- **Also:** new `past_predictors_non_admin` segment so the 306 admin-and-player people get the admin survey only, never two emails. By decision, **no Resend topic** is attached — maximum reach, so per-category opt-outs aren't honored on these two sends.
+- **Touches:** `lib/email/segments.ts`, `app/api/admin/send-template/route.ts`, `scripts/preflight-feedback-survey.ts`, super-admin **Templates** tab.
+- **Blocked on:** a production deploy. The fix is local; the Templates tab runs against prod, so sending before the deploy resolves the old truncated audience *and* burns the idempotency key.
+- **Runbook:** `drafts/2026-07-21_feedback_survey_send_runbook.md` — pre-flight, expected counts, and partial-send recovery.
+- **Done when:** `npx tsx scripts/preflight-feedback-survey.ts` passes, both sends report 477/477 and 3,652/3,652, and responses are landing in Tally.
+
+> Beyond that and the **recurring knockout ops** below, the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
 
 ### ✅ Completed (verified against code, 2026-07-12)
 | Item | What shipped — evidence | Note |
@@ -111,6 +129,14 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Why a DB trigger, not the route/RPC guard originally scoped:** predictions have four write paths with no shared app chokepoint — web `POST /predictions` → `save_predictions_batch` (SECURITY INVOKER), the web client's **full-set autosave** (`PredictionsFlow.tsx:377`), and **mobile's direct `.upsert()` in `usePredictions.ts` which bypasses every API route**. Only the row write is common to all. Silent-skip (not raise) is deliberate so a full-set batch still persists the still-open matches instead of failing wholesale.
 - **Verified in prod:** a write to an upcoming match persists; a write to a completed match is skipped. Pre-fix footprint: 2,599 post-kickoff writes across 478 entries (latest 2026-07-11).
 
+### Empty-bracket bonus inflation `Bug` `Scoring` ⏳
+- **Is:** entries that predicted almost nothing collect most of the group bonuses. With no predictions a group's teams are all `played 0 / points 0 / GD 0`, so `calculateGroupStandings` falls through every tiebreaker to criterion 8, **FIFA ranking** (`lib/tournament.ts:398-414`) — and the resulting "predicted" table is just the seeded order, which is roughly what really happens. `calculateGroupStandingsBonuses` (`lib/bonusCalculation.ts:120`) gates only on the real matches being *complete*, never on the member having *predicted* them.
+- **Same class as the podium's fabricated pick**, fixed in `ea8d9da` via `requireExplicitPick` (`lib/tournament.ts:641`); the group-standings path never got the equivalent gate. Criterion 8 is right as a cascade fallback, wrong as evidence of an opinion.
+- **Measured (prod 2026-07-21):** 155 entries with 1–5 predictions all tournament — 66 full_tournament (avg **1,881** bonus vs **56** match pts) + 89 progressive (1,340 vs 233). A near-zero predictor earns **~77% of a full predictor's bonus** with ~2% of their match points. Tells: **994 `group_winner_and_runnerup` rows across 139 entries ≈ 7.2 of 12 groups called exactly right**, and `75pct_qualified_correct` fired for **140 of 140**. ≈ **243,000 pts** inflated.
+- **Fix:** require the group's 6 matches (and, for the qualification bonus, all 48) to have been predicted before awarding; better, make an unpredicted group return an explicitly *unresolved* table so the phantom standings can't leak to any consumer. Regression test: zero group predictions ⇒ zero group/qualification bonuses.
+- **Why deferred:** fixing it retroactively demotes ~155 real people (~87 pools move). Do it **before the next competition**, not during this one's wind-down.
+- **Detail:** `drafts/2026-07-21_empty_bracket_bonus_inflation.md` · **Status:** deferred by decision 2026-07-21.
+
 ### Recalc orphan-row cleanup `Bug`
 - **Is:** When an entry is un-submitted after being scored, its `match_scores` rows are left behind (11 seen in June).
 - **Touches:** delete-scope logic in `lib/scoring/recalculate.ts` (currently only touches current entryTotals).
@@ -167,7 +193,7 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 ### ✅ Completed (verified against code, 2026-07-12)
 | Item | What shipped — evidence | Note |
 |---|---|---|
-| Post-tournament feedback plan `Feature` | Both survey emails built — `poolAdminFeedbackSurveyTemplate` + `playerFeedbackSurveyTemplate` (`lib/email/templates.ts`, real Tally URLs), send route `app/api/admin/send-template/route.ts:187` (segments `pool_admins` + `past_predictors`), super-admin UI `TemplatesTab.tsx`. | Firing the two sends post-final + collecting responses is the only remaining (ops) step. |
+| Post-tournament feedback plan `Feature` | Both survey emails built — `poolAdminFeedbackSurveyTemplate` + `playerFeedbackSurveyTemplate` (`lib/email/templates.ts`), send route `app/api/admin/send-template/route.ts` (segments `pool_admins` + `past_predictors_non_admin`), super-admin UI `TemplatesTab.tsx`. | ⚠️ **"Built" was not "sendable" — see 2026-07-21 below.** Now ready; the two sends are the only remaining (ops) step. |
 
 ## 📋 Features — medium priority
 
@@ -307,6 +333,19 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 
 > Board "Others" cluster — connect players beyond a single pool's chat. Reuses the realtime Broadcast-from-DB infra from the July 2026 banter migration.
 
+### Boost banter engagement `Feature` `Design` `Mobile`
+- **Is:** Deepen engagement with the pool chat (banter) we already shipped — turn a mostly one-way feed into back-and-forth conversation and lift the share of members who ever post. A cluster of independently-shippable levers, not one build.
+- **Why (data 2026-07-19):** organic banter = ~1,383 real typed messages from ~315 people across 118 pools — but only **~7% of members ever type**, **half of chatters post exactly once**, a **~30-person core drives a third** of all chat, and **~67% of the feed is auto "share cards" (badge-flex / standings-drop) that draw almost no replies**. Replies (<1%), @mentions, and reactions-on-text (from ~7 people total) are effectively unused. Activity spikes on match days → it's second-screen behaviour, so match-moment nudges are the biggest lever.
+- **Levers (pick + sequence):**
+  - **Match-moment push → chat** *(first slice)*: nudge members into banter at live beats (kickoff, goal, red card, full-time, big rank swing) via the existing push infra, deep-linking straight into the pool chat.
+  - **Make share-cards conversational:** badge-flex / standings-drop / prediction-share cards should invite an inline reply or one-tap reaction instead of reading as a wall; consider auto-prompts ("Anyone catching Melanie? She just hit L9").
+  - **Close the notification loop:** push/notify on @mention + reply so threads continue — today both are silent, so conversations die after one message.
+  - **Discoverability:** surface the reaction / reply / @mention affordances on text messages (reactions come from ~7 people — the control is likely hard to find).
+  - **First-message activation:** empty-state prompt + a re-engagement nudge for the 50% who posted exactly once.
+- **Touches:** banter surfaces (mobile `usePoolBanter.ts` + `BanterSheet`, web `CommunityTab.tsx`); the rich-card types in `pool_messages.message_type` (`badge_flex` / `standings_drop` / `prediction_share`); push/email via `/api/notifications/*` + Resend + the match-day push cron; realtime Broadcast-from-DB infra (migration `022`).
+- **Effort:** ~1–2 weeks for the full set; match-moment push ≈ 2–3 days as the first standalone slice.
+- **Done when:** the share of members who post and the reply/reaction rate per message both climb against the 2026-07-19 baseline (illustrative targets: text-posters 7% → 15%, replies <1% → 10%).
+
 ### Direct messaging (1:1) `Feature`
 - **Is:** Private 1:1 messaging between users, separate from pool chat. Today all chat is pool-scoped — no private conversations.
 - **Touches:** a new DM data model + inbox UI (web + mobile); reuses realtime broadcast infra.
@@ -341,6 +380,13 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 | Chat auto-refresh / live messages `Feature` | Migration `022_banter_realtime_broadcast` (AFTER-INSERT trigger → `realtime.send` to private `pool:{id}`); both mobile `usePoolBanter.ts` and web `CommunityTab.tsx` subscribe to that private channel (`message_insert` + `reaction_insert`/`reaction_delete`) after `realtime.setAuth()`. Web converged onto the DB broadcast 2026-07-13 — dropped its old client-to-client rebroadcast, 5s poll, and `postgres_changes` reactions channel. Both surfaces update live. | Resolves the "back out two screens to see new messages" card. |
 
 ## 🎨 Design / UX polish — post-v1
+
+### Migrate transactional emails to the new brand `Design`
+- **Is:** Bring the rest of the email system onto the RN-app identity. The two feedback surveys were rebranded 2026-07-21 via a reusable `brandedTemplate()` (`lib/email/templates.ts`) — midnight header, gold accent strip, two-tone **Sport**​**Pool** wordmark (Nunito 900), primary-blue `#3B6EFF` CTA, tokens straight from `mobile/theme/colors.ts`. Every **other** template still renders through the legacy green (`#16a34a`) `baseTemplate()` (and `supportTemplate()` on slate `#1e293b`), so a user's inbox mixes old-green and new-blue Sport Pool mail.
+- **Touches:** `lib/email/templates.ts` — repoint each template's `baseTemplate({...})` call to `brandedTemplate({...})` (same param shape, so it's near-mechanical): `deadlineReminderTemplate`, `roundDeadlineReminderTemplate`, `pendingPredictionsReminderTemplate`, `emptyPoolNudgeTemplate`, `soloPoolNudgeTemplate`, `smallPoolBoostTemplate`, `startAPoolTemplate`, `weMissYouTemplate`, `readyToJoinTemplate`, `pastPredictorHypeTemplate`, `bracketFixTemplate`, `pointsAdjustedTemplate`, the `custom` path, and the automated crons. Decide whether `supportTemplate` keeps its distinct "Support" header or folds in too.
+- **Watch for:** per-template inline body colours — most bodies hard-code neutral `#525252`; on the new white surface that still reads fine, but sweep for any green (`#16a34a`) accents inside bodies/buttons that would now clash. Semantic colours (`pointsAdjustedTemplate`'s +/- green/red) are intentional — leave them. Re-render each through Resend to a test inbox before shipping; `@import` Nunito degrades to system fonts in Gmail/Outlook by design.
+- **Effort:** ~half a day (mechanical swap + a visual pass on all ~15).
+- **Done when:** every customer-facing email renders the new brand; no template still calls the green `baseTemplate`.
 
 ### Banter sheet polish `Design`
 - **Is:** Smooth out the banter sheet — reaction long-press, quick-actions anchoring, and verify share-prediction + badge-flex against real data.
