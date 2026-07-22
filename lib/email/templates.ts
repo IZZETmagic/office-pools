@@ -41,6 +41,82 @@ export function baseTemplate(params: {
 </body></html>`
 }
 
+// Branded email shell matching the RN app identity (mobile/theme + Wordmark/Splash):
+// two-tone "SportPool" wordmark in Nunito 900 on a midnight header, gold accent strip,
+// primary-blue CTA. Reusable — the legacy green `baseTemplate` above still backs the
+// older transactional emails; migrate them here one at a time.
+const BRAND = {
+  primary: '#3B6EFF', // palette.primary.light
+  primaryDark: '#5B8AFF', // palette.primary.dark — brighter, for the dark header
+  accent: '#F5C518', // palette.accent — champion gold
+  ink: '#1B2340', // palette.ink.light — headings
+  bodyText: '#3D4560', // navy-tinted body copy
+  slate: '#7B87A8', // palette.slate — muted / footer
+  midnight: '#0E1220', // header background (between palette.midnight & snow.dark)
+  snow: '#F7F8FC', // palette.snow.light — page background
+  hairline: '#EEF1F8', // palette.mist.light — borders
+} as const
+
+const BRAND_FONT =
+  "'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+
+export function brandedTemplate(params: {
+  preheader: string
+  heading: string
+  body: string
+  ctaText?: string
+  ctaUrl?: string
+}): string {
+  const { preheader, heading, body, ctaText, ctaUrl } = params
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <!-- Font import kept in its own block: clients that strip @import (Gmail) still keep the responsive rules below. Nunito falls back to the system stack everywhere it isn't supported. -->
+  <style>@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap');</style>
+  <style>
+    body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%;}
+    a{text-decoration:none;}
+    @media only screen and (max-width:600px){
+      .sp-container{width:100%!important;border-radius:0!important;}
+      .sp-pad{padding-left:24px!important;padding-right:24px!important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.snow};font-family:${BRAND_FONT};">
+  <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.snow};padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" class="sp-container" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.hairline};box-shadow:0 6px 20px rgba(27,35,64,0.08);">
+        <tr><td style="background:${BRAND.midnight};padding:28px 32px;text-align:center;">
+          <span style="font-family:${BRAND_FONT};font-size:26px;font-weight:900;letter-spacing:-0.5px;color:#FFFFFF;">Sport<span style="color:${BRAND.primaryDark};">Pool</span></span>
+        </td></tr>
+        <tr><td class="sp-pad" style="padding:32px;">
+          <h1 style="margin:0 0 16px;color:${BRAND.ink};font-family:${BRAND_FONT};font-size:20px;font-weight:800;letter-spacing:-0.2px;">${heading}</h1>
+          ${body}
+          ${ctaText && ctaUrl ? `
+          <div style="text-align:center;margin:28px 0 8px;">
+            <a href="${ctaUrl}" style="display:inline-block;padding:14px 36px;background:${BRAND.primary};color:#FFFFFF;font-family:${BRAND_FONT};font-weight:800;font-size:15px;border-radius:10px;box-shadow:0 4px 12px rgba(59,110,255,0.35);">${ctaText}</a>
+          </div>` : ''}
+        </td></tr>
+        <tr><td class="sp-pad" style="padding:20px 32px 24px;border-top:1px solid ${BRAND.hairline};text-align:center;">
+          <p style="margin:0 0 6px;font-family:${BRAND_FONT};font-size:13px;font-weight:800;color:${BRAND.ink};">Sport<span style="color:${BRAND.primary};">Pool</span></p>
+          <p style="margin:0;color:${BRAND.slate};font-family:${BRAND_FONT};font-size:12px;line-height:1.6;">
+            <a href="${APP_URL}" style="color:${BRAND.slate};">sportpool.io</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:${BRAND.slate};">Notification Settings</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:${BRAND.slate};">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+}
+
 export function supportTemplate(params: {
   preheader: string
   heading: string
@@ -1027,20 +1103,20 @@ export function poolAdminFeedbackSurveyTemplate(params: {
   const { firstName } = params
   return {
     subject: 'How was running your World Cup pool? (3-min survey)',
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: 'Six short questions on what worked, what didn\'t, and what we should build next.',
       heading: 'Help shape what comes next',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Thanks for running a pool this tournament — it doesn't happen without admins like you doing the legwork. Now that the dust has settled, I'd love your honest take.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Six short questions, about three minutes. The answers shape what gets built before the next tournament — and which sports we tackle next.</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Thanks for running a pool this tournament — it doesn't happen without admins like you doing the legwork. Now that the dust has settled, I'd love your honest take.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Six short questions, about three minutes. The answers shape what gets built before the next tournament — and which sports we tackle next.</p>
+        <ul style="color:#3D4560;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
           <li>What took the most work?</li>
           <li>What worked well?</li>
           <li>What was confusing or broken?</li>
           <li>Would you run another pool with us?</li>
         </ul>
-        <p style="color:#525252;line-height:1.6;margin:0;">Wild ideas, complaints, and kind words all welcome.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0;">Wild ideas, complaints, and kind words all welcome.</p>
       `,
       ctaText: 'Take the survey',
       ctaUrl: POOL_ADMIN_FEEDBACK_SURVEY_URL,
@@ -1055,20 +1131,20 @@ export function playerFeedbackSurveyTemplate(params: {
   const { firstName } = params
   return {
     subject: 'How was your World Cup? (2-min survey)',
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: 'Five short questions on your favorite moment, biggest frustration, and what\'s next.',
       heading: 'What did you think?',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Thanks for playing this tournament. Hopefully you had as much fun making picks as we had building it.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Five short questions, about two minutes. Your answers help us decide what to fix, what to keep, and which tournament to do next.</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Thanks for playing this tournament. Hopefully you had as much fun making picks as we had building it.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Five short questions, about two minutes. Your answers help us decide what to fix, what to keep, and which tournament to do next.</p>
+        <ul style="color:#3D4560;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
           <li>Favorite moment?</li>
           <li>Biggest frustration?</li>
           <li>Would you play again?</li>
           <li>What sport would you want next?</li>
         </ul>
-        <p style="color:#525252;line-height:1.6;margin:0;">Honest feedback is the best gift you can give a small team. Thanks in advance.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0;">Honest feedback is the best gift you can give a small team. Thanks in advance.</p>
       `,
       ctaText: 'Take the survey',
       ctaUrl: PLAYER_FEEDBACK_SURVEY_URL,
