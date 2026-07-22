@@ -18,6 +18,7 @@ const SEGMENTS = {
   lapsed_users: { label: 'Lapsed Users', description: 'Signed up 30+ days ago, no pool' },
   engaged_no_pool: { label: 'Engaged, No Pool', description: 'Recent signup, not in any pool' },
   past_predictors: { label: 'Past Predictors', description: 'Have submitted predictions before' },
+  past_predictors_non_admin: { label: 'Past Predictors (non-admin)', description: 'Predicted before and does not run a pool' },
   recent_signups: { label: 'Recent Signups', description: 'Joined in the last 14 days' },
   super_admins: { label: 'Super Admins', description: 'Internal / test emails only' },
 } as const

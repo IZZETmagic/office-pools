@@ -23,6 +23,7 @@
 // ============================================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { writePoolEntryAnalytics } from '@/lib/analytics/entryAnalytics'
 
 export const dynamic = 'force-dynamic'
@@ -69,23 +70,31 @@ async function handle(request: NextRequest) {
 
   // Which pools changed since last run? Entries rescored since lastRun →
   // their member_ids → pool_ids.
-  const { data: changedEntries } = await admin
-    .from('pool_entries')
-    .select('member_id')
-    .gt('last_rank_update', lastRun)
-  const changedMemberIds = Array.from(
-    new Set(((changedEntries ?? []) as Array<{ member_id: string }>).map((e) => e.member_id)),
+  // Paged: a bulk recalc (e.g. a full re-score) stamps last_rank_update on far more than
+  // 1,000 entries at once. Unpaged, this read caps at 1,000 while the watermark below still
+  // advances to now — so the truncated-away pools would NEVER get swept. Must page.
+  const changedEntries = await fetchAllRows<{ member_id: string }>(
+    (from, to) =>
+      admin.from('pool_entries').select('member_id').gt('last_rank_update', lastRun).range(from, to),
+    'analytics-sweep changed entries'
   )
+  const changedMemberIds = Array.from(new Set(changedEntries.map((e) => e.member_id)))
 
   let poolIds: string[] = []
   if (changedMemberIds.length > 0) {
-    const { data: memberRows } = await admin
-      .from('pool_members')
-      .select('pool_id')
-      .in('member_id', changedMemberIds)
-    poolIds = Array.from(
-      new Set(((memberRows ?? []) as Array<{ pool_id: string }>).map((m) => m.pool_id)),
-    )
+    // changedMemberIds can be several thousand after paging above; a single `.in()` would
+    // both overflow the request URL and cap its result at 1,000. Chunk the id list.
+    const CHUNK = 200
+    const poolIdSet = new Set<string>()
+    for (let i = 0; i < changedMemberIds.length; i += CHUNK) {
+      const slice = changedMemberIds.slice(i, i + CHUNK)
+      const rows = await fetchAllRows<{ pool_id: string }>(
+        (from, to) => admin.from('pool_members').select('pool_id').in('member_id', slice).range(from, to),
+        'analytics-sweep member->pool'
+      )
+      rows.forEach((m) => poolIdSet.add(m.pool_id))
+    }
+    poolIds = Array.from(poolIdSet)
   }
 
   // Stamp the new watermark up front (so a slow run doesn't double-process the

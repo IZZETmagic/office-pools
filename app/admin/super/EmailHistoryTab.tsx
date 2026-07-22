@@ -75,6 +75,7 @@ const SEGMENTS: Record<string, { label: string }> = {
   lapsed_users: { label: 'Lapsed Users' },
   engaged_no_pool: { label: 'Engaged, No Pool' },
   past_predictors: { label: 'Past Predictors' },
+  past_predictors_non_admin: { label: 'Past Predictors (non-admin)' },
   recent_signups: { label: 'Recent Signups' },
   super_admins: { label: 'Super Admins' },
 }

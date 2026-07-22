@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { sendBatchEmails } from '@/lib/email/send'
 import {
   baseTemplate,
@@ -24,6 +25,11 @@ import { querySegment, type SegmentKey, SEGMENT_KEYS } from '@/lib/email/segment
 import { ROUND_LABELS, ROUND_MATCH_STAGES, type RoundKey } from '@/lib/tournament'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+
+// The post-tournament survey segments are ~4k recipients = ~40 sequential Resend batch
+// calls. The idempotency key is recorded *before* the first send, so a timeout mid-run
+// leaves a partial send that can't be retried without clearing `sent_announcements`.
+export const maxDuration = 300
 
 type TemplateType =
   | 'pending_predictions'
@@ -52,30 +58,42 @@ export async function GET() {
 
   const supabase = createAdminClient()
 
-  // Fetch pools with deadlines
-  const { data: pools } = await supabase
-    .from('pools')
-    .select('pool_id, pool_name, prediction_mode, prediction_deadline')
-    .order('pool_name')
+  // Paged: `users` is 4.8k (>1,000 cap) so the individual-targeting dropdown MUST page or
+  // it silently offers only the first 1,000. `pools` is 623 today but paged defensively —
+  // once it crosses 1,000 the composer's pool dropdown would truncate the same way.
+  const [pools, users] = await Promise.all([
+    fetchAllRows(
+      (from, to) =>
+        supabase
+          .from('pools')
+          .select('pool_id, pool_name, prediction_mode, prediction_deadline')
+          .order('pool_name')
+          .range(from, to),
+      'GET pools'
+    ),
+    fetchAllRows(
+      (from, to) =>
+        supabase
+          .from('users')
+          .select('user_id, email, full_name, username')
+          .not('email', 'is', null)
+          .order('full_name')
+          .range(from, to),
+      'GET users'
+    ),
+  ])
 
-  // Fetch open rounds
+  // Open rounds are bounded by the `state` filter (a handful at a time), so no paging.
   const { data: rounds } = await supabase
     .from('pool_round_states')
     .select('id, pool_id, round_key, deadline, state')
     .in('state', ['open', 'locked'])
     .order('round_key')
 
-  // Fetch user list for individual targeting
-  const { data: users } = await supabase
-    .from('users')
-    .select('user_id, email, full_name, username')
-    .not('email', 'is', null)
-    .order('full_name')
-
   return NextResponse.json({
-    pools: pools ?? [],
+    pools,
     rounds: rounds ?? [],
-    users: (users ?? []).map((u) => ({
+    users: users.map((u) => ({
       user_id: u.user_id,
       email: u.email,
       name: u.full_name || u.username || u.email,
@@ -188,7 +206,9 @@ export async function POST(request: NextRequest) {
       result = await handleSimpleGrowthTemplate(supabase, 'pool_admins', poolAdminFeedbackSurveyTemplate)
       break
     case 'player_feedback_survey':
-      result = await handleSimpleGrowthTemplate(supabase, 'past_predictors', playerFeedbackSurveyTemplate)
+      // Non-admin predictors only — pool admins get the (richer) admin survey instead,
+      // so nobody receives both.
+      result = await handleSimpleGrowthTemplate(supabase, 'past_predictors_non_admin', playerFeedbackSurveyTemplate)
       break
     default:
       return NextResponse.json({ error: `Unknown template: ${body.template}` }, { status: 400 })
@@ -237,16 +257,28 @@ export async function POST(request: NextRequest) {
 
   // Send in batches of 100
   const BATCH_SIZE = 100
+  // Resend's default limit is 2 requests/second. A 4k-recipient segment is ~40 sequential
+  // batch calls, so pace them rather than trip a 429 partway through the send.
+  const BATCH_PAUSE_MS = 600
   let totalSent = 0
   const errors: unknown[] = []
+  const unsent: string[] = []
 
   for (let i = 0; i < result.emails.length; i += BATCH_SIZE) {
     const batch = result.emails.slice(i, i + BATCH_SIZE)
     const sendResult = await sendBatchEmails(batch)
     if (sendResult.success) {
-      totalSent += batch.length
+      // The per-email fallback path reports its own tally; trust it over the batch size.
+      const partial = sendResult.data as { sentCount?: number } | undefined
+      totalSent += typeof partial?.sentCount === 'number' ? partial.sentCount : batch.length
     } else {
       errors.push(sendResult.error)
+      // Name who missed out, so a follow-up can target those users directly instead of
+      // burning a second idempotency key on the whole segment.
+      unsent.push(...batch.map((e) => e.to))
+    }
+    if (i + BATCH_SIZE < result.emails.length) {
+      await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS))
     }
   }
 
@@ -256,6 +288,7 @@ export async function POST(request: NextRequest) {
     totalEmails: result.emails.length,
     template: body.template,
     ...(errors.length > 0 ? { errors } : {}),
+    ...(unsent.length > 0 ? { unsent } : {}),
   })
 }
 
@@ -702,18 +735,23 @@ async function handleGrowthTemplate(
 
   const userMap = new Map(usersWithId.map((u) => [u.user_id, u]))
 
-  // Get all pools with their admin and code
-  const { data: pools } = await supabase
-    .from('pools')
-    .select('pool_id, pool_name, pool_code, admin_user_id')
-  if (!pools) return { emails: [] }
+  // Get all pools with their admin and code. Paged: this drives which admins get mail, and
+  // `pool_members` (4.8k) truncated at 1,000 would under-count members → misclassify pools
+  // into the empty/solo/small buckets → wrong recipients.
+  const pools = await fetchAllRows(
+    (from, to) =>
+      supabase.from('pools').select('pool_id, pool_name, pool_code, admin_user_id').range(from, to),
+    'growth pools'
+  )
+  if (pools.length === 0) return { emails: [] }
 
   // Get member counts per pool
-  const { data: members } = await supabase
-    .from('pool_members')
-    .select('pool_id')
+  const members = await fetchAllRows(
+    (from, to) => supabase.from('pool_members').select('pool_id').range(from, to),
+    'growth pool_members'
+  )
   const memberCountByPool = new Map<string, number>()
-  for (const m of members || []) {
+  for (const m of members) {
     memberCountByPool.set(m.pool_id, (memberCountByPool.get(m.pool_id) || 0) + 1)
   }
 
@@ -839,6 +877,11 @@ function extractFirstName(fullName?: string | null, username?: string | null): s
 async function handleBracketFix(
   supabase: ReturnType<typeof createAdminClient>
 ): Promise<SendResult> {
+  // HISTORICAL — the one-shot July 2026 bracket-fix send (already fired, comms done). Left
+  // truncation-prone ON PURPOSE, exactly like its twin `bracket_fix_affected` in segments.ts:
+  // the `predictions` scan below walks a six-figure table and the `.in(entry_id, …)` list can
+  // exceed both the 1,000-row cap and the URL length. Do NOT naively page it — re-derive the
+  // affected set in SQL if this ever needs to run again.
   const { data: pickerRows } = await supabase
     .from('bracket_picker_knockout_picks')
     .select('entry_id')

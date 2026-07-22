@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { getResendClient } from '@/lib/email/resend'
 import { countdownReminderTemplate, type CountdownMilestone } from '@/lib/email/templates'
 import { sendPushToAll } from '@/lib/push/apns'
@@ -112,13 +113,14 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Log to broadcast_log for audit trail
-    const { data: users } = await supabase
-      .from('users')
-      .select('email')
-      .not('email', 'is', null)
-
-    const recipientEmails = (users || []).map((u) => u.email)
+    // Log to broadcast_log for audit trail. Paged: the actual send goes via the Resend
+    // audience, but an unpaged read here recorded only the first 1,000 of 4.8k as the
+    // audited recipient list.
+    const users = await fetchAllRows(
+      (from, to) => supabase.from('users').select('email').not('email', 'is', null).range(from, to),
+      'countdown audit users'
+    )
+    const recipientEmails = users.map((u) => u.email)
 
     await supabase.from('broadcast_log').insert({
       broadcast_id: broadcast.id,

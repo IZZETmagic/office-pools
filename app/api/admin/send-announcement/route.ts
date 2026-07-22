@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { sendBatchEmails } from '@/lib/email/send'
 import { allTeamsAnnouncementTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -89,13 +90,20 @@ export async function POST(request: NextRequest) {
   const now = new Date()
   const daysUntilKickoff = Math.ceil((kickoff.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-  // 4. Fetch all users with email notifications
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('user_id, full_name, username, email')
-    .not('email', 'is', null)
-
-  if (usersError || !users) {
+  // 4. Fetch all users with email notifications. Paged: users (4.8k) exceeds the 1,000-row
+  // cap, so an unpaged "send to all" reached only the first 1,000.
+  let users: { user_id: string; full_name: string | null; username: string; email: string }[]
+  try {
+    users = await fetchAllRows(
+      (from, to) =>
+        supabase
+          .from('users')
+          .select('user_id, full_name, username, email')
+          .not('email', 'is', null)
+          .range(from, to),
+      'announcement users'
+    )
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
 

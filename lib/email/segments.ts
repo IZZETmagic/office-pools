@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 
 export type SegmentKey =
   | 'all'
@@ -12,6 +13,7 @@ export type SegmentKey =
   | 'lapsed_users'
   | 'engaged_no_pool'
   | 'past_predictors'
+  | 'past_predictors_non_admin'
   | 'recent_signups'
   | 'super_admins'
   | 'bracket_fix_affected'
@@ -61,6 +63,10 @@ export const SEGMENTS: Record<SegmentKey, { label: string; description: string }
     label: 'Past Predictors',
     description: 'Users who have submitted predictions before',
   },
+  past_predictors_non_admin: {
+    label: 'Past Predictors (non-admin)',
+    description: 'Submitted predictions and does not run a pool — so pool admins can get the admin email instead',
+  },
   recent_signups: {
     label: 'Recent Signups',
     description: 'Joined in the last 14 days',
@@ -83,219 +89,209 @@ type SegmentUser = {
   username: string
 }
 
+type SegmentUserRow = SegmentUser & { user_id: string }
+
+// Every segment below joins two or three unbounded lists in memory, so a single truncated
+// fetch quietly shrinks the audience: before pagination, `past_predictors` resolved to 146
+// recipients out of 3,958 (users capped at 1,000 of 4,841, AND entries at 1,000 of 4,263).
+// `fetchAllRows` (lib/supabase/paginate) pages every one of them. See that file for why.
+const fetchAll = fetchAllRows
+
+/** Base query for every user with an email — chain filters onto it, then `.range()`. */
+function usersQuery(supabase: SupabaseClient) {
+  return supabase
+    .from('users')
+    .select('email, full_name, username, user_id')
+    .not('email', 'is', null)
+}
+
+/** Every user with an email, paged. */
+function allUsers(supabase: SupabaseClient): Promise<SegmentUserRow[]> {
+  return fetchAll<SegmentUserRow>((from, to) => usersQuery(supabase).range(from, to))
+}
+
+/** user_ids that admin at least one pool. */
+async function adminUserIds(supabase: SupabaseClient): Promise<Set<string>> {
+  const pools = await fetchAll<{ admin_user_id: string }>((from, to) =>
+    supabase.from('pools').select('admin_user_id').range(from, to)
+  )
+  return new Set(pools.map((p) => p.admin_user_id))
+}
+
+/** user_ids that belong to at least one pool. */
+async function memberUserIds(supabase: SupabaseClient): Promise<Set<string>> {
+  const members = await fetchAll<{ user_id: string }>((from, to) =>
+    supabase.from('pool_members').select('user_id').range(from, to)
+  )
+  return new Set(members.map((m) => m.user_id))
+}
+
+/** How many members each pool has. */
+async function memberCountByPool(supabase: SupabaseClient): Promise<Map<string, number>> {
+  const members = await fetchAll<{ pool_id: string }>((from, to) =>
+    supabase.from('pool_members').select('pool_id').range(from, to)
+  )
+  const counts = new Map<string, number>()
+  for (const m of members) {
+    counts.set(m.pool_id, (counts.get(m.pool_id) || 0) + 1)
+  }
+  return counts
+}
+
+/** Pools with their admin, paged. */
+function allPools(supabase: SupabaseClient): Promise<{ pool_id: string; admin_user_id: string }[]> {
+  return fetchAll<{ pool_id: string; admin_user_id: string }>((from, to) =>
+    supabase.from('pools').select('pool_id, admin_user_id').range(from, to)
+  )
+}
+
+/** user_ids that have ever submitted predictions for an entry. */
+async function predictorUserIds(supabase: SupabaseClient): Promise<Set<string>> {
+  // PostgREST returns the embedded to-one row as an object, but supabase-js types the
+  // embed as an array — accept either shape rather than casting through `any`.
+  type Embedded = { user_id: string }
+  const entries = await fetchAll<{ pool_members: Embedded | Embedded[] }>((from, to) =>
+    supabase
+      .from('pool_entries')
+      .select('member_id, pool_members!inner(user_id)')
+      .eq('has_submitted_predictions', true)
+      .range(from, to)
+  )
+  const ids = new Set<string>()
+  for (const e of entries) {
+    const member = Array.isArray(e.pool_members) ? e.pool_members[0] : e.pool_members
+    if (member?.user_id) ids.add(member.user_id)
+  }
+  return ids
+}
+
+/** Admins of pools whose member count satisfies `matches`. */
+async function adminIdsByPoolSize(
+  supabase: SupabaseClient,
+  matches: (memberCount: number) => boolean
+): Promise<Set<string>> {
+  const [pools, counts] = await Promise.all([allPools(supabase), memberCountByPool(supabase)])
+  return new Set(
+    pools.filter((p) => matches(counts.get(p.pool_id) || 0)).map((p) => p.admin_user_id)
+  )
+}
+
 export async function querySegment(
   supabase: SupabaseClient,
   segment: SegmentKey
 ): Promise<SegmentUser[]> {
   switch (segment) {
     case 'all': {
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username')
-        .not('email', 'is', null)
-      return data || []
+      return allUsers(supabase)
     }
 
     case 'pool_admins': {
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!data) return []
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('admin_user_id')
-      const adminIds = new Set((pools || []).map((p) => p.admin_user_id))
-      return data.filter((u) => adminIds.has(u.user_id))
+      const [users, adminIds] = await Promise.all([allUsers(supabase), adminUserIds(supabase)])
+      return users.filter((u) => adminIds.has(u.user_id))
     }
 
     case 'empty_pool_admins': {
-      const { data: users } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!users) return []
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('pool_id, admin_user_id')
-      if (!pools) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('pool_id')
-      const memberCountByPool = new Map<string, number>()
-      for (const m of members || []) {
-        memberCountByPool.set(m.pool_id, (memberCountByPool.get(m.pool_id) || 0) + 1)
-      }
-      const emptyPoolAdminIds = new Set(
-        pools
-          .filter((p) => !memberCountByPool.has(p.pool_id) || memberCountByPool.get(p.pool_id) === 0)
-          .map((p) => p.admin_user_id)
-      )
-      return users.filter((u) => emptyPoolAdminIds.has(u.user_id))
+      const [users, adminIds] = await Promise.all([
+        allUsers(supabase),
+        adminIdsByPoolSize(supabase, (count) => count === 0),
+      ])
+      return users.filter((u) => adminIds.has(u.user_id))
     }
 
     case 'solo_pool_admins': {
-      const { data: users } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!users) return []
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('pool_id, admin_user_id')
-      if (!pools) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('pool_id')
-      const memberCountByPool = new Map<string, number>()
-      for (const m of members || []) {
-        memberCountByPool.set(m.pool_id, (memberCountByPool.get(m.pool_id) || 0) + 1)
-      }
-      const soloAdminIds = new Set(
-        pools
-          .filter((p) => memberCountByPool.get(p.pool_id) === 1)
-          .map((p) => p.admin_user_id)
-      )
-      return users.filter((u) => soloAdminIds.has(u.user_id))
+      const [users, adminIds] = await Promise.all([
+        allUsers(supabase),
+        adminIdsByPoolSize(supabase, (count) => count === 1),
+      ])
+      return users.filter((u) => adminIds.has(u.user_id))
     }
 
     case 'small_pool_admins': {
-      const { data: users } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!users) return []
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('pool_id, admin_user_id')
-      if (!pools) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('pool_id')
-      const memberCountByPool = new Map<string, number>()
-      for (const m of members || []) {
-        memberCountByPool.set(m.pool_id, (memberCountByPool.get(m.pool_id) || 0) + 1)
-      }
-      const smallPoolAdminIds = new Set(
-        pools
-          .filter((p) => {
-            const count = memberCountByPool.get(p.pool_id) || 0
-            return count >= 2 && count <= 4
-          })
-          .map((p) => p.admin_user_id)
-      )
-      return users.filter((u) => smallPoolAdminIds.has(u.user_id))
+      const [users, adminIds] = await Promise.all([
+        allUsers(supabase),
+        adminIdsByPoolSize(supabase, (count) => count >= 2 && count <= 4),
+      ])
+      return users.filter((u) => adminIds.has(u.user_id))
     }
 
     case 'non_admin_members': {
-      const { data: users } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!users) return []
-      const { data: pools } = await supabase
-        .from('pools')
-        .select('admin_user_id')
-      const adminIds = new Set((pools || []).map((p) => p.admin_user_id))
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('user_id')
-      const memberIds = new Set((members || []).map((m) => m.user_id))
+      const [users, adminIds, memberIds] = await Promise.all([
+        allUsers(supabase),
+        adminUserIds(supabase),
+        memberUserIds(supabase),
+      ])
       return users.filter((u) => memberIds.has(u.user_id) && !adminIds.has(u.user_id))
     }
 
     case 'active_members': {
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!data) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('user_id')
-      const memberIds = new Set((members || []).map((m) => m.user_id))
-      return data.filter((u) => memberIds.has(u.user_id))
+      const [users, memberIds] = await Promise.all([allUsers(supabase), memberUserIds(supabase)])
+      return users.filter((u) => memberIds.has(u.user_id))
     }
 
     case 'inactive_users': {
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!data) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('user_id')
-      const memberIds = new Set((members || []).map((m) => m.user_id))
-      return data.filter((u) => !memberIds.has(u.user_id))
+      const [users, memberIds] = await Promise.all([allUsers(supabase), memberUserIds(supabase)])
+      return users.filter((u) => !memberIds.has(u.user_id))
     }
 
     case 'lapsed_users': {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-        .lt('created_at', thirtyDaysAgo)
-      if (!data) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('user_id')
-      const memberIds = new Set((members || []).map((m) => m.user_id))
-      return data.filter((u) => !memberIds.has(u.user_id))
+      const [users, memberIds] = await Promise.all([
+        fetchAll<SegmentUserRow>((from, to) =>
+          usersQuery(supabase).lt('created_at', thirtyDaysAgo).range(from, to)
+        ),
+        memberUserIds(supabase),
+      ])
+      return users.filter((u) => !memberIds.has(u.user_id))
     }
 
     case 'engaged_no_pool': {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-        .gte('created_at', thirtyDaysAgo)
-      if (!data) return []
-      const { data: members } = await supabase
-        .from('pool_members')
-        .select('user_id')
-      const memberIds = new Set((members || []).map((m) => m.user_id))
-      return data.filter((u) => !memberIds.has(u.user_id))
+      const [users, memberIds] = await Promise.all([
+        fetchAll<SegmentUserRow>((from, to) =>
+          usersQuery(supabase).gte('created_at', thirtyDaysAgo).range(from, to)
+        ),
+        memberUserIds(supabase),
+      ])
+      return users.filter((u) => !memberIds.has(u.user_id))
     }
 
     case 'past_predictors': {
-      const { data: users } = await supabase
-        .from('users')
-        .select('email, full_name, username, user_id')
-        .not('email', 'is', null)
-      if (!users) return []
-      const { data: entries } = await supabase
-        .from('pool_entries')
-        .select('member_id, pool_members!inner(user_id)')
-        .eq('has_submitted_predictions', true)
-      const predictorIds = new Set(
-        (entries || []).map((e) => (e.pool_members as any).user_id as string)
-      )
+      const [users, predictorIds] = await Promise.all([
+        allUsers(supabase),
+        predictorUserIds(supabase),
+      ])
       return users.filter((u) => predictorIds.has(u.user_id))
+    }
+
+    case 'past_predictors_non_admin': {
+      const [users, predictorIds, adminIds] = await Promise.all([
+        allUsers(supabase),
+        predictorUserIds(supabase),
+        adminUserIds(supabase),
+      ])
+      return users.filter((u) => predictorIds.has(u.user_id) && !adminIds.has(u.user_id))
     }
 
     case 'recent_signups': {
       const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username')
-        .not('email', 'is', null)
-        .gte('created_at', fourteenDaysAgo)
-      return data || []
+      return fetchAll<SegmentUserRow>((from, to) =>
+        usersQuery(supabase).gte('created_at', fourteenDaysAgo).range(from, to)
+      )
     }
 
     case 'super_admins': {
-      const { data } = await supabase
-        .from('users')
-        .select('email, full_name, username')
-        .not('email', 'is', null)
-        .eq('is_super_admin', true)
-      return data || []
+      return fetchAll<SegmentUserRow>((from, to) =>
+        usersQuery(supabase).eq('is_super_admin', true).range(from, to)
+      )
     }
 
     case 'bracket_fix_affected': {
+      // HISTORICAL — built for the one-shot July 2026 bracket-fix send and kept for the
+      // audit trail. Deliberately NOT converted to fetchAll: the `predictions` scan below
+      // would page through six figures of rows, and the `.in(entry_id, …)` list would blow
+      // the URL length. It is truncation-prone by the same 1,000-row cap as everything else
+      // above; re-derive it in SQL before ever reusing it.
+      //
       // Affected = entries that had R16+ picks invalidated.
       // Two sources:
       //   1. Entries that have any bracket_picker_knockout_picks row (the R16+ rows were deleted by the bracket-fix migration; R32 rows remaining identify bracket-picker entries that need to re-pick R16+).

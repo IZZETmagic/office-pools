@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { syncContactToResend } from '@/lib/email/contacts'
 
 // =============================================================
@@ -12,12 +13,20 @@ export async function POST() {
   if (auth.error) return auth.error
   const { supabase } = auth.data
 
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('email, full_name, username')
-    .not('email', 'is', null)
-
-  if (error || !users) {
+  // Paged: users (4.8k) exceeds the 1,000-row cap. Unpaged, only the first 1,000 ever
+  // reached the Resend audience — the rest silently never synced.
+  let users: { email: string; full_name: string | null; username: string }[]
+  try {
+    users = await fetchAllRows(
+      (from, to) =>
+        supabase
+          .from('users')
+          .select('email, full_name, username')
+          .not('email', 'is', null)
+          .range(from, to),
+      'resend-sync users'
+    )
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
 
