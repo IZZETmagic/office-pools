@@ -1,5 +1,14 @@
 -- 025_pool_accepting_members.sql
--- NOT YET APPLIED — deploy 1 of 3. See drafts/2026-07-25_pool_status_display_audit.md.
+-- Applied to prod 2026-07-25 (Supabase migration: pool_accepting_members).
+-- Deploy 1 of 3. See drafts/2026-07-25_pool_status_display_audit.md.
+--
+-- Post-apply state: 623 pools, all accepting_members = true; status unchanged
+-- at 610 open / 13 completed; 0 rows had status = 'closed', so the backfill
+-- below was a verified no-op in prod.
+--
+-- ⚠ The application code that WRITES this column is not deployed yet
+-- (branch pool-status-accepting-members). Prod code is unaffected: the column
+-- is additive with a default, so existing select('*') reads just gain a field.
 --
 -- `pools.status` currently conflates two orthogonal concepts, as its own admin
 -- copy admits:
