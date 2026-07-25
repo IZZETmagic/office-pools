@@ -55,6 +55,19 @@ export function poolStatusDisplay(
   return { label: 'Open', tone: 'green' };
 }
 
+/**
+ * Whether the pool is over, for surfaces that swap live UI for a
+ * final-standings state.
+ *
+ * Without a phase this is exactly `status === 'completed'`. Pass a phase and a
+ * tournament whose matches have all finished also counts, which is what lets a
+ * card read "final standings" during the window before auto-archive retires
+ * the pool.
+ */
+export function isPoolFinished(pool: PoolStatusInput, phase?: TournamentPhase): boolean {
+  return (pool.status ?? 'open') === 'completed' || phase === 'finished';
+}
+
 export type PoolJoinability = {
   canJoin: boolean;
   reason: string | null;

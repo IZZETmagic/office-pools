@@ -3,6 +3,7 @@ import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNTex
 
 import { Icon, Text } from '@/components/ui';
 import { getLevel } from '@/lib/levels';
+import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { FormResult, PoolSummary } from '@/lib/useHomeData';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -68,9 +69,13 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   // is stale trivia. Surface the pool's own state instead. Completed pools
   // only reach this card because the Pools tab shows every status — the
   // home dashboard's list is active-only.
-  const isArchived = pool.status === 'archived';
-  const isFinished = pool.status === 'completed' || isArchived;
-  const finishedLabel = isArchived ? 'Archived' : 'Completed';
+  //
+  // Label and finished-ness both come from lib/poolStatus so this card cannot
+  // drift from the rest of the app. The previous hand-rolled version branched
+  // on status === 'archived', a value nothing has ever written and that
+  // migration 025b forbids outright.
+  const isFinished = isPoolFinished(pool);
+  const finishedLabel = poolStatusDisplay(pool).label;
   const level = getLevel(pool.totalPoints);
   const progress =
     pool.predictionsTotal > 0

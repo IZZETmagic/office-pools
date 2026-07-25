@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest'
 import {
   poolStatusDisplay,
   poolJoinability,
+  isPoolFinished,
   poolStatusSortRank,
   toneToBadgeVariant,
   toneToTagClass,
@@ -140,6 +141,36 @@ describe('poolJoinability', () => {
     expect(poolJoinability({ status: 'completed', accepting_members: false }).reason).toBe(
       'This pool has finished.',
     )
+  })
+})
+
+describe('isPoolFinished', () => {
+  it('is true for a completed pool', () => {
+    expect(isPoolFinished({ status: 'completed' })).toBe(true)
+  })
+
+  it('is false for an open pool with no phase given', () => {
+    expect(isPoolFinished({ status: 'open' })).toBe(false)
+  })
+
+  it('is true for an open pool once the tournament has finished', () => {
+    // The auto-archive window: matches are done, the pool has not been retired
+    // yet, and the card should already read "final standings".
+    expect(isPoolFinished({ status: 'open' }, 'finished')).toBe(true)
+  })
+
+  it('is false while the tournament is still running', () => {
+    expect(isPoolFinished({ status: 'open' }, 'running')).toBe(false)
+  })
+
+  it('is not affected by join-ability', () => {
+    expect(isPoolFinished({ status: 'open', accepting_members: false })).toBe(false)
+  })
+
+  it('treats the retired "archived" value as not-finished rather than crashing', () => {
+    // Nothing writes 'archived' and migration 025b forbids it; this pins the
+    // behaviour so a stray legacy row cannot silently read as finished.
+    expect(isPoolFinished({ status: 'archived' })).toBe(false)
   })
 })
 
