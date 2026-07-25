@@ -1152,6 +1152,57 @@ export function playerFeedbackSurveyTemplate(params: {
   }
 }
 
+// --- Post-Tournament Feedback Follow-ups (thank-you + reminder in one) ---
+// Sent to the same two audiences a few days after the surveys. Worded to land whether or
+// not the recipient already responded (we can't tell who did). Plural "we" voice by
+// preference. Same Tally URLs as the surveys, so responses land in the same forms.
+
+export function poolAdminFollowupTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName } = params
+  return {
+    subject: 'Thanks for running a pool — one last nudge',
+    html: brandedTemplate({
+      preheader: 'Already sent your feedback? Thank you. If not, the survey\'s still open — about 3 minutes.',
+      heading: 'Thank you — and a quick reminder',
+      body: `
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">The World Cup's wrapped, and pools like yours are the whole reason it was any fun. Running one is real work — chasing picks, fielding questions, keeping everyone honest — and it doesn't happen without admins like you. Thank you.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">A little while back we sent a short survey about what running your pool was actually like. <strong>If you already filled it out — genuinely, thank you.</strong> Those answers are exactly what we're using to decide what gets built before the next tournament.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;"><strong>If you haven't gotten to it yet, it's still open</strong> — six questions, about three minutes. Even a line or two makes a difference.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0;">Either way, thanks for being part of this one.</p>
+      `,
+      ctaText: 'Take the survey',
+      ctaUrl: POOL_ADMIN_FEEDBACK_SURVEY_URL,
+    }),
+  }
+}
+
+export function playerFollowupTemplate(params: {
+  firstName: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const { firstName } = params
+  return {
+    subject: 'Thanks for playing — did we get your two cents?',
+    html: brandedTemplate({
+      preheader: 'Already did the survey? Thank you. If not, it\'s still open — about 2 minutes.',
+      heading: 'Thanks for playing — one last thing',
+      body: `
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">That's a wrap on the World Cup. Thanks for making your picks and sticking it out to the final whistle — the whole thing is more fun with more people in it.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">A bit ago we sent a quick survey — favorite moment, biggest frustration, what you'd want next. <strong>If you already sent yours back, thank you, truly</strong> — we've read every single one.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;"><strong>If you haven't yet, it's still open and takes about two minutes.</strong> Your answer genuinely shapes what we do next — including which tournament or sport comes after this one.</p>
+        <p style="color:#3D4560;line-height:1.6;margin:0;">Thanks either way. See you next tournament.</p>
+      `,
+      ctaText: 'Take the survey',
+      ctaUrl: PLAYER_FEEDBACK_SURVEY_URL,
+    }),
+  }
+}
+
 // --- Community Templates ---
 
 export function pointsAdjustedTemplate(params: {

@@ -38,6 +38,10 @@ yarn-error.log*
 
 # claude code
 .claude/
+
+# operational send ledgers — contain real recipient email addresses, never commit
+scripts/.followup_send_ledger.jsonl
+scripts/.*_send_ledger.jsonl
 .mcp.json
 nul
 
