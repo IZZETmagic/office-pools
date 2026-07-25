@@ -105,10 +105,10 @@ export type HomeData = {
   // dashboard's "Your Pools" section and the aggregate stats below, which
   // are intentionally an active-only view.
   pools: PoolSummary[];
-  // Every pool the user is a member of, regardless of status (open, active,
-  // completed, archived, …). The Pools tab shows this full list so its
-  // Status filter — which already ships Completed/Archived options — has
-  // something to match. Sorted the same way as `pools`.
+  // Every pool the user is a member of, regardless of status. Migration 025b
+  // constrains pools.status to ('open','completed'). The Pools tab shows this
+  // full list so its Status filter's Completed option has something to match.
+  // Sorted the same way as `pools`.
   allPools: PoolSummary[];
   totalPoints: number;
   bestRank: number | null;

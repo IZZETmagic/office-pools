@@ -4,7 +4,10 @@ import { Icon, Text } from '@/components/ui';
 import { type FilterSheetConfig } from './PoolsFilterSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-export type StatusFilter = 'all' | 'open' | 'completed' | 'archived';
+// Mirrors the values pools.status can actually hold. Migration 025b constrains
+// the column to ('open','completed'), so there is nothing else to filter on —
+// an 'archived' option used to sit here and could never match a row.
+export type StatusFilter = 'all' | 'open' | 'completed';
 export type TypeFilter = 'all' | 'full_tournament' | 'progressive' | 'bracket_picker';
 export type PredictionFilter = 'all' | 'submitted' | 'pending';
 export type SortMode = 'smart' | 'newest' | 'name' | 'points';
@@ -27,7 +30,6 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
   { value: 'completed', label: 'Completed' },
-  { value: 'archived', label: 'Archived' },
 ];
 
 const TYPE_OPTIONS: Array<{ value: TypeFilter; label: string }> = [

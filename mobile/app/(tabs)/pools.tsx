@@ -78,9 +78,9 @@ export default function PoolsScreen() {
     }, []),
   );
 
-  // Full membership list (all statuses) so the Status filter's
-  // Completed/Archived options have pools to match. `data.pools` is the
-  // active-only subset used by the home dashboard.
+  // Full membership list (all statuses) so the Status filter's Completed
+  // option has pools to match. `data.pools` is the active-only subset used
+  // by the home dashboard.
   const allPools = data?.allPools ?? [];
 
   const visiblePools = useMemo(() => applyFilters(allPools, filters), [allPools, filters]);
