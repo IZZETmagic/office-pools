@@ -101,7 +101,15 @@ export type HomeData = {
   username: string | null;
   email: string | null;
   memberSince: string | null;
+  // The user's ACTIVE pools only (status open/active). Drives the home
+  // dashboard's "Your Pools" section and the aggregate stats below, which
+  // are intentionally an active-only view.
   pools: PoolSummary[];
+  // Every pool the user is a member of, regardless of status (open, active,
+  // completed, archived, …). The Pools tab shows this full list so its
+  // Status filter — which already ships Completed/Archived options — has
+  // something to match. Sorted the same way as `pools`.
+  allPools: PoolSummary[];
   totalPoints: number;
   bestRank: number | null;
   bestStreak: number;
@@ -576,11 +584,11 @@ export function useHomeDataInternal() {
           };
         });
 
-        const activePools = allPools.filter(
-          (p) => p.status === 'open' || p.status === 'active',
-        );
-
-        activePools.sort((a, b) => {
+        // Sort the FULL membership list once. The Pools tab re-sorts by the
+        // user's chosen sort mode, but keeping a sensible default order here
+        // means any consumer reading the raw list (and `activePools`, derived
+        // below by filtering, which preserves this order) gets it too.
+        allPools.sort((a, b) => {
           // 1. Branded (sponsored) pools always come first
           const aBranded = a.brandName ? 0 : 1;
           const bBranded = b.brandName ? 0 : 1;
@@ -597,6 +605,12 @@ export function useHomeDataInternal() {
           // 4. Alphabetical by pool name
           return a.poolName.localeCompare(b.poolName);
         });
+
+        // The home dashboard + aggregate stats are an active-only view.
+        // `filter` preserves the sort order established above.
+        const activePools = allPools.filter(
+          (p) => p.status === 'open' || p.status === 'active',
+        );
 
         const totalPoints = activePools.reduce((s, p) => s + p.totalPoints, 0);
         const bestRank = activePools
@@ -674,6 +688,7 @@ export function useHomeDataInternal() {
           email: (userData as { email?: string | null }).email ?? null,
           memberSince: (userData as { created_at?: string | null }).created_at ?? null,
           pools: activePools,
+          allPools,
           totalPoints,
           bestRank,
           bestStreak,
