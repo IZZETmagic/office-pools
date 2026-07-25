@@ -223,7 +223,9 @@ export async function GET(
   const availablePoolsQuery = supabase
     .from('pools')
     .select('pool_id, pool_name, pool_code, status')
-    .in('status', ['open', 'closed'])
+    // Was ['open','closed'] — 'closed' meant "not taking joiners", which never
+    // should have excluded a super admin adding someone by hand (migration 025).
+    .eq('status', 'open')
     .order('pool_name')
 
   if (memberPoolIds.length > 0) {

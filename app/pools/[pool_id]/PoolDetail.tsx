@@ -52,6 +52,7 @@ import type {
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 import { formatTimeAgo } from '@/lib/format'
+import { poolStatusTag } from '@/lib/poolStatus'
 
 // =====================
 // TAB DEFINITIONS
@@ -1025,13 +1026,8 @@ export function PoolDetail({
             ]}
             badges={
               <>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${
-                  pool.status === 'open' || pool.status === 'active' ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
-                    : pool.status === 'upcoming' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                    : pool.status === 'closed' ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
-                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-                }`}>
-                  {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${poolStatusTag(pool).className}`}>
+                  {poolStatusTag(pool).label}
                 </span>
                 {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
               </>

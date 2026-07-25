@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
+import { poolStatusLabel } from '@/components/ui/Badge'
 
 // =============================================
 // TYPES
@@ -897,7 +898,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-2xl font-extrabold sp-heading sp-text-ink">{pool.pool_name}</h2>
-              <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+              <Badge variant={getStatusVariant(pool.status)}>{poolStatusLabel(pool.status)}</Badge>
             </div>
             <p className="text-sm sp-text-slate mt-0.5 sp-body">
               {pool.brand_name} &middot; {pool.pool_code} &middot; {pool.pool_members?.[0]?.count ?? 0} members
@@ -1108,7 +1109,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
     {
       key: 'status',
       header: 'Status',
-      render: (p) => <Badge variant={getStatusVariant(p.status)}>{p.status}</Badge>,
+      render: (p) => <Badge variant={getStatusVariant(p.status)}>{poolStatusLabel(p.status)}</Badge>,
     },
     {
       key: 'members',
@@ -1211,7 +1212,7 @@ export function BrandedPoolsTab({ pools, setPools, onNavigateToPool }: BrandedPo
                   </div>
                   <div className="text-xs sp-text-slate">{p.pool_name}</div>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <Badge variant={getStatusVariant(p.status)}>{p.status}</Badge>
+                    <Badge variant={getStatusVariant(p.status)}>{poolStatusLabel(p.status)}</Badge>
                     <span className="text-xs sp-text-slate">{p.pool_members?.[0]?.count ?? 0} members</span>
                   </div>
                   {p.brand_slug && (

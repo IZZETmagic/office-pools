@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { useToast } from '@/components/ui/Toast'
+import { poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
 
 // Dynamic import recharts to avoid SSR issues
 const BarChart = dynamic(() => import('recharts').then((m) => m.BarChart), { ssr: false })
@@ -263,9 +264,9 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
   const completionPercent = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0
 
   // Pool breakdown by status (include fill color in data so Cell is not needed)
-  const poolsByStatus = ['open', 'closed', 'completed']
+  const poolsByStatus = ['open', 'completed']
     .map((s) => {
-      const name = s.charAt(0).toUpperCase() + s.slice(1)
+      const name = poolStatusLabel(s)
       return {
         name,
         value: pools.filter((p) => p.status === s).length,
@@ -557,8 +558,8 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Badge variant={p.status === 'open' ? 'green' : p.status === 'closed' ? 'yellow' : 'gray'}>
-                        {p.status}
+                      <Badge variant={getStatusVariantSolid(p.status)}>
+                        {poolStatusLabel(p.status)}
                       </Badge>
                       <span className="text-xs font-bold sp-text-slate sp-body">
                         {p.member_count}

@@ -1,7 +1,7 @@
 'use client'
 
 import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
+import { Badge, poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
 import type { PoolData, MemberData, EntryData, PoolRoundState } from './types'
 
 type PoolInfoTabProps = {
@@ -172,13 +172,8 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
         <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Pool Details</h4>
         <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
           <InfoRow label="Status">
-            <Badge variant={
-              pool.status === 'open' || pool.status === 'active' ? 'green'
-              : pool.status === 'upcoming' ? 'blue'
-              : pool.status === 'closed' ? 'yellow'
-              : 'gray'
-            }>
-              {pool.status === 'open' || pool.status === 'active' ? 'Open' : pool.status.charAt(0).toUpperCase() + pool.status.slice(1)}
+            <Badge variant={getStatusVariantSolid(pool.status)}>
+              {poolStatusLabel(pool.status)}
             </Badge>
           </InfoRow>
           <InfoRow label="Created">

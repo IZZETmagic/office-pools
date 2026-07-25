@@ -13,6 +13,7 @@ import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
+import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
 
 // =====================
 // TYPES
@@ -147,12 +148,9 @@ function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check'
     className: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300',
     isButton: false,
   }
-  if (pool.status === 'closed') return {
-    label: 'Closed',
-    icon: null,
-    className: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500',
-    isButton: false,
-  }
+  // The 'closed' branch that used to sit here is unreachable now that
+  // join-ability lives in accepting_members — a pool that has stopped taking
+  // joiners is still fully playable for its existing members (migration 025).
   if (pool.has_submitted_predictions) return {
     label: 'Submitted',
     icon: 'check',
@@ -185,25 +183,11 @@ function getModeName(mode: string): string {
 }
 
 function getStatusTagClass(status: string): string {
-  switch (status) {
-    case 'open':
-    case 'active': return 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
-    case 'upcoming': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-    case 'closed': return 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
-    case 'completed': return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
-  }
+  return toneToTagClass(poolStatusDisplay({ status }).tone)
 }
 
 function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'open':
-    case 'active': return 'Open'
-    case 'upcoming': return 'Upcoming'
-    case 'closed': return 'Closed'
-    case 'completed': return 'Completed'
-    default: return status
-  }
+  return poolStatusDisplay({ status }).label
 }
 
 function getModeTagClass(mode: string): string {
@@ -530,7 +514,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   <option value="all">All Statuses</option>
                   {availableStatuses.map((s) => (
                     <option key={s} value={s}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                      {getStatusLabel(s)}
                     </option>
                   ))}
                 </select>

@@ -27,6 +27,7 @@ import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { usePoolEntries } from '@/lib/usePoolEntries';
 import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { poolStatusDisplay } from '@/lib/poolStatus';
 
 const MODE_LABEL: Record<string, string> = {
   full_tournament: 'Full Tournament',
@@ -477,16 +478,14 @@ function RoundStateBadge({ state }: { state: string }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 
+// Both delegate to mobile/lib/poolStatus so mobile and web cannot drift, and so
+// a raw lowercase DB value can never reach the user (migration 025).
 function statusTone(status: string): BadgeTone {
-  if (status === 'open' || status === 'active') return 'green';
-  if (status === 'upcoming') return 'blue';
-  if (status === 'closed') return 'amber';
-  return 'neutral';
+  return poolStatusDisplay({ status }).tone;
 }
 
 function statusLabel(status: string): string {
-  if (status === 'open' || status === 'active') return 'Open';
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return poolStatusDisplay({ status }).label;
 }
 
 // Leave row variant of DangerRow with built-in disabled state for the

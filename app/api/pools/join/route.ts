@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { poolJoinability } from '@/lib/poolStatus'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -13,19 +14,24 @@ export async function POST(request: NextRequest) {
   const adminClient = createAdminClient()
 
   // Look up pool by ID or code
-  let pool: { pool_id: string; pool_name: string; status: string } | null = null
+  let pool: {
+    pool_id: string
+    pool_name: string
+    status: string
+    accepting_members: boolean | null
+  } | null = null
 
   if (pool_id) {
     const { data } = await adminClient
       .from('pools')
-      .select('pool_id, pool_name, status')
+      .select('pool_id, pool_name, status, accepting_members')
       .eq('pool_id', pool_id)
       .single()
     pool = data
   } else if (pool_code) {
     const { data } = await adminClient
       .from('pools')
-      .select('pool_id, pool_name, status')
+      .select('pool_id, pool_name, status, accepting_members')
       .eq('pool_code', pool_code)
       .single()
     pool = data
@@ -37,8 +43,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Pool not found. Check the code and try again.' }, { status: 404 })
   }
 
-  if (pool.status !== 'open') {
-    return NextResponse.json({ error: 'This pool is no longer accepting new members.' }, { status: 400 })
+  // Lifecycle and join-ability are separate refusals with separate copy, so the
+  // user learns which one applies (migration 025).
+  const { canJoin, reason } = poolJoinability(pool)
+  if (!canJoin) {
+    return NextResponse.json({ error: reason }, { status: 400 })
   }
 
   // Check for existing membership

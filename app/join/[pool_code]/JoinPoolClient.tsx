@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+import { poolJoinability } from '@/lib/poolStatus'
 
 type PoolInfo = {
   pool_id: string
@@ -12,6 +13,7 @@ type PoolInfo = {
   pool_code: string
   description: string | null
   status: string
+  accepting_members: boolean | null
   prediction_mode: string
   brand_name: string | null
   brand_emoji: string | null
@@ -39,7 +41,9 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolC
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isOpen = pool.status === 'open'
+  // Mirrors the server-side gate in /api/pools/join so the button state and the
+  // API refusal always agree, including which reason is shown.
+  const { canJoin, reason: blockedReason } = poolJoinability(pool)
 
   const handleJoin = async () => {
     setLoading(true)
@@ -132,8 +136,8 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolC
                   Go to Pool
                 </Button>
               </div>
-            ) : !isOpen ? (
-              <Alert variant="error">This pool is no longer accepting new members.</Alert>
+            ) : !canJoin ? (
+              <Alert variant="error">{blockedReason}</Alert>
             ) : (
               <Button
                 fullWidth

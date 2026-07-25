@@ -44,7 +44,9 @@ export async function POST(
     // ===== CHANGE STATUS =====
     case 'change_status': {
       const { status } = payload
-      const validStatuses = ['open', 'closed', 'completed']
+      // 'closed' was removed here when join-ability moved to its own column —
+      // use the set_accepting_members action instead (migration 025).
+      const validStatuses = ['open', 'completed']
       if (!status || !validStatuses.includes(status)) {
         return NextResponse.json(
           { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -65,6 +67,34 @@ export async function POST(
         'change_pool_status',
         `Changed ${targetPool.pool_name} status from "${targetPool.status}" to "${status}"`,
         { previous_status: targetPool.status, new_status: status }
+      )
+
+      return NextResponse.json({ success: true })
+    }
+
+    // ===== SET ACCEPTING MEMBERS (join-ability) =====
+    case 'set_accepting_members': {
+      const { accepting_members } = payload
+      if (typeof accepting_members !== 'boolean') {
+        return NextResponse.json(
+          { error: 'accepting_members must be a boolean' },
+          { status: 400 }
+        )
+      }
+
+      const { error: updateError } = await supabase
+        .from('pools')
+        .update({ accepting_members, updated_at: new Date().toISOString() })
+        .eq('pool_id', id)
+
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
+      }
+
+      await audit(
+        'set_accepting_members',
+        `${accepting_members ? 'Opened' : 'Closed'} ${targetPool.pool_name} to new members`,
+        { accepting_members }
       )
 
       return NextResponse.json({ success: true })

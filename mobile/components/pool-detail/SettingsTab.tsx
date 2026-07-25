@@ -54,6 +54,8 @@ type EditableState = {
   name: string;
   description: string;
   status: string;
+  /** Join-ability, independent of `status` (migration 025). */
+  acceptingMembers: boolean;
   isPrivate: boolean;
   maxEntries: number;
   maxParticipants: number;
@@ -106,6 +108,7 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       name: pool.poolName,
       description: pool.description ?? '',
       status: pool.status,
+      acceptingMembers: pool.acceptingMembers ?? true,
       isPrivate: pool.isPrivate,
       maxEntries: pool.maxEntriesPerUser,
       maxParticipants: pool.maxParticipants ?? 0,
@@ -159,6 +162,7 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
     edit.name !== initial.name ||
     edit.description !== initial.description ||
     edit.status !== initial.status ||
+    edit.acceptingMembers !== initial.acceptingMembers ||
     edit.isPrivate !== initial.isPrivate ||
     edit.maxEntries !== initial.maxEntries ||
     edit.maxParticipants !== initial.maxParticipants ||
@@ -188,6 +192,7 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         pool_name: edit.name.trim(),
         description: edit.description.trim() || null,
         status: edit.status,
+        accepting_members: edit.acceptingMembers,
         is_private: edit.isPrivate,
         max_entries_per_user: edit.maxEntries,
         max_participants: edit.maxParticipants > 0 ? edit.maxParticipants : null,
@@ -435,14 +440,15 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         </FieldRow>
       </Card>
 
-      {/* Status */}
+      {/* Status — lifecycle only. 'Closed' used to live here meaning "no new
+          members"; that join-ability concept now has its own card below
+          (migration 025). */}
       <Card>
         <Caption>Status</Caption>
         <SegmentedPicker
           value={edit.status}
           options={[
             { value: 'open', label: 'Open' },
-            { value: 'closed', label: 'Closed' },
             { value: 'completed', label: 'Completed' },
           ]}
           onChange={(v) => setEdit({ ...edit, status: v })}
@@ -455,6 +461,30 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
           }}
         >
           {statusDescription(edit.status)}
+        </RNText>
+      </Card>
+
+      {/* New members — independent of status */}
+      <Card>
+        <Caption>New Members</Caption>
+        <SegmentedPicker
+          value={edit.acceptingMembers ? 'yes' : 'no'}
+          options={[
+            { value: 'yes', label: 'Accepting' },
+            { value: 'no', label: 'Not accepting' },
+          ]}
+          onChange={(v) => setEdit({ ...edit, acceptingMembers: v === 'yes' })}
+        />
+        <RNText
+          style={{
+            fontFamily: fontFamilies.regular,
+            fontSize: 12,
+            color: theme.colors.slate,
+          }}
+        >
+          {edit.acceptingMembers
+            ? 'Anyone with the code can join.'
+            : 'No new members can join. The pool stays visible to existing members.'}
         </RNText>
       </Card>
 
@@ -1104,12 +1134,12 @@ function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * 3600 * 1000);
 }
 
+// Lifecycle only — whether new members can join is a separate axis, described
+// by its own card (migration 025).
 function statusDescription(status: string): string {
   switch (status) {
     case 'open':
-      return 'Pool is open and accepting new members.';
-    case 'closed':
-      return 'Pool is closed to new members.';
+      return 'Pool is running.';
     case 'completed':
       return 'Tournament is over. No new activity allowed.';
     default:
