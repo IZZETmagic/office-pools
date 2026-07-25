@@ -1,6 +1,14 @@
 -- 025b_pool_status_check.sql
--- NOT YET APPLIED — deploy 3 of 3. Run ONLY after the 025 code pass is live in
--- production. See drafts/2026-07-25_pool_status_display_audit.md.
+-- Applied to prod 2026-07-25 (Supabase migration: pool_status_check).
+-- Deploy 3 of 3, run after the code went live on master 5d599f0.
+-- See drafts/2026-07-25_pool_status_display_audit.md.
+--
+-- Pre-flight returned zero rows. Post-apply: 623 pools (610 open / 13
+-- completed), 0 non-conforming. Guard verified live by attempting an
+-- `UPDATE ... SET status='archived'` inside a self-rolling-back DO block —
+-- the CHECK rejected it and no row was mutated.
+--
+-- The `join_deadline` drop below was deliberately NOT applied.
 --
 -- The contract half of the expand/contract. Once no code writes 'closed'
 -- (or the never-written 'active' / 'upcoming' / phantom 'archived'), constrain
