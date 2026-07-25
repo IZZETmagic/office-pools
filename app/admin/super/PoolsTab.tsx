@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
+import { poolStatusLabel } from '@/components/ui/Badge'
 
 // =============================================
 // TYPES
@@ -339,7 +340,7 @@ function ActionModals({
 
   // ---- Change Status ----
   if (actionModal.type === 'change_status') {
-    const statuses = ['open', 'closed', 'completed']
+    const statuses = ['open', 'completed']
     return (
       <ModalShell
         {...shellProps}
@@ -357,7 +358,7 @@ function ActionModals({
       >
         <div className="space-y-3">
           <p className="text-sm sp-text-ink sp-body">
-            Current status: <Badge variant={getStatusVariant(actionModal.currentStatus)}>{actionModal.currentStatus}</Badge>
+            Current status: <Badge variant={getStatusVariant(actionModal.currentStatus)}>{poolStatusLabel(actionModal.currentStatus)}</Badge>
           </p>
           <div>
             <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">New Status</label>
@@ -1105,7 +1106,7 @@ function PoolDetailSheet({
             <h2 className="text-2xl font-extrabold sp-heading sp-text-ink">
               {pool.pool_name}
             </h2>
-            <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+            <Badge variant={getStatusVariant(pool.status)}>{poolStatusLabel(pool.status)}</Badge>
             <span className="text-xs font-mono sp-text-slate">{pool.pool_code}</span>
           </div>
           {pool.description && (
@@ -1165,7 +1166,7 @@ function PoolDetailSheet({
         {[
           ['Pool ID', pool.pool_id],
           ['Pool Code', pool.pool_code],
-          ['Status', pool.status],
+          ['Status', poolStatusLabel(pool.status)],
           ['Mode', MODE_LABELS[pool.prediction_mode] || pool.prediction_mode],
           ['Tournament', pool.tournaments?.name || '-'],
           ['Max Participants', pool.max_participants ?? 'Unlimited'],
@@ -1878,7 +1879,6 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
   const statusOptions: { value: string; label: string; count: number | null }[] = [
     { value: 'all', label: 'All', count: null },
     { value: 'open', label: 'Open', count: pools.filter((p) => p.status === 'open').length },
-    { value: 'closed', label: 'Closed', count: pools.filter((p) => p.status === 'closed').length },
     { value: 'completed', label: 'Completed', count: pools.filter((p) => p.status === 'completed').length },
   ]
 
@@ -1948,7 +1948,7 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
       align: 'center',
       render: (pool) => (
         <Badge variant={getStatusVariant(pool.status)}>
-          {pool.status}
+          {poolStatusLabel(pool.status)}
         </Badge>
       ),
     },
@@ -2065,7 +2065,7 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
                   {pool.pool_name}
                 </span>
                 <div className="flex gap-1.5 ml-auto flex-shrink-0">
-                  <Badge variant={getStatusVariant(pool.status)}>{pool.status}</Badge>
+                  <Badge variant={getStatusVariant(pool.status)}>{poolStatusLabel(pool.status)}</Badge>
                 </div>
               </div>
               <div className="px-3.5 py-3">

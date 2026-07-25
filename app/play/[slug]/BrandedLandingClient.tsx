@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { LeaderboardPlayer } from './getLeaderboard'
 import type { TournamentSummary, StageProgress } from './getTournamentSummary'
+import { poolStatusDisplay } from '@/lib/poolStatus'
 
 type PoolConfig = {
   name: string
@@ -594,7 +595,7 @@ export default function BrandedLandingClient({
                   {poolConfig.mode}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${poolConfig.accentColor}20`, color: poolConfig.accentColor }}>
-                  {isLive ? 'Live' : isComplete ? 'Final' : poolConfig.status === 'open' ? 'Open' : poolConfig.status}
+                  {isLive ? 'Live' : isComplete ? 'Final' : poolStatusDisplay({ status: poolConfig.status }).label}
                 </span>
               </div>
 

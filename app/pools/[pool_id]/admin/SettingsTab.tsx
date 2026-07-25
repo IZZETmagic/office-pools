@@ -27,6 +27,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   const [poolName, setPoolName] = useState(pool.pool_name)
   const [description, setDescription] = useState(pool.description || '')
   const [status, setStatus] = useState(pool.status)
+  const [acceptingMembers, setAcceptingMembers] = useState(pool.accepting_members ?? true)
   const [isPrivate, setIsPrivate] = useState(pool.is_private)
   const [maxParticipants, setMaxParticipants] = useState(
     pool.max_participants?.toString() || '0'
@@ -77,6 +78,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       poolName !== pool.pool_name ||
       description !== (pool.description || '') ||
       status !== pool.status ||
+      acceptingMembers !== (pool.accepting_members ?? true) ||
       isPrivate !== pool.is_private ||
       maxParticipants !== (pool.max_participants?.toString() || '0') ||
       maxEntries !== (pool.max_entries_per_user?.toString() || '1') ||
@@ -85,7 +87,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       entryFee !== (pool.entry_fee?.toString() || '') ||
       entryFeeCurrency !== (pool.entry_fee_currency || 'USD')
     )
-  }, [poolName, description, status, isPrivate, maxParticipants, maxEntries, deadlineDate, deadlineTime, pool, initialDeadlineDate, initialDeadlineTime, entryFee, entryFeeCurrency])
+  }, [poolName, description, status, acceptingMembers, isPrivate, maxParticipants, maxEntries, deadlineDate, deadlineTime, pool, initialDeadlineDate, initialDeadlineTime, entryFee, entryFeeCurrency])
 
   // Notify parent of dirty state
   useEffect(() => {
@@ -156,6 +158,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       pool_name: poolName.trim(),
       description: description.trim() || null,
       status,
+      accepting_members: acceptingMembers,
       is_private: isPrivate,
       max_participants: maxP > 0 ? maxP : null,
       max_entries_per_user: maxE,
@@ -199,6 +202,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       pool_name: poolName.trim(),
       description: description.trim() || null,
       status,
+      accepting_members: acceptingMembers,
       is_private: isPrivate,
       max_participants: maxP > 0 ? maxP : null,
       max_entries_per_user: maxE,
@@ -322,10 +326,17 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     setDeadlineTime(d.toTimeString().slice(0, 5))
   }
 
+  // 'closed' used to live here, meaning "no new members" — a join-ability
+  // concept sharing a column with lifecycle. It now has its own toggle below
+  // (migration 025); this control is lifecycle only.
   const statusOptions = [
-    { value: 'open' as const, label: 'Open', desc: 'Accepting new members' },
-    { value: 'closed' as const, label: 'Closed', desc: 'No new members' },
+    { value: 'open' as const, label: 'Open', desc: 'Pool is running' },
     { value: 'completed' as const, label: 'Completed', desc: 'Tournament finished' },
+  ]
+
+  const acceptingOptions = [
+    { value: true as const, label: 'Accepting', desc: 'Anyone with the code can join' },
+    { value: false as const, label: 'Not accepting', desc: 'No new members can join' },
   ]
 
   const visibilityOptions = [
@@ -413,6 +424,29 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               </div>
               <p className="text-xs text-neutral-500 mt-1.5">
                 {statusOptions.find(s => s.value === status)?.desc}
+              </p>
+            </FormField>
+
+            <FormField label="New Members">
+              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+                {acceptingOptions.map((o) => (
+                  <button
+                    key={String(o.value)}
+                    type="button"
+                    onClick={() => setAcceptingMembers(o.value)}
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                      acceptingMembers === o.value
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-neutral-500 mt-1.5">
+                {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
+                {' '}Independent of pool status — the pool stays visible to existing members either way.
               </p>
             </FormField>
           </div>

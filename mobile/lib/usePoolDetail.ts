@@ -23,6 +23,8 @@ export type PoolDetailInfo = {
   brandLogoUrl: string | null;
   predictionDeadline: string | null;
   status: string;
+  /** Join-ability, independent of `status` (migration 025). */
+  acceptingMembers: boolean | null;
   maxParticipants: number | null;
   maxEntriesPerUser: number;
   isPrivate: boolean;
@@ -69,7 +71,7 @@ export function usePoolDetail(poolId: string | undefined) {
             supabase
               .from('pools')
               .select(
-                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency',
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency',
               )
               .eq('pool_id', poolId)
               .maybeSingle(),
@@ -109,6 +111,7 @@ export function usePoolDetail(poolId: string | undefined) {
           brand_logo_url: string | null;
           prediction_deadline: string | null;
           status: string;
+          accepting_members: boolean | null;
           max_participants: number | null;
           max_entries_per_user: number;
           is_private: boolean | null;
@@ -132,6 +135,7 @@ export function usePoolDetail(poolId: string | undefined) {
             brandLogoUrl: poolRow.brand_logo_url,
             predictionDeadline: poolRow.prediction_deadline,
             status: poolRow.status,
+            acceptingMembers: poolRow.accepting_members,
             maxParticipants: poolRow.max_participants,
             maxEntriesPerUser: poolRow.max_entries_per_user,
             isPrivate: !!poolRow.is_private,

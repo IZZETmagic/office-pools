@@ -1,3 +1,5 @@
+import { poolStatusDisplay, toneToBadgeVariant } from '@/lib/poolStatus'
+
 type BadgeVariant = 'blue' | 'green' | 'yellow' | 'gray' | 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
 
 type BadgeProps = {
@@ -25,8 +27,26 @@ export function Badge({ variant = 'blue', children, className }: BadgeProps) {
   )
 }
 
+/**
+ * @deprecated Prefer `poolStatusLabel` alongside this so the user never sees a
+ * raw lowercase DB value. Delegates to lib/poolStatus so colours cannot drift.
+ */
 export function getStatusVariant(status: string): BadgeVariant {
-  if (status === 'open') return 'outline-green'
-  if (status === 'closed') return 'outline-yellow'
-  return 'outline-gray'
+  return toneToBadgeVariant(poolStatusDisplay({ status }).tone)
+}
+
+/** Solid-fill counterpart, for surfaces that use filled rather than outline pills. */
+export function getStatusVariantSolid(status: string): BadgeVariant {
+  const { tone } = poolStatusDisplay({ status })
+  switch (tone) {
+    case 'green': return 'green'
+    case 'amber': return 'yellow'
+    case 'blue': return 'blue'
+    case 'neutral': return 'gray'
+  }
+}
+
+/** The human label that belongs with either variant helper above. */
+export function poolStatusLabel(status: string): string {
+  return poolStatusDisplay({ status }).label
 }

@@ -13,6 +13,7 @@ import { getLevelName } from '@/lib/levelNames'
 import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
+import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
 
 // =====================
 // TYPES
@@ -180,25 +181,11 @@ function getModeTagClass(mode: string): string {
 }
 
 function getStatusTagClass(status: string): string {
-  switch (status) {
-    case 'open':
-    case 'active': return 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
-    case 'upcoming': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-    case 'closed': return 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
-    case 'completed': return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-  }
+  return toneToTagClass(poolStatusDisplay({ status }).tone)
 }
 
 function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'open':
-    case 'active': return 'Open'
-    case 'upcoming': return 'Upcoming'
-    case 'closed': return 'Closed'
-    case 'completed': return 'Completed'
-    default: return status
-  }
+  return poolStatusDisplay({ status }).label
 }
 
 function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): string {

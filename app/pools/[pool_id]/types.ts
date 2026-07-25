@@ -6,6 +6,8 @@ export type PoolData = {
   pool_code: string
   description: string | null
   status: string
+  /** Join-ability, independent of `status` (migration 025). Null on pre-migration rows. */
+  accepting_members: boolean | null
   is_private: boolean
   max_participants: number | null
   max_entries_per_user: number

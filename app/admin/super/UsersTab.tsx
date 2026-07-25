@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
+import { poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
 
 // =============================================
 // TYPES
@@ -665,7 +666,7 @@ function ActionModals({
               <option value="">Select a pool...</option>
               {actionModal.availablePools.map((p) => (
                 <option key={p.pool_id} value={p.pool_id}>
-                  {p.pool_name} ({p.pool_code}) — {p.status}
+                  {p.pool_name} ({p.pool_code}) — {poolStatusLabel(p.status)}
                 </option>
               ))}
             </select>
@@ -1145,7 +1146,7 @@ function UserDetailSheet({
                           {pool ? MODE_LABELS[pool.prediction_mode] || pool.prediction_mode : '-'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <Badge variant={pool?.status === 'open' ? 'green' : pool?.status === 'closed' ? 'yellow' : 'gray'}>
+                          <Badge variant={getStatusVariantSolid(pool?.status ?? '')}>
                             {pool?.status || '-'}
                           </Badge>
                         </td>
