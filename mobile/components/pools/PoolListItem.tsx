@@ -62,6 +62,15 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   // submitted but a new one opened, AND admin-style pools where the
   // user has deleted all their entries.
   const needsPredictions = pool.needsPredictions;
+  // Pool lifecycle state. Once a pool is finished its footer must stop
+  // reporting prediction status: "Predictions needed" (amber) is actively
+  // misleading on a pool that can no longer be predicted, and "Submitted"
+  // is stale trivia. Surface the pool's own state instead. Completed pools
+  // only reach this card because the Pools tab shows every status — the
+  // home dashboard's list is active-only.
+  const isArchived = pool.status === 'archived';
+  const isFinished = pool.status === 'completed' || isArchived;
+  const finishedLabel = isArchived ? 'Archived' : 'Completed';
   const level = getLevel(pool.totalPoints);
   const progress =
     pool.predictionsTotal > 0
@@ -214,6 +223,7 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
               }}
             >
               {isAdmin ? <Badge label="ADMIN" tone="primary" /> : null}
+              {isFinished ? <Badge label={finishedLabel.toUpperCase()} tone="success" /> : null}
               <Badge label={modeLabel} tone="neutral" />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Icon name="person.2.fill" color="slate" size={11} />
@@ -266,7 +276,14 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-            {needsPredictions ? (
+            {isFinished ? (
+              <>
+                <Icon name="trophy.fill" color="slate" size={14} />
+                <Text variant="caption" color="slate">
+                  {finishedLabel} &middot; final standings
+                </Text>
+              </>
+            ) : needsPredictions ? (
               <>
                 <View
                   style={{
@@ -459,10 +476,20 @@ function ProgressCircle({
   );
 }
 
-function Badge({ label, tone }: { label: string; tone: 'primary' | 'neutral' }) {
+function Badge({ label, tone }: { label: string; tone: 'primary' | 'neutral' | 'success' }) {
   const theme = useTheme();
-  const bg = tone === 'primary' ? withOpacity(theme.colors.primary, 0.12) : theme.colors.mist;
-  const fg = tone === 'primary' ? theme.colors.primary : theme.colors.slate;
+  const bg =
+    tone === 'primary'
+      ? withOpacity(theme.colors.primary, 0.12)
+      : tone === 'success'
+        ? withOpacity(theme.colors.green, 0.14)
+        : theme.colors.mist;
+  const fg =
+    tone === 'primary'
+      ? theme.colors.primary
+      : tone === 'success'
+        ? theme.colors.green
+        : theme.colors.slate;
   return (
     <View
       style={{
