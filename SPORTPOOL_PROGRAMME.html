@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SportPool Programme</title>
+<style>
+:root{
+  --snow:#F7F8FC; --surface:#FFFFFF; --mist:#EEF1F8; --silver:#D4DAE8;
+  --slate:#7B87A8; --ink:#1B2340; --midnight:#0B0F1A;
+  --primary:#3B6EFF; --primary-light:#F7F9FF;
+  --accent:#F5C518; --accent-light:#FFF8E1;
+  --green:#22C55E; --green-light:#ECFDF5;
+  --amber:#F59E0B; --amber-light:#FFFBEB;
+  --red:#EF4444; --red-light:#FEF2F2;
+  --shadow:0 1px 2px rgba(27,35,64,.06), 0 4px 12px rgba(27,35,64,.05);
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --snow:#121520; --surface:#1C2030; --mist:#232840; --silver:#2E3448;
+    --slate:#8B97B8; --ink:#E8EAF0; --midnight:#0B0F1A;
+    --primary:#5B8AFF; --primary-light:#1A2440;
+    --accent:#F5C518; --accent-light:#2A2210;
+    --green:#34D972; --green-light:#0F2A1A;
+    --amber:#FBBF24; --amber-light:#2A2210;
+    --red:#F87171; --red-light:#2A1010;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:88px}
+body{
+  margin:0; background:var(--snow); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:var(--primary); text-decoration:none}
+a:hover{text-decoration:underline}
+code,.mono{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.86em; background:var(--mist); border:1px solid var(--silver);
+  border-radius:5px; padding:1px 5px; color:var(--ink); word-break:break-word;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px}
+
+/* ---------- masthead + nav ---------- */
+header.masthead{
+  background:linear-gradient(180deg,var(--midnight),#141A2C);
+  color:#fff; padding:30px 0 26px; border-bottom:3px solid var(--accent);
+}
+header.masthead h1{margin:0 0 6px; font-size:27px; letter-spacing:-.4px; font-weight:800}
+header.masthead h1 .sport{color:#fff}
+header.masthead h1 .pool{color:var(--accent)}
+header.masthead p{margin:0; color:#B9C2DA; font-size:13.5px; max-width:75ch}
+header.masthead .src{margin-top:12px; font-size:12px; color:#8D98B6}
+header.masthead .src code{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.14); color:#D7DEF0}
+
+nav.sticky{
+  position:sticky; top:0; z-index:50; background:var(--surface);
+  border-bottom:1px solid var(--silver); box-shadow:var(--shadow);
+}
+nav.sticky .wrap{display:flex; gap:4px; overflow-x:auto; padding-top:9px; padding-bottom:9px; scrollbar-width:thin}
+nav.sticky a{
+  white-space:nowrap; font-size:13px; font-weight:600; color:var(--slate);
+  padding:6px 11px; border-radius:8px;
+}
+nav.sticky a:hover{background:var(--mist); color:var(--ink); text-decoration:none}
+
+main{padding:26px 0 70px}
+section{margin:0 0 40px; scroll-margin-top:88px}
+h2.sec{
+  font-size:20px; margin:0 0 4px; letter-spacing:-.3px; display:flex;
+  align-items:baseline; gap:9px; flex-wrap:wrap;
+}
+h2.sec .count{font-size:12px; font-weight:600; color:var(--slate)}
+.sec-sub{color:var(--slate); font-size:13.5px; margin:0 0 16px; max-width:90ch}
+h3.grp{
+  font-size:15px; margin:26px 0 10px; padding-bottom:6px;
+  border-bottom:1px solid var(--silver); color:var(--ink); letter-spacing:-.2px;
+}
+
+/* ---------- status strip ---------- */
+.strip{display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px; margin-bottom:12px}
+.stat{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  padding:12px 13px; box-shadow:var(--shadow);
+}
+.stat .n{font-size:26px; font-weight:800; line-height:1.1; letter-spacing:-1px}
+.stat .l{font-size:11.5px; color:var(--slate); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-top:3px}
+.stat.crit{border-left:4px solid var(--red)} .stat.crit .n{color:var(--red)}
+.stat.high{border-left:4px solid var(--amber)} .stat.high .n{color:var(--amber)}
+.stat.med{border-left:4px solid var(--accent)} .stat.med .n{color:var(--accent)}
+.stat.low{border-left:4px solid var(--green)} .stat.low .n{color:var(--green)}
+.stat.pri{border-left:4px solid var(--primary)} .stat.pri .n{color:var(--primary)}
+.stat.neu{border-left:4px solid var(--silver)}
+.strip-note{font-size:12.5px; color:var(--slate); margin:0 0 6px}
+
+/* ---------- chips ---------- */
+.chip{
+  display:inline-block; font-size:11px; font-weight:700; letter-spacing:.3px;
+  padding:2px 8px; border-radius:999px; border:1px solid var(--silver);
+  background:var(--mist); color:var(--slate); white-space:nowrap;
+}
+.chip.cat{background:var(--primary-light); border-color:var(--primary); color:var(--primary)}
+.chip.lvl-crit{background:var(--red-light); border-color:var(--red); color:var(--red)}
+.chip.lvl-high{background:var(--amber-light); border-color:var(--amber); color:var(--amber)}
+.chip.lvl-med{background:var(--accent-light); border-color:var(--accent); color:#8A6D00}
+.chip.lvl-low{background:var(--green-light); border-color:var(--green); color:var(--green)}
+.chip.ok{background:var(--green-light); border-color:var(--green); color:var(--green)}
+.chip.warn{background:var(--amber-light); border-color:var(--amber); color:var(--amber)}
+.chip.danger{background:var(--red-light); border-color:var(--red); color:var(--red)}
+.chip.gold{background:var(--accent-light); border-color:var(--accent); color:#8A6D00}
+@media (prefers-color-scheme: dark){
+  .chip.lvl-med,.chip.gold{color:var(--accent)}
+}
+
+/* ---------- tables ---------- */
+.scroller{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--silver); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:720px}
+table.risk{min-width:1180px}
+thead th{
+  background:var(--mist); text-align:left; font-size:11px; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--slate); padding:9px 11px; border-bottom:1px solid var(--silver);
+  position:sticky; top:0; white-space:nowrap;
+}
+tbody td{padding:11px; border-bottom:1px solid var(--silver); vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--mist)}
+td.id{font-weight:800; white-space:nowrap; font-size:13px}
+td.blast{font-variant-numeric:tabular-nums}
+.risk-crit td.id{color:var(--red)} .risk-high td.id{color:var(--amber)}
+.risk-med td.id{color:#8A6D00} .risk-low td.id{color:var(--green)}
+@media (prefers-color-scheme: dark){ .risk-med td.id{color:var(--accent)} }
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  padding:15px 17px; margin-bottom:12px; box-shadow:var(--shadow);
+}
+.card.crit{border-left:4px solid var(--red)}
+.card.warnc{border-left:4px solid var(--amber)}
+.card.okc{border-left:4px solid var(--green)}
+.card.goldc{border-left:4px solid var(--accent)}
+.card.neutral{border-left:4px solid var(--silver)}
+.card h4{margin:0 0 8px; font-size:15px; letter-spacing:-.2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.card ul{margin:0; padding-left:18px}
+.card li{margin:0 0 5px}
+.card li:last-child{margin-bottom:0}
+.fields{list-style:none; margin:0; padding:0}
+.fields li{margin:0 0 6px; padding-left:0}
+.fields li:last-child{margin-bottom:0}
+.f{font-weight:700}
+.note{
+  background:var(--mist); border-left:3px solid var(--slate); border-radius:0 8px 8px 0;
+  padding:9px 12px; margin:10px 0; font-size:13px; color:var(--ink);
+}
+.note.gold{background:var(--accent-light); border-left-color:var(--accent)}
+.note.danger{background:var(--red-light); border-left-color:var(--red)}
+.note.warn{background:var(--amber-light); border-left-color:var(--amber)}
+.note.ok{background:var(--green-light); border-left-color:var(--green)}
+.quote{color:var(--slate); font-size:13.5px; border-left:3px solid var(--silver); padding-left:12px; margin:0 0 16px}
+
+/* ---------- details ---------- */
+details.dec{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  margin-bottom:9px; box-shadow:var(--shadow); overflow:hidden;
+}
+details.dec>summary{
+  cursor:pointer; padding:12px 15px; font-weight:700; font-size:14px;
+  list-style:none; display:flex; gap:9px; align-items:baseline;
+}
+details.dec>summary::-webkit-details-marker{display:none}
+details.dec>summary::before{content:"▸"; color:var(--primary); font-size:12px}
+details.dec[open]>summary::before{content:"▾"}
+details.dec>summary:hover{background:var(--mist)}
+details.dec .body{padding:0 17px 15px; border-top:1px solid var(--silver); padding-top:12px}
+details.dec .body ul{margin:0; padding-left:18px}
+details.dec .body li{margin:0 0 6px}
+.dec-num{color:var(--slate); font-weight:800; font-size:12px}
+
+footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slate); font-size:12.5px}
+@media (max-width:640px){
+  body{font-size:14.5px}
+  header.masthead h1{font-size:22px}
+  .stat .n{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <h1><span class="sport">Sport</span><span class="pool">Pool</span> Programme</h1>
+    <p>Single source of truth for everything we want to build, fix, or decide — and for the
+      <strong>decisions already made</strong>, so they don't get re-litigated. A <em>programme</em>, not a roadmap,
+      because SportPool is now several distinct projects running under one banner rather than one ordered list.</p>
+    <div class="src">
+      A view of <code>SPORTPOOL_PROGRAMME.md</code> as committed at <code>486430a</code>. The markdown is the source of
+      truth — <strong>if these two ever disagree, the markdown wins.</strong> Last updated 2026-07-26.
+    </div>
+  </div>
+</header>
+
+<nav class="sticky">
+  <div class="wrap">
+    <a href="#status">Status</a>
+    <a href="#risks">Risk register</a>
+    <a href="#projects">Projects</a>
+    <a href="#decisions">Settled decisions</a>
+    <a href="#now">🔥 Now</a>
+    <a href="#recurring">Recurring</a>
+    <a href="#next-scale">Next · scale</a>
+    <a href="#next-scoring">Next · scoring</a>
+    <a href="#epl">Showdown / EPL</a>
+    <a href="#features">Features</a>
+    <a href="#football">Football data</a>
+    <a href="#social">Social</a>
+    <a href="#design">Design</a>
+    <a href="#bugs">Bugs</a>
+    <a href="#mobile">Mobile</a>
+    <a href="#later">Later 💎</a>
+    <a href="#techdebt">Tech debt</a>
+    <a href="#reference">Reference</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ============================ STATUS ============================ -->
+<section id="status">
+  <h2 class="sec">Status at a glance</h2>
+  <p class="sec-sub">Counts are of what this document records, on 2026-07-26. Risk levels are defined in the register below.</p>
+  <div class="strip">
+    <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
+    <div class="stat high"><div class="n">5</div><div class="l">🟠 High risks</div></div>
+    <div class="stat med"><div class="n">3</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat low"><div class="n">1</div><div class="l">🟢 Low risks</div></div>
+    <div class="stat pri"><div class="n">3</div><div class="l">Items in 🔥 Now</div></div>
+    <div class="stat neu"><div class="n">6</div><div class="l">Projects</div></div>
+    <div class="stat neu"><div class="n">8</div><div class="l">Settled decisions</div></div>
+    <div class="stat neu"><div class="n">6</div><div class="l">Still-open questions</div></div>
+    <div class="stat neu"><div class="n">7</div><div class="l">Unverified claim groups</div></div>
+  </div>
+  <p class="strip-note">Two risks are marked as already carrying a decision from Ryan: <strong>R6</strong> (accepted /
+    deferred 2026-07-21, on a condition that is now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented).
+    An accepted risk stays on the register — it is not closed.</p>
+</section>
+
+<!-- ============================ RISKS ============================ -->
+<section id="risks">
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R11</span></h2>
+  <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
+    code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
+    whether Ryan has already called it</strong>, plus the backlog item it maps onto so the register and the backlog
+    can't drift apart. <strong>A risk Ryan has knowingly accepted stays here, marked accepted — it is not closed.</strong></p>
+
+  <div class="card neutral">
+    <p style="margin:0 0 8px"><strong>Levels</strong> — <span class="chip lvl-crit">🔴 CRITICAL</span> live now, currently
+      destroying data, corrupting results or misleading users · <span class="chip lvl-high">🟠 HIGH</span> one user action
+      away, or certain to bite on a known date · <span class="chip lvl-med">🟡 MEDIUM</span> degrades quality or trust, no
+      data loss · <span class="chip lvl-low">🟢 LOW</span> cosmetic, or deferred by explicit decision.</p>
+    <p style="margin:0"><strong>Ranking rule used here and in status updates:</strong> anything that <em>silently produces
+      wrong data</em> outranks anything that is merely missing; after that, <code>(blast radius × likelihood) ÷ effort</code>.
+      Silent wrongness is this codebase's recurring failure mode — zero-scoring leagues, a truncated email segment, a 20×
+      rescale, phantom bonuses, predictions destroyed by a delete.</p>
+  </div>
+
+  <div class="scroller">
+  <table class="risk">
+    <thead>
+      <tr>
+        <th>#</th><th>Risk</th><th>Level</th><th>Blast radius</th><th>Trigger</th>
+        <th>Mitigation status</th><th>Ryan's call</th><th>Backlog item</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="risk-crit">
+        <td class="id">R1</td>
+        <td><strong>"Delete Pool" destroys members' predictions.</strong> Web runs five un-transactional deletes from the
+          browser against an asymmetric RLS pair; <strong>mobile is a second, separate door</strong> — a single
+          <code>supabase.from('pools').delete()</code> (<code>mobile/components/pool-detail/SettingsTab.tsx:222</code>)</td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast"><strong>6 pools / 41 entries already destroyed</strong>, earliest in June.
+          <strong>458 pools with an admin</strong> are one tap away, of 623 live</td>
+        <td>One admin tap, on <strong>either</strong> platform. Elevated now — post-tournament tidying</td>
+        <td><strong>None applied.</strong> The zero-deploy policy drop is identified, not run — and it covers the
+          <strong>web</strong> door only</td>
+        <td>Documented-only 2026-07-21; <em>archive, not delete</em> decided 2026-07-25 — <strong>not implemented</strong></td>
+        <td><a href="#i-delete-pool">"Delete Pool" destroys every member's predictions</a> (🔥 Now)</td>
+      </tr>
+      <tr class="risk-crit">
+        <td class="id">R2</td>
+        <td><strong>A league pool scores zero, silently.</strong> Not just the gate: <code>full.ts:89</code> /
+          <code>progressive.ts:110</code> source predicted teams from a WC-shaped <code>knockoutTeamMap</code>, so a
+          <code>regular_season</code> fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups
+          (<code>lib/tournament.ts:137</code>), so a league pool has no bonus path either</td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast"><strong>100% of points</strong> in every EPL pool; scoring trust in the flagship next season</td>
+        <td>Creating an EPL <code>tournaments</code> row — <strong>both create-pool wizards list tournaments unfiltered</strong>
+          (<code>components/pools/CreatePoolModal.tsx:107</code>, <code>mobile/app/create-pool.tsx:144</code>), so the row alone
+          makes league pools creatable</td>
+        <td><strong>None.</strong> Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a
+          safety catch, not a plan</td>
+        <td>Recognised in the item; not scoped or scheduled</td>
+        <td><a href="#i-league-ingestion">League ingestion (Premier League)</a> (Multi-sport → Foundational)</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R3</td>
+        <td><strong>Three scoring default sets disagree; "Reset to defaults" rescales a live pool ~20×.</strong>
+          create = <code>group_exact_score: 100</code>, reset button = <code>5</code>,
+          <code>bonus_champion_correct</code> stays <code>1000</code></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Any of <strong>623 live pools</strong>; one click turns 103 fixtures into decoration. Reset ladder is
+          also non-monotonic (SF &lt; QF)</td>
+        <td>An admin presses <strong>Reset to defaults</strong> on a live pool</td>
+        <td>None</td>
+        <td><strong>Decided 2026-07-25</strong> (100/75/50 canonical, delete the dead bonuses, fix the ladder) — unimplemented,
+          ~half a day</td>
+        <td><a href="#i-scoring-config">Scoring config is internally inconsistent</a> (🔥 Now); <a href="#d6">Decision 6</a></td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R4</td>
+        <td><strong>Shadow/prod podium divergence, behind an undocumented live kill switch.</strong> Prod now <em>derives</em>
+          the podium from completed matches (<code>lib/podium.ts</code>); the shadow bonus SQL still <code>JOIN</code>s
+          <code>tournament_awards</code> (<code>drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164</code>) —
+          <strong>the same root cause prod just paid ~324k points to fix</strong></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Last occurrence: <strong>669 rows / ~324,375 pts</strong>, concentrated in ~73 pools; 50 changed rank,
+          <strong>13 changed their #1</strong></td>
+        <td>Re-enabling shadow reads, or shadow scoring any competition that has a podium</td>
+        <td>Prod fixed and re-scored; <strong>shadow not fixed</strong>. Current <code>sync_settings</code> flag values unverified</td>
+        <td>No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26</td>
+        <td><a href="#i-shadow">Shadow scoring engine</a>; <a href="#i-podium">Podium bonus remediation</a> (✅ Recently shipped)</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R5</td>
+        <td><strong>EPL mid-August is not reachable on current foundations.</strong> Missing: league scoring + bonuses (R2),
+          matchweek deadlines, <strong>auto round-opening — zero code</strong>, multi-tenant sync
+          (<code>sync-fixtures/route.ts:67</code> still reads three env globals), importer commit + apply</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">The entire next-season target; Showdown sits behind it</td>
+        <td>The fixture list, mid-Aug — a fixed external date</td>
+        <td>None applied</td>
+        <td>Needs a <strong>scope-or-date</strong> call. Decision 7 already calls auto round-opening "a prerequisite, not
+          polish" — 38 matchweeks × every pool, manually, is not viable</td>
+        <td><a href="#epl">Showdown / EPL launch</a> project; <a href="#i-sync-cron">Sync cron is single-tenant</a>;
+          <a href="#d7">Decision 7</a></td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R6</td>
+        <td><strong>Empty-bracket bonus inflation.</strong> An unpredicted group falls through to the FIFA-ranking tiebreaker,
+          so seeded order ≈ reality and near-zero predictors collect the bonuses</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast"><strong>~243,000 pts across 155 entries</strong>; a near-zero predictor earns ~77% of a full
+          predictor's bonus with ~2% of their match points. Retro-fixing demotes ~155 real people (~87 pools move)</td>
+        <td>Any competition with group standings</td>
+        <td>None — no "did they predict it" gate in <code>calculateGroupStandingsBonuses</code> (re-verified 2026-07-26)</td>
+        <td><strong>Accepted / deferred 2026-07-21</strong>, on the condition "fix before the next competition" —
+          <strong>that condition is now due</strong></td>
+        <td><a href="#i-empty-bracket">Empty-bracket bonus inflation</a></td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R7</td>
+        <td><strong>Admin churn is unmeasured.</strong> <code>/api/admin/stats</code> has counts (pool admins, avg pool size,
+          deleted accounts) but <strong>no cohort or retention series</strong></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">The best-identified growth lever: preventing 20% of admin churn ≈ <strong>+722 players</strong>
+          (Decision 7's table). Not silent-wrongness class — ranks below R1–R3</td>
+        <td>Dated, not action-driven: the clean baseline is the <strong>WC→EPL transition</strong>, which is happening now and
+          closes at EPL start</td>
+        <td>None built</td>
+        <td>Decision 7 says "instrument admin retention"; nothing exists</td>
+        <td><a href="#d7">Decision 7</a>; <a href="#i-superadmin-stats">Enhanced super-admin stats</a></td>
+      </tr>
+      <tr class="risk-med">
+        <td class="id">R8</td>
+        <td><strong>The feedback survey is past its own time box, and was held on a blocker that has cleared.</strong> All four
+          fixes are on <code>origin/master</code> as of 2026-07-25</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">477 admins + 3,652 players; response quality decays with distance from the final (16 Jul)</td>
+        <td>Already triggered — the stated window was "~1 week of the final", i.e. ~23 Jul</td>
+        <td>Code fixes verified in the repo; <strong>deploy status is prod state, unverified</strong></td>
+        <td>Send-or-drop is Ryan's</td>
+        <td><a href="#i-surveys">Post-tournament feedback surveys — send them</a> (🔥 Now)</td>
+      </tr>
+      <tr class="risk-med">
+        <td class="id">R9</td>
+        <td><strong>Repo lives in iCloud-synced <code>~/Documents</code>.</strong> Now <strong>18</strong> duplicate artifacts on
+          disk, including <code>.git/index 2</code> through <code>.git/index 7</code></td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Local only — <strong>but</strong> it can flip a byte in tracked source, which can then be committed
+          and pushed</td>
+        <td>Any build or git operation while iCloud syncs</td>
+        <td>Workaround only (clean <code>npm ci</code> in a throwaway worktree; scan <code>git diff</code> for null bytes)</td>
+        <td>Known; ~1 hour to move the repo — not done</td>
+        <td><a href="#i-icloud">iCloud corrupts the local checkout</a> (🧹 Housekeeping)</td>
+      </tr>
+      <tr class="risk-med">
+        <td class="id">R10</td>
+        <td><strong>The archive decision conflicts with the shipped schema.</strong> Migration 025b constrains
+          <code>pools.status</code> to <code>('open','completed')</code>, so an <code>archived</code> state is impossible without
+          another migration; today's "Archive Pool" button just sets <code>completed</code></td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on</td>
+        <td>Implementing the archive decision</td>
+        <td>None — needs either a migration or a ruling that archive <em>means</em> <code>completed</code></td>
+        <td>Unrecognised conflict; needs a ruling before R1's proper fix is built</td>
+        <td><a href="#d7">Decision 7</a> <em>"Archive, not delete"</em>; <a href="#i-delete-pool">"Delete Pool" destroys…</a></td>
+      </tr>
+      <tr class="risk-low">
+        <td class="id">R11</td>
+        <td><strong>Dead scoring knobs are editable on mobile.</strong> <code>bonus_best_player_correct</code> /
+          <code>bonus_top_scorer_correct</code> are read by zero scoring code</td>
+        <td><span class="chip lvl-low">🟢 LOW</span></td>
+        <td class="blast">A mobile admin can set a value that can never pay out; members see it in the pool's rules</td>
+        <td>Any admin opening mobile scoring config</td>
+        <td>Web is honest (greyed <em>"Coming Soon"</em>); <strong>mobile is not</strong>
+          (<code>mobile/app/pool/[id]/scoring-config.tsx:442</code>)</td>
+        <td>Covered by the Decision-6 deletion, unimplemented</td>
+        <td><a href="#i-scoring-config">Scoring config is internally inconsistent</a>, defect 4</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="grp" id="unverifiable">⚠️ Unverifiable without prod access</h3>
+  <div class="card warnc">
+    <p style="margin:0 0 9px">Everything above is verified against <strong>code, migrations and git history</strong> unless
+      listed here. These claims depend on production state and are carried on the authority of the drafts/runbooks that
+      recorded them — <strong>treat them as unverified, not as done</strong>:</p>
+    <ul>
+      <li>Whether the survey fixes are actually <strong>deployed</strong> on Vercel (they are on <code>origin/master</code>;
+        that is not the same thing) — R8.</li>
+      <li>All <code>sync_settings</code> flag values: <code>prod_scoring_enabled</code>, <code>shadow_read_enabled_pools</code>,
+        <code>analytics_read_from_columns</code>, <code>sweep_time_box_enabled</code> — R4.</li>
+      <li>pg_cron job health, including the shadow <strong>parity alarm</strong> (jobid 21) and the reconcilers (jobids 19/20).</li>
+      <li>Whether <strong>migration 024</strong> was applied (it carries no "applied to prod" header, unlike 025/025b — so almost
+        certainly not) — R2.</li>
+      <li>The <strong>RLS policy bodies</strong> behind the delete asymmetry, and the FK cascade definitions behind mobile's
+        <code>pools</code> delete — both taken from <code>drafts/2026-07-21_delete_pool_data_loss.md</code>, not re-introspected — R1.</li>
+      <li>The counts <strong>6 destroyed / 458 exposed</strong>, the audience sizes <strong>477 / 3,652</strong>, and the
+        <strong>~243k pts / 155 entries</strong> inflation measurement — all prod queries from their source drafts.</li>
+      <li>Presence of <code>badge_unlocks</code> (+ its backfill) and the <code>trg_enforce_prediction_before_kickoff</code> trigger.</li>
+    </ul>
+    <p style="margin:10px 0 0"><strong>Anything not on this list, and not marked unverified inline, was read in the code on
+      2026-07-26.</strong></p>
+  </div>
+
+  <h3 class="grp">Known drift, found 2026-07-26, not yet actioned</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 9px">Recorded so it isn't re-discovered. None of it is a risk; it is the document being wrong about
+      status, in both directions. Awaiting Ryan's call on what to do with each:</p>
+    <ul>
+      <li><strong>Two items are better than written.</strong> <em>Members' / all predictions after lock</em> is
+        <strong>shipped</strong>, not "PARTIAL — admin-gated" (<code>lib/predictions/revealGate.ts</code> + gated API route +
+        web page + mobile <code>viewAs=member</code>, commits <code>7d14a26</code> → <code>f97ca61</code>). And the
+        <em>Enhanced super-admin stats</em> item is accurate — verified.</li>
+      <li><strong>A whole project is missing:</strong> pool status → <code>lifecycle</code> + <code>accepting_members</code>
+        (migrations 025 + 025b, both recorded prod-applied, plus <code>3d95e5c</code> / <code>3a5fa5e</code> /
+        <code>10d555c</code>) has no item here. It is also what created <strong>R10</strong>.</li>
+      <li><strong>Work sitting in <code>drafts/</code> with no item:</strong>
+        <code>2026-07-25_entry_fee_collection_assessment.md</code> (a legal/feasibility assessment ending in a recommendation
+        Ryan hasn't ruled on) and <code>2026-07-19_caching_infrastructure_plan.md</code>.</li>
+      <li><strong>Smaller staleness:</strong> the <em>Recurring each knockout round</em> section still reads "SF/Final upcoming"
+        ten days after the final; <code>analytics_read_from_columns</code> still appears zero times in code (the M4 note is
+        accurate); auto round-opening has no code at all (feeds <strong>R5</strong>).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ PROJECTS ============================ -->
+<section id="projects">
+  <h2 class="sec">Projects in this programme <span class="count">6</span></h2>
+  <p class="sec-sub">SportPool is several distinct projects under one banner. Day-to-day delivery is still ordered by
+    priority (Now → Later) below; these are the larger bodies of work those items roll up into.
+    <em>Nesting note: the markdown associates work with a project through its section headings and each project's own
+    description — it does not tag every backlog item with a project. Only stated associations are shown here.</em></p>
+
+  <div class="card pri" style="border-left:4px solid var(--primary)">
+    <h4>🌍 Multi-sport platform <span class="chip">🔵 Designing</span></h4>
+    <p style="margin:0 0 8px">Generalise the single World Cup product into a reusable multi-competition platform. Product
+      decisions settled 2026-07-25; foundations still TODO.</p>
+    <div class="note"><strong>Audit 2026-07-12:</strong> the foundations are genuinely <strong>TODO</strong> — the schema is
+      hardcoded to a single tournament (<code>00000000-…-0001</code>, 63 files reference <code>tournament_id</code>, zero
+      reference any competition abstraction); ingestion is one api-football integration with no adapter; no
+      <code>pool_templates</code>/<code>survivor</code>/catalog exists.</div>
+    <p style="margin:0 0 6px"><strong>Contains:</strong> <a href="#decisions">the 8 settled product decisions</a> ·
+      <a href="#foundational">foundational work items</a> (league ingestion, sync cron, data model, templates, ingestion
+      layer, email cadence, catalog, branding, monetisation) · <a href="#stillopen">still-open questions</a>.</p>
+  </div>
+
+  <div class="card pri" style="border-left:4px solid var(--primary)">
+    <h4>🚀 Showdown / EPL launch <span class="chip">🔵 Designing</span></h4>
+    <p style="margin:0 0 8px">H2H duels, persistent rivalries, and the first league season. Target Aug 2026.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#epl">Showdown mode, Showdown notifications, Avatars v1,
+      Match-day recap emails</a>. Gated by <a href="#i-league-ingestion">League ingestion</a> and the
+      <a href="#i-sync-cron">single-tenant sync cron</a> — see <strong>R2</strong> and <strong>R5</strong>.</p>
+  </div>
+
+  <div class="card okc">
+    <h4>⚙️ Scale &amp; scoring integrity <span class="chip ok">🟢 In flight</span></h4>
+    <p style="margin:0 0 8px">Shadow engine, leaderboard precompute, IO reduction, scoring correctness.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#next-scale">Leaderboard precompute · Scale downgrade XL→Medium ·
+      Tournament IO reduction · Kickoff write spike · Shadow scoring engine</a> and
+      <a href="#next-scoring">scoring correctness &amp; data integrity</a>. Carries <strong>R4</strong> and <strong>R6</strong>.</p>
+  </div>
+
+  <div class="card goldc">
+    <h4>🏆 World Cup wind-down <span class="chip gold">🟡 Closing out</span></h4>
+    <p style="margin:0 0 8px">Residual bugs, feedback surveys, knockout ops.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#i-surveys">Post-tournament feedback surveys</a> ·
+      <a href="#recurring">knockout fixture API-linking + progressive round-open playbook</a> ·
+      <a href="#i-podium">Podium bonus remediation</a> (shipped). Carries <strong>R8</strong>.</p>
+  </div>
+
+  <div class="card neutral">
+    <h4>⚽ Live match &amp; rich football data <span class="chip">⚪ Not started</span></h4>
+    <p style="margin:0 0 8px">Squads, line-ups, events, player pages.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#football">the football-data cluster</a> — team page, squad,
+      player page, line-ups, match events, live minutes, match status notes, key-match indicator.</p>
+  </div>
+
+  <div class="card neutral">
+    <h4>💎 Monetisation &amp; cosmetics <span class="chip">⚪ Gated</span></h4>
+    <p style="margin:0 0 8px">Sponsored pools, premium analytics, avatar IAP.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#later">Later — monetization &amp; cosmetics</a>. Gated on a
+      monetisation decision (<a href="#d6">Decisions</a> · foundational item <em>Monetization model</em>).</p>
+  </div>
+
+  <h3 class="grp">Every backlog item has four fields</h3>
+  <div class="card neutral">
+    <ul class="fields">
+      <li><span class="f">Is</span> — what it is, in plain English.</li>
+      <li><span class="f">Touches</span> — the code / systems / tables it involves.</li>
+      <li><span class="f">Effort</span> — rough order-of-magnitude estimate (not a commitment).</li>
+      <li><span class="f">Done when</span> — the end goal and how we verify it.</li>
+    </ul>
+    <p style="margin:10px 0 0"><strong>Legend</strong> — Categories:
+      <span class="chip cat">Bug</span> <span class="chip cat">Scoring</span> <span class="chip cat">Feature</span>
+      <span class="chip cat">Design</span> <span class="chip cat">Mobile</span> <span class="chip cat">Infra</span>
+      <span class="chip cat">Multi-sport</span> <span class="chip cat">Ops</span><br>
+      Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing call · ✅ done (verified in code 2026-07-12)</p>
+  </div>
+
+  <h3 class="grp">The disclosure gate</h3>
+  <div class="card goldc">
+    <p style="margin:0 0 8px">Any mechanic that touches notifications, rewards, or social pressure must pass one question
+      before it ships:</p>
+    <p style="margin:0 0 8px"><strong>Would it still work if you wrote its actual mechanism in a one-sentence tooltip?</strong></p>
+    <p style="margin:0 0 8px"><em>"We pre-built next season with your 14 members so you only have to confirm"</em> — passes.<br>
+      <em>"We hold your score back a day so you come back"</em> — fails.</p>
+    <p style="margin:0">Dark patterns are covert by definition. If explaining it kills it, it was manipulation. The full
+      five-gate version is <a href="#d8">Decision 8</a>.</p>
+  </div>
+</section>
+
+<!-- ============================ DECISIONS ============================ -->
+<section id="decisions">
+  <h2 class="sec">Settled product decisions <span class="count">8 · Project: Multi-sport platform</span></h2>
+  <p class="sec-sub"><strong>Settled 2026-07-25 and not open for re-debate without a reason.</strong> The <em>why</em> is
+    recorded alongside each so the argument doesn't have to be re-run. Research behind them: competitor UX across 14
+    platforms, a pool-format taxonomy, and behavioural research on retention and organiser motivation. Collapsed by
+    default — they are reference, not daily reading.</p>
+
+  <details class="dec" id="d1">
+    <summary><span class="dec-num">1</span> The durable object is the Crew</summary>
+    <div class="body">
+      <p style="margin:0 0 8px">A <strong>Crew</strong> is permanent. A <strong>pool</strong> (one crew playing one
+        competition) is time-boxed and archives. Today those are collapsed into one row — which is why the same group
+        re-assembles from scratch every season, and why the current <code>lifecycle</code> vs <code>accepting_members</code>
+        work is harder than it should be (two lifetimes modelled on one row).</p>
+      <ul>
+        <li><strong>Plural.</strong> A person belongs to many crews — work, five-a-side, family. They overlap and have
+          different tones. <em>This is why a single flat "people you've played with" list is the wrong shape: it merges
+          distinct social circles.</em></li>
+        <li><strong>Keeps history</strong> — all-time record, past seasons, rivalries.</li>
+        <li><strong>Three ways to create, no gate:</strong> (1) at pool creation — <em>"Save these 12 as a crew?"</em> — the
+          primary path; (2) directly, any time; (3) discovered from a repeat group, as a <strong>fallback</strong>.</li>
+        <li><strong>Captain + co-captain from the start.</strong> Creator is captain. Co-captain exists day one so a crew is
+          never frozen behind one dormant person.</li>
+        <li><strong>Captain ≠ pool admin.</strong> Captain owns <em>people</em>; a pool admin owns <em>one season</em>. Lets the
+          season-running role rotate while the crew stays stable — and creates new admins from inside a group that already
+          exists.</li>
+        <li><strong>Any member can start a pool</strong>; they become that pool's admin, and it still counts as the crew
+          playing (carries crew history).</li>
+        <li><strong>A crew can run several pools at once</strong> — the office does the World Cup <em>and</em> March Madness.</li>
+        <li><strong>Removal = "stops getting invited", not "erased".</strong> History survives; the removed person is not
+          notified.</li>
+        <li><strong>Banter stays per pool</strong>, not per crew.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d2">
+    <summary><span class="dec-num">2</span> Crews join a new season by held seat</summary>
+    <div class="body">
+      <p style="margin:0 0 8px">Crew membership is consent to the <strong>group</strong>, not to every <strong>competition</strong>.</p>
+      <ul>
+        <li><strong>Held seat</strong> — a reserved, visible spot (<em>"your spot's saved, picks lock Friday"</em>), shown as
+          <strong>pending</strong>, not as an entry. <strong>Releases at first lock</strong> if unused, so there are no ghost
+          entries on zero and nobody is publicly shown having failed to turn up.</li>
+        <li><strong>Pool stays joinable after first lock</strong> for long competitions — week 3 of 38 is viable; a bracket is not.</li>
+        <li><em>Why:</em> auto-join makes the <strong>pool</strong> pay (dead leaderboard); invite-only makes the
+          <strong>captain</strong> pay (chasing — the second-most-cited reason organisers quit). The held seat makes the
+          <strong>platform</strong> pay.</li>
+        <li><strong>One reminder</strong>, SportPool-branded. <strong>Never in the captain's name</strong> — LinkedIn survived
+          the contact import and the first invite in <em>Perkins</em>; it lost $13M over reminders sent in users' names.</li>
+        <li><strong>Roster review screen with reasons</strong> ("email bounced", "never picked last season", "dormant 6 months").
+          All checked by default except hard failures. A service to the captain, not a chore.</li>
+        <li><strong>Run it back</strong> stays as the one-tap shortcut: carries <strong>the admin's own past setup</strong>
+          (competition, format, scoring), with <strong>the crew chosen separately</strong> — so "same setup, different group" is
+          first-class. Guard against a crew already playing that competition.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d3">
+    <summary><span class="dec-num">3</span> The format screen stays, as a one-tap confirmation</summary>
+    <div class="body">
+      <ul>
+        <li>Recommended format <strong>pre-selected</strong>; primary button names it (<em>"Continue with Score Predictor"</em>).
+          <strong>Skipped entirely</strong> when only one format exists, and by Run it back. Shows crew history.</li>
+        <li><em>Why keep it:</em> <strong>the formats are the product.</strong> For a multi-sport app, the fact a league crew can
+          play Score Predictor, Last Man Standing or Final Table <em>is</em> the range. Hiding it makes SportPool look like a
+          one-trick pick'em app.</li>
+        <li><strong>A format is a named preset that carries its own scoring.</strong> The admin chooses a game, never assembles one.</li>
+        <li><strong>Crew selection lives on the name screen:</strong> <em>Name · Crew · Who can join · Create</em>. "No crew" is
+          valid → share-link path, then <em>"save these people as a crew?"</em>.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d4">
+    <summary><span class="dec-num">4</span> Sport filters, tournament ranks</summary>
+    <div class="body">
+      <ul>
+        <li><strong>Sport is asked once in onboarding</strong> (~9 options, one screen, skippable) — not in the wizard. It powers
+          the create picker, Discover, <strong>and</strong> "starting soon" notifications.</li>
+        <li><strong>Filter on by default</strong>, with a visible "Only sports I follow" toggle.</li>
+        <li><strong>Event-driven breakthrough</strong> — a competition punches through only when <em>starting soon</em>
+          <strong>and</strong> <em>big</em>, honestly labelled. <strong>Dismissible for that season.</strong> Deliberately rare: a
+          permanent "other sports" shelf becomes furniture.</li>
+        <li><strong>Tournament preference ranks; it never filters.</strong> Chips expand within the same onboarding screen; tap
+          nothing and you get the whole sport. <em>A Premier League fan still wants the World Cup — narrowing must never hide a
+          major event in a sport they follow.</em> Plus "Notify me" per competition, and derive the rest from behaviour.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d5">
+    <summary><span class="dec-num">5</span> Discover lists all public pools</summary>
+    <div class="body">
+      <ul>
+        <li><strong>All pools set to public are listed</strong> — not a curated shelf. <strong>Quality is a ranking problem, not a
+          membership problem:</strong> sort by joinability, share who actually picked, fill velocity, proximity to start. Dormant
+          pools are listed but sink.</li>
+        <li><strong>Honest state on every card</strong> — <em>"Opens 8 Aug · 12 joined"</em> / <em>"Live · matchweek 3"</em> /
+          <em>"Closed"</em>.</li>
+        <li><strong>Three-way privacy:</strong> private · <strong>unlisted</strong> <em>(stays the default)</em> ·
+          <strong>listed</strong> (opt-in).</li>
+        <li><strong>Report path + fast unlist</strong> — a listed pool is content published under our logo.</li>
+        <li><strong>Official SportPool pools per major competition</strong> — always live, guaranteed-good first experience for a
+          crewless user, and a controlled surface for testing formats. Branded-pool machinery exists.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d6">
+    <summary><span class="dec-num">6</span> Scoring: one canonical scale, presets, locked at kickoff</summary>
+    <div class="body">
+      <ul>
+        <li><strong>100 / 75 / 50 is canonical.</strong> Collapse the three disagreeing default sets into one exported constant.
+          See <a href="#i-scoring-config">Scoring config is internally inconsistent</a> under 🔥 Now.</li>
+        <li><strong>Named, versioned presets for new pools</strong>, replacing the 43-knob surface. <em>(Assumed: the 622 existing
+          pools are grandfathered — re-scoring finished pools would be indefensible. Not explicitly ruled.)</em></li>
+        <li><strong>"Advanced" means a different game, not different numbers</strong> — an admin asking for advanced scoring wants a
+          confidence ladder or upset bonus, not <code>quarter_final_multiplier = 3.7</code>.</li>
+        <li><strong>Scoring locks at first kickoff</strong>, enforced by a <strong>DB trigger</strong> — mobile writes directly, so
+          the UI is not a gate. Same lesson as <code>trg_enforce_prediction_before_kickoff</code>. Super-admin override requires a
+          written reason and notifies members.</li>
+        <li>Comparable scoring across pools is a <strong>hard prerequisite for Showdown</strong> — H2H duels need comparable weekly
+          scores.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="dec" id="d7">
+    <summary><span class="dec-num">7</span> Platform as referee; admin keeps real powers up to kickoff</summary>
+    <div class="body">
+      <p style="margin:0 0 8px">Admins don't quit from workload. A study of 71 lapsed community moderators found
+        <strong>conflict and time ranked above workload</strong>, with high emotional exhaustion and low task stress. They quit
+        over the argument, not the admin panel.</p>
+      <ul>
+        <li><strong>Platform enforces</strong> locks, deadlines, round opening, reminders, scoring — <strong>and says so in the
+          UI</strong> (<em>"SportPool locked picks — your commissioner can't change this"</em>), giving the admin something to point
+          at. <strong>Admin chooses</strong> format, preset, roster, tone, house rules.</li>
+        <li>Automate the <em>chores</em>, never the <em>choices</em> — removing judgment and autonomy together turns the
+          commissioner into a spectator with a title.</li>
+        <li><strong>Auto round-opening is a prerequisite, not polish.</strong> The progressive World Cup needed super-admin bulk
+          updates for 7 rounds; the EPL is 38 matchweeks × every pool.</li>
+        <li><strong>The override wall is kickoff, not the deadline.</strong> Freely allowed up to kickoff: extend a deadline, reopen
+          a round for everyone, <strong>reopen for one specific member</strong>, nudge/remove/re-invite. <strong>Nothing is accepted
+          after a match starts, by anyone including super-admin.</strong> <em>The risk isn't that admins cheat — it's that they can
+          be accused of it.</em></li>
+        <li><strong>Members see the override log</strong> (<em>"Ryan reopened matchweek 3 for Dave — 14:02, before kickoff"</em>).
+          This <strong>protects</strong> the admin: it's their proof they were fair.</li>
+        <li><strong>Wrong results route to super-admin</strong>, fixed once at source — an admin hand-editing a result would create
+          divergent realities across 600 pools.</li>
+        <li><strong>Archive, not delete</strong> — see <a href="#i-delete-pool">the 🔥 Now item</a>; Delete Pool is removed from
+          admins entirely.</li>
+        <li><strong>Instrument admin retention.</strong> Currently invisible on every dashboard, and it is the biggest lever we
+          found:</li>
+      </ul>
+      <div class="scroller" style="margin-top:10px">
+        <table style="min-width:420px">
+          <thead><tr><th>Path</th><th>Yield</th></tr></thead>
+          <tbody>
+            <tr><td>+10% more admins (477 → 525)</td><td>+365 players</td></tr>
+            <tr><td>+10% players per admin (7.6 → 8.4)</td><td>+382 players</td></tr>
+            <tr><td><strong>Prevent 20% of admin churn (~95 admins)</strong></td><td><strong>+722 players</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin:10px 0 0">An 11.6% organiser rate is ~<strong>ten times</strong> the classic ~1% creator benchmark — an
+        outlier to defend, not a funnel to fix. The 478th admin is by construction the person with the smallest, least
+        enthusiastic group.</p>
+    </div>
+  </details>
+
+  <details class="dec" id="d8">
+    <summary><span class="dec-num">8</span> The ethical test</summary>
+    <div class="body">
+      <p style="margin:0 0 8px">The <strong>disclosure gate</strong> (top of this document) is adopted as a real gate, and is
+        recorded in <code>CLAUDE.md</code> (2026-07-25) so it fires when a feature is <em>proposed</em> rather than at merge time.
+        The full five, for genuinely new mechanics:</p>
+      <ol>
+        <li><strong>Disclosure</strong> — would it survive being explained in a tooltip?</li>
+        <li><strong>Affect</strong> — which emotion does the work, and would the user thank you for it? Anticipation, pride,
+          rivalry: fine. Guilt, shame, obligation, manufactured FOMO: not.</li>
+        <li><strong>Symmetry</strong> — is exit as easy, fast and prominent as entry?</li>
+        <li><strong>Substitution</strong> — does the user end up with more of what they came for, or just more sessions? Pair every
+          mechanic with a quality counter-metric.</li>
+        <li><strong>Variance provenance</strong> — is every element of uncertainty <strong>inherited from the sport</strong>?
+          Randomness <em>we</em> add is gambling design whether or not money moves.</li>
+      </ol>
+      <p style="margin:8px 0 0">Standing check: assume a 15-year-old is in a family pool.</p>
+    </div>
+  </details>
+
+  <h3 class="grp" id="stillopen">Still open <span style="font-weight:600;color:var(--slate);font-size:12px">— 6</span></h3>
+  <div class="card warnc">
+    <ul>
+      <li><strong>Presets for new pools with existing pools grandfathered</strong> — assumed yes, not explicitly ruled.</li>
+      <li><strong>Crew-departure semantics</strong> — history is immutable, but self-removal and exact removal behaviour aren't
+        settled.</li>
+      <li><strong>Where the format recommendation comes from</strong> when crew history and global popularity disagree. (Settled
+        for Run it back: the admin's own past setup.)</li>
+      <li><strong>The breakthrough threshold</strong> for out-of-sport events — instinct is deliberately high; the moment it fires
+        often it stops working.</li>
+      <li><strong>Discover ranking weights</strong> — signals agreed, formula not.</li>
+      <li><strong>Migration path</strong> from today's <code>pools</code> table to Crew + Season without disturbing 622 live pools.
+        Biggest unknown in the project.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">Not yet discussed</h3>
+  <div class="card neutral">
+    <ul>
+      <li>The competition-shape × pool-format grid, and which format engines to build in what order.</li>
+      <li>Showdown mechanics beyond "no playoff cut, matched pairing".</li>
+      <li>Monetisation (tracked separately under 💎).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ SHIPPED ============================ -->
+<section id="shipped">
+  <h2 class="sec">✅ Recently shipped</h2>
+  <p class="sec-sub">Completed and deployed to production. Kept here for visibility, then pruned once it's old news.</p>
+
+  <div class="card okc" id="i-podium">
+    <h4>Podium bonus remediation <span class="chip cat">Scoring</span> <span class="chip cat">Bug</span>
+      <span class="chip ok">SHIPPED 2026-07-21</span></h4>
+    <div class="note danger">Added 2026-07-26. This incident and its remediation were <strong>missing from this document
+      entirely</strong> — the largest scoring correction the product has run, absent from the single source of truth.
+      <strong>R4</strong> depends on it.</div>
+    <ul class="fields">
+      <li><span class="f">What broke:</span> the tournament podium was scored off <code>tournament_awards</code> (empty) plus, in
+        progressive, a phantom cascaded bracket. <strong>669 podium bonus rows / ~324,375 pts owed</strong>, concentrated in
+        <strong>~73 pools</strong>; 50 saw rank changes and <strong>13 changed their #1</strong>. <code>full_tournament</code> was
+        always correct.</li>
+      <li><span class="f">What shipped:</span> <code>lib/podium.ts</code> is now the single owner — <code>resolveActualPodium()</code>
+        derives the podium from the completed final / third-place matches with <code>tournament_awards</code> demoted to an optional
+        admin override, and <code>resolveEntryPodiumPick()</code> dispatches on a <strong>required</strong> mode discriminant (no
+        default). Commit <code>ea8d9da</code>, deployed, then a full re-score over all <strong>524 classic pools</strong>. Final audit
+        <code>ADD=0 / REMOVE=0</code> on all six lines. Rollback snapshots <code>_podium_before_20260721</code> /
+        <code>_pool_entries_before_20260721</code> left in place.</li>
+      <li><span class="f">Landed with no comms, by decision.</span> Runbook + full evidence:
+        <code>drafts/2026-07-21_podium_remediation_runbook.md</code>. Re-audit with <code>npx tsx scripts/audit-podium.ts</code>.</li>
+      <li>⚠️ <span class="f">Two live consequences:</span> (1) the shadow engine still carries the <strong>pre-fix</strong> podium
+        logic — see <a href="#i-shadow">Shadow scoring engine</a> and <strong>R4</strong>; (2) the re-score is what
+        <em>surfaced</em> the Delete Pool data loss (one pool's predictions had already been destroyed, so 26 members correctly
+        zeroed and were restored from snapshot) — see <strong>R1</strong>.</li>
+      <li><span class="f">Lesson worth keeping:</span> prod↔shadow parity was blind to this, because shadow carried a hand-fork of
+        the same bug. Parity between two implementations is not an oracle; validate against the domain.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>HTTP security headers + security.txt <span class="chip cat">Infra</span>
+      <span class="chip ok">SHIPPED 2026-07-11</span></h4>
+    <ul class="fields">
+      <li><span class="f">What:</span> production HTTP hardening in <code>next.config.ts</code> <code>headers()</code> —
+        <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: strict-origin-when-cross-origin</code>, and
+        <code>Permissions-Policy: camera=()/microphone=()/geolocation=()</code> on all routes; <code>X-Frame-Options: DENY</code> +
+        CSP <code>frame-ancestors 'none'</code> on everything except <code>/tv/*</code> (frame-exempt via
+        <code>/((?!tv/).*)</code>); plus a <code>security.txt</code>. Commit <code>d6d6042</code>, verified live on sportpool.io.</li>
+      <li><span class="f">Watch for:</span> new embeddable surfaces must be added to the <code>/tv/*</code> negative-lookahead or
+        they'll be frame-denied; <code>camera=()</code> will silently block future in-app photo <em>capture</em> (Avatars) until
+        <code>camera=(self)</code> is allowed.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ NOW ============================ -->
+<section id="now">
+  <h2 class="sec">🔥 Now — active, can't wait <span class="count">3 items</span></h2>
+
+  <div class="card crit" id="i-delete-pool">
+    <h4>"Delete Pool" destroys every member's predictions <span class="chip cat">Bug</span>
+      <span class="chip danger">Data-loss</span> <span class="chip danger">🔥 R1</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> <code>app/pools/[pool_id]/admin/SettingsTab.tsx:232-302</code> runs five un-transactional
+        PostgREST deletes from the <strong>browser</strong>, predictions first. An RLS asymmetry makes it catastrophic:
+        <code>predictions</code> DELETE is <code>is_pool_admin(pool_id)</code> (an admin can delete <strong>everyone's</strong>)
+        while <code>pool_entries</code> has <strong>no</strong> admin DELETE policy, so step 2 silently deletes only the admin's own
+        entry and <strong>returns no error</strong>. Any abort after step 1 leaves the pool alive with every member's predictions
+        gone.</li>
+      <li><span class="f">Impact:</span> <strong>6 pools / 41 entries already destroyed</strong>, the earliest in June — this has
+        been happening quietly for weeks. <strong>458 pools with an admin are one click away.</strong> Risk is elevated
+        post-tournament, when people tidy up pools.</li>
+      <li>⚠️ <span class="f">There is a second door, on mobile (added 2026-07-26).</span>
+        <code>mobile/components/pool-detail/SettingsTab.tsx:222</code> runs its own
+        <code>supabase.from('pools').delete().eq('pool_id', …)</code> — a different shape (one statement, relying on FK cascades)
+        reached from the same admin Settings screen. It is <strong>not</strong> covered by the zero-deploy mitigation below, and
+        "remove Delete Pool from admins entirely" is therefore <strong>two</strong> removals, not one. Whether the cascade completes
+        or errors depends on FK definitions that are prod state — unverified.</li>
+      <li><span class="f">Also:</span> <code>app/api/account/delete/route.ts</code> deletes predictions/entries/memberships across
+        all pools at lines 33-85, then only checks "are you still a pool admin?" at line 90 — a pool owner who tries to delete their
+        account keeps the account and loses everything everywhere.</li>
+      <li><span class="f">Zero-deploy mitigation (verified safe, policy has one consumer):</span>
+        <code>drop policy "Pool admins can delete predictions" on predictions;</code> → the <strong>web</strong> button then fails
+        loudly having destroyed nothing. It does not touch the mobile path, which deletes <code>pools</code> rather than
+        <code>predictions</code>.</li>
+      <li><span class="f">Proper fix:</span> server-side transactional delete (single Postgres function / soft-delete), move the
+        account-delete guard to the top, add real <code>ON DELETE CASCADE</code>, and an alarm for non-<code>bracket_picker</code>
+        pools with submitted entries but zero predictions.</li>
+      <li><span class="f">Detail + full evidence:</span> <code>drafts/2026-07-21_delete_pool_data_loss.md</code></li>
+      <li><span class="f">Decision 2026-07-25:</span> the fix is <strong>archive, not delete</strong> — Delete Pool is removed from
+        admins entirely, replaced with a reversible archive that keeps history; true deletion becomes a support action. Rationale: it
+        destroys <em>other people's</em> data irreversibly on one person's tap, and once Crews keep history
+        (<a href="#d1">Decision 1</a>) it erases part of the crew's permanent record for everyone in it.</li>
+      <li><span class="f">Status:</span> documented only, by decision 2026-07-21. <strong>Not mitigated — still live.</strong></li>
+    </ul>
+  </div>
+
+  <div class="card warnc" id="i-surveys">
+    <h4>Post-tournament feedback surveys — send them <span class="chip cat">Ops</span>
+      <span class="chip warn">⏳ R8</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> the two survey emails to pool admins (477) and non-admin players (3,652). Ready to fire, and
+        time-boxed — the plan was "within ~1 week of the final."</li>
+      <li><span class="f">Prep done 2026-07-21:</span> three blockers found and fixed, none of them visible from the "✅ built"
+        status this item carried. <strong>(a)</strong> Every segment in <code>lib/email/segments.ts</code> silently truncated at
+        PostgREST's 1,000-row cap — the player survey resolved to <strong>146 recipients out of 3,958</strong>, and a dry run would
+        have reported that as the audience. Now paged via <code>fetchAll()</code> (all 15 segments, not just these two).
+        <strong>(b)</strong> Both Tally forms were still <strong>DRAFT</strong> — every CTA 404'd. Published, and the "Anything
+        else?" box that was marked required despite reading "Optional." is now optional. <strong>(c)</strong> No
+        <code>maxDuration</code> on a ~41-batch send whose idempotency key is written <em>before</em> the first email; now
+        <code>300</code> with 600 ms inter-batch pacing.</li>
+      <li><span class="f">Also:</span> new <code>past_predictors_non_admin</code> segment so the 306 admin-and-player people get the
+        admin survey only, never two emails. By decision, <strong>no Resend topic</strong> is attached — maximum reach, so
+        per-category opt-outs aren't honored on these two sends.</li>
+      <li><span class="f">Touches:</span> <code>lib/email/segments.ts</code>, <code>app/api/admin/send-template/route.ts</code>,
+        <code>scripts/preflight-feedback-survey.ts</code>, super-admin <strong>Templates</strong> tab.</li>
+      <li>⚠️ <span class="f">Blocker corrected 2026-07-26 — "the fix is local" is no longer true.</span> All four commits are on
+        <code>origin/master</code> (<code>a5cdf0e</code> paging, <code>68a48ec</code> branding, <code>bb50f5d</code> runbook,
+        <code>71e0a44</code> sender), pushed 2026-07-25; the only unpushed commit on <code>master</code> is <code>a1e1ef4</code>.
+        The original hazard still stands in principle — the Templates tab runs against prod, so sending <em>before</em> the deploy is
+        live resolves the old truncated audience <strong>and</strong> burns the idempotency key — but the remaining question is now
+        <strong>"is the deploy live?"</strong>, which is prod state and unverified here, not "has the code been written?". Check the
+        deploy, then send.</li>
+      <li>⏰ <span class="f">Past its time box:</span> the stated window was "within ~1 week of the final" (16 Jul), i.e. ~23 Jul.
+        Every further day costs response quality. See <strong>R8</strong>.</li>
+      <li><span class="f">Runbook:</span> <code>drafts/2026-07-21_feedback_survey_send_runbook.md</code> — pre-flight, expected
+        counts, and partial-send recovery.</li>
+      <li><span class="f">Done when:</span> <code>npx tsx scripts/preflight-feedback-survey.ts</code> passes, both sends report
+        477/477 and 3,652/3,652, and responses are landing in Tally.</li>
+    </ul>
+  </div>
+
+  <div class="card crit" id="i-scoring-config">
+    <h4>Scoring config is internally inconsistent <span class="chip cat">Bug</span> <span class="chip cat">Scoring</span>
+      <span class="chip danger">🔥 R3 · R11</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> four defects in the pool-scoring settings, all verified in code 2026-07-25.</li>
+    </ul>
+    <ol>
+      <li><strong>Three default sets disagree.</strong> <code>app/api/pools/create/route.ts:5</code> gives new pools
+        <code>group_exact_score: 100</code>; the engine fallback (<code>app/pools/[pool_id]/results/points.ts:69</code>) and the admin
+        <strong>Reset to defaults</strong> button (<code>app/pools/[pool_id]/admin/ScoringTab.tsx:21</code>) both say <code>5</code>.
+        <strong>Pressing reset on a live pool rescales it ~20×</strong> while leaving <code>bonus_champion_correct</code> at 1000 —
+        turning the champion pick from ~10 group matches into ~200, and the other 103 fixtures into decoration.</li>
+      <li><strong>The reset ladder is non-monotonic</strong> — r16 <code>2</code>, QF <code>3</code>, <strong>SF <code>2</code></strong>,
+        3rd <code>1.5</code>, final <code>3</code>. One click makes a semi-final worth less than a quarter-final.</li>
+      <li><strong><code>round_32_multiplier</code> is missing</strong> from <code>SCORING_DEFAULTS</code> entirely — every new pool's
+        first knockout round is priced by an unexamined column default.</li>
+      <li><strong>Two settings are stored, editable, and read by zero scoring code</strong> — <code>bonus_best_player_correct</code> /
+        <code>bonus_top_scorer_correct</code>. <strong>Web is honest about it:</strong> they sit under a greyed <em>"Coming Soon"</em>
+        header (<code>ScoringRulesTab.tsx:375</code>). <strong>Mobile is not:</strong>
+        <code>mobile/app/pool/[id]/scoring-config.tsx:442</code> renders them as ordinary editable <code>PointsField</code>s alongside
+        the working bonuses, so a mobile admin can set a value that will never pay out. <em>(Corrected 2026-07-25 — an earlier version
+        of this item overstated the web case.)</em></li>
+    </ol>
+    <ul class="fields" style="margin-top:10px">
+      <li><span class="f">Decision 2026-07-25:</span> <strong>100/75/50 is canonical</strong> — collapse to one exported constant.
+        <strong>Delete</strong> the two dead bonuses from the UI and defaults. Fix the ladder's monotonicity and add
+        <code>round_32_multiplier</code>. Longer term these are replaced by named presets (<a href="#d6">Decision 6</a>).</li>
+      <li><span class="f">Touches:</span> <code>app/api/pools/create/route.ts</code>, <code>app/pools/[pool_id]/results/points.ts</code>,
+        <code>app/pools/[pool_id]/admin/ScoringTab.tsx</code>, <code>app/pools/[pool_id]/ScoringRulesTab.tsx</code>,
+        <code>app/api/admin/branded-pools/route.ts</code>.</li>
+      <li><span class="f">Effort:</span> ~half a day for 1–4; presets are a separate, larger piece.</li>
+      <li><span class="f">Done when:</span> one constant defines defaults for every consumer, reset is non-destructive, the multiplier
+        ladder is monotonic and validated on save, and no member-visible rule is unreachable by the scoring engine.</li>
+    </ul>
+  </div>
+
+  <p class="quote">Beyond that and the <strong>recurring knockout ops</strong> below, the master fix list from the June outages is
+    fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: <em>Badge batch</em>,
+    <em>Mobile</em>, <em>Post-deadline lock</em>, <em>IO reduction</em>.</p>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>WC incident master fix list <span class="chip cat">Bug</span> <span class="chip cat">Ops</span></td>
+          <td>Opening-day outage fixes all landed: per-match recalc (<code>app/api/cron/sync-fixtures/route.ts:401</code> →
+            <code>recalculatePool({matchId})</code>), sweep overlap + time-box guard (<code>try_acquire_sweep_lock</code> RPC,
+            <code>sweep_time_box_enabled</code> flag), phantom-diff fix, badge fraction bug (commit <code>4e920b0</code>).</td>
+          <td>Tracking snapshot, not a work item — residual threads live under other items below.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ RECURRING ============================ -->
+<section id="recurring">
+  <h2 class="sec">🔁 Recurring each knockout round — SF/Final upcoming</h2>
+  <p class="sec-sub">Not "done"-able — re-run <strong>before every knockout round</strong> or scores don't sync / pools don't open.
+    <em>(Known staleness: this heading still reads "SF/Final upcoming" after the 16 Jul final — see Known drift.)</em></p>
+
+  <div class="card neutral">
+    <h4>Knockout fixture API-linking <span class="chip cat">Ops</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Knockout matches must be manually linked to the live data feed each round, or scores never sync.</li>
+      <li><span class="f">Touches:</span> <code>scripts/map-knockout-fixtures.ts</code> (writes <code>external_match_id</code> onto
+        <code>matches</code>); the api-football sync cron reads it. Auto-link path also exists
+        (<code>lib/integrations/apiFootball/linkKnockoutFixtures.ts</code>) but only fires once api-football publishes the fixture.</li>
+      <li><span class="f">Effort:</span> ~15–30 min per round.</li>
+      <li><span class="f">Done when:</span> every knockout match for the round has an <code>external_match_id</code> and live scores
+        flow. Done: R32 (06-28), R16 (07-04), QF (07-07 + #100 07-12), <strong>both SFs linked 2026-07-12 (#101 France–Spain
+        <code>1585131</code>, #102 England–Argentina <code>1586077</code>)</strong>. Remaining: #103 (3rd place) + #104 (final) once
+        teams resolve.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Progressive round-open playbook <span class="chip cat">Ops</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Each round opens per-pool; super-admin bulk-opens the rest and (optionally) emails members.</li>
+      <li><span class="f">Touches:</span> <code>pool_round_states</code> UPDATE (guard <code>state='locked'</code>); announce via
+        <code>scripts/notify-r16-open.mjs</code> (Resend "Pool Activity" topic).</li>
+      <li><span class="f">Effort:</span> ~30–60 min per round.</li>
+      <li><span class="f">Done when:</span> all pools for the round are open by deadline. Done: R16 (07-04, 194 pools/796 emails), QF
+        (07-07, 250 pools). Recurs SF/Final.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ NEXT: SCALE ============================ -->
+<section id="next-scale">
+  <h2 class="sec">⏭️ Next — WC stability &amp; scale</h2>
+  <p class="sec-sub">These four overlap — they're one coordinated "get off expensive compute and scale to thousands" program, not
+    four separate efforts.</p>
+
+  <div class="card neutral">
+    <h4>Leaderboard precompute (read-path flip) <span class="chip cat">Infra</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> The leaderboard recomputes per-entry analytics on <em>every</em> page load; that's what saturated
+        the DB in the June 16 outage. Precompute it once per score-change instead of per-view.</li>
+      <li><span class="f">Touches:</span> read path <code>app/api/pools/[pool_id]/leaderboard/route.ts</code> +
+        <code>app/pools/[pool_id]/LeaderboardTab.tsx</code>; storage = extra columns on <code>entry_xp_state</code>; writer =
+        <code>analytics-sweep</code> cron + <code>lib/analytics/entryAnalytics.ts</code>. Backfill/cron <strong>already live and
+        verified no-op</strong> (M1/M2 done); remaining is the <strong>M4 read-path flip</strong> (read columns, drop
+        <code>force-dynamic</code>, add cache) behind flag <code>analytics_read_from_columns</code>.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> M4 confirmed <strong>not started</strong> — the leaderboard route still imports
+        <code>computeStreaks</code>/<code>computeFullXPBreakdown</code> and recomputes per-read (zero <code>entry_xp_state</code>
+        reads); flag <code>analytics_read_from_columns</code> appears only in prose, never in code. The cited design doc
+        <code>drafts/M4_read_path_flip.md</code> is <strong>missing from the repo</strong> — recreate it or drop the reference.</li>
+      <li><span class="f">Effort:</span> ~2–3 days (calm-window deploy + load test). Bracket pools need a <strong>separate</strong>
+        parallel-analytics track (~2–3 days more) — they score via <code>bonus_scores</code>, not <code>predictions</code>.</li>
+      <li><span class="f">Done when:</span> backfill-vs-live parity = 0 diffs, the ~516ms leaderboard query drops to ~20ms, and a
+        match-night load test holds on Medium compute.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Scale downgrade XL→Medium <span class="chip cat">Infra</span> <span class="chip ok">✅ DONE 2026-07-12</span></h4>
+    <ul class="fields">
+      <li><span class="f">What happened:</span> Ryan downgraded XL→Medium himself as the tournament winds down.
+        <strong>Live-DB check 2026-07-12:</strong> Phase-B was already 2/3 live — <code>pool_cache_enabled</code> <strong>ON</strong>
+        and <code>scoring_diff_writes_enabled</code> <strong>ON</strong> in prod <code>sync_settings</code> (the earlier audit read the
+        <em>code default</em> off, not the live value); only <code>sweep_time_box_enabled</code> remains off. Phase A hygiene applied
+        2026-06-30.</li>
+      <li><span class="f">Still open (folds into other items):</span> flip the last flag <code>sweep_time_box_enabled</code> (crash
+        fix), and <strong>Phase D durable</strong> — leaderboard precompute read-path flip + per-pool realtime broadcast, which is what
+        keeps Medium comfortable at Showdown/EPL scale. See runbook
+        <code>drafts/2026-07-12_xl_to_medium_downgrade_runbook.md</code>.</li>
+      <li><span class="f">Watch:</span> CPU headroom / replication lag on the next live-ish window; the Phase-B flags are the rollback
+        lever (bump compute back to XL if needed).</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Tournament IO reduction <span class="chip cat">Infra</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Punch list of background-IO cuts. <strong>Largely done</strong> — api-perf writer trimmed,
+        policies consolidated, sync fan-out batched, per-match recalc + RLS initplan shipped; predictions auto-save is already a single
+        round-trip (<code>predictions/route.ts:260</code>).</li>
+      <li><span class="f">Touches:</span> Remaining open: drop 6 duplicate + 33 unused indexes (mechanical); realtime publication diet
+        (remove tables that don't need live events — overlaps the broadcast migration).</li>
+      <li><span class="f">Effort:</span> ~1 day for the index + realtime trims (pure DB migrations — no repo artifact to confirm).</li>
+      <li><span class="f">Done when:</span> duplicate/unused indexes gone, realtime publication carries only tables that need it, no
+        regression on a live day.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Kickoff write spike <span class="chip cat">Infra</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> At kickoff, a synchronous calc+write burst briefly spikes CPU (~4.3 on 2 cores) and replication
+        lag. Recovered fine, but should be smoothed.</li>
+      <li><span class="f">Touches:</span> the scoring sweep in <code>lib/scoring/recalculate.ts</code> +
+        <code>app/api/cron/sync-fixtures/route.ts</code>; fix direction = precompute / batch / queue the burst.</li>
+      <li><span class="f">Audit 2026-07-12:</span> <code>recalculate.ts</code> already batches (<code>batchSize = 50</code>, sequential
+        <code>inBatches</code>, paginated reads) — the gap is a real queue/precompute, not zero mitigation. Folds into the precompute +
+        scale work above.</li>
+      <li><span class="f">Effort:</span> ~1 day incremental.</li>
+      <li><span class="f">Done when:</span> kickoff no longer produces a CPU/replication spike on the Supabase graph.</li>
+    </ul>
+  </div>
+
+  <div class="card warnc" id="i-shadow">
+    <h4>Shadow scoring engine <span class="chip cat">Infra</span> <span class="chip warn">🔒 R4</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A set-based, DB-native replacement for the Node recalc, running in parallel as a validation tool
+        (not customer-facing). Match + bonus + rank parity-verified for group + R32; fully automated via reconciler crons.</li>
+      <li><span class="f">Touches:</span> <code>shadow_*</code> tables (all 5 confirmed present: <code>shadow_resolved_brackets</code>,
+        <code>shadow_score_diffs</code>, <code>shadow_match_scores</code>, <code>shadow_bonus_scores</code>,
+        <code>shadow_entry_totals</code>) + RPCs, <code>lib/scoring/shadowBrackets.ts</code>,
+        <code>app/api/cron/shadow-materialize/route.ts</code>, and reconciler <strong>pg_cron</strong> jobs
+        (<code>drafts/2026-07-0*_shadow_*.sql</code>). Migration plan is read-path-first, reversible, pilot = mobile + one web pool via
+        <code>shadow_read_enabled_pools</code>.</li>
+      <li><span class="f">Effort:</span> low urgency near-term — it's a parallel tool. The durable knockout resolver that was deferred
+        here <strong>landed early (2026-07-11)</strong> as part of the tie-break bug fix (shared prediction-only resolver);
+        <code>shadow_resolved_brackets</code> was rebuilt on it (0 backfill errors).</li>
+      <li>✅ <span class="f">Knockout parity RE-VERIFIED clean 2026-07-12:</span> fresh shadow-vs-live compare showed 392 knockout
+        mismatches that were <strong>100% staleness</strong> (shadow last materialized 2026-07-10 18:47, before the 2026-07-11 tie-break
+        live recalc). A forced <code>shadow_apply_changes</code> re-materialize dropped them to <strong>0</strong> (69,852 knockout
+        match-score rows agree; end-to-end totals 3,416/3,418, the 2 residuals being orphan unsubmitted-entry rows). Shadow's knockout
+        <strong>logic is correct</strong>.</li>
+      <li>✅ <span class="f">Ground-truth correctness audit 2026-07-13:</span> validated the shadow bracket against <strong>actual
+        results</strong> (not just vs live, which only proves reproduction): 0 scoring violations across 36,678 full_tournament knockout
+        rows (0 false awards, 0 false denials, 0 points-on-wrong-teams); resolver qualification = exactly the 32 teams that reached R32;
+        actual standings match an independent points/GD/GF ranking on all 48 group positions. Shadow bracket is
+        <strong>ground-truth-correct through the QF</strong>, not merely live-parity.</li>
+      <li>✅ <span class="f">Cutover-hardening shipped 2026-07-13</span> (DB objects live; <code>recalculate.ts</code> +
+        <code>shadow-materialize</code> route changes pending a deploy): <strong>(#4)</strong> <code>v_shadow_worker_runs</code>
+        repointed off the retired <code>shadow-drain-queue</code> to the live jobs; <strong>(#3)</strong> automated parity alarm
+        <code>shadow_detect_diffs()</code> + <code>shadow-parity-alarm</code> pg_cron (jobid 21, <code>*/15</code>) writes
+        <code>entry_total_mismatch</code> rows + reports coverage-by-mode; <strong>(#2)</strong> <code>shadow_dirty_pools</code> marker
+        closes the bulk-recalc staleness gap — <code>recalculatePool</code> full recomputes (no <code>matchId</code>) flag the pool, the
+        shadow-materialize cron drains + re-scores it (re-scoring completed matches so fresh brackets take, change-only so it's
+        cheap).</li>
+      <li>⚠️ <span class="f">Out of shadow scope (#1):</span> <code>bracket_picker</code> pools (1,012 entries / ~20%) have <strong>no
+        shadow arm</strong> — scored by the separate <code>lib/bracketPickerScoring.ts</code>. The parity alarm's coverage report
+        surfaces this (<code>bracket_picker: live 1012 / shadow 0</code>) so it can't be silently assumed covered at cutover. A
+        bracket_picker shadow arm is a separate project, deferred.</li>
+    </ul>
+    <div class="note danger">🔴 <strong>The read-path cutover happened, and this document did not record it (added 2026-07-26).</strong>
+      The line below said the pilot was "deliberately deferred". In fact the full machinery shipped and was flipped:
+      <code>f843788</code> (Phase A fidelity + read helper), <code>9e6db6e</code> + <code>e90db3c</code> (production-scoring kill
+      switch), <code>96b996c</code> (rollback runbook) — all on <code>origin/master</code>. <code>lib/scoring/readSource.ts:48</code>
+      gates reads per pool on <code>sync_settings.shadow_read_enabled_pools</code>; <code>lib/scoring/prodScoringFlag.ts:29</code> can
+      disable the Node engine outright. <code>drafts/2026-07-19_caching_infrastructure_plan.md:20</code> records the state on
+      2026-07-19 as <em>"<code>shadow_read_enabled_pools = [all pools]</code> (shadow is the sole scorer as of the 2026-07-19
+      cutover)"</em>; the rollback path is <code>drafts/2026-07-19_prod_scoring_rollback.sql</code>. <strong>Which engine is scoring
+      right now is a live flag value and is unverified here.</strong> Nobody should plan the EPL without answering that first.</div>
+    <div class="note warn">🟠 <strong>Shadow's podium logic is the pre-fix version.</strong> Prod's podium was rebuilt to
+      <em>derive</em> from completed matches (<code>lib/podium.ts</code>, <code>ea8d9da</code>); shadow's bonus SQL still
+      <code>JOIN</code>s <code>tournament_awards</code>
+      (<code>drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164</code>) — the exact root cause of the ~324k-point
+      error remediated on 2026-07-21. <strong>Shadow must not score a competition with a podium until this is fixed.</strong> See
+      <a href="#i-podium">Podium bonus remediation</a> and <strong>R4</strong>.</div>
+    <ul class="fields">
+      <li><span class="f">Done when:</span> predicted brackets resolved once at entry submission (removing re-materialization);
+        shadow's podium arm matches <code>lib/podium.ts</code>; and a read-path flip is validated <strong>per pool</strong> before any
+        wider customer-facing flip (the 07-19 flip went to all pools at once and was rolled back at tournament end).</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>EAS OTA pending <span class="chip cat">Mobile</span> <span class="chip ok">✅ SHIPPED 2026-07-12</span></h4>
+    <ul class="fields">
+      <li><span class="f">What shipped:</span> production OTA of the Jul 11 tie-break resolver (<code>bracketResolver.ts</code>,
+        <code>tournament.ts</code>, <code>usePredictions.ts</code>) to runtime <code>1.0.0</code> (last prod build 2026-07-06,
+        unchanged runtime — verified via <code>eas build:list</code>; branch had zero prior updates). Published
+        <strong>native-only</strong> (see <a href="#i-web-export">Mobile web-export</a> bug below): iOS update group
+        <code>283a68d0…</code>, Android <code>5307e504…</code>, branch <code>production</code>.</li>
+      <li><span class="f">Done:</span> testers on the ≥ Jul 6 build pull the update; mobile bracket display now matches the shipped web
+        tie-break correction.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ NEXT: SCORING ============================ -->
+<section id="next-scoring">
+  <h2 class="sec">⏭️ Next — scoring correctness &amp; data integrity</h2>
+
+  <div class="card warnc">
+    <h4>Badge batch — persistence + semantics <span class="chip cat">Scoring</span> <span class="chip warn">⏳</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> The blatant fraction bug (Dark Horse/Upset Caller firing for everyone) is <strong>already
+        fixed</strong> (commit <code>4e920b0</code>, verified live in <code>xpSystem.ts:256</code>/<code>:416</code>). What's left: (a)
+        badges vanish on recompute because there's no persistence, and (b) a few badges whose copy ≠ logic.</li>
+      <li><span class="f">Touches:</span> persistence = new append-only <code>badge_unlocks</code> table (see
+        <a href="#i-badge-history">Badge unlock history</a>); semantic fixes in
+        <code>app/pools/[pool_id]/analytics/xpSystem.ts</code> — Contrarian Win (copy says "75%+", logic checks "differs from
+        majority"), Lightning Rod (no deadline check), Quick Draw (24h measured from pool creation, not join); award-on-completion-only
+        gating in <code>recalculate.ts</code> + <code>lib/push/badges.ts</code>; mirror every change into
+        <code>lib/push/badges.ts</code> (push parity).</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> confirmed — <code>badge_unlocks</code> table <strong>does not exist</strong>
+        (persistence not started; the only store is the <em>mutable</em> <code>entry_xp_state.earned_badge_ids</code> array, which
+        shrinks on recompute); all 3 semantic mismatches still present; no completion gating
+        (<code>detectAndPushBadgesForPool</code> fires after every write).</li>
+      <li><span class="f">Effort:</span> persistence ~1–2 days; semantic copy/logic fixes ~0.5 day; completion-gating ~0.5 day.</li>
+      <li><span class="f">Done when:</span> an earned badge never disappears across recalcs; each badge's copy matches its trigger; push
+        and analytics never disagree.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Post-deadline prediction lock <span class="chip cat">Bug</span> <span class="chip ok">✅ SHIPPED 2026-07-12</span></h4>
+    <ul class="fields">
+      <li><span class="f">What shipped:</span> DB trigger <code>trg_enforce_prediction_before_kickoff</code> on
+        <code>public.predictions</code> (fn <code>enforce_prediction_before_kickoff</code>) — a <code>BEFORE INSERT OR UPDATE</code>
+        row trigger that <strong>silently skips</strong> (returns null) any write to a match that has kicked off
+        (<code>match_date &lt;= now()</code>) or is completed. Migration <code>prediction_kickoff_lock</code>; SQL in
+        <code>drafts/2026-07-12_prediction_kickoff_lock.sql</code>.</li>
+      <li><span class="f">Why a DB trigger, not the route/RPC guard originally scoped:</span> predictions have four write paths with no
+        shared app chokepoint — web <code>POST /predictions</code> → <code>save_predictions_batch</code> (SECURITY INVOKER), the web
+        client's <strong>full-set autosave</strong> (<code>PredictionsFlow.tsx:377</code>), and <strong>mobile's direct
+        <code>.upsert()</code> in <code>usePredictions.ts</code> which bypasses every API route</strong>. Only the row write is common
+        to all. Silent-skip (not raise) is deliberate so a full-set batch still persists the still-open matches instead of failing
+        wholesale.</li>
+      <li><span class="f">Verified in prod:</span> a write to an upcoming match persists; a write to a completed match is skipped.
+        Pre-fix footprint: 2,599 post-kickoff writes across 478 entries (latest 2026-07-11).</li>
+    </ul>
+  </div>
+
+  <div class="card warnc" id="i-empty-bracket">
+    <h4>Empty-bracket bonus inflation <span class="chip cat">Bug</span> <span class="chip cat">Scoring</span>
+      <span class="chip warn">⏳ R6</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> entries that predicted almost nothing collect most of the group bonuses. With no predictions a
+        group's teams are all <code>played 0 / points 0 / GD 0</code>, so <code>calculateGroupStandings</code> falls through every
+        tiebreaker to criterion 8, <strong>FIFA ranking</strong> (<code>lib/tournament.ts:398-414</code>) — and the resulting
+        "predicted" table is just the seeded order, which is roughly what really happens.
+        <code>calculateGroupStandingsBonuses</code> (<code>lib/bonusCalculation.ts:120</code>) gates only on the real matches being
+        <em>complete</em>, never on the member having <em>predicted</em> them.</li>
+      <li><span class="f">Same class as the podium's fabricated pick</span>, fixed in <code>ea8d9da</code> via
+        <code>requireExplicitPick</code> (<code>lib/tournament.ts:641</code>); the group-standings path never got the equivalent gate.
+        Criterion 8 is right as a cascade fallback, wrong as evidence of an opinion.</li>
+      <li><span class="f">Measured (prod 2026-07-21):</span> 155 entries with 1–5 predictions all tournament — 66 full_tournament (avg
+        <strong>1,881</strong> bonus vs <strong>56</strong> match pts) + 89 progressive (1,340 vs 233). A near-zero predictor earns
+        <strong>~77% of a full predictor's bonus</strong> with ~2% of their match points. Tells: <strong>994
+        <code>group_winner_and_runnerup</code> rows across 139 entries ≈ 7.2 of 12 groups called exactly right</strong>, and
+        <code>75pct_qualified_correct</code> fired for <strong>140 of 140</strong>. ≈ <strong>243,000 pts</strong> inflated.</li>
+      <li><span class="f">Fix:</span> require the group's 6 matches (and, for the qualification bonus, all 48) to have been predicted
+        before awarding; better, make an unpredicted group return an explicitly <em>unresolved</em> table so the phantom standings
+        can't leak to any consumer. Regression test: zero group predictions ⇒ zero group/qualification bonuses.</li>
+      <li><span class="f">Why deferred:</span> fixing it retroactively demotes ~155 real people (~87 pools move). Do it <strong>before
+        the next competition</strong>, not during this one's wind-down.</li>
+      <li><span class="f">Detail:</span> <code>drafts/2026-07-21_empty_bracket_bonus_inflation.md</code> · <span class="f">Status:</span>
+        deferred by decision 2026-07-21.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Recalc orphan-row cleanup <span class="chip cat">Bug</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> When an entry is un-submitted after being scored, its <code>match_scores</code> rows are left
+        behind (11 seen in June).</li>
+      <li><span class="f">Touches:</span> delete-scope logic in <code>lib/scoring/recalculate.ts</code> (currently only touches current
+        entryTotals).</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> confirmed — deletes are scoped to <code>allEntryIds</code> derived from
+        <em>submitted</em> entries only (<code>recalculate.ts:482</code>); an un-submitted entry drops out of that set, so its old
+        <code>match_scores</code> are never touched. A one-off sweep is also needed to clear existing orphans.</li>
+      <li><span class="f">Effort:</span> ~0.5 day.</li>
+      <li><span class="f">Done when:</span> zero orphan <code>match_scores</code> rows for unsubmitted entries after any sweep.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Perfect-group bonus <span class="chip cat">Scoring</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> New optional scoring rule — bonus for nailing all 4 positions in a group. (Carson's feedback, May
+        2026.)</li>
+      <li><span class="f">Touches:</span> scoring config (<code>ScoringRulesTab.tsx</code> + settings), bonus calc
+        (<code>lib/bonusCalculation.ts</code> / <code>lib/scoring</code>), and the shadow engine mirror.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no perfect-group setting or award logic exists
+        (<code>calculateGroupStandingsBonuses</code> only rewards winner/runner-up).</li>
+      <li><span class="f">Effort:</span> ~1 day.</li>
+      <li><span class="f">Done when:</span> admins can toggle it, it awards correctly on group completion, and shadow parity holds.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Penalty-prediction redesign <span class="chip cat">Scoring</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Rework the "goes to penalties" knockout bonus so it can't be gamed by blanket check/uncheck.
+        (George's feedback, May 2026.)</li>
+      <li><span class="f">Touches:</span> ⚠️ <strong>corrected 2026-07-12</strong> — the gameable logic lives in
+        <code>lib/bracketPickerScoring.ts:306</code> (+ emitted via <code>lib/scoring/bracket.ts</code>), <strong>not</strong>
+        <code>lib/bonusCalculation.ts</code> as previously noted. It's a bracket_picker-mode rule; the full_tournament/progressive PSO
+        path (<code>points.ts</code> <code>calculatePsoPoints</code>) predicts the actual shootout score and isn't gameable the same
+        way. Interim workaround remains admins setting <code>bp_penalty_correct=0</code>.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — logic still awards points whenever
+        <code>predictedPenalty === actualWentToPenalties</code> (blanket strategy scores).</li>
+      <li><span class="f">Effort:</span> ~1–2 days (needs a scoring-design decision first).</li>
+      <li><span class="f">Done when:</span> the bonus rewards genuine skill, not a blanket strategy; verified against sample entries.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ EPL / SHOWDOWN ============================ -->
+<section id="epl">
+  <h2 class="sec">🚀 Post-WC near-term — Showdown / EPL launch <span class="count">target Aug 2026 · R5</span></h2>
+
+  <div class="card neutral">
+    <h4>Showdown mode <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> The flagship post-WC product — a head-to-head pick'em league. Every gameweek you're randomly
+        paired with another pool member; beat their accuracy to take the points (3 win / 1 draw / 0 loss, 38-week season). Creates a
+        personal league with named rivals and a "Banter Cup" side-pot. Full spec captured in notes.</li>
+      <li><span class="f">Touches:</span> new pairing engine + duel-scoring model + <code>pool_templates</code>-style mode; reuses
+        office mini-league, WhatsApp share, QR join, and OG-preview infra. Sub-tracks: <strong>prep</strong> (pairing engine, duel
+        scoring, Banter Cup logic, schema on paper) · <strong>animations</strong> (Remotion server MP4 for the tunnel walk-out reveal,
+        <code>next/og</code> previews, Reanimated + Skia in-app, Lottie hand-off) · <strong>notifications</strong> (below).</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — zero engine code (no pairing/duel/Banter-Cup/<code>pool_templates</code>);
+        spec-only.</li>
+      <li><span class="f">Effort:</span> multi-week epic — core ~1–2 wks, prep ~1 wk, animations ~1 wk.</li>
+      <li><span class="f">Done when:</span> a 10-person pool can run a full season of weekly duels with correct scoring, standings,
+        tiebreakers, and the Monday pairing reveal.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Showdown notifications <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> The engagement loop for Showdown — pairing-reveal push, duel-result push, Banter Cup
+        standing-change push, plus deep links into the matchup card → reveal animation. Closes the virality loop (push → tap → reveal →
+        screenshot → share).</li>
+      <li><span class="f">Touches:</span> <code>expo-notifications</code> + existing <code>/api/notifications/*</code> endpoints +
+        Resend; 4 new email templates; deep-link routing in the Expo app.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — depends on Showdown mode; generic notification infra exists but nothing
+        Showdown-specific is wired.</li>
+      <li><span class="f">Effort:</span> ~4 days (launch-critical for Showdown).</li>
+      <li><span class="f">Done when:</span> a completed gameweek fires the right pushes/emails and each deep-links to the animated
+        matchup card.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Avatars v1 <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Real profile avatars with an initials fallback. Gates Showdown matchup-card personalization.</li>
+      <li><span class="f">Touches:</span> Supabase Storage bucket + <code>&lt;Avatar&gt;</code> component + upload UI (Expo + web) +
+        profile screen.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — only <strong>initials-fallback placeholders</strong> exist; no
+        <code>avatars</code> bucket, no <code>avatar_url</code> column, no image upload (grep for
+        <code>expo-image-picker</code>/<code>uploadAvatar</code> = 0).</li>
+      <li><span class="f">Effort:</span> ~3–5 days.</li>
+      <li><span class="f">Done when:</span> a user can upload an avatar that renders across web + mobile, with initials fallback when
+        none is set.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Match-day recap emails <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Replace the weekly recap with a per-match-day recap.</li>
+      <li><span class="f">Touches:</span> <code>lib/push/recaps.ts</code> + <code>lib/email/resend.ts</code> +
+        <code>AutomatedEmailsTab.tsx</code>; re-enable the email crons when a competition is live.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> the matchday recap is <strong>already built — but as an APNs push, not
+        email</strong> (<code>firePendingMatchdayRecaps</code> in <code>recaps.ts</code>, <code>app/api/cron/push-matchday-recap</code>,
+        dedup table <code>push_matchday_recaps_sent</code>). No recap <strong>email</strong> template exists, and the
+        <strong>weekly</strong> recap it was meant to replace is <strong>still present</strong> (<code>firePendingWeeklyRecaps</code> +
+        <code>push-weekly-recap</code>). Remaining: decide push-vs-email, build the email template if wanted, retire weekly, confirm the
+        cron is scheduled/enabled.</li>
+      <li><span class="f">Effort:</span> ~1–2 days.</li>
+      <li><span class="f">Done when:</span> a match day triggers one accurate recap (email if that's the decision); crons re-enabled and
+        verified.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Post-tournament feedback plan <span class="chip cat">Feature</span></td>
+          <td>Both survey emails built — <code>poolAdminFeedbackSurveyTemplate</code> + <code>playerFeedbackSurveyTemplate</code>
+            (<code>lib/email/templates.ts</code>), send route <code>app/api/admin/send-template/route.ts</code> (segments
+            <code>pool_admins</code> + <code>past_predictors_non_admin</code>), super-admin UI <code>TemplatesTab.tsx</code>.</td>
+          <td>⚠️ <strong>"Built" was not "sendable" — see 2026-07-21 above.</strong> Now ready; the two sends are the only remaining
+            (ops) step.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ FEATURES ============================ -->
+<section id="features">
+  <h2 class="sec">📋 Features — medium priority</h2>
+
+  <div class="card okc" id="i-badge-history">
+    <h4>Badge unlock history <span class="chip cat">Feature</span> <span class="chip ok">mostly shipped</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Append-only record of badge unlocks so we can show "10× Lightning Rod" and per-badge timelines.
+        (Also the persistence half of the Badge batch.)</li>
+      <li><span class="f">Touches:</span> new <code>badge_unlocks</code> table + write on badge detection + read in the badge UI.</li>
+      <li>✅ <span class="f">SHIPPED 2026-07-12 (capture half):</span> append-only <code>badge_unlocks</code> table (migration
+        <code>badge_unlocks_history</code>; SQL <code>drafts/2026-07-12_badge_unlocks_history.sql</code>) + write in
+        <code>lib/push/badges.ts</code> (idempotent upsert on every recalc) + one-time backfill of <strong>15,934</strong> existing
+        unlocks. RLS: pool members can read their pools' unlocks.</li>
+      <li>✅ <span class="f">Read half — web SHIPPED 2026-07-12:</span> <code>computeFullXPBreakdown</code> now takes
+        <code>everEarnedBadgeIds</code> and unions them into the displayed badge set (display-only — XP/level stay on the live set;
+        transient <code>top_dog</code> excluded). Wired in the web AnalyticsTab (lazy <code>badge_unlocks</code> fetch) + the
+        entry-analytics route (so any mobile client consuming <code>/analytics</code> benefits server-side, no OTA).</li>
+      <li>✅ <span class="f">Mobile also covered — no OTA (verified 2026-07-12):</span> the mobile FormTab, banter badge-flex, and
+        activity feed all read badges from the <strong>same <code>/analytics</code> route</strong> (<code>FormTab</code> →
+        <code>useEntryAnalytics</code> → <code>fetchEntryAnalytics</code> → <code>data.xp.earned_badges</code>); grep confirms <strong>no
+        mobile file reads <code>entry_xp_state.earned_badge_ids</code> directly</strong>. So the server-side union reaches mobile as soon
+        as the deploy is live.</li>
+      <li>✅ <span class="f">Bracket-picker (<code>bp_*</code>) SHIPPED 2026-07-12:</span> <code>computeFullBPXPBreakdown</code> gained
+        the same <code>everEarnedBadgeIds</code> display-only union; the <code>/bracket-analytics</code> route now <strong>writes</strong>
+        earned <code>bp_*</code> badges to <code>badge_unlocks</code> (idempotent — both the pre-tournament submission-badge path and the
+        full path) and passes ever-earned for the display union; web <code>AnalyticsTab</code> fetches + passes them. <strong>Capture is
+        server-side</strong> (on any <code>/bracket-analytics</code> compute — mobile always hits it); the one edge is a web-only BP entry
+        never computed server-side (no scoring-time BP badge path exists to hook, unlike full/progressive's <code>badges.ts</code>).
+        <strong>No BP backfill</strong> — BP badges were never persisted anywhere to backfill from, so they populate lazily on next
+        analytics view.</li>
+      <li><span class="f">Done when:</span> unlocks recorded permanently + cumulative counts render — persistence, backfill, and the
+        full/progressive <strong>and</strong> bracket-picker display all done. Remaining polish only: the profile trophy-case /
+        cumulative-count <em>UI</em>, and the semantic/XP items under <em>Badge batch</em>.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Super-admin project dashboard <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A lightweight visual of this roadmap inside super admin.</li>
+      <li><span class="f">Touches:</span> a super-admin page reading <code>SPORTPOOL_PROGRAMME.md</code> (v1) — later possibly a
+        <code>roadmap_items</code> table.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no roadmap tab in <code>SuperAdminDashboard.tsx</code>; no
+        <code>roadmap_items</code> table.</li>
+      <li><span class="f">Effort:</span> ~1–2 days (v1 read-only).</li>
+      <li><span class="f">Done when:</span> the roadmap renders in super admin without hand-editing HTML.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Creative pool-name award <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Admin-curated "hall of names" honouring great pool names. Lowest priority.</li>
+      <li><span class="f">Touches:</span> a badge on the pool card (v1 = no voting/algorithm).</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no code found.</li>
+      <li><span class="f">Effort:</span> ~1 day.</li>
+      <li><span class="f">Done when:</span> an admin can flag a pool name and a badge shows on its card.</li>
+    </ul>
+  </div>
+
+  <div class="card okc" id="i-superadmin-stats">
+    <h4>Enhanced super-admin stats <span class="chip cat">Feature</span> <span class="chip ok">✅ SHIPPED 2026-07-12</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> New super-admin metrics — number of pool admins, average pool size, and how many users have deleted
+        their account. <code>#SuperAdmin</code></li>
+      <li><span class="f">Touches:</span> the super-admin dashboard/stats page + aggregate queries over pools / members / deleted
+        accounts.</li>
+      <li>✅ <span class="f">SHIPPED 2026-07-12:</span> added to <code>app/api/admin/stats/route.ts</code> + surfaced in
+        <code>StatsTab.tsx</code> — pool-admin count (<code>role='admin'</code> memberships: 606), average pool size
+        (<code>totalPoolMembers / totalPools</code>), deleted-account count (<code>users.is_active = false</code>). Shown as
+        overview-card subtitles (Users → "N deleted", Pools → "avg N", Predictions → "N admins").</li>
+      <li><span class="f">Done when:</span> super admin shows admin count, average pool size, and deleted-account count, accurately —
+        done.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Lifetime trophy tracker <span class="chip cat">Feature</span> <span class="chip ok">web v1 shipped</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Split the profile page's statistics section into its own navigable page with an achievements area —
+        including cumulative counts of how many of each trophy/badge a user has earned. <code>#Achievements</code></li>
+      <li><span class="f">Touches:</span> profile page (web + mobile) → a dedicated stats/achievements sub-page; reads cumulative badge
+        counts — depends on <em>Badge unlock history</em>'s append-only table for accurate lifetime totals.</li>
+      <li>✅ <span class="f">Web v1 SHIPPED 2026-07-12:</span> the <code>badge_unlocks</code> gate is now satisfied (table built +
+        backfilled). Added a <strong>Trophy Case</strong> section to the profile Statistics tab (<code>ProfilePage.tsx</code>
+        <code>AchievementsSection</code>) — reads the user's <code>badge_unlocks</code> directly (RLS-safe), renders a tier-styled grid of
+        every badge earned with cumulative "N×" counts (full/progressive + bracket-picker; Top Dog excluded as transient). Data path
+        verified against real users (richest = Oracle 5× / Lightning Rod 5× / Stadium Regular 5×).</li>
+      <li>✅ <span class="f">Per-badge timeline added 2026-07-12:</span> tapping a badge opens a modal listing which pools you earned it
+        in (grouped by pool, with per-pool counts) + the date, via the <code>badge_unlocks → pools</code> FK. Data path verified (e.g.
+        Oracle → Alabamaron22 ×3, Rochester ×2).</li>
+      <li><span class="f">Known limitation:</span> timeline dates are the <strong>backfill date</strong> for pre-existing badges —
+        accurate going forward; the <em>pool breakdown</em> is what's meaningful now.</li>
+      <li>✅ <span class="f">All three follow-ups SHIPPED 2026-07-13:</span> (1) <strong>left-pool fix</strong> — additive
+        <code>badge_unlocks</code> self-read RLS policy (<code>user_id</code> → <code>auth.uid()</code> via
+        <code>users.auth_user_id</code>; migration <code>badge_unlocks_self_read</code>, draft
+        <code>drafts/2026-07-13_badge_unlocks_self_read.sql</code>), so a user sees their own unlocks even in pools they've left;
+        (2) <strong>dedicated page</strong> — the Trophy Case is now its own profile tab (<code>?tab=achievements</code>), moved out of
+        Statistics with a full header; (3) <strong>mobile</strong> — a Trophy Case section on the mobile profile
+        (<code>profile.tsx</code> <code>TrophyCaseSection</code>) reusing the <code>badgeIcon</code> medallions + cumulative counts (ships
+        via OTA).</li>
+      <li><span class="f">Remaining:</span> only the live-auth visual confirmation (can't render locally — types + data paths verified)
+        and the mobile OTA push.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Home-screen widgets <span class="chip cat">Feature</span> <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Widgets so users see key info without opening the app — current pool rank, upcoming-match countdown,
+        predictions still to make, recent leaderboard movement.</li>
+      <li><span class="f">Touches:</span> iOS/Android home-screen widget extensions (WidgetKit / Expo) + a lightweight read API for the
+        surfaced stats.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no widget/extension/app-group config anywhere.</li>
+      <li><span class="f">Effort:</span> ~3–5 days.</li>
+      <li><span class="f">Done when:</span> a user can add a widget showing at least rank + next-match countdown + outstanding
+        predictions, refreshing sensibly.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>In-progress pool landing page <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A landing screen tailored to pools already underway (mid-tournament), surfacing what matters during
+        play — current standings, recent results/movement.</li>
+      <li><span class="f">Touches:</span> pool detail (web + mobile) — a mid-tournament layout variant keyed off pool/tournament state.</li>
+      <li><span class="f">Audit 2026-07-12:</span> PARTIAL — the app already <strong>defaults to the live leaderboard</strong> on both
+        platforms and rank-delta arrows exist (<code>LeaderboardTab.tsx:1106</code>, mobile <code>LeaderboardPodium.tsx:93</code>), but
+        there's <strong>no tournament-state-keyed layout variant</strong> — the same static default serves pre/in-progress/completed pools
+        alike.</li>
+      <li><span class="f">Effort:</span> ~2–3 days.</li>
+      <li><span class="f">Done when:</span> an active pool opens to an in-progress view that leads with live standings + recent
+        movement.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>2nd Chance Cup — full-tournament redemption <span class="chip cat">Feature</span> <span class="chip cat">Scoring</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A redemption side-game for <code>full_tournament</code> players whose locked bracket is busted. When
+        the knockout stage starts, eligible players redraw predictions for the remaining matches and compete on a separate leaderboard —
+        keeping busted players engaged.</li>
+      <li><span class="f">Touches:</span> <code>full_tournament</code> mode — a second prediction set + separate leaderboard/scoring track
+        + eligibility + an entry window at knockout start; scoring engine + shadow mirror.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no code found.</li>
+      <li><span class="f">Effort:</span> ~1–2 weeks (new scoring track).</li>
+      <li><span class="f">Done when:</span> after the knockout stage opens, eligible players can submit a fresh remaining-matches bracket
+        that scores on its own leaderboard without affecting the main one.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Admin member-management actions <span class="chip cat">Feature</span></td>
+          <td><code>app/pools/[pool_id]/admin/MembersTab.tsx</code> — view / adjust-points / unlock / promote / demote / remove /
+            delete-entry; <code>point_adjustments</code> audit trail; mode-aware branches; mobile member-detail
+            (<code>mobile/app/pool/[id]/member/[memberId].tsx</code>).</td>
+          <td>Full parity across all three modes.</td>
+        </tr>
+        <tr>
+          <td>Pool Info tab + non-admin leave <span class="chip cat">Feature</span></td>
+          <td>Read-only Pool Info tab both platforms (web <code>PoolInfoTab.tsx</code>, mobile <code>PoolInfoTab.tsx</code>); leave via
+            <code>/api/pools/[pool_id]/leave</code> (audit row + sole-admin guard); mobile stop-participating fix.</td>
+          <td>The PoolInfoTab 400-fix + leave are <strong>in the pending EAS OTA</strong> — live on web, not yet on testers' phones.</td>
+        </tr>
+        <tr>
+          <td>Activity tab — XP gains <span class="chip cat">Feature</span></td>
+          <td>Mobile Activity tab real — <code>mobile/lib/useActivity.ts</code> synthesizes <code>xp_gain</code> items (match/bonus/badge
+            XP), rendered in <code>ActivityCard.tsx</code>.</td>
+          <td>Mobile only; the web activity route stubs <code>xp_gain</code> ("NOT computed here yet") — web parity optional.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ FOOTBALL DATA ============================ -->
+<section id="football">
+  <h2 class="sec">⚽ Live match &amp; rich football data</h2>
+  <p class="sec-sub">A cluster from the board's "Others" column — richer team/player/match data plus live-match state. Mostly new
+    api-football pulls + new detail screens; grouped so they can be built as one content system. <strong>Audit theme
+    (2026-07-12):</strong> the api-football client only fetches fixtures/events/teams; the five "rich data" items below are all TODO and
+    DB-gated. The live-state items are further along on <strong>mobile</strong> than web.</p>
+
+  <div class="card neutral">
+    <h4>Detailed team page <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Tap a team anywhere (fixtures, standings, predictions) to open a team detail page with its own tabs —
+        squad list, honours/trophy history, etc. Parent for several items below.</li>
+      <li><span class="f">Touches:</span> new team-detail route (web + mobile) + team data from the sports API (api-football).</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no team-detail route; teams render as non-tappable flags+names.</li>
+      <li><span class="f">Effort:</span> ~3–5 days. <span class="f">Done when:</span> tapping a team opens a detail page with at least a
+        squad tab and an honours/history tab.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Full team squad <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A tab on the detailed team page showing the full team squad.</li>
+      <li><span class="f">Touches:</span> the team-detail page (above) + squad endpoint from api-football.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no squad UI; api-football client has no squad/players endpoint.</li>
+      <li><span class="f">Effort:</span> ~1 day (once <em>Detailed team page</em> exists). <span class="f">Done when:</span> the
+        team-detail page lists the full current squad.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Player detail page <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Tap a player (from a squad, starting lineup, etc.) to see that player's history and detail.</li>
+      <li><span class="f">Touches:</span> new player-detail route (web + mobile) + player data from api-football.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no player route or endpoint.</li>
+      <li><span class="f">Effort:</span> ~3–5 days. <span class="f">Done when:</span> tapping a player opens a page with their key
+        history/details.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Match line-ups <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A tab showing each team's line-up on a pitch appropriate to the sport (football pitch; formations like
+        4-4-2 / 4-2-3-1).</li>
+      <li><span class="f">Touches:</span> match detail page + lineup endpoint from api-football + a pitch/formation renderer.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no lineup/formation code or endpoint.</li>
+      <li><span class="f">Effort:</span> ~2–4 days. <span class="f">Done when:</span> the match-detail page shows both line-ups on a pitch
+        with formations, when the API provides them.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Match events <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A tab (or section on the match-detail page) for in-match events — goals, red/yellow cards, subs —
+        whatever the API exposes.</li>
+      <li><span class="f">Touches:</span> match detail page + events endpoint from api-football.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — <code>getFixtureEvents</code> IS fetched by the sync cron, but only
+        <strong>Card</strong> events are kept (→ <code>match_conduct</code> for scoring); goals/subs are discarded, and there's no
+        <code>match_events</code> table or events UI.</li>
+      <li><span class="f">Effort:</span> ~1–2 days. <span class="f">Done when:</span> the match-detail page lists match events (cards,
+        goals, subs) for a live/completed match.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Live match minutes (min / HT / FT) <span class="chip cat">Feature</span> <span class="chip ok">web shipped</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Show live match state — current minute elapsed, an HT indicator at halftime, FT at full-time.</li>
+      <li><span class="f">Touches:</span> match cards/detail + live minute/status from api-football
+        (<code>matches.live_minute</code>/<code>live_period</code> already populated).</li>
+      <li>✅ <span class="f">Web SHIPPED 2026-07-12:</span> new shared <code>lib/matchStatus.ts</code> <code>getLiveClock</code> wired into
+        the Results <code>MatchCard</code> — renders <code>45'</code>/HT/ET/PENS with the pulsing LIVE dot. Data already flowed (poolData
+        <code>select('*')</code>); added the fields to <code>MatchData</code>/<code>ResultMatch</code> + mapping.</li>
+      <li>✅ <span class="f">Bracket surface added 2026-07-12:</span> live clock + status wired into <code>BracketResultsTab</code>
+        (knockout cells + Final/3rd-place cards), reusing <code>lib/matchStatus.ts</code>. StandingsTab intentionally skipped — it's
+        group-stage standings and the group stage is complete (no live group matches). Remaining polish: explicit "FT" (currently implicit
+        via the final-score box).</li>
+      <li><span class="f">Done when:</span> live matches show the running minute, HT at halftime, and FT at full-time on <strong>web</strong>
+        too — met for the Results tab.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Match status notes (delayed / postponed / cancelled) <span class="chip cat">Feature</span>
+      <span class="chip ok">web shipped</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Surface exception statuses — delayed, postponed, cancelled, abandoned, rescheduled — instead of
+        assuming every match kicks off on time.</li>
+      <li><span class="f">Touches:</span> match cards/detail + status detection (<code>matches.status_detail</code> +
+        <code>original_match_date</code>; badging added in <code>00c4ae2</code>).</li>
+      <li>✅ <span class="f">Web SHIPPED 2026-07-12:</span> <code>getMatchStatusBadge</code> (in the new shared
+        <code>lib/matchStatus.ts</code>) wired into the Results <code>MatchCard</code> — Delayed/Postponed/Suspended/Cancelled/… render as
+        amber/red pills. Mobile already had it.</li>
+      <li>✅ <span class="f">Bracket surface added 2026-07-12</span> (<code>BracketResultsTab</code> cells + Final cards). StandingsTab
+        skipped (group stage complete).</li>
+      <li><span class="f">Done when:</span> a non-normal match clearly shows its exception status to users on <strong>web</strong> too —
+        met for the Results tab.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Key-match indicator (per player, in-pool) <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Flag a player's "key" matches in a pool — e.g. a very tightly predicted match, or one where the user's
+        pick differs from the majority — to draw attention to high-leverage games.</li>
+      <li><span class="f">Touches:</span> predictions/leaderboard views + a per-user/per-match calc comparing the user's pick vs the pool
+        distribution.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — only retrospective contrarian awards exist; nothing flags an upcoming/in-play
+        match as key.</li>
+      <li><span class="f">Effort:</span> ~1–2 days. <span class="f">Done when:</span> a user sees their high-leverage matches flagged
+        (contrarian pick and/or tight margin) in the pool.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Live match indicator <span class="chip cat">Feature</span></td>
+          <td>Web animated cues — <code>MatchCard.tsx</code> <code>animate-ping</code> "LIVE" dot,
+            <code>StandingsTab</code>/<code>BracketResultsTab</code> <code>animate-pulse</code>; mobile LIVE cue on
+            <code>LiveMatchCard</code>/<code>MatchResultRow</code>/detail header, all keyed off <code>status='live'</code>.</td>
+          <td>Mobile dot is static (not animated) — minor polish vs web.</td>
+        </tr>
+        <tr>
+          <td>Penalty-shootout scores on results <span class="chip cat">Feature</span></td>
+          <td>Web <code>MatchCard.tsx:222</code> renders <code>PSO: h-a</code>; mobile <code>MatchResultRow.tsx:220</code> + match-detail
+            header render <code>(h-a PSO)</code>; <code>home/away_score_pso</code> selected in read hooks.</td>
+          <td>✅ <strong>Already shipped</strong> — supersedes the earlier "candidate to build" note.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ SOCIAL ============================ -->
+<section id="social">
+  <h2 class="sec">💬 Social &amp; messaging</h2>
+  <p class="sec-sub">Board "Others" cluster — connect players beyond a single pool's chat. Reuses the realtime Broadcast-from-DB infra
+    from the July 2026 banter migration.</p>
+
+  <div class="card goldc">
+    <h4>Boost banter engagement <span class="chip cat">Feature</span> <span class="chip cat">Design</span>
+      <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Deepen engagement with the pool chat (banter) we already shipped — turn a mostly one-way feed into
+        back-and-forth conversation and lift the share of members who ever post. A cluster of independently-shippable levers, not one
+        build.</li>
+      <li><span class="f">Why (data 2026-07-19):</span> organic banter = ~1,383 real typed messages from ~315 people across 118 pools — but
+        only <strong>~7% of members ever type</strong>, <strong>half of chatters post exactly once</strong>, a <strong>~30-person core
+        drives a third</strong> of all chat, and <strong>~67% of the feed is auto "share cards"</strong> (badge-flex / standings-drop) that
+        draw almost no replies. Replies (&lt;1%), @mentions, and reactions-on-text (from ~7 people total) are effectively unused. Activity
+        spikes on match days → it's second-screen behaviour, so match-moment nudges are the biggest lever.</li>
+    </ul>
+    <p style="margin:10px 0 4px"><strong>Levers (pick + sequence):</strong></p>
+    <ul>
+      <li><strong>Match-moment push → chat</strong> <em>(first slice)</em>: nudge members into banter at live beats (kickoff, goal, red
+        card, full-time, big rank swing) via the existing push infra, deep-linking straight into the pool chat.</li>
+      <li><strong>Make share-cards conversational:</strong> badge-flex / standings-drop / prediction-share cards should invite an inline
+        reply or one-tap reaction instead of reading as a wall; consider auto-prompts ("Anyone catching Melanie? She just hit L9").</li>
+      <li><strong>Close the notification loop:</strong> push/notify on @mention + reply so threads continue — today both are silent, so
+        conversations die after one message.</li>
+      <li><strong>Discoverability:</strong> surface the reaction / reply / @mention affordances on text messages (reactions come from ~7
+        people — the control is likely hard to find).</li>
+      <li><strong>First-message activation:</strong> empty-state prompt + a re-engagement nudge for the 50% who posted exactly once.</li>
+    </ul>
+    <ul class="fields" style="margin-top:10px">
+      <li><span class="f">Touches:</span> banter surfaces (mobile <code>usePoolBanter.ts</code> + <code>BanterSheet</code>, web
+        <code>CommunityTab.tsx</code>); the rich-card types in <code>pool_messages.message_type</code>
+        (<code>badge_flex</code> / <code>standings_drop</code> / <code>prediction_share</code>); push/email via
+        <code>/api/notifications/*</code> + Resend + the match-day push cron; realtime Broadcast-from-DB infra (migration
+        <code>022</code>).</li>
+      <li><span class="f">Effort:</span> ~1–2 weeks for the full set; match-moment push ≈ 2–3 days as the first standalone slice.</li>
+      <li><span class="f">Done when:</span> the share of members who post and the reply/reaction rate per message both climb against the
+        2026-07-19 baseline (illustrative targets: text-posters 7% → 15%, replies &lt;1% → 10%).</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Direct messaging (1:1) <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Private 1:1 messaging between users, separate from pool chat. Today all chat is pool-scoped — no
+        private conversations.</li>
+      <li><span class="f">Touches:</span> a new DM data model + inbox UI (web + mobile); reuses realtime broadcast infra.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no DM/conversation table (confirmed no <code>direct_messages</code> table); all
+        chat is <code>pool_messages</code>.</li>
+      <li><span class="f">Effort:</span> ~1–2 weeks. <span class="f">Done when:</span> two users can hold a private 1:1 conversation
+        outside any pool.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Admin messaging to pool members <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Let a pool admin message all members at once — announcements, reminders, nudges. Admins have no group
+        channel today.</li>
+      <li><span class="f">Touches:</span> an admin broadcast path → pool chat and/or push/email (reuses <code>/api/notifications/*</code> +
+        Resend) + an admin UI entry point.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — the only broadcast paths are <strong>super-admin only</strong>
+        (<code>requireSuperAdmin</code>); no <strong>pool</strong>-admin → members path exists.</li>
+      <li><span class="f">Effort:</span> ~2–3 days. <span class="f">Done when:</span> an admin can send one message that reaches all pool
+        members via in-app + push/email.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Friends list <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Let users add each other as friends and keep a persistent cross-pool connections list. Today
+        relationships only exist inside a shared pool.</li>
+      <li><span class="f">Touches:</span> a new friends/relationship model + friend UI (add/list) + cross-pool surfacing.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no <code>friends</code> table; every <code>friend</code> hit is marketing copy.</li>
+      <li><span class="f">Effort:</span> ~1 week. <span class="f">Done when:</span> a user can add friends and see a persistent list that
+        carries across pools.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Picture sharing in chat <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Let players share images/screenshots in pool chat (brackets, results, banter, reactions). Chat is
+        text-only today.</li>
+      <li><span class="f">Touches:</span> chat composer + Supabase Storage upload + inline image rendering in the banter/chat list; ties to
+        <em>Avatars v1</em> storage work.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — banter composer is text + rich cards only; no image picker/upload/Storage
+        bucket.</li>
+      <li><span class="f">Effort:</span> ~2–3 days. <span class="f">Done when:</span> a user can attach and send an image in pool chat and
+        others see it inline.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Chat auto-refresh / live messages <span class="chip cat">Feature</span></td>
+          <td>Migration <code>022_banter_realtime_broadcast</code> (AFTER-INSERT trigger → <code>realtime.send</code> to private
+            <code>pool:{id}</code>); both mobile <code>usePoolBanter.ts</code> and web <code>CommunityTab.tsx</code> subscribe to that
+            private channel (<code>message_insert</code> + <code>reaction_insert</code>/<code>reaction_delete</code>) after
+            <code>realtime.setAuth()</code>. Web converged onto the DB broadcast 2026-07-13 — dropped its old client-to-client rebroadcast,
+            5s poll, and <code>postgres_changes</code> reactions channel. Both surfaces update live.</td>
+          <td>Resolves the "back out two screens to see new messages" card.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ DESIGN ============================ -->
+<section id="design">
+  <h2 class="sec">🎨 Design / UX polish — post-v1</h2>
+
+  <div class="card neutral">
+    <h4>Migrate transactional emails to the new brand <span class="chip cat">Design</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Bring the rest of the email system onto the RN-app identity. The two feedback surveys were rebranded
+        2026-07-21 via a reusable <code>brandedTemplate()</code> (<code>lib/email/templates.ts</code>) — midnight header, gold accent strip,
+        two-tone <strong>Sport</strong><strong>Pool</strong> wordmark (Nunito 900), primary-blue <code>#3B6EFF</code> CTA, tokens straight
+        from <code>mobile/theme/colors.ts</code>. Every <strong>other</strong> template still renders through the legacy green
+        (<code>#16a34a</code>) <code>baseTemplate()</code> (and <code>supportTemplate()</code> on slate <code>#1e293b</code>), so a user's
+        inbox mixes old-green and new-blue Sport Pool mail.</li>
+      <li><span class="f">Touches:</span> <code>lib/email/templates.ts</code> — repoint each template's <code>baseTemplate({...})</code> call
+        to <code>brandedTemplate({...})</code> (same param shape, so it's near-mechanical): <code>deadlineReminderTemplate</code>,
+        <code>roundDeadlineReminderTemplate</code>, <code>pendingPredictionsReminderTemplate</code>, <code>emptyPoolNudgeTemplate</code>,
+        <code>soloPoolNudgeTemplate</code>, <code>smallPoolBoostTemplate</code>, <code>startAPoolTemplate</code>,
+        <code>weMissYouTemplate</code>, <code>readyToJoinTemplate</code>, <code>pastPredictorHypeTemplate</code>,
+        <code>bracketFixTemplate</code>, <code>pointsAdjustedTemplate</code>, the <code>custom</code> path, and the automated crons. Decide
+        whether <code>supportTemplate</code> keeps its distinct "Support" header or folds in too.</li>
+      <li><span class="f">Watch for:</span> per-template inline body colours — most bodies hard-code neutral <code>#525252</code>; on the new
+        white surface that still reads fine, but sweep for any green (<code>#16a34a</code>) accents inside bodies/buttons that would now
+        clash. Semantic colours (<code>pointsAdjustedTemplate</code>'s +/- green/red) are intentional — leave them. Re-render each through
+        Resend to a test inbox before shipping; <code>@import</code> Nunito degrades to system fonts in Gmail/Outlook by design.</li>
+      <li><span class="f">Effort:</span> ~half a day (mechanical swap + a visual pass on all ~15).</li>
+      <li><span class="f">Done when:</span> every customer-facing email renders the new brand; no template still calls the green
+        <code>baseTemplate</code>.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Banter sheet polish <span class="chip cat">Design</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Smooth out the banter sheet — reaction long-press, quick-actions anchoring, and verify share-prediction
+        + badge-flex against real data.</li>
+      <li><span class="f">Touches:</span> <code>mobile/components/.../BanterSheet</code> + reaction/quick-action components.</li>
+      <li><span class="f">Audit 2026-07-12:</span> PARTIAL — sheet is feature-complete (long-press + anchoring wired); remaining is
+        subjective smoothness + real-data verification of share/flex.</li>
+      <li><span class="f">Effort:</span> ~1–2 days. <span class="f">Done when:</span> interactions feel smooth and share/flex render
+        correctly with real data.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Round / match-week label on upcoming matches (mobile) <span class="chip cat">Feature</span>
+      <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> On the Predictions tab, label each upcoming match with the round it belongs to, using
+        competition-appropriate wording — "Match Week 3" (EPL), "Round of 16" (WC knockout).</li>
+      <li><span class="f">Touches:</span> <code>mobile/components/pool-detail/PredictionsTab.tsx</code> +
+        <code>MatchPredictionRow.tsx</code> / <code>components/home/UpcomingMatchCard.tsx</code>; reads round/stage off the match plus lock
+        state.</li>
+      <li><span class="f">Audit 2026-07-12:</span> PARTIAL — label infra exists (<code>usePoolRounds.ts</code> <code>ROUND_LABELS</code>,
+        shown on the entry status pill + wizard headers) but the per-upcoming-match rows carry no round label; wording is WC-only.</li>
+      <li><span class="f">Effort:</span> ~0.5–1 day. <span class="f">Done when:</span> a non-admin member sees the correct
+        round/match-week label on upcoming matches, with wording matching the competition.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Members' / all predictions after lock <span class="chip cat">Feature</span> <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> An <strong>all-members</strong> feature — once predictions lock, <strong>any</strong> member can see
+        every <em>other</em> member's predictions, presented as a <strong>read-only replay of the prediction wizard flow</strong>. Same view
+        on <strong>web</strong> too.</li>
+      <li><span class="f">Touches:</span> a new section/list in <code>PredictionsTab.tsx</code> + a <strong>read-only reuse of the wizard
+        UI</strong> (<code>BracketPickerWizard.tsx</code> / <code>ProgressivePredictionWizard.tsx</code>) + a read of all pool entries'
+        <code>predictions</code>; plus a web equivalent.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> PARTIAL — the read-only wizard replay is <strong>built but admin-gated</strong>
+        (<code>readOnly</code> prop reached only via <code>?viewAs=admin</code> from the admin Members drill-down). Remaining = expose it to
+        <strong>any</strong> member after lock (mobile + web); no web equivalent yet.</li>
+      <li><span class="f">Effort:</span> ~1–2 days (mobile) + ~0.5–1 day (web).</li>
+      <li><span class="f">Done when:</span> after lock, any member can browse every other member's predictions on mobile and web. ⚠️ Reveal
+        <strong>only after lock</strong>, or it becomes a pre-deadline cheat sheet.</li>
+    </ul>
+    <div class="note">Known drift (2026-07-26, not yet actioned): this item's status is stale — the feature <strong>has shipped</strong>
+      (<code>lib/predictions/revealGate.ts</code> + gated API route + web page + mobile <code>viewAs=member</code>, commits
+      <code>7d14a26</code> → <code>f97ca61</code>). Recorded under <a href="#risks">Known drift</a>; not corrected in the item itself
+      pending Ryan's call.</div>
+  </div>
+
+  <div class="card neutral">
+    <h4>Tab-swipe jitter (mobile) <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Swiping left/right between pool tabs is janky — not clean or smooth.</li>
+      <li><span class="f">Touches:</span> the pool-detail tab pager + <code>mobile/components/pool-detail/PoolTabBar.tsx</code>. ⚠️ A
+        <strong>different</strong> tab issue (bottom-tab size-pop) was already fixed with <code>enableScreens(false)</code> — load-bearing,
+        don't touch; per-tab Reanimated <code>entering</code> wrappers + <code>detachInactiveScreens={false}</code> were tried and
+        <strong>don't</strong> help.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — pager impl is reasonable (Reanimated SharedValue sync) but no fix commit /
+        profiling evidence.</li>
+      <li><span class="f">Effort:</span> ~1–2 days (investigation-heavy). <span class="f">Done when:</span> tab swipes hold ~60fps with no
+        dropped frames on a mid-tier device.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Chat scroll jitter (mobile) <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Scrolling the banter/chat is janky; needs to be smoothed out.</li>
+      <li><span class="f">Touches:</span> <code>BanterSheet.tsx</code> + <code>mobile/app/pool/[id]/banter.tsx</code> +
+        <code>mobile/lib/usePoolBanter.ts</code>. Prime suspects: list virtualization, re-renders on every realtime message, scroll inside
+        the gorhom sheet.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — <code>GiftedChat</code> (inverted FlatList) is the named suspect; only an
+        open-latency mount fix exists, no scroll-jitter/virtualization work.</li>
+      <li><span class="f">Effort:</span> ~1–2 days (investigation-heavy). <span class="f">Done when:</span> chat scrolls smoothly at ~60fps,
+        including while new messages arrive live.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>App-loading splash screen <span class="chip cat">Design</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Remove the <code>SP</code> app-icon flash shown during app open <em>before</em> the splash screen — go
+        straight to the splash, or use the same blue. <code>#SplashScreen</code></li>
+      <li><span class="f">Touches:</span> app launch/splash config (Expo splash + iOS launch screen).</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — <code>expo-splash-screen</code> + a custom <code>Splash.tsx</code> smooth the
+        native→JS handoff, but nothing addresses the pre-splash cold-start icon frame.</li>
+      <li><span class="f">Effort:</span> ~0.5 day. <span class="f">Done when:</span> app open shows a single clean splash (or matching blue)
+        with no stray icon frame.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>On-theme trophies <span class="chip cat">Design</span> <span class="chip ok">web shipped</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Redesign the Form-tab trophies/badges so they fit the app's design system — the current ones work but
+        feel off-theme. <code>#Achievements</code></li>
+      <li><span class="f">Touches:</span> badge/trophy visuals in the Form tab. Cross-refs <em>Form tab polish</em> + <em>Badge batch</em>.</li>
+      <li>✅ <span class="f">Web SHIPPED 2026-07-13:</span> all <strong>23</strong> v4 medallions (12 full/progressive +
+        <strong>11 <code>bp_*</code></strong> — the bracket art DID exist, contra the earlier "SF Symbols" note) are web-optimized into
+        <code>public/badges/</code> (resized 160px, 588 KB total) and rendered via a shared <code>&lt;BadgeMedallion&gt;</code> (emoji
+        fallback for any id without art) in the profile <strong>Trophy Case</strong> + the pool <strong>analytics badge grid</strong>
+        (<code>XPProgressSection</code>). Web badges now match the mobile medallions instead of bare emoji.</li>
+      <li><span class="f">Effort:</span> ~1–2 days (design + asset pass) — web done; mobile already uses the medallions.</li>
+      <li><span class="f">Remaining:</span> mobile Form-tab <code>bp_*</code> fallback can now point at the real art (it exists); any badge
+        without a medallion still shows emoji.</li>
+      <li><span class="f">Done when:</span> trophies/badges match the design system — done on web; mobile parity for <code>bp_*</code> is the
+        tail.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Form tab polish <span class="chip cat">Design</span></td>
+          <td><code>mobile/components/pool-detail/BadgeDetailSheet.tsx</code> wired into <code>FormTab.tsx</code> +
+            <code>BPFormTab.tsx</code>; tapping a badge cell opens a sheet showing its earning condition.</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Slide-up save button <span class="chip cat">Design</span> <span class="chip cat">Mobile</span></td>
+          <td>Dirty-state sticky footer — <code>hasChanges</code> gates an absolute-positioned <code>SaveBar</code> in
+            <code>SettingsTab.tsx</code> + <code>scoring-config.tsx</code>, with content padding reserved.</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ BUGS ============================ -->
+<section id="bugs">
+  <h2 class="sec">🐞 Bugs — triage (unsorted severity)</h2>
+  <p class="sec-sub">Captured from the board's "Bug" column. Severity not yet assessed — promote into the sections above as they're
+    triaged.</p>
+
+  <div class="card neutral" id="i-web-export">
+    <h4>Mobile web-export breaks <code>eas update --platform all</code> <span class="chip cat">Bug</span>
+      <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> <code>eas update</code> with its default <code>--platform all</code> fails during the
+        <strong>web</strong> export's static render — <code>mobile/lib/supabase.ts:16</code> calls <code>expo-secure-store</code>'s
+        <code>getItemAsync</code> in a Node context where the native module doesn't exist
+        (<code>getValueWithKeyAsync is not a function</code>), aborting the export. Native iOS/Android bundles export fine. Hit during the
+        2026-07-12 tie-break OTA.</li>
+      <li><span class="f">Touches:</span> <code>mobile/lib/supabase.ts</code> auth-storage adapter — guard SecureStore behind
+        <code>Platform.OS !== 'web'</code> with a web/SSR-safe fallback. Web isn't a shipped Expo surface, so the <strong>interim workaround
+        is <code>eas update --platform ios</code> + <code>--platform android</code></strong> (what shipped the tie-break OTA).</li>
+      <li><span class="f">Effort:</span> ~0.5 day. <span class="f">Done when:</span> <code>eas update</code> (all platforms) completes
+        without the SecureStore crash.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Align quick-chat rich cards (web vs mobile) <span class="chip cat">Bug</span> <span class="chip cat">Design</span>
+      <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Rich cards in quick chat render differently on web vs the React Native app; they should look the same.
+        <code>#BanterChat</code> <code>#Mobile</code></li>
+      <li><span class="f">Touches:</span> rich-card rendering in banter/quick-chat on both web and <code>mobile/</code>.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — two separate implementations with <strong>divergent metadata contracts</strong>
+        (web writes <code>entries</code>/<code>badges</code>; mobile reads <code>top_entries</code>/<code>badge_count</code>), so a card
+        authored on one platform falls back to plain text on the other.</li>
+      <li><span class="f">Effort:</span> ~1–2 days. <span class="f">Done when:</span> a given rich card looks consistent across web and
+        mobile.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Pending-submissions logic (multi-entry) <span class="chip cat">Bug</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Fix the "all entries submitted?" logic for pools that allow more than one entry per user — the mobile
+        "pending" notice should account for <em>all</em> of a user's entries. <code>#EntrySubmission</code></li>
+      <li><span class="f">Touches:</span> the submission-status checks (mobile dashboard notice + related surfaces) for multi-entry pools.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — <code>useHomeData.ts:555</code> keys <code>needsPredictions</code> to the single
+        best entry, not all entries.</li>
+      <li><span class="f">Effort:</span> ~0.5–1 day. <span class="f">Done when:</span> multi-entry pools correctly report submitted vs
+        pending across all of a user's entries.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Live-update tabs on member removal <span class="chip cat">Bug</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> When a pool admin removes a member, all tabs should live-update — e.g. the Fees tab should immediately
+        reflect the reduced pot. <code>#DeleteMember</code> <code>#LiveUpdates</code></li>
+      <li><span class="f">Touches:</span> member-removal path + live refresh of dependent tabs. Relates to <em>Admin member-management
+        actions</em>.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> PARTIAL — web <code>MembersTab</code> <strong>does</strong> call
+        <code>/recalculate</code> (contrary to the board framing); the real gap is <strong>no web realtime <code>pool_members</code>
+        subscription</strong> (mobile has one), so other viewers don't live-update. Also mobile removal omits the recalc call.</li>
+      <li><span class="f">Effort:</span> ~1 day. <span class="f">Done when:</span> removing a member updates every affected tab without a
+        manual refresh.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Match-detail page bug (app dashboard) <span class="chip cat">Bug</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> A reported bug on the match-detail page reached from the app dashboard. Card has no detail.</li>
+      <li><span class="f">Touches:</span> TBD — match-detail page in the mobile app.</li>
+      <li><span class="f">Effort:</span> TBD — needs repro/specifics first.</li>
+      <li><span class="f">Done when:</span> the (to-be-specified) match-detail issue is reproduced and fixed. ⚠️ <strong>Needs specifics
+        before it's actionable.</strong></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ MOBILE ============================ -->
+<section id="mobile">
+  <h2 class="sec">📱 Mobile</h2>
+
+  <div class="card neutral">
+    <h4>Pool card: level + form dots wrong (mobile) <span class="chip cat">Bug</span> <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> On the "Your Pools" tab, pool cards show correct <strong>rank</strong> and <strong>points</strong>, but
+        the <strong>Level</strong> doesn't match the pool-detail Form tab and the <strong>form dots</strong> are missing or incomplete.</li>
+      <li><span class="f">Touches:</span> two distinct root causes, both spanning <code>mobile/lib/useHomeData.ts</code> +
+        <code>mobile/components/pools/PoolListItem.tsx</code>:
+        <ul>
+          <li><strong>Level</strong> — the card computes <code>getLevel(pool.totalPoints)</code> (a <em>points</em>-based table) while the
+            app shows an <em>XP</em>-based <code>current_level</code>.</li>
+          <li><strong>Form dots</strong> — built from an unbounded <code>match_scores</code> query
+            (<code>.in('entry_id', allEntryIds)</code>, no <code>.limit()</code>), so entries past PostgREST's 1000-row cap get
+            empty/partial dots.</li>
+        </ul>
+      </li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — both root causes confirmed still present; <code>useHomeData.ts</code> never reads
+        <code>entry_xp_state</code>. <strong>Note:</strong> <code>entry_xp_state</code> has <code>current_level</code> but <strong>no
+        <code>last_five</code> column</strong> — the durable form-dots fix needs it added.</li>
+      <li><span class="f">Effort:</span> ~0.5–1 day.</li>
+      <li><span class="f">Done when:</span> the card's Level matches the Form tab and form dots render the correct last-5 for every pool.
+        <strong>Durable fix:</strong> source both from precomputed <code>entry_xp_state</code> columns (<code>current_level</code> + a new
+        <code>last_five</code>). Folds into <em>Leaderboard precompute</em>.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Mobile error triage <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Deferred residuals from the June error review.</li>
+      <li><span class="f">Touches:</span> <code>user_presence</code> RLS failures (172k failed inserts); push-cron duplicate-key races (need
+        <code>ON CONFLICT</code>); bracket-picks mobile submit gating.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> PARTIAL — <strong>2 of 3 done</strong>: push-cron dedup ✅ (claim-on-insert pattern
+        across all <code>push_*_sent</code> tables), bracket submit gating ✅ (<code>BracketPickerWizard.tsx:162</code>). Only
+        <code>user_presence</code> RLS remains (a DB-side policy; also ships with the presence OTA).</li>
+      <li><span class="f">Effort:</span> ~0.5–1 day (presence RLS only). <span class="f">Done when:</span> zero presence RLS errors, zero
+        duplicate-key errors, and bracket submit gates correctly on mobile.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Expo migration eval <span class="chip cat">Mobile</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Evaluate replacing the Swift iOS app with Expo/RN for iOS + Android (post-WC).</li>
+      <li><span class="f">Touches:</span> decision/spike, not a fixed build — assess feature parity + store deployment.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO (as a formal deliverable) — effectively <strong>in progress</strong>: the
+        <code>mobile/</code> Expo app is already the go-forward customer surface; only the written go/no-go is outstanding.</li>
+      <li><span class="f">Effort:</span> large — a scoping spike first, then a phased build if greenlit (weeks).
+        <span class="f">Done when:</span> a go/no-go decision with a scoped plan.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">✅ Completed (verified against code, 2026-07-12)</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>What shipped — evidence</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Push + banter notification parity <span class="chip cat">Mobile</span></td>
+          <td><code>usePoolBanter.ts:620/639</code> call <code>notifyMessage</code>/<code>notifyMention</code> →
+            <code>/api/notifications/{message,mention}</code> (<code>api.ts:594/575</code>); comment confirms it matches the Swift app's
+            dual-endpoint behavior.</td>
+          <td>On-device confirmation after the OTA ship is the only follow-up.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ FOUNDATIONAL ============================ -->
+<section id="foundational">
+  <h2 class="sec">🌍 Multi-sport platform — foundational work items</h2>
+  <p class="sec-sub">The build work under <a href="#projects">Project: Multi-sport platform</a>. The product decisions that govern it are
+    in <a href="#decisions">Settled decisions</a>.</p>
+
+  <div class="card crit" id="i-league-ingestion">
+    <h4>League ingestion (Premier League) <span class="chip cat">Multi-sport</span> <span class="chip danger">🔥 R2</span></h4>
+    <p style="margin:0 0 8px">Migration <code>024_multi_competition_league_support.sql</code>,
+      <code>lib/integrations/apiFootball/importLeagueSeason.ts</code> and <code>scripts/import-league-season.ts</code> are
+      <strong>drafted, not applied</strong>.</p>
+    <div class="note danger">⚠️ <strong>A league pool scores zero today, silently:</strong> <code>checkKnockoutTeamsMatch</code>
+      (<code>lib/scoring/core.ts:88</code>) returns <code>true</code> only for <code>'group'</code> or when teams aren't set; a
+      <code>'regular_season'</code> fixture is neither, so it falls to <code>return false</code> and <code>core.ts:141</code> zeroes the
+      match. Even after fixing the gate, <code>isGroupStage</code> selects the <strong>point values</strong> — the group/knockout binary is
+      welded into the price lookup, not just the gate. Importing fixtures is <strong>not</strong> the last step before a working league
+      pool.</div>
+  </div>
+
+  <div class="card warnc" id="i-sync-cron">
+    <h4>Sync cron is single-tenant <span class="chip cat">Multi-sport</span></h4>
+    <p style="margin:0">Competition comes from three env globals (<code>app/api/cron/sync-fixtures/route.ts:67</code>). Looping over active
+      tournaments (reading <code>external_league_id</code>/<code>external_season</code> per row, which 024 backfills) is the unlock for N
+      competitions. WC = api-football league 1; EPL = league 39.</p>
+  </div>
+
+  <div class="card neutral">
+    <h4>The rest of the foundations <span class="chip cat">Multi-sport</span></h4>
+    <ul>
+      <li><strong>Data-model abstraction</strong> — competition-instance model, now also carrying Crew + Season
+        (<a href="#d1">Decision 1</a>). Everything else depends on it.</li>
+      <li><strong>Pool template system</strong> — formats as named presets carrying their own scoring (<a href="#d3">Decision 3</a>).</li>
+      <li><strong>Sports-data ingestion</strong> — pluggable fixtures/results/standings layer behind a provider interface.</li>
+      <li><strong>Per-competition email cadence</strong> — schedules per competition instead of global crons.</li>
+      <li><strong>Competition catalog &amp; lifecycle</strong> — catalog, season rollover, clone-from-last-year. Date-computed state chips,
+        <strong>never authored</strong> (<a href="#d4">Decision 4</a>).</li>
+      <li><strong>Per-competition branding</strong> — theme/copy per sport. (The existing <code>branded-pools</code> feature is
+        per-<strong>pool</strong> white-label — a different axis.)</li>
+      <li><strong>Monetization model</strong> — free vs freemium vs paid. Tracked under 💎.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ LATER ============================ -->
+<section id="later">
+  <h2 class="sec">💎 Later — monetization &amp; cosmetics</h2>
+
+  <div class="card neutral">
+    <h4>Sponsored pools <span class="chip cat">Feature</span> <span class="chip cat">Monetization</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> For self-directed designed pools using the pool-payment model, let "ultra" / paying pools be marked as
+        <strong>sponsored</strong> and pinned to the top of discovery. <code>#Monetization</code></li>
+      <li><span class="f">Touches:</span> a <code>sponsored</code> flag on pools + discovery sort (pin sponsored to top) + an admin marking
+        path.</li>
+      <li><span class="f">Audit 2026-07-12:</span> PARTIAL — the pin-to-top-of-discovery mechanic already ships, but keyed off
+        <strong>branding</strong>, not a <code>sponsored</code> flag (<code>PoolsClient.tsx:289</code>, <code>useHomeData.ts:582</code>).
+        Still need a real <code>sponsored</code> flag + paid-tier marking path.</li>
+      <li><span class="f">Effort:</span> ~2–3 days. <span class="f">Done when:</span> a pool can be marked sponsored and reliably appears
+        pinned at the top of discovery.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Premium analytics <span class="chip cat">Feature</span> <span class="chip cat">Monetization</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> In-depth analytics as a paid premium feature — accuracy trends, H2H records, pick patterns, pool
+        history. Deeper than the free analytics.</li>
+      <li><span class="f">Touches:</span> an analytics surface gated behind an entitlement/paywall + the underlying stats.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no entitlement/paywall layer; analytics are ungated.</li>
+      <li><span class="f">Effort:</span> large — multi-week; gated on a monetization decision. <span class="f">Done when:</span> a paying
+        user unlocks richer personal analytics not available on the free tier.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Character avatars + cosmetics IAP <span class="chip cat">Feature</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Long-term play — a Bitmoji-style character system plus an IAP cosmetics economy (tunnel themes, walkout
+        animations, victory celebrations).</li>
+      <li><span class="f">Touches:</span> character rendering + IAP (App Store / Play billing) + cosmetics catalog.</li>
+      <li><span class="f">Audit 2026-07-12:</span> TODO — no IAP/cosmetics/character code; also gated on the (unbuilt) Avatars v1.</li>
+      <li><span class="f">Effort:</span> large — months; gated on Avatars v1 adoption + a Phase-2 monetization decision.
+        <span class="f">Done when:</span> <em>(gated — not scoped until the gate opens)</em>.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ TECH DEBT ============================ -->
+<section id="techdebt">
+  <h2 class="sec">🧰 Streamlining &amp; tech debt (background) · 🧹 Housekeeping</h2>
+
+  <div class="card neutral">
+    <h4>Bounded reads &amp; server-side aggregation (app-wide) <span class="chip cat">Infra</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Background "simplify how the app pulls data" cleanup. Many screens fetch large, unbounded row sets to
+        the client and compute a small summary in JS — risking silent truncation at PostgREST's 1000-row cap and wasting egress + CPU. Move
+        the work into the database. <strong>Excludes scoring</strong> (shadow engine owns that).</li>
+      <li><span class="f">Touches:</span> the anti-pattern is an unbounded <code>.in('col', [manyIds])</code> with no
+        <code>.limit()</code>/<code>.range()</code>. Sweep (2026-07-10): <strong>161</strong> <code>.in()</code> reads on web vs 53 bounded;
+        <strong>30</strong> vs 7 on mobile. User-facing candidates first: mobile
+        <code>useHomeData.ts</code>/<code>usePoolBanter.ts</code>/<code>useMatchDetail.ts</code>/<code>useActivity.ts</code>; web
+        <code>dashboard</code>/<code>pools</code>/<code>leaderboard</code>/<code>activity</code>/<code>poolData.ts</code>/<code>entryAnalytics.ts</code>/<code>profile</code>.
+        <strong>Skip</strong> scoring + admin one-offs. Fix menu: RPC + window function, view, precomputed columns, or <code>.range()</code>
+        pagination. Do <strong>not</strong> raise <code>max-rows</code>.</li>
+      <li><span class="f">Audit 2026-07-12:</span> the first, confirmed instance (mobile pool-card in <code>useHomeData.ts</code>) is
+        <strong>still unfixed</strong> — nothing from this sweep has landed yet.</li>
+      <li><span class="f">Effort:</span> ongoing/background — ~0.5–1 day per site. <span class="f">Done when:</span> no user-facing screen
+        depends on an unbounded multi-row fetch; re-running the sweep shows hot read paths are all bounded or DB-aggregated.</li>
+    </ul>
+  </div>
+
+  <div class="card warnc" id="i-icloud">
+    <h4>iCloud corrupts the local checkout <span class="chip cat">Infra</span> <span class="chip warn">R9</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> The repo lives in iCloud-synced <code>~/Documents</code>, which corrupts build artifacts, spawns
+        <code>" 2"</code>/<code>" 3"</code> duplicate files, and can even flip a byte in tracked source.</li>
+      <li><span class="f">Touches:</span> local dev environment only. Workaround: diagnose build artifacts via a clean <code>npm ci</code> in
+        a throwaway worktree first; scan <code>git diff</code> for null bytes before committing.</li>
+      <li>⚠️ <span class="f">Audit 2026-07-12:</span> the hazard is <strong>live right now</strong> — duplicate <code>.git/index 2</code> /
+        <code>.git/index 3</code> and <code>.next/* 2</code> files are present on disk.</li>
+      <li><span class="f">Effort:</span> ~1 hour — move the repo off iCloud. <span class="f">Done when:</span> the working copy lives outside
+        iCloud sync and phantom build failures stop.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ REFERENCE ============================ -->
+<section id="reference">
+  <h2 class="sec">📎 Reference</h2>
+
+  <h3 class="grp">Architecture deep-dives (not backlog items)</h3>
+  <div class="card neutral">
+    <ul>
+      <li><code>drafts/2026-07-02_shadow_engine_audit_report.md</code></li>
+      <li><code>drafts/2026-07-05_match_status_display_plan.md</code></li>
+      <li><code>drafts/2026-07-09_scoring_table_architecture_deepdive.md</code></li>
+      <li><s><code>drafts/M4_read_path_flip.md</code></s> — ⚠️ <strong>missing from the repo</strong> (referenced by
+        <em>Leaderboard precompute</em> but never created / was removed — recreate or drop the reference).</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">What is verified, and what isn't</h3>
+  <div class="card warnc">
+    <p style="margin:0">The distinction is the point of this programme. Claims are verified against <strong>code, migrations and git
+      history</strong> unless they appear on the <a href="#unverifiable">⚠️ Unverifiable without prod access</a> list in the risk register —
+      seven groups of claims that depend on production state and are carried on the authority of the drafts and runbooks that recorded them.
+      <strong>Unverified is not done.</strong></p>
+  </div>
+
+  <h3 class="grp">About this file</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 6px">A view of <code>SPORTPOOL_PROGRAMME.md</code> at commit <code>486430a</code>, generated 2026-07-26. It is
+      updated in the same piece of work as the markdown, never as a follow-up — a stale view is worse than no view, because it looks
+      authoritative.</p>
+    <p style="margin:0">Self-contained by design: no CDN, no external fonts, no images, no network calls. Colour tokens are SportPool's own,
+      from <code>mobile/theme/colors.ts</code>, with light and dark handled by <code>prefers-color-scheme</code>.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>SportPool Programme</strong> — generated view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
+      <code>486430a</code>. Self-contained: no network calls, no external fonts, no CDN. Colours are the SportPool tokens from
+      <code>mobile/theme/colors.ts</code>, light/dark via <code>prefers-color-scheme</code>.</p>
+    <p>The markdown is the source of truth. This file is a view of it and is updated in the same piece of work — if they
+      disagree, <strong>the markdown wins</strong>.</p>
+  </div>
+</footer>
+
+</body>
+</html>
