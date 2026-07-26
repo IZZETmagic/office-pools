@@ -15,6 +15,12 @@ Completed** tables; PARTIAL items annotated with what the code actually shows; p
 prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published**.
 · **2026-07-19:** added *Boost banter engagement*, grounded in an organic banter-usage analysis
 (~1,383 real messages / ~315 people; ~7% of members post, ~67% of feed is auto share-cards).
+· **2026-07-26:** opened the **🚨 Risk register** (below, R1–R11) from a fresh audit against code,
+migrations and git. Four targeted corrections came out of it, each because the document contradicted
+a risk: the shadow **read-path cutover and its rollback** were unrecorded, the **podium remediation**
+(~324k pts, 524 pools) was missing entirely, the feedback survey's "blocked on a deploy" line was
+stale, and *Delete Pool* named only the web door — **mobile has a second one**. Other drift found in
+that audit is listed but deliberately not yet actioned; see the end of the register.
 
 ## Projects in this programme
 
@@ -52,9 +58,78 @@ five-gate version is under *Project: Multi-sport platform → Decision 8*.
 
 ---
 
+## 🚨 Risk register
+
+> Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against
+> the code, migrations and git history. Every risk carries: **what · blast radius · trigger ·
+> mitigation status · whether Ryan has already called it**, plus the backlog item it maps onto so the
+> register and the backlog can't drift apart. **A risk Ryan has knowingly accepted stays here, marked
+> accepted — it is not closed.**
+
+**Levels** — 🔴 **Critical:** live now, currently destroying data, corrupting results or misleading
+users · 🟠 **High:** one user action away, or certain to bite on a known date · 🟡 **Medium:**
+degrades quality or trust, no data loss · 🟢 **Low:** cosmetic, or deferred by explicit decision.
+
+**Ranking rule used here and in status updates:** anything that *silently produces wrong data*
+outranks anything that is merely missing; after that, `(blast radius × likelihood) ÷ effort`. Silent
+wrongness is this codebase's recurring failure mode — zero-scoring leagues, a truncated email
+segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
+
+| # | Risk | Level | Blast radius | Trigger | Mitigation status | Ryan's call | Backlog item |
+|---|---|---|---|---|---|---|---|
+| **R1** | **"Delete Pool" destroys members' predictions.** Web runs five un-transactional deletes from the browser against an asymmetric RLS pair; **mobile is a second, separate door** — a single `supabase.from('pools').delete()` (`mobile/components/pool-detail/SettingsTab.tsx:222`) | 🔴 | **6 pools / 41 entries already destroyed**, earliest in June. **458 pools with an admin** are one tap away, of 623 live | One admin tap, on **either** platform. Elevated now — post-tournament tidying | **None applied.** The zero-deploy policy drop is identified, not run — and it covers the **web** door only | Documented-only 2026-07-21; *archive, not delete* decided 2026-07-25 — **not implemented** | *"Delete Pool" destroys every member's predictions* (🔥 Now) |
+| **R2** | **A league pool scores zero, silently.** Not just the gate: `full.ts:89` / `progressive.ts:110` source predicted teams from a WC-shaped `knockoutTeamMap`, so a `regular_season` fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`), so a league pool has no bonus path either | 🔴 | **100% of points** in every EPL pool; scoring trust in the flagship next season | Creating an EPL `tournaments` row — **both create-pool wizards list tournaments unfiltered** (`components/pools/CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`), so the row alone makes league pools creatable | **None.** Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a safety catch, not a plan | Recognised in the item; not scoped or scheduled | *League ingestion (Premier League)* (Multi-sport → Foundational) |
+| **R3** | **Three scoring default sets disagree; "Reset to defaults" rescales a live pool ~20×.** create = `group_exact_score: 100`, reset button = `5`, `bonus_champion_correct` stays `1000` | 🟠 | Any of **623 live pools**; one click turns 103 fixtures into decoration. Reset ladder is also non-monotonic (SF < QF) | An admin presses **Reset to defaults** on a live pool | None | **Decided 2026-07-25** (100/75/50 canonical, delete the dead bonuses, fix the ladder) — unimplemented, ~half a day | *Scoring config is internally inconsistent* (🔥 Now); Decision 6 |
+| **R4** | **Shadow/prod podium divergence, behind an undocumented live kill switch.** Prod now *derives* the podium from completed matches (`lib/podium.ts`); the shadow bonus SQL still `JOIN`s `tournament_awards` (`drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164`) — **the same root cause prod just paid ~324k points to fix** | 🟠 | Last occurrence: **669 rows / ~324,375 pts**, concentrated in ~73 pools; 50 changed rank, **13 changed their #1** | Re-enabling shadow reads, or shadow scoring any competition that has a podium | Prod fixed and re-scored; **shadow not fixed**. Current `sync_settings` flag values unverified | No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26 | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped) |
+| **R5** | **EPL mid-August is not reachable on current foundations.** Missing: league scoring + bonuses (R2), matchweek deadlines, **auto round-opening — zero code**, multi-tenant sync (`sync-fixtures/route.ts:67` still reads three env globals), importer commit + apply | 🟠 | The entire next-season target; Showdown sits behind it | The fixture list, mid-Aug — a fixed external date | None applied | Needs a **scope-or-date** call. Decision 7 already calls auto round-opening "a prerequisite, not polish" — 38 matchweeks × every pool, manually, is not viable | *Showdown / EPL launch* project; *Sync cron is single-tenant*; Decision 7 |
+| **R6** | **Empty-bracket bonus inflation.** An unpredicted group falls through to the FIFA-ranking tiebreaker, so seeded order ≈ reality and near-zero predictors collect the bonuses | 🟠 | **~243,000 pts across 155 entries**; a near-zero predictor earns ~77% of a full predictor's bonus with ~2% of their match points. Retro-fixing demotes ~155 real people (~87 pools move) | Any competition with group standings | None — no "did they predict it" gate in `calculateGroupStandingsBonuses` (re-verified 2026-07-26) | **Accepted / deferred 2026-07-21**, on the condition "fix before the next competition" — **that condition is now due** | *Empty-bracket bonus inflation* |
+| **R7** | **Admin churn is unmeasured.** `/api/admin/stats` has counts (pool admins, avg pool size, deleted accounts) but **no cohort or retention series** | 🟠 | The best-identified growth lever: preventing 20% of admin churn ≈ **+722 players** (Decision 7's table). Not silent-wrongness class — ranks below R1–R3 | Dated, not action-driven: the clean baseline is the **WC→EPL transition**, which is happening now and closes at EPL start | None built | Decision 7 says "instrument admin retention"; nothing exists | Decision 7; *Enhanced super-admin stats* |
+| **R8** | **The feedback survey is past its own time box, and was held on a blocker that has cleared.** All four fixes are on `origin/master` as of 2026-07-25 | 🟡 | 477 admins + 3,652 players; response quality decays with distance from the final (16 Jul) | Already triggered — the stated window was "~1 week of the final", i.e. ~23 Jul | Code fixes verified in the repo; **deploy status is prod state, unverified** | Send-or-drop is Ryan's | *Post-tournament feedback surveys — send them* (🔥 Now) |
+| **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done | *iCloud corrupts the local checkout* (🧹 Housekeeping) |
+| **R10** | **The archive decision conflicts with the shipped schema.** Migration 025b constrains `pools.status` to `('open','completed')`, so an `archived` state is impossible without another migration; today's "Archive Pool" button just sets `completed` | 🟡 | Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on | Implementing the archive decision | None — needs either a migration or a ruling that archive *means* `completed` | Unrecognised conflict; needs a ruling before R1's proper fix is built | Decision 7 *"Archive, not delete"*; *"Delete Pool" destroys…* |
+| **R11** | **Dead scoring knobs are editable on mobile.** `bonus_best_player_correct` / `bonus_top_scorer_correct` are read by zero scoring code | 🟢 | A mobile admin can set a value that can never pay out; members see it in the pool's rules | Any admin opening mobile scoring config | Web is honest (greyed *"Coming Soon"*); **mobile is not** (`mobile/app/pool/[id]/scoring-config.tsx:442`) | Covered by the Decision-6 deletion, unimplemented | *Scoring config is internally inconsistent*, defect 4 |
+
+### ⚠️ Unverifiable without prod access
+
+Everything above is verified against **code, migrations and git history** unless listed here. These
+claims depend on production state and are carried on the authority of the drafts/runbooks that
+recorded them — **treat them as unverified, not as done**:
+
+- Whether the survey fixes are actually **deployed** on Vercel (they are on `origin/master`; that is not the same thing) — R8.
+- All `sync_settings` flag values: `prod_scoring_enabled`, `shadow_read_enabled_pools`, `analytics_read_from_columns`, `sweep_time_box_enabled` — R4.
+- pg_cron job health, including the shadow **parity alarm** (jobid 21) and the reconcilers (jobids 19/20).
+- Whether **migration 024** was applied (it carries no "applied to prod" header, unlike 025/025b — so almost certainly not) — R2.
+- The **RLS policy bodies** behind the delete asymmetry, and the FK cascade definitions behind mobile's `pools` delete — both taken from `drafts/2026-07-21_delete_pool_data_loss.md`, not re-introspected — R1.
+- The counts **6 destroyed / 458 exposed**, the audience sizes **477 / 3,652**, and the **~243k pts / 155 entries** inflation measurement — all prod queries from their source drafts.
+- Presence of `badge_unlocks` (+ its backfill) and the `trg_enforce_prediction_before_kickoff` trigger.
+
+**Anything not on this list, and not marked unverified inline, was read in the code on 2026-07-26.**
+
+### Known drift, found 2026-07-26, not yet actioned
+
+Recorded so it isn't re-discovered. None of it is a risk; it is the document being wrong about
+status, in both directions. Awaiting Ryan's call on what to do with each:
+
+- **Two items are better than written.** *Members' / all predictions after lock* is **shipped**, not "PARTIAL — admin-gated" (`lib/predictions/revealGate.ts` + gated API route + web page + mobile `viewAs=member`, commits `7d14a26` → `f97ca61`). And the *Enhanced super-admin stats* item is accurate — verified.
+- **A whole project is missing:** pool status → `lifecycle` + `accepting_members` (migrations 025 + 025b, both recorded prod-applied, plus `3d95e5c` / `3a5fa5e` / `10d555c`) has no item here. It is also what created **R10**.
+- **Work sitting in `drafts/` with no item:** `2026-07-25_entry_fee_collection_assessment.md` (a legal/feasibility assessment ending in a recommendation Ryan hasn't ruled on) and `2026-07-19_caching_infrastructure_plan.md`.
+- **Smaller staleness:** the *Recurring each knockout round* section still reads "SF/Final upcoming" ten days after the final; `analytics_read_from_columns` still appears zero times in code (the M4 note is accurate); auto round-opening has no code at all (feeds **R5**).
+
+---
+
 ## ✅ Recently shipped
 
 > Completed and deployed to production. Kept here for visibility, then pruned once it's old news.
+
+### Podium bonus remediation `Scoring` `Bug` — SHIPPED 2026-07-21
+> Added 2026-07-26. This incident and its remediation were **missing from this document entirely** —
+> the largest scoring correction the product has run, absent from the single source of truth. R4
+> depends on it.
+- **What broke:** the tournament podium was scored off `tournament_awards` (empty) plus, in progressive, a phantom cascaded bracket. **669 podium bonus rows / ~324,375 pts owed**, concentrated in **~73 pools**; 50 saw rank changes and **13 changed their #1**. `full_tournament` was always correct.
+- **What shipped:** `lib/podium.ts` is now the single owner — `resolveActualPodium()` derives the podium from the completed final / third-place matches with `tournament_awards` demoted to an optional admin override, and `resolveEntryPodiumPick()` dispatches on a **required** mode discriminant (no default). Commit `ea8d9da`, deployed, then a full re-score over all **524 classic pools**. Final audit `ADD=0 / REMOVE=0` on all six lines. Rollback snapshots `_podium_before_20260721` / `_pool_entries_before_20260721` left in place.
+- **Landed with no comms, by decision.** Runbook + full evidence: `drafts/2026-07-21_podium_remediation_runbook.md`. Re-audit with `npx tsx scripts/audit-podium.ts`.
+- ⚠️ **Two live consequences:** (1) the shadow engine still carries the **pre-fix** podium logic — see *Shadow scoring engine* and **R4**; (2) the re-score is what *surfaced* the Delete Pool data loss (one pool's predictions had already been destroyed, so 26 members correctly zeroed and were restored from snapshot) — see **R1**.
+- **Lesson worth keeping:** prod↔shadow parity was blind to this, because shadow carried a hand-fork of the same bug. Parity between two implementations is not an oracle; validate against the domain.
 
 ### HTTP security headers + security.txt `Infra` — SHIPPED 2026-07-11
 - **What:** production HTTP hardening in `next.config.ts` `headers()` — `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: camera=()/microphone=()/geolocation=()` on all routes; `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` on everything except `/tv/*` (frame-exempt via `/((?!tv/).*)`); plus a `security.txt`. Commit `d6d6042`, verified live on sportpool.io.
@@ -67,8 +142,9 @@ five-gate version is under *Project: Multi-sport platform → Decision 8*.
 ### "Delete Pool" destroys every member's predictions `Bug` `Data-loss` 🔥
 - **Is:** `app/pools/[pool_id]/admin/SettingsTab.tsx:232-302` runs five un-transactional PostgREST deletes from the **browser**, predictions first. An RLS asymmetry makes it catastrophic: `predictions` DELETE is `is_pool_admin(pool_id)` (an admin can delete **everyone's**) while `pool_entries` has **no** admin DELETE policy, so step 2 silently deletes only the admin's own entry and **returns no error**. Any abort after step 1 leaves the pool alive with every member's predictions gone.
 - **Impact:** **6 pools / 41 entries already destroyed**, the earliest in June — this has been happening quietly for weeks. **458 pools with an admin are one click away.** Risk is elevated post-tournament, when people tidy up pools.
+- ⚠️ **There is a second door, on mobile (added 2026-07-26).** `mobile/components/pool-detail/SettingsTab.tsx:222` runs its own `supabase.from('pools').delete().eq('pool_id', …)` — a different shape (one statement, relying on FK cascades) reached from the same admin Settings screen. It is **not** covered by the zero-deploy mitigation below, and "remove Delete Pool from admins entirely" is therefore **two** removals, not one. Whether the cascade completes or errors depends on FK definitions that are prod state — unverified.
 - **Also:** `app/api/account/delete/route.ts` deletes predictions/entries/memberships across all pools at lines 33-85, then only checks "are you still a pool admin?" at line 90 — a pool owner who tries to delete their account keeps the account and loses everything everywhere.
-- **Zero-deploy mitigation (verified safe, policy has one consumer):** `drop policy "Pool admins can delete predictions" on predictions;` → the button then fails loudly having destroyed nothing.
+- **Zero-deploy mitigation (verified safe, policy has one consumer):** `drop policy "Pool admins can delete predictions" on predictions;` → the **web** button then fails loudly having destroyed nothing. It does not touch the mobile path, which deletes `pools` rather than `predictions`.
 - **Proper fix:** server-side transactional delete (single Postgres function / soft-delete), move the account-delete guard to the top, add real `ON DELETE CASCADE`, and an alarm for non-`bracket_picker` pools with submitted entries but zero predictions.
 - **Detail + full evidence:** `drafts/2026-07-21_delete_pool_data_loss.md`
 - **Decision 2026-07-25:** the fix is **archive, not delete** — Delete Pool is removed from admins entirely, replaced with a reversible archive that keeps history; true deletion becomes a support action. Rationale: it destroys *other people's* data irreversibly on one person's tap, and once Crews keep history (*Project: Multi-sport platform → Decision 1*) it erases part of the crew's permanent record for everyone in it.
@@ -79,7 +155,8 @@ five-gate version is under *Project: Multi-sport platform → Decision 8*.
 - **Prep done 2026-07-21:** three blockers found and fixed, none of them visible from the "✅ built" status this item carried. **(a)** Every segment in `lib/email/segments.ts` silently truncated at PostgREST's 1,000-row cap — the player survey resolved to **146 recipients out of 3,958**, and a dry run would have reported that as the audience. Now paged via `fetchAll()` (all 15 segments, not just these two). **(b)** Both Tally forms were still **DRAFT** — every CTA 404'd. Published, and the "Anything else?" box that was marked required despite reading "Optional." is now optional. **(c)** No `maxDuration` on a ~41-batch send whose idempotency key is written *before* the first email; now `300` with 600 ms inter-batch pacing.
 - **Also:** new `past_predictors_non_admin` segment so the 306 admin-and-player people get the admin survey only, never two emails. By decision, **no Resend topic** is attached — maximum reach, so per-category opt-outs aren't honored on these two sends.
 - **Touches:** `lib/email/segments.ts`, `app/api/admin/send-template/route.ts`, `scripts/preflight-feedback-survey.ts`, super-admin **Templates** tab.
-- **Blocked on:** a production deploy. The fix is local; the Templates tab runs against prod, so sending before the deploy resolves the old truncated audience *and* burns the idempotency key.
+- ⚠️ **Blocker corrected 2026-07-26 — "the fix is local" is no longer true.** All four commits are on `origin/master` (`a5cdf0e` paging, `68a48ec` branding, `bb50f5d` runbook, `71e0a44` sender), pushed 2026-07-25; the only unpushed commit on `master` is `a1e1ef4`. The original hazard still stands in principle — the Templates tab runs against prod, so sending *before* the deploy is live resolves the old truncated audience **and** burns the idempotency key — but the remaining question is now **"is the deploy live?"**, which is prod state and unverified here, not "has the code been written?". Check the deploy, then send.
+- ⏰ **Past its time box:** the stated window was "within ~1 week of the final" (16 Jul), i.e. ~23 Jul. Every further day costs response quality. See **R8**.
 - **Runbook:** `drafts/2026-07-21_feedback_survey_send_runbook.md` — pre-flight, expected counts, and partial-send recovery.
 - **Done when:** `npx tsx scripts/preflight-feedback-survey.ts` passes, both sends report 477/477 and 3,652/3,652, and responses are landing in Tally.
 
@@ -88,7 +165,7 @@ five-gate version is under *Project: Multi-sport platform → Decision 8*.
   1. **Three default sets disagree.** `app/api/pools/create/route.ts:5` gives new pools `group_exact_score: 100`; the engine fallback (`app/pools/[pool_id]/results/points.ts:69`) and the admin **Reset to defaults** button (`app/pools/[pool_id]/admin/ScoringTab.tsx:21`) both say `5`. **Pressing reset on a live pool rescales it ~20×** while leaving `bonus_champion_correct` at 1000 — turning the champion pick from ~10 group matches into ~200, and the other 103 fixtures into decoration.
   2. **The reset ladder is non-monotonic** — r16 `2`, QF `3`, **SF `2`**, 3rd `1.5`, final `3`. One click makes a semi-final worth less than a quarter-final.
   3. **`round_32_multiplier` is missing** from `SCORING_DEFAULTS` entirely — every new pool's first knockout round is priced by an unexamined column default.
-  4. **Two settings are shown to members and read by zero scoring code** — `bonus_best_player_correct` / `bonus_top_scorer_correct` render at `ScoringRulesTab.tsx:382,386` **with a points value**. Members are looking at a rule that can never pay out.
+  4. **Two settings are stored, editable, and read by zero scoring code** — `bonus_best_player_correct` / `bonus_top_scorer_correct`. **Web is honest about it:** they sit under a greyed *"Coming Soon"* header (`ScoringRulesTab.tsx:375`). **Mobile is not:** `mobile/app/pool/[id]/scoring-config.tsx:442` renders them as ordinary editable `PointsField`s alongside the working bonuses, so a mobile admin can set a value that will never pay out. *(Corrected 2026-07-25 — an earlier version of this item overstated the web case.)*
 - **Decision 2026-07-25:** **100/75/50 is canonical** — collapse to one exported constant. **Delete** the two dead bonuses from the UI and defaults. Fix the ladder's monotonicity and add `round_32_multiplier`. Longer term these are replaced by named presets (*Project: Multi-sport platform → Decision 6*).
 - **Touches:** `app/api/pools/create/route.ts`, `app/pools/[pool_id]/results/points.ts`, `app/pools/[pool_id]/admin/ScoringTab.tsx`, `app/pools/[pool_id]/ScoringRulesTab.tsx`, `app/api/admin/branded-pools/route.ts`.
 - **Effort:** ~half a day for 1–4; presets are a separate, larger piece.
@@ -156,7 +233,9 @@ five-gate version is under *Project: Multi-sport platform → Decision 8*.
 - ✅ **Ground-truth correctness audit 2026-07-13:** validated the shadow bracket against **actual results** (not just vs live, which only proves reproduction): 0 scoring violations across 36,678 full_tournament knockout rows (0 false awards, 0 false denials, 0 points-on-wrong-teams); resolver qualification = exactly the 32 teams that reached R32; actual standings match an independent points/GD/GF ranking on all 48 group positions. Shadow bracket is **ground-truth-correct through the QF**, not merely live-parity.
 - ✅ **Cutover-hardening shipped 2026-07-13** (DB objects live; `recalculate.ts` + `shadow-materialize` route changes pending a deploy): **(#4)** `v_shadow_worker_runs` repointed off the retired `shadow-drain-queue` to the live jobs; **(#3)** automated parity alarm `shadow_detect_diffs()` + `shadow-parity-alarm` pg_cron (jobid 21, `*/15`) writes `entry_total_mismatch` rows + reports coverage-by-mode; **(#2)** `shadow_dirty_pools` marker closes the bulk-recalc staleness gap — `recalculatePool` full recomputes (no `matchId`) flag the pool, the shadow-materialize cron drains + re-scores it (re-scoring completed matches so fresh brackets take, change-only so it's cheap).
 - ⚠️ **Out of shadow scope (#1):** `bracket_picker` pools (1,012 entries / ~20%) have **no shadow arm** — scored by the separate `lib/bracketPickerScoring.ts`. The parity alarm's coverage report surfaces this (`bracket_picker: live 1012 / shadow 0`) so it can't be silently assumed covered at cutover. A bracket_picker shadow arm is a separate project, deferred.
-- **Done when:** predicted brackets resolved once at entry submission (removing re-materialization); shadow read-path pilot (#5, deliberately deferred — direct customer impact) validated before any customer-facing flip.
+- 🔴 **The read-path cutover happened, and this document did not record it (added 2026-07-26).** The line below said the pilot was "deliberately deferred". In fact the full machinery shipped and was flipped: `f843788` (Phase A fidelity + read helper), `9e6db6e` + `e90db3c` (production-scoring kill switch), `96b996c` (rollback runbook) — all on `origin/master`. `lib/scoring/readSource.ts:48` gates reads per pool on `sync_settings.shadow_read_enabled_pools`; `lib/scoring/prodScoringFlag.ts:29` can disable the Node engine outright. `drafts/2026-07-19_caching_infrastructure_plan.md:20` records the state on 2026-07-19 as *"`shadow_read_enabled_pools = [all pools]` (shadow is the sole scorer as of the 2026-07-19 cutover)"*; the rollback path is `drafts/2026-07-19_prod_scoring_rollback.sql`. **Which engine is scoring right now is a live flag value and is unverified here.** Nobody should plan the EPL without answering that first.
+- 🟠 **Shadow's podium logic is the pre-fix version.** Prod's podium was rebuilt to *derive* from completed matches (`lib/podium.ts`, `ea8d9da`); shadow's bonus SQL still `JOIN`s `tournament_awards` (`drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164`) — the exact root cause of the ~324k-point error remediated on 2026-07-21. **Shadow must not score a competition with a podium until this is fixed.** See *Podium bonus remediation* under ✅ Recently shipped, and **R4**.
+- **Done when:** predicted brackets resolved once at entry submission (removing re-materialization); shadow's podium arm matches `lib/podium.ts`; and a read-path flip is validated **per pool** before any wider customer-facing flip (the 07-19 flip went to all pools at once and was rolled back at tournament end).
 
 ### EAS OTA pending `Mobile` — ✅ SHIPPED 2026-07-12
 - **What shipped:** production OTA of the Jul 11 tie-break resolver (`bracketResolver.ts`, `tournament.ts`, `usePredictions.ts`) to runtime `1.0.0` (last prod build 2026-07-06, unchanged runtime — verified via `eas build:list`; branch had zero prior updates). Published **native-only** (see *Mobile web-export* bug below): iOS update group `283a68d0…`, Android `5307e504…`, branch `production`.
