@@ -8,6 +8,33 @@ banner rather than one ordered list. Day-to-day delivery is still ordered by pri
 (**Now → Later**) and tagged by category; the **Projects** below are the larger bodies of work those
 items roll up into.
 
+## Where this stands
+
+The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
+handful of residual bugs. The record itself is current again: the two things this document was
+missing, the shadow read-path cutover of 2026-07-19 with its rollback and the ~324k-point podium
+remediation of 2026-07-21, are now written down, so the programme and the code broadly agree for the
+first time since the final. The picture that leaves is not comfortable. **Two 🔴 risks are live and
+unmitigated:** an admin tapping *Delete Pool* still destroys every member's predictions — on **two**
+surfaces, web and mobile, with six pools already gone — and any Premier League pool created today
+would score **zero, silently**, because the group/knockout binary is welded into the scoring price
+lookup and not just the gate. Behind them sit five 🟠, including one Ryan knowingly accepted
+(empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before the next
+competition* — **that condition is now due**.
+
+The next milestone is the **Premier League 2026/27 season, mid-August**, and on the foundations
+recorded here it is **not reachable**: league scoring and bonuses don't exist, matchweek deadlines
+and auto round-opening don't exist (Decision 7 calls the latter *"a prerequisite, not polish"*), the
+sync cron is still single-tenant on three env globals, and the importer plus migration 024 are
+drafted but uncommitted and unapplied. Almost none of that is blocked on capacity — the **sequencing
+is blocked on four decisions only Ryan can make**: what "archive" means now that migration 025b
+constrains `pools.status` to `('open','completed')`; which engine actually scores the EPL, given the
+07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether
+EPL scope shrinks or the date moves; and whether the post-tournament survey still goes out now that
+it is past its own time box. One standing caveat on everything above: **seven groups of claims here
+depend on production state and cannot be verified from code** — they are listed in the register, and
+unverified is not done.
+
 **Last updated:** 2026-07-25 · Renamed from `ROADMAP.md`; absorbed the product-decision record from
 the multi-sport planning session (8 settled decisions, now under *Project: Multi-sport platform*).
 · **2026-07-12:** full audit against the codebase — completed items moved to per-section **✅
@@ -20,7 +47,9 @@ migrations and git. Four targeted corrections came out of it, each because the d
 a risk: the shadow **read-path cutover and its rollback** were unrecorded, the **podium remediation**
 (~324k pts, 524 pools) was missing entirely, the feedback survey's "blocked on a deploy" line was
 stale, and *Delete Pool* named only the web door — **mobile has a second one**. Other drift found in
-that audit is listed but deliberately not yet actioned; see the end of the register.
+that audit is listed but deliberately not yet actioned; see the end of the register. Also added
+*Where this stands* (above) and *Order of deliveries — proposed* (after the register); the latter is
+a recommendation derived from what this document already records, **not a plan Ryan has agreed**.
 
 ## Projects in this programme
 
@@ -114,6 +143,116 @@ status, in both directions. Awaiting Ryan's call on what to do with each:
 - **A whole project is missing:** pool status → `lifecycle` + `accepting_members` (migrations 025 + 025b, both recorded prod-applied, plus `3d95e5c` / `3a5fa5e` / `10d555c`) has no item here. It is also what created **R10**.
 - **Work sitting in `drafts/` with no item:** `2026-07-25_entry_fee_collection_assessment.md` (a legal/feasibility assessment ending in a recommendation Ryan hasn't ruled on) and `2026-07-19_caching_infrastructure_plan.md`.
 - **Smaller staleness:** the *Recurring each knockout round* section still reads "SF/Final upcoming" ten days after the final; `analytics_read_from_columns` still appears zero times in code (the M4 note is accurate); auto round-opening has no code at all (feeds **R5**).
+
+---
+
+## 🧭 Order of deliveries — **proposed**
+
+> **Proposed, not committed.** This is a recommendation for Ryan, derived from what this document
+> already records — the dependency chain, the risk levels, the prioritisation rule below, and the
+> settled decisions. He has agreed none of it.
+>
+> **No dates.** The only fixed external date in this programme is the **EPL season start**. Everything
+> else is ordered relative to what it depends on, never to a calendar. Effort remains
+> order-of-magnitude, never a commitment.
+
+**Rule applied:** anything that *silently produces wrong data* outranks anything merely missing; then
+`(blast radius × likelihood) ÷ effort` for defects and `(what it unlocks) ÷ effort` for features.
+Where two items are genuinely interchangeable, that is stated rather than resolved into a fake order.
+
+### The sequence
+
+**0 · Send or drop the feedback survey** `Ops` — **R8**, independent of everything below.
+Not a dependency of anything; it sits first only because its value decays and it is already past its
+own time box. The written blocker has cleared (all four commits are on `origin/master`); what remains
+is confirming the deploy is live, which is prod state this document cannot verify.
+
+**1 · Close both *Delete Pool* doors** `Bug` `Data-loss` — **R1**.
+First because it is the only item here where the loss is **already happening and irreversible**: six
+pools destroyed, 458 one tap away, and the mitigation is the cheapest in the register. Web and mobile
+are two separate removals — the zero-deploy policy drop covers web only.
+
+> **🚦 Gate A — what does "archive" mean, given 025b?**
+> The *interim* close does not wait on this. The **durable** fix does: Decision 7 says *archive, not
+> delete*, but migration 025b constrains `pools.status` to `('open','completed')`, so a reversible
+> archive needs either another migration or a ruling that archive **is** `completed` (**R10**).
+> Until Ryan rules, the replacement cannot be specified — only the interim can proceed.
+
+**2 · Collapse the scoring defaults to one constant** `Scoring` — **R3** (carries **R11**).
+Before anything that consumes scoring, because one admin click rescales a live pool ~20×, the answer
+is already settled (Decision 6: 100/75/50 canonical), and it is ~half a day. **Also a Showdown
+dependency:** Decision 6 states comparable scoring across pools is *a hard prerequisite for
+Showdown* — so this precedes Showdown, not merely the backlog.
+*Genuinely close to #1.* Both are one user action away and both are cheap; #1 goes first only because
+its damage cannot be undone, where a rescale can.
+
+> **🚦 Gate B — which engine scores the EPL?**
+> Must be answered **before** league scoring is designed, because the same fix lands in a different
+> codebase depending on the answer: the Node engine (`lib/scoring/*`) or the shadow engine's SQL. The
+> 07-19 cutover left a live kill switch (`prod_scoring_enabled`, `shadow_read_enabled_pools`) whose
+> current values are prod state and unverified here. Related but **not** an EPL gate: shadow still
+> carries the pre-fix podium logic (**R4**) — a league has no podium, so that blocks any *re-cutover*
+> or any future cup, not the EPL itself.
+
+**3 · The league critical path** `Multi-sport` — **R2**, then **R5**. In dependency order:
+
+| Step | Why it must come where it is |
+|---|---|
+| **3a.** A `regular_season` path through the scoring gate **and the price lookup** | Everything downstream is meaningless without it — a league pool that ingests perfectly still scores nothing. |
+| **3b.** Decide the bonus story (build a league bonus path, or ship match-points-only) | `calculateGroupStandingsBonuses` iterates 12 hardcoded groups; a league has none, so today there is no bonus path at all. This is a **scope option for Ryan**, recorded here, not chosen here. |
+| **3c.** Multi-tenant sync — read competition config off the tournament row | Until this lands, the competition *is* three env globals (`sync-fixtures/route.ts:67`); 024 backfills the columns it needs. |
+| **3d.** Apply migration 024 + land the importer | Deliberately **after** 3a. 024 staying uncommitted is currently the only thing preventing a zero-scoring league pool from being creatable at all — both create-pool wizards list tournaments unfiltered, so the `tournaments` row *is* the trigger. Landing the importer first would open that door before scoring can hold it. |
+| **3e.** Matchweek deadlines + **auto round-opening** | Decision 7: *"a prerequisite, not polish"* — the progressive World Cup needed super-admin bulk updates for 7 rounds; the EPL is 38 matchweeks × every pool. |
+| **3f.** Competition-appropriate round labels | Existing item; wording is WC-only today ("Round of 16" vs "Match Week 3"). Cosmetic relative to 3a–3e, so last in the block. |
+
+> **🚦 Gate C — scope, or date?**
+> **R5's position stands: mid-August is not reachable on these foundations.** For it to become
+> reachable, all of 3a, 3c, 3d and a workable answer to 3e would have to be true, with 3b scoped down.
+> A **minimum viable league pool**, as this document describes one, is: fixtures ingested (024 +
+> importer) · a scoring path that prices a regular-season fixture (3a) · per-matchweek deadlines and
+> some way to open them (3e, automated *or* explicitly accepted as manual ops) · one canonical scoring
+> scale (#2). The open scope levers are **bonuses in v1 or not** (3b) and **automated vs manual
+> round-opening** (3e). Which lever moves — or whether the date moves instead — is Ryan's call, and
+> nothing below it can be sequenced until he makes it.
+
+**4 · Empty-bracket bonus gate** `Scoring` — **R6**, accepted-but-due.
+*Order genuinely ambiguous, deliberately not resolved:* the condition Ryan set was "before the next
+competition". If the next competition is the **EPL**, a league has no group standings, so this can
+follow the league path without harm. If any **cup** competition comes first, it must precede it. The
+ordering depends on a fact only Ryan holds — what actually runs next.
+
+**5 · Showdown** `Feature` — gated by #2 (comparable scoring, Decision 6) and by the EPL season
+existing at all. *Avatars v1* gates matchup-card personalisation; *Showdown notifications* is recorded
+as launch-critical for it. Nothing in Showdown can start meaningfully before Gate C is answered.
+
+**6 · Leaderboard precompute (M4 read-path flip) + Phase D** `Infra`.
+Positioned here, not earlier, because it is a **scale** dependency rather than a correctness one — the
+XL→Medium item records Phase D as *"what keeps Medium comfortable at Showdown/EPL scale"*. It should
+precede EPL/Showdown **traffic**, not EPL **correctness**.
+
+**Unsequenced, and deliberately so:**
+
+- **R7 — instrument admin churn.** Not silent-wrongness class, so the rule ranks it below everything
+  above; but its measurement window (the WC→EPL transition) is open **now** and closes at EPL start.
+  It genuinely competes with #3 for attention, and that trade is Ryan's, not a sequencing fact.
+- **R9 — move the repo off iCloud.** ~1 hour, no dependencies, competes with nothing. Worth doing
+  before any long build-and-commit stretch, since it can flip bytes in tracked source.
+- The **Known drift** items above (a missing project, two stale statuses, untracked drafts) — awaiting
+  Ryan's call on each; none of them block delivery.
+
+### Dependencies this ordering surfaced that no item currently states
+
+Recorded here because deriving the sequence exposed them; the items themselves have **not** been
+edited to add them.
+
+1. **R3 is a Showdown dependency, not just a defect.** Decision 6 makes comparable scoring a hard
+   prerequisite for Showdown, but the *Scoring config is internally inconsistent* item never says so.
+2. **Leaderboard precompute is an EPL/Showdown scale dependency.** The XL→Medium item says Phase D is
+   what keeps Medium comfortable at that scale; the *Leaderboard precompute* item itself frames the
+   work only as a June-outage fix.
+3. **R6's position depends on which competition runs next**, because a league has no group standings —
+   the item's "before the next competition" condition is ambiguous in a multi-sport world, and nothing
+   in the document resolves it.
 
 ---
 

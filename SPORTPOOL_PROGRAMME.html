@@ -180,6 +180,31 @@ details.dec .body ul{margin:0; padding-left:18px}
 details.dec .body li{margin:0 0 6px}
 .dec-num{color:var(--slate); font-weight:800; font-size:12px}
 
+/* ---------- delivery order ---------- */
+.step{
+  background:var(--surface); border:1px solid var(--silver); border-left:4px solid var(--primary);
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+}
+.step h4{margin:0 0 7px; font-size:15px; display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+.step .num{
+  background:var(--primary); color:#fff; font-weight:800; font-size:12px; min-width:24px; height:24px;
+  border-radius:7px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px;
+}
+.step p{margin:0 0 7px} .step p:last-child{margin-bottom:0}
+.step.ops{border-left-color:var(--slate)} .step.ops .num{background:var(--slate)}
+.step.crit-step{border-left-color:var(--red)} .step.crit-step .num{background:var(--red)}
+.gate{
+  background:var(--accent-light); border:1px solid var(--accent); border-left:4px solid var(--accent);
+  border-radius:var(--radius); padding:13px 16px; margin:0 0 10px 0; box-shadow:var(--shadow);
+}
+.gate h4{margin:0 0 6px; font-size:14px; letter-spacing:-.1px}
+.gate p{margin:0 0 6px} .gate p:last-child{margin-bottom:0}
+.proposed-banner{
+  background:var(--primary-light); border:1px solid var(--primary); border-radius:var(--radius);
+  padding:13px 16px; margin-bottom:14px;
+}
+.proposed-banner p{margin:0 0 7px} .proposed-banner p:last-child{margin-bottom:0}
+
 footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slate); font-size:12.5px}
 @media (max-width:640px){
   body{font-size:14.5px}
@@ -197,16 +222,19 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>decisions already made</strong>, so they don't get re-litigated. A <em>programme</em>, not a roadmap,
       because SportPool is now several distinct projects running under one banner rather than one ordered list.</p>
     <div class="src">
-      A view of <code>SPORTPOOL_PROGRAMME.md</code> as committed at <code>486430a</code>. The markdown is the source of
-      truth — <strong>if these two ever disagree, the markdown wins.</strong> Last updated 2026-07-26.
+      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>486430a</code> plus the 2026-07-26
+      additions (<em>Where this stands</em> and <em>Order of deliveries</em>), <strong>not yet committed</strong>. The markdown
+      is the source of truth — <strong>if these two ever disagree, the markdown wins.</strong>
     </div>
   </div>
 </header>
 
 <nav class="sticky">
   <div class="wrap">
+    <a href="#summary">Where this stands</a>
     <a href="#status">Status</a>
     <a href="#risks">Risk register</a>
+    <a href="#order">Order of deliveries</a>
     <a href="#projects">Projects</a>
     <a href="#decisions">Settled decisions</a>
     <a href="#now">🔥 Now</a>
@@ -227,6 +255,34 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 </nav>
 
 <main class="wrap">
+
+<!-- ============================ SUMMARY ============================ -->
+<section id="summary">
+  <h2 class="sec">Where this stands</h2>
+  <div class="card crit">
+    <p style="margin:0 0 10px">The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
+      handful of residual bugs. The record itself is current again: the two things this document was missing, the shadow read-path
+      cutover of 2026-07-19 with its rollback and the ~324k-point podium remediation of 2026-07-21, are now written down, so the
+      programme and the code broadly agree for the first time since the final. The picture that leaves is not comfortable.
+      <strong>Two 🔴 risks are live and unmitigated:</strong> an admin tapping <em>Delete Pool</em> still destroys every member's
+      predictions — on <strong>two</strong> surfaces, web and mobile, with six pools already gone — and any Premier League pool created
+      today would score <strong>zero, silently</strong>, because the group/knockout binary is welded into the scoring price lookup and
+      not just the gate. Behind them sit five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on
+      the condition it be fixed <em>before the next competition</em> — <strong>that condition is now due</strong>.</p>
+    <p style="margin:0 0 10px">The next milestone is the <strong>Premier League 2026/27 season, mid-August</strong>, and on the
+      foundations recorded here it is <strong>not reachable</strong>: league scoring and bonuses don't exist, matchweek deadlines and
+      auto round-opening don't exist (Decision 7 calls the latter <em>"a prerequisite, not polish"</em>), the sync cron is still
+      single-tenant on three env globals, and the importer plus migration 024 are drafted but uncommitted and unapplied. Almost none of
+      that is blocked on capacity — the <strong>sequencing is blocked on four decisions only Ryan can make</strong>: what "archive"
+      means now that migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>; which engine actually
+      scores the EPL, given the 07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether
+      EPL scope shrinks or the date moves; and whether the post-tournament survey still goes out now that it is past its own time
+      box.</p>
+    <p style="margin:0">One standing caveat on everything above: <strong>seven groups of claims here depend on production state and
+      cannot be verified from code</strong> — they are listed in <a href="#unverifiable">the register</a>, and unverified is not
+      done.</p>
+  </div>
+</section>
 
 <!-- ============================ STATUS ============================ -->
 <section id="status">
@@ -467,6 +523,161 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         ten days after the final; <code>analytics_read_from_columns</code> still appears zero times in code (the M4 note is
         accurate); auto round-opening has no code at all (feeds <strong>R5</strong>).</li>
     </ul>
+  </div>
+</section>
+
+<!-- ============================ ORDER ============================ -->
+<section id="order">
+  <h2 class="sec">🧭 Order of deliveries — <span style="color:var(--primary)">proposed</span></h2>
+
+  <div class="proposed-banner">
+    <p><strong>Proposed, not committed.</strong> A recommendation for Ryan, derived from what this document already records — the
+      dependency chain, the risk levels, the prioritisation rule below, and the settled decisions. <strong>He has agreed none of
+      it.</strong></p>
+    <p><strong>No dates.</strong> The only fixed external date in this programme is the <strong>EPL season start</strong>. Everything
+      else is ordered relative to what it depends on, never to a calendar. Effort remains order-of-magnitude, never a commitment.</p>
+    <p><strong>Rule applied:</strong> anything that <em>silently produces wrong data</em> outranks anything merely missing; then
+      <code>(blast radius × likelihood) ÷ effort</code> for defects and <code>(what it unlocks) ÷ effort</code> for features. Where two
+      items are genuinely interchangeable, that is stated rather than resolved into a fake order.</p>
+  </div>
+
+  <div class="step ops">
+    <h4><span class="num">0</span> Send or drop the feedback survey <span class="chip cat">Ops</span>
+      <span class="chip lvl-med">R8</span></h4>
+    <p><strong>Independent of everything below.</strong> Not a dependency of anything; it sits first only because its value decays and
+      it is already past its own time box. The written blocker has cleared (all four commits are on <code>origin/master</code>); what
+      remains is confirming the deploy is live, which is prod state this document cannot verify.</p>
+  </div>
+
+  <div class="step crit-step">
+    <h4><span class="num">1</span> Close both <em>Delete Pool</em> doors <span class="chip cat">Bug</span>
+      <span class="chip danger">Data-loss</span> <span class="chip lvl-crit">R1</span></h4>
+    <p>First because it is the only item here where the loss is <strong>already happening and irreversible</strong>: six pools
+      destroyed, 458 one tap away, and the mitigation is the cheapest in the register. Web and mobile are two separate removals — the
+      zero-deploy policy drop covers web only.</p>
+  </div>
+
+  <div class="gate">
+    <h4>🚦 Gate A — what does "archive" mean, given 025b?</h4>
+    <p>The <em>interim</em> close does not wait on this. The <strong>durable</strong> fix does: Decision 7 says <em>archive, not
+      delete</em>, but migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>, so a reversible archive
+      needs either another migration or a ruling that archive <strong>is</strong> <code>completed</code> (<strong>R10</strong>).</p>
+    <p>Until Ryan rules, the replacement cannot be specified — only the interim can proceed.</p>
+  </div>
+
+  <div class="step">
+    <h4><span class="num">2</span> Collapse the scoring defaults to one constant <span class="chip cat">Scoring</span>
+      <span class="chip lvl-high">R3</span> <span class="chip lvl-low">R11</span></h4>
+    <p>Before anything that consumes scoring, because one admin click rescales a live pool ~20×, the answer is already settled
+      (<a href="#d6">Decision 6</a>: 100/75/50 canonical), and it is ~half a day. <strong>Also a Showdown dependency:</strong> Decision 6
+      states comparable scoring across pools is <em>a hard prerequisite for Showdown</em> — so this precedes Showdown, not merely the
+      backlog.</p>
+    <p><em>Genuinely close to #1.</em> Both are one user action away and both are cheap; #1 goes first only because its damage cannot be
+      undone, where a rescale can.</p>
+  </div>
+
+  <div class="gate">
+    <h4>🚦 Gate B — which engine scores the EPL?</h4>
+    <p>Must be answered <strong>before</strong> league scoring is designed, because the same fix lands in a different codebase depending
+      on the answer: the Node engine (<code>lib/scoring/*</code>) or the shadow engine's SQL. The 07-19 cutover left a live kill switch
+      (<code>prod_scoring_enabled</code>, <code>shadow_read_enabled_pools</code>) whose current values are prod state and unverified
+      here.</p>
+    <p>Related but <strong>not</strong> an EPL gate: shadow still carries the pre-fix podium logic (<strong>R4</strong>) — a league has
+      no podium, so that blocks any <em>re-cutover</em> or any future cup, not the EPL itself.</p>
+  </div>
+
+  <div class="step crit-step">
+    <h4><span class="num">3</span> The league critical path <span class="chip cat">Multi-sport</span>
+      <span class="chip lvl-crit">R2</span> <span class="chip lvl-high">R5</span></h4>
+    <p>In dependency order:</p>
+    <div class="scroller" style="margin-top:8px">
+      <table>
+        <thead><tr><th>Step</th><th>Why it must come where it is</th></tr></thead>
+        <tbody>
+          <tr><td><strong>3a.</strong> A <code>regular_season</code> path through the scoring gate <strong>and the price lookup</strong></td>
+            <td>Everything downstream is meaningless without it — a league pool that ingests perfectly still scores nothing.</td></tr>
+          <tr><td><strong>3b.</strong> Decide the bonus story (build a league bonus path, or ship match-points-only)</td>
+            <td><code>calculateGroupStandingsBonuses</code> iterates 12 hardcoded groups; a league has none, so today there is no bonus
+              path at all. This is a <strong>scope option for Ryan</strong>, recorded here, not chosen here.</td></tr>
+          <tr><td><strong>3c.</strong> Multi-tenant sync — read competition config off the tournament row</td>
+            <td>Until this lands, the competition <em>is</em> three env globals (<code>sync-fixtures/route.ts:67</code>); 024 backfills
+              the columns it needs.</td></tr>
+          <tr><td><strong>3d.</strong> Apply migration 024 + land the importer</td>
+            <td>Deliberately <strong>after</strong> 3a. 024 staying uncommitted is currently the only thing preventing a zero-scoring
+              league pool from being creatable at all — both create-pool wizards list tournaments unfiltered, so the
+              <code>tournaments</code> row <em>is</em> the trigger. Landing the importer first would open that door before scoring can
+              hold it.</td></tr>
+          <tr><td><strong>3e.</strong> Matchweek deadlines + <strong>auto round-opening</strong></td>
+            <td>Decision 7: <em>"a prerequisite, not polish"</em> — the progressive World Cup needed super-admin bulk updates for 7
+              rounds; the EPL is 38 matchweeks × every pool.</td></tr>
+          <tr><td><strong>3f.</strong> Competition-appropriate round labels</td>
+            <td>Existing item; wording is WC-only today ("Round of 16" vs "Match Week 3"). Cosmetic relative to 3a–3e, so last in the
+              block.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="gate">
+    <h4>🚦 Gate C — scope, or date?</h4>
+    <p><strong>R5's position stands: mid-August is not reachable on these foundations.</strong> For it to become reachable, all of 3a,
+      3c, 3d and a workable answer to 3e would have to be true, with 3b scoped down.</p>
+    <p>A <strong>minimum viable league pool</strong>, as this document describes one, is: fixtures ingested (024 + importer) · a scoring
+      path that prices a regular-season fixture (3a) · per-matchweek deadlines and some way to open them (3e, automated <em>or</em>
+      explicitly accepted as manual ops) · one canonical scoring scale (#2).</p>
+    <p>The open scope levers are <strong>bonuses in v1 or not</strong> (3b) and <strong>automated vs manual round-opening</strong> (3e).
+      Which lever moves — or whether the date moves instead — is Ryan's call, and nothing below it can be sequenced until he makes
+      it.</p>
+  </div>
+
+  <div class="step">
+    <h4><span class="num">4</span> Empty-bracket bonus gate <span class="chip cat">Scoring</span>
+      <span class="chip lvl-high">R6 · accepted, due</span></h4>
+    <p><em>Order genuinely ambiguous, deliberately not resolved:</em> the condition Ryan set was "before the next competition". If the
+      next competition is the <strong>EPL</strong>, a league has no group standings, so this can follow the league path without harm. If
+      any <strong>cup</strong> competition comes first, it must precede it. The ordering depends on a fact only Ryan holds — what
+      actually runs next.</p>
+  </div>
+
+  <div class="step">
+    <h4><span class="num">5</span> Showdown <span class="chip cat">Feature</span></h4>
+    <p>Gated by #2 (comparable scoring, <a href="#d6">Decision 6</a>) and by the EPL season existing at all. <em>Avatars v1</em> gates
+      matchup-card personalisation; <em>Showdown notifications</em> is recorded as launch-critical for it. Nothing in Showdown can start
+      meaningfully before Gate C is answered.</p>
+  </div>
+
+  <div class="step">
+    <h4><span class="num">6</span> Leaderboard precompute (M4 read-path flip) + Phase D <span class="chip cat">Infra</span></h4>
+    <p>Positioned here, not earlier, because it is a <strong>scale</strong> dependency rather than a correctness one — the XL→Medium item
+      records Phase D as <em>"what keeps Medium comfortable at Showdown/EPL scale"</em>. It should precede EPL/Showdown
+      <strong>traffic</strong>, not EPL <strong>correctness</strong>.</p>
+  </div>
+
+  <h3 class="grp">Unsequenced, and deliberately so</h3>
+  <div class="card neutral">
+    <ul>
+      <li><strong>R7 — instrument admin churn.</strong> Not silent-wrongness class, so the rule ranks it below everything above; but its
+        measurement window (the WC→EPL transition) is open <strong>now</strong> and closes at EPL start. It genuinely competes with #3 for
+        attention, and that trade is Ryan's, not a sequencing fact.</li>
+      <li><strong>R9 — move the repo off iCloud.</strong> ~1 hour, no dependencies, competes with nothing. Worth doing before any long
+        build-and-commit stretch, since it can flip bytes in tracked source.</li>
+      <li>The <a href="#risks">Known drift</a> items (a missing project, two stale statuses, untracked drafts) — awaiting Ryan's call on
+        each; none of them block delivery.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">Dependencies this ordering surfaced that no item currently states</h3>
+  <div class="card warnc">
+    <p style="margin:0 0 9px">Recorded here because deriving the sequence exposed them; the items themselves have <strong>not</strong>
+      been edited to add them.</p>
+    <ol>
+      <li><strong>R3 is a Showdown dependency, not just a defect.</strong> Decision 6 makes comparable scoring a hard prerequisite for
+        Showdown, but the <a href="#i-scoring-config">Scoring config is internally inconsistent</a> item never says so.</li>
+      <li><strong>Leaderboard precompute is an EPL/Showdown scale dependency.</strong> The XL→Medium item says Phase D is what keeps
+        Medium comfortable at that scale; the <em>Leaderboard precompute</em> item itself frames the work only as a June-outage fix.</li>
+      <li><strong>R6's position depends on which competition runs next</strong>, because a league has no group standings — the item's
+        "before the next competition" condition is ambiguous in a multi-sport world, and nothing in the document resolves it.</li>
+    </ol>
   </div>
 </section>
 
@@ -2249,9 +2460,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <h3 class="grp">About this file</h3>
   <div class="card neutral">
-    <p style="margin:0 0 6px">A view of <code>SPORTPOOL_PROGRAMME.md</code> at commit <code>486430a</code>, generated 2026-07-26. It is
-      updated in the same piece of work as the markdown, never as a follow-up — a stale view is worse than no view, because it looks
-      authoritative.</p>
+    <p style="margin:0 0 6px">A view of <code>SPORTPOOL_PROGRAMME.md</code> as it stands in the working copy — commit
+      <code>486430a</code> plus the uncommitted 2026-07-26 additions (<a href="#summary">Where this stands</a>,
+      <a href="#order">Order of deliveries</a>). It is updated in the same piece of work as the markdown, never as a follow-up — a stale
+      view is worse than no view, because it looks authoritative.</p>
     <p style="margin:0">Self-contained by design: no CDN, no external fonts, no images, no network calls. Colour tokens are SportPool's own,
       from <code>mobile/theme/colors.ts</code>, with light and dark handled by <code>prefers-color-scheme</code>.</p>
   </div>
