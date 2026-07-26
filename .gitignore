@@ -36,8 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
-# claude code
-.claude/
+# claude code — local settings stay private, shared agent definitions are versioned.
+# NOTE: must be `.claude/*` not `.claude/`; git won't descend into an ignored
+# directory, so a negation inside it would never match.
+.claude/*
+!.claude/agents/
 
 # operational send ledgers — contain real recipient email addresses, never commit
 scripts/.followup_send_ledger.jsonl
