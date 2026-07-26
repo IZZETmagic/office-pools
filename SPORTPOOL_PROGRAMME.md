@@ -14,24 +14,29 @@ The World Cup shipped, completed, and is nearly wound down — what's left of it
 handful of residual bugs. The record itself is current again: the two things this document was
 missing, the shadow read-path cutover of 2026-07-19 with its rollback and the ~324k-point podium
 remediation of 2026-07-21, are now written down, so the programme and the code broadly agree for the
-first time since the final. The picture that leaves is not comfortable. **Two 🔴 risks are live and
-unmitigated:** an admin tapping *Delete Pool* still destroys every member's predictions — on **two**
-surfaces, web and mobile, with six pools already gone — and any Premier League pool created today
-would score **zero, silently**, because the group/knockout binary is welded into the scoring price
-lookup and not just the gate. Behind them sit five 🟠, including one Ryan knowingly accepted
-(empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before the next
-competition* — **that condition is now due**.
+first time since the final. The picture that leaves is not comfortable. **Three 🔴 risks are live and
+unmitigated.** Two of them are the same structural failure: **this product has no soft-delete
+anywhere**, and `pool_entries` carries 21 cascading children — so an admin tapping *Delete Pool*
+destroys every member's predictions (two surfaces, six pools already gone), and *any* membership
+exit — leaving, being removed, deleting an account, stop-participating — permanently purges the
+entry, every prediction, every derived score and the append-only badge history, with **no application
+code involved in three of the four paths** and **no count of how often it has already happened**. The
+third is that any Premier League pool created today would score **zero, silently**, because the
+group/knockout binary is welded into the scoring price lookup and not just the gate. Behind them sit
+five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the
+condition it be fixed *before the next competition* — **that condition is now due**.
 
 The next milestone is the **Premier League 2026/27 season, mid-August**, and on the foundations
 recorded here it is **not reachable**: league scoring and bonuses don't exist, matchweek deadlines
 and auto round-opening don't exist (Decision 7 calls the latter *"a prerequisite, not polish"*), the
 sync cron is still single-tenant on three env globals, and the importer plus migration 024 are
 drafted but uncommitted and unapplied. Almost none of that is blocked on capacity — the **sequencing
-is blocked on four decisions only Ryan can make**: what "archive" means now that migration 025b
-constrains `pools.status` to `('open','completed')`; which engine actually scores the EPL, given the
-07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether
-EPL scope shrinks or the date moves; and whether the post-tournament survey still goes out now that
-it is past its own time box. One standing caveat on everything above: **seven groups of claims here
+is blocked on five decisions only Ryan can make**: what "archive" means now that migration 025b
+constrains `pools.status` to `('open','completed')`; **what leaving a pool should do to a member's
+history**, now that we know it purges it; which engine actually scores the EPL, given the 07-19
+cutover left a live kill switch whose current flag values cannot be read from the repo; whether EPL
+scope shrinks or the date moves; and whether the post-tournament survey still goes out now that it is
+past its own time box. One standing caveat on everything above: **seven groups of claims here
 depend on production state and cannot be verified from code** — they are listed in the register, and
 unverified is not done.
 
@@ -50,6 +55,10 @@ stale, and *Delete Pool* named only the web door — **mobile has a second one**
 that audit is listed but deliberately not yet actioned; see the end of the register. Also added
 *Where this stands* (above) and *Order of deliveries — proposed* (after the register); the latter is
 a recommendation derived from what this document already records, **not a plan Ryan has agreed**.
+· **2026-07-26 (later):** added **R12** — every membership-exit path permanently purges the entry
+through a **21-table cascade**, with no soft-delete anywhere. R1 was scoped to pool destruction and
+the two are cross-linked under *The destruction class*. New **Gate A2** (what leaving should do to a
+member's history) is open and unanswered.
 
 ## Projects in this programme
 
@@ -104,9 +113,18 @@ outranks anything that is merely missing; after that, `(blast radius × likeliho
 wrongness is this codebase's recurring failure mode — zero-scoring leagues, a truncated email
 segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 
+> **R1 and R12 share one root cause: there is no soft-delete anywhere in this product.** Every exit
+> path is a hard `DELETE`, and `pool_entries` carries **21 `ON DELETE CASCADE` children**, so removing
+> a single row destroys the entry, every original prediction, every derived score, and the badge
+> history. They are listed separately because they have different actors, different triggers,
+> different mitigations and different evidence: R1 has a documented incident count, R12 has **none at
+> all**. Merging them would let R1's evidence vouch for R12's, or R12's unknown dilute R1's. See
+> *The destruction class* below the table.
+
 | # | Risk | Level | Blast radius | Trigger | Mitigation status | Ryan's call | Backlog item |
 |---|---|---|---|---|---|---|---|
-| **R1** | **"Delete Pool" destroys members' predictions.** Web runs five un-transactional deletes from the browser against an asymmetric RLS pair; **mobile is a second, separate door** — a single `supabase.from('pools').delete()` (`mobile/components/pool-detail/SettingsTab.tsx:222`) | 🔴 | **6 pools / 41 entries already destroyed**, earliest in June. **458 pools with an admin** are one tap away, of 623 live | One admin tap, on **either** platform. Elevated now — post-tournament tidying | **None applied.** The zero-deploy policy drop is identified, not run — and it covers the **web** door only | Documented-only 2026-07-21; *archive, not delete* decided 2026-07-25 — **not implemented** | *"Delete Pool" destroys every member's predictions* (🔥 Now) |
+| **R1** | **"Delete Pool" destroys members' predictions.** Web runs five un-transactional deletes from the browser against an asymmetric RLS pair; **mobile is a second, separate door** — a single `supabase.from('pools').delete()` (`mobile/components/pool-detail/SettingsTab.tsx:222`). Scope of this row is **pool destruction**; membership exit is **R12** | 🔴 | **6 pools / 41 entries already destroyed**, earliest in June. **458 pools with an admin** are one tap away, of 623 live | One admin tap, on **either** platform. Elevated now — post-tournament tidying | **None applied.** The zero-deploy policy drop is identified, not run — and it covers the **web** door only | Documented-only 2026-07-21; *archive, not delete* decided 2026-07-25 — **not implemented** | *"Delete Pool" destroys every member's predictions* (🔥 Now) |
+| **R12** | **Every membership-exit path permanently purges the entry.** Leaving a pool, being removed, deleting an account, or "stop participating" all end in a hard delete that cascades through **21 tables** — predictions, all derived scores, `point_adjustments`, and `badge_unlocks`. **Three of the four doors contain no delete of entries or predictions in application code at all**; the destruction is entirely the DB cascade, which is why it is invisible from the route. `badge_unlocks` is designed as an **append-only permanent record** and cascades away with the entry — the permanent record is not permanent | 🔴 | ⚠️ **Unverified — no count exists.** Unlike R1 there is **no documented incident**, which is not evidence it hasn't been happening: nobody has looked. Requires a production query. Structurally the exposure is *every member who has ever left, been removed, or deleted their account*, across 623 pools | Four doors: **(1)** self-leave · **(2)** admin removes a member · **(3)** account deletion (cascades from `users`) · **(4)** "stop participating". Doors 1–3 are ordinary product actions available to any user | **None.** No soft-delete exists anywhere (0 `deleted_at`/`is_deleted` references in `app/`, `lib/`, `mobile/` — verified 2026-07-26) | **New — no call made.** Ryan's stated position 2026-07-26 is that this *should not happen either*. That is a direction, not yet a decision: see the open question in *Order of deliveries* → Gate A2 | **None** — this risk has no backlog item yet |
 | **R2** | **A league pool scores zero, silently.** Not just the gate: `full.ts:89` / `progressive.ts:110` source predicted teams from a WC-shaped `knockoutTeamMap`, so a `regular_season` fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`), so a league pool has no bonus path either | 🔴 | **100% of points** in every EPL pool; scoring trust in the flagship next season | Creating an EPL `tournaments` row — **both create-pool wizards list tournaments unfiltered** (`components/pools/CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`), so the row alone makes league pools creatable | **None.** Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a safety catch, not a plan | Recognised in the item; not scoped or scheduled | *League ingestion (Premier League)* (Multi-sport → Foundational) |
 | **R3** | **Three scoring default sets disagree; "Reset to defaults" rescales a live pool ~20×.** create = `group_exact_score: 100`, reset button = `5`, `bonus_champion_correct` stays `1000` | 🟠 | Any of **623 live pools**; one click turns 103 fixtures into decoration. Reset ladder is also non-monotonic (SF < QF) | An admin presses **Reset to defaults** on a live pool | None | **Decided 2026-07-25** (100/75/50 canonical, delete the dead bonuses, fix the ladder) — unimplemented, ~half a day | *Scoring config is internally inconsistent* (🔥 Now); Decision 6 |
 | **R4** | **Shadow/prod podium divergence, behind an undocumented live kill switch.** Prod now *derives* the podium from completed matches (`lib/podium.ts`); the shadow bonus SQL still `JOIN`s `tournament_awards` (`drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164`) — **the same root cause prod just paid ~324k points to fix** | 🟠 | Last occurrence: **669 rows / ~324,375 pts**, concentrated in ~73 pools; 50 changed rank, **13 changed their #1** | Re-enabling shadow reads, or shadow scoring any competition that has a podium | Prod fixed and re-scored; **shadow not fixed**. Current `sync_settings` flag values unverified | No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26 | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped) |
@@ -117,6 +135,42 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done | *iCloud corrupts the local checkout* (🧹 Housekeeping) |
 | **R10** | **The archive decision conflicts with the shipped schema.** Migration 025b constrains `pools.status` to `('open','completed')`, so an `archived` state is impossible without another migration; today's "Archive Pool" button just sets `completed` | 🟡 | Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on | Implementing the archive decision | None — needs either a migration or a ruling that archive *means* `completed` | Unrecognised conflict; needs a ruling before R1's proper fix is built | Decision 7 *"Archive, not delete"*; *"Delete Pool" destroys…* |
 | **R11** | **Dead scoring knobs are editable on mobile.** `bonus_best_player_correct` / `bonus_top_scorer_correct` are read by zero scoring code | 🟢 | A mobile admin can set a value that can never pay out; members see it in the pool's rules | Any admin opening mobile scoring config | Web is honest (greyed *"Coming Soon"*); **mobile is not** (`mobile/app/pool/[id]/scoring-config.tsx:442`) | Covered by the Decision-6 deletion, unimplemented | *Scoring config is internally inconsistent*, defect 4 |
+
+### The destruction class — four doors to one purge (R1 · R12)
+
+Recorded 2026-07-26. **Provenance matters here and is marked per line:** the schema facts were verified
+against the production schema (`pg_constraint`) by Ryan's side and **cannot be re-verified from this
+repo**; the route facts below I read in the code myself on 2026-07-26.
+
+**The cascade chain** *(prod schema — inherited, not re-verified here)*: `pool_members` → `pool_entries`
+via `pool_entries_member_id_fkey ... ON DELETE CASCADE`. From `pool_entries`, **21 tables** cascade:
+`predictions`, `group_predictions`, `special_predictions`, `bracket_picker_knockout_picks`,
+`bracket_picker_group_rankings`, `bracket_picker_third_place_rankings`, `entry_round_submissions`,
+`match_scores`, `bonus_scores`, `player_scores`, `point_adjustments`, `badge_unlocks`,
+`entry_xp_state`, plus **8 `shadow_*` tables**.
+
+| Door | Path | What the application code does | Verified |
+|---|---|---|---|
+| **1. Self-leave** | `app/api/pools/[pool_id]/leave/route.ts:80-82` | Deletes the `pool_members` row and **nothing else** — the file's only `.delete()`. All destruction is the DB cascade | ✅ read in code 2026-07-26 |
+| **2. Admin removes a member** | Direct delete on `pool_members` | Same cascade | Inherited — I did **not** locate the call site in this pass; no file:line asserted |
+| **3. Account deletion** | `pool_members_user_id_fkey ... ON DELETE CASCADE` from `users` | Purges that person's entries in **every** pool | Inherited (prod schema) |
+| **4. Stop participating** | `app/api/pools/[pool_id]/stop-participating/route.ts:59` | Deletes the caller's `pool_entries` directly; membership row is preserved. Same 21-table cascade | ✅ read in code 2026-07-26 |
+
+**The cascade is known, but undercounted in the code's own documentation.** The comment at
+`stop-participating/route.ts:15` reads *"pool_entries has 12 cascade children"* — and the same "12"
+is repeated at `:52`. It is now **21**; the `shadow_*` tables were added later and neither comment was
+updated. Whoever reasons about blast radius from that comment will be reasoning from a number that is
+**43% low**.
+
+**Why this reads worse than R1 in one specific way:** R1 is an admin destroying *other people's* data
+and we know it has happened six times. R12 fires on ordinary actions — leaving a pool is a shipped,
+member-facing feature — and **nobody has ever counted it**. The absence of an incident count is not
+an absence of incidents.
+
+*(Level note: R12 is set 🔴 because the mechanism is live, irreversible, reachable by any user, and
+erases a record designed to be permanent. There is an argument that door 1 is consented — the user
+did choose to leave — which would pull it down. That argument turns on the open question in Gate A2
+and is Ryan's to settle, not mine.)*
 
 ### ⚠️ Unverifiable without prod access
 
@@ -131,6 +185,7 @@ recorded them — **treat them as unverified, not as done**:
 - The **RLS policy bodies** behind the delete asymmetry, and the FK cascade definitions behind mobile's `pools` delete — both taken from `drafts/2026-07-21_delete_pool_data_loss.md`, not re-introspected — R1.
 - The counts **6 destroyed / 458 exposed**, the audience sizes **477 / 3,652**, and the **~243k pts / 155 entries** inflation measurement — all prod queries from their source drafts.
 - Presence of `badge_unlocks` (+ its backfill) and the `trg_enforce_prediction_before_kickoff` trigger.
+- **R12's blast radius — no count exists at all.** How many entries have already been purged by leave / removal / account deletion / stop-participating is **unknown and unmeasured**; it needs a production query (e.g. `pool_membership_events` rows of type `left`/`removed` against surviving entries). The 21-table cascade itself is also prod-schema-verified by Ryan's side, **not** re-verifiable from this repo — only the two route files are.
 
 **Anything not on this list, and not marked unverified inline, was read in the code on 2026-07-26.**
 
@@ -167,16 +222,41 @@ Not a dependency of anything; it sits first only because its value decays and it
 own time box. The written blocker has cleared (all four commits are on `origin/master`); what remains
 is confirming the deploy is live, which is prod state this document cannot verify.
 
-**1 · Close both *Delete Pool* doors** `Bug` `Data-loss` — **R1**.
-First because it is the only item here where the loss is **already happening and irreversible**: six
-pools destroyed, 458 one tap away, and the mitigation is the cheapest in the register. Web and mobile
-are two separate removals — the zero-deploy policy drop covers web only.
+**1 · Stop the irreversible deletion paths** `Bug` `Data-loss` — **R1** *(2 doors)* + **R12**
+*(4 doors)*.
+First because this is the only place in the programme where the loss is **already happening and
+cannot be undone** — everything else below produces wrong numbers, which can be recomputed.
+The two halves are **not** equally actionable, and that difference drives the order inside this step:
+
+- **R1 has a cheap interim available now** — drop the policy (web) and remove the mobile button. Six
+  pools destroyed, 458 one tap away, and it is the lowest-effort mitigation in the register.
+- **R12 has no interim identified.** The destruction is a schema property, not application logic —
+  three of its four doors contain no delete of entries or predictions in code at all. There is no
+  button to remove and no policy to drop; anything real here is a schema change (soft-delete,
+  retention, or re-pointed FKs), and its *shape* depends on Gate A2 below.
+- **Counting first is cheap and unblocked.** R12's blast radius is unknown because nobody has
+  queried it. That query needs no decision from anyone and would tell us whether this is a live wound
+  or a latent one — which is exactly what the level and the urgency turn on.
 
 > **🚦 Gate A — what does "archive" mean, given 025b?**
 > The *interim* close does not wait on this. The **durable** fix does: Decision 7 says *archive, not
 > delete*, but migration 025b constrains `pools.status` to `('open','completed')`, so a reversible
 > archive needs either another migration or a ruling that archive **is** `completed` (**R10**).
 > Until Ryan rules, the replacement cannot be specified — only the interim can proceed.
+
+> **🚦 Gate A2 — what should leaving a pool do to a member's history?** *(new 2026-07-26)*
+> **Gate A does not cover this**, and that is the point: Gate A is about a *pool* ending, A2 is about a
+> *person* exiting one that continues. Ryan's stated direction is that entries should not be purged
+> on exit; the direction does not yet say what replaces it, and the options differ enough that the
+> fix cannot be specified without an answer — soft-delete the entry, retain it and only hide it from
+> the leaderboard, or retain the history while releasing the seat. Each implies a different schema
+> change, a different answer for what the leaderboard shows afterwards, and a different position on
+> whether a departed member's picks stay visible to the pool.
+> Two sub-questions ride on it, both currently unanswered:
+> **(a)** does self-leave count as consent to erasure, where admin-removal and account-deletion
+> plainly do not? **(b)** does account deletion — a likely privacy/erasure obligation — need a
+> *different* answer from the other three doors?
+> **Surfaced, not answered.** Until this is ruled, R12 has no specifiable fix and stays open.
 
 **2 · Collapse the scoring defaults to one constant** `Scoring` — **R3** (carries **R11**).
 Before anything that consumes scoring, because one admin click rescales a live pool ~20×, the answer
@@ -253,6 +333,11 @@ edited to add them.
 3. **R6's position depends on which competition runs next**, because a league has no group standings —
    the item's "before the next competition" condition is ambiguous in a multi-sport world, and nothing
    in the document resolves it.
+4. **Crews (Decision 1) are in direct tension with the cascade (R12).** Decision 1 settles that a crew
+   *"keeps history — all-time record, past seasons, rivalries"* and that removal means *"stops getting
+   invited, not erased"*. The schema does the opposite today: exit erases. Recorded as a surfaced
+   conflict, **not** a challenge to Decision 1 — the decision stands; it is the implementation that
+   contradicts it, and Gate A2 is where that gets reconciled.
 
 ---
 

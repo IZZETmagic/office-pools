@@ -264,20 +264,24 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       handful of residual bugs. The record itself is current again: the two things this document was missing, the shadow read-path
       cutover of 2026-07-19 with its rollback and the ~324k-point podium remediation of 2026-07-21, are now written down, so the
       programme and the code broadly agree for the first time since the final. The picture that leaves is not comfortable.
-      <strong>Two 🔴 risks are live and unmitigated:</strong> an admin tapping <em>Delete Pool</em> still destroys every member's
-      predictions — on <strong>two</strong> surfaces, web and mobile, with six pools already gone — and any Premier League pool created
-      today would score <strong>zero, silently</strong>, because the group/knockout binary is welded into the scoring price lookup and
-      not just the gate. Behind them sit five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on
-      the condition it be fixed <em>before the next competition</em> — <strong>that condition is now due</strong>.</p>
+      <strong>Three 🔴 risks are live and unmitigated.</strong> Two of them are the same structural failure: <strong>this product has no
+      soft-delete anywhere</strong>, and <code>pool_entries</code> carries 21 cascading children — so an admin tapping <em>Delete
+      Pool</em> destroys every member's predictions (two surfaces, six pools already gone), and <em>any</em> membership exit — leaving,
+      being removed, deleting an account, stop-participating — permanently purges the entry, every prediction, every derived score and
+      the append-only badge history, with <strong>no application code involved in three of the four paths</strong> and <strong>no count
+      of how often it has already happened</strong>. The third is that any Premier League pool created today would score
+      <strong>zero, silently</strong>, because the group/knockout binary is welded into the scoring price lookup and not just the gate.
+      Behind them sit five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be
+      fixed <em>before the next competition</em> — <strong>that condition is now due</strong>.</p>
     <p style="margin:0 0 10px">The next milestone is the <strong>Premier League 2026/27 season, mid-August</strong>, and on the
       foundations recorded here it is <strong>not reachable</strong>: league scoring and bonuses don't exist, matchweek deadlines and
       auto round-opening don't exist (Decision 7 calls the latter <em>"a prerequisite, not polish"</em>), the sync cron is still
       single-tenant on three env globals, and the importer plus migration 024 are drafted but uncommitted and unapplied. Almost none of
-      that is blocked on capacity — the <strong>sequencing is blocked on four decisions only Ryan can make</strong>: what "archive"
-      means now that migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>; which engine actually
-      scores the EPL, given the 07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether
-      EPL scope shrinks or the date moves; and whether the post-tournament survey still goes out now that it is past its own time
-      box.</p>
+      that is blocked on capacity — the <strong>sequencing is blocked on five decisions only Ryan can make</strong>: what "archive"
+      means now that migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>; <strong>what leaving a
+      pool should do to a member's history</strong>, now that we know it purges it; which engine actually scores the EPL, given the
+      07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether EPL scope shrinks or the
+      date moves; and whether the post-tournament survey still goes out now that it is past its own time box.</p>
     <p style="margin:0">One standing caveat on everything above: <strong>seven groups of claims here depend on production state and
       cannot be verified from code</strong> — they are listed in <a href="#unverifiable">the register</a>, and unverified is not
       done.</p>
@@ -289,7 +293,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <h2 class="sec">Status at a glance</h2>
   <p class="sec-sub">Counts are of what this document records, on 2026-07-26. Risk levels are defined in the register below.</p>
   <div class="strip">
-    <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
+    <div class="stat crit"><div class="n">3</div><div class="l">🔴 Critical risks</div></div>
     <div class="stat high"><div class="n">5</div><div class="l">🟠 High risks</div></div>
     <div class="stat med"><div class="n">3</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">1</div><div class="l">🟢 Low risks</div></div>
@@ -297,16 +301,17 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <div class="stat neu"><div class="n">6</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">8</div><div class="l">Settled decisions</div></div>
     <div class="stat neu"><div class="n">6</div><div class="l">Still-open questions</div></div>
-    <div class="stat neu"><div class="n">7</div><div class="l">Unverified claim groups</div></div>
+    <div class="stat neu"><div class="n">8</div><div class="l">Unverified claim groups</div></div>
   </div>
   <p class="strip-note">Two risks are marked as already carrying a decision from Ryan: <strong>R6</strong> (accepted /
     deferred 2026-07-21, on a condition that is now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented).
-    An accepted risk stays on the register — it is not closed.</p>
+    An accepted risk stays on the register — it is not closed. <strong>R12</strong> is new (2026-07-26) and carries no call yet;
+    its blast radius is <strong>uncounted</strong>, not small.</p>
 </section>
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R11</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R12</span></h2>
   <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
     code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
     whether Ryan has already called it</strong>, plus the backlog item it maps onto so the register and the backlog
@@ -323,6 +328,15 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       rescale, phantom bonuses, predictions destroyed by a delete.</p>
   </div>
 
+  <div class="note danger" style="margin-bottom:14px">
+    <strong>R1 and R12 share one root cause: there is no soft-delete anywhere in this product.</strong> Every exit path is a hard
+    <code>DELETE</code>, and <code>pool_entries</code> carries <strong>21 <code>ON DELETE CASCADE</code> children</strong>, so removing a
+    single row destroys the entry, every original prediction, every derived score, and the badge history. They are listed separately
+    because they have different actors, different triggers, different mitigations and different evidence: R1 has a documented incident
+    count, R12 has <strong>none at all</strong>. Merging them would let R1's evidence vouch for R12's, or R12's unknown dilute R1's. See
+    <a href="#destruction-class">The destruction class</a> below the table.
+  </div>
+
   <div class="scroller">
   <table class="risk">
     <thead>
@@ -336,7 +350,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td class="id">R1</td>
         <td><strong>"Delete Pool" destroys members' predictions.</strong> Web runs five un-transactional deletes from the
           browser against an asymmetric RLS pair; <strong>mobile is a second, separate door</strong> — a single
-          <code>supabase.from('pools').delete()</code> (<code>mobile/components/pool-detail/SettingsTab.tsx:222</code>)</td>
+          <code>supabase.from('pools').delete()</code> (<code>mobile/components/pool-detail/SettingsTab.tsx:222</code>).
+          Scope of this row is <strong>pool destruction</strong>; membership exit is <strong>R12</strong></td>
         <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
         <td class="blast"><strong>6 pools / 41 entries already destroyed</strong>, earliest in June.
           <strong>458 pools with an admin</strong> are one tap away, of 623 live</td>
@@ -477,8 +492,74 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td>Covered by the Decision-6 deletion, unimplemented</td>
         <td><a href="#i-scoring-config">Scoring config is internally inconsistent</a>, defect 4</td>
       </tr>
+      <tr class="risk-crit">
+        <td class="id">R12</td>
+        <td><strong>Every membership-exit path permanently purges the entry.</strong> Leaving a pool, being removed, deleting an account,
+          or "stop participating" all end in a hard delete that cascades through <strong>21 tables</strong> — predictions, all derived
+          scores, <code>point_adjustments</code>, and <code>badge_unlocks</code>. <strong>Three of the four doors contain no delete of
+          entries or predictions in application code at all</strong>; the destruction is entirely the DB cascade, which is why it is
+          invisible from the route. <code>badge_unlocks</code> is designed as an <strong>append-only permanent record</strong> and
+          cascades away with the entry — the permanent record is not permanent</td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast">⚠️ <strong>Unverified — no count exists.</strong> Unlike R1 there is <strong>no documented incident</strong>,
+          which is not evidence it hasn't been happening: nobody has looked. Requires a production query. Structurally the exposure is
+          <em>every member who has ever left, been removed, or deleted their account</em>, across 623 pools</td>
+        <td>Four doors: <strong>(1)</strong> self-leave · <strong>(2)</strong> admin removes a member · <strong>(3)</strong> account
+          deletion (cascades from <code>users</code>) · <strong>(4)</strong> "stop participating". Doors 1–3 are ordinary product actions
+          available to any user</td>
+        <td><strong>None.</strong> No soft-delete exists anywhere (0 <code>deleted_at</code>/<code>is_deleted</code> references in
+          <code>app/</code>, <code>lib/</code>, <code>mobile/</code> — verified 2026-07-26)</td>
+        <td><strong>New — no call made.</strong> Ryan's stated position 2026-07-26 is that this <em>should not happen either</em>. That is
+          a direction, not yet a decision: see <a href="#gate-a2">Gate A2</a></td>
+        <td><strong>None</strong> — this risk has no backlog item yet</td>
+      </tr>
     </tbody>
   </table>
+  </div>
+
+  <h3 class="grp" id="destruction-class">The destruction class — four doors to one purge (R1 · R12)</h3>
+  <div class="card crit">
+    <p style="margin:0 0 10px">Recorded 2026-07-26. <strong>Provenance matters here and is marked per line:</strong> the schema facts
+      were verified against the production schema (<code>pg_constraint</code>) by Ryan's side and <strong>cannot be re-verified from
+      this repo</strong>; the route facts below I read in the code myself on 2026-07-26.</p>
+    <p style="margin:0 0 10px"><strong>The cascade chain</strong> <em>(prod schema — inherited, not re-verified here)</em>:
+      <code>pool_members</code> → <code>pool_entries</code> via <code>pool_entries_member_id_fkey ... ON DELETE CASCADE</code>. From
+      <code>pool_entries</code>, <strong>21 tables</strong> cascade: <code>predictions</code>, <code>group_predictions</code>,
+      <code>special_predictions</code>, <code>bracket_picker_knockout_picks</code>, <code>bracket_picker_group_rankings</code>,
+      <code>bracket_picker_third_place_rankings</code>, <code>entry_round_submissions</code>, <code>match_scores</code>,
+      <code>bonus_scores</code>, <code>player_scores</code>, <code>point_adjustments</code>, <code>badge_unlocks</code>,
+      <code>entry_xp_state</code>, plus <strong>8 <code>shadow_*</code> tables</strong>.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Door</th><th>Path</th><th>What the application code does</th><th>Verified</th></tr></thead>
+        <tbody>
+          <tr><td><strong>1. Self-leave</strong></td><td><code>app/api/pools/[pool_id]/leave/route.ts:80-82</code></td>
+            <td>Deletes the <code>pool_members</code> row and <strong>nothing else</strong> — the file's only <code>.delete()</code>. All
+              destruction is the DB cascade</td><td>✅ read in code 2026-07-26</td></tr>
+          <tr><td><strong>2. Admin removes a member</strong></td><td>Direct delete on <code>pool_members</code></td>
+            <td>Same cascade</td><td>Inherited — I did <strong>not</strong> locate the call site in this pass; no file:line asserted</td></tr>
+          <tr><td><strong>3. Account deletion</strong></td>
+            <td><code>pool_members_user_id_fkey ... ON DELETE CASCADE</code> from <code>users</code></td>
+            <td>Purges that person's entries in <strong>every</strong> pool</td><td>Inherited (prod schema)</td></tr>
+          <tr><td><strong>4. Stop participating</strong></td>
+            <td><code>app/api/pools/[pool_id]/stop-participating/route.ts:59</code></td>
+            <td>Deletes the caller's <code>pool_entries</code> directly; membership row is preserved. Same 21-table cascade</td>
+            <td>✅ read in code 2026-07-26</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:10px 0 0"><strong>The cascade is known, but undercounted in the code's own documentation.</strong> The comment at
+      <code>stop-participating/route.ts:15</code> reads <em>"pool_entries has 12 cascade children"</em> — and the same "12" is repeated at
+      <code>:52</code>. It is now <strong>21</strong>; the <code>shadow_*</code> tables were added later and neither comment was updated.
+      Whoever reasons about blast radius from that comment will be reasoning from a number that is <strong>43% low</strong>.</p>
+    <p style="margin:10px 0 0"><strong>Why this reads worse than R1 in one specific way:</strong> R1 is an admin destroying <em>other
+      people's</em> data and we know it has happened six times. R12 fires on ordinary actions — leaving a pool is a shipped,
+      member-facing feature — and <strong>nobody has ever counted it</strong>. The absence of an incident count is not an absence of
+      incidents.</p>
+    <div class="note" style="margin-bottom:0"><em>Level note:</em> R12 is set 🔴 because the mechanism is live, irreversible, reachable by
+      any user, and erases a record designed to be permanent. There is an argument that door 1 is consented — the user did choose to
+      leave — which would pull it down. That argument turns on the open question in <a href="#gate-a2">Gate A2</a> and is Ryan's to
+      settle, not mine.</div>
   </div>
 
   <h3 class="grp" id="unverifiable">⚠️ Unverifiable without prod access</h3>
@@ -499,6 +580,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li>The counts <strong>6 destroyed / 458 exposed</strong>, the audience sizes <strong>477 / 3,652</strong>, and the
         <strong>~243k pts / 155 entries</strong> inflation measurement — all prod queries from their source drafts.</li>
       <li>Presence of <code>badge_unlocks</code> (+ its backfill) and the <code>trg_enforce_prediction_before_kickoff</code> trigger.</li>
+      <li><strong>R12's blast radius — no count exists at all.</strong> How many entries have already been purged by leave / removal /
+        account deletion / stop-participating is <strong>unknown and unmeasured</strong>; it needs a production query (e.g.
+        <code>pool_membership_events</code> rows of type <code>left</code>/<code>removed</code> against surviving entries). The 21-table
+        cascade itself is also prod-schema-verified by Ryan's side, <strong>not</strong> re-verifiable from this repo — only the two route
+        files are.</li>
     </ul>
     <p style="margin:10px 0 0"><strong>Anything not on this list, and not marked unverified inline, was read in the code on
       2026-07-26.</strong></p>
@@ -550,11 +636,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 
   <div class="step crit-step">
-    <h4><span class="num">1</span> Close both <em>Delete Pool</em> doors <span class="chip cat">Bug</span>
-      <span class="chip danger">Data-loss</span> <span class="chip lvl-crit">R1</span></h4>
-    <p>First because it is the only item here where the loss is <strong>already happening and irreversible</strong>: six pools
-      destroyed, 458 one tap away, and the mitigation is the cheapest in the register. Web and mobile are two separate removals — the
-      zero-deploy policy drop covers web only.</p>
+    <h4><span class="num">1</span> Stop the irreversible deletion paths <span class="chip cat">Bug</span>
+      <span class="chip danger">Data-loss</span> <span class="chip lvl-crit">R1 · 2 doors</span>
+      <span class="chip lvl-crit">R12 · 4 doors</span></h4>
+    <p>First because this is the only place in the programme where the loss is <strong>already happening and cannot be undone</strong> —
+      everything else below produces wrong numbers, which can be recomputed. The two halves are <strong>not</strong> equally actionable,
+      and that difference drives the order inside this step:</p>
+    <ul style="margin:0; padding-left:18px">
+      <li><strong>R1 has a cheap interim available now</strong> — drop the policy (web) and remove the mobile button. Six pools destroyed,
+        458 one tap away, and it is the lowest-effort mitigation in the register.</li>
+      <li><strong>R12 has no interim identified.</strong> The destruction is a schema property, not application logic — three of its four
+        doors contain no delete of entries or predictions in code at all. There is no button to remove and no policy to drop; anything real
+        here is a schema change (soft-delete, retention, or re-pointed FKs), and its <em>shape</em> depends on Gate A2 below.</li>
+      <li><strong>Counting first is cheap and unblocked.</strong> R12's blast radius is unknown because nobody has queried it. That query
+        needs no decision from anyone and would tell us whether this is a live wound or a latent one — which is exactly what the level and
+        the urgency turn on.</li>
+    </ul>
   </div>
 
   <div class="gate">
@@ -563,6 +660,20 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       delete</em>, but migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>, so a reversible archive
       needs either another migration or a ruling that archive <strong>is</strong> <code>completed</code> (<strong>R10</strong>).</p>
     <p>Until Ryan rules, the replacement cannot be specified — only the interim can proceed.</p>
+  </div>
+
+  <div class="gate" id="gate-a2">
+    <h4>🚦 Gate A2 — what should leaving a pool do to a member's history? <span class="chip gold">new 2026-07-26</span></h4>
+    <p><strong>Gate A does not cover this</strong>, and that is the point: Gate A is about a <em>pool</em> ending, A2 is about a
+      <em>person</em> exiting one that continues. Ryan's stated direction is that entries should not be purged on exit; the direction does
+      not yet say what replaces it, and the options differ enough that the fix cannot be specified without an answer — soft-delete the
+      entry, retain it and only hide it from the leaderboard, or retain the history while releasing the seat. Each implies a different
+      schema change, a different answer for what the leaderboard shows afterwards, and a different position on whether a departed member's
+      picks stay visible to the pool.</p>
+    <p>Two sub-questions ride on it, both currently unanswered: <strong>(a)</strong> does self-leave count as consent to erasure, where
+      admin-removal and account-deletion plainly do not? <strong>(b)</strong> does account deletion — a likely privacy/erasure obligation —
+      need a <em>different</em> answer from the other three doors?</p>
+    <p><strong>Surfaced, not answered.</strong> Until this is ruled, R12 has no specifiable fix and stays open.</p>
   </div>
 
   <div class="step">
@@ -677,6 +788,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         Medium comfortable at that scale; the <em>Leaderboard precompute</em> item itself frames the work only as a June-outage fix.</li>
       <li><strong>R6's position depends on which competition runs next</strong>, because a league has no group standings — the item's
         "before the next competition" condition is ambiguous in a multi-sport world, and nothing in the document resolves it.</li>
+      <li><strong>Crews (<a href="#d1">Decision 1</a>) are in direct tension with the cascade (R12).</strong> Decision 1 settles that a
+        crew <em>"keeps history — all-time record, past seasons, rivalries"</em> and that removal means <em>"stops getting invited, not
+        erased"</em>. The schema does the opposite today: exit erases. Recorded as a surfaced conflict, <strong>not</strong> a challenge
+        to Decision 1 — the decision stands; it is the implementation that contradicts it, and <a href="#gate-a2">Gate A2</a> is where
+        that gets reconciled.</li>
     </ol>
   </div>
 </section>
