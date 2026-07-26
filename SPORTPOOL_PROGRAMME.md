@@ -1,11 +1,33 @@
-# Roadmap
+# SportPool Programme
 
-Single source of truth for everything we want to build, fix, or decide.
-Ordered by priority (**Now → Later**), tagged by category.
+Single source of truth for everything we want to build, fix, or decide — and for the
+**decisions already made**, so they don't get re-litigated.
 
-**Last updated:** 2026-07-12 · Full audit against the codebase — completed items moved to per-section **✅ Completed** tables; PARTIAL items annotated with what the code actually shows. · **Later 2026-07-12:** post-deadline prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published** (iOS + Android). · **2026-07-19:** added *Boost banter engagement* under 💬 Social & messaging, grounded in an organic banter-usage analysis (~1,383 real messages / ~315 people; ~7% of members post, ~67% of feed is auto share-cards).
+A *programme*, not a roadmap, because SportPool is now several distinct projects running under one
+banner rather than one ordered list. Day-to-day delivery is still ordered by priority
+(**Now → Later**) and tagged by category; the **Projects** below are the larger bodies of work those
+items roll up into.
 
-Each item has four fields:
+**Last updated:** 2026-07-25 · Renamed from `ROADMAP.md`; absorbed the product-decision record from
+the multi-sport planning session (8 settled decisions, now under *Project: Multi-sport platform*).
+· **2026-07-12:** full audit against the codebase — completed items moved to per-section **✅
+Completed** tables; PARTIAL items annotated with what the code actually shows; post-deadline
+prediction lock **shipped** (DB trigger), XL→Medium downgrade **done**, tie-break OTA **published**.
+· **2026-07-19:** added *Boost banter engagement*, grounded in an organic banter-usage analysis
+(~1,383 real messages / ~315 people; ~7% of members post, ~67% of feed is auto share-cards).
+
+## Projects in this programme
+
+| Project | What it is | Status |
+|---|---|---|
+| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25; foundations still TODO. | 🔵 Designing |
+| **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. Target Aug 2026. | 🔵 Designing |
+| **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
+| **World Cup wind-down** | Residual bugs, feedback surveys, knockout ops. | 🟡 Closing out |
+| **Live match & rich football data** | Squads, line-ups, events, player pages. | ⚪ Not started |
+| **Monetisation & cosmetics** | Sponsored pools, premium analytics, avatar IAP. | ⚪ Gated |
+
+Each backlog item has four fields:
 
 - **Is** — what it is, in plain English.
 - **Touches** — the code / systems / tables it involves.
@@ -14,6 +36,19 @@ Each item has four fields:
 
 **Legend** — Categories: `Bug` · `Scoring` · `Feature` · `Design` · `Mobile` · `Infra` · `Multi-sport` · `Ops`
 Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing call · ✅ done (verified in code 2026-07-12)
+
+### The disclosure gate
+
+Any mechanic that touches notifications, rewards, or social pressure must pass one question before
+it ships:
+
+> **Would it still work if you wrote its actual mechanism in a one-sentence tooltip?**
+>
+> *"We pre-built next season with your 14 members so you only have to confirm"* — passes.
+> *"We hold your score back a day so you come back"* — fails.
+
+Dark patterns are covert by definition. If explaining it kills it, it was manipulation. The full
+five-gate version is under *Project: Multi-sport platform → Decision 8*.
 
 ---
 
@@ -36,6 +71,7 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Zero-deploy mitigation (verified safe, policy has one consumer):** `drop policy "Pool admins can delete predictions" on predictions;` → the button then fails loudly having destroyed nothing.
 - **Proper fix:** server-side transactional delete (single Postgres function / soft-delete), move the account-delete guard to the top, add real `ON DELETE CASCADE`, and an alarm for non-`bracket_picker` pools with submitted entries but zero predictions.
 - **Detail + full evidence:** `drafts/2026-07-21_delete_pool_data_loss.md`
+- **Decision 2026-07-25:** the fix is **archive, not delete** — Delete Pool is removed from admins entirely, replaced with a reversible archive that keeps history; true deletion becomes a support action. Rationale: it destroys *other people's* data irreversibly on one person's tap, and once Crews keep history (*Project: Multi-sport platform → Decision 1*) it erases part of the crew's permanent record for everyone in it.
 - **Status:** documented only, by decision 2026-07-21. **Not mitigated — still live.**
 
 ### Post-tournament feedback surveys — send them `Ops` ⏳
@@ -46,6 +82,17 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 - **Blocked on:** a production deploy. The fix is local; the Templates tab runs against prod, so sending before the deploy resolves the old truncated audience *and* burns the idempotency key.
 - **Runbook:** `drafts/2026-07-21_feedback_survey_send_runbook.md` — pre-flight, expected counts, and partial-send recovery.
 - **Done when:** `npx tsx scripts/preflight-feedback-survey.ts` passes, both sends report 477/477 and 3,652/3,652, and responses are landing in Tally.
+
+### Scoring config is internally inconsistent `Bug` `Scoring` 🔥
+- **Is:** four defects in the pool-scoring settings, all verified in code 2026-07-25.
+  1. **Three default sets disagree.** `app/api/pools/create/route.ts:5` gives new pools `group_exact_score: 100`; the engine fallback (`app/pools/[pool_id]/results/points.ts:69`) and the admin **Reset to defaults** button (`app/pools/[pool_id]/admin/ScoringTab.tsx:21`) both say `5`. **Pressing reset on a live pool rescales it ~20×** while leaving `bonus_champion_correct` at 1000 — turning the champion pick from ~10 group matches into ~200, and the other 103 fixtures into decoration.
+  2. **The reset ladder is non-monotonic** — r16 `2`, QF `3`, **SF `2`**, 3rd `1.5`, final `3`. One click makes a semi-final worth less than a quarter-final.
+  3. **`round_32_multiplier` is missing** from `SCORING_DEFAULTS` entirely — every new pool's first knockout round is priced by an unexamined column default.
+  4. **Two settings are shown to members and read by zero scoring code** — `bonus_best_player_correct` / `bonus_top_scorer_correct` render at `ScoringRulesTab.tsx:382,386` **with a points value**. Members are looking at a rule that can never pay out.
+- **Decision 2026-07-25:** **100/75/50 is canonical** — collapse to one exported constant. **Delete** the two dead bonuses from the UI and defaults. Fix the ladder's monotonicity and add `round_32_multiplier`. Longer term these are replaced by named presets (*Project: Multi-sport platform → Decision 6*).
+- **Touches:** `app/api/pools/create/route.ts`, `app/pools/[pool_id]/results/points.ts`, `app/pools/[pool_id]/admin/ScoringTab.tsx`, `app/pools/[pool_id]/ScoringRulesTab.tsx`, `app/api/admin/branded-pools/route.ts`.
+- **Effort:** ~half a day for 1–4; presets are a separate, larger piece.
+- **Done when:** one constant defines defaults for every consumer, reset is non-destructive, the multiplier ladder is monotonic and validated on save, and no member-visible rule is unreachable by the scoring engine.
 
 > Beyond that and the **recurring knockout ops** below, the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
 
@@ -208,7 +255,7 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 
 ### Super-admin project dashboard `Feature`
 - **Is:** A lightweight visual of this roadmap inside super admin.
-- **Touches:** a super-admin page reading `ROADMAP.md` (v1) — later possibly a `roadmap_items` table.
+- **Touches:** a super-admin page reading `SPORTPOOL_PROGRAMME.md` (v1) — later possibly a `roadmap_items` table.
 - **Audit 2026-07-12:** TODO — no roadmap tab in `SuperAdminDashboard.tsx`; no `roadmap_items` table.
 - **Effort:** ~1–2 days (v1 read-only).
 - **Done when:** the roadmap renders in super admin without hand-editing HTML.
@@ -513,17 +560,198 @@ Status: 🔥 active/hurting now · 🔒 blocked · ⏳ waiting on your timing ca
 
 ---
 
-## 🌍 Later — multi-sport platform (long-horizon epic)
+## 🌍 Project: Multi-sport platform
 
-> Generalize the single World Cup product into a reusable multi-competition platform. **Audit 2026-07-12:** all seven are genuinely foundational/**TODO** — the schema is hardcoded to a single tournament (`00000000-…-0001`, 63 files reference `tournament_id`, zero reference any competition abstraction); ingestion is one api-football integration with no adapter; no `pool_templates`/`survivor`/catalog exists.
+> Generalize the single World Cup product into a reusable multi-competition platform. **Audit 2026-07-12:** the foundations are genuinely **TODO** — the schema is hardcoded to a single tournament (`00000000-…-0001`, 63 files reference `tournament_id`, zero reference any competition abstraction); ingestion is one api-football integration with no adapter; no `pool_templates`/`survivor`/catalog exists.
 
-- **Data-model abstraction** `Multi-sport` — competition-instance model (foundational; everything else depends on it).
-- **Pool template system** `Multi-sport` — bracket / pick'em / survivor / score-prediction modes per competition.
-- **Sports-data ingestion** `Multi-sport` — pluggable fixtures/results/standings layer to replace the single WC feed.
+**Product decisions below were settled 2026-07-25** and are not open for re-debate without a reason.
+The *why* is recorded alongside each so the argument doesn't have to be re-run. Research behind them:
+competitor UX across 14 platforms, a pool-format taxonomy, and behavioural research on retention and
+organiser motivation.
+
+---
+
+### Decision 1 — The durable object is the Crew
+
+A **Crew** is permanent. A **pool** (one crew playing one competition) is time-boxed and archives.
+Today those are collapsed into one row — which is why the same group re-assembles from scratch every
+season, and why the current `lifecycle` vs `accepting_members` work is harder than it should be (two
+lifetimes modelled on one row).
+
+- **Plural.** A person belongs to many crews — work, five-a-side, family. They overlap and have
+  different tones. *This is why a single flat "people you've played with" list is the wrong shape:
+  it merges distinct social circles.*
+- **Keeps history** — all-time record, past seasons, rivalries.
+- **Three ways to create, no gate:** (1) at pool creation — *"Save these 12 as a crew?"* — the
+  primary path; (2) directly, any time; (3) discovered from a repeat group, as a **fallback**.
+- **Captain + co-captain from the start.** Creator is captain. Co-captain exists day one so a crew is
+  never frozen behind one dormant person.
+- **Captain ≠ pool admin.** Captain owns *people*; a pool admin owns *one season*. Lets the
+  season-running role rotate while the crew stays stable — and creates new admins from inside a group
+  that already exists.
+- **Any member can start a pool**; they become that pool's admin, and it still counts as the crew
+  playing (carries crew history).
+- **A crew can run several pools at once** — the office does the World Cup *and* March Madness.
+- **Removal = "stops getting invited", not "erased".** History survives; the removed person is not
+  notified.
+- **Banter stays per pool**, not per crew.
+
+### Decision 2 — Crews join a new season by held seat
+
+Crew membership is consent to the **group**, not to every **competition**.
+
+- **Held seat** — a reserved, visible spot (*"your spot's saved, picks lock Friday"*), shown as
+  **pending**, not as an entry. **Releases at first lock** if unused, so there are no ghost entries
+  on zero and nobody is publicly shown having failed to turn up.
+- **Pool stays joinable after first lock** for long competitions — week 3 of 38 is viable; a bracket
+  is not.
+- *Why:* auto-join makes the **pool** pay (dead leaderboard); invite-only makes the **captain** pay
+  (chasing — the second-most-cited reason organisers quit). The held seat makes the **platform** pay.
+- **One reminder**, SportPool-branded. **Never in the captain's name** — LinkedIn survived the
+  contact import and the first invite in *Perkins*; it lost $13M over reminders sent in users' names.
+- **Roster review screen with reasons** ("email bounced", "never picked last season", "dormant 6
+  months"). All checked by default except hard failures. A service to the captain, not a chore.
+- **Run it back** stays as the one-tap shortcut: carries **the admin's own past setup** (competition,
+  format, scoring), with **the crew chosen separately** — so "same setup, different group" is
+  first-class. Guard against a crew already playing that competition.
+
+### Decision 3 — The format screen stays, as a one-tap confirmation
+
+- Recommended format **pre-selected**; primary button names it (*"Continue with Score Predictor"*).
+  **Skipped entirely** when only one format exists, and by Run it back. Shows crew history.
+- *Why keep it:* **the formats are the product.** For a multi-sport app, the fact a league crew can
+  play Score Predictor, Last Man Standing or Final Table *is* the range. Hiding it makes SportPool
+  look like a one-trick pick'em app.
+- **A format is a named preset that carries its own scoring.** The admin chooses a game, never
+  assembles one.
+- **Crew selection lives on the name screen:** *Name · Crew · Who can join · Create*. "No crew" is
+  valid → share-link path, then *"save these people as a crew?"*.
+
+### Decision 4 — Sport filters, tournament ranks
+
+- **Sport is asked once in onboarding** (~9 options, one screen, skippable) — not in the wizard. It
+  powers the create picker, Discover, **and** "starting soon" notifications.
+- **Filter on by default**, with a visible "Only sports I follow" toggle.
+- **Event-driven breakthrough** — a competition punches through only when *starting soon* **and**
+  *big*, honestly labelled. **Dismissible for that season.** Deliberately rare: a permanent "other
+  sports" shelf becomes furniture.
+- **Tournament preference ranks; it never filters.** Chips expand within the same onboarding screen;
+  tap nothing and you get the whole sport. *A Premier League fan still wants the World Cup — narrowing
+  must never hide a major event in a sport they follow.* Plus "Notify me" per competition, and derive
+  the rest from behaviour.
+
+### Decision 5 — Discover lists all public pools
+
+- **All pools set to public are listed** — not a curated shelf. **Quality is a ranking problem, not a
+  membership problem:** sort by joinability, share who actually picked, fill velocity, proximity to
+  start. Dormant pools are listed but sink.
+- **Honest state on every card** — *"Opens 8 Aug · 12 joined"* / *"Live · matchweek 3"* / *"Closed"*.
+- **Three-way privacy:** private · **unlisted** *(stays the default)* · **listed** (opt-in).
+- **Report path + fast unlist** — a listed pool is content published under our logo.
+- **Official SportPool pools per major competition** — always live, guaranteed-good first experience
+  for a crewless user, and a controlled surface for testing formats. Branded-pool machinery exists.
+
+### Decision 6 — Scoring: one canonical scale, presets, locked at kickoff
+
+- **100 / 75 / 50 is canonical.** Collapse the three disagreeing default sets into one exported
+  constant. See *Scoring config is internally inconsistent* under 🔥 Now.
+- **Named, versioned presets for new pools**, replacing the 43-knob surface. *(Assumed: the 622
+  existing pools are grandfathered — re-scoring finished pools would be indefensible. Not explicitly
+  ruled.)*
+- **"Advanced" means a different game, not different numbers** — an admin asking for advanced scoring
+  wants a confidence ladder or upset bonus, not `quarter_final_multiplier = 3.7`.
+- **Scoring locks at first kickoff**, enforced by a **DB trigger** — mobile writes directly, so the UI
+  is not a gate. Same lesson as `trg_enforce_prediction_before_kickoff`. Super-admin override requires
+  a written reason and notifies members.
+- Comparable scoring across pools is a **hard prerequisite for Showdown** — H2H duels need comparable
+  weekly scores.
+
+### Decision 7 — Platform as referee; admin keeps real powers up to kickoff
+
+Admins don't quit from workload. A study of 71 lapsed community moderators found **conflict and time
+ranked above workload**, with high emotional exhaustion and low task stress. They quit over the
+argument, not the admin panel.
+
+- **Platform enforces** locks, deadlines, round opening, reminders, scoring — **and says so in the
+  UI** (*"SportPool locked picks — your commissioner can't change this"*), giving the admin something
+  to point at. **Admin chooses** format, preset, roster, tone, house rules.
+- Automate the *chores*, never the *choices* — removing judgment and autonomy together turns the
+  commissioner into a spectator with a title.
+- **Auto round-opening is a prerequisite, not polish.** The progressive World Cup needed super-admin
+  bulk updates for 7 rounds; the EPL is 38 matchweeks × every pool.
+- **The override wall is kickoff, not the deadline.** Freely allowed up to kickoff: extend a deadline,
+  reopen a round for everyone, **reopen for one specific member**, nudge/remove/re-invite. **Nothing
+  is accepted after a match starts, by anyone including super-admin.** *The risk isn't that admins
+  cheat — it's that they can be accused of it.*
+- **Members see the override log** (*"Ryan reopened matchweek 3 for Dave — 14:02, before kickoff"*).
+  This **protects** the admin: it's their proof they were fair.
+- **Wrong results route to super-admin**, fixed once at source — an admin hand-editing a result would
+  create divergent realities across 600 pools.
+- **Archive, not delete** — see the 🔥 Now item; Delete Pool is removed from admins entirely.
+- **Instrument admin retention.** Currently invisible on every dashboard, and it is the biggest lever
+  we found:
+
+  | Path | Yield |
+  |---|---|
+  | +10% more admins (477 → 525) | +365 players |
+  | +10% players per admin (7.6 → 8.4) | +382 players |
+  | **Prevent 20% of admin churn (~95 admins)** | **+722 players** |
+
+  An 11.6% organiser rate is ~**ten times** the classic ~1% creator benchmark — an outlier to defend,
+  not a funnel to fix. The 478th admin is by construction the person with the smallest, least
+  enthusiastic group.
+
+### Decision 8 — The ethical test
+
+The **disclosure gate** (top of this document) is adopted as a real gate, and is recorded in
+`CLAUDE.md` (2026-07-25) so it fires when a feature is *proposed* rather than at merge time. The full
+five, for genuinely new mechanics:
+
+1. **Disclosure** — would it survive being explained in a tooltip?
+2. **Affect** — which emotion does the work, and would the user thank you for it? Anticipation, pride,
+   rivalry: fine. Guilt, shame, obligation, manufactured FOMO: not.
+3. **Symmetry** — is exit as easy, fast and prominent as entry?
+4. **Substitution** — does the user end up with more of what they came for, or just more sessions?
+   Pair every mechanic with a quality counter-metric.
+5. **Variance provenance** — is every element of uncertainty **inherited from the sport**? Randomness
+   *we* add is gambling design whether or not money moves.
+
+Standing check: assume a 15-year-old is in a family pool.
+
+---
+
+### Still open
+
+- **Presets for new pools with existing pools grandfathered** — assumed yes, not explicitly ruled.
+- **Crew-departure semantics** — history is immutable, but self-removal and exact removal behaviour
+  aren't settled.
+- **Where the format recommendation comes from** when crew history and global popularity disagree.
+  (Settled for Run it back: the admin's own past setup.)
+- **The breakthrough threshold** for out-of-sport events — instinct is deliberately high; the moment
+  it fires often it stops working.
+- **Discover ranking weights** — signals agreed, formula not.
+- **Migration path** from today's `pools` table to Crew + Season without disturbing 622 live pools.
+  Biggest unknown in the project.
+
+### Not yet discussed
+
+- The competition-shape × pool-format grid, and which format engines to build in what order.
+- Showdown mechanics beyond "no playoff cut, matched pairing".
+- Monetisation (tracked separately under 💎).
+
+---
+
+### Foundational work items
+
+- **League ingestion (Premier League)** `Multi-sport` 🔥 — migration `024_multi_competition_league_support.sql`, `lib/integrations/apiFootball/importLeagueSeason.ts` and `scripts/import-league-season.ts` are **drafted, not applied**. ⚠️ **A league pool scores zero today, silently**: `checkKnockoutTeamsMatch` ([lib/scoring/core.ts:88](lib/scoring/core.ts)) returns `true` only for `'group'` or when teams aren't set; a `'regular_season'` fixture is neither, so it falls to `return false` and [core.ts:141](lib/scoring/core.ts) zeroes the match. Even after fixing the gate, `isGroupStage` selects the **point values** — the group/knockout binary is welded into the price lookup, not just the gate. Importing fixtures is **not** the last step before a working league pool.
+- **Sync cron is single-tenant** `Multi-sport` — competition comes from three env globals (`app/api/cron/sync-fixtures/route.ts:67`). Looping over active tournaments (reading `external_league_id`/`external_season` per row, which 024 backfills) is the unlock for N competitions. WC = api-football league 1; EPL = league 39.
+- **Data-model abstraction** `Multi-sport` — competition-instance model, now also carrying Crew + Season (Decision 1). Everything else depends on it.
+- **Pool template system** `Multi-sport` — formats as named presets carrying their own scoring (Decision 3).
+- **Sports-data ingestion** `Multi-sport` — pluggable fixtures/results/standings layer behind a provider interface.
 - **Per-competition email cadence** `Multi-sport` — schedules per competition instead of global crons.
-- **Competition catalog & lifecycle** `Multi-sport` — catalog, season rollover, clone-from-last-year.
-- **Per-competition branding** `Multi-sport` — theme/copy per sport. (Note: the existing `branded-pools` feature is per-**pool** white-label, a different axis.)
-- **Monetization model** `Multi-sport` — decide free vs freemium vs paid beyond friends-and-family.
+- **Competition catalog & lifecycle** `Multi-sport` — catalog, season rollover, clone-from-last-year. Date-computed state chips, **never authored** (Decision 4).
+- **Per-competition branding** `Multi-sport` — theme/copy per sport. (The existing `branded-pools` feature is per-**pool** white-label — a different axis.)
+- **Monetization model** `Multi-sport` — free vs freemium vs paid. Tracked under 💎.
 
 ## 💎 Later — monetization & cosmetics
 

@@ -1,6 +1,6 @@
 // =============================================================
 // Group tiebreaker order — regression lock for the knockout
-// tie-break scoring bug (ROADMAP "Now" #1).
+// tie-break scoring bug (SPORTPOOL_PROGRAMME "Now" #1).
 // =============================================================
 // Two properties this pins down:
 //

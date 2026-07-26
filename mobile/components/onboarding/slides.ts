@@ -100,7 +100,7 @@ export const SLIDES: OnboardingSlide[] = [
     // SWAP TARGET — this slide is expected to be rewritten over the next
     // 12 months as the product expands to multiple competitions. Today
     // it pitches the three WC modes; once a second competition ships
-    // (likely EPL Showdown per ROADMAP §3a), this slot pivots to
+    // (likely EPL Showdown per SPORTPOOL_PROGRAMME §3a), this slot pivots to
     // "All your tournaments in one place" with competition cards instead
     // of mode cards. Keep the schema; rewrite the content.
     key: 'modes',

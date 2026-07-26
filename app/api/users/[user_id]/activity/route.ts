@@ -14,7 +14,7 @@ import { withPerfLogging } from '@/lib/api-perf'
 // XP-gain events (match XP / bonus / badge) are NOT computed here yet —
 // the existing per-entry analytics fan-out on the client handles those
 // until we extract a slim XP-only helper from computeFullXPBreakdown.
-// See ROADMAP §3 follow-up.
+// See SPORTPOOL_PROGRAMME §3 follow-up.
 //
 // Auth: caller may only read their own activity. Super admins may
 // read any user's feed for support / debugging.
