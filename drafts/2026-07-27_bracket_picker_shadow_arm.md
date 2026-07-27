@@ -192,3 +192,89 @@ Steps 1–3 are safe in isolation. Step 4 is the first that changes what shadow 
   again.
 - A bracket_picker pool's leaderboard renders identically before and after the client flip.
 - `readSource.ts` no longer needs its bracket_picker special case.
+
+---
+
+## 8. Rank parity — RESOLVED 2026-07-27 (wiring blocker, now understood)
+
+Wiring revealed bp **totals matched perfectly (859/859)** but **ranks differed on 161 entries**.
+Diagnosed to two independent causes.
+
+### 8.1 Cause A — a missing tiebreaker (83 entries). MINE.
+
+`shadow_finalize_totals` derives its rank tiebreakers from `shadow_match_scores`:
+
+```sql
+count(*) FILTER (WHERE s.score_type='exact')   AS ex,
+count(*) FILTER (WHERE s.score_type <> 'miss') AS co
+```
+
+**bracket_picker has NO match scores**, so both come out 0 — but prod does not use 0. Per
+`lib/scoring/bracket.ts:292`:
+
+```ts
+exact_count: 0,              // Not applicable for bracket picker
+correct_count: bpCorrectCount,
+```
+
+```ts
+bpCorrectCount = groupDetails.filter(d => d.correct).length
+               + thirdPlaceDetails.filter(d => d.correct).length
+               + knockoutDetails.filter(d => d.correct).length
+```
+
+So ties on total that prod breaks by **correct picks** were falling through to submission time.
+Champion, penalty and the all-8 bonus are **excluded** — only picks count.
+
+**Fix:** `shadow_finalize_totals` must supply a bp-specific `correct_count`:
+group rows with `points_earned > 0`, plus `bp_third_qualifies` / `bp_third_eliminated`, plus
+`bp_knockout_*`. Reconstructing exactly that took the mismatch **161 → 78**.
+
+⚠ Proxy caveat: counting rows-with-points differs from `d.correct` in a pool that sets a point
+value to 0 (correct pick, zero points, no row). 6 pools have such a setting. None of the
+residual 78 are in them, so it does not bite today — but a pool created with a 0 value later
+would drift. The durable fix is for the arm to record correctness rather than infer it from
+points.
+
+### 8.2 Cause B — 3 pools with stale stored ranks (78 entries). NOT SHADOW.
+
+Verified using **prod's own** `bonus_scores`, `scored_total_points` and `bonus_points`, with
+shadow excluded entirely: prod's `current_rank` does not follow from prod's own stored data for
+**exactly the same 78 entries**, concentrated in **3 pools** (the other 96 are perfectly
+consistent), and **none** of the three has a zero point setting.
+
+That is the signature of those pools not having been re-ranked since their scores last changed
+— `current_rank` is written by `recalculatePool`, so a pool that has not recalculated since its
+last scoring change keeps an older ordering.
+
+> **An earlier note in this session claimed prod's bp ranks were broadly "internally
+> inconsistent — a production bug affecting 21%". That was asserted from an aggregate before
+> inspecting rows and was WRONG.** The top of the worst pool matched perfectly, and part of the
+> apparent gap was a flawed comparison that excluded unsubmitted entries. The real figure is 78
+> entries in 3 pools, and the cause is staleness, not a scoring defect.
+
+### 8.3 What this means for wiring
+
+1. Add the bp `correct_count` to `shadow_finalize_totals`, then remove its
+   `<> 'bracket_picker'` exclusion. Expect rank parity on the 781 self-consistent entries.
+2. **The 78 will still "mismatch", and shadow will be RIGHT.** Do not treat that as a parity
+   failure — it is prod being stale. Confirm by recalculating those 3 pools in prod and
+   re-checking; they should converge.
+3. `shadow_eligible_entries` and `shadow_pools_needing_materialize` must **keep** excluding
+   bracket_picker — see §9.
+
+## 9. ⚠ The trap in "remove the exclusions"
+
+bracket_picker entries have **zero rows** in `shadow_resolved_standings`,
+`shadow_match_scores` and `shadow_entry_totals`. Adding bracket_picker to
+`shadow_eligible_entries` would therefore:
+
+- select all 859 bp entries as `never_resolved`;
+- hand them to a reconciler whose backfills explicitly skip bracket_picker, producing nothing;
+- leave the marker (migration 032) correctly refusing to mark them — **forever**, re-materializing
+  99 pools every run in perpetuity.
+
+bracket_picker needs **no per-entry materialization**: `shadow_calculate_bp_bonuses` reads the
+pick tables and `shadow_actual_standings` directly. The exclusions stay. The arm is driven from
+the SQL scoring path instead — call it from `shadow_reconcile_matches`, scoped to the bp pools of
+the affected tournament.
