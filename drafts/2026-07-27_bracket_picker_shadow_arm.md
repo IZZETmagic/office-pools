@@ -175,7 +175,7 @@ drive-by:
 |---|---|---|
 | 1 | **`tournament_inputs_version` bump** (statement-level trigger on `matches` / `match_conduct`) | §3 — the arm is built on stale standings without it |
 | 2 | **`shadow_calculate_bp_bonuses(p_pool_ids)`** — the four rules, shadow-only, inert | Nothing reads it; verifiable alone |
-| 3 | **Parity check vs prod's 48,604 `bp_*` rows** — entry-for-entry, not totals | The lesson from the podium: matching totals hide wrong members |
+| 3 | **Parity check vs prod's 58,604 `bp_*` rows** — entry-for-entry, not totals | The lesson from the podium: matching totals hide wrong members |
 | 4 | Wire into `shadow_apply_changes` + drop the `bracket_picker` exclusions from `shadow_eligible_entries` / `shadow_pools_needing_materialize` | Only after 3 is clean |
 | 5 | **Client flip** (§5), after its two checks | Removes the third implementation |
 | 6 | Then, and only then, `readSource` can stop forcing bracket_picker to `'prod'` | The actual unblock |
@@ -187,7 +187,7 @@ Steps 1–3 are safe in isolation. Step 4 is the first that changes what shadow 
 ## 7. Acceptance
 
 - `shadow_bonus_scores` holds all 13 `bp_*` types, matching prod **entry-for-entry with zero
-  point differences** across 999 entries / 48,604 rows.
+  point differences** across 999 entries / 58,604 rows.
 - `shadow_eligible_entries` count rises from 3,411 to ~4,400 and the P2 selector drains to 0
   again.
 - A bracket_picker pool's leaderboard renders identically before and after the client flip.
