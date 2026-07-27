@@ -67,7 +67,7 @@ async function handle(request: NextRequest) {
   // Runs every pass, independent of the watermark. Never throws into the flow.
   const staleReconcile = await reconcileStaleEntries(admin, tournamentId, { cap: 500 })
     .catch((e) => ({
-      enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, reasons: {},
+      enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, skippedNoOutput: 0, reasons: {},
       errors: [e instanceof Error ? e.message : String(e)],
     }))
 

@@ -754,10 +754,11 @@ export async function reconcileStaleEntries(
   pools: number
   marked: number
   quarantined: number
+  skippedNoOutput: number
   reasons: Record<string, number>
   errors: string[]
 }> {
-  const out = { enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, reasons: {} as Record<string, number>, errors: [] as string[] }
+  const out = { enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, skippedNoOutput: 0, reasons: {} as Record<string, number>, errors: [] as string[] }
 
   // ⚠ PostgREST silently truncates ANY response at 1,000 rows — including RPC
   // results (see the `supabase_postgrest_row_cap` class of bug, which has hit
@@ -859,7 +860,7 @@ export async function reconcileStaleEntries(
         continue // this chunk stays stale; the rest still get their chance
       }
 
-      const { data: marked, error: markErr } = await adminClient.rpc('shadow_mark_pools_rederived', {
+      const { data: markRes, error: markErr } = await adminClient.rpc('shadow_mark_pools_rederived', {
         p_pool_ids: chunk,
         p_snapshot: snapshot,
       })
@@ -867,7 +868,23 @@ export async function reconcileStaleEntries(
         out.errors.push(`mark[${i / APPLY_CHUNK}]: ${markErr.message}`)
         continue
       }
-      markedTotal += Number(marked ?? 0)
+
+      // Migration 032: the marker now REFUSES to mark an entry that produced no
+      // derived output, and reports which. Surface that loudly — an entry in
+      // this list is one P2 will keep retrying forever, which is the correct
+      // behaviour but must never be something you have to infer from a diff.
+      // (This is the safeguard for the 98f3163f class of failure: marked clean
+      // while holding zero derived rows.)
+      const skippedNoOutput = Number(markRes?.skipped_no_output ?? 0)
+      if (skippedNoOutput > 0) {
+        const ids = (markRes?.skipped_entry_ids ?? []) as string[]
+        out.skippedNoOutput += skippedNoOutput
+        out.errors.push(
+          `mark[${i / APPLY_CHUNK}]: ${skippedNoOutput} entr${skippedNoOutput === 1 ? 'y' : 'ies'} produced NO derived output and were left stale — ${ids.join(', ')}`,
+        )
+      }
+
+      markedTotal += Number(markRes?.marked ?? 0)
       appliedPools += chunk.length
     }
     out.marked = markedTotal
