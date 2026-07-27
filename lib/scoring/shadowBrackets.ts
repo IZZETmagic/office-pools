@@ -17,6 +17,7 @@
 import { resolvePredictedBracket, resolveActualBracket, buildActualResultsMap, type BracketResult } from '@/lib/bracketResolver'
 import { getKnockoutWinner } from '@/lib/tournament'
 import { resolveEntryPodiumPick } from '@/lib/podium'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import { buildPredictionMap, toTeams } from './helpers'
 import type { MatchWithResult, TeamData, ConductData, EntryWithPredictions } from './types'
 
@@ -137,9 +138,10 @@ export async function backfillResolvedBrackets(
     .from('teams')
     .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
     .eq('tournament_id', tournamentId)
-  const { data: conduct } = await adminClient
-    .from('match_conduct')
-    .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
+  // Scoped + paginated. Unfiltered this is silently truncated at 1,000 rows by
+  // PostgREST, which in the live scoring engine means conduct-based tiebreaks
+  // resolved against partial data — no error, just wrong brackets.
+  const conduct = await fetchMatchConductForTournament(adminClient, tournamentId)
   if (!matches || !teams) {
     summary.errors.push('failed to load matches/teams')
     return summary
@@ -439,9 +441,10 @@ export async function backfillBonusInputs(
     .from('teams')
     .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
     .eq('tournament_id', tournamentId)
-  const { data: conduct } = await adminClient
-    .from('match_conduct')
-    .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
+  // Scoped + paginated. Unfiltered this is silently truncated at 1,000 rows by
+  // PostgREST, which in the live scoring engine means conduct-based tiebreaks
+  // resolved against partial data — no error, just wrong brackets.
+  const conduct = await fetchMatchConductForTournament(adminClient, tournamentId)
   if (!matches || !teams) {
     summary.errors.push('failed to load matches/teams')
     return summary
@@ -494,12 +497,26 @@ export async function backfillBonusInputs(
       const predsByEntry = new Map<string, any[]>()
       let offset = 0, hasMore = true
       while (hasMore) {
-        const { data: page } = await adminClient
+        const { data: page, error: pageErr } = await adminClient
           .from('predictions')
           .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
           .in('entry_id', entryIds)
           .order('entry_id', { ascending: true }).order('match_id', { ascending: true })
           .range(offset, offset + 999)
+        // ⚠ This error used to be DISCARDED. A transient failure (the
+        // `TypeError: fetch failed` seen throughout 2026-07-27) left `page`
+        // null, which exited the loop as though paging had COMPLETED — so every
+        // entry whose predictions had not yet loaded fell through the
+        // `preds.length === 0 → continue` below and was silently skipped, with
+        // no error and no summary entry. Its previously-materialized rows were
+        // then purged by the write, leaving it with nothing.
+        //
+        // Real damage, found by diffing prod vs shadow: entry NasserSEN
+        // (98f3163f) — 104 predictions, fully submitted — had 0 standings, 0
+        // podium and 0 bonus rows against prod's 26, while its 10 pool-mates
+        // were byte-perfect. Throwing here quarantines the pool for retry
+        // instead of silently corrupting one member's scoring.
+        if (pageErr) throw new Error(`predictions page @${offset}: ${pageErr.message}`)
         if (!page || page.length === 0) hasMore = false
         else {
           for (const p of page) { const l = predsByEntry.get(p.entry_id) ?? []; l.push(p); predsByEntry.set(p.entry_id, l) }
@@ -512,7 +529,15 @@ export async function backfillBonusInputs(
       const eligibleIds: string[] = []
       for (const e of entries) {
         const preds = predsByEntry.get(e.entry_id) ?? []
-        if (preds.length === 0) continue
+        if (preds.length === 0) {
+          // Make the skip VISIBLE. A submitted entry with zero loaded
+          // predictions is anomalous, and silently dropping it is how
+          // NasserSEN lost 26 bonus rows unnoticed. The paging error check
+          // above should now prevent the transient cause, but if this ever
+          // fires again it must be seen rather than inferred from a diff.
+          summary.errors.push(`pool ${pool.pool_id}: entry ${e.entry_id} skipped — 0 predictions loaded`)
+          continue
+        }
         eligibleIds.push(e.entry_id)
         mats.push(resolveEntryBonusRows(
           pool.pool_id, mode,
@@ -588,9 +613,10 @@ export async function reconcileVersionedBrackets(
     .from('teams')
     .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
     .eq('tournament_id', tournamentId)
-  const { data: conduct } = await adminClient
-    .from('match_conduct')
-    .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards')
+  // Scoped + paginated. Unfiltered this is silently truncated at 1,000 rows by
+  // PostgREST, which in the live scoring engine means conduct-based tiebreaks
+  // resolved against partial data — no error, just wrong brackets.
+  const conduct = await fetchMatchConductForTournament(adminClient, tournamentId)
   if (!matches || !teams) {
     summary.errors.push('failed to load matches/teams')
     return summary
@@ -684,4 +710,171 @@ export async function reconcileVersionedBrackets(
   }
 
   return summary
+}
+
+// ============================================================================
+// P2 — the one reconciler. Re-derives every entry whose shadow per-entry output
+// is stale for ANY reason, across ALL modes.
+//
+// Plan: drafts/2026-07-27_shadow_P2_input_version_watermark.md
+// Migrations: 029 (schema) / 030 (selector) / 031 (marker)
+//
+// WHY THIS EXISTS — the defect it closes
+// --------------------------------------
+// The materialize cron only picks up pools whose PREDICTIONS changed
+// (`shadow_pools_needing_materialize` tests `predictions.updated_at > since`).
+// So a fix to derivation LOGIC never reaches existing data. Measured 2026-07-27:
+// the July podium fix landed in `resolveEntryPodiumPick`, but
+// `shadow_resolved_podium` still held pre-fix cascade values — 19 of 32 entries
+// in one progressive pool recorded as picking France when they had picked
+// Spain. The last prediction edit in the whole database was 2026-07-19, so the
+// selector had returned zero pools for over a week and always would have.
+//
+// HOW IT DIFFERS FROM reconcileVersionedBrackets (P1), WHICH IT WILL REPLACE
+//   - all modes, not full_tournament only (progressive is 44.5% of entries)
+//   - governs ALL per-entry derived tables, not just shadow_entry_bracket
+//   - watches results/conduct via inputs_version, which P1 is blind to
+//
+// NOT a replacement yet: P1 still runs, and its selector is untouched.
+//
+// ⚠ KNOWN INTERACTION (benign, self-converging): P1's own stamp does not set
+// `inputs_version`, so a row it INSERTS lands at the column default 0. Once the
+// tournament version is bumped past 0, such a row looks stale to P2 and gets
+// re-derived once more than strictly needed. It converges and never produces
+// wrong data. Deliberately not "fixed" by editing P1's live path — that goes
+// away when this function replaces it.
+// ============================================================================
+export async function reconcileStaleEntries(
+  adminClient: any,
+  tournamentId: string,
+  opts?: { cap?: number },
+): Promise<{
+  enabled: boolean
+  selected: number
+  pools: number
+  marked: number
+  quarantined: number
+  reasons: Record<string, number>
+  errors: string[]
+}> {
+  const out = { enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, reasons: {} as Record<string, number>, errors: [] as string[] }
+
+  // ⚠ PostgREST silently truncates ANY response at 1,000 rows — including RPC
+  // results (see the `supabase_postgrest_row_cap` class of bug, which has hit
+  // this codebase repeatedly). A cap above 1,000 would therefore return 1,000
+  // and quietly under-reconcile while looking successful. Clamp it: batches are
+  // meant to be small anyway, and the cron re-runs until the selector is dry.
+  const MAX_CAP = 1000
+  const cap = Math.min(opts?.cap ?? 500, MAX_CAP)
+
+  // Opt-in kill switch. ABSENT = DISABLED, deliberately: deploying this code
+  // must not start an estate-wide sweep on its own. Ryan flips it explicitly.
+  const { data: enabledRow } = await adminClient
+    .from('sync_settings').select('setting_value').eq('setting_key', 'shadow_rederive_enabled').maybeSingle()
+  if (enabledRow?.setting_value !== true && enabledRow?.setting_value !== 'true') return out
+  out.enabled = true
+
+  // Snapshot BEFORE selection. Migration 031 clamps the stored watermark to this
+  // instant, so an edit landing mid-run stays stale and is re-picked-up next
+  // run rather than being marked clean against picks we never read.
+  const snapshot = new Date().toISOString()
+
+  const { data: stale, error: selErr } = await adminClient.rpc('shadow_entries_needing_rederive', { p_cap: cap })
+  if (selErr) {
+    out.errors.push(`select: ${selErr.message}`)
+    return out
+  }
+  const rows = (stale ?? []) as Array<{ entry_id: string; pool_id: string; reason: string }>
+  out.selected = rows.length
+  if (rows.length === 0) return out
+
+  for (const r of rows) out.reasons[r.reason] = (out.reasons[r.reason] ?? 0) + 1
+
+  // Selection is per-entry; writing is per-pool (backfillBonusInputs takes pool
+  // ids). We therefore re-derive whole pools and mark whole pools — see the
+  // migration 031 header.
+  const poolIds = [...new Set(rows.map((r) => r.pool_id))]
+  out.pools = poolIds.length
+
+  try {
+    const brackets = await backfillResolvedBrackets(adminClient, tournamentId, { poolIds })
+    const bonus = await backfillBonusInputs(adminClient, tournamentId, { poolIds })
+
+    // ⚠ These helpers COLLECT errors into their summary rather than throwing.
+    // On 2026-07-27 a run reported `podium: 0` while having actually written the
+    // rows, then failed a later step — so a throw-only guard would have marked
+    // partially-derived pools as clean.
+    const softErrors = [...(brackets.errors ?? []), ...(bonus.errors ?? [])]
+
+    // PER-POOL QUARANTINE, not all-or-nothing.
+    //
+    // `TypeError: fetch failed` is a transient network error and shows up in
+    // most multi-pool batches: a 500-entry batch spans ~46 pools, so even a
+    // low per-pool failure rate means nearly every batch has one. Discarding
+    // the whole batch's work because one pool blipped would mean the sweep
+    // NEVER CONVERGES — it would redo ~43 good pools every pass and mark none.
+    //
+    // So: quarantine the pools named in the errors, mark the rest. The failed
+    // ones stay stale and are re-selected next run, which is exactly the
+    // retry mechanism we want and needs no retry logic.
+    //
+    // Conservative fallback: an error we cannot attribute to a specific pool
+    // poisons the whole batch, because we cannot tell which pool is bad.
+    const failedPools = new Set<string>()
+    let unattributable = false
+    for (const e of softErrors) {
+      const m = /pool ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(e)
+      if (m) failedPools.add(m[1])
+      else unattributable = true
+    }
+    out.errors.push(...softErrors.map((e: string) => `backfill: ${e}`))
+    if (unattributable) return out
+
+    const cleanPools = poolIds.filter((p) => !failedPools.has(p))
+    out.quarantined = failedPools.size
+    if (cleanPools.length === 0) return out
+
+    // CHUNK THE APPLY + MARK. `shadow_apply_changes` across 40 pools exceeds the
+    // 2-minute statement_timeout — observed 2026-07-27, and it is the SAME
+    // failure that killed the reverted dirty-pool drain ("shipped a
+    // statement-timeout bug in the drain", commit 724b4ee). Phase A hit it too
+    // and fixed it the same way.
+    //
+    // Each chunk is applied AND marked before the next starts, so a timeout
+    // later in the batch cannot discard work already completed and committed.
+    // Progress is monotonic: every successful chunk permanently shrinks the
+    // selector, so the sweep converges even on a flaky connection.
+    const APPLY_CHUNK = 10
+    let markedTotal = 0
+    let appliedPools = 0
+    for (let i = 0; i < cleanPools.length; i += APPLY_CHUNK) {
+      const chunk = cleanPools.slice(i, i + APPLY_CHUNK)
+
+      const { error: applyErr } = await adminClient.rpc('shadow_apply_changes', {
+        p_match_ids: [],
+        p_pool_ids: chunk,
+      })
+      if (applyErr) {
+        out.errors.push(`shadow_apply_changes[${i / APPLY_CHUNK}]: ${applyErr.message}`)
+        continue // this chunk stays stale; the rest still get their chance
+      }
+
+      const { data: marked, error: markErr } = await adminClient.rpc('shadow_mark_pools_rederived', {
+        p_pool_ids: chunk,
+        p_snapshot: snapshot,
+      })
+      if (markErr) {
+        out.errors.push(`mark[${i / APPLY_CHUNK}]: ${markErr.message}`)
+        continue
+      }
+      markedTotal += Number(marked ?? 0)
+      appliedPools += chunk.length
+    }
+    out.marked = markedTotal
+    out.pools = appliedPools
+  } catch (e: any) {
+    out.errors.push(`rederive: ${e?.message ?? String(e)}`)
+  }
+
+  return out
 }

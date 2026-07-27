@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth'
-import { backfillResolvedBrackets, backfillBonusInputs, reconcileVersionedBrackets } from '@/lib/scoring/shadowBrackets'
+import { backfillResolvedBrackets, backfillBonusInputs, reconcileVersionedBrackets, reconcileStaleEntries } from '@/lib/scoring/shadowBrackets'
 
 export const dynamic = 'force-dynamic'
 // Scoped runs process only the handful of pools with recent prediction activity,
@@ -58,6 +58,19 @@ async function handle(request: NextRequest) {
   const bracketReconcile = await reconcileVersionedBrackets(admin, tournamentId, { cap: 500 })
     .catch((e) => ({ flagged: 0, resolved: 0, errors: [e instanceof Error ? e.message : String(e)] }))
 
+  // Durable P2: the ONE reconciler — re-derives any entry whose shadow per-entry
+  // output is stale for ANY reason (never resolved / logic changed / results or
+  // conduct changed / member edited), across ALL modes. This is what makes a fix
+  // to derivation LOGIC actually reach existing data; the watermark detection
+  // below only ever fires on prediction edits, so it cannot.
+  // Opt-in: no-ops unless sync_settings.shadow_rederive_enabled = true.
+  // Runs every pass, independent of the watermark. Never throws into the flow.
+  const staleReconcile = await reconcileStaleEntries(admin, tournamentId, { cap: 500 })
+    .catch((e) => ({
+      enabled: false, selected: 0, pools: 0, marked: 0, quarantined: 0, reasons: {},
+      errors: [e instanceof Error ? e.message : String(e)],
+    }))
+
   // Watermark = last successful materialize. Capture the run start BEFORE detection
   // so any edit landing mid-run is (idempotently) re-picked-up next run, never missed.
   const runIso = new Date().toISOString()
@@ -86,7 +99,10 @@ async function handle(request: NextRequest) {
 
   if (poolIds.length === 0 && matchIds.length === 0) {
     await advanceWatermark()
-    return NextResponse.json({ ok: true, changedPools: 0, changedMatches: 0, bracketReconcile, note: 'nothing to materialize' })
+    // NOTE: this is the path that fires once a competition goes quiet — the
+    // watermark detects nothing. staleReconcile MUST be reported here too, or
+    // P2's work would be invisible in exactly the situation it exists for.
+    return NextResponse.json({ ok: true, changedPools: 0, changedMatches: 0, bracketReconcile, staleReconcile, note: 'nothing to materialize' })
   }
 
   const batch = poolIds.slice(0, CAP)
@@ -117,6 +133,7 @@ async function handle(request: NextRequest) {
       processed: batch.length,
       deferred,
       bracketReconcile,
+      staleReconcile,
       brackets,
       bonus,
     })
