@@ -48,8 +48,51 @@ Ported from `lib/bracketPickerScoring.ts::calculateBracketPickerPoints`. Point v
 | 3 | **Knockout** | `bp_knockout_picks` ⋈ `matches` on `match_id` where `winner_team_id = m.winner_team_id AND m.is_completed` | by stage: 1/2/4/8/10/20 (`bp_r32`…`bp_final_correct`) |
 | 4 | **Champion + penalty** | final's winner; `predicted_penalty` vs actual pso | `bp_champion_bonus` 50, `bp_penalty_correct` |
 
-Output shape: the existing 13 `bp_*` `bonus_type` values, written to `shadow_bonus_scores` in the
+Output shape: the existing `bp_*` `bonus_type` values, written to `shadow_bonus_scores` in the
 same shape `shadow_calculate_bonuses` uses, so `readSource` and the totals path need no changes.
+
+### 2a. The exact row contract — read from the writer, not inferred
+
+From `app/api/pools/[pool_id]/bracket-picks/calculate/route.ts:340-430`. Getting any of this
+wrong means permanent parity noise, so it is transcribed rather than assumed.
+
+| Rule | `bonus_type` | `bonus_category` | `related_group_letter` | `related_match_id` | Written when |
+|---|---|---|---|---|---|
+| Group | `bp_group_position_{1..4}` | `bp_group` | group letter | null | **ALWAYS — correct AND incorrect** |
+| Third | `bp_third_qualifies` / `bp_third_eliminated` | `bp_third_place` | group letter | null | points > 0 |
+| Third all-8 | `bp_third_all_correct` | `bp_third_place` | null | null | points > 0 |
+| Knockout | `bp_knockout_{stage}` | `bp_knockout` | null | match_id | points > 0 |
+| Penalty | `bp_penalty_predictions` | `bp_bonus` | null | null | points > 0, **one aggregate row per entry** |
+| Champion | `bp_champion` | `bp_bonus` | null | null | points > 0 |
+
+**⚠ Three traps, all of which would silently break parity:**
+
+1. **Group rows are written for every position, including wrong ones, with
+   `points_earned = 0`** (`// include all positions (correct and incorrect)`). Every OTHER rule
+   writes only when `points > 0`. That asymmetry is why `bp_group_position_1..4` each hold
+   exactly 10,308 rows. A "write only what scores" arm would be short ~40,000 rows.
+2. **`description` is part of the row and is PROSE containing team names** — e.g. `Group A 1st
+   position: Correctly predicted Mexico`. `shadow_bonus_scores`' change-only upsert compares
+   `description`, so text that differs by a character rewrites the row on every sweep forever.
+   The SQL must reproduce these strings exactly, including the `1st/2nd/3rd/4th` labels and the
+   `Correctly`/`Incorrectly` prefix.
+3. **Penalty is ONE aggregate row per entry**, not one per match — `points_earned` is the summed
+   total across all completed knockout matches.
+
+### 2b. Scoring subtleties that are not obvious from the table
+
+- **Third place pays only if the team ACTUALLY finished 3rd** in its group
+  (`isActualThirdPlace`). Predicting Team A as 3rd-and-qualifying scores nothing if Team B
+  finished 3rd — even though the qualify/eliminate call would otherwise be "right".
+- **The all-8 bonus requires `actualThirdPlaceQualifierTeamIds.size === 8`** and exact set
+  equality with the user's top 8 by rank.
+- **`completedGroups` needs ≥6 total AND ≥6 completed** matches in the group.
+- **Knockout winner falls back through three sources**: `winner_team_id`, then FT scores, then
+  PSO — so shadow cannot simply read `winner_team_id`.
+- **Penalty scores when prediction and reality AGREE ON FALSE too** — predicting "no penalties"
+  and being right pays. That is the gameable behaviour behind
+  `project_backlog_scoring_penalty_redesign`, and it must be reproduced faithfully, not "fixed"
+  here.
 
 ---
 
