@@ -111,8 +111,11 @@ async function main() {
   for (const b of blanked) console.log(`    ${b}`)
   if (blanked.length) {
     console.log(
-      '\n  Check each before dismissing: an entry with points but no predictions is\n' +
-        '  the known empty-bracket bonus inflation, where shadow is RIGHT to show 0.',
+      '\n  Check each before dismissing. An entry with points but NO predictions is\n' +
+        '  usually a manual point_adjustment, which shadow DROPS for unscored entries\n' +
+        '  (it only writes shadow_entry_totals for entries it scores) — that is real\n' +
+        '  data loss, not a correction. Read pool_entries.adjustment_reason before\n' +
+        '  assuming the empty-bracket bonus inflation.',
     )
   }
 }

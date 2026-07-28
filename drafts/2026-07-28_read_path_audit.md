@@ -112,13 +112,35 @@ Measured across all 83 enabled pools (`scripts/verify-read-paths.ts`):
 
 - 998 entries, **139 with no `shadow_entry_totals` row**
 - **none** of the 139 had submitted predictions
-- exactly **one** carried points: entry `53a55116` in `PES PREDICTS 2026 WORLD CUP WINNER`,
-  223 points with **zero** predictions
+- exactly **one** carried points: entry `53a55116` (`CEM`) in
+  `PES PREDICTS 2026 WORLD CUP WINNER`, 223 points with **zero** predictions
 
-That last one is the known empty-bracket bonus inflation, where shadow is **right** to
-show 0. So unifying the read path removes an inflated number rather than creating a
-wrong one — and the profile/admin views now agree with the leaderboard, which already
-read shadow.
+**⚠ CORRECTED 2026-07-28.** I first called that the known empty-bracket bonus inflation
+and said shadow was *right* to show 0. **Both wrong.** Checked properly, the 223 is
+`pool_entries.point_adjustment` — a MANUAL admin award, reason *"Based on submissions"*.
+There are no `match_scores`, no `bonus_scores` and no `predictions` rows at all:
+
+| field | value |
+|---|---|
+| match_points | null |
+| bonus_points | null |
+| **point_adjustment** | **223** |
+| scored_total_points | 223 |
+
+So shadow is **wrong** to show 0 — it is dropping a legitimate manual adjustment, because
+it only writes a `shadow_entry_totals` row for entries it SCORES, and an entry with no
+predictions never gets one. The adjustment lives on `pool_entries` and shadow's read path
+never consults it for an entry it has no row for.
+
+**Blast radius is exactly one entry.** Platform-wide, 164 entries carry a non-zero
+`point_adjustment`; 32 are in shadow-enabled pools; 31 of those have a shadow row and
+**all 31 carry the adjustment correctly and agree with prod**. CEM is the only casualty,
+and no further entries are at risk on a wider cutover (0 adjusted entries outside the
+enabled set lack a shadow row).
+
+**Durable fix:** shadow must materialise a row for any entry with a non-zero
+`point_adjustment`, scored or not — otherwise the same loss recurs the moment an admin
+awards points to someone who didn't submit.
 
 **Run `scripts/verify-read-paths.ts` before adding any pool to the flag**, not after.
 
