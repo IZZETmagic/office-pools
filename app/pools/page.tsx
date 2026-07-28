@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
 import { resolveEntryLevel } from '@/lib/entryLevel'
 import { pickBestEntry } from '@/lib/bestEntry'
@@ -127,6 +128,31 @@ export default async function PoolsPage() {
   }
 
   // Enrich pools with member counts and stored v2 scores
+  // --- scoring source resolution (one pass, before the per-pool work) -------
+  // These surfaces used to read match_scores / pool_entries.current_rank
+  // directly, so they showed PROD's numbers even for pools whose leaderboard
+  // had been cut over to shadow — same member, same score, two sources.
+  //
+  // The shadow_* tables are RLS deny-all (RLS on, zero policies), so they are
+  // readable only by the service role. `supabase` above is the USER client and
+  // would silently return zero rows. scoringAdmin is used ONLY to read scoring
+  // for entry ids that came out of the RLS-checked membership query, so it
+  // never widens what this user can see.
+  const scoringAdmin = createAdminClient()
+  const shadowPools = await getShadowReadPools(scoringAdmin)
+
+  // Batch the scoring read: one call for every entry on the page, rather than
+  // one per pool. Only entries in shadow-enabled pools need it — prod values
+  // are already on the pool_entries rows fetched above.
+  const shadowEntryIds = (userPools ?? []).flatMap((m: any) =>
+    shadowPools.has(m.pools?.pool_id)
+      ? ((m.pool_entries || []) as any[]).map((e) => e.entry_id)
+      : [],
+  )
+  const scoredByEntry = shadowEntryIds.length > 0
+    ? await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
+    : new Map()
+
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
       const pool = m.pools
@@ -188,23 +214,23 @@ export default async function PoolsPage() {
         }
       }
 
-      // Read stored v2 scores instead of computing on-the-fly
-      const matchPoints = defaultEntry?.match_points ?? 0
-      const bonusPoints = defaultEntry?.bonus_points ?? 0
+      // Read stored v2 scores instead of computing on-the-fly. For a
+      // shadow-enabled pool these come from shadow_entry_totals; the fallback
+      // keeps prod's pool_entries values byte-identical when the flag is off.
+      const scoring = defaultEntryId ? scoredByEntry.get(defaultEntryId) : undefined
+      const matchPoints = scoring?.match_points ?? defaultEntry?.match_points ?? 0
+      const bonusPoints = scoring?.bonus_points ?? defaultEntry?.bonus_points ?? 0
 
-      // Fetch last 5 match results from match_scores for form display
+      // Form dots + points/rank must come from the SAME source the pool's
+      // leaderboard uses, or a member sees one score here and another in the
+      // pool. Shadow tables are RLS deny-all (0 policies) so they are readable
+      // only by the service role — hence scoringAdmin, scoped to entries this
+      // user already proved access to via the RLS'd query above.
+      const source = shadowPools.has(pool.pool_id) ? 'shadow' as const : 'prod' as const
+
       let form: string[] = []
       if (defaultEntryId) {
-        const { data: recentScores } = await supabase
-          .from('match_scores')
-          .select('score_type, match_number')
-          .eq('entry_id', defaultEntryId)
-          .order('match_number', { ascending: false })
-          .limit(5)
-
-        form = (recentScores ?? [])
-          .reverse()
-          .map((s: any) => s.score_type)
+        form = await readRecentForm(scoringAdmin, defaultEntryId, source, 5)
       }
 
       return {
@@ -216,7 +242,7 @@ export default async function PoolsPage() {
         // Best (lowest) rank across all of this user's entries — the card
         // shows the user's best leaderboard position, and points/form above
         // come from this same entry (bestEntry = lowest rank by construction).
-        current_rank: defaultEntry?.current_rank ?? null,
+        current_rank: scoring?.current_rank ?? defaultEntry?.current_rank ?? null,
         // Highest XP level across all of this user's entries — matches the
         // in-pool Form tab (scored snapshot if present, else live pre-tournament
         // submission-badge level). Defaults to 1.

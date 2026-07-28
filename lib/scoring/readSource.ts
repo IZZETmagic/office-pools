@@ -285,3 +285,37 @@ export async function readBonusScores(
     description: r.description as string,
   })) as BonusScoreData[]
 }
+
+// --- recent form (last N results) -------------------------------------------
+
+/**
+ * The last N match results for ONE entry, newest-last, as score_type strings —
+ * the ▪▪▪▪▪ form dots on the My Pools / Dashboard / Profile cards.
+ *
+ * Deliberately NOT built on readMatchScores. That returns EVERY match score for
+ * the given entries, which is right for the leaderboard but wrong here: these
+ * cards need 5 rows per entry, and a user in 10 pools would pull ~1,040 rows to
+ * display 50. This keeps the original bounded query (`order by match_number
+ * desc limit N`) and only switches which table it reads — correct source AND
+ * minimal egress, which is the whole point of routing these surfaces through
+ * readSource in the first place.
+ *
+ * Both tables expose score_type + match_number, so the query shape is identical.
+ */
+export async function readRecentForm(
+  admin: AdminClient,
+  entryId: string,
+  source: ScoringSource,
+  limit = 5,
+): Promise<string[]> {
+  const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
+  const { data, error } = await admin
+    .from(table)
+    .select('score_type, match_number')
+    .eq('entry_id', entryId)
+    .order('match_number', { ascending: false })
+    .limit(limit)
+  // Form is decorative — a failure must not take down the pools list.
+  if (error) return []
+  return (data ?? []).reverse().map((s: { score_type: string }) => s.score_type)
+}
