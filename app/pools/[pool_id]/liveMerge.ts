@@ -1,4 +1,4 @@
-import type { MatchData, MatchScoreData, MemberData } from './types'
+import type { MatchData, MatchScoreNarrow, MemberData } from './types'
 import type { PoolLiveResponse } from '@/app/api/pools/[pool_id]/live/route'
 
 /**
@@ -102,9 +102,9 @@ export function mergeMembers(prev: MemberData[], live: PoolLiveResponse): Member
  * because that match was scored for the first time since page load.
  */
 export function mergeMatchScores(
-  prev: MatchScoreData[],
+  prev: MatchScoreNarrow[],
   live: PoolLiveResponse,
-): MatchScoreData[] {
+): MatchScoreNarrow[] {
   if (live.scores.length === 0) return prev
   const key = (entryId: string, matchId: string) => `${entryId}:${matchId}`
   const incoming = new Map(live.scores.map((s) => [key(s.entry_id, s.match_id), s]))

@@ -301,6 +301,25 @@ export type BPKnockoutPick = {
 // STORED MATCH SCORES (from scoring engine)
 // ========================
 
+/**
+ * The subset of match_scores the POOL-WIDE payload carries.
+ *
+ * The wide MatchScoreData below has 22 columns and is 8,477 kB for a 192-entry
+ * pool; these 8 are 3,698 kB. Only per-entry detail views (PointsBreakdownModal,
+ * results/MatchCard) read the other 14, and they only ever look at ONE entry —
+ * so those fetch on demand instead of every pool open paying for all of them.
+ */
+export type MatchScoreNarrow = {
+  id: string
+  entry_id: string
+  match_id: string
+  pool_id: string
+  match_number: number
+  stage: string
+  score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+  total_points: number
+}
+
 export type MatchScoreData = {
   id: string
   entry_id: string

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import type { MatchScoreData } from '@/app/pools/[pool_id]/types'
-import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
+import type { MatchScoreNarrow } from '@/app/pools/[pool_id]/types'
+import { getScoringSource, readEntryScoring, readMatchScoresNarrow } from '@/lib/scoring/readSource'
 
 // =============================================================
 // GET /api/pools/:pool_id/live
@@ -50,7 +50,7 @@ export type PoolLiveResponse = {
   /** Full rows, not a narrowed shape — the client merges them into the array
    * it already holds, so they must be the same type. Bounded by live matches
    * × entries, so a handful of matches' worth. */
-  scores: MatchScoreData[]
+  scores: MatchScoreNarrow[]
   matches: Array<{
     match_id: string
     status: string
@@ -136,11 +136,11 @@ async function handleGET(
 
   // Between matchdays there are no live matches, so this runs no query at all
   // and the response is just the leaderboard totals.
-  let scores: MatchScoreData[] = []
+  let scores: MatchScoreNarrow[] = []
   if (liveIds.length > 0) {
     // Same reader the full payload uses, so shadow/prod column differences and
     // the synthesised shadow id are handled in one place.
-    scores = await readMatchScores(admin, entryIds, source, { matchIds: liveIds })
+    scores = await readMatchScoresNarrow(admin, entryIds, source, liveIds)
   }
 
   const entries: LiveEntry[] = entryIds.map((id) => {

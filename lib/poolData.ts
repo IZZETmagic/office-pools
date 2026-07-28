@@ -21,7 +21,7 @@
 // ============================================================================
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getScoringSource, readEntryScoring, readMatchScores, readBonusScores } from '@/lib/scoring/readSource'
+import { getScoringSource, readEntryScoring, readMatchScoresNarrow, readBonusScores } from '@/lib/scoring/readSource'
 import type {
   PoolData,
   MemberData,
@@ -30,7 +30,7 @@ import type {
   SettingsData,
   PredictionData,
   TeamData,
-  MatchScoreData,
+  MatchScoreNarrow,
   BonusScoreData,
   PodiumResult,
 } from '@/app/pools/[pool_id]/types'
@@ -85,7 +85,7 @@ export type PoolSharedData = {
     direct_red_cards: number
     yellow_direct_red_cards: number
   }[]
-  matchScores: MatchScoreData[]
+  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
   bpProvisionalScoring: boolean
   // Final tournament podium (from tournament_awards), or null until finalized.
@@ -239,7 +239,10 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   // The heavy, per-pool, all-entries pulls — all paginated, all admin client.
   const [bonusScores, matchScores, allPredictions] = await Promise.all([
     safeRead(readBonusScores(admin, allEntryIds, source), [] as BonusScoreData[]),
-    safeRead(readMatchScores(admin, allEntryIds, source), [] as MatchScoreData[]),
+    // Narrow: the pool-wide array only feeds leaderboard aggregates. The 14
+    // wide columns are read by PointsBreakdownModal and results/MatchCard, which
+    // both look at ONE entry — they fetch those on demand.
+    safeRead(readMatchScoresNarrow(admin, allEntryIds, source), [] as MatchScoreNarrow[]),
     allEntryIds.length
       ? fetchAllPages<PredictionData>('predictions', (from, to) =>
           admin

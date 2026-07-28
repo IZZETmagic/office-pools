@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
 import type { PoolSettings } from './results/points'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
@@ -25,7 +25,7 @@ import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 type AnalyticsTabProps = {
   matches: MatchData[]
   allPredictions: PredictionData[]
-  matchScores: MatchScoreData[]
+  matchScores: MatchScoreNarrow[]
   members: MemberData[]
   teams: TeamData[]
   conductData: MatchConductData[]

@@ -44,6 +44,7 @@ import type {
   TeamData,
   ExistingPrediction,
   MatchScoreData,
+  MatchScoreNarrow,
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
@@ -114,7 +115,7 @@ type PoolDetailProps = {
   allPredictions: PredictionData[]
   teams: TeamData[]
   conductData: MatchConductData[]
-  matchScores: MatchScoreData[]
+  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
   memberId: string | null
   currentUserId: string
@@ -251,6 +252,23 @@ export function PoolDetail({
     userEntries[0]?.entry_id || ''
   )
   const activeEntry = entries.find(e => e.entry_id === activeEntryId) || entries[0] || null
+
+  // Full 22-column rows for the ACTIVE entry only. The pool-wide `matchScores`
+  // carries 8 columns; the results view and the points breakdown need the other
+  // 14 (predicted/actual scores, PSO, team ids) but only ever for one entry.
+  // Fetching ~104 rows here instead of shipping 13,385 wide rows on every pool
+  // open is the difference between 3,698 kB and 8,477 kB of payload.
+  const [activeEntryScores, setActiveEntryScores] = useState<MatchScoreData[]>([])
+  useEffect(() => {
+    const entryId = activeEntry?.entry_id
+    if (!entryId) { setActiveEntryScores([]); return }
+    let cancelled = false
+    fetch(`/api/pools/${pool.pool_id}/entries/${entryId}/match-scores`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { scores: [] }))
+      .then(d => { if (!cancelled) setActiveEntryScores(d.scores ?? []) })
+      .catch(() => { if (!cancelled) setActiveEntryScores([]) })
+    return () => { cancelled = true }
+  }, [pool.pool_id, activeEntry?.entry_id])
 
   // Entry rename state
   const [editingEntryName, setEditingEntryName] = useState(false)
@@ -1314,6 +1332,7 @@ export function PoolDetail({
         <div key={activeTab} className="tab-transition">
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
+                poolId={pool.pool_id}
                 members={members}
                 matchScores={matchScores}
                 bonusScores={bonusScores}
@@ -1738,7 +1757,7 @@ export function PoolDetail({
                 isAdmin={isAdmin}
                 members={members}
                 allPredictions={allPredictions}
-                matchScores={matchScores}
+                matchScores={activeEntryScores}
                 currentEntryId={activeEntry?.entry_id || ''}
                 userEntries={entries}
               />

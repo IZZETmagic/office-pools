@@ -33,7 +33,7 @@
 // TTL.
 // ============================================================================
 import { createAdminClient } from '@/lib/supabase/server'
-import type { MatchScoreData, BonusScoreData } from '@/app/pools/[pool_id]/types'
+import type { MatchScoreData, MatchScoreNarrow, BonusScoreData } from '@/app/pools/[pool_id]/types'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -404,4 +404,27 @@ export async function readRecentMatchScoreEvents(
     .limit(limit)
   if (error) return []
   return (data ?? []) as unknown as MatchScoreEvent[]
+}
+
+
+/** The 8 columns the pool-wide payload needs — see MatchScoreNarrow. */
+const MATCH_SCORE_NARROW_COLS = 'entry_id, match_id, pool_id, match_number, stage, score_type, total_points'
+
+export async function readMatchScoresNarrow(
+  admin: AdminClient,
+  entryIds: string[],
+  source: ScoringSource,
+  matchIds?: string[],
+): Promise<MatchScoreNarrow[]> {
+  if (entryIds.length === 0) return []
+  const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
+  const columns = source === 'shadow' ? MATCH_SCORE_NARROW_COLS : 'id, ' + MATCH_SCORE_NARROW_COLS
+  const rows = await paginateByEntry<Record<string, unknown>>(
+    admin, table, columns, entryIds, ['entry_id', 'match_id'], undefined,
+    matchIds?.length ? { column: 'match_id', values: matchIds } : undefined,
+  )
+  return rows.map((r) => ({
+    id: (r.id as string | undefined) ?? `${r.entry_id as string}:${r.match_id as string}`,
+    ...(r as Omit<MatchScoreNarrow, 'id'>),
+  })) as MatchScoreNarrow[]
 }

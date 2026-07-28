@@ -1,5 +1,5 @@
 import { calculatePoints, checkKnockoutTeamsMatch, type PoolSettings, type PointsResult } from '../results/points'
-import type { MatchData, PredictionData, TeamData, MemberData, MatchScoreData } from '../types'
+import type { MatchData, PredictionData, TeamData, MemberData, MatchScoreNarrow } from '../types'
 import type { MatchConductData, ScoreEntry } from '@/lib/tournament'
 import { resolvePredictedBracket } from '@/lib/bracketResolver'
 
@@ -19,7 +19,7 @@ export type PredictionResult = {
  * Convert stored match_scores to PredictionResult[] (single source of truth).
  * Use this instead of computePredictionResults() for client-side code.
  */
-export function matchScoresToPredictionResults(matchScores: MatchScoreData[]): PredictionResult[] {
+export function matchScoresToPredictionResults(matchScores: MatchScoreNarrow[]): PredictionResult[] {
   return matchScores
     .map(ms => ({
       matchId: ms.match_id,

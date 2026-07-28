@@ -5,7 +5,7 @@ import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
-import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult } from './types'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreNarrow, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
@@ -15,7 +15,8 @@ import { computeFullXPBreakdown, computeLevel } from './analytics/xpSystem'
 
 type LeaderboardTabProps = {
   members: MemberData[]
-  matchScores: MatchScoreData[]
+  poolId: string
+  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
   matches: MatchData[]
   teams: TeamData[]
@@ -54,6 +55,7 @@ function toTournamentTeams(teams: TeamData[]): Team[] {
 
 export function LeaderboardTab({
   members,
+  poolId,
   matchScores,
   bonusScores,
   matches,
@@ -89,7 +91,7 @@ export function LeaderboardTab({
 
   // Build match_scores lookup: entry_id → MatchScoreData[]
   const matchScoresByEntry = useMemo(() => {
-    const map = new Map<string, MatchScoreData[]>()
+    const map = new Map<string, MatchScoreNarrow[]>()
     for (const ms of matchScores) {
       const existing = map.get(ms.entry_id) || []
       existing.push(ms)
@@ -100,7 +102,7 @@ export function LeaderboardTab({
 
   // Build match_scores lookup: entry_id → match_id → MatchScoreData
   const matchScoresLookup = useMemo(() => {
-    const map = new Map<string, Map<string, MatchScoreData>>()
+    const map = new Map<string, Map<string, MatchScoreNarrow>>()
     for (const ms of matchScores) {
       if (!map.has(ms.entry_id)) map.set(ms.entry_id, new Map())
       map.get(ms.entry_id)!.set(ms.match_id, ms)
@@ -936,6 +938,21 @@ export function LeaderboardTab({
   // =============================================
 
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
+
+  // The breakdown modal needs the full 22-column rows, and it can be opened for
+  // ANY member — so they are fetched for that one entry when it opens, rather
+  // than shipped for all 13,385 rows on every pool open. ~104 rows on click.
+  const [breakdownScores, setBreakdownScores] = useState<MatchScoreData[]>([])
+  useEffect(() => {
+    const entryId = selectedEntry?.entry_id
+    if (!entryId) { setBreakdownScores([]); return }
+    let cancelled = false
+    fetch(`/api/pools/${poolId}/entries/${entryId}/match-scores`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { scores: [] }))
+      .then(d => { if (!cancelled) setBreakdownScores(d.scores ?? []) })
+      .catch(() => { if (!cancelled) setBreakdownScores([]) })
+    return () => { cancelled = true }
+  }, [poolId, selectedEntry?.entry_id])
   const [visibleCount, setVisibleCount] = useState(20)
 
   // The selected entry's PREDICTED podium (champion/runner-up/third), derived from
@@ -1713,7 +1730,7 @@ export function LeaderboardTab({
           isMultiEntry={isMultiEntry}
           poolSettings={poolSettings}
           matches={matches}
-          entryMatchScores={matchScoresByEntry.get(selectedEntry.entry_id) || []}
+          entryMatchScores={breakdownScores}
           predictionMode={predictionMode}
           actualPodium={tournamentAwards}
           predictedPodium={selectedPredictedPodium}
