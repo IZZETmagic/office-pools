@@ -319,3 +319,73 @@ export async function readRecentForm(
   if (error) return []
   return (data ?? []).reverse().map((s: { score_type: string }) => s.score_type)
 }
+
+/**
+ * Minimal per-match classification for a set of entries: which result type each
+ * prediction earned and how many points. Used by the Profile page to label a
+ * user's predictions across every pool they're in.
+ *
+ * Four columns, not the 22 in MATCH_SCORE_SHARED_COLS. readMatchScores is the
+ * right call when the caller renders a full breakdown; here it would ship ~5x
+ * the bytes to render a label. Paginated, so it also fixes the silent
+ * PostgREST 1,000-row truncation the previous direct `.in()` query had — a user
+ * in enough pools would simply stop seeing older predictions classified.
+ */
+export async function readMatchScoreClassification(
+  admin: AdminClient,
+  entryIds: string[],
+  source: ScoringSource,
+): Promise<Array<{ entry_id: string; match_id: string; score_type: string; total_points: number }>> {
+  if (entryIds.length === 0) return []
+  const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
+  return paginateByEntry(
+    admin,
+    table,
+    'entry_id, match_id, score_type, total_points',
+    entryIds,
+    ['entry_id', 'match_id'],
+  )
+}
+
+export type MatchScoreEvent = {
+  entry_id: string
+  pool_id: string
+  match_id: string
+  match_number: number
+  score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+  total_points: number
+  actual_home_score: number | null
+  actual_away_score: number | null
+  calculated_at: string
+}
+
+/**
+ * The N most recently scored matches for a set of entries — the activity feed's
+ * source. Bounded by `limit` rather than paginated: the feed shows recent events,
+ * so pulling every historical row to discard all but the newest would be pure
+ * egress.
+ *
+ * Callers with entries spanning both sources should call this once per source
+ * and merge: the global top-N is always a subset of (top-N from each), so
+ * concatenating and re-sorting is exact, not an approximation.
+ */
+export async function readRecentMatchScoreEvents(
+  admin: AdminClient,
+  entryIds: string[],
+  source: ScoringSource,
+  limit = 200,
+): Promise<MatchScoreEvent[]> {
+  if (entryIds.length === 0) return []
+  const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
+  const { data, error } = await admin
+    .from(table)
+    .select(
+      'entry_id, pool_id, match_id, match_number, score_type, total_points, ' +
+        'actual_home_score, actual_away_score, calculated_at',
+    )
+    .in('entry_id', entryIds)
+    .order('calculated_at', { ascending: false })
+    .limit(limit)
+  if (error) return []
+  return (data ?? []) as unknown as MatchScoreEvent[]
+}

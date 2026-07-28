@@ -17,14 +17,17 @@ ever see shadow.
 | Public boards `/play/*` | `readSource` | ✅ |
 | `lib/poolData.ts` (the shared pool fetch) | `readSource` | ✅ |
 | `lib/analytics/entryAnalytics.ts` | `readSource` | ✅ |
-| **Web — My Pools list** (`app/pools/page.tsx:199`) | **direct `match_scores` + `pool_entries.current_rank`** | ❌ |
-| **Web — Dashboard** (`app/dashboard/page.tsx:286`) | **direct `match_scores`** | ❌ |
-| **Web — Profile** (`app/profile/page.tsx:289`) | **direct `match_scores`** | ❌ |
-| **Web — Activity API** (`app/api/users/[user_id]/activity/route.ts:603`) | **direct `match_scores`** | ❌ |
-| **Web — Admin Scoring tab** | **direct `pool_entries.current_rank`** | ❌ |
+| Web — My Pools list (`app/pools/page.tsx`) | `readSource` | ✅ fixed |
+| Web — Dashboard (`app/dashboard/page.tsx`) | `readSource` | ✅ fixed |
+| Web — Profile (`app/profile/page.tsx`) | `readSource` | ✅ fixed |
+| Web — Activity API (`app/api/users/[user_id]/activity/route.ts`) | `readSource` | ✅ fixed |
+| Web — Admin pool + user routes (`app/api/admin/{pools,users}/[id]`) | `readSource` | ✅ fixed |
 | **RN — Home screen** (`mobile/lib/useHomeData.ts:436,627`) | **direct PostgREST `match_scores`** | ❌ |
 
-**Consequence, live right now:** all 859 bracket_picker members read shadow on the pool
+**Every web surface now resolves through `readSource`.** Only the RN direct-PostgREST
+hooks remain, and they cannot be fixed in place — see §1a.
+
+**Consequence before the fix:** all 859 bracket_picker members read shadow on the pool
 leaderboard, and prod on the My Pools list and the app home screen. Same member, same score, two
 sources. They agree today only because prod and shadow are at parity — the moment they diverge
 (a bug, a stale sweep, a rollback) the two surfaces disagree and there is no signal telling anyone.
@@ -74,17 +77,73 @@ query fix. See the architecture plan §5.2a and §6.1.
 
 ---
 
+## 2b. Three readers, not one — over-fetch is a real trap here
+
+Routing a surface through `readSource` is not automatically a win. `readMatchScores`
+returns the 22 columns in `MATCH_SCORE_SHARED_COLS`; Profile needs 4 and the activity
+feed needs 9. Using the general reader would have fixed the source while making the
+egress **worse** — the opposite of the goal. So the module now has three readers, chosen
+by what the surface renders:
+
+| Reader | Columns | Bounding | Used by |
+|---|---|---|---|
+| `readMatchScores` | 22 | paginated (all rows) | full breakdowns |
+| `readMatchScoreClassification` | 4 | paginated (all rows) | Profile prediction labels |
+| `readRecentMatchScoreEvents` | 9 | `limit` (newest N) | activity feed |
+| `readRecentForm` | 2 | `limit 5` | form dots |
+
+Profile's previous query was also **unpaginated** — a user in enough pools silently hit
+PostgREST's 1,000-row cap and stopped seeing older predictions classified. Fixed by
+construction now.
+
+For entries spanning both sources (a user in one cut-over pool and one prod pool), the
+feed reads each source separately and merges: the global newest-N is a subset of
+(newest-N from each), so this is exact, not an approximation.
+
+---
+
+## 2c. The zero-fill hazard these overlays inherit
+
+`readEntryScoring` back-fills any requested entry that has no row as all-zero. That is
+right for the leaderboard, but every surface now overlaying shadow onto `pool_entries`
+inherits it: an enabled pool whose entries lack `shadow_entry_totals` rows renders zeros
+where prod showed a number.
+
+Measured across all 83 enabled pools (`scripts/verify-read-paths.ts`):
+
+- 998 entries, **139 with no `shadow_entry_totals` row**
+- **none** of the 139 had submitted predictions
+- exactly **one** carried points: entry `53a55116` in `PES PREDICTS 2026 WORLD CUP WINNER`,
+  223 points with **zero** predictions
+
+That last one is the known empty-bracket bonus inflation, where shadow is **right** to
+show 0. So unifying the read path removes an inflated number rather than creating a
+wrong one — and the profile/admin views now agree with the leaderboard, which already
+read shadow.
+
+**Run `scripts/verify-read-paths.ts` before adding any pool to the flag**, not after.
+
+### One trap worth naming
+
+`requireSuperAdmin()` hands back the **user-scoped** client, not the service role. Shadow
+tables are RLS deny-all (0 policies), so reading them with it returns nothing and
+`readEntryScoring` zero-fills — which would have blanked every score in the super-admin
+view, the one place a score discrepancy actually gets diagnosed. The admin user route
+creates its own `createAdminClient()` for this; the admin pool route already had one.
+
+---
+
 ## 3. What to do, in order
 
 | # | Change | Why here |
 |---|---|---|
-| 1 | **Route the 5 web bypass surfaces through `readSource`** (My Pools, Dashboard, Profile, Activity API, Admin Scoring) | Pure server-side; removes the same-member-two-sources split on web. Smallest real win. |
+| ~~1~~ | ~~Route the 5 web bypass surfaces through `readSource`~~ | ✅ **done** — all web surfaces resolve through `readSource` |
 | 2 | **Move the RN home-screen scoring reads behind an API route that uses `readSource`** | The larger half. Do NOT reimplement source resolution in the app. |
 | 3 | **Kill the 30s full-page poll / ship derived consensus** | The actual egress reduction — §2a |
 | 4 | Narrow the remaining web `select('*')` | Real but small; bounded queries already |
 
 Only after 1 and 2 can `prod_scoring_enabled` go false without leaving surfaces reading dead
-columns.
+columns. **1 is done; 2 is the remaining blocker.**
 
 ---
 
@@ -93,6 +152,9 @@ columns.
 A surface is correctly wired when, for a shadow-enabled pool, it renders the **same** numbers as
 the pool leaderboard. The practical test: enable one pool, then compare its member's score on the
 leaderboard vs the My Pools list vs the app home screen. Today those can silently differ.
+
+`scripts/verify-read-paths.ts` automates both halves: it exercises the readers against
+live data and reports the zero-fill risk per enabled pool.
 
 For egress specifically: re-measure with `pg_stat_statements` **after a counter reset** (the
 337.5-hour cumulative figure predates every fix), and read the actual bytes from the Vercel and

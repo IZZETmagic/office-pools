@@ -14,6 +14,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fanOutResultPushes } from '@/lib/push/match-results'
 import { detectAndPushBadgesForPool } from '@/lib/push/badges'
 import { invalidatePoolCache } from '@/lib/poolData'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import type {
   ScoringResult,
   MatchScoreRow,
@@ -100,7 +101,7 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
     const [
       { data: matches },
       { data: teams },
-      { data: conductData },
+      conductData,
       { data: settingsRow },
       { data: tournamentAwardsRow },
       { data: poolMembers },
@@ -114,9 +115,10 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
         .from('teams')
         .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
         .eq('tournament_id', pool.tournament_id),
-      adminClient
-        .from('match_conduct')
-        .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+      // Scoped to this tournament. An unfiltered read is silently capped at
+      // 1,000 rows by PostgREST — in a SCORING path that means bonuses computed
+      // against truncated conduct data, with no error raised.
+      fetchMatchConductForTournament(adminClient, pool.tournament_id),
       adminClient
         .from('pool_settings')
         .select('*')
@@ -146,7 +148,7 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
 
     const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
     const tournamentAwards: TournamentAwards | null = tournamentAwardsRow || null
-    const conduct: ConductData[] = conductData || []
+    const conduct: ConductData[] = conductData
     const teamsData: TeamData[] = (teams as any[]).map(t => ({
       ...t,
       group_letter: t.group_letter?.trim() || '',

@@ -9,7 +9,7 @@ import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, Mat
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
-import { computeStreaks, computeCrowdPredictions } from './analytics/analyticsHelpers'
+import { computeStreaks, computeCrowdConsensus, applyCrowdOverlay } from './analytics/analyticsHelpers'
 // Types used implicitly through function returns
 import { computeFullXPBreakdown, computeLevel } from './analytics/xpSystem'
 
@@ -517,6 +517,11 @@ export function LeaderboardTab({
       predsByEntry.set(p.entry_id, arr)
     }
 
+    // Pool-wide and identical for every entry — computed once, not once per row.
+    // This used to re-scan every prediction in the pool inside the loop below,
+    // in the browser, on the largest pools that is ~2.6M iterations per render.
+    const crowdConsensus = computeCrowdConsensus(matches, allPredictions, members)
+
     for (const entry of sorted) {
       const entryPreds = predsByEntry.get(entry.entry_id) || []
       const mPts = entry.match_points ?? storedMatchPointsMap.get(entry.entry_id) ?? 0
@@ -557,7 +562,7 @@ export function LeaderboardTab({
         .map(r => r.type)
 
       // Compute crowd data per entry for XP + contrarian stats
-      const crowdForEntry = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
+      const crowdForEntry = applyCrowdOverlay(crowdConsensus, entryPreds)
       const contrarianWins = crowdForEntry.filter(c => c.userIsContrarian && c.userWasCorrect).length
       const crowdAgreementPct = crowdForEntry.length > 0
         ? (crowdForEntry.filter(c => !c.userIsContrarian).length / crowdForEntry.length) * 100

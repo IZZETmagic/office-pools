@@ -11,11 +11,38 @@
 //
 // Triggered from recalculatePool after match-results fan-out so badge pushes
 // arrive shortly after the match that earned them.
+//
+// ---------------------------------------------------------------------------
+// XP OWNERSHIP (fixed 2026-07-26 — see drafts/2026-07-26_analytics_parity_result.md)
+//
+// This file used to compute its OWN total_xp as `Σ match_scores.total_points +
+// badgeXP` and write it to entry_xp_state.total_xp / .current_level. That is a
+// different QUANTITY from the XP the rest of the product means: computeFullXP-
+// Breakdown uses BASE_XP[tier] x STAGE_MULTIPLIERS plus crowd/streak bonus
+// events. Both were compared against the same LEVELS.xpRequired thresholds and
+// both wrote the same two columns, last-writer-wins — so the level shown on
+// /pools and /dashboard depended on which path last touched the row.
+//
+// entry_xp_state.total_xp / .current_level now have exactly ONE definition:
+// computeFullXPBreakdown, reached via computePoolEntryAnalytics. This file
+// consumes that value; it no longer invents one. The slim badge set below is
+// unchanged and still drives badge pushes, so push behaviour is untouched.
+// ---------------------------------------------------------------------------
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { BADGE_DEFINITIONS, LEVELS } from '@/app/pools/[pool_id]/analytics/xpSystem'
+import { computePoolEntryAnalytics, type EntryAnalyticsRow } from '@/lib/analytics/entryAnalytics'
 import { sendPushToUser } from './apns'
 import { isProdScoringEnabled } from '@/lib/scoring/prodScoringFlag'
+
+/**
+ * The authoritative analytics row for one entry, or null when it could not be
+ * computed. Carries XP/level (the columns this file used to invent) AND the
+ * analytics columns — we compute them all in one pass, so we persist them all
+ * rather than throwing the rest away. That keeps entry_xp_state fresh as a
+ * by-product of scoring, instead of depending on a separate sweep.
+ */
+export type EntryXP = EntryAnalyticsRow | null
 
 type Snapshot = {
   current_level: number
@@ -24,8 +51,9 @@ type Snapshot = {
 }
 
 type BadgeState = {
-  totalXP: number
-  currentLevel: number
+  /** Mirrors the authoritative XP passed in — never computed here. */
+  totalXP: number | null
+  currentLevel: number | null
   earnedBadgeIds: string[]
 }
 
@@ -111,6 +139,27 @@ export async function detectAndPushBadgesForPool(poolId: string): Promise<void> 
   }
   const matches = (rawMatches ?? []) as MatchRow[]
 
+  // 4b. Authoritative XP + level for every entry in the pool — computed ONCE,
+  // in bulk, from the single shared definition (computeFullXPBreakdown). This
+  // replaces the per-entry points-based figure this file used to invent.
+  //
+  // Cost note: this is a handful of bulk queries for the whole pool, versus the
+  // 3-queries-per-entry that computeBadgeState still issues below — so on a
+  // large pool this is cheaper than what it displaces, not an addition.
+  //
+  // On failure we deliberately DO NOT fall back to a locally-derived number:
+  // a wrong level is worse than a stale one. xpByEntry stays empty, the two
+  // columns are omitted from the upsert (leaving any existing value untouched),
+  // and level-up pushes are skipped for this run.
+  const xpByEntry = new Map<string, EntryAnalyticsRow>()
+  try {
+    for (const row of await computePoolEntryAnalytics(adminClient, poolId)) {
+      xpByEntry.set(row.entry_id, row)
+    }
+  } catch (err) {
+    console.error('[badges] XP compute failed for', poolId, '— XP columns left untouched:', err)
+  }
+
   // 5. Process each entry. Settle in parallel; ignore individual failures.
   await Promise.allSettled(
     entries.map((e) => {
@@ -126,6 +175,9 @@ export async function detectAndPushBadgesForPool(poolId: string): Promise<void> 
         tournamentId,
         matches,
         totalEntries,
+        // Entries with no predictions get no analytics row — they have no XP
+        // to speak of, and computeBadgeState will find no scores either.
+        xp: xpByEntry.get(e.entry_id) ?? null,
       }).catch((err) => console.error('[badges] entry fan-out failed', e.entry_id, err))
     }),
   )
@@ -141,10 +193,11 @@ async function detectAndPushBadgesForEntry(args: {
   tournamentId: string
   matches: MatchRow[]
   totalEntries: number
+  xp: EntryXP
 }): Promise<void> {
-  const { adminClient, entryId, entryName, poolId, poolName, userId, tournamentId, matches, totalEntries } = args
+  const { adminClient, entryId, entryName, poolId, poolName, userId, tournamentId, matches, totalEntries, xp } = args
 
-  const state = await computeBadgeState(adminClient, entryId, matches, totalEntries)
+  const state = await computeBadgeState(adminClient, entryId, matches, totalEntries, xp)
 
   // Load existing snapshot.
   const { data: snapshot } = (await adminClient
@@ -154,14 +207,47 @@ async function detectAndPushBadgesForEntry(args: {
     .maybeSingle()) as { data: Snapshot | null }
 
   // Upsert new snapshot (always done — keeps state in sync even on first run).
-  await adminClient.from('entry_xp_state').upsert({
+  // The XP + analytics columns are OMITTED when they could not be computed: on
+  // conflict PostgREST only SETs the columns present, so existing values are
+  // left intact rather than clobbered with a guess.
+  //
+  // The error IS checked, and loudly. This upsert names highest_level_reached
+  // (migration 026). If this code ever runs against a database where 026 has
+  // not been applied, PostgREST rejects the ENTIRE upsert — not just that
+  // column — so earned_badge_ids and `seeded` would silently stop updating
+  // while the push paths below kept firing. That failure is invisible without
+  // this check. Same class of bug as the swallowed pool_members error that made
+  // this whole pipeline a no-op for months (see the note in step 2 above).
+  const { error: snapshotErr } = await adminClient.from('entry_xp_state').upsert({
     entry_id: entryId,
-    total_xp: state.totalXP,
-    current_level: state.currentLevel,
+    ...(xp
+      ? {
+          total_xp: xp.total_xp,
+          current_level: xp.current_level,
+          highest_level_reached: xp.highest_level_reached,
+          // Persisted here too so the precomputed analytics stay fresh as a
+          // by-product of scoring — we already paid to compute them above.
+          last_five: xp.last_five,
+          current_streak: xp.current_streak,
+          hit_rate: xp.hit_rate,
+          total_completed: xp.total_completed,
+          exact_count: xp.exact_count,
+          contrarian_wins: xp.contrarian_wins,
+          crowd_agreement_pct: xp.crowd_agreement_pct,
+          analytics_updated_at: xp.analytics_updated_at,
+        }
+      : {}),
     earned_badge_ids: state.earnedBadgeIds,
     seeded: true,
     updated_at: new Date().toISOString(),
   })
+  if (snapshotErr) {
+    console.error('[badges] entry_xp_state upsert FAILED for', entryId, '—', snapshotErr.message)
+    // Bail before pushing. The snapshot is the diff basis for "what's new": if
+    // it didn't persist, the next run re-derives the same badges and levels as
+    // new and pushes them again. Staying silent is the safe failure.
+    return
+  }
 
   // Permanent, append-only record of every badge this entry has earned. Unlike
   // earned_badge_ids above (a mutable snapshot that shrinks when a later
@@ -194,7 +280,9 @@ async function detectAndPushBadgesForEntry(args: {
   const previousBadgeIds = snapshot.earned_badge_ids ?? []
   const newBadgeIds = state.earnedBadgeIds.filter((id) => !previousBadgeIds.includes(id))
   const previousLevel = snapshot.current_level ?? 1
-  const leveledUp = state.currentLevel > previousLevel
+  // No authoritative level this run ⇒ no level-up claim. Never infer a crossing
+  // from a number we didn't compute.
+  const leveledUp = state.currentLevel !== null && state.currentLevel > previousLevel
 
   // Fire badge pushes (one per newly earned badge).
   for (const badgeId of newBadgeIds) {
@@ -282,6 +370,7 @@ async function computeBadgeState(
   entryId: string,
   matches: MatchRow[],
   totalEntries: number,
+  xp: EntryXP,
 ): Promise<BadgeState> {
   // Shadow-cutover mode (prod scoring off): read scores from the shadow table.
   const scoreTable = (await isProdScoringEnabled(adminClient)) ? 'match_scores' : 'shadow_match_scores'
@@ -390,21 +479,19 @@ async function computeBadgeState(
     }
   }
 
-  // ⭐ legend — Level 10 (totalXP >= 7500). Computed AFTER badge bonuses so
-  // legend can stack on top of everything else.
-  const matchPoints = scores.reduce((sum, s) => sum + s.total_points, 0)
-  const badgeXP = earnedIds.reduce((sum, id) => {
-    const b = BADGE_DEFINITIONS.find((b) => b.id === id)
-    return sum + (b?.xpBonus ?? 0)
-  }, 0)
-  const totalXP = matchPoints + badgeXP
-  if (totalXP >= 7500) earnedIds.push('legend')
+  // ⭐ legend — Level 10. Uses the AUTHORITATIVE XP (computeFullXPBreakdown),
+  // not a locally-derived figure. This file previously computed
+  // `Σ match_scores.total_points + badgeXP` here and treated it as XP — a
+  // different quantity measured against the same LEVELS thresholds. See the
+  // XP OWNERSHIP note at the top of this file.
+  //
+  // Note the badge XP that computeFullXPBreakdown folds in comes from ITS badge
+  // set, which is the fuller one (it includes dark_horse). That is intended:
+  // XP is a whole-product number, while the slim set below exists only to
+  // decide which badge PUSHES to fire.
+  if (xp && xp.total_xp >= 7500) earnedIds.push('legend')
 
-  // Map total XP → level number.
-  let currentLevel = 1
-  for (const level of LEVELS) {
-    if (totalXP >= level.xpRequired) currentLevel = level.level
-  }
-
-  return { totalXP, currentLevel, earnedBadgeIds: earnedIds }
+  // Level is whatever the shared definition says. Null when unavailable — the
+  // caller then omits the column and skips level-up pushes.
+  return { totalXP: xp?.total_xp ?? null, currentLevel: xp?.current_level ?? null, earnedBadgeIds: earnedIds }
 }

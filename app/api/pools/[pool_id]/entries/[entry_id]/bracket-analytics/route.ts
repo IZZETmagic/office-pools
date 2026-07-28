@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllPages } from '@/lib/poolData'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import type { GroupStanding, Team, MatchConductData, PredictionMap, ScoreEntry } from '@/lib/tournament'
 import type { BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, TeamData, MatchData } from '@/app/pools/[pool_id]/types'
@@ -82,7 +83,7 @@ async function handleGET(
   const [
     { data: matches },
     { data: teams },
-    { data: conductData },
+    conductData,
     { data: members },
     { data: entryGroupRankings },
     { data: entryThirdPlaceRankings },
@@ -97,9 +98,7 @@ async function handleGET(
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    adminClient
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournament(adminClient, pool.tournament_id),
     adminClient
       .from('pool_members')
       .select('member_id, pool_entries(entry_id, has_submitted_predictions)')
@@ -122,7 +121,7 @@ async function handleGET(
     return NextResponse.json({ error: 'Failed to fetch pool data' }, { status: 500 })
   }
 
-  const conduct: MatchConductData[] = conductData || []
+  const conduct: MatchConductData[] = conductData
   const teamsData: TeamData[] = (teams as any[]).map(t => ({
     ...t,
     group_letter: t.group_letter?.trim() || '',

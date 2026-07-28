@@ -222,9 +222,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>decisions already made</strong>, so they don't get re-litigated. A <em>programme</em>, not a roadmap,
       because SportPool is now several distinct projects running under one banner rather than one ordered list.</p>
     <div class="src">
-      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>486430a</code> plus the 2026-07-26
-      additions (<em>Where this stands</em> and <em>Order of deliveries</em>), <strong>not yet committed</strong>. The markdown
-      is the source of truth — <strong>if these two ever disagree, the markdown wins.</strong>
+      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>e2da3ab</code> plus the 2026-07-26
+      <em>performance session</em> additions (<em>⚡ Performance &amp; caching</em>, the <em>XP has two writers</em> item, and
+      risks <strong>R13–R16</strong>), <strong>not yet committed</strong>. The markdown is the source of truth —
+      <strong>if these two ever disagree, the markdown wins.</strong>
     </div>
   </div>
 </header>
@@ -235,11 +236,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <a href="#status">Status</a>
     <a href="#risks">Risk register</a>
     <a href="#order">Order of deliveries</a>
+    <a href="#design-system">🏗️ System design</a>
     <a href="#projects">Projects</a>
     <a href="#decisions">Settled decisions</a>
     <a href="#now">🔥 Now</a>
     <a href="#recurring">Recurring</a>
     <a href="#next-scale">Next · scale</a>
+    <a href="#perf">⚡ Perf &amp; caching</a>
     <a href="#next-scoring">Next · scoring</a>
     <a href="#epl">Showdown / EPL</a>
     <a href="#features">Features</a>
@@ -271,7 +274,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       the append-only badge history, with <strong>no application code involved in three of the four paths</strong> and <strong>no count
       of how often it has already happened</strong>. The third is that any Premier League pool created today would score
       <strong>zero, silently</strong>, because the group/knockout binary is welded into the scoring price lookup and not just the gate.
-      Behind them sit five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be
+      Behind them sit <strong>nine 🟠</strong> (five, plus four opened by the 2026-07-26 performance session), including one Ryan
+      knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be
       fixed <em>before the next competition</em> — <strong>that condition is now due</strong>.</p>
     <p style="margin:0 0 10px">The next milestone is the <strong>Premier League 2026/27 season, mid-August</strong>, and on the
       foundations recorded here it is <strong>not reachable</strong>: league scoring and bonuses don't exist, matchweek deadlines and
@@ -279,12 +283,35 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       single-tenant on three env globals, and the importer plus migration 024 are drafted but uncommitted and unapplied. Almost none of
       that is blocked on capacity — the <strong>sequencing is blocked on five decisions only Ryan can make</strong>: what "archive"
       means now that migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>; <strong>what leaving a
-      pool should do to a member's history</strong>, now that we know it purges it; which engine actually scores the EPL, given the
-      07-19 cutover left a live kill switch whose current flag values cannot be read from the repo; whether EPL scope shrinks or the
-      date moves; and whether the post-tournament survey still goes out now that it is past its own time box.</p>
-    <p style="margin:0">One standing caveat on everything above: <strong>seven groups of claims here depend on production state and
-      cannot be verified from code</strong> — they are listed in <a href="#unverifiable">the register</a>, and unverified is not
-      done.</p>
+      pool should do to a member's history</strong>, now that we know it purges it; which engine <em>should</em> score the EPL (the
+      flags are now known — prod is scoring everything, shadow reads are off — so what remains is the choice, not the uncertainty);
+      whether EPL scope shrinks or the date moves; <strong>what "live" has to mean</strong>, since the stated goal says <em>real-time
+      leaderboard</em> and a recorded principle says <em>minute-cadence is sufficient</em> (<a href="#gate-d">Gate D</a>); and whether
+      the post-tournament survey still goes out now that it is past its own time box.</p>
+    <p style="margin:0 0 10px">A <a href="#design-system">system-design section</a> was added 2026-07-26 from two research workflows, and
+      it turned up one thing that belongs in this summary: <strong>the ledger does not reconcile to itself.</strong> 29 of 4,985 entries
+      show a total their own line items don't support — 26 of them <strong>too high, by 149,525 points</strong>, three carrying points
+      with no line items at all. It is bounded and it does not spread, but "100% accurate scores" is the product's first promise, and
+      right now nothing checks that promise continuously; this was found by asking, not by an alarm.</p>
+    <p style="margin:0 0 10px">One standing caveat on everything above: <strong>fourteen groups of claims here depend on production
+      state and cannot be verified from code</strong> (every measured number in the 2026-07-26 performance session, plus the six ⬜
+      analysis claims in System design) — they are listed in <a href="#unverifiable">the register</a>, and unverified is not done.</p>
+  </div>
+  <div class="card warnc">
+    <p style="margin:0"><strong>Added 2026-07-26 (performance session).</strong> A site-wide performance pass measured where the
+      database actually spends its time and, in the process, found another instance of the failure mode above:
+      <code>entry_xp_state.total_xp</code> / <code>.current_level</code> have <strong>two writers computing different
+      quantities</strong>, so the level shown on <code>/pools</code> and <code>/dashboard</code> today is whichever path last touched
+      the row. That is live and user-facing now, and it is <em>not</em> a caching problem — the parity pass meant to unblock a
+      read-path flip is what exposed it. Fixes for it, and for <strong>13 of 14</strong> whole-table <code>match_conduct</code> reads
+      (four inside scoring engines, where PostgREST's silent 1,000-row cap becomes wrong bonuses the moment a second competition
+      exists), are <strong>written, tested and entirely uncommitted</strong>. Nothing is applied or deployed, so <strong>production is
+      unchanged</strong> — treat all of it as still live until migration 026 is applied and the deploy is confirmed. The session also
+      introduced one regression of its own — full-pool analytics on the scoring path (<strong>R15</strong>, since fixed in code) — and left
+      one deliberate blocker in place (<strong>R16</strong>, <code>advance-teams</code>), which must clear before a second competition is
+      ingested. <strong>R15 and R14 were raised by this register, confirmed against the code by Ryan, and fixed the same day; R13's open
+      question on <code>current_level</code> was answered and migration 026's comment rewritten.</strong> None of that changes the headline:
+      it is all still local, and none of it is live.</p>
   </div>
 </section>
 
@@ -294,24 +321,29 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <p class="sec-sub">Counts are of what this document records, on 2026-07-26. Risk levels are defined in the register below.</p>
   <div class="strip">
     <div class="stat crit"><div class="n">3</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">5</div><div class="l">🟠 High risks</div></div>
+    <div class="stat high"><div class="n">10</div><div class="l">🟠 High risks</div></div>
     <div class="stat med"><div class="n">3</div><div class="l">🟡 Medium risks</div></div>
-    <div class="stat low"><div class="n">1</div><div class="l">🟢 Low risks</div></div>
-    <div class="stat pri"><div class="n">3</div><div class="l">Items in 🔥 Now</div></div>
-    <div class="stat neu"><div class="n">6</div><div class="l">Projects</div></div>
-    <div class="stat neu"><div class="n">8</div><div class="l">Settled decisions</div></div>
+    <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
+    <div class="stat pri"><div class="n">4</div><div class="l">Items in 🔥 Now</div></div>
+    <div class="stat neu"><div class="n">7</div><div class="l">Projects</div></div>
+    <div class="stat neu"><div class="n">8+5</div><div class="l">Settled decisions · product + infra</div></div>
     <div class="stat neu"><div class="n">6</div><div class="l">Still-open questions</div></div>
-    <div class="stat neu"><div class="n">8</div><div class="l">Unverified claim groups</div></div>
+    <div class="stat neu"><div class="n">14</div><div class="l">Unverified claim groups</div></div>
   </div>
   <p class="strip-note">Two risks are marked as already carrying a decision from Ryan: <strong>R6</strong> (accepted /
     deferred 2026-07-21, on a condition that is now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented).
     An accepted risk stays on the register — it is not closed. <strong>R12</strong> is new (2026-07-26) and carries no call yet;
-    its blast radius is <strong>uncounted</strong>, not small.</p>
+    its blast radius is <strong>uncounted</strong>, not small. <strong>R13–R16</strong> came out of the 2026-07-26 performance session;
+    <strong>R15 is fixed in code and R14 now fails safe</strong> — both raised here, verified by Ryan against the code, fixed the same day,
+    and kept on the register because <strong>a defect fixed in an uncommitted working copy is not a defect production no longer has</strong>.
+    Every fix from that session is <strong>local and uncommitted</strong> — the risks it addresses are still live in production.
+    <strong>R17–R18</strong> came out of the 2026-07-26 system-design research and carry no call yet. Levels are counted at their
+    <em>current</em> value, so <strong>R15</strong> counts 🟢, having been downgraded from 🟠.</p>
 </section>
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R12</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R16</span></h2>
   <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
     code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
     whether Ryan has already called it</strong>, plus the backlog item it maps onto so the register and the backlog
@@ -366,9 +398,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td><strong>A league pool scores zero, silently.</strong> Not just the gate: <code>full.ts:89</code> /
           <code>progressive.ts:110</code> source predicted teams from a WC-shaped <code>knockoutTeamMap</code>, so a
           <code>regular_season</code> fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups
-          (<code>lib/tournament.ts:137</code>), so a league pool has no bonus path either</td>
+          (<code>lib/tournament.ts:137</code>), so a league pool has no bonus path either. ✅ <strong>Prospective, not live (2026-07-26):</strong> zero <code>stage='regular_season'</code> rows exist in prod (<a href="#design-system">V6</a>) — <strong>level unchanged</strong>, because the trigger is one <code>tournaments</code> row away</td>
         <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
-        <td class="blast"><strong>100% of points</strong> in every EPL pool; scoring trust in the flagship next season</td>
+        <td class="blast"><strong>100% of points</strong> in every EPL pool; scoring trust in the flagship next season. Currently <strong>0 pools affected</strong></td>
         <td>Creating an EPL <code>tournaments</code> row — <strong>both create-pool wizards list tournaments unfiltered</strong>
           (<code>components/pools/CreatePoolModal.tsx:107</code>, <code>mobile/app/create-pool.tsx:144</code>), so the row alone
           makes league pools creatable</td>
@@ -401,7 +433,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td class="blast">Last occurrence: <strong>669 rows / ~324,375 pts</strong>, concentrated in ~73 pools; 50 changed rank,
           <strong>13 changed their #1</strong></td>
         <td>Re-enabling shadow reads, or shadow scoring any competition that has a podium</td>
-        <td>Prod fixed and re-scored; <strong>shadow not fixed</strong>. Current <code>sync_settings</code> flag values unverified</td>
+        <td>Prod fixed and re-scored; <strong>shadow not fixed</strong>. ✅ 2026-07-26: the flags were read — <code>prod_scoring_enabled = true</code>, <code>shadow_read_enabled_pools = []</code> (<a href="#design-system">V5</a>) — so the divergence is <strong>latent, not live</strong></td>
         <td>No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26</td>
         <td><a href="#i-shadow">Shadow scoring engine</a>; <a href="#i-podium">Podium bonus remediation</a> (✅ Recently shipped)</td>
       </tr>
@@ -513,8 +545,140 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           a direction, not yet a decision: see <a href="#gate-a2">Gate A2</a></td>
         <td><strong>None</strong> — this risk has no backlog item yet</td>
       </tr>
+      <tr class="risk-high">
+        <td class="id">R13</td>
+        <td><strong><code>entry_xp_state</code> has two writers with two different formulas — the level shown to users is whichever ran
+          last.</strong> <code>lib/push/badges.ts</code> (pre-fix) wrote <code>Σ match_scores.total_points + badgeXP</code>;
+          <code>lib/analytics/entryAnalytics.ts</code> writes <code>computeFullXPBreakdown</code> XP
+          (<code>BASE_XP[tier] × STAGE_MULTIPLIERS</code> + crowd/streak events + badge XP). Different <strong>quantities</strong>, both
+          measured against the same <code>LEVELS</code> thresholds, both writing the same two columns, last-writer-wins. Because
+          <code>vercel.json</code> is <code>{}</code> the analytics sweep has <strong>never been registered</strong>, so
+          <code>badges.ts</code> is the de facto owner and <code>analytics_updated_at</code> records when the <em>other</em> writer last
+          ran — the timestamp lies</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast"><strong>187 of 331 sampled entries mismatch</strong> (prod, drafts-sourced), split perfectly by mode: 5/5
+          <code>progressive</code> clean, 5/5 <code>full_tournament</code> wrong. Read live at <code>app/pools/page.tsx:95</code> and
+          <code>app/dashboard/page.tsx:188</code>, so two members with identical performance can be shown different levels. Correcting the
+          formula moves <strong>1,048 entries — 817 up, 231 down</strong></td>
+        <td>Already fired. Any recalc after an analytics backfill re-flips the column</td>
+        <td><strong>Written, not landed.</strong> <code>badges.ts</code> now consumes the shared value; migration 026 adds the ratchet;
+          <code>scripts/reseed-entry-xp.ts</code> re-seeds silently. All <strong>uncommitted</strong>; 026 <strong>not applied</strong>;
+          reseed <strong>not run</strong> — prod is unchanged</td>
+        <td><strong>Decided 2026-07-26:</strong> levels never demote (ratchet, mirroring <code>badge_unlocks</code>);
+          <code>total_xp</code> stays honest; <strong>do not register the analytics-sweep cron</strong> — a second writer is what caused
+          this</td>
+        <td><a href="#i-xp-writers">XP has two writers</a> (🔥 Now)</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R14</td>
+        <td><strong>The XP correction's rollout order is load-bearing — now a release constraint, not a code defect.</strong> If
+          <code>lib/push/badges.ts</code> deploys <em>before</em> migration 026 is applied, its upsert names
+          <code>highest_level_reached</code>, which won't exist, and PostgREST rejects the <strong>entire</strong> upsert.
+          <s>The result is never error-checked</s> — <strong>fixed 2026-07-26</strong> (verified): the error is captured, logged loudly,
+          and the function <strong>returns before pushing</strong>, because the snapshot is the diff basis for "what's new" — if it
+          didn't persist, the next run re-derives the same badges and levels as new and pushes them again. Silence is the safe failure.
+          The other half is unchanged: if the fix deploys and <code>scripts/reseed-entry-xp.ts</code> is not run, the first recalc sees
+          the corrected level exceed the stored one and announces it</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Now: badge/level pushes go <strong>silent</strong> for every scored pool until 026 is applied — visible in logs,
+          no user-facing wrongness. Still: <strong>~817 level-up pushes</strong> in one burst if the reseed is skipped — a notification
+          event with no sporting cause, which fails the disclosure gate on its face</td>
+        <td>A <code>git push</code> to <code>master</code> — <strong>that is a production deploy</strong> — in the wrong order</td>
+        <td><strong>Code now fails safe</strong> (<code>lib/push/badges.ts</code>, error checked + early return). <strong>Order is still
+          the mitigation</strong> for the rest: apply 026 → deploy → run the reseed <strong>immediately</strong> → re-run
+          <code>scripts/verify-analytics-parity.ts</code>. <code>scripts/reseed-entry-xp.ts:22</code> states the same order</td>
+        <td><strong>Open — Ryan's timing call.</strong> Needs a window where the deploy and the reseed run back to back</td>
+        <td><a href="#i-xp-writers">XP has two writers</a> (🔥 Now)</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R15</td>
+        <td>✅ <strong>FIXED IN CODE 2026-07-26 (not deployed) — the performance work had put full-pool analytics on the scoring
+          path.</strong> <code>lib/push/badges.ts:156</code> calls <code>computePoolEntryAnalytics</code> for the whole pool on every
+          badge run, and badge runs fire from <code>lib/scoring/recalculate.ts:93</code> and <code>:322</code> on every recalc. That
+          helper called <code>computeCrowdPredictions</code> <strong>once per entry</strong> — the exact O(entries × predictions) loop
+          this same session hoisted out of three other call sites, left un-hoisted in the fourth. <strong>Now hoisted</strong>
+          (<code>lib/analytics/entryAnalytics.ts:201</code> consensus once, <code>:223</code> overlay per entry), matching the other
+          three</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span> → <span class="chip lvl-low">🟢 on deploy</span></td>
+        <td class="blast">Was: 192 entries × 13,385 predictions ≈ <strong>2.6M iterations per recalc</strong> on the largest pool,
+          net-new, on the path with a documented kickoff CPU spike behind it. Now O(n + m); the full-pool prediction pull remains and is
+          inherent to the design</td>
+        <td>Would have fired on the <strong>first live matchday of the next competition</strong>. Never reached production — the
+          regression and its fix are both in the same unlanded change</td>
+        <td><strong>Fixed and verified in code.</strong> The file header, which <em>claimed</em> the hoist while the code below did the
+          opposite, is corrected; its STATUS now reads <em>"LIVE, ON THE SCORING PATH — treat added work here as scoring-path cost"</em>
+          instead of <em>"DRAFT, not imported by any live code path"</em> — the more durable half of the fix</td>
+        <td><strong>New — fixed, no decision needed.</strong> Stays on the register until deployed</td>
+        <td><a href="#perf">⚡ Performance &amp; caching</a>; <a href="#next-scale">Kickoff write spike</a></td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R16</td>
+        <td><strong>Cross-competition unscoped reads — one deliberate blocker, plus the audit scripts.</strong>
+          <code>app/api/admin/advance-teams/route.ts:56</code> reads <code>matches</code>, <code>teams</code> <strong>and</strong>
+          <code>match_conduct</code> tournament-wide with no scope and no pagination. Unscoped <code>matches</code> means the advancement
+          cascade would resolve knockout placeholders <strong>across competitions</strong>; unscoped conduct is capped at 1,000 rows. Left
+          unfixed on purpose (blocker comment in-file) — scoping it means threading a tournament id through the cascade, a design change.
+          Separately, four <code>scripts/*.ts</code> still read the whole conduct table, including <code>scripts/audit-bonuses.ts:78</code>
+          — <strong>the recurring end-of-competition bonus audit is itself subject to the truncation it exists to catch</strong></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Wrong advancement and wrong conduct tiebreaks across competitions; a bonus audit that silently passes on partial
+          data. Conduct today = 206 rows; PL 2026/27 adds ~760 → 966; the competition after that crosses 1,000</td>
+        <td>Ingesting a <strong>second competition</strong> — the EPL, mid-August. A fixed external date</td>
+        <td><strong>13 of 14 app call sites fixed</strong> via <code>lib/matchConduct.ts</code> (scoped through the
+          <code>match_conduct → matches</code> FK, paginated) — but <strong>uncommitted</strong>, so prod still runs all 14 unscoped.
+          <code>advance-teams</code> and the scripts are excluded from that fix</td>
+        <td><strong>New — no call made.</strong> Must precede league ingestion (step 3d in the delivery order)</td>
+        <td><a href="#perf">⚡ Performance &amp; caching</a>; <a href="#i-league-ingestion">League ingestion</a>; R2, R5</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R17</td>
+        <td><strong>The ledger does not reconcile to its own line items.</strong> 29 of 4,985 entries have
+          <code>scored_total_points ≠ Σmatch_scores + Σbonus_scores + point_adjustment</code> — <strong>26 over by 149,525 pts</strong>,
+          3 under by 4,975, <strong>3 carrying points with no line items at all</strong>; max single delta 9,825. Verified in prod
+          2026-07-26 (<a href="#design-system">V1</a>). <strong>Does not contradict the 2026-07-21 ledger audit</strong> — that asked "is
+          anyone owed points?", this asks "does the total reconcile to its evidence?"</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast"><strong>29 entries of 4,985 (0.6%)</strong>, ~154,500 pts of discrepancy in total. Bounded and
+          non-propagating — but these are <strong>final standings</strong>, and 26 people are shown a score their line items don't
+          support</td>
+        <td>Already live. Any member opening a points breakdown on an affected entry sees a total that doesn't match its own rows</td>
+        <td><strong>None.</strong> No continuous reconciliation check exists — this was found by asking, not by an alarm</td>
+        <td><strong>New — no call made</strong></td>
+        <td><strong>None yet.</strong> Directly violates <a href="#design-system">P1</a></td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R18</td>
+        <td><strong>The parity alarm detects into a table nothing reads.</strong> <code>shadow_score_diffs</code>: 849 rows, <strong>418
+          in the last 24 h</strong>, newest 2026-07-26 17:45, 3 <code>diff_kind</code> values. Verified in prod 2026-07-26
+          (<a href="#design-system">V2</a>). <strong>This corrects the earlier belief that the alarm cron was failing</strong> — the cron
+          works; the consumer was never built</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Unknown by construction: the system has been reporting discrepancies all day and <strong>nobody is receiving
+          them</strong>. Whether these 418 rows relate to R17's 29 entries is <strong>an open question, not a claim</strong> — worth
+          checking first, since it is cheap</td>
+        <td>Already live and firing</td>
+        <td><strong>None.</strong> Detection exists; consumption doesn't</td>
+        <td><strong>New — no call made</strong></td>
+        <td><a href="#i-shadow">Shadow scoring engine</a>. Violates <a href="#design-system">P3</a></td>
+      </tr>
     </tbody>
   </table>
+  </div>
+
+  <div class="note" style="margin-top:14px">
+    <strong>Why R13 is 🟠 and not 🔴.</strong> It meets the 🔴 wording — it is live and it is misleading users right now. It is held at 🟠
+    because the wrongness is confined to a <strong>displayed gamification level</strong>: no score, rank, points total or record is
+    affected, and nothing is destroyed. Putting it beside "six pools of predictions are gone" and "an EPL pool scores zero" would dilute
+    what 🔴 means in this register. That is my judgement, stated so it can be overruled — if the displayed level counts as part of the
+    product's result surface, it is a 🔴. <strong>Ryan reviewed and did not overrule it (2026-07-26): 🟠 stands.</strong>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <strong>R14 and R15, on being fixed rather than closed.</strong> Both were raised here on 2026-07-26, verified against the code by Ryan
+    rather than taken on trust, and fixed the same day. They <strong>stay on the register</strong>, because nothing is deployed: a defect
+    fixed in an uncommitted working copy is not a defect production no longer has. R15 is annotated 🟠 → 🟢 and closes on deploy; R14 changes
+    <em>kind</em> rather than closing — the code now fails safe, so what remains is a <strong>release-ordering constraint</strong>, and
+    constraints are not fixed by commits.
   </div>
 
   <h3 class="grp" id="destruction-class">The destruction class — four doors to one purge (R1 · R12)</h3>
@@ -570,9 +734,18 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul>
       <li>Whether the survey fixes are actually <strong>deployed</strong> on Vercel (they are on <code>origin/master</code>;
         that is not the same thing) — R8.</li>
-      <li>All <code>sync_settings</code> flag values: <code>prod_scoring_enabled</code>, <code>shadow_read_enabled_pools</code>,
-        <code>analytics_read_from_columns</code>, <code>sweep_time_box_enabled</code> — R4.</li>
-      <li>pg_cron job health, including the shadow <strong>parity alarm</strong> (jobid 21) and the reconcilers (jobids 19/20).</li>
+      <li><s>All <code>sync_settings</code> flag values</s> — ✅ <strong>resolved 2026-07-26:</strong>
+        <code>prod_scoring_enabled = true</code>, <code>shadow_read_enabled_pools = []</code>, and
+        <code>sweep_time_box_enabled</code> has <strong>no row at all</strong> (<a href="#design-system">V3, V5</a>).
+        <code>analytics_read_from_columns</code> remains unread here.</li>
+      <li><s>pg_cron job health, including the shadow <strong>parity alarm</strong> (jobid 21)</s> — ✅ <strong>partly
+        resolved:</strong> the alarm is <strong>working</strong> and has written 849 rows / 418 in 24 h
+        (<a href="#design-system">V2</a>); the earlier "cron failing" note was wrong. The <strong>reconcilers (jobids 19/20)</strong>
+        are still unverified.</li>
+      <li><strong>The six ⬜ analysis claims A1–A6</strong> in <a href="#design-system">System design</a> — realtime's share of DB time,
+        pool payload size (3.8 MB vs 12 MB, unreconciled), <code>max_connections = 60</code>, whether the admin recalculate button can
+        succeed, whether ingest failures are recorded as healthy, and the count of unbounded <code>.in()</code> reads. None are measured;
+        A3 in particular contradicts the recorded XL→Medium downgrade and must be confirmed before any capacity planning.</li>
       <li>Whether <strong>migration 024</strong> was applied (it carries no "applied to prod" header, unlike 025/025b — so almost
         certainly not) — R2.</li>
       <li>The <strong>RLS policy bodies</strong> behind the delete asymmetry, and the FK cascade definitions behind mobile's
@@ -580,6 +753,21 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li>The counts <strong>6 destroyed / 458 exposed</strong>, the audience sizes <strong>477 / 3,652</strong>, and the
         <strong>~243k pts / 155 entries</strong> inflation measurement — all prod queries from their source drafts.</li>
       <li>Presence of <code>badge_unlocks</code> (+ its backfill) and the <code>trg_enforce_prediction_before_kickoff</code> trigger.</li>
+      <li><strong>The whole 2026-07-26 performance baseline.</strong> <code>pg_stat_statements</code> on
+        <code>ujthamlehjyubbzxbnes</code>: 337.5 total DB-hours, <code>SELECT predictions.*</code> at 111.3h / <strong>33.0%</strong> /
+        30.0M calls, realtime WAL decoding 80.9h / 24.0%, <code>row_to_json(pool_members)</code> 34.5h / 10.2% at 404–450ms mean,
+        <code>match_scores</code> 31.0h / 9.2% — top four = 76.4%. Counter reset date unknown, so these are cumulative-since-unknown, not
+        a rate. Source: <code>drafts/2026-07-26_performance_optimization_audit.md</code>.</li>
+      <li><strong>The pool-size distribution the caching strategy rests on</strong> — 623 pools, 4,809 memberships,
+        <strong>median 1 member</strong>, mean 7.7, 70% ≤5, four pools ≥100, max 192; 288,029 predictions across 4,985 entries; 3,184
+        users in 30d. Every CDN and cache conclusion follows from this table, so if it is wrong the strategy is wrong.</li>
+      <li><strong>The payload measurements</strong> — largest pool 5,420 kB → 3,854 kB after column narrowing (29%), and therefore still
+        over Vercel Runtime Cache's 2 MB item limit — R13 / ⚡ Performance &amp; caching.</li>
+      <li><strong>The parity result and the XP movement</strong> — 187/331 entries mismatched, 5/5 mode split, and 1,048 entries moving
+        (817 up / 231 down) on the corrected formula. From <code>scripts/verify-analytics-parity.ts</code> and the reseed dry run against
+        prod; re-runnable, but not from code — <strong>R13</strong>, <strong>R14</strong>.</li>
+      <li><strong>That the scoped conduct read returns identical data</strong> (206 = 206 rows across three query shapes) — verified
+        against prod by Ryan's side on 2026-07-26, not re-verifiable here — <strong>R16</strong>.</li>
       <li><strong>R12's blast radius — no count exists at all.</strong> How many entries have already been purged by leave / removal /
         account deletion / stop-participating is <strong>unknown and unmeasured</strong>; it needs a production query (e.g.
         <code>pool_membership_events</code> rows of type <code>left</code>/<code>removed</code> against surviving entries). The 21-table
@@ -604,11 +792,44 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>10d555c</code>) has no item here. It is also what created <strong>R10</strong>.</li>
       <li><strong>Work sitting in <code>drafts/</code> with no item:</strong>
         <code>2026-07-25_entry_fee_collection_assessment.md</code> (a legal/feasibility assessment ending in a recommendation
-        Ryan hasn't ruled on) and <code>2026-07-19_caching_infrastructure_plan.md</code>.</li>
+        Ryan hasn't ruled on). ✅ <em>Resolved 2026-07-26 for the caching drafts</em> — <code>2026-07-19_caching_infrastructure_plan.md</code>
+        and the three new <code>2026-07-26_*</code> drafts now roll up into <a href="#perf">⚡ Performance &amp; caching</a>.</li>
       <li><strong>Smaller staleness:</strong> the <em>Recurring each knockout round</em> section still reads "SF/Final upcoming"
-        ten days after the final; <code>analytics_read_from_columns</code> still appears zero times in code (the M4 note is
-        accurate); auto round-opening has no code at all (feeds <strong>R5</strong>).</li>
+        ten days after the final; <code>analytics_read_from_columns</code> still appears zero times in code —
+        <strong>re-verified 2026-07-26</strong>, it exists only in <code>drafts/</code>, so the M4 note remains accurate; auto
+        round-opening has no code at all (feeds <strong>R5</strong>).</li>
     </ul>
+  </div>
+
+  <h3 class="grp">Found in the 2026-07-26 performance session — three claims the code contradicted, all three now closed</h3>
+  <div class="card okc">
+    <p style="margin:0 0 9px">Raised here, <strong>verified against the code by Ryan rather than taken on trust</strong>, and closed the
+      same day.</p>
+    <ul class="fields">
+      <li>✅ <span class="f">Migration 026's <code>current_level</code> semantics — answered, comment rewritten.</span> The migration said
+        <code>current_level</code> was <em>"the level implied by current total_xp"</em> while
+        <code>lib/analytics/entryAnalytics.ts:236</code> wrote the <strong>already-ratcheted</strong> level into it.
+        <strong>Ryan's answer 2026-07-26: floored, deliberately.</strong> The comment now states it: <code>total_xp</code> honest and may
+        fall · <code>current_level</code> <strong>the level to DISPLAY, already ratcheted</strong>, so the simple readers that select it raw
+        (<code>app/pools/page.tsx:95</code>, <code>app/dashboard/page.tsx:188</code>) get the floor for free and can never show a demotion ·
+        <code>highest_level_reached</code> the high-water mark producing that floor, equal by construction today, kept separate because the
+        surfaces that recompute level <em>live</em> never read <code>current_level</code> and need a stored mark to floor against · the raw
+        unfloored level is never stored — always recoverable as <code>computeLevel(total_xp)</code>. <strong>Settled, not open.</strong></li>
+      <li>✅ <span class="f"><code>entryAnalytics.ts</code> not converted to the split it motivated — fixed.</span> Hoisted to
+        <code>computeCrowdConsensus</code> once above the loop (<code>lib/analytics/entryAnalytics.ts:201</code>) +
+        <code>applyCrowdOverlay</code> per entry (<code>:223</code>), matching the other three call sites. The file header, which claimed the
+        hoist while the code did the opposite, is corrected, and its STATUS changed from <em>"DRAFT, not imported by any live code path"</em>
+        to <em>"LIVE, ON THE SCORING PATH"</em>. That second half matters more than the first: the stale STATUS is <strong>why</strong> the
+        O(n²) was tolerable to add. See <strong>R15</strong>.</li>
+      <li>✅ <span class="f">"Shadow has been the sole scorer since the 2026-07-19 cutover" — corrected in the draft.</span>
+        <code>drafts/2026-07-26_performance_optimization_audit.md:73-77</code> now carries an explicit correction note: the read cutover was
+        <strong>rolled back on 2026-07-20</strong> (<code>prod_scoring_enabled = true</code>), and
+        <code>lib/scoring/shadowBrackets.ts</code> is a bracket <strong>materialiser</strong> whose own header says it never runs on the live
+        per-goal scoring path. The conduct fix stands on its own merits; the severity framing did not. Which engine is scoring is still a
+        live flag value and unverified here (<a href="#gate-b">Gate B</a>).</li>
+    </ul>
+    <p style="margin:10px 0 0"><strong>Two lines remain, and neither closes on a commit:</strong> the deploy ordering (<strong>R14</strong> —
+      the code now fails safe, the ordering constraint stands) and the fact that none of it is applied or deployed.</p>
   </div>
 </section>
 
@@ -687,12 +908,28 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       undone, where a rescale can.</p>
   </div>
 
-  <div class="gate">
+  <div class="step">
+    <h4><span class="num">2b</span> Land the XP-ownership correction <span class="chip cat">Bug</span>
+      <span class="chip cat">Scoring</span> <span class="chip lvl-high">R13</span> <span class="chip lvl-high">R14</span></h4>
+    <p><em>Added 2026-07-26. Numbered 2b so the existing cross-references to "#2" still mean the scoring defaults.</em> Placed here by the
+      same rule: it silently produces wrong data — the level shown on <code>/pools</code> and <code>/dashboard</code> depends on which
+      writer ran last — and the fix is <strong>already written and tested</strong> (157/157 pass), so
+      <code>(blast radius × likelihood) ÷ effort</code> puts it near the top on a denominator close to zero.</p>
+    <p>What remains is not engineering, it is a <strong>release</strong>: apply migration 026 → deploy → run
+      <code>scripts/reseed-entry-xp.ts</code> immediately → re-run <code>scripts/verify-analytics-parity.ts</code>.
+      <strong>The order is not optional</strong> (R14): deploying before the migration silently breaks every
+      <code>entry_xp_state</code> write, and skipping the reseed fires ~817 level-up pushes. It also unblocks step 6's analytics read
+      flip, which parity currently fails.</p>
+  </div>
+
+  <div class="gate" id="gate-b">
     <h4>🚦 Gate B — which engine scores the EPL?</h4>
     <p>Must be answered <strong>before</strong> league scoring is designed, because the same fix lands in a different codebase depending
-      on the answer: the Node engine (<code>lib/scoring/*</code>) or the shadow engine's SQL. The 07-19 cutover left a live kill switch
-      (<code>prod_scoring_enabled</code>, <code>shadow_read_enabled_pools</code>) whose current values are prod state and unverified
-      here.</p>
+      on the answer: the Node engine (<code>lib/scoring/*</code>) or the shadow engine's SQL. ✅ <strong>The factual half is now answered
+      (2026-07-26, <a href="#design-system">V5</a>):</strong> <code>prod_scoring_enabled = true</code> and
+      <code>shadow_read_enabled_pools = []</code> — the <strong>prod Node engine is scoring everything</strong>, shadow reads are fully
+      off. The gate is no longer <em>"what is running?"</em> but purely <strong>"which engine should own the EPL?"</strong> — Ryan's call,
+      still open.</p>
     <p>Related but <strong>not</strong> an EPL gate: shadow still carries the pre-fix podium logic (<strong>R4</strong>) — a league has
       no podium, so that blocks any <em>re-cutover</em> or any future cup, not the EPL itself.</p>
   </div>
@@ -772,6 +1009,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         attention, and that trade is Ryan's, not a sequencing fact.</li>
       <li><strong>R9 — move the repo off iCloud.</strong> ~1 hour, no dependencies, competes with nothing. Worth doing before any long
         build-and-commit stretch, since it can flip bytes in tracked source.</li>
+      <li><strong>R16 — <code>advance-teams</code> multi-competition scoping.</strong> Not sequenced against the risks above, but it
+        <strong>is</strong> sequenced inside step 3: it has to precede <strong>3d</strong> (apply 024 + land the importer), because the
+        first thing a second <code>tournaments</code> row does is make that route cross-competition.</li>
+      <li><s><strong>R15 — the analytics-on-scoring-path regression.</strong></s> ✅ <strong>Fixed in code 2026-07-26</strong>, before it
+        ever reached production. Nothing to sequence; it ships with the rest of the unlanded change.</li>
       <li>The <a href="#risks">Known drift</a> items (a missing project, two stale statuses, untracked drafts) — awaiting Ryan's call on
         each; none of them block delivery.</li>
     </ul>
@@ -797,9 +1039,237 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 </section>
 
+<!-- ============================ SYSTEM DESIGN ============================ -->
+<section id="design-system">
+  <h2 class="sec">🏗️ System design — today, and where it should go</h2>
+  <div class="proposed-banner">
+    <p>Added 2026-07-26 from two research workflows (15 agents). <strong>Provenance is marked on every claim and is not
+      negotiable:</strong> <span class="chip ok">✅ VERIFIED</span> means checked against production or read in the code on 2026-07-26 ·
+      <span class="chip">⬜ ANALYSIS</span> means a workflow's reasoning that nobody has measured. A design opinion is not a fact, and
+      this section keeps them apart on purpose. <strong>Nothing here is a decision.</strong></p>
+  </div>
+
+  <h3 class="grp">The goal, as four testable properties</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 10px">Ryan's statement of the product: <em>"an office pool product that makes it easy for admins to run their
+      pools, always shows 100% accurate scores, and gives a real-time live leaderboard."</em> The research split that into four
+      properties, because <strong>"accurate" and "live" are different things with different owners</strong> — and a goal you can't test
+      is an aspiration.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>#</th><th>Property</th><th>Proposed invariant / metric ⬜</th></tr></thead>
+        <tbody>
+          <tr><td class="id">P1</td><td><strong>Correctness</strong> — every number is reproducible from source facts and reconciles to
+            its own line items</td><td>For every entry:
+            <code>scored_total_points == Σmatch_scores + Σbonus_scores + point_adjustment</code>. Zero exceptions, checked
+            continuously, not at incident time</td></tr>
+          <tr><td class="id">P2</td><td><strong>Freshness</strong> — staleness is <em>bounded, measured and visible</em>, split by owner:
+            <strong>ingest lag</strong> (reality→DB, provider-governed) and <strong>fan-out lag</strong> (DB→screen, entirely ours)</td>
+            <td>Two separate numbers, each with a stated budget. Conflating them hides which half is broken</td></tr>
+          <tr><td class="id">P3</td><td><strong>Admin operability</strong> — an admin can answer <em>"is it working?"</em> and <em>"why is
+            this number what it is?"</em> without an engineer</td><td>Every displayed total is drillable to its line items; every
+            automated job exposes last-success and lag</td></tr>
+          <tr><td class="id">P4</td><td><strong>Multi-competition capacity</strong> — N competitions run concurrently with <strong>no
+            per-competition deploy</strong></td><td>Competition config lives in data, not env vars or code branches</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:10px 0 0">These four are the spine of everything below, and they map onto the register: P1 ↔ <strong>R17</strong>,
+      <strong>R3</strong>, <strong>R6</strong> · P2 ↔ the fan-out work · P3 ↔ <strong>R18</strong> · P4 ↔ <strong>R2</strong>,
+      <strong>R5</strong>.</p>
+  </div>
+
+  <h3 class="grp">✅ Verified against production, 2026-07-26</h3>
+  <div class="card okc">
+    <p style="margin:0 0 9px">State these as fact.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>#</th><th>Finding</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td class="id">V1</td>
+            <td><strong>The ledger does not reconcile to itself.</strong> Of 4,985 entries, <strong>29 mismatch</strong>
+              <code>scored_total_points</code> vs <code>Σmatch_scores + Σbonus_scores + point_adjustment</code>: <strong>26 show MORE than
+              earned (149,525 pts over)</strong>, 3 show LESS (4,975 under), <strong>3 carry points with zero line items</strong>. Max
+              single delta <strong>9,825</strong></td>
+            <td>A direct <strong>P1</strong> violation, live. <strong>This does not contradict the 2026-07-21 ledger audit</strong> — that
+              asked <em>"is anyone owed points?"</em> and was essentially right. This asks <em>"does the total reconcile to its
+              evidence?"</em>, a different question it never posed. Now <strong>R17</strong></td></tr>
+          <tr><td class="id">V2</td>
+            <td><strong>The parity alarm is alive and unconsumed.</strong> <code>shadow_score_diffs</code> holds <strong>849 rows, 418 in
+              the last 24 h</strong>, newest 2026-07-26 17:45, across 3 distinct <code>diff_kind</code> values</td>
+            <td>It has been detecting discrepancies all day into a table <strong>nothing reads</strong>. <strong>Corrects</strong> the
+              earlier note that the alarm cron was failing — it isn't; the consumer is. A <strong>P3</strong> failure. Now
+              <strong>R18</strong></td></tr>
+          <tr><td class="id">V3</td>
+            <td><strong><code>sweep_time_box_enabled</code> has no row in <code>sync_settings</code></strong> — absent, not
+              <code>false</code>. The flag read returns undefined, so the time-boxed resumable sweep never engages and the lock TTL stays
+              600 s</td>
+            <td>Other flags exist as explicit <code>true</code>, so this looks <strong>never inserted</strong> rather than deliberately
+              disabled. The <em>XL→Medium</em> item calls this "the last flag to flip"; it cannot be flipped, only created</td></tr>
+          <tr><td class="id">V4</td>
+            <td><strong><code>pool_entries</code> is in the <code>supabase_realtime</code> publication</strong>, alongside
+              <code>matches</code>, <code>pool_members</code>, <code>pool_round_states</code>, <code>user_activity</code>,
+              <code>user_presence</code> and four more</td>
+            <td>Every scoring UPDATE writes WAL that is then <strong>RLS-evaluated per subscriber</strong>. This is the mechanism behind
+              the fan-out cost in A1 below</td></tr>
+          <tr><td class="id">V5</td>
+            <td><strong>Gate B's factual half is answered:</strong> <code>prod_scoring_enabled = true</code>,
+              <code>shadow_read_enabled_pools = []</code></td>
+            <td>The <strong>prod Node engine is scoring everything</strong>; shadow reads are fully off. <strong>R4's divergence is
+              therefore latent, not live.</strong> It does <strong>not</strong> decide which engine <em>should</em> score the EPL — still
+              Ryan's call — but the uncertainty that question rested on is gone</td></tr>
+          <tr><td class="id">V6</td>
+            <td><strong>Zero <code>stage='regular_season'</code> rows exist in production</strong></td>
+            <td><strong>R2 is prospective, not live</strong> — materially better than the register implied. The level is unchanged because
+              the trigger is still one <code>tournaments</code> row away</td></tr>
+          <tr><td class="id">V7</td>
+            <td><strong>Migration 024 is not applied</strong> (expected — deliberately uncommitted). <strong>Migration 026 is also not
+              applied</strong> — <code>entry_xp_state.highest_level_reached</code> does not exist</td>
+            <td>024 is the R2 safety catch working as intended. 026 is an unexplained gap: a migration that exists and has not landed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="grp">✅ Verified in code, 2026-07-26 (this pass)</h3>
+  <div class="card okc">
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Finding</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td>The web pool page polls <strong>every 30 s via <code>router.refresh()</code></strong>, layered <em>on top of</em> an
+            existing realtime subscription</td>
+            <td><code>app/pools/[pool_id]/PoolDetail.tsx:666</code>. It is gated on the active tab (<code>:663-664</code>, four tabs) but
+              has <strong>no visibility check and no jitter</strong> — a backgrounded tab keeps refreshing, and every client fires on the
+              same wall-clock phase</td></tr>
+          <tr><td><strong>Mobile has no query cache at all</strong></td>
+            <td>No <code>react-query</code> / <code>@tanstack</code> / <code>swr</code> in <code>mobile/package.json</code></td></tr>
+          <tr><td><strong>No caller ever passes <code>strict</code></strong> to the api-football client</td>
+            <td><code>strict</code> appears only at <code>lib/integrations/apiFootball/client.ts:59,73</code> and
+              <code>types.ts:65</code> — zero call sites set it. The <em>mechanism</em> for silent failure is real; whether a failed fetch
+              is then <strong>recorded as a healthy run</strong> is the unverified half (A5)</td></tr>
+          <tr><td><code>recalculate_all_pool_points</code> is <strong>called from</strong>
+            <code>app/pools/[pool_id]/admin/ScoringTab.tsx</code></td>
+            <td>The function body lives in the database, <strong>not in this repo</strong> — so the claim that it INSERTs non-existent
+              columns (A4) cannot be settled from here</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="grp">⬜ Analysis, not measurement — do not treat as fact</h3>
+  <div class="card warnc">
+    <p style="margin:0 0 9px">Recorded because it is decision-relevant, flagged because nobody has measured it.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>#</th><th>Claim ⬜</th><th>What would settle it</th></tr></thead>
+        <tbody>
+          <tr><td class="id">A1</td>
+            <td><strong>Realtime is ~25.6% of all DB time</strong>, with <code>realtime.apply_rls</code> alone ~18.6%. If true, the
+              kickoff spike's real cost was <strong>fan-out, not scoring writes</strong>, and the highest-leverage single change is
+              removing high-churn tables from the publication — reusing the <strong>Broadcast-from-database</strong> pattern migration
+              <code>022</code> already established for banter</td>
+            <td><code>pg_stat_statements</code> by total time. The percentages are unverified</td></tr>
+          <tr><td class="id">A2</td>
+            <td><strong>The two workflows disagree on pool payload size: ~3.8 MB vs ~12 MB</strong> (the latter claiming
+              <code>match_scores</code> alone is ~10 MB for the largest pool)</td>
+            <td>Measure one large pool's response. <strong>This matters beyond curiosity:</strong> the recorded caching decision was taken
+              on the 3.8 MB figure, so if it is really 12 MB, that decision rests on a wrong number</td></tr>
+          <tr><td class="id">A3</td>
+            <td><strong><code>max_connections = 60</code></strong>, which would mean the instance is <strong>not</strong> Medium (Medium is
+              120)</td>
+            <td>Supabase dashboard. <strong>Contradicts the recorded XL→Medium downgrade.</strong> Confirm before any capacity planning —
+              it changes the arithmetic on everything downstream</td></tr>
+          <tr><td class="id">A4</td>
+            <td><strong>The admin "Recalculate points" button cannot succeed</strong> — <code>recalculate_all_pool_points</code> allegedly
+              INSERTs columns that don't exist on <code>match_scores</code></td>
+            <td>Introspect the function body in the DB. If true this is a <strong>P3</strong> failure and belongs in the register as its
+              own risk; flagged for verification, <strong>not</strong> recorded as broken</td></tr>
+          <tr><td class="id">A5</td>
+            <td><strong>api-football errors are swallowed</strong> — with <code>strict</code> never passed, failures return an empty
+              envelope and are recorded as <strong>healthy runs</strong>, making mean-time-to-notice for an ingest stall unbounded</td>
+            <td>The <code>strict</code> half is verified above; what remains is whether the sync route writes a success record on an empty
+              envelope</td></tr>
+          <tr><td class="id">A6</td>
+            <td><strong>~96 unbounded <code>.in()</code> reads</strong> across <code>app/</code>, <code>lib/</code>, <code>mobile/</code>,
+              against the 1,000-row PostgREST cap</td>
+            <td>My raw grep finds <strong>199</strong> <code>.in(</code> call sites in total (bounded and unbounded together), and the
+              existing <em>Bounded reads</em> item records a 2026-07-10 sweep of 161 web + 30 mobile. <strong>Three different numbers,
+              none reconciled</strong> — re-run the sweep with one definition before quoting any of them</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="grp">⬜ Proposed direction</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 9px">Where the design should go. All of it is proposal.</p>
+    <ul>
+      <li><strong>Precompute over cache.</strong> The only genuinely <em>shared</em> object in this product is the
+        <strong>competition</strong>, not the pool — the median pool has very few members, so a per-pool cache has almost nothing to
+        amortise. Cache less than instinct suggests; precompute more.</li>
+      <li><strong>Move fan-out off WAL-plus-RLS</strong> for high-churn tables, using the Broadcast-from-database pattern already proven in
+        migration <code>022</code>. Contingent on <strong>A1</strong> being true (V4 establishes the mechanism; A1 is the size of it).</li>
+      <li><strong>The largest available wins are client-side, not server-side</strong> — a visibility-gated, jittered poll on web, and a
+        query cache on mobile. Both are cheap and neither needs a schema change.</li>
+      <li><strong>Split the freshness budget in two (P2)</strong> and show both numbers to admins (P3), so "is it working?" has an answer
+        that doesn't require an engineer.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">⬜ Not yet — and the trigger</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 9px">Each classic building block that was rejected, why it's wrong <em>for this product today</em>, and the number
+      that would change the answer. This is the part that keeps its value as the product grows.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Block</th><th>Why not today ⬜</th><th>Trigger that reopens it</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Load balancer</strong></td><td>Nothing to design — Vercel's anycast layer already provides ingress, autoscaling
+            and failover</td><td>Leaving Vercel</td></tr>
+          <tr><td><strong>Sharding</strong></td><td>Adds cross-shard complexity to a dataset that is small and cleanly pool-scoped</td>
+            <td>A single competition's <code>match_scores</code> exceeding what one Postgres instance serves comfortably, <strong>or</strong>
+              write throughput that vertical scaling can no longer absorb</td></tr>
+          <tr><td><strong>CDN for pool detail</strong></td><td>Responses are per-member and carry <code>set-cookie</code>, so the platform
+            won't cache them anyway; median pool size means ~0% hit rate</td>
+            <td>Never for pool detail. CDN stays right for <strong>static assets, marketing, <code>/play/*</code>,
+              <code>/tv/*</code></strong> — genuinely shared content</td></tr>
+          <tr><td><strong>Redis / external cache</strong></td><td>A second consistency boundary to keep honest, for an object that is
+            barely shared</td><td>A measured, repeated read that precompute cannot serve — e.g. leaderboard ZSETs at a scale precompute
+              can't hold</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="grp">How this section touches the rest of the programme</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 9px">Cross-references, not duplicates. <strong>P1</strong> ↔ <strong>R17</strong>, <strong>R3</strong>,
+      <strong>R6</strong> · <strong>P2</strong> ↔ the fan-out work and A1 · <strong>P3</strong> ↔ <strong>R18</strong>, A4 ·
+      <strong>P4</strong> ↔ <strong>R2</strong>, <strong>R5</strong>, and <a href="#i-sync-cron">Sync cron is single-tenant</a>. V5 answers
+      the factual half of <strong>Gate B</strong>; V6 re-characterises <strong>R2</strong>; V3 corrects the <em>XL→Medium</em> item's "last
+      flag to flip". <a href="#d6">Decision 6</a> (one canonical scale) and <a href="#d7">Decision 7</a> (platform as referee, admin
+      operability) are the product-side statements of P1 and P3 respectively.</p>
+    <p style="margin:0"><strong>Where the design assumes an unanswered gate:</strong> the precompute-over-cache direction assumes the
+      competition is the shared object — which is only true once <strong>P4</strong> exists, and P4 is gated by <strong>Gate C</strong>
+      (EPL scope-or-date). Sequencing this work before Gate C is answered risks precomputing the wrong shape.</p>
+  </div>
+
+  <div class="gate" id="gate-d">
+    <h4>🚦 Gate D — "real-time live leaderboard" vs "minute-cadence is sufficient" <span class="chip gold">new 2026-07-26</span></h4>
+    <p>The stated goal says <strong>real-time live leaderboard</strong>. A recorded product principle says <strong>"predictions app, not a
+      score tracker — minute-cadence live updates are sufficient; don't over-engineer real-time score fidelity."</strong> Both are Ryan's.
+      They point at different systems: one justifies pushing every scoring change to every viewer, the other justifies bounded, cheap
+      polling — and <strong>A1 suggests the difference is a large share of the database bill.</strong></p>
+    <p>This is not a contradiction to resolve by picking the newer statement; it is a genuine product question about what "live" has to
+      <em>feel</em> like on a match night. <strong>Surfaced, not answered.</strong> Until it is, P2's freshness budget has no target number
+      to be measured against.</p>
+  </div>
+</section>
+
 <!-- ============================ PROJECTS ============================ -->
 <section id="projects">
-  <h2 class="sec">Projects in this programme <span class="count">6</span></h2>
+  <h2 class="sec">Projects in this programme <span class="count">7</span></h2>
   <p class="sec-sub">SportPool is several distinct projects under one banner. Day-to-day delivery is still ordered by
     priority (Now → Later) below; these are the larger bodies of work those items roll up into.
     <em>Nesting note: the markdown associates work with a project through its section headings and each project's own
@@ -832,6 +1302,15 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0"><strong>Contains:</strong> <a href="#next-scale">Leaderboard precompute · Scale downgrade XL→Medium ·
       Tournament IO reduction · Kickoff write spike · Shadow scoring engine</a> and
       <a href="#next-scoring">scoring correctness &amp; data integrity</a>. Carries <strong>R4</strong> and <strong>R6</strong>.</p>
+  </div>
+
+  <div class="card okc">
+    <h4>⚡ Performance &amp; caching <span class="chip ok">🟢 In flight</span></h4>
+    <p style="margin:0 0 8px">Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; three
+      fixes written locally, none landed.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#perf">the measured baseline, what landed locally, the open sequence and the
+      five infrastructure decisions</a>. Carries <strong>R13</strong>, <strong>R14</strong>, <strong>R15</strong> and
+      <strong>R16</strong>.</p>
   </div>
 
   <div class="card goldc">
@@ -1153,7 +1632,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ NOW ============================ -->
 <section id="now">
-  <h2 class="sec">🔥 Now — active, can't wait <span class="count">3 items</span></h2>
+  <h2 class="sec">🔥 Now — active, can't wait <span class="count">4 items</span></h2>
 
   <div class="card crit" id="i-delete-pool">
     <h4>"Delete Pool" destroys every member's predictions <span class="chip cat">Bug</span>
@@ -1264,6 +1743,56 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     </ul>
   </div>
 
+  <div class="card crit" id="i-xp-writers">
+    <h4>XP has two writers — the level shown to users is whichever ran last <span class="chip cat">Bug</span>
+      <span class="chip cat">Scoring</span> <span class="chip danger">🔥 R13</span> <span class="chip danger">R14</span></h4>
+    <p class="quote" style="margin:0 0 10px">Added 2026-07-26 from the analytics read-path parity pass. The fix is written and tested;
+      <strong>nothing is applied or deployed</strong>, so this is live.</p>
+    <ul class="fields">
+      <li><span class="f">Is:</span> <code>entry_xp_state.total_xp</code> / <code>.current_level</code> were written by two independent
+        paths computing <strong>different quantities</strong>, both compared against the same <code>LEVELS.xpRequired</code> thresholds,
+        last-writer-wins. <code>lib/push/badges.ts</code> (pre-fix, old line 400) wrote
+        <code>Σ match_scores.total_points + badgeXP</code> — <strong>scoring points</strong>.
+        <code>lib/analytics/entryAnalytics.ts</code> writes <code>computeFullXPBreakdown</code> XP —
+        <code>BASE_XP[tier] × STAGE_MULTIPLIERS</code> + crowd/streak bonus events + badge XP. Not two implementations of one formula; two
+        formulas.</li>
+      <li><span class="f">Already user-facing.</span> <code>app/pools/page.tsx:95</code> and <code>app/dashboard/page.tsx:188</code> both
+        read <code>current_level</code> and show it on pool cards. Two members with identical performance can be shown different levels
+        depending only on whether their pool was recalculated after the last analytics backfill.</li>
+      <li><span class="f">Evidence (prod, drafts-sourced):</span> <code>scripts/verify-analytics-parity.ts</code> →
+        <strong>187 of 331 entries mismatched</strong>, split perfectly by mode (5/5 <code>progressive</code> clean, 5/5
+        <code>full_tournament</code> wrong). Proof it is Writer A's formula: <code>stored − Σ match_points</code> yields a clean badge
+        residual, and two entries with the identical badge set both give exactly <strong>355</strong>. Alternatives ruled out by re-running
+        with the crowd refactor stashed (identical), checking input freshness, membership drift, and <code>numeric(5,2)</code> rounding
+        (real, cosmetic, 0 failures).</li>
+      <li><span class="f">Why nobody caught it:</span> <code>vercel.json</code> is <code>{}</code> — the analytics-sweep cron
+        (<code>app/api/cron/analytics-sweep/route.ts</code>, which says so in its own header) has <strong>never been registered</strong>, so
+        <code>badges.ts</code> is the de facto owner and <code>analytics_updated_at</code> records when the <em>other</em> writer last ran.
+        <strong>The timestamp lies.</strong></li>
+      <li><span class="f">What's written (local, uncommitted):</span> <code>badges.ts</code> consumes the shared value and omits the columns
+        entirely when it can't compute one rather than guessing (<code>lib/push/badges.ts:213</code>); <code>everReachedLevel</code> added
+        to <code>computeFullXPBreakdown</code> (<code>xpSystem.ts:570</code>); <code>lib/migrations/026_entry_xp_highest_level.sql</code>;
+        <code>scripts/reseed-entry-xp.ts</code>; two new test files. Suite <strong>157/157 green</strong>, no type errors in any touched
+        file.</li>
+      <li><span class="f">Decisions 2026-07-26:</span> <strong>levels never demote</strong> — the corrected formula moves 1,048 entries and
+        <strong>231 of them down</strong>, so a ratchet mirrors the keep-once rule <code>badge_unlocks</code> already applies to badges;
+        <code>total_xp</code> stays honest and may fall; and <strong>the analytics-sweep cron is not to be registered</strong> — scoring
+        maintains the columns, and a second writer path is precisely what caused this.</li>
+      <li>🔒 <span class="f">Blocked on a release, in a fixed order (R14):</span> apply 026 → deploy the <code>badges.ts</code> fix → run
+        <code>scripts/reseed-entry-xp.ts</code> <strong>immediately</strong> → re-run the parity check. Deploying before the migration means
+        PostgREST rejects the whole <code>entry_xp_state</code> upsert on the unknown <code>highest_level_reached</code> column —
+        <strong>as of 2026-07-26 that now fails loudly and skips the push</strong> rather than silently, so the consequence is quiet
+        badge/level pushes and a log line, not repeat notifications. Skipping the reseed still fires <strong>~817 level-up pushes</strong> in
+        one burst.</li>
+      <li><span class="f">Two defects in this fix were found after it was called done</span> — the missing <code>entryAnalytics</code> hoist
+        (R15) and the unchecked upsert (R14) — both raised by this register, confirmed by Ryan against the code, and fixed 2026-07-26. Tests
+        and typecheck re-run <strong>after</strong> those fixes: 157/157, clean.</li>
+      <li><span class="f">Effort:</span> the code is done — ~1–2 hours of ops in one window, plus the parity re-run.
+        <span class="f">Done when:</span> parity comes back clean, <code>/pools</code> and <code>/dashboard</code> show a level with one
+        definition behind it, and no user received a level-up push for a formula change.</li>
+    </ul>
+  </div>
+
   <p class="quote">Beyond that and the <strong>recurring knockout ops</strong> below, the master fix list from the June outages is
     fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: <em>Badge batch</em>,
     <em>Mobile</em>, <em>Post-deadline lock</em>, <em>IO reduction</em>.</p>
@@ -1339,8 +1868,21 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>computeStreaks</code>/<code>computeFullXPBreakdown</code> and recomputes per-read (zero <code>entry_xp_state</code>
         reads); flag <code>analytics_read_from_columns</code> appears only in prose, never in code. The cited design doc
         <code>drafts/M4_read_path_flip.md</code> is <strong>missing from the repo</strong> — recreate it or drop the reference.</li>
-      <li><span class="f">Effort:</span> ~2–3 days (calm-window deploy + load test). Bracket pools need a <strong>separate</strong>
-        parallel-analytics track (~2–3 days more) — they score via <code>bonus_scores</code>, not <code>predictions</code>.</li>
+      <li>🔒 <span class="f">Blocked 2026-07-26 — the parity pass was run and it FAILED.</span> "Backfill-vs-live parity = 0 diffs" is the
+        <em>Done when</em> on this item, and the first real run came back <strong>187 of 331 entries mismatched</strong>. The cause is not
+        staleness and not the caching work: <code>entry_xp_state</code> has <strong>two writers with different formulas</strong>
+        (<strong>R13</strong>). Until that has one owner, is deployed, and the re-seed has run, this flip cannot proceed. Result:
+        <code>drafts/2026-07-26_analytics_parity_result.md</code>; checker: <code>scripts/verify-analytics-parity.ts</code> (read-only,
+        exits non-zero on failure, so it can gate the deploy).</li>
+      <li>⚠️ <span class="f">The writer named in this item no longer applies.</span> It says the writer is "the
+        <code>analytics-sweep</code> cron + <code>lib/analytics/entryAnalytics.ts</code>". <code>vercel.json</code> is <code>{}</code> —
+        <strong>that cron has never been registered</strong>, and Ryan's decision 2026-07-26 is <strong>not to register it</strong>:
+        scoring maintains the columns via <code>lib/push/badges.ts</code> → <code>computePoolEntryAnalytics</code>. The flip's freshness
+        guarantee therefore now rests on the scoring path, not on a sweep — a different design, and it needs re-validating on that
+        basis.</li>
+      <li><span class="f">Effort:</span> ~2–3 days (calm-window deploy + load test), <strong>plus</strong> the R13 release ahead of it.
+        Bracket pools need a <strong>separate</strong> parallel-analytics track (~2–3 days more) — they score via
+        <code>bonus_scores</code>, not <code>predictions</code>.</li>
       <li><span class="f">Done when:</span> backfill-vs-live parity = 0 diffs, the ~516ms leaderboard query drops to ~20ms, and a
         match-night load test holds on Medium compute.</li>
     </ul>
@@ -1387,7 +1929,16 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Audit 2026-07-12:</span> <code>recalculate.ts</code> already batches (<code>batchSize = 50</code>, sequential
         <code>inBatches</code>, paginated reads) — the gap is a real queue/precompute, not zero mitigation. Folds into the precompute +
         scale work above.</li>
-      <li><span class="f">Effort:</span> ~1 day incremental.</li>
+      <li>🟠 <span class="f">This path gained a new tenant on 2026-07-26 (R15) — and the O(n²) on it is fixed, but the tenancy isn't going
+        away.</span> <code>detectAndPushBadgesForPool</code> — fired from <code>recalculate.ts:93</code> and <code>:322</code> on every
+        recalc — now calls <code>computePoolEntryAnalytics</code> for the whole pool (<code>lib/push/badges.ts:156</code>), because that
+        function is the single owner of <code>entry_xp_state</code>. Its per-entry crowd rebuild (~2.6M iterations on the largest pool)
+        <strong>is fixed</strong> — hoisted at <code>lib/analytics/entryAnalytics.ts:201</code>. What remains by design is a
+        <strong>full-pool prediction pull per recalc</strong> (~3.8 MB on the largest pool). It is fire-and-forget (<code>void</code>), so it
+        doesn't block the recalc's return, but it burns the same function's CPU at the same moment. <strong><code>entryAnalytics.ts</code>'s
+        header now says so</strong> — <em>"ON THE SCORING PATH: treat added work here as scoring-path cost"</em> — the durable half of the
+        fix, because the stale "DRAFT, not imported by any live code path" header is what made the regression easy to add.</li>
+      <li><span class="f">Effort:</span> ~1 day incremental. <em>(The R15 hoist itself is done, in code, 2026-07-26.)</em></li>
       <li><span class="f">Done when:</span> kickoff no longer produces a CPU/replication spike on the Supabase graph.</li>
     </ul>
   </div>
@@ -1462,6 +2013,163 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Done:</span> testers on the ≥ Jul 6 build pull the update; mobile bracket display now matches the shipped web
         tie-break correction.</li>
     </ul>
+  </div>
+</section>
+
+<!-- ============================ PERFORMANCE & CACHING ============================ -->
+<section id="perf">
+  <h2 class="sec">⚡ Performance &amp; caching <span class="count">opened 2026-07-26 · R13–R16</span></h2>
+  <p class="quote">Scope came from Ryan: <em>"optimize the entire site so we do not have unneeded requests, unneeded calculations, or even
+    when requesting data the app or web only requests exactly what is required — coupled with caching, web to mobile."</em> Three drafts:
+    <code>drafts/2026-07-26_performance_optimization_audit.md</code> (what to stop doing),
+    <code>drafts/2026-07-26_caching_strategy.md</code> (where to put what's left), and
+    <code>drafts/2026-07-26_analytics_parity_result.md</code> (the blocker it found). Supersedes the caching-only scope of
+    <code>drafts/2026-07-19_caching_infrastructure_plan.md</code>, which stays valid as the layer design.</p>
+
+  <div class="note danger" style="margin-bottom:14px">
+    <strong>Everything in this section is local and uncommitted.</strong> Nothing is pushed, deployed, or applied to prod — so the risks
+    these changes address are <strong>still live in production exactly as before</strong>.
+  </div>
+
+  <div class="card neutral">
+    <h4>Framing that ordered the work</h4>
+    <p style="margin:0">Caching a wasteful query makes the waste cheaper, not smaller. Stop asking for data we don't use → stop asking
+      repeatedly for unchanged data → stop recomputing what we already computed → <em>then</em> cache what's left.</p>
+  </div>
+
+  <div class="card neutral">
+    <h4>Measured baseline <span class="chip cat">Infra</span> <span class="chip warn">prod-sourced · unverifiable here</span></h4>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Statement</th><th>DB hours</th><th>% of all DB time</th><th>Calls</th></tr></thead>
+        <tbody>
+          <tr><td><code>SELECT predictions.*</code></td><td><strong>111.3</strong></td><td><strong>33.0%</strong></td><td>30.0M</td></tr>
+          <tr><td>Realtime WAL decoding</td><td>80.9</td><td>24.0%</td><td>16.6M</td></tr>
+          <tr><td><code>row_to_json(pool_members)</code> — 404–450ms mean, slowest by mean</td><td>34.5</td><td>10.2%</td><td>8.6M</td></tr>
+          <tr><td><code>SELECT match_scores.*</code></td><td>31.0</td><td>9.2%</td><td>8.8M</td></tr>
+          <tr><td><strong>Top four combined</strong></td><td><strong>257.7</strong></td><td><strong>76.4%</strong></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="fields" style="margin-top:10px">
+      <li><span class="f">Source:</span> <code>pg_stat_statements</code> on <code>ujthamlehjyubbzxbnes</code>, 337.5 total DB-hours,
+        cumulative since an unknown counter reset — a total, not a rate.</li>
+      <li><span class="f">Realtime WAL decoding at 24% is flagged and deliberately NOT addressed</span> — it is a publication-configuration
+        question, not app code. It deserves its own pass; it is not in this one.</li>
+      <li><span class="f">The distribution that drives every caching decision:</span> 623 pools, 4,809 memberships,
+        <strong>median pool = 1 member</strong>, mean 7.7, 70% ≤5 members, <strong>only 4 pools ≥100</strong> (max 192); 288,029
+        predictions across 4,985 entries. High key cardinality, near-1:1 read-per-fetch for 90% of pools, extreme concentration in four. A
+        cache only pays when one fetch serves many reads — so the strategy is <strong>"cache the few genuinely shared things, precompute
+        the rest"</strong>, not "cache pool data".</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>What landed locally <span class="chip cat">Infra</span> <span class="chip ok">verified in code 2026-07-26</span></h4>
+    <ul class="fields">
+      <li><span class="f"><code>predictions.select('*')</code> → 8 named columns.</span> <code>lib/poolData.ts:247</code> now uses the shared
+        <code>PREDICTION_COLUMNS</code> constant (<code>lib/poolData.ts:43</code>). <code>predictions</code> has 11 columns;
+        <code>PredictionData</code> consumes 8, so <code>confidence_level</code> / <code>created_at</code> / <code>updated_at</code> were
+        being <code>json_agg</code>'d and discarded on the single most expensive statement in the product. Measured on the largest pool:
+        <strong>5,420 kB → 3,854 kB (29%)</strong> <em>(prod measurement)</em>.</li>
+      <li><span class="f">13 of 14 whole-table <code>match_conduct</code> reads scoped</span>, via new <code>lib/matchConduct.ts</code>
+        (filters through the <code>match_conduct → matches</code> FK in one round trip, and paginates so it cannot be truncated). Count
+        verified by reading every call site: 7 web routes/pages + <code>lib/scoring/recalculate.ts</code> +
+        <code>lib/scoring/shadowBrackets.ts</code> ×3 + 2 mobile hooks = 13 fixed;
+        <code>app/api/admin/advance-teams/route.ts</code> deliberately not (<strong>R16</strong>).</li>
+      <li><span class="f">Why that one mattered more than performance:</span> <code>match_conduct</code> has <strong>no
+        <code>tournament_id</code> column</strong>, so an unfiltered read is inherently cross-competition <em>and</em> silently capped at
+        1,000 rows by PostgREST. 206 rows today; PL adds ~760 → 966; the competition after that truncates in silence. <strong>Four of the 14
+        were inside scoring engines</strong>, where truncation means wrong bonuses and wrong conduct tiebreaks with no error raised.</li>
+      <li><span class="f"><code>computeCrowdPredictions</code> split</span> into <code>computeCrowdConsensus</code> (pool-wide, once) +
+        <code>applyCrowdOverlay</code> (per entry) — <code>analyticsHelpers.ts:345</code>/<code>:435</code>, with
+        <code>computeCrowdPredictions</code> kept as the composition so single-entry callers are untouched. It had been called once
+        <strong>per entry</strong>, each call re-scanning every prediction in the pool: 192 × 13,385 ≈ <strong>2.6M iterations</strong> on
+        the largest pool, in the leaderboard API route <em>and</em> client-side in <code>LeaderboardTab.tsx</code> and
+        <code>CommunityTab.tsx</code>. Converted in <strong>all four</strong> — the fourth,
+        <code>lib/analytics/entryAnalytics.ts</code>, was missed on the first pass and is the one that landed on the scoring path; hoisted
+        2026-07-26 (<code>:201</code> consensus, <code>:223</code> overlay) after this register flagged it. See <strong>R15</strong>. The two
+        remaining <code>computeCrowdPredictions</code> callers (<code>AnalyticsTab.tsx:127</code>,
+        <code>entries/[entry_id]/analytics/route.ts:224</code>) are genuinely single-entry — verified, not an oversight.</li>
+      <li><span class="f">The badge snapshot upsert now fails loudly</span> (<code>lib/push/badges.ts</code>, 2026-07-26). It was unchecked;
+        it now captures the error, logs it, and <strong>returns before pushing</strong> — because that snapshot is the diff basis for "what's
+        new", so a silent write failure would make the next run re-derive the same badges and levels as new and push them again.
+        <strong>Silence is the safe failure</strong>, and it is the same class of bug as the swallowed <code>pool_members</code> error that
+        made this pipeline a no-op for months. Reduces <strong>R14</strong> from a code defect to a release-ordering constraint.</li>
+      <li><span class="f">Also in the same change:</span> <code>teams</code> was unscoped in <code>bracket-picks/calculate</code>,
+        <code>dashboard/page.tsx</code> and <code>profile/page.tsx</code> — now filtered by tournament.</li>
+      <li><span class="f">Verification:</span> vitest <strong>157/157 pass</strong>, <code>tsc --noEmit</code> shows <strong>no error in any
+        touched file</strong> (the only errors are the known local phantoms — <code>mobile/</code> resolved through the root tsconfig, the
+        <code>FormData</code> false positive, and an iCloud <code>routes.d 2.ts</code> duplicate). Both re-run <strong>after</strong> the
+        R14/R15 fixes on 2026-07-26, not just before them.</li>
+      <li><span class="f">Two of this section's own defects were found by the register and fixed the same day</span> — the R15 hoist and the
+        R14 error check. Recorded because it is the argument for auditing a performance change against the code rather than against its own
+        summary: both were in the change that was described as complete and tested.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h4>Open work, in the sequence Ryan set <span class="chip cat">Infra</span></h4>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>#</th><th>Step</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>Mobile client cache (react-query)</strong></td>
+            <td>Not started. Mobile has <strong>no</strong> client cache at all — hand-rolled <code>useState</code>/<code>useEffect</code>,
+              six surfaces refetching on <code>useFocusEffect</code>, so every tab switch re-runs a full load including the uncached
+              leaderboard route. Largest untapped mobile win; needs no server change</td></tr>
+          <tr><td>2</td><td><strong>Fix the 30s full-page poll</strong></td>
+            <td>Not started. <code>app/pools/[pool_id]/PoolDetail.tsx:666</code> — <code>setInterval(() =&gt; router.refresh(), 30000)</code>
+              on a <code>force-dynamic</code> page re-runs the <em>entire</em> server component every 30s per open tab, on 4 tabs,
+              regardless of visibility, and is redundant with the Realtime subscription directly above it. Most likely explanation for
+              <code>row_to_json(pool_members)</code> at 8.6M calls</td></tr>
+          <tr><td>3</td><td><strong>Shrink the pool payload below 2 MB</strong></td>
+            <td>Not started — <strong>and it is a hard prerequisite, not a nice-to-have.</strong> At 3,854 kB the largest pool's
+              <code>getPoolData</code> <strong>cannot be stored in Vercel Runtime Cache at all</strong> (2 MB per-item limit). Direction:
+              ship <em>derived</em> crowd consensus (~100 rows) instead of 13,385 raw prediction rows — now possible because
+              <code>computeCrowdConsensus</code> is split out</td></tr>
+          <tr><td>4</td><td><strong>Tagged SWR cache on the mobile API routes</strong></td>
+            <td>Not started. 30s staleness budget (decided). Replaces today's <code>expire: 0</code> invalidate-on-every-score, which hard-
+              expires every affected pool at exactly the moment traffic peaks</td></tr>
+          <tr><td>5</td><td><strong><code>s-maxage</code> + SWR on <code>/play/*</code>, <code>/tv/*</code></strong></td>
+            <td>Not started. The only CDN change recommended</td></tr>
+          <tr><td>6</td><td><strong>React <code>cache()</code> request-scoped dedup</strong></td>
+            <td>Not started. Free; removes repeat <code>isPoolCacheEnabled()</code> / <code>requireAuth()</code> /
+              <code>getScoringSource()</code> lookups. Mobile separately re-resolves <code>auth_user_id → user_id</code> in
+              <strong>11 files</strong> for a value that is constant for the session</td></tr>
+          <tr><td>7</td><td><strong>Flip analytics reads to <code>entry_xp_state</code></strong></td>
+            <td>🔒 <strong>Blocked by R13</strong> — parity failed. Was step 1 of the strategy; it is now last because the correction has to
+              ship and be re-seeded first</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="fields" style="margin-top:10px">
+      <li><span class="f">Effort:</span> each step is order-of-magnitude ~0.5–2 days; steps 1–3 hold most of the value and need no new
+        infrastructure. <strong>Not a commitment.</strong></li>
+      <li><span class="f">Done when:</span> the top-four statement share falls materially against a fresh <code>pg_stat_statements</code>
+        baseline, mobile stops refetching on every focus, and the pool payload fits a shared cache.</li>
+    </ul>
+  </div>
+
+  <div class="card okc">
+    <h4>Decisions settled 2026-07-26 (infrastructure) <span class="chip cat">Infra</span></h4>
+    <p class="quote" style="margin:0 0 10px">Recorded here rather than under <a href="#decisions">Project: Multi-sport platform</a> — those
+      eight are <strong>product</strong> decisions and are not renumbered by these.</p>
+    <ol>
+      <li><strong>Staleness budget for cached reads: 30 seconds.</strong> Matches the existing poll cadence and the recorded "predictions
+        app, not a score tracker" principle. Drives the step-4 TTL.</li>
+      <li><strong>Mobile client cache: react-query.</strong> Takes the dependency; buys focus-dedup, TTL, background refetch and request
+        de-duplication — all four of which the hand-rolled hooks need.</li>
+      <li><strong>CDN is never for pool detail.</strong> Keeps exactly three jobs: static assets, images, and the genuinely public
+        <code>/play/*</code> and <code>/tv/*</code> boards. The numbers back the call: median pool = 1 member ⇒ ~0% edge hit rate; many
+        isolated PoPs multiply cold misses on 623 low-traffic keys; and the content is auth-gated and viewer-shaped (own picks, admin
+        visibility, the reveal gate), so a shared object either leaks picks or fragments the key per user and takes hit rate to zero.</li>
+      <li><strong>Redis: hold.</strong> Not justified by current numbers, and steps 1–4 change the shape of the problem. When revisited, the
+        case is specific: a leaderboard <strong>is</strong> a sorted set (<code>ZADD</code>/<code>ZREVRANGE</code>/<code>ZRANK</code> give
+        top-N and a member's rank in O(log n)) — adopt it as the leaderboard <em>data structure</em>, not as a generic blob cache.</li>
+      <li><strong>Levels never demote</strong> and <strong>the analytics-sweep cron is not to be registered</strong> — both recorded on the
+        <a href="#i-xp-writers">XP has two writers</a> item, since that is where they bite.</li>
+    </ol>
   </div>
 </section>
 
@@ -2444,6 +3152,17 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       pool.</div>
   </div>
 
+  <div class="card warnc" id="i-advance-teams">
+    <h4>Team advancement is single-tournament <span class="chip cat">Multi-sport</span> <span class="chip warn">🔒 R16</span>
+      <span class="chip warn">added 2026-07-26</span></h4>
+    <p style="margin:0"><code>app/api/admin/advance-teams/route.ts:56</code> reads <code>matches</code>, <code>teams</code> and
+      <code>match_conduct</code> <strong>tournament-wide with no scope</strong>, because the advancement cascade was written for one
+      competition. With a second competition present, unscoped <code>matches</code> would resolve knockout placeholders
+      <strong>across</strong> competitions, and unscoped conduct is capped at 1,000 rows by PostgREST. Carries a blocker comment in-file.
+      The fix is not a query change — it means deriving the tournament from <code>match_id</code> (or taking it as a parameter) and
+      threading it through the cascade. <strong>Must land before a second competition is ingested</strong>, i.e. before 024 is applied.</p>
+  </div>
+
   <div class="card warnc" id="i-sync-cron">
     <h4>Sync cron is single-tenant <span class="chip cat">Multi-sport</span></h4>
     <p style="margin:0">Competition comes from three env globals (<code>app/api/cron/sync-fixtures/route.ts:67</code>). Looping over active
@@ -2531,6 +3250,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         pagination. Do <strong>not</strong> raise <code>max-rows</code>.</li>
       <li><span class="f">Audit 2026-07-12:</span> the first, confirmed instance (mobile pool-card in <code>useHomeData.ts</code>) is
         <strong>still unfixed</strong> — nothing from this sweep has landed yet.</li>
+      <li>✅ <span class="f">First landings, 2026-07-26 (local, uncommitted):</span> the <code>match_conduct</code> family — 13 of 14
+        unfiltered whole-table reads now scoped and paginated via <code>lib/matchConduct.ts</code> — plus <code>predictions</code> narrowed
+        to its 8 used columns and three unscoped <code>teams</code> reads filtered. That is this sweep's exact anti-pattern, and it was
+        <strong>live inside the scoring engines</strong>. See <a href="#perf">⚡ Performance &amp; caching</a>. <code>useHomeData.ts</code>
+        is still unfixed.</li>
       <li><span class="f">Effort:</span> ongoing/background — ~0.5–1 day per site. <span class="f">Done when:</span> no user-facing screen
         depends on an unbounded multi-row fetch; re-running the sweep shows hot read paths are all bounded or DB-aggregated.</li>
     </ul>
@@ -2561,6 +3285,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><code>drafts/2026-07-02_shadow_engine_audit_report.md</code></li>
       <li><code>drafts/2026-07-05_match_status_display_plan.md</code></li>
       <li><code>drafts/2026-07-09_scoring_table_architecture_deepdive.md</code></li>
+      <li><code>drafts/2026-07-19_caching_infrastructure_plan.md</code> — the caching <em>layer</em> design; superseded in scope by the two
+        below, still valid as the layer sketch.</li>
+      <li><code>drafts/2026-07-26_performance_optimization_audit.md</code> — measured baseline + the four tiers of waste
+        (<a href="#perf">⚡ Performance &amp; caching</a>).</li>
+      <li><code>drafts/2026-07-26_caching_strategy.md</code> — layer-by-layer strategy, the pool-size distribution it rests on, and the
+        settled decisions.</li>
+      <li><code>drafts/2026-07-26_analytics_parity_result.md</code> — the parity failure and the two-writer root cause
+        (<strong>R13</strong>).</li>
       <li><s><code>drafts/M4_read_path_flip.md</code></s> — ⚠️ <strong>missing from the repo</strong> (referenced by
         <em>Leaderboard precompute</em> but never created / was removed — recreate or drop the reference).</li>
     </ul>
@@ -2570,16 +3302,18 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card warnc">
     <p style="margin:0">The distinction is the point of this programme. Claims are verified against <strong>code, migrations and git
       history</strong> unless they appear on the <a href="#unverifiable">⚠️ Unverifiable without prod access</a> list in the risk register —
-      seven groups of claims that depend on production state and are carried on the authority of the drafts and runbooks that recorded them.
+      thirteen groups of claims that depend on production state and are carried on the authority of the drafts and runbooks that recorded
+      them, including <strong>every measured number in the 2026-07-26 performance session</strong>.
       <strong>Unverified is not done.</strong></p>
   </div>
 
   <h3 class="grp">About this file</h3>
   <div class="card neutral">
     <p style="margin:0 0 6px">A view of <code>SPORTPOOL_PROGRAMME.md</code> as it stands in the working copy — commit
-      <code>486430a</code> plus the uncommitted 2026-07-26 additions (<a href="#summary">Where this stands</a>,
-      <a href="#order">Order of deliveries</a>). It is updated in the same piece of work as the markdown, never as a follow-up — a stale
-      view is worse than no view, because it looks authoritative.</p>
+      <code>e2da3ab</code> plus the uncommitted 2026-07-26 <em>performance session</em> additions
+      (<a href="#perf">⚡ Performance &amp; caching</a>, <a href="#i-xp-writers">XP has two writers</a>, risks R13–R16, and step
+      <a href="#order">2b</a>). It is updated in the same piece of work as the markdown, never as a follow-up — a stale view is worse than
+      no view, because it looks authoritative.</p>
     <p style="margin:0">Self-contained by design: no CDN, no external fonts, no images, no network calls. Colour tokens are SportPool's own,
       from <code>mobile/theme/colors.ts</code>, with light and dark handled by <code>prefers-color-scheme</code>.</p>
   </div>
@@ -2590,7 +3324,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 <footer>
   <div class="wrap">
     <p><strong>SportPool Programme</strong> — generated view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
-      <code>486430a</code>. Self-contained: no network calls, no external fonts, no CDN. Colours are the SportPool tokens from
+      <code>e2da3ab</code> + the uncommitted 2026-07-26 performance-session additions. Self-contained: no network calls, no external
+      fonts, no CDN. Colours are the SportPool tokens from
       <code>mobile/theme/colors.ts</code>, light/dark via <code>prefers-color-scheme</code>.</p>
     <p>The markdown is the source of truth. This file is a view of it and is updated in the same piece of work — if they
       disagree, <strong>the markdown wins</strong>.</p>

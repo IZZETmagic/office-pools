@@ -45,10 +45,25 @@ export async function POST(request: NextRequest) {
   const { trigger, match_id } = await request.json()
 
   // 3. Fetch all matches, teams, conduct data
+  //
+  // ⚠ MULTI-COMPETITION BLOCKER: all three reads here are deliberately
+  // tournament-WIDE with no scope, because this route was written for a
+  // single-tournament world. Every other conduct read has since been scoped
+  // (see lib/matchConduct.ts); this one cannot be fixed mechanically:
+  //   - `matches` unscoped means the advancement cascade would resolve
+  //     placeholders ACROSS competitions once a second one exists.
+  //   - `match_conduct` unscoped is silently capped at 1,000 rows by PostgREST,
+  //     so group tiebreaks would resolve against partial conduct data.
+  // Scoping this properly means deriving the tournament from `match_id` (or
+  // taking it as a parameter) and threading it through the cascade — a design
+  // change to advancement, not a query change. MUST be done before a second
+  // competition is ingested.
   const [{ data: matches }, { data: teams }, { data: conductData }] = await Promise.all([
     supabase.from('matches').select('*').order('match_number', { ascending: true }),
     supabase.from('teams').select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url'),
-    supabase.from('match_conduct').select('*'),
+    supabase
+      .from('match_conduct')
+      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
   ])
 
   if (!matches || !teams) {

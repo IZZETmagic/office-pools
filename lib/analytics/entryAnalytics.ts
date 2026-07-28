@@ -10,19 +10,22 @@
 //   - (later) the leaderboard read path             (read these columns)
 // Because all three call THIS function, they cannot drift.
 //
-// Note: the crowd computation is hoisted OUT of the per-entry loop (the
-// leaderboard route currently calls it per-entry, which is redundant — it's
-// pool-wide). Same result, computed once per pool.
+// The crowd computation is hoisted OUT of the per-entry loop — see the comment
+// at the loop itself. (This header previously CLAIMED that hoist while the code
+// below still rebuilt the consensus per entry; corrected 2026-07-26.)
 //
-// STATUS: DRAFT. Not imported by any live code path yet. Zero runtime impact
-// until explicitly wired in (cron registration + read-path flip), both of
-// which are separate, gated, calm-window steps.
+// STATUS: LIVE as of 2026-07-26. lib/push/badges.ts calls
+// computePoolEntryAnalytics on every recalc — it is the single owner of
+// entry_xp_state.total_xp / .current_level, and it also persists the analytics
+// columns so they stay fresh as a by-product of scoring. This function is
+// therefore ON THE SCORING PATH: treat added work here as scoring-path cost.
 // ============================================================================
 import { createAdminClient } from '@/lib/supabase/server'
 import {
   matchScoresToPredictionResults,
   computeStreaks,
-  computeCrowdPredictions,
+  computeCrowdConsensus,
+  applyCrowdOverlay,
 } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
@@ -30,7 +33,11 @@ import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scori
 export type EntryAnalyticsRow = {
   entry_id: string
   total_xp: number
+  /** Level implied by total_xp, already ratcheted against highest_level_reached. */
   current_level: number
+  /** The ratchet itself — max(previous, current). Persisted so display surfaces
+   *  can floor a live recompute. See migration 026. */
+  highest_level_reached: number
   last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[]
   current_streak: { type: 'hot' | 'cold' | 'none'; length: number }
   hit_rate: number
@@ -86,6 +93,21 @@ export async function computePoolEntryAnalytics(
 
   const entryIds = entries.map((e: any) => e.entry_id)
   const scoringMap = await readEntryScoring(admin, entryIds, source)
+
+  // Level ratchet (migration 026): the level shown must never fall below one
+  // already displayed, mirroring the keep-once rule badge_unlocks applies to
+  // badges. Read the existing high-water mark so computeFullXPBreakdown can
+  // floor against it.
+  const everReachedByEntry = new Map<string, number>()
+  for (let off = 0; off < entryIds.length; off += 500) {
+    const { data: prior } = await admin
+      .from('entry_xp_state')
+      .select('entry_id, highest_level_reached, current_level')
+      .in('entry_id', entryIds.slice(off, off + 500))
+    for (const r of (prior ?? []) as any[]) {
+      everReachedByEntry.set(r.entry_id, Math.max(r.highest_level_reached ?? 1, r.current_level ?? 1))
+    }
+  }
 
   // All predictions, paginated with the SAME stable order as the route.
   const allPredictions: any[] = []
@@ -169,6 +191,19 @@ export async function computePoolEntryAnalytics(
   const now = new Date().toISOString()
   const rows: EntryAnalyticsRow[] = []
 
+  // Pool-wide crowd consensus — computed ONCE, outside the loop.
+  //
+  // This function is called from detectAndPushBadgesForPool on EVERY recalc, so
+  // a per-entry crowd rebuild here lands directly on the scoring path (which has
+  // a documented kickoff write/CPU spike). Rebuilding it per entry is a full
+  // rescan of every prediction in the pool each time: 192 x 13,385 ≈ 2.6M
+  // iterations on the largest pool. Only the viewer overlay is per-entry.
+  const crowdConsensus = computeCrowdConsensus(
+    normalizedMatches as any,
+    allPredsTyped,
+    membersWithEntries,
+  )
+
   for (const entry of entries as any[]) {
     const entryPreds = (predsByEntry.get(entry.entry_id) || []).map((p: any) => ({
       prediction_id: p.prediction_id || '',
@@ -184,12 +219,9 @@ export async function computePoolEntryAnalytics(
 
     const predResults = matchScoresToPredictionResults(matchScoresByEntry.get(entry.entry_id) || [])
     const streaks = computeStreaks(predResults)
-    const crowdData = computeCrowdPredictions(
-      normalizedMatches as any,
-      allPredsTyped,
-      entryPreds as any,
-      membersWithEntries,
-    )
+    // Consensus is hoisted above the loop — this is just the per-entry overlay.
+    const crowdData = applyCrowdOverlay(crowdConsensus, entryPreds as any)
+    const everReached = everReachedByEntry.get(entry.entry_id)
     const xp = computeFullXPBreakdown({
       predictionResults: predResults,
       matches: normalizedMatches as any,
@@ -198,6 +230,7 @@ export async function computePoolEntryAnalytics(
       entryPredictions: entryPreds as any,
       entryRank: scoringMap.get(entry.entry_id)?.current_rank ?? null,
       totalMatches: normalizedMatches.length,
+      everReachedLevel: everReached,
     })
 
     const lastFive = predResults.slice(-5).map((r: any) => r.type) as EntryAnalyticsRow['last_five']
@@ -210,8 +243,10 @@ export async function computePoolEntryAnalytics(
 
     rows.push({
       entry_id: entry.entry_id,
+      // total_xp stays honest — it may fall. Only the LEVEL ratchets.
       total_xp: xp.totalXP,
       current_level: xp.currentLevel.level,
+      highest_level_reached: Math.max(everReached ?? 1, xp.currentLevel.level),
       last_five: lastFive,
       current_streak: streaks.currentStreak,
       hit_rate: totalCompleted > 0 ? Math.round((nonMiss / totalCompleted) * 10000) / 100 : 0,

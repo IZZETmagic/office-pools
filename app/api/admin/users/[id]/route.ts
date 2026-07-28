@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getShadowReadPools, readEntryScoring } from '@/lib/scoring/readSource'
 
 export async function GET(
   request: NextRequest,
@@ -132,6 +133,38 @@ export async function GET(
   // the super admin was reporting every progressive entry as Pending.
   // For non-progressive pools we just mirror the legacy flag.
   const memberships = (membershipsRes.data || []) as any[]
+
+  // Overlay scoring from whichever engine each pool's leaderboard reads. Without
+  // this the super admin investigating "why is my score wrong?" sees prod's
+  // pool_entries columns for a pool the member sees scored by shadow — i.e. the
+  // one place the discrepancy gets diagnosed would show the wrong number.
+  {
+    // Service role, NOT the request's user-scoped client: shadow tables are RLS
+    // deny-all (0 policies), so a user-scoped read returns nothing and
+    // readEntryScoring back-fills zeros — which would blank every score here.
+    const scoringAdmin = createAdminClient()
+    const shadowPools = await getShadowReadPools(scoringAdmin)
+    const shadowEntryIds: string[] = []
+    for (const m of memberships) {
+      if (!m.pools || !shadowPools.has(m.pools.pool_id)) continue
+      for (const e of m.pool_entries || []) {
+        if (e.entry_id) shadowEntryIds.push(e.entry_id)
+      }
+    }
+    if (shadowEntryIds.length > 0) {
+      const scored = await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
+      for (const m of memberships) {
+        for (const e of m.pool_entries || []) {
+          const sc = scored.get(e.entry_id)
+          if (!sc) continue
+          e.match_points = sc.match_points
+          e.bonus_points = sc.bonus_points
+          e.current_rank = sc.current_rank
+        }
+      }
+    }
+  }
+
   const progressivePoolIds = memberships
     .filter(m => m.pools && (m.pools as any).prediction_mode === 'progressive')
     .map(m => (m.pools as any).pool_id)

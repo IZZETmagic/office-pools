@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getShadowReadPools, readEntryScoring } from '@/lib/scoring/readSource'
 
 export async function GET(
   request: NextRequest,
@@ -98,6 +99,31 @@ export async function GET(
   // entry_round_submissions for the currently-open round; for everything
   // else we just mirror the legacy flag.
   const members = membersRes.data || []
+
+  // This whole pool is either cut over or it isn't, so one flag check decides
+  // the source for every entry. `supabase` here is already the service-role
+  // client, which shadow's deny-all RLS requires.
+  {
+    const scoringAdmin = supabase
+    const shadowPools = await getShadowReadPools(scoringAdmin)
+    if (shadowPools.has(id)) {
+      const entryIds = members.flatMap((m) =>
+        (m.pool_entries || []).map((e) => e.entry_id).filter(Boolean),
+      )
+      if (entryIds.length > 0) {
+        const scored = await readEntryScoring(scoringAdmin, entryIds, 'shadow')
+        for (const m of members) {
+          for (const e of m.pool_entries || []) {
+            const sc = scored.get(e.entry_id)
+            if (!sc) continue
+            e.match_points = sc.match_points
+            e.bonus_points = sc.bonus_points
+            e.current_rank = sc.current_rank
+          }
+        }
+      }
+    }
+  }
   const allEntries = members.flatMap((m: any) => m.pool_entries || [])
   const isProgressive = (poolRes.data as any).prediction_mode === 'progressive'
   const openRound = isProgressive

@@ -309,15 +309,44 @@ export function computeOverallAccuracy(results: PredictionResult[]): OverallAccu
   }
 }
 
+// ---------------------------------------------------------------------------
+// Crowd predictions, split into a pool-wide half and a per-entry half.
+//
+// WHY THE SPLIT: computeCrowdPredictions used to do everything in one pass, and
+// three callers invoke it once PER ENTRY inside a loop (the leaderboard API
+// route, LeaderboardTab, CommunityTab). Each call re-scanned every prediction in
+// the pool to rebuild predsByMatch — so the cost was O(entries x predictions).
+// On the largest pool that is 192 x 13,385 = ~2.6M iterations per render, twice
+// over (once on the server, once in the browser).
+//
+// But only three output fields actually depend on which entry you are looking
+// at: userPredictedResult, userIsContrarian, userWasCorrect. The consensus —
+// vote shares, most popular score, crowd majority — is identical for everyone.
+//
+// So: compute the consensus ONCE (computeCrowdConsensus), then overlay each
+// entry's own picks with a map lookup (applyCrowdOverlay). O(n + m).
+// computeCrowdPredictions is kept as the composition of the two so single-entry
+// callers are unaffected.
+// ---------------------------------------------------------------------------
+
+/** The pool-wide half: everything that doesn't depend on whose entry it is. */
+export type CrowdConsensusMatch = Omit<
+  CrowdMatch,
+  'userPredictedResult' | 'userIsContrarian' | 'userWasCorrect'
+> & {
+  /** Kept so the overlay can decide userWasCorrect without re-reading the match. */
+  actualResult: 'home' | 'draw' | 'away'
+}
+
 /**
- * Compute crowd prediction data for each completed match.
+ * Per-match crowd consensus for a pool. Depends only on (matches, allPredictions,
+ * members) — hoist this out of any per-entry loop and reuse it.
  */
-export function computeCrowdPredictions(
+export function computeCrowdConsensus(
   matches: MatchData[],
   allPredictions: PredictionData[],
-  entryPredictions: PredictionData[],
   members: MemberData[],
-): CrowdMatch[] {
+): CrowdConsensusMatch[] {
   const completed = matches.filter(m => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
   if (completed.length === 0) return []
 
@@ -340,9 +369,7 @@ export function computeCrowdPredictions(
     predsByMatch.set(p.match_id, list)
   }
 
-  const userPredMap = new Map(entryPredictions.map(p => [p.match_id, p]))
-
-  const results: CrowdMatch[] = []
+  const results: CrowdConsensusMatch[] = []
 
   for (const match of completed) {
     const preds = predsByMatch.get(match.match_id) ?? []
@@ -379,15 +406,6 @@ export function computeCrowdPredictions(
     const maxVotes = Math.max(homeWins, draws, awayWins)
     const crowdMajority = homeWins === maxVotes ? 'home' : draws === maxVotes ? 'draw' : 'away'
 
-    // User's prediction
-    const userPred = userPredMap.get(match.match_id)
-    const userResult = userPred
-      ? getWinner(userPred.predicted_home_score, userPred.predicted_away_score)
-      : null
-
-    const userIsContrarian = userResult !== null && userResult !== crowdMajority
-    const userWasCorrect = userResult !== null && userResult === actualResult
-
     results.push({
       matchId: match.match_id,
       matchNumber: match.match_number,
@@ -402,14 +420,53 @@ export function computeCrowdPredictions(
       drawPct: total > 0 ? draws / total : 0,
       awayWinPct: total > 0 ? awayWins / total : 0,
       mostPopularScore: { ...topScore, pct: total > 0 ? topScore.count / total : 0 },
-      userPredictedResult: userResult,
       crowdMajorityResult: crowdMajority,
-      userIsContrarian,
-      userWasCorrect,
+      actualResult,
     })
   }
 
   return results.sort((a, b) => a.matchNumber - b.matchNumber)
+}
+
+/**
+ * Overlay one entry's picks onto a precomputed consensus. Cheap — one map build
+ * over the entry's own predictions, then a lookup per completed match.
+ */
+export function applyCrowdOverlay(
+  consensus: CrowdConsensusMatch[],
+  entryPredictions: PredictionData[],
+): CrowdMatch[] {
+  const userPredMap = new Map(entryPredictions.map(p => [p.match_id, p]))
+
+  return consensus.map(({ actualResult, ...shared }) => {
+    const userPred = userPredMap.get(shared.matchId)
+    const userResult = userPred
+      ? getWinner(userPred.predicted_home_score, userPred.predicted_away_score)
+      : null
+
+    return {
+      ...shared,
+      userPredictedResult: userResult,
+      userIsContrarian: userResult !== null && userResult !== shared.crowdMajorityResult,
+      userWasCorrect: userResult !== null && userResult === actualResult,
+    }
+  })
+}
+
+/**
+ * Compute crowd prediction data for each completed match.
+ *
+ * Unchanged behaviour — now just the composition of the two halves above. If you
+ * are calling this once per entry, call computeCrowdConsensus once outside the
+ * loop and applyCrowdOverlay inside it instead.
+ */
+export function computeCrowdPredictions(
+  matches: MatchData[],
+  allPredictions: PredictionData[],
+  entryPredictions: PredictionData[],
+  members: MemberData[],
+): CrowdMatch[] {
+  return applyCrowdOverlay(computeCrowdConsensus(matches, allPredictions, members), entryPredictions)
 }
 
 /**

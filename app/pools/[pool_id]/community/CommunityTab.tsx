@@ -32,7 +32,7 @@ import { formatDayHeader, generateSystemEvents } from './helpers'
 import { computeFullXPBreakdown } from '../analytics/xpSystem'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import { computeFullBPXPBreakdown } from '../analytics/bracketPickerXpSystem'
-import { matchScoresToPredictionResults, computeCrowdPredictions, computeStreaks } from '../analytics/analyticsHelpers'
+import { matchScoresToPredictionResults, computeCrowdConsensus, applyCrowdOverlay, computeStreaks } from '../analytics/analyticsHelpers'
 import type { PoolSettings } from '../results/points'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import type { GroupStanding, Team } from '@/lib/tournament'
@@ -190,6 +190,10 @@ export function CommunityTab({
       user_id: userId, username, full_name: fullName, level: 1, level_name: 'Rookie', total_xp: 0, current_rank: rank, badges: [],
     })
 
+    // Pool-wide, identical for every member — computed once instead of being
+    // rebuilt (a full scan of every prediction in the pool) on each iteration.
+    const crowdConsensus = computeCrowdConsensus(matches, allPredictions, members)
+
     for (const member of members) {
       const entries = member.entries ?? []
       const bestEntry = entries.length > 0
@@ -248,7 +252,7 @@ export function CommunityTab({
 
           const predResults = matchScoresToPredictionResults(entryMatchScores)
           const streakData = computeStreaks(predResults)
-          const crowdData = computeCrowdPredictions(matches, allPredictions, entryPreds, members)
+          const crowdData = applyCrowdOverlay(crowdConsensus, entryPreds)
 
           const xpBreakdown = computeFullXPBreakdown({
             predictionResults: predResults,

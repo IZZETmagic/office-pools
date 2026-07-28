@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import {
@@ -76,7 +77,7 @@ async function handlePOST(
     const [
       { data: matches, error: matchesErr },
       { data: teams, error: teamsErr },
-      { data: conductData },
+      conductData,
       { data: settingsRow },
       { data: poolMembers, error: membersErr },
     ] = await Promise.all([
@@ -87,10 +88,11 @@ async function handlePOST(
         .order('match_number', { ascending: true }),
       adminClient
         .from('teams')
-        .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url'),
-      adminClient
-        .from('match_conduct')
-        .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+        .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
+        // Was unscoped — every team in every competition. The sibling routes all
+        // filter by tournament; this one didn't.
+        .eq('tournament_id', pool.tournament_id),
+      fetchMatchConductForTournament(adminClient, pool.tournament_id),
       adminClient
         .from('pool_settings')
         .select('*')
@@ -146,7 +148,7 @@ async function handlePOST(
     // We need actual group standings from real match results to compare against
     // the user's predicted group rankings.
 
-    const conduct: MatchConductData[] = conductData || []
+    const conduct: MatchConductData[] = conductData
 
     // Build a "prediction map" from actual results so we can reuse calculateGroupStandings
     const actualResultsMap: PredictionMap = new Map()

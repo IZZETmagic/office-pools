@@ -37,6 +37,12 @@ import type {
 
 export const POOL_CACHE_TTL_SECONDS = 45
 
+// The exact columns behind `PredictionData` — nothing more. `predictions` has 11
+// columns; only these 8 are ever read. Shared so every bulk prediction fetch
+// stays narrow and can't drift back to `select('*')`.
+export const PREDICTION_COLUMNS =
+  'prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id'
+
 // Single source of truth for a pool's cache tag — used both when caching
 // (getPoolDataCached) and when invalidating (invalidatePoolCache), so the two
 // can never drift apart.
@@ -238,7 +244,12 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
       ? fetchAllPages<PredictionData>('predictions', (from, to) =>
           admin
             .from('predictions')
-            .select('*')
+            // Name the columns — this is the single most expensive statement in
+            // the product (~33% of all DB execution time). `*` dragged
+            // confidence_level + created_at + updated_at through json_agg and
+            // over the wire on every render; nothing reads them (PredictionData
+            // is exactly these 8 fields).
+            .select(PREDICTION_COLUMNS)
             .in('entry_id', allEntryIds)
             .order('entry_id', { ascending: true })
             .order('match_id', { ascending: true })

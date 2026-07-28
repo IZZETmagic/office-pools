@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getShadowReadPools, readEntryScoring, readMatchScoreClassification } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
+import { fetchMatchConductForTournaments } from '@/lib/matchConduct'
 import ProfilePage from './ProfilePage'
 // resolvePredictedBracket is used for enriching knockout predictions with team names (display only)
 import { resolvePredictedBracket } from '@/lib/bracketResolver'
@@ -52,7 +54,10 @@ export default async function ProfileServerPage() {
   const poolMemberships = (userPools ?? []).map((m: any) => {
     const entries = (m.pool_entries || []) as any[]
     const bestEntry = entries.length > 0
-      ? entries.reduce((best: any, e: any) => (e.total_points > best.total_points ? e : best), entries[0])
+      // scored_total_points, not total_points: the latter is dead-legacy and
+      // always 0, so this reduce silently always returned entries[0] — and
+      // disagreed with the pick used for playerScoresMap below.
+      ? entries.reduce((best: any, e: any) => ((e.scored_total_points ?? 0) > (best.scored_total_points ?? 0) ? e : best), entries[0])
       : null
     const anySubmitted = entries.some((e: any) => e.has_submitted_predictions)
     const defaultEntryId = bestEntry?.entry_id || entries[0]?.entry_id || null
@@ -72,6 +77,27 @@ export default async function ProfileServerPage() {
       entry_id: defaultEntryId,
     }
   })
+
+  // Every scoring number on this page must follow the SAME source as the pool's
+  // own leaderboard, or a member sees one rank on their profile and another in
+  // the pool. Shadow tables are RLS deny-all (0 policies), so this needs the
+  // service role — scoped to entries the RLS'd query above already proved this
+  // user can see.
+  const scoringAdmin = createAdminClient()
+  const shadowPools = await getShadowReadPools(scoringAdmin)
+  const shadowEntryIds = poolMemberships
+    .filter((p) => p.entry_id && shadowPools.has(p.pool_id))
+    .map((p) => p.entry_id as string)
+  const scoredByEntry = shadowEntryIds.length > 0
+    ? await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
+    : new Map()
+
+  for (const pm of poolMemberships) {
+    const scoring = pm.entry_id ? scoredByEntry.get(pm.entry_id) : undefined
+    if (!scoring) continue
+    pm.current_rank = scoring.current_rank ?? pm.current_rank
+    pm.total_points = scoring.scored_total_points
+  }
 
   // Get member counts for each pool (for rank display like #2/12)
   const memberCounts: Record<string, number> = {}
@@ -182,15 +208,18 @@ export default async function ProfileServerPage() {
   }
 
   // Fetch shared data needed for on-the-fly bonus calculation (teams, conduct)
-  const [{ data: allTeams }, { data: conductRes }] = await Promise.all([
+  // Scoped to the tournaments this user has pools in — see the same fix in
+  // app/dashboard/page.tsx. Unscoped these read every team and every conduct
+  // row in the database, with the conduct read silently capped at 1,000.
+  const profileTournamentIds = [...new Set(poolMemberships.map((p) => p.tournament_id))]
+  const [{ data: allTeams }, conductRes] = await Promise.all([
     supabase
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
+      .in('tournament_id', profileTournamentIds)
       .order('group_letter', { ascending: true })
       .order('fifa_ranking_points', { ascending: false }),
-    supabase
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournaments(supabase, profileTournamentIds),
   ])
 
   const teams: Team[] = (allTeams ?? []).map((t: any) => ({
@@ -199,7 +228,7 @@ export default async function ProfileServerPage() {
     country_code: t.country_code?.trim() || '',
   }))
 
-  const conductData: MatchConductData[] = (conductRes ?? []) as MatchConductData[]
+  const conductData: MatchConductData[] = conductRes
 
   // Read stored v2 scores for each membership (instead of computing on-the-fly)
   const playerScoresMap: Record<string, { match_points: number; bonus_points: number; total_points: number }> = {}
@@ -212,8 +241,11 @@ export default async function ProfileServerPage() {
       ? entries.reduce((best: any, e: any) => ((e.scored_total_points ?? 0) > (best.scored_total_points ?? 0) ? e : best), entries[0])
       : null
 
-    const matchPoints = bestEntry?.match_points ?? 0
-    const bonusPoints = bestEntry?.bonus_points ?? 0
+    // Shadow when the pool is cut over, prod columns otherwise — same
+    // resolution the pool leaderboard uses.
+    const scoring = pool.entry_id ? scoredByEntry.get(pool.entry_id) : undefined
+    const matchPoints = scoring?.match_points ?? bestEntry?.match_points ?? 0
+    const bonusPoints = scoring?.bonus_points ?? bestEntry?.bonus_points ?? 0
 
     playerScoresMap[pool.entry_id || pool.member_id] = {
       match_points: matchPoints,
@@ -278,20 +310,31 @@ export default async function ProfileServerPage() {
     }
   }
 
-  // Fetch stored match_scores for all user entries (for prediction classification)
-  let matchScoresMap: Record<string, { score_type: string; total_points: number }> = {}
+  // Stored match scores for prediction classification, read from the SAME source
+  // as each pool's leaderboard. Entries are split by their pool's source because
+  // a user can be in both shadow-enabled and prod pools at once.
+  //
+  // Two fixes over the previous direct read: it bypassed readSource entirely (so
+  // it showed prod's classification even for cut-over pools), and its `.in()`
+  // was UNPAGINATED — PostgREST caps at 1,000 rows, so a user in enough pools
+  // silently stopped seeing older predictions classified.
+  const matchScoresMap: Record<string, { score_type: string; total_points: number }> = {}
   if (entryIds.length > 0) {
-    const { data: matchScoresData } = await supabase
-      .from('match_scores')
-      .select('entry_id, match_id, score_type, total_points')
-      .in('entry_id', entryIds)
+    const shadowIds: string[] = []
+    const prodEntryIds: string[] = []
+    for (const pm of poolMemberships) {
+      if (!pm.entry_id) continue
+      ;(shadowPools.has(pm.pool_id) ? shadowIds : prodEntryIds).push(pm.entry_id)
+    }
 
-    if (matchScoresData) {
-      for (const ms of matchScoresData) {
-        matchScoresMap[`${ms.entry_id}:${ms.match_id}`] = {
-          score_type: ms.score_type,
-          total_points: ms.total_points,
-        }
+    const [shadowRows, prodRows] = await Promise.all([
+      readMatchScoreClassification(scoringAdmin, shadowIds, 'shadow'),
+      readMatchScoreClassification(scoringAdmin, prodEntryIds, 'prod'),
+    ])
+    for (const ms of [...shadowRows, ...prodRows]) {
+      matchScoresMap[`${ms.entry_id}:${ms.match_id}`] = {
+        score_type: ms.score_type,
+        total_points: ms.total_points,
       }
     }
   }

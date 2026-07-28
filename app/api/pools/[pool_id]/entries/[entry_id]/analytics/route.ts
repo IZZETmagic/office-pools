@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, LEVELS, BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
@@ -79,7 +80,7 @@ async function handleGET(
   const [
     { data: matches },
     { data: teams },
-    { data: conductData },
+    conductData,
     { data: settingsRow },
     { data: entryPredictions },
     { data: members },
@@ -93,9 +94,7 @@ async function handleGET(
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    adminClient
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournament(adminClient, pool.tournament_id),
     adminClient
       .from('pool_settings')
       .select('*')
@@ -181,7 +180,7 @@ async function handleGET(
   }))
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
-  const conduct: MatchConductData[] = conductData || []
+  const conduct: MatchConductData[] = conductData
   const teamsData: TeamData[] = (teams as any[]).map(t => ({
     ...t,
     group_letter: t.group_letter?.trim() || '',
@@ -229,10 +228,25 @@ async function handleGET(
     // earned badge never vanishes from the display when a later recompute no
     // longer re-derives it. computeFullXPBreakdown unions these in for display
     // (excluding the transient top_dog), leaving XP/level on the live set.
-    const { data: unlockRows } = await adminClient
-      .from('badge_unlocks')
-      .select('badge_id')
-      .eq('entry_id', entry_id)
+    // Same keep-once idea applied to the LEVEL: highest_level_reached is the
+    // ratchet (migration 026), so a live recompute can never demote someone
+    // below a rank they have already been shown. This surface computes level
+    // live, so it must floor here too — otherwise a pool card and the Form tab
+    // would disagree.
+    const [{ data: unlockRows }, { data: xpStateRow }] = await Promise.all([
+      adminClient.from('badge_unlocks').select('badge_id').eq('entry_id', entry_id),
+      adminClient
+        .from('entry_xp_state')
+        .select('highest_level_reached, current_level')
+        .eq('entry_id', entry_id)
+        .maybeSingle(),
+    ])
+    const everReachedLevel = xpStateRow
+      ? Math.max(
+          (xpStateRow as any).highest_level_reached ?? 1,
+          (xpStateRow as any).current_level ?? 1,
+        )
+      : undefined
 
     const xpBreakdown = computeFullXPBreakdown({
       predictionResults,
@@ -244,6 +258,7 @@ async function handleGET(
       totalMatches: matchesData.length,
       totalEntries,
       everEarnedBadgeIds: (unlockRows ?? []).map(r => r.badge_id as string),
+      everReachedLevel,
     })
 
     // 8. Build response in snake_case format

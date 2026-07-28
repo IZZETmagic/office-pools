@@ -566,8 +566,15 @@ export function computeFullXPBreakdown(params: {
   /** Badge ids permanently recorded in badge_unlocks — re-surfaced for display
    *  so an earned badge never vanishes on recompute (persistence). */
   everEarnedBadgeIds?: string[]
+  /** Highest level this entry has ever been shown (entry_xp_state.
+   *  highest_level_reached). Levels ratchet: the displayed level never drops
+   *  below this, mirroring the keep-once rule already applied to badges above.
+   *  Introduced 2026-07-26 when the XP formula was corrected — see
+   *  drafts/2026-07-26_analytics_parity_result.md. Without it, that correction
+   *  would have demoted 231 entries who had already been shown a higher rank. */
+  everReachedLevel?: number
 }): XPBreakdown {
-  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches, totalEntries = 1, everEarnedBadgeIds } = params
+  const { predictionResults, matches, crowdData, streaks, entryPredictions, entryRank, totalMatches, totalEntries = 1, everEarnedBadgeIds, everReachedLevel } = params
 
   // 1. Base XP from match predictions
   const matchXP = computeMatchXP(predictionResults, matches)
@@ -594,7 +601,18 @@ export function computeFullXPBreakdown(params: {
 
   // 4. Total XP and level (from the LIVE earned set only)
   const totalXP = totalBaseXP + totalBonusXP + totalBadgeXP
-  const levelInfo = computeLevel(totalXP)
+  const liveLevelInfo = computeLevel(totalXP)
+
+  // Levels ratchet — same keep-once principle as badges. totalXP stays honest
+  // (it can fall); the LEVEL never does. computeLevel is re-run at the floored
+  // threshold so nextLevel / xpToNextLevel / levelProgress stay internally
+  // consistent with the level actually displayed.
+  const levelInfo =
+    everReachedLevel != null && everReachedLevel > liveLevelInfo.currentLevel.level
+      ? computeLevel(
+          Math.max(totalXP, LEVELS.find((l) => l.level === everReachedLevel)?.xpRequired ?? totalXP),
+        )
+      : liveLevelInfo
 
   // Display-only persistence: re-surface badges recorded in badge_unlocks that
   // the live recompute no longer re-derives, so an earned badge never vanishes.

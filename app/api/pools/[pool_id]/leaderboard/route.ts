@@ -6,11 +6,12 @@ import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
 import { withPerfLogging } from '@/lib/api-perf'
-import { matchScoresToPredictionResults, computeStreaks, computeCrowdPredictions } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
+import { matchScoresToPredictionResults, computeStreaks, computeCrowdConsensus, applyCrowdOverlay } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, computeLevel } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import type { MatchData, PredictionData, MemberData } from '@/app/pools/[pool_id]/types'
 import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 
 // =============================================================
 // GET /api/pools/:poolId/leaderboard
@@ -85,7 +86,7 @@ async function handleGET(
   const [
     { data: matches },
     { data: teams },
-    { data: conductData },
+    conductData,
     { data: settingsRow },
     { data: poolMembers },
   ] = await Promise.all([
@@ -98,9 +99,7 @@ async function handleGET(
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    adminClient
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournament(adminClient, pool.tournament_id),
     adminClient
       .from('pool_settings')
       .select('*')
@@ -171,7 +170,7 @@ async function handleGET(
   }))
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
-  const conduct: MatchConductData[] = conductData || []
+  const conduct: MatchConductData[] = conductData
   const teamsData: Team[] = (teams as any[]).map(t => ({
     ...t,
     group_letter: t.group_letter?.trim() || '',
@@ -252,6 +251,32 @@ async function handleGET(
   }
 
   // 5. Compute points for each entry
+  //
+  // The crowd consensus is pool-wide and identical for every entry, so it is
+  // computed ONCE here rather than rebuilt inside the loop below. Previously
+  // each entry re-scanned every prediction in the pool — O(entries x
+  // predictions), ~2.6M iterations per request on the largest pool.
+  const crowdConsensus = computeCrowdConsensus(
+    normalizedMatches as MatchData[],
+    allPredsTyped as PredictionData[],
+    membersWithEntries,
+  )
+
+  // Level high-water marks for the whole pool, in one read (migration 026).
+  // Levels ratchet: a corrected XP formula must never demote someone below a
+  // rank already displayed to them — the same keep-once rule badge_unlocks
+  // applies to badges.
+  const everReachedByEntry = new Map<string, number>()
+  for (let off = 0; off < entryIds.length; off += 500) {
+    const { data: xpRows } = await adminClient
+      .from('entry_xp_state')
+      .select('entry_id, highest_level_reached, current_level')
+      .in('entry_id', entryIds.slice(off, off + 500))
+    for (const r of (xpRows ?? []) as any[]) {
+      everReachedByEntry.set(r.entry_id, Math.max(r.highest_level_reached ?? 1, r.current_level ?? 1))
+    }
+  }
+
   const leaderboard: LeaderboardEntryResponse[] = []
   const entryPredResultsMap = new Map<string, PredictionResult[]>()
 
@@ -306,12 +331,7 @@ async function handleGET(
 
         const streaks = computeStreaks(predResults)
 
-        const crowdData = computeCrowdPredictions(
-          normalizedMatches as MatchData[],
-          allPredsTyped as PredictionData[],
-          entryPreds as PredictionData[],
-          membersWithEntries,
-        )
+        const crowdData = applyCrowdOverlay(crowdConsensus, entryPreds as PredictionData[])
 
         const xpBreakdown = computeFullXPBreakdown({
           predictionResults: predResults,
@@ -321,6 +341,9 @@ async function handleGET(
           entryPredictions: entryPreds as PredictionData[],
           entryRank: sc.current_rank,
           totalMatches: normalizedMatches.length,
+          // Level ratchet (migration 026) — never display a rank below one this
+          // entry has already been shown.
+          everReachedLevel: everReachedByEntry.get(entry.entry_id),
         })
 
         // last_five: take last 5 from predResults, map to type, pad with 'no_pick' if needed

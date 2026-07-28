@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import {
+  getShadowReadPools,
+  readRecentMatchScoreEvents,
+  type MatchScoreEvent,
+} from '@/lib/scoring/readSource'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -588,26 +593,29 @@ async function handleGET(
   // at match_scores.calculated_at (the moment scoring ran), which is the right
   // "when did I find out?" anchor for the feed.
   if (allEntryIds.length > 0) {
-    type ScoreRow = {
-      entry_id: string
-      pool_id: string
-      match_id: string
-      match_number: number
-      score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
-      total_points: number
-      actual_home_score: number | null
-      actual_away_score: number | null
-      calculated_at: string
+    // Read each entry from the SAME source its pool's leaderboard uses, or the
+    // feed reports points that don't match the pool. A user can sit in both
+    // cut-over and prod pools, so the two groups are read separately and merged:
+    // the global newest-200 is a subset of (newest-200 from each), so this is
+    // exact rather than an approximation.
+    const shadowPools = await getShadowReadPools(adminClient)
+    const shadowIds: string[] = []
+    const prodIds: string[] = []
+    for (const m of memberships) {
+      const isShadow = m.pools ? shadowPools.has(m.pools.pool_id) : false
+      for (const e of m.pool_entries ?? []) {
+        if (e.entry_id) (isShadow ? shadowIds : prodIds).push(e.entry_id)
+      }
     }
-    const { data: scoreData } = await adminClient
-      .from('match_scores')
-      .select(
-        'entry_id, pool_id, match_id, match_number, score_type, total_points, actual_home_score, actual_away_score, calculated_at',
-      )
-      .in('entry_id', allEntryIds)
-      .order('calculated_at', { ascending: false })
-      .limit(200)
-    const scores = (scoreData ?? []) as ScoreRow[]
+
+    const [shadowScores, prodScores] = await Promise.all([
+      readRecentMatchScoreEvents(adminClient, shadowIds, 'shadow', 200),
+      readRecentMatchScoreEvents(adminClient, prodIds, 'prod', 200),
+    ])
+    type ScoreRow = MatchScoreEvent
+    const scores = [...shadowScores, ...prodScores]
+      .sort((a, b) => (a.calculated_at < b.calculated_at ? 1 : -1))
+      .slice(0, 200)
 
     // Resolve home/away team names + match_date per match in one batch.
     const matchIds = Array.from(new Set(scores.map((s) => s.match_id)))

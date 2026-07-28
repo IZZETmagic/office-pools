@@ -23,8 +23,9 @@ entry, every prediction, every derived score and the append-only badge history, 
 code involved in three of the four paths** and **no count of how often it has already happened**. The
 third is that any Premier League pool created today would score **zero, silently**, because the
 group/knockout binary is welded into the scoring price lookup and not just the gate. Behind them sit
-five 🟠, including one Ryan knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the
-condition it be fixed *before the next competition* — **that condition is now due**.
+**nine 🟠** (five, plus four opened by the 2026-07-26 performance session), including one Ryan
+knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before
+the next competition* — **that condition is now due**.
 
 The next milestone is the **Premier League 2026/27 season, mid-August**, and on the foundations
 recorded here it is **not reachable**: league scoring and bonuses don't exist, matchweek deadlines
@@ -33,12 +34,39 @@ sync cron is still single-tenant on three env globals, and the importer plus mig
 drafted but uncommitted and unapplied. Almost none of that is blocked on capacity — the **sequencing
 is blocked on five decisions only Ryan can make**: what "archive" means now that migration 025b
 constrains `pools.status` to `('open','completed')`; **what leaving a pool should do to a member's
-history**, now that we know it purges it; which engine actually scores the EPL, given the 07-19
-cutover left a live kill switch whose current flag values cannot be read from the repo; whether EPL
-scope shrinks or the date moves; and whether the post-tournament survey still goes out now that it is
-past its own time box. One standing caveat on everything above: **seven groups of claims here
-depend on production state and cannot be verified from code** — they are listed in the register, and
+history**, now that we know it purges it; which engine should score the EPL (the flags are now
+known — prod is scoring everything, shadow reads are off — so what remains is the choice, not the
+uncertainty); whether EPL scope shrinks or the date moves; **what "live" has to mean**, since the
+stated goal says *real-time leaderboard* and a recorded principle says *minute-cadence is
+sufficient*; and whether the post-tournament survey still goes out now that it is past its own time
+box.
+
+A system-design section was added 2026-07-26 from two research workflows, and it turned up one thing
+that belongs in this summary: **the ledger does not reconcile to itself.** 29 of 4,985 entries show a
+total their own line items don't support — 26 of them **too high, by 149,525 points**, three carrying
+points with no line items at all. It is bounded and it does not spread, but "100% accurate scores" is
+the product's first promise, and right now nothing checks that promise continuously; this was found
+by asking, not by an alarm. One standing caveat on everything above: **thirteen groups of claims here
+depend on production state and cannot be verified from code** (eight, plus five added by the
+2026-07-26 performance session — every measured number in it) — they are listed in the register, and
 unverified is not done.
+
+**Added 2026-07-26 (performance session).** A site-wide performance pass measured where the database
+actually spends its time and, in the process, found another instance of the failure mode above:
+`entry_xp_state.total_xp` / `.current_level` have **two writers computing different quantities**, so
+the level shown on `/pools` and `/dashboard` today is whichever path last touched the row. That is
+live and user-facing now, and it is **not** a caching problem — the parity pass that was meant to
+unblock a read-path flip is what exposed it. Fixes for it, and for **13 of 14** whole-table
+`match_conduct` reads (four of them inside scoring engines, where PostgREST's silent 1,000-row cap
+becomes wrong bonuses the moment a second competition exists), are **written, tested and entirely
+uncommitted**. Nothing is applied or deployed, so **production is unchanged** — treat all of it as
+still live until migration 026 is applied and the deploy is confirmed. The session also introduced
+one regression of its own — full-pool analytics on the scoring path (**R15**) — and left one
+deliberate blocker in place (**R16**, `advance-teams`), which must clear before a second competition
+is ingested. **R15 and R14 were raised by this register, confirmed against the code by Ryan, and
+fixed the same day; R13's open question on `current_level` was answered and migration 026's comment
+rewritten** — see the register and *Known drift*. None of that changes the headline: it is all still
+local, and none of it is live.
 
 **Last updated:** 2026-07-25 · Renamed from `ROADMAP.md`; absorbed the product-decision record from
 the multi-sport planning session (8 settled decisions, now under *Project: Multi-sport platform*).
@@ -59,6 +87,18 @@ a recommendation derived from what this document already records, **not a plan R
 through a **21-table cascade**, with no soft-delete anywhere. R1 was scoped to pool destruction and
 the two are cross-linked under *The destruction class*. New **Gate A2** (what leaving should do to a
 member's history) is open and unanswered.
+· **2026-07-26 (system design):** added *🏗️ System design* from two research workflows — the goal
+restated as four testable properties (P1–P4), seven production-verified findings, six ⬜ unmeasured
+analysis claims kept explicitly separate from them, a proposed direction, and a *"Not yet — and the
+trigger"* table. Produced **R17** (the ledger doesn't reconcile — 29 entries, 149,525 pts over) and
+**R18** (the parity alarm writes into a table nothing reads), and answered the factual half of
+**Gate B**. New **Gate D** (what "live" has to mean) is open.
+· **2026-07-26 (performance session):** recorded the site-wide performance + caching pass and the
+**`entry_xp_state` two-writer bug** it surfaced. New section *⚡ Performance & caching*, new 🔥 Now
+item *XP has two writers*, four new risks **R13–R16**, five decisions Ryan settled this session, and
+corrections to *Leaderboard precompute*, *Bounded reads*, and *Kickoff write spike*. **Everything
+from that session is local and uncommitted** — nothing is applied to prod, so the risks it fixes are
+still live in production exactly as before.
 
 ## Projects in this programme
 
@@ -67,6 +107,7 @@ member's history) is open and unanswered.
 | **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25; foundations still TODO. | 🔵 Designing |
 | **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. Target Aug 2026. | 🔵 Designing |
 | **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
+| **Performance & caching** | Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; three fixes written locally, none landed. | 🟢 In flight |
 | **World Cup wind-down** | Residual bugs, feedback surveys, knockout ops. | 🟡 Closing out |
 | **Live match & rich football data** | Squads, line-ups, events, player pages. | ⚪ Not started |
 | **Monetisation & cosmetics** | Sponsored pools, premium analytics, avatar IAP. | ⚪ Gated |
@@ -124,17 +165,38 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | # | Risk | Level | Blast radius | Trigger | Mitigation status | Ryan's call | Backlog item |
 |---|---|---|---|---|---|---|---|
 | **R1** | **"Delete Pool" destroys members' predictions.** Web runs five un-transactional deletes from the browser against an asymmetric RLS pair; **mobile is a second, separate door** — a single `supabase.from('pools').delete()` (`mobile/components/pool-detail/SettingsTab.tsx:222`). Scope of this row is **pool destruction**; membership exit is **R12** | 🔴 | **6 pools / 41 entries already destroyed**, earliest in June. **458 pools with an admin** are one tap away, of 623 live | One admin tap, on **either** platform. Elevated now — post-tournament tidying | **None applied.** The zero-deploy policy drop is identified, not run — and it covers the **web** door only | Documented-only 2026-07-21; *archive, not delete* decided 2026-07-25 — **not implemented** | *"Delete Pool" destroys every member's predictions* (🔥 Now) |
+| **R17** | **The ledger does not reconcile to its own line items.** 29 of 4,985 entries have `scored_total_points ≠ Σmatch_scores + Σbonus_scores + point_adjustment` — **26 over by 149,525 pts**, 3 under by 4,975, **3 carrying points with no line items at all**; max single delta 9,825. Verified in prod 2026-07-26 (V1). **Does not contradict the 2026-07-21 ledger audit** — that asked "is anyone owed points?", this asks "does the total reconcile to its evidence?" | 🟠 | **29 entries of 4,985 (0.6%)**, ~154,500 pts of discrepancy in total. Bounded and non-propagating — but these are **final standings**, and 26 people are shown a score their line items don't support | Already live. Any member opening a points breakdown on an affected entry sees a total that doesn't match its own rows | **None.** No continuous reconciliation check exists — this was found by asking, not by an alarm | **New — no call made** | **None yet.** Directly violates **P1** |
+| **R18** | **The parity alarm detects into a table nothing reads.** `shadow_score_diffs`: 849 rows, **418 in the last 24 h**, newest 2026-07-26 17:45, 3 `diff_kind` values. Verified in prod 2026-07-26 (V2). **This corrects the earlier belief that the alarm cron was failing** — the cron works; the consumer was never built | 🟠 | Unknown by construction: the system has been reporting discrepancies all day and **nobody is receiving them**. Whether these 418 rows relate to R17's 29 entries is **an open question, not a claim** — worth checking first, since it is cheap | Already live and firing | **None.** Detection exists; consumption doesn't | **New — no call made** | *Shadow scoring engine*. Violates **P3** |
 | **R12** | **Every membership-exit path permanently purges the entry.** Leaving a pool, being removed, deleting an account, or "stop participating" all end in a hard delete that cascades through **21 tables** — predictions, all derived scores, `point_adjustments`, and `badge_unlocks`. **Three of the four doors contain no delete of entries or predictions in application code at all**; the destruction is entirely the DB cascade, which is why it is invisible from the route. `badge_unlocks` is designed as an **append-only permanent record** and cascades away with the entry — the permanent record is not permanent | 🔴 | ⚠️ **Unverified — no count exists.** Unlike R1 there is **no documented incident**, which is not evidence it hasn't been happening: nobody has looked. Requires a production query. Structurally the exposure is *every member who has ever left, been removed, or deleted their account*, across 623 pools | Four doors: **(1)** self-leave · **(2)** admin removes a member · **(3)** account deletion (cascades from `users`) · **(4)** "stop participating". Doors 1–3 are ordinary product actions available to any user | **None.** No soft-delete exists anywhere (0 `deleted_at`/`is_deleted` references in `app/`, `lib/`, `mobile/` — verified 2026-07-26) | **New — no call made.** Ryan's stated position 2026-07-26 is that this *should not happen either*. That is a direction, not yet a decision: see the open question in *Order of deliveries* → Gate A2 | **None** — this risk has no backlog item yet |
-| **R2** | **A league pool scores zero, silently.** Not just the gate: `full.ts:89` / `progressive.ts:110` source predicted teams from a WC-shaped `knockoutTeamMap`, so a `regular_season` fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`), so a league pool has no bonus path either | 🔴 | **100% of points** in every EPL pool; scoring trust in the flagship next season | Creating an EPL `tournaments` row — **both create-pool wizards list tournaments unfiltered** (`components/pools/CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`), so the row alone makes league pools creatable | **None.** Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a safety catch, not a plan | Recognised in the item; not scoped or scheduled | *League ingestion (Premier League)* (Multi-sport → Foundational) |
+| **R2** | **A league pool scores zero, silently.** Not just the gate: `full.ts:89` / `progressive.ts:110` source predicted teams from a WC-shaped `knockoutTeamMap`, so a `regular_season` fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`), so a league pool has no bonus path either. ✅ **Prospective, not live (2026-07-26):** zero `stage='regular_season'` rows exist in prod (V6) — **level unchanged**, because the trigger is one `tournaments` row away | 🔴 | **100% of points** in every EPL pool; scoring trust in the flagship next season. Currently **0 pools affected** | Creating an EPL `tournaments` row — **both create-pool wizards list tournaments unfiltered** (`components/pools/CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`), so the row alone makes league pools creatable | **None.** Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a safety catch, not a plan | Recognised in the item; not scoped or scheduled | *League ingestion (Premier League)* (Multi-sport → Foundational) |
 | **R3** | **Three scoring default sets disagree; "Reset to defaults" rescales a live pool ~20×.** create = `group_exact_score: 100`, reset button = `5`, `bonus_champion_correct` stays `1000` | 🟠 | Any of **623 live pools**; one click turns 103 fixtures into decoration. Reset ladder is also non-monotonic (SF < QF) | An admin presses **Reset to defaults** on a live pool | None | **Decided 2026-07-25** (100/75/50 canonical, delete the dead bonuses, fix the ladder) — unimplemented, ~half a day | *Scoring config is internally inconsistent* (🔥 Now); Decision 6 |
-| **R4** | **Shadow/prod podium divergence, behind an undocumented live kill switch.** Prod now *derives* the podium from completed matches (`lib/podium.ts`); the shadow bonus SQL still `JOIN`s `tournament_awards` (`drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164`) — **the same root cause prod just paid ~324k points to fix** | 🟠 | Last occurrence: **669 rows / ~324,375 pts**, concentrated in ~73 pools; 50 changed rank, **13 changed their #1** | Re-enabling shadow reads, or shadow scoring any competition that has a podium | Prod fixed and re-scored; **shadow not fixed**. Current `sync_settings` flag values unverified | No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26 | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped) |
+| **R4** | **Shadow/prod podium divergence, behind an undocumented live kill switch.** Prod now *derives* the podium from completed matches (`lib/podium.ts`); the shadow bonus SQL still `JOIN`s `tournament_awards` (`drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164`) — **the same root cause prod just paid ~324k points to fix** | 🟠 | Last occurrence: **669 rows / ~324,375 pts**, concentrated in ~73 pools; 50 changed rank, **13 changed their #1** | Re-enabling shadow reads, or shadow scoring any competition that has a podium | Prod fixed and re-scored; **shadow not fixed**. ✅ 2026-07-26: the flags were read — `prod_scoring_enabled = true`, `shadow_read_enabled_pools = []` (V5) — so the divergence is **latent, not live** | No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26 | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped) |
 | **R5** | **EPL mid-August is not reachable on current foundations.** Missing: league scoring + bonuses (R2), matchweek deadlines, **auto round-opening — zero code**, multi-tenant sync (`sync-fixtures/route.ts:67` still reads three env globals), importer commit + apply | 🟠 | The entire next-season target; Showdown sits behind it | The fixture list, mid-Aug — a fixed external date | None applied | Needs a **scope-or-date** call. Decision 7 already calls auto round-opening "a prerequisite, not polish" — 38 matchweeks × every pool, manually, is not viable | *Showdown / EPL launch* project; *Sync cron is single-tenant*; Decision 7 |
 | **R6** | **Empty-bracket bonus inflation.** An unpredicted group falls through to the FIFA-ranking tiebreaker, so seeded order ≈ reality and near-zero predictors collect the bonuses | 🟠 | **~243,000 pts across 155 entries**; a near-zero predictor earns ~77% of a full predictor's bonus with ~2% of their match points. Retro-fixing demotes ~155 real people (~87 pools move) | Any competition with group standings | None — no "did they predict it" gate in `calculateGroupStandingsBonuses` (re-verified 2026-07-26) | **Accepted / deferred 2026-07-21**, on the condition "fix before the next competition" — **that condition is now due** | *Empty-bracket bonus inflation* |
 | **R7** | **Admin churn is unmeasured.** `/api/admin/stats` has counts (pool admins, avg pool size, deleted accounts) but **no cohort or retention series** | 🟠 | The best-identified growth lever: preventing 20% of admin churn ≈ **+722 players** (Decision 7's table). Not silent-wrongness class — ranks below R1–R3 | Dated, not action-driven: the clean baseline is the **WC→EPL transition**, which is happening now and closes at EPL start | None built | Decision 7 says "instrument admin retention"; nothing exists | Decision 7; *Enhanced super-admin stats* |
 | **R8** | **The feedback survey is past its own time box, and was held on a blocker that has cleared.** All four fixes are on `origin/master` as of 2026-07-25 | 🟡 | 477 admins + 3,652 players; response quality decays with distance from the final (16 Jul) | Already triggered — the stated window was "~1 week of the final", i.e. ~23 Jul | Code fixes verified in the repo; **deploy status is prod state, unverified** | Send-or-drop is Ryan's | *Post-tournament feedback surveys — send them* (🔥 Now) |
 | **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done | *iCloud corrupts the local checkout* (🧹 Housekeeping) |
 | **R10** | **The archive decision conflicts with the shipped schema.** Migration 025b constrains `pools.status` to `('open','completed')`, so an `archived` state is impossible without another migration; today's "Archive Pool" button just sets `completed` | 🟡 | Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on | Implementing the archive decision | None — needs either a migration or a ruling that archive *means* `completed` | Unrecognised conflict; needs a ruling before R1's proper fix is built | Decision 7 *"Archive, not delete"*; *"Delete Pool" destroys…* |
+| **R13** | **`entry_xp_state` has two writers with two different formulas — the level shown to users is whichever ran last.** `lib/push/badges.ts` (pre-fix) wrote `Σ match_scores.total_points + badgeXP`; `lib/analytics/entryAnalytics.ts` writes `computeFullXPBreakdown` XP (`BASE_XP[tier] × STAGE_MULTIPLIERS` + crowd/streak events + badge XP). Different **quantities**, both measured against the same `LEVELS` thresholds, both writing the same two columns, last-writer-wins. Because `vercel.json` is `{}` the analytics sweep has **never been registered**, so `badges.ts` is the de facto owner and `analytics_updated_at` records when the *other* writer last ran — the timestamp lies | 🟠 | **187 of 331 sampled entries mismatch** (prod, drafts-sourced), split perfectly by mode: 5/5 `progressive` pools clean, 5/5 `full_tournament` pools wrong. Read live at `app/pools/page.tsx:95` and `app/dashboard/page.tsx:188`, so two members with identical performance can be shown different levels. Correcting the formula moves **1,048 entries — 817 up, 231 down** | Already fired. Any recalc after an analytics backfill re-flips the column | **Written, not landed.** `badges.ts` now consumes the shared value; migration 026 adds the ratchet; `scripts/reseed-entry-xp.ts` re-seeds silently. All **uncommitted**; 026 **not applied**; reseed **not run** — so prod is unchanged | **Decided 2026-07-26:** levels never demote (ratchet via `everReachedLevel`, mirroring `badge_unlocks`); `total_xp` stays honest; **do not register the analytics-sweep cron** — a second writer is what caused this | *XP has two writers* (🔥 Now) |
+| **R14** | **The XP correction's rollout order is load-bearing — now a release constraint, not a code defect.** If `lib/push/badges.ts` deploys **before** migration 026 is applied, its `entry_xp_state` upsert names `highest_level_reached`, which won't exist, and PostgREST rejects the **entire** upsert. ~~The result is never error-checked~~ — **fixed 2026-07-26** (verified): the error is captured, logged loudly, and the function **returns before pushing**, because the snapshot is the diff basis for "what's new" — if it didn't persist, the next run re-derives the same badges and levels as new and pushes them again. Silence is the safe failure. The remaining half is unchanged: if the fix deploys and `scripts/reseed-entry-xp.ts` is **not** run, the first recalc sees the corrected level exceed the stored one and announces it | 🟠 | Now: badge/level pushes go **silent** for every scored pool until 026 is applied — visible in logs, no user-facing wrongness. Still: **~817 level-up pushes** in one burst if the reseed is skipped — a notification event with no sporting cause, which fails the disclosure gate on its face | A `git push` to `master` — **that is a production deploy** — in the wrong order | **Code now fails safe** (`lib/push/badges.ts`, error checked + early return). **Order is still the mitigation** for the rest: apply 026 → deploy → run the reseed **immediately** → re-run `scripts/verify-analytics-parity.ts`. `scripts/reseed-entry-xp.ts:22` states the same order | **Open — Ryan's timing call.** Needs a window where the deploy and the reseed run back to back | *XP has two writers* (🔥 Now) |
+| **R15** | ✅ **FIXED IN CODE 2026-07-26 (not deployed) — the performance work had put full-pool analytics on the scoring path.** `lib/push/badges.ts:156` calls `computePoolEntryAnalytics` for the whole pool on every badge run, and badge runs fire from `lib/scoring/recalculate.ts:93` and `:322` on every recalc. That helper called `computeCrowdPredictions` **once per entry** — the exact O(entries × predictions) loop this same session hoisted out of three other call sites, left un-hoisted in the fourth. **Now hoisted** (`lib/analytics/entryAnalytics.ts:201` consensus once, `:223` overlay per entry), matching the other three | 🟠 → 🟢 | Was: 192 entries × 13,385 predictions ≈ **2.6M iterations per recalc** on the largest pool, net-new, on the path with a documented kickoff CPU spike behind it. Now O(n + m); the full-pool prediction pull remains and is inherent to the design | Would have fired on the **first live matchday of the next competition**. Never reached production — the regression and its fix are both in the same unlanded change | **Fixed and verified in code.** The file header, which *claimed* the hoist while the code below did the opposite, is corrected; its STATUS now reads *"LIVE, ON THE SCORING PATH — treat added work here as scoring-path cost"* instead of *"DRAFT, not imported by any live code path"* — the more durable half of the fix | **New — fixed, no decision needed.** Stays on the register until deployed | *⚡ Performance & caching*; *Kickoff write spike* |
+| **R16** | **Cross-competition unscoped reads — one deliberate blocker, plus the audit scripts.** `app/api/admin/advance-teams/route.ts:56` reads `matches`, `teams` **and** `match_conduct` tournament-wide with no scope and no pagination. Unscoped `matches` means the advancement cascade would resolve knockout placeholders **across competitions**; unscoped conduct is capped at 1,000 rows. Left unfixed on purpose (blocker comment in-file) because scoping it means threading a tournament id through the cascade — a design change, not a query change. Separately, four `scripts/*.ts` still read the whole conduct table, including `scripts/audit-bonuses.ts:78` — **the recurring end-of-competition bonus audit is itself subject to the truncation it exists to catch** | 🟠 | Wrong advancement and wrong conduct tiebreaks across competitions; a bonus audit that silently passes on partial data. Conduct today = 206 rows; PL 2026/27 adds ~760 → 966; the competition after that crosses 1,000 | Ingesting a **second competition** — the EPL, mid-August. A fixed external date | **13 of 14 app call sites fixed** via `lib/matchConduct.ts` (scoped through the `match_conduct → matches` FK, paginated) — but **uncommitted**, so prod still runs all 14 unscoped. `advance-teams` and the scripts are excluded from that fix | **New — no call made.** Must precede league ingestion (3d in the delivery order) | *⚡ Performance & caching*; *League ingestion*; **R2**, **R5** |
 | **R11** | **Dead scoring knobs are editable on mobile.** `bonus_best_player_correct` / `bonus_top_scorer_correct` are read by zero scoring code | 🟢 | A mobile admin can set a value that can never pay out; members see it in the pool's rules | Any admin opening mobile scoring config | Web is honest (greyed *"Coming Soon"*); **mobile is not** (`mobile/app/pool/[id]/scoring-config.tsx:442`) | Covered by the Decision-6 deletion, unimplemented | *Scoring config is internally inconsistent*, defect 4 |
+
+**Why R13 is 🟠 and not 🔴.** It meets the 🔴 wording — it is live and it is misleading users right
+now. It is held at 🟠 because the wrongness is confined to a **displayed gamification level**: no
+score, rank, points total or record is affected, and nothing is destroyed. Putting it beside "six
+pools of predictions are gone" and "an EPL pool scores zero" would dilute what 🔴 means in this
+register. That is my judgement, stated so it can be overruled — if the displayed level is considered
+part of the product's result surface, it is a 🔴. **Ryan reviewed and did not overrule it
+(2026-07-26): 🟠 stands.**
+
+**R14 and R15, on being fixed rather than closed.** Both were raised here on 2026-07-26, verified
+against the code by Ryan rather than taken on trust, and fixed the same day. They **stay on the
+register**, because nothing is deployed: a defect fixed in an uncommitted working copy is not a
+defect that production no longer has. R15 is annotated 🟠 → 🟢 and closes on deploy; R14 changes
+*kind* rather than closing — the code now fails safe, so what remains is a **release-ordering
+constraint**, and constraints are not fixed by commits.
 
 ### The destruction class — four doors to one purge (R1 · R12)
 
@@ -179,12 +241,18 @@ claims depend on production state and are carried on the authority of the drafts
 recorded them — **treat them as unverified, not as done**:
 
 - Whether the survey fixes are actually **deployed** on Vercel (they are on `origin/master`; that is not the same thing) — R8.
-- All `sync_settings` flag values: `prod_scoring_enabled`, `shadow_read_enabled_pools`, `analytics_read_from_columns`, `sweep_time_box_enabled` — R4.
-- pg_cron job health, including the shadow **parity alarm** (jobid 21) and the reconcilers (jobids 19/20).
+- ~~All `sync_settings` flag values~~ — ✅ **resolved 2026-07-26:** `prod_scoring_enabled = true`, `shadow_read_enabled_pools = []`, and `sweep_time_box_enabled` has **no row at all** (V3, V5). `analytics_read_from_columns` remains unread here.
+- ~~pg_cron job health, including the shadow **parity alarm** (jobid 21)~~ — ✅ **partly resolved:** the alarm is **working** and has written 849 rows / 418 in 24 h (V2); the earlier "cron failing" note was wrong. The **reconcilers (jobids 19/20)** are still unverified.
+- **The six ⬜ analysis claims A1–A6** in *System design* — realtime's share of DB time, pool payload size (3.8 MB vs 12 MB, unreconciled), `max_connections = 60`, whether the admin recalculate button can succeed, whether ingest failures are recorded as healthy, and the count of unbounded `.in()` reads. None are measured; A3 in particular contradicts the recorded XL→Medium downgrade and must be confirmed before any capacity planning.
 - Whether **migration 024** was applied (it carries no "applied to prod" header, unlike 025/025b — so almost certainly not) — R2.
 - The **RLS policy bodies** behind the delete asymmetry, and the FK cascade definitions behind mobile's `pools` delete — both taken from `drafts/2026-07-21_delete_pool_data_loss.md`, not re-introspected — R1.
 - The counts **6 destroyed / 458 exposed**, the audience sizes **477 / 3,652**, and the **~243k pts / 155 entries** inflation measurement — all prod queries from their source drafts.
 - Presence of `badge_unlocks` (+ its backfill) and the `trg_enforce_prediction_before_kickoff` trigger.
+- **The whole 2026-07-26 performance baseline.** `pg_stat_statements` on `ujthamlehjyubbzxbnes`: 337.5 total DB-hours, `SELECT predictions.*` at 111.3h / **33.0%** / 30.0M calls, realtime WAL decoding 80.9h / 24.0%, `row_to_json(pool_members)` 34.5h / 10.2% at 404–450ms mean, `match_scores` 31.0h / 9.2% — top four = 76.4%. Counter reset date unknown, so these are cumulative-since-unknown, not a rate. Source: `drafts/2026-07-26_performance_optimization_audit.md`.
+- **The pool-size distribution the caching strategy rests on** — 623 pools, 4,809 memberships, **median 1 member**, mean 7.7, 70% ≤5, four pools ≥100, max 192; 288,029 predictions across 4,985 entries; 3,184 users in 30d. Every CDN and cache conclusion follows from this table, so if it is wrong the strategy is wrong.
+- **The payload measurements** — largest pool 5,420 kB → 3,854 kB after column narrowing (29%), and therefore still over Vercel Runtime Cache's 2 MB item limit — R13/§*Performance & caching*.
+- **The parity result and the XP movement** — 187/331 entries mismatched, 5/5 mode split, and 1,048 entries moving (817 up / 231 down) on the corrected formula. All from `npx tsx scripts/verify-analytics-parity.ts` and the reseed dry run against prod; re-runnable, but not from code — **R13**, **R14**.
+- **The claim that the scoped conduct read returns identical data** (206 = 206 rows across three query shapes) — verified against prod by Ryan's side on 2026-07-26, not re-verifiable here — **R16**.
 - **R12's blast radius — no count exists at all.** How many entries have already been purged by leave / removal / account deletion / stop-participating is **unknown and unmeasured**; it needs a production query (e.g. `pool_membership_events` rows of type `left`/`removed` against surviving entries). The 21-table cascade itself is also prod-schema-verified by Ryan's side, **not** re-verifiable from this repo — only the two route files are.
 
 **Anything not on this list, and not marked unverified inline, was read in the code on 2026-07-26.**
@@ -196,8 +264,19 @@ status, in both directions. Awaiting Ryan's call on what to do with each:
 
 - **Two items are better than written.** *Members' / all predictions after lock* is **shipped**, not "PARTIAL — admin-gated" (`lib/predictions/revealGate.ts` + gated API route + web page + mobile `viewAs=member`, commits `7d14a26` → `f97ca61`). And the *Enhanced super-admin stats* item is accurate — verified.
 - **A whole project is missing:** pool status → `lifecycle` + `accepting_members` (migrations 025 + 025b, both recorded prod-applied, plus `3d95e5c` / `3a5fa5e` / `10d555c`) has no item here. It is also what created **R10**.
-- **Work sitting in `drafts/` with no item:** `2026-07-25_entry_fee_collection_assessment.md` (a legal/feasibility assessment ending in a recommendation Ryan hasn't ruled on) and `2026-07-19_caching_infrastructure_plan.md`.
-- **Smaller staleness:** the *Recurring each knockout round* section still reads "SF/Final upcoming" ten days after the final; `analytics_read_from_columns` still appears zero times in code (the M4 note is accurate); auto round-opening has no code at all (feeds **R5**).
+- **Work sitting in `drafts/` with no item:** `2026-07-25_entry_fee_collection_assessment.md` (a legal/feasibility assessment ending in a recommendation Ryan hasn't ruled on). ✅ *Resolved 2026-07-26 for the caching drafts* — `2026-07-19_caching_infrastructure_plan.md` and the three new `2026-07-26_*` drafts now roll up into *⚡ Performance & caching*.
+- **Smaller staleness:** the *Recurring each knockout round* section still reads "SF/Final upcoming" ten days after the final; `analytics_read_from_columns` still appears zero times in code — **re-verified 2026-07-26**, it exists only in `drafts/`, so the M4 note remains accurate; auto round-opening has no code at all (feeds **R5**).
+
+**Found in the 2026-07-26 performance session — three claims the code contradicted. All three raised,
+confirmed against the code by Ryan, and closed the same day:**
+
+- ✅ **Migration 026's `current_level` semantics — answered, comment rewritten.** The migration said `current_level` was *"the level implied by current total_xp"* while `lib/analytics/entryAnalytics.ts:236` wrote the **already-ratcheted** level into it. **Ryan's answer 2026-07-26: floored, deliberately.** The comment now states it: `total_xp` honest and may fall · `current_level` **the level to DISPLAY, already ratcheted**, so the simple readers that select it raw (`app/pools/page.tsx:95`, `app/dashboard/page.tsx:188`) get the floor for free and can never show a demotion · `highest_level_reached` the high-water mark producing that floor, equal by construction today, kept separate because the surfaces that recompute level **live** never read `current_level` and need a stored mark to floor against · the raw unfloored level is never stored — always recoverable as `computeLevel(total_xp)`. **Recorded as settled, not open.**
+- ✅ **`entryAnalytics.ts` not converted to the split it motivated — fixed.** Hoisted to `computeCrowdConsensus` once above the loop (`lib/analytics/entryAnalytics.ts:201`) + `applyCrowdOverlay` per entry (`:223`), matching the other three call sites. The file header, which claimed the hoist while the code did the opposite, is corrected, and its STATUS changed from *"DRAFT, not imported by any live code path"* to *"LIVE, ON THE SCORING PATH"*. That second half matters more than the first: the stale STATUS is **why** the O(n²) was tolerable to add. See **R15**.
+- ✅ **"Shadow has been the sole scorer since the 2026-07-19 cutover" — corrected in the draft.** `drafts/2026-07-26_performance_optimization_audit.md:73-77` now carries an explicit correction note: the read cutover was **rolled back on 2026-07-20** (`prod_scoring_enabled = true`), and `lib/scoring/shadowBrackets.ts` is a bracket **materialiser** whose own header says it never runs on the live per-goal scoring path. The conduct fix stands on its own merits; the severity framing did not. Which engine is scoring is still a live flag value and unverified here (**Gate B**).
+
+**Two remaining unfixed-in-code lines, both of which only close on a release, not a commit:** the
+deploy ordering (**R14** — the code now fails safe, the ordering constraint stands) and the fact that
+none of it is applied or deployed.
 
 ---
 
@@ -266,13 +345,26 @@ Showdown* — so this precedes Showdown, not merely the backlog.
 *Genuinely close to #1.* Both are one user action away and both are cheap; #1 goes first only because
 its damage cannot be undone, where a rescale can.
 
+**2b · Land the XP-ownership correction** `Bug` `Scoring` — **R13**, carrying **R14**.
+*Added 2026-07-26. Numbered 2b so the existing cross-references to "#2" still mean the scoring
+defaults.* Placed here by the same rule: it silently produces wrong data (the level shown on
+`/pools` and `/dashboard` depends on which writer ran last), and the fix is **already written and
+tested** — 157/157 pass — so `(blast radius × likelihood) ÷ effort` puts it near the top on a
+denominator close to zero. What remains is not engineering, it is a **release**: apply migration
+026 → deploy → run `scripts/reseed-entry-xp.ts` immediately → re-run
+`scripts/verify-analytics-parity.ts`. **The order is not optional** (R14): deploying before the
+migration silently breaks every `entry_xp_state` write, and skipping the reseed fires ~817 level-up
+pushes at once. It also unblocks step 6's analytics read flip, which parity currently fails.
+
 > **🚦 Gate B — which engine scores the EPL?**
 > Must be answered **before** league scoring is designed, because the same fix lands in a different
-> codebase depending on the answer: the Node engine (`lib/scoring/*`) or the shadow engine's SQL. The
-> 07-19 cutover left a live kill switch (`prod_scoring_enabled`, `shadow_read_enabled_pools`) whose
-> current values are prod state and unverified here. Related but **not** an EPL gate: shadow still
-> carries the pre-fix podium logic (**R4**) — a league has no podium, so that blocks any *re-cutover*
-> or any future cup, not the EPL itself.
+> codebase depending on the answer: the Node engine (`lib/scoring/*`) or the shadow engine's SQL.
+> ✅ **The factual half is now answered (2026-07-26, V5):** `prod_scoring_enabled = true` and
+> `shadow_read_enabled_pools = []` — the **prod Node engine is scoring everything**, shadow reads are
+> fully off. The gate is no longer *"what is running?"* but purely **"which engine should own the
+> EPL?"** — Ryan's call, still open. Related but **not** an EPL gate: shadow still carries the pre-fix
+> podium logic (**R4**) — a league has no podium, so that blocks any *re-cutover* or any future cup,
+> not the EPL itself, and with reads off that divergence is **latent**.
 
 **3 · The league critical path** `Multi-sport` — **R2**, then **R5**. In dependency order:
 
@@ -317,6 +409,11 @@ precede EPL/Showdown **traffic**, not EPL **correctness**.
   It genuinely competes with #3 for attention, and that trade is Ryan's, not a sequencing fact.
 - **R9 — move the repo off iCloud.** ~1 hour, no dependencies, competes with nothing. Worth doing
   before any long build-and-commit stretch, since it can flip bytes in tracked source.
+- **R16 — `advance-teams` multi-competition scoping.** Not sequenced against the risks above, but it
+  **is** sequenced inside step 3: it has to precede **3d** (apply 024 + land the importer), because
+  the first thing a second `tournaments` row does is make that route cross-competition.
+- ~~**R15 — the analytics-on-scoring-path regression.**~~ ✅ **Fixed in code 2026-07-26**, before it
+  ever reached production. Nothing to sequence; it ships with the rest of the unlanded change.
 - The **Known drift** items above (a missing project, two stale statuses, untracked drafts) — awaiting
   Ryan's call on each; none of them block delivery.
 
@@ -338,6 +435,111 @@ edited to add them.
    invited, not erased"*. The schema does the opposite today: exit erases. Recorded as a surfaced
    conflict, **not** a challenge to Decision 1 — the decision stands; it is the implementation that
    contradicts it, and Gate A2 is where that gets reconciled.
+
+---
+
+## 🏗️ System design — today, and where it should go
+
+> Added 2026-07-26 from two research workflows (15 agents). **Provenance is marked on every claim and
+> is not negotiable:** ✅ **verified** means checked against production or read in the code on
+> 2026-07-26 · ⬜ **analysis** means a workflow's reasoning that nobody has measured. A design opinion
+> is not a fact, and this section keeps them apart on purpose. Nothing here is a decision.
+
+### The goal, as four testable properties
+
+Ryan's statement of the product: *"an office pool product that makes it easy for admins to run their
+pools, always shows 100% accurate scores, and gives a real-time live leaderboard."* The research split
+that into four properties, because **"accurate" and "live" are different things with different
+owners** — and a goal you can't test is an aspiration.
+
+| # | Property | Proposed invariant / metric ⬜ |
+|---|---|---|
+| **P1** | **Correctness** — every number is reproducible from source facts and reconciles to its own line items | For every entry: `scored_total_points == Σmatch_scores + Σbonus_scores + point_adjustment`. Zero exceptions, checked continuously, not at incident time |
+| **P2** | **Freshness** — staleness is *bounded, measured and visible*, split by owner: **ingest lag** (reality→DB, provider-governed) and **fan-out lag** (DB→screen, entirely ours) | Two separate numbers, each with a stated budget. Conflating them hides which half is broken |
+| **P3** | **Admin operability** — an admin can answer *"is it working?"* and *"why is this number what it is?"* without an engineer | Every displayed total is drillable to its line items; every automated job exposes last-success and lag |
+| **P4** | **Multi-competition capacity** — N competitions run concurrently with **no per-competition deploy** | Competition config lives in data, not env vars or code branches |
+
+These four are the spine of everything below, and they map onto the register: P1 ↔ R17/R3/R6, P2 ↔ the
+fan-out work, P3 ↔ R18, P4 ↔ R2/R5.
+
+### ✅ Verified against production, 2026-07-26
+
+State these as fact.
+
+| # | Finding | Why it matters |
+|---|---|---|
+| **V1** | **The ledger does not reconcile to itself.** Of 4,985 entries, **29 mismatch** `scored_total_points` vs `Σmatch_scores + Σbonus_scores + point_adjustment`: **26 show MORE than earned (149,525 pts over)**, 3 show LESS (4,975 under), **3 carry points with zero line items**. Max single delta **9,825** | A direct **P1** violation, live. **This does not contradict the 2026-07-21 ledger audit** — that audit asked *"is anyone owed points?"* and was essentially right. This asks *"does the total reconcile to its evidence?"*, which is a different question it never posed. Now **R17** |
+| **V2** | **The parity alarm is alive and unconsumed.** `shadow_score_diffs` holds **849 rows, 418 in the last 24 h**, newest 2026-07-26 17:45, across 3 distinct `diff_kind` values | It has been detecting discrepancies all day into a table **nothing reads**. **Corrects** the earlier note that the alarm cron was failing — it isn't; the consumer is. A **P3** failure. Now **R18** |
+| **V3** | **`sweep_time_box_enabled` has no row in `sync_settings`** — absent, not `false`. The flag read returns undefined, so the time-boxed resumable sweep never engages and the lock TTL stays 600 s | Other flags exist as explicit `true`, so this looks **never inserted** rather than deliberately disabled. The *XL→Medium* item calls this "the last flag to flip"; it cannot be flipped, only created |
+| **V4** | **`pool_entries` is in the `supabase_realtime` publication**, alongside `matches`, `pool_members`, `pool_round_states`, `user_activity`, `user_presence` and four more | Every scoring UPDATE writes WAL that is then **RLS-evaluated per subscriber**. This is the mechanism behind the fan-out cost in A1 below |
+| **V5** | **Gate B's factual half is answered:** `prod_scoring_enabled = true`, `shadow_read_enabled_pools = []` | The **prod Node engine is scoring everything**; shadow reads are fully off. **R4's divergence is therefore latent, not live.** It does **not** decide which engine *should* score the EPL — still Ryan's call — but the uncertainty that question rested on is gone |
+| **V6** | **Zero `stage='regular_season'` rows exist in production** | **R2 is prospective, not live** — materially better than the register implied. The risk level is unchanged because the trigger is still one `tournaments` row away |
+| **V7** | **Migration 024 is not applied** (expected — deliberately uncommitted). **Migration 026 is also not applied** — `entry_xp_state.highest_level_reached` does not exist | 024 is the R2 safety catch working as intended. 026 is an unexplained gap: a migration that exists and has not landed |
+
+### ✅ Verified in code, 2026-07-26 (mine, this pass)
+
+| Finding | Evidence |
+|---|---|
+| The web pool page polls **every 30 s via `router.refresh()`**, layered *on top of* an existing realtime subscription | `app/pools/[pool_id]/PoolDetail.tsx:666`. It is gated on the active tab (`:663-664`, four tabs) but has **no visibility check and no jitter** — a backgrounded tab keeps refreshing, and every client fires on the same wall-clock phase |
+| **Mobile has no query cache at all** | No `react-query` / `@tanstack` / `swr` in `mobile/package.json` |
+| **No caller ever passes `strict`** to the api-football client | `strict` appears only at `lib/integrations/apiFootball/client.ts:59,73` and `types.ts:65` — zero call sites set it. The *mechanism* for silent failure is therefore real; whether a failed fetch is then **recorded as a healthy run** is the unverified half (see A5) |
+| `recalculate_all_pool_points` is **called from** `app/pools/[pool_id]/admin/ScoringTab.tsx` | The function body lives in the database, **not in this repo** — so the claim that it INSERTs non-existent columns (A4) cannot be settled from here |
+
+### ⬜ Analysis, not measurement — do not treat as fact
+
+Recorded because it is decision-relevant, flagged because nobody has measured it.
+
+| # | Claim ⬜ | What would settle it |
+|---|---|---|
+| **A1** | **Realtime is ~25.6% of all DB time**, with `realtime.apply_rls` alone ~18.6%. If true, the kickoff spike's real cost was **fan-out, not scoring writes**, and the highest-leverage single change is removing high-churn tables from the publication — reusing the **Broadcast-from-database** pattern migration `022` already established for banter | `pg_stat_statements` by total time. The percentages are unverified |
+| **A2** | **The two workflows disagree on pool payload size: ~3.8 MB vs ~12 MB** (the latter claiming `match_scores` alone is ~10 MB for the largest pool) | Measure one large pool's response. **This matters beyond curiosity:** the recorded caching decision was taken on the 3.8 MB figure, so if it is really 12 MB, that decision rests on a wrong number |
+| **A3** | **`max_connections = 60`**, which would mean the instance is **not** Medium (Medium is 120) | Supabase dashboard. **Contradicts the recorded XL→Medium downgrade.** Confirm before any capacity planning — it changes the arithmetic on everything downstream |
+| **A4** | **The admin "Recalculate points" button cannot succeed** — `recalculate_all_pool_points` allegedly INSERTs columns that don't exist on `match_scores` | Introspect the function body in the DB. If true this is a **P3** failure and belongs in the register as its own risk; flagged for verification, **not** recorded as broken |
+| **A5** | **api-football errors are swallowed** — with `strict` never passed, failures return an empty envelope and are recorded as **healthy runs**, making mean-time-to-notice for an ingest stall unbounded | The `strict` half is verified above; what remains is whether the sync route writes a success record on an empty envelope |
+| **A6** | **~96 unbounded `.in()` reads** across `app/`, `lib/`, `mobile/`, against the 1,000-row PostgREST cap | My raw grep finds **199** `.in(` call sites in total (bounded and unbounded together), and the existing *Bounded reads* item records a 2026-07-10 sweep of 161 web + 30 mobile. **Three different numbers, none reconciled** — re-run the sweep with one definition before quoting any of them |
+
+### ⬜ Proposed direction
+
+Where the design should go. All of it is proposal.
+
+- **Precompute over cache.** The only genuinely *shared* object in this product is the **competition**, not the pool — the median pool has very few members, so a per-pool cache has almost nothing to amortise. Cache less than instinct suggests; precompute more.
+- **Move fan-out off WAL-plus-RLS** for high-churn tables, using the Broadcast-from-database pattern already proven in migration `022`. Contingent on **A1** being true (V4 establishes the mechanism; A1 is the size of it).
+- **The largest available wins are client-side, not server-side** — a visibility-gated, jittered poll on web, and a query cache on mobile. Both are cheap and neither needs a schema change.
+- **Split the freshness budget in two (P2)** and show both numbers to admins (P3), so "is it working?" has an answer that doesn't require an engineer.
+
+### ⬜ Not yet — and the trigger
+
+Each classic building block that was rejected, why it's wrong *for this product today*, and the
+number that would change the answer. This is the part that keeps its value as the product grows.
+
+| Block | Why not today ⬜ | Trigger that reopens it |
+|---|---|---|
+| **Load balancer** | Nothing to design — Vercel's anycast layer already provides ingress, autoscaling and failover | Leaving Vercel |
+| **Sharding** | Adds cross-shard complexity to a dataset that is small and cleanly pool-scoped | A single competition's `match_scores` exceeding what one Postgres instance serves comfortably, **or** write throughput that vertical scaling can no longer absorb |
+| **CDN for pool detail** | Responses are per-member and carry `set-cookie`, so the platform won't cache them anyway; median pool size means ~0% hit rate | Never for pool detail. CDN stays right for **static assets, marketing, `/play/*`, `/tv/*`** — genuinely shared content |
+| **Redis / external cache** | A second consistency boundary to keep honest, for an object that is barely shared | A measured, repeated read that precompute cannot serve — e.g. leaderboard ZSETs at a scale precompute can't hold |
+
+### How this section touches the rest of the programme
+
+Cross-references, not duplicates. **P1** ↔ **R17**, **R3**, **R6** · **P2** ↔ the fan-out work and
+A1 · **P3** ↔ **R18**, A4 · **P4** ↔ **R2**, **R5**, and *Sync cron is single-tenant*. V5 answers the
+factual half of **Gate B**; V6 re-characterises **R2**; V3 corrects the *XL→Medium* item's "last flag
+to flip". **Decision 6** (one canonical scale) and **Decision 7** (platform as referee, admin
+operability) are the product-side statements of P1 and P3 respectively.
+
+**Where the design assumes an unanswered gate:** the precompute-over-cache direction assumes the
+competition is the shared object — which is only true once **P4** exists, and P4 is gated by **Gate C**
+(EPL scope-or-date). Sequencing this work before Gate C is answered risks precomputing the wrong shape.
+
+> **🚦 Gate D — "real-time live leaderboard" vs "minute-cadence is sufficient"** *(new 2026-07-26)*
+> The stated goal says **real-time live leaderboard**. A recorded product principle says
+> **"predictions app, not a score tracker — minute-cadence live updates are sufficient; don't
+> over-engineer real-time score fidelity."** Both are Ryan's. They point at different systems: one
+> justifies pushing every scoring change to every viewer, the other justifies bounded, cheap polling
+> — and **A1 suggests the difference is a large share of the database bill.**
+> This is not a contradiction to resolve by picking the newer statement; it is a genuine product
+> question about what "live" has to *feel* like on a match night. **Surfaced, not answered.** Until
+> it is, P2's freshness budget has no target number to be measured against.
 
 ---
 
@@ -395,6 +597,20 @@ edited to add them.
 - **Effort:** ~half a day for 1–4; presets are a separate, larger piece.
 - **Done when:** one constant defines defaults for every consumer, reset is non-destructive, the multiplier ladder is monotonic and validated on save, and no member-visible rule is unreachable by the scoring engine.
 
+### XP has two writers — the level shown to users is whichever ran last `Bug` `Scoring` 🔥
+> Added 2026-07-26 from the analytics read-path parity pass. **R13** (the bug) and **R14** (the
+> rollout order). The fix is written and tested; **nothing is applied or deployed**, so this is live.
+- **Is:** `entry_xp_state.total_xp` / `.current_level` were written by two independent paths computing **different quantities**, both compared against the same `LEVELS.xpRequired` thresholds, last-writer-wins. `lib/push/badges.ts` (pre-fix, old line 400) wrote `Σ match_scores.total_points + badgeXP` — **scoring points**. `lib/analytics/entryAnalytics.ts` writes `computeFullXPBreakdown` XP — `BASE_XP[tier] × STAGE_MULTIPLIERS` + crowd/streak bonus events + badge XP. Not two implementations of one formula; two formulas.
+- **Already user-facing.** `app/pools/page.tsx:95` and `app/dashboard/page.tsx:188` both read `current_level` and show it on pool cards. Two members with identical performance can be shown different levels depending only on whether their pool was recalculated after the last analytics backfill.
+- **Evidence (prod, drafts-sourced):** `scripts/verify-analytics-parity.ts` → **187 of 331 entries mismatched**, split perfectly by mode (5/5 `progressive` clean, 5/5 `full_tournament` wrong). Proof it is Writer A's formula: `stored − Σ match_points` yields a clean badge residual, and two entries with the identical badge set both give exactly **355**. Alternatives ruled out by re-running with the crowd refactor stashed (identical), checking input freshness, membership drift, and `numeric(5,2)` rounding (real, cosmetic, 0 failures).
+- **Why nobody caught it:** `vercel.json` is `{}` — the analytics-sweep cron (`app/api/cron/analytics-sweep/route.ts`, which says so in its own header) has **never been registered**, so `badges.ts` is the de facto owner and `analytics_updated_at` records when the *other* writer last ran. **The timestamp lies.**
+- **What's written (local, uncommitted):** `badges.ts` consumes the shared value and omits the columns entirely when it can't compute one, rather than guessing (`lib/push/badges.ts:213`); `everReachedLevel` added to `computeFullXPBreakdown` (`xpSystem.ts:570`); `lib/migrations/026_entry_xp_highest_level.sql`; `scripts/reseed-entry-xp.ts`; two new test files (`lib/push/__tests__/badges.xp-ownership.test.ts`, `lib/__tests__/xpSystem.level-ratchet.test.ts`). Suite **157/157 green**, no type errors in any touched file.
+- **Decisions 2026-07-26:** **levels never demote** — the corrected formula moves 1,048 entries and **231 of them down**, so a ratchet mirrors the keep-once rule `badge_unlocks` already applies to badges; `total_xp` stays honest and may fall; and **the analytics-sweep cron is not to be registered** — scoring maintains the columns, and a second writer path is precisely what caused this.
+- 🔒 **Blocked on a release, in a fixed order (R14):** apply 026 → deploy the `badges.ts` fix → run `scripts/reseed-entry-xp.ts` **immediately** → re-run the parity check. Deploying before the migration means PostgREST rejects the whole `entry_xp_state` upsert on the unknown `highest_level_reached` column — **as of 2026-07-26 that now fails loudly and skips the push** rather than silently, so the consequence is quiet badge/level pushes and a log line, not repeat notifications. Skipping the reseed still fires **~817 level-up pushes** in one burst.
+- **Two defects in this fix were found after it was called done** — the missing `entryAnalytics` hoist (R15) and the unchecked upsert (R14) — both raised by this register, confirmed by Ryan against the code, and fixed 2026-07-26. Tests and typecheck re-run **after** those fixes: 157/157, clean.
+- **Effort:** the code is done. What's left is ~1–2 hours of ops in one window, plus the parity re-run.
+- **Done when:** parity comes back clean, `/pools` and `/dashboard` show a level with one definition behind it, and no user received a level-up push for a formula change.
+
 > Beyond that and the **recurring knockout ops** below, the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
 
 ### ✅ Completed (verified against code, 2026-07-12)
@@ -428,7 +644,9 @@ edited to add them.
 - **Is:** The leaderboard recomputes per-entry analytics on *every* page load; that's what saturated the DB in the June 16 outage. Precompute it once per score-change instead of per-view.
 - **Touches:** read path `app/api/pools/[pool_id]/leaderboard/route.ts` + `app/pools/[pool_id]/LeaderboardTab.tsx`; storage = extra columns on `entry_xp_state`; writer = `analytics-sweep` cron + `lib/analytics/entryAnalytics.ts`. Backfill/cron **already live and verified no-op** (M1/M2 done); remaining is the **M4 read-path flip** (read columns, drop `force-dynamic`, add cache) behind flag `analytics_read_from_columns`.
 - ⚠️ **Audit 2026-07-12:** M4 confirmed **not started** — the leaderboard route still imports `computeStreaks`/`computeFullXPBreakdown` and recomputes per-read (zero `entry_xp_state` reads); flag `analytics_read_from_columns` appears only in prose, never in code. The cited design doc `drafts/M4_read_path_flip.md` is **missing from the repo** — recreate it or drop the reference.
-- **Effort:** ~2–3 days (calm-window deploy + load test). Bracket pools need a **separate** parallel-analytics track (~2–3 days more) — they score via `bonus_scores`, not `predictions`.
+- 🔒 **Blocked 2026-07-26 — the parity pass was run and it FAILED.** "Backfill-vs-live parity = 0 diffs" is the *Done when* on this item, and the first real run came back **187 of 331 entries mismatched**. The cause is not staleness and not the caching work: `entry_xp_state` has **two writers with different formulas** (**R13**). Until that has one owner, is deployed, and the re-seed has run, this flip cannot proceed. Result: `drafts/2026-07-26_analytics_parity_result.md`; checker: `npx tsx scripts/verify-analytics-parity.ts` (read-only, exits non-zero on failure, so it can gate the deploy).
+- ⚠️ **The writer named in this item no longer applies.** This item says the writer is "the `analytics-sweep` cron + `lib/analytics/entryAnalytics.ts`". `vercel.json` is `{}` — **that cron has never been registered**, and Ryan's decision 2026-07-26 is **not to register it**: scoring maintains the columns via `lib/push/badges.ts` → `computePoolEntryAnalytics`. The flip's freshness guarantee therefore now rests on the scoring path, not on a sweep — which is a different design and needs re-validating on that basis.
+- **Effort:** ~2–3 days (calm-window deploy + load test), **plus** the R13 release ahead of it. Bracket pools need a **separate** parallel-analytics track (~2–3 days more) — they score via `bonus_scores`, not `predictions`.
 - **Done when:** backfill-vs-live parity = 0 diffs, the ~516ms leaderboard query drops to ~20ms, and a match-night load test holds on Medium compute.
 
 ### Scale downgrade XL→Medium `Infra` — ✅ DONE 2026-07-12
@@ -446,7 +664,8 @@ edited to add them.
 - **Is:** At kickoff, a synchronous calc+write burst briefly spikes CPU (~4.3 on 2 cores) and replication lag. Recovered fine, but should be smoothed.
 - **Touches:** the scoring sweep in `lib/scoring/recalculate.ts` + `app/api/cron/sync-fixtures/route.ts`; fix direction = precompute / batch / queue the burst.
 - **Audit 2026-07-12:** `recalculate.ts` already batches (`batchSize = 50`, sequential `inBatches`, paginated reads) — the gap is a real queue/precompute, not zero mitigation. Folds into the precompute + scale work above.
-- **Effort:** ~1 day incremental.
+- 🟠 **This path gained a new tenant on 2026-07-26 (R15) — and the O(n²) on it is fixed, but the tenancy isn't going away.** `detectAndPushBadgesForPool` — fired from `recalculate.ts:93` and `:322` on every recalc — now calls `computePoolEntryAnalytics` for the whole pool (`lib/push/badges.ts:156`), because that function is the single owner of `entry_xp_state`. Its per-entry crowd rebuild (~2.6M iterations on the largest pool) **is fixed** — hoisted at `lib/analytics/entryAnalytics.ts:201`. What remains by design is a **full-pool prediction pull per recalc** (~3.8 MB on the largest pool). It is fire-and-forget (`void`), so it doesn't block the recalc's return, but it burns the same function's CPU at the same moment. **`entryAnalytics.ts`'s header now says so** — *"ON THE SCORING PATH: treat added work here as scoring-path cost"* — which is the durable half of the fix, because the stale "DRAFT, not imported by any live code path" header is what made the regression easy to add.
+- **Effort:** ~1 day incremental. *(The R15 hoist itself is done, in code, 2026-07-26.)*
 - **Done when:** kickoff no longer produces a CPU/replication spike on the Supabase graph.
 
 ### Shadow scoring engine `Infra` 🔒
@@ -464,6 +683,62 @@ edited to add them.
 ### EAS OTA pending `Mobile` — ✅ SHIPPED 2026-07-12
 - **What shipped:** production OTA of the Jul 11 tie-break resolver (`bracketResolver.ts`, `tournament.ts`, `usePredictions.ts`) to runtime `1.0.0` (last prod build 2026-07-06, unchanged runtime — verified via `eas build:list`; branch had zero prior updates). Published **native-only** (see *Mobile web-export* bug below): iOS update group `283a68d0…`, Android `5307e504…`, branch `production`.
 - **Done:** testers on the ≥ Jul 6 build pull the update; mobile bracket display now matches the shipped web tie-break correction.
+
+## ⚡ Performance & caching
+
+> Opened 2026-07-26. Scope came from Ryan: *"optimize the entire site so we do not have unneeded
+> requests, unneeded calculations, or even when requesting data the app or web only requests exactly
+> what is required — coupled with caching, web to mobile."* Three drafts:
+> `drafts/2026-07-26_performance_optimization_audit.md` (what to stop doing),
+> `drafts/2026-07-26_caching_strategy.md` (where to put what's left), and
+> `drafts/2026-07-26_analytics_parity_result.md` (the blocker it found). Supersedes the caching-only
+> scope of `drafts/2026-07-19_caching_infrastructure_plan.md`, which stays valid as the layer design.
+>
+> **Framing that ordered the work:** caching a wasteful query makes the waste cheaper, not smaller.
+> Stop asking for data we don't use → stop asking repeatedly for unchanged data → stop recomputing
+> what we already computed → *then* cache what's left.
+>
+> ⚠️ **Everything below is local and uncommitted.** Nothing is pushed, deployed, or applied to prod.
+
+### Measured baseline `Infra` — 2026-07-26
+- **Where DB time goes** *(pg_stat_statements on `ujthamlehjyubbzxbnes`, cumulative since an unknown counter reset — **prod-sourced, unverifiable from this repo**)*: 337.5 total DB-hours. `SELECT predictions.*` **111.3h / 33.0% / 30.0M calls** · realtime WAL decoding 80.9h / 24.0% · `row_to_json(pool_members)` 34.5h / 10.2% at **404–450ms mean** (slowest by mean) · `match_scores` 31.0h / 9.2%. **Top four = 76.4%.**
+- **Realtime WAL decoding at 24% is flagged and deliberately NOT addressed** — it is a publication-configuration question, not app code. It deserves its own pass; it is not in this one.
+- **The distribution that drives every caching decision:** 623 pools, 4,809 memberships, **median pool = 1 member**, mean 7.7, 70% ≤5 members, **only 4 pools ≥100** (max 192); 288,029 predictions across 4,985 entries. High key cardinality, near-1:1 read-per-fetch for 90% of pools, extreme concentration in four. A cache only pays when one fetch serves many reads — so the strategy is **"cache the few genuinely shared things, precompute the rest"**, not "cache pool data".
+
+### What landed locally `Infra` — verified in code 2026-07-26
+- **`predictions.select('*')` → 8 named columns.** `lib/poolData.ts:247` now uses the shared `PREDICTION_COLUMNS` constant (`lib/poolData.ts:43`). `predictions` has 11 columns; `PredictionData` consumes 8, so `confidence_level` / `created_at` / `updated_at` were being `json_agg`'d and discarded on the single most expensive statement in the product. Measured effect on the largest pool: **5,420 kB → 3,854 kB (29%)** *(prod measurement)*.
+- **13 of 14 whole-table `match_conduct` reads scoped**, via new `lib/matchConduct.ts` (filters through the `match_conduct → matches` FK in one round trip, and paginates so it cannot be truncated). Count verified by reading every call site: 7 web routes/pages + `lib/scoring/recalculate.ts` + `lib/scoring/shadowBrackets.ts` ×3 + 2 mobile hooks = 13 fixed; `app/api/admin/advance-teams/route.ts` deliberately not (**R16**).
+- **Why that one mattered more than performance:** `match_conduct` has **no `tournament_id` column**, so an unfiltered read is inherently cross-competition *and* silently capped at 1,000 rows by PostgREST. 206 rows today; PL adds ~760 → 966; the competition after that truncates in silence. **Four of the 14 were inside scoring engines**, where truncation means wrong bonuses and wrong conduct tiebreaks with no error raised.
+- **`computeCrowdPredictions` split** into `computeCrowdConsensus` (pool-wide, once) + `applyCrowdOverlay` (per entry) — `app/pools/[pool_id]/analytics/analyticsHelpers.ts:345`/`:435`, with `computeCrowdPredictions` kept as the composition so single-entry callers are untouched. It had been called once **per entry**, each call re-scanning every prediction in the pool: 192 × 13,385 ≈ **2.6M iterations** on the largest pool, in the leaderboard API route *and* client-side in `LeaderboardTab.tsx` and `CommunityTab.tsx`. Converted in **all four** — the fourth, `lib/analytics/entryAnalytics.ts`, was missed on the first pass and is the one that landed on the scoring path; hoisted 2026-07-26 (`:201` consensus, `:223` overlay) after this register flagged it. See **R15**. The two remaining `computeCrowdPredictions` callers (`AnalyticsTab.tsx:127`, `entries/[entry_id]/analytics/route.ts:224`) are genuinely single-entry — verified, not an oversight.
+- **The badge snapshot upsert now fails loudly** (`lib/push/badges.ts`, 2026-07-26). It was unchecked; it now captures the error, logs it, and **returns before pushing** — because that snapshot is the diff basis for "what's new", so a silent write failure would make the next run re-derive the same badges and levels as new and push them again. **Silence is the safe failure**, and it is the same class of bug as the swallowed `pool_members` error that made this pipeline a no-op for months. Reduces **R14** from a code defect to a release-ordering constraint.
+- **Also in the same change:** `teams` was unscoped in `bracket-picks/calculate`, `dashboard/page.tsx` and `profile/page.tsx` — now filtered by tournament.
+- **Verification:** vitest **157/157 pass**, `tsc --noEmit` shows **no error in any touched file** (the only errors are the known local phantoms — `mobile/` resolved through the root tsconfig, the `FormData` false positive, and an iCloud `routes.d 2.ts` duplicate). Both re-run **after** the R14/R15 fixes on 2026-07-26, not just before them.
+- **Two of this section's own defects were found by the register and fixed the same day** — the R15 hoist and the R14 error check. Recorded because it is the argument for auditing a performance change against the code rather than against its own summary: both were in the change that was described as complete and tested.
+
+### Open work, in the sequence Ryan set `Infra`
+| # | Step | State |
+|---|---|---|
+| 1 | **Mobile client cache (react-query)** | Not started. Mobile has **no** client cache at all — hand-rolled `useState`/`useEffect`, six surfaces refetching on `useFocusEffect`, so every tab switch re-runs a full load including the uncached leaderboard route. Largest untapped mobile win; needs no server change |
+| 2 | **Fix the 30s full-page poll** | Not started. `app/pools/[pool_id]/PoolDetail.tsx:666` — `setInterval(() => router.refresh(), 30000)` on a `force-dynamic` page re-runs the *entire* server component every 30s per open tab, on 4 tabs, regardless of visibility, and is redundant with the Realtime subscription directly above it. Most likely explanation for `row_to_json(pool_members)` at 8.6M calls |
+| 3 | **Shrink the pool payload below 2 MB** | Not started — **and it is a hard prerequisite, not a nice-to-have.** At 3,854 kB the largest pool's `getPoolData` **cannot be stored in Vercel Runtime Cache at all** (2 MB per-item limit). Direction: ship *derived* crowd consensus (~100 rows) instead of 13,385 raw prediction rows — now possible because `computeCrowdConsensus` is split out |
+| 4 | **Tagged SWR cache on the mobile API routes** | Not started. 30s staleness budget (decided). Replaces today's `expire: 0` invalidate-on-every-score, which hard-expires every affected pool at exactly the moment traffic peaks |
+| 5 | **`s-maxage` + SWR on `/play/*`, `/tv/*`** | Not started. The only CDN change recommended |
+| 6 | **React `cache()` request-scoped dedup** | Not started. Free; removes repeat `isPoolCacheEnabled()` / `requireAuth()` / `getScoringSource()` lookups. Mobile separately re-resolves `auth_user_id → user_id` in **11 files** for a value that is constant for the session |
+| 7 | **Flip analytics reads to `entry_xp_state`** | 🔒 **Blocked by R13** — parity failed. Was step 1 of the strategy; it is now last because the correction has to ship and be re-seeded first |
+
+- **Effort:** each step is order-of-magnitude ~0.5–2 days; steps 1–3 hold most of the value and need no new infrastructure. **Not a commitment.**
+- **Done when:** the top-four statement share falls materially against a fresh `pg_stat_statements` baseline, mobile stops refetching on every focus, and the pool payload fits a shared cache.
+
+### Decisions settled 2026-07-26 (infrastructure) `Infra`
+> Recorded here rather than under *Project: Multi-sport platform* — those eight are **product**
+> decisions and are not renumbered by these.
+1. **Staleness budget for cached reads: 30 seconds.** Matches the existing poll cadence and the recorded "predictions app, not a score tracker" principle. Drives the step-4 TTL.
+2. **Mobile client cache: react-query.** Takes the dependency; buys focus-dedup, TTL, background refetch and request de-duplication — all four of which the hand-rolled hooks need.
+3. **CDN is never for pool detail.** Keeps exactly three jobs: static assets, images, and the genuinely public `/play/*` and `/tv/*` boards. The numbers back the call: median pool = 1 member ⇒ ~0% edge hit rate; many isolated PoPs multiply cold misses on 623 low-traffic keys; and the content is auth-gated and viewer-shaped (own picks, admin visibility, the reveal gate), so a shared object either leaks picks or fragments the key per user and takes hit rate to zero.
+4. **Redis: hold.** Not justified by current numbers, and steps 1–4 change the shape of the problem. When it is revisited, the case is specific: a leaderboard **is** a sorted set (`ZADD`/`ZREVRANGE`/`ZRANK` give top-N and a member's rank in O(log n)) — adopt it as the leaderboard *data structure*, not as a generic blob cache.
+5. **Levels never demote** and **the analytics-sweep cron is not to be registered** — both recorded on the *XP has two writers* item above, since that is where they bite.
+
+---
 
 ## ⏭️ Next — scoring correctness & data integrity
 
@@ -1047,6 +1322,7 @@ Standing check: assume a 15-year-old is in a family pool.
 ### Foundational work items
 
 - **League ingestion (Premier League)** `Multi-sport` 🔥 — migration `024_multi_competition_league_support.sql`, `lib/integrations/apiFootball/importLeagueSeason.ts` and `scripts/import-league-season.ts` are **drafted, not applied**. ⚠️ **A league pool scores zero today, silently**: `checkKnockoutTeamsMatch` ([lib/scoring/core.ts:88](lib/scoring/core.ts)) returns `true` only for `'group'` or when teams aren't set; a `'regular_season'` fixture is neither, so it falls to `return false` and [core.ts:141](lib/scoring/core.ts) zeroes the match. Even after fixing the gate, `isGroupStage` selects the **point values** — the group/knockout binary is welded into the price lookup, not just the gate. Importing fixtures is **not** the last step before a working league pool.
+- **Team advancement is single-tournament** `Multi-sport` 🔒 **(added 2026-07-26 — R16)** — `app/api/admin/advance-teams/route.ts:56` reads `matches`, `teams` and `match_conduct` **tournament-wide with no scope**, because the advancement cascade was written for one competition. With a second competition present, unscoped `matches` would resolve knockout placeholders **across** competitions, and unscoped conduct is capped at 1,000 rows by PostgREST. Carries a blocker comment in-file. The fix is not a query change — it means deriving the tournament from `match_id` (or taking it as a parameter) and threading it through the cascade. **Must land before a second competition is ingested**, i.e. before 024 is applied.
 - **Sync cron is single-tenant** `Multi-sport` — competition comes from three env globals (`app/api/cron/sync-fixtures/route.ts:67`). Looping over active tournaments (reading `external_league_id`/`external_season` per row, which 024 backfills) is the unlock for N competitions. WC = api-football league 1; EPL = league 39.
 - **Data-model abstraction** `Multi-sport` — competition-instance model, now also carrying Crew + Season (Decision 1). Everything else depends on it.
 - **Pool template system** `Multi-sport` — formats as named presets carrying their own scoring (Decision 3).
@@ -1087,6 +1363,7 @@ Standing check: assume a 15-year-old is in a family pool.
 - **Is:** Background "simplify how the app pulls data" cleanup. Many screens fetch large, unbounded row sets to the client and compute a small summary in JS — risking silent truncation at PostgREST's 1000-row cap and wasting egress + CPU. Move the work into the database. **Excludes scoring** (shadow engine owns that).
 - **Touches:** the anti-pattern is an unbounded `.in('col', [manyIds])` with no `.limit()`/`.range()`. Sweep (2026-07-10): **161** `.in()` reads on web vs 53 bounded; **30** vs 7 on mobile. User-facing candidates first: mobile `useHomeData.ts`/`usePoolBanter.ts`/`useMatchDetail.ts`/`useActivity.ts`; web `dashboard`/`pools`/`leaderboard`/`activity`/`poolData.ts`/`entryAnalytics.ts`/`profile`. **Skip** scoring + admin one-offs. Fix menu: RPC + window function, view, precomputed columns, or `.range()` pagination. Do **not** raise `max-rows`.
 - **Audit 2026-07-12:** the first, confirmed instance (mobile pool-card in `useHomeData.ts`) is **still unfixed** — nothing from this sweep has landed yet.
+- ✅ **First landings, 2026-07-26 (local, uncommitted):** the `match_conduct` family — 13 of 14 unfiltered whole-table reads now scoped and paginated via `lib/matchConduct.ts` — plus `predictions` narrowed to its 8 used columns and three unscoped `teams` reads filtered. That is this sweep's exact anti-pattern, and it was **live inside the scoring engines**. See *⚡ Performance & caching*. `useHomeData.ts` is still unfixed.
 - **Effort:** ongoing/background — ~0.5–1 day per site.
 - **Done when:** no user-facing screen depends on an unbounded multi-row fetch; re-running the sweep shows hot read paths are all bounded or DB-aggregated.
 
@@ -1108,4 +1385,8 @@ Standing check: assume a 15-year-old is in a family pool.
 - `drafts/2026-07-02_shadow_engine_audit_report.md`
 - `drafts/2026-07-05_match_status_display_plan.md`
 - `drafts/2026-07-09_scoring_table_architecture_deepdive.md`
+- `drafts/2026-07-19_caching_infrastructure_plan.md` — the caching *layer* design; superseded in scope by the two below, still valid as the layer sketch.
+- `drafts/2026-07-26_performance_optimization_audit.md` — measured baseline + the four tiers of waste (*⚡ Performance & caching*).
+- `drafts/2026-07-26_caching_strategy.md` — layer-by-layer strategy, the pool-size distribution it rests on, and the settled decisions.
+- `drafts/2026-07-26_analytics_parity_result.md` — the parity failure and the two-writer root cause (**R13**).
 - ~~`drafts/M4_read_path_flip.md`~~ — ⚠️ **missing from the repo** (referenced by *Leaderboard precompute* but never created / was removed — recreate or drop the reference).

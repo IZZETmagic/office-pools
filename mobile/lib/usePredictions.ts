@@ -127,9 +127,16 @@ export function usePredictions(
           .from('teams')
           .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
           .eq('tournament_id', tournamentId),
+        // Scoped to this tournament via the match_conduct -> matches FK.
+        // Unfiltered, this pulled every conduct row in the database and was
+        // silently capped at 1,000 by PostgREST once more than one competition
+        // exists. One tournament's rows (2 per match) stay well under the cap.
         supabase
           .from('match_conduct')
-          .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+          .select(
+            'match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards, matches!inner(tournament_id)',
+          )
+          .eq('matches.tournament_id', tournamentId),
         predsPromise,
       ]);
       if (mErr) throw mErr;

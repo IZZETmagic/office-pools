@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { calculateAllBonusPoints, type MatchWithResult, type TournamentAwards } from '@/lib/bonusCalculation'
@@ -67,7 +68,7 @@ async function handlePOST(
   const [
     { data: matches },
     { data: teams },
-    { data: conductData },
+    conductData,
     { data: settingsRow },
     { data: tournamentAwardsRow },
     { data: poolMembers },
@@ -81,9 +82,7 @@ async function handlePOST(
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
       .eq('tournament_id', pool.tournament_id),
-    adminClient
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournament(adminClient, pool.tournament_id),
     adminClient
       .from('pool_settings')
       .select('*')
@@ -124,7 +123,7 @@ async function handlePOST(
 
   const settings: PoolSettings = { ...DEFAULT_POOL_SETTINGS, ...(settingsRow || {}) }
   const tournamentAwards: TournamentAwards | null = tournamentAwardsRow || null
-  const conduct: MatchConductData[] = conductData || []
+  const conduct: MatchConductData[] = conductData
   const teamsData: Team[] = (teams as any[]).map(t => ({
     ...t,
     group_letter: t.group_letter?.trim() || '',

@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
+import { fetchMatchConductForTournaments } from '@/lib/matchConduct'
 import { resolveEntryLevel } from '@/lib/entryLevel'
 import { pickBestEntry } from '@/lib/bestEntry'
 import { DashboardClient } from './DashboardClient'
@@ -131,15 +133,17 @@ export default async function DashboardPage() {
   }))
 
   // STEP 4c: Fetch shared data needed for bonus calculation (teams, conduct)
-  const [{ data: allTeams }, { data: conductRes }] = await Promise.all([
+  // Both scoped to the tournaments this user actually has pools in. Unscoped,
+  // these pulled every team and every conduct row in the database — and the
+  // conduct read was silently capped at 1,000 rows by PostgREST.
+  const [{ data: allTeams }, conductRes] = await Promise.all([
     supabase
       .from('teams')
       .select('team_id, country_name, country_code, group_letter, fifa_ranking_points, flag_url')
+      .in('tournament_id', userTournamentIds)
       .order('group_letter', { ascending: true })
       .order('fifa_ranking_points', { ascending: false }),
-    supabase
-      .from('match_conduct')
-      .select('match_id, team_id, yellow_cards, indirect_red_cards, direct_red_cards, yellow_direct_red_cards'),
+    fetchMatchConductForTournaments(supabase, userTournamentIds),
   ])
 
   const teams: Team[] = (allTeams ?? []).map((t: any) => ({
@@ -148,7 +152,7 @@ export default async function DashboardPage() {
     country_code: t.country_code?.trim() || '',
   }))
 
-  const conductData: MatchConductData[] = (conductRes ?? []) as MatchConductData[]
+  const conductData: MatchConductData[] = conductRes
 
   // STEP 4d: Determine which pools have started scoring. Signal: any entry
   // in the pool has total_points > 0. This mirrors recalculatePool's gate
@@ -191,6 +195,21 @@ export default async function DashboardPage() {
   }
 
   // STEP 5: Enrich each pool with calculated points (match + bonus), member count, match counts
+  // Scoring source resolution — one pass, before the per-pool work. See the
+  // fuller note in app/pools/page.tsx: shadow_* tables are RLS deny-all, so
+  // scoring must be read with the service role, scoped to entry ids that came
+  // out of the RLS-checked membership query above.
+  const scoringAdmin = createAdminClient()
+  const shadowPools = await getShadowReadPools(scoringAdmin)
+  const shadowEntryIds = (userPools ?? []).flatMap((m: any) =>
+    shadowPools.has(m.pools?.pool_id)
+      ? ((m.pool_entries || []) as any[]).map((e) => e.entry_id)
+      : [],
+  )
+  const scoredByEntry = shadowEntryIds.length > 0
+    ? await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
+    : new Map()
+
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
       const pool = m.pools
@@ -272,23 +291,21 @@ export default async function DashboardPage() {
         }
       }
 
-      // Read stored v2 scores instead of computing on-the-fly
-      const matchPoints = defaultEntry?.match_points ?? 0
-      const bonusPoints = defaultEntry?.bonus_points ?? 0
+      // Read stored v2 scores instead of computing on-the-fly. Shadow-enabled
+      // pools resolve from shadow_entry_totals; the fallback keeps prod values
+      // byte-identical when the flag is off.
+      const scoring = defaultEntryId ? scoredByEntry.get(defaultEntryId) : undefined
+      const matchPoints = scoring?.match_points ?? defaultEntry?.match_points ?? 0
+      const bonusPoints = scoring?.bonus_points ?? defaultEntry?.bonus_points ?? 0
 
-      // Fetch last 5 match results from match_scores for form display
+      // Same source as the pool's leaderboard — see the note in app/pools/page.tsx.
+      // Bounded (limit 5) rather than readMatchScores, which would pull every
+      // match score for every entry to render five dots.
+      const source = shadowPools.has(pool.pool_id) ? 'shadow' as const : 'prod' as const
+
       let form: string[] = []
       if (defaultEntryId) {
-        const { data: recentScores } = await supabase
-          .from('match_scores')
-          .select('score_type, match_number')
-          .eq('entry_id', defaultEntryId)
-          .order('match_number', { ascending: false })
-          .limit(5)
-
-        form = (recentScores ?? [])
-          .reverse()
-          .map((s: any) => s.score_type)
+        form = await readRecentForm(scoringAdmin, defaultEntryId, source, 5)
       }
 
       // Build per-entry progress (prediction counts for each entry)
@@ -324,7 +341,7 @@ export default async function DashboardPage() {
         // Best (lowest) rank across all of this user's entries — the card
         // shows the user's best leaderboard position, and points/form above
         // come from this same entry (bestEntry = lowest rank by construction).
-        current_rank: defaultEntry?.current_rank ?? null,
+        current_rank: scoring?.current_rank ?? defaultEntry?.current_rank ?? null,
         // Highest XP level across all of this user's entries — matches the
         // in-pool Form tab (scored snapshot if present, else live pre-tournament
         // submission-badge level). Defaults to 1.
