@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import type { PoolLiveResponse } from '@/app/api/pools/[pool_id]/live/route'
 import { Button } from '@/components/ui/Button'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
@@ -153,7 +154,7 @@ export function PoolDetail({
   allPredictions: initialAllPredictions,
   teams,
   conductData,
-  matchScores,
+  matchScores: initialMatchScores,
   bonusScores,
   memberId,
   currentUserId,
@@ -233,6 +234,8 @@ export function PoolDetail({
   const [matches, setMatches] = useState(initialMatches)
   const [settings, setSettings] = useState(initialSettings)
   const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
+  // Stateful so the live delta can be merged in without a full RSC refresh.
+  const [matchScores, setMatchScores] = useState(initialMatchScores)
   const [showNavWarning, setShowNavWarning] = useState(false)
 
   // Prediction mode flags (defined early so hooks can reference them)
@@ -566,6 +569,110 @@ export function PoolDetail({
   useEffect(() => { setMatches(initialMatches) }, [initialMatches])
   useEffect(() => { setSettings(initialSettings) }, [initialSettings])
   useEffect(() => { setAllPredictions(initialAllPredictions) }, [initialAllPredictions])
+  useEffect(() => { setMatchScores(initialMatchScores) }, [initialMatchScores])
+
+  // ---------------------------------------------------------------------
+  // Live refresh
+  //
+  // A router.refresh() re-sends the WHOLE server payload — 3.8 MB on the
+  // largest pool — even though during a live match only that match's scores
+  // can have changed. Predictions can't change at all (locked at kickoff by
+  // trg_enforce_prediction_before_kickoff, and page.tsx only ships revealed
+  // picks), and completed matches' scores are final. So ~98.6% of a refresh is
+  // provably identical to what we already hold.
+  //
+  // /live returns just the moving parts (~15 kB) and we merge them. Structural
+  // changes — a member joining, settings edits — still go through
+  // router.refresh(), because those DO change the immutable half.
+  // ---------------------------------------------------------------------
+  const liveSeq = useRef(0)
+
+  const applyLive = useCallback(async () => {
+    // Guard against out-of-order responses: a slow request that lands after a
+    // newer one must not overwrite fresher numbers with staler ones.
+    const seq = ++liveSeq.current
+    let data: PoolLiveResponse
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/live`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`live ${res.status}`)
+      data = await res.json()
+    } catch {
+      // Never leave the leaderboard stale on a transient failure — live
+      // standings are a product guarantee, so fall back to the full refresh.
+      router.refresh()
+      return
+    }
+    if (seq !== liveSeq.current) return
+
+    // A match finished since we loaded. Its scores moved from the live half to
+    // the immutable half, which we can't reconstruct from a delta — so rebuild.
+    setMatches(prevMatches => {
+      const completedLocally = prevMatches.filter(m => m.status === 'completed').length
+      if (data.completed_matches !== completedLocally) {
+        router.refresh()
+        return prevMatches
+      }
+      if (data.matches.length === 0) return prevMatches
+      const byId = new Map(data.matches.map(m => [m.match_id, m]))
+      return prevMatches.map(m => {
+        const live = byId.get(m.match_id)
+        if (!live) return m
+        if (
+          m.status === live.status &&
+          m.home_score_ft === live.home_score_ft &&
+          m.away_score_ft === live.away_score_ft
+        ) return m
+        return {
+          ...m,
+          status: live.status,
+          home_score_ft: live.home_score_ft,
+          away_score_ft: live.away_score_ft,
+        }
+      })
+    })
+
+    // Leaderboard totals and ranks — the part that must never lag.
+    if (data.entries.length > 0) {
+      const byEntry = new Map(data.entries.map(e => [e.entry_id, e]))
+      setMembers(prev => prev.map(member => {
+        if (!member.entries?.length) return member
+        return {
+          ...member,
+          entries: member.entries.map(entry => {
+            const live = byEntry.get(entry.entry_id)
+            if (!live) return entry
+            return {
+              ...entry,
+              match_points: live.match_points,
+              bonus_points: live.bonus_points,
+              point_adjustment: live.point_adjustment,
+              scored_total_points: live.scored_total_points,
+              current_rank: live.current_rank,
+              previous_rank: live.previous_rank,
+            }
+          }),
+        }
+      }))
+    }
+
+    // Per-match scores for whatever is in play. Keyed by (entry_id, match_id),
+    // and a match goes live exactly once, so this is a plain upsert.
+    if (data.scores.length > 0) {
+      setMatchScores(prev => {
+        const key = (entryId: string, matchId: string) => `${entryId}:${matchId}`
+        const incoming = new Map(data.scores.map(sc => [key(sc.entry_id, sc.match_id), sc]))
+        const merged = prev.map(sc => {
+          const live = incoming.get(key(sc.entry_id, sc.match_id))
+          if (!live) return sc
+          incoming.delete(key(sc.entry_id, sc.match_id))
+          return { ...sc, score_type: live.score_type, total_points: live.total_points }
+        })
+        // Rows for a match scored for the first time since page load.
+        for (const live of incoming.values()) merged.push(live as unknown as MatchScoreData)
+        return merged
+      })
+    }
+  }, [pool.pool_id, router])
 
   // Ref to check PredictionsFlow unsaved state
   const predictionsRef = useRef<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>(null)
@@ -642,7 +749,7 @@ export function PoolDetail({
           // refresh in the same second (thundering herd on the server)
           if (debounceTimer) clearTimeout(debounceTimer)
           debounceTimer = setTimeout(() => {
-            router.refresh()
+            applyLive()
           }, 2000 + Math.random() * 8000)
         }
       )
@@ -656,16 +763,16 @@ export function PoolDetail({
       if (debounceTimer) clearTimeout(debounceTimer)
       supabase.removeChannel(channel)
     }
-  }, [pool.pool_id, members, router])
+  }, [pool.pool_id, members, applyLive])
 
   // Fallback: auto-refresh every 30s on active tabs in case Realtime misses an event
   useEffect(() => {
     const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'my_bracket', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
 
-    const interval = setInterval(() => router.refresh(), 30000)
+    const interval = setInterval(() => applyLive(), 30000)
     return () => clearInterval(interval)
-  }, [activeTab, router])
+  }, [activeTab, applyLive])
 
   const switchTab = useCallback((tab: Tab) => {
     setActiveTab(tab)

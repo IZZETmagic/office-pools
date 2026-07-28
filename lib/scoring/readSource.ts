@@ -91,6 +91,7 @@ async function paginateByEntry<T = Record<string, unknown>>(
   entryIds: string[],
   orderCols: string[],
   eq?: Record<string, string>,
+  inFilter?: { column: string; values: string[] },
 ): Promise<T[]> {
   const out: T[] = []
   const pageSize = 1000
@@ -98,6 +99,7 @@ async function paginateByEntry<T = Record<string, unknown>>(
   for (;;) {
     let q = admin.from(table).select(columns).in('entry_id', entryIds)
     if (eq) for (const [col, val] of Object.entries(eq)) q = q.eq(col, val)
+    if (inFilter) q = q.in(inFilter.column, inFilter.values)
     for (const c of orderCols) q = q.order(c, { ascending: true })
     const { data, error } = await q.range(offset, offset + pageSize - 1)
     if (error) throw new Error(`readSource: ${table} page@${offset}: ${error.message}`)
@@ -210,7 +212,7 @@ export async function readMatchScores(
   admin: AdminClient,
   entryIds: string[],
   source: ScoringSource,
-  opts?: { matchId?: string },
+  opts?: { matchId?: string; matchIds?: string[] },
 ): Promise<MatchScoreData[]> {
   if (entryIds.length === 0) return []
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
@@ -223,6 +225,9 @@ export async function readMatchScores(
     entryIds,
     ['entry_id', 'match_id'],
     opts?.matchId ? { match_id: opts.matchId } : undefined,
+    // Used by the /live endpoint to pull only in-play matches. Bounded by how
+    // many matches kick off at once, never by the size of the fixture list.
+    opts?.matchIds?.length ? { column: 'match_id', values: opts.matchIds } : undefined,
   )
   return rows.map((r) => ({
     // synthesise a stable id for shadow rows (unused downstream, but the type +
