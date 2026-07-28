@@ -922,3 +922,35 @@ export function fetchBracketAnalytics(poolId: string, entryId: string) {
     `/api/pools/${poolId}/entries/${entryId}/bracket-analytics`,
   );
 }
+
+// --- home screen scoring -----------------------------------------------------
+// Per-entry form / accuracy / streak, derived server-side.
+//
+// This cannot be read from PostgREST directly: the shadow scoring tables are
+// RLS deny-all, so a user-scoped client sees nothing in them, and the
+// shadow-vs-prod resolution lives in server-side TypeScript the app never runs.
+// Asking the API for the answer keeps one source of truth instead of a second
+// copy of the rules in the client.
+export type EntryScoringSummary = {
+  entry_id: string;
+  /** Newest-last, at most 5 — the form indicator dots. */
+  form: Array<'exact' | 'winner_gd' | 'winner' | 'miss'>;
+  total_completed: number;
+  exact_count: number;
+  correct_count: number;
+  /** Consecutive point-scoring matches counting back from the most recent. */
+  streak: number;
+  /** Same source as the pool's own leaderboard. */
+  match_points: number;
+  bonus_points: number;
+  point_adjustment: number;
+  scored_total_points: number;
+  current_rank: number | null;
+};
+
+export async function fetchHomeScoring(userId: string): Promise<EntryScoringSummary[]> {
+  const res = await apiFetch<{ entries: EntryScoringSummary[] }>(
+    `/api/users/${userId}/home-scoring`,
+  );
+  return res.entries ?? [];
+}

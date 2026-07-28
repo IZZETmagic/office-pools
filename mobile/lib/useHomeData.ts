@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
 import { supabase } from './supabase';
+import { fetchHomeScoring, type EntryScoringSummary } from './api';
 
 // How long the home data is considered "fresh" before a focus-driven check
 // will actually refetch. Tab switches inside this window show the cached
@@ -429,14 +430,24 @@ export function useHomeDataInternal() {
           string,
           { totalCompleted: number; exactCount: number; correctCount: number }
         > = {};
+        // Longest current point-scoring run across the user's entries. Derived
+        // from the same API response as form and accuracy — it used to need a
+        // second full read of match_scores.
+        let bestStreakFromApi = 0;
+        // Points and rank per entry, resolved server-side to whichever engine
+        // the pool's leaderboard reads. Overlaid onto the PostgREST rows below
+        // so the home card cannot disagree with the pool it links to.
+        const scoringByEntry: Record<string, EntryScoringSummary> = {};
         if (allEntryIdsForPreds.length > 0) {
-          const [{ data: predRows }, { data: scoreFormRows }, bracketRes] = await Promise.all([
+          // Form / accuracy / streak come from the API, not PostgREST. Two
+          // reasons: the shadow tables this must follow are RLS deny-all, and
+          // the previous query selected is_exact_score / is_correct_difference
+          // / is_correct_result — columns that do not exist on either table, so
+          // it 400'd on every call and the discarded error left form and
+          // accuracy permanently empty. They are all just `score_type`.
+          const [{ data: predRows }, scoringSummaries, bracketRes] = await Promise.all([
             supabase.from('predictions').select('entry_id').in('entry_id', allEntryIdsForPreds),
-            supabase
-              .from('match_scores')
-              .select('entry_id, is_exact_score, is_correct_difference, is_correct_result, calculated_at')
-              .in('entry_id', allEntryIdsForPreds)
-              .order('calculated_at', { ascending: false }),
+            fetchHomeScoring(userData.user_id).catch(() => [] as EntryScoringSummary[]),
             bracketPickerEntryIds.length > 0
               ? Promise.all([
                   supabase
@@ -464,37 +475,17 @@ export function useHomeDataInternal() {
               }
             }
           }
-          for (const s of (scoreFormRows ?? []) as Array<{
-            entry_id: string;
-            is_exact_score: boolean | null;
-            is_correct_difference: boolean | null;
-            is_correct_result: boolean | null;
-          }>) {
-            // Aggregate every scored match into the entry's accuracy bucket.
-            const agg = accuracyByEntry[s.entry_id] ?? {
-              totalCompleted: 0,
-              exactCount: 0,
-              correctCount: 0,
+          for (const summary of scoringSummaries) {
+            accuracyByEntry[summary.entry_id] = {
+              totalCompleted: summary.total_completed,
+              exactCount: summary.exact_count,
+              correctCount: summary.correct_count,
             };
-            agg.totalCompleted += 1;
-            if (s.is_exact_score) agg.exactCount += 1;
-            if (s.is_exact_score || s.is_correct_difference || s.is_correct_result) {
-              agg.correctCount += 1;
-            }
-            accuracyByEntry[s.entry_id] = agg;
-
-            // Form indicator — last 5 only, ordered newest-first by query.
-            const arr = formByEntry[s.entry_id] ?? [];
-            if (arr.length >= 5) continue;
-            const result: FormResult = s.is_exact_score
-              ? 'exact'
-              : s.is_correct_difference
-                ? 'winner_gd'
-                : s.is_correct_result
-                  ? 'winner'
-                  : 'miss';
-            arr.push(result);
-            formByEntry[s.entry_id] = arr;
+            // The API returns form newest-LAST; the indicator renders
+            // newest-first, same as the old query's ordering.
+            formByEntry[summary.entry_id] = [...summary.form].reverse() as FormResult[];
+            if (summary.streak > bestStreakFromApi) bestStreakFromApi = summary.streak;
+            scoringByEntry[summary.entry_id] = summary;
           }
         }
 
@@ -507,20 +498,29 @@ export function useHomeDataInternal() {
           // best-by-total_points — a legacy column v2 scoring never writes
           // (0 for every entry), which silently degenerated to "first entry
           // returned" and showed an arbitrary entry's numbers.
+          // Ranks the comparison, and the numbers it selects, both come from the
+          // API summary where present — picking the best entry by prod's rank
+          // and then showing shadow's points would describe two different
+          // entries on the same card.
+          const rankOf = (e: { entry_id: string; current_rank: number | null }) =>
+            scoringByEntry[e.entry_id]?.current_rank ?? e.current_rank ?? Number.MAX_SAFE_INTEGER;
+          const pointsOf = (e: { entry_id: string; scored_total_points: number | null }) =>
+            scoringByEntry[e.entry_id]?.scored_total_points ?? e.scored_total_points ?? 0;
           const best =
             entries.length > 0
               ? entries.reduce((a, b) => {
-                  const aRank = a.current_rank ?? Number.MAX_SAFE_INTEGER;
-                  const bRank = b.current_rank ?? Number.MAX_SAFE_INTEGER;
+                  const aRank = rankOf(a);
+                  const bRank = rankOf(b);
                   if (bRank < aRank) return b;
-                  if (bRank === aRank && (b.scored_total_points ?? 0) > (a.scored_total_points ?? 0)) return b;
+                  if (bRank === aRank && pointsOf(b) > pointsOf(a)) return b;
                   return a;
                 })
               : null;
 
-          const matchPoints = best?.match_points ?? 0;
-          const bonusPoints = best?.bonus_points ?? 0;
-          const adjustment = best?.point_adjustment ?? 0;
+          const bestScoring = best ? scoringByEntry[best.entry_id] : undefined;
+          const matchPoints = bestScoring?.match_points ?? best?.match_points ?? 0;
+          const bonusPoints = bestScoring?.bonus_points ?? best?.bonus_points ?? 0;
+          const adjustment = bestScoring?.point_adjustment ?? best?.point_adjustment ?? 0;
           const bestEntryId = best?.entry_id;
 
           return {
@@ -543,7 +543,7 @@ export function useHomeDataInternal() {
             // higher total point count.
             currentRank: (() => {
               const ranks = entries
-                .map((e) => e.current_rank)
+                .map((e) => scoringByEntry[e.entry_id]?.current_rank ?? e.current_rank)
                 .filter((r): r is number => r != null);
               return ranks.length > 0 ? Math.min(...ranks) : null;
             })(),
@@ -620,30 +620,11 @@ export function useHomeDataInternal() {
             return p.currentRank! < best ? p.currentRank : best;
           }, null);
 
-        const allEntryIds = rows.flatMap((r) => (r.pool_entries ?? []).map((e) => e.entry_id));
-        let bestStreak = 0;
-        if (allEntryIds.length > 0) {
-          const { data: scoreRows } = await supabase
-            .from('match_scores')
-            .select('entry_id, points_earned, calculated_at')
-            .in('entry_id', allEntryIds)
-            .order('calculated_at', { ascending: false });
-
-          const byEntry = new Map<string, number[]>();
-          for (const s of (scoreRows ?? []) as Array<{ entry_id: string; points_earned: number | null }>) {
-            const arr = byEntry.get(s.entry_id) ?? [];
-            arr.push(s.points_earned ?? 0);
-            byEntry.set(s.entry_id, arr);
-          }
-          for (const points of byEntry.values()) {
-            let streak = 0;
-            for (const p of points) {
-              if (p > 0) streak += 1;
-              else break;
-            }
-            if (streak > bestStreak) bestStreak = streak;
-          }
-        }
+        // Already computed from the home-scoring response above. This used to
+        // be a second unbounded read of every scored match for every entry,
+        // selecting `points_earned` — a column that does not exist, so it
+        // 400'd and best streak was always 0.
+        const bestStreak = bestStreakFromApi;
 
         const [liveRes, upcomingRes] = await Promise.all([
           supabase

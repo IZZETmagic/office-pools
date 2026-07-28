@@ -325,25 +325,36 @@ export async function readRecentForm(
  * prediction earned and how many points. Used by the Profile page to label a
  * user's predictions across every pool they're in.
  *
- * Four columns, not the 22 in MATCH_SCORE_SHARED_COLS. readMatchScores is the
+ * Five columns, not the 22 in MATCH_SCORE_SHARED_COLS. readMatchScores is the
  * right call when the caller renders a full breakdown; here it would ship ~5x
  * the bytes to render a label. Paginated, so it also fixes the silent
  * PostgREST 1,000-row truncation the previous direct `.in()` query had — a user
  * in enough pools would simply stop seeing older predictions classified.
+ *
+ * Ordered by match_number so callers can derive recent form and streaks from
+ * the same rows without a second query.
  */
+export type MatchScoreClassification = {
+  entry_id: string
+  match_id: string
+  match_number: number
+  score_type: 'exact' | 'winner_gd' | 'winner' | 'miss'
+  total_points: number
+}
+
 export async function readMatchScoreClassification(
   admin: AdminClient,
   entryIds: string[],
   source: ScoringSource,
-): Promise<Array<{ entry_id: string; match_id: string; score_type: string; total_points: number }>> {
+): Promise<MatchScoreClassification[]> {
   if (entryIds.length === 0) return []
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
-  return paginateByEntry(
+  return paginateByEntry<MatchScoreClassification>(
     admin,
     table,
-    'entry_id, match_id, score_type, total_points',
+    'entry_id, match_id, match_number, score_type, total_points',
     entryIds,
-    ['entry_id', 'match_id'],
+    ['entry_id', 'match_number'],
   )
 }
 

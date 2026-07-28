@@ -22,10 +22,9 @@ ever see shadow.
 | Web — Profile (`app/profile/page.tsx`) | `readSource` | ✅ fixed |
 | Web — Activity API (`app/api/users/[user_id]/activity/route.ts`) | `readSource` | ✅ fixed |
 | Web — Admin pool + user routes (`app/api/admin/{pools,users}/[id]`) | `readSource` | ✅ fixed |
-| **RN — Home screen** (`mobile/lib/useHomeData.ts:436,627`) | **direct PostgREST `match_scores`** | ❌ |
+| RN — Home screen (`mobile/lib/useHomeData.ts`) | `/api/users/[user_id]/home-scoring` → `readSource` | ✅ fixed |
 
-**Every web surface now resolves through `readSource`.** Only the RN direct-PostgREST
-hooks remain, and they cannot be fixed in place — see §1a.
+**Every scoring read on web and the RN home screen now resolves through `readSource`.**
 
 **Consequence before the fix:** all 859 bracket_picker members read shadow on the pool
 leaderboard, and prod on the My Pools list and the app home screen. Same member, same score, two
@@ -133,17 +132,67 @@ creates its own `createAdminClient()` for this; the admin pool route already had
 
 ---
 
+## 2d. The RN home screen was not mis-sourced — it was dead
+
+Routing the home screen through an API route turned up something the source audit
+was not looking for. Both of its scoring queries selected columns that **do not exist
+on either `match_scores` or `shadow_match_scores`**:
+
+```
+form / accuracy:  is_exact_score, is_correct_difference, is_correct_result
+streak:           points_earned
+```
+
+Both 400 on every call. Both call sites destructured only `{ data }`, discarding the
+error, so `data` was null and the code fell through to its empty defaults. Net effect,
+for as long as this has been shipped:
+
+- form dots on the home screen — **always empty**
+- accuracy aggregates — **always zero**
+- best streak — **always 0**
+
+The boolean triple was only ever a re-derivation of `score_type`, which does exist and
+already holds exactly `'exact' | 'winner_gd' | 'winner' | 'miss'`. So the fix and the
+re-sourcing are the same change.
+
+Verified against live data: the route's derivation reproduces `readRecentForm` exactly
+on sampled entries, and one sample pulled **1,042 rows** — past PostgREST's 1,000-row
+cap, so the old unbounded `.in()` would have truncated at exactly this scale even had
+it worked.
+
+### Shape, not just source
+
+The route returns **one small object per entry** — form, accuracy counts, streak,
+points, rank — instead of every scored row for every entry the user owns. For a user
+in ten pools that is ~1,000 rows collapsed to ~10 objects on the client leg. The
+server still reads the rows to aggregate them; doing that aggregation in SQL is the
+obvious follow-up, and is where the remaining Supabase egress on this path lives.
+
+### Failure mode if the OTA lands before the web deploy
+
+`fetchHomeScoring` is wrapped in `.catch(() => [])`, so an unreachable route leaves
+form/accuracy/streak empty — identical to today's behaviour — and points and rank fall
+back to the PostgREST `pool_entries` columns. Degraded, not broken, and no worse than
+current. **The mobile half needs an OTA to reach users; Ryan controls that timing.**
+
+---
+
 ## 3. What to do, in order
 
 | # | Change | Why here |
 |---|---|---|
 | ~~1~~ | ~~Route the 5 web bypass surfaces through `readSource`~~ | ✅ **done** — all web surfaces resolve through `readSource` |
-| 2 | **Move the RN home-screen scoring reads behind an API route that uses `readSource`** | The larger half. Do NOT reimplement source resolution in the app. |
+| ~~2~~ | ~~Move the RN home-screen scoring reads behind an API route~~ | ✅ **done** — `/api/users/[user_id]/home-scoring`; needs an OTA to reach users |
 | 3 | **Kill the 30s full-page poll / ship derived consensus** | The actual egress reduction — §2a |
 | 4 | Narrow the remaining web `select('*')` | Real but small; bounded queries already |
 
 Only after 1 and 2 can `prod_scoring_enabled` go false without leaving surfaces reading dead
-columns. **1 is done; 2 is the remaining blocker.**
+columns. **1 and 2 are both done** — the remaining work is item 3 (the 30s poll) and
+the classic-pool cutover, neither of which blocks `prod_scoring_enabled = false`.
+
+Still outstanding on RN: `usePoolEntries` / `usePoolDetail` / `usePredictions` read
+PostgREST directly, but they read predictions and pool metadata, not scoring — they
+are not part of this cutover.
 
 ---
 
