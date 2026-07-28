@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { PoolLiveResponse } from '@/app/api/pools/[pool_id]/live/route'
+import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores } from './liveMerge'
 import { Button } from '@/components/ui/Button'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
@@ -586,6 +587,10 @@ export function PoolDetail({
   // router.refresh(), because those DO change the immutable half.
   // ---------------------------------------------------------------------
   const liveSeq = useRef(0)
+  // Read the latest matches without adding them to applyLive's deps — otherwise
+  // the 30s interval tears down and re-arms on every score change.
+  const matchesRef = useRef(matches)
+  useEffect(() => { matchesRef.current = matches }, [matches])
 
   const applyLive = useCallback(async () => {
     // Guard against out-of-order responses: a slow request that lands after a
@@ -604,74 +609,16 @@ export function PoolDetail({
     }
     if (seq !== liveSeq.current) return
 
-    // A match finished since we loaded. Its scores moved from the live half to
-    // the immutable half, which we can't reconstruct from a delta — so rebuild.
-    setMatches(prevMatches => {
-      const completedLocally = prevMatches.filter(m => m.status === 'completed').length
-      if (data.completed_matches !== completedLocally) {
-        router.refresh()
-        return prevMatches
-      }
-      if (data.matches.length === 0) return prevMatches
-      const byId = new Map(data.matches.map(m => [m.match_id, m]))
-      return prevMatches.map(m => {
-        const live = byId.get(m.match_id)
-        if (!live) return m
-        if (
-          m.status === live.status &&
-          m.home_score_ft === live.home_score_ft &&
-          m.away_score_ft === live.away_score_ft
-        ) return m
-        return {
-          ...m,
-          status: live.status,
-          home_score_ft: live.home_score_ft,
-          away_score_ft: live.away_score_ft,
-        }
-      })
-    })
-
-    // Leaderboard totals and ranks — the part that must never lag.
-    if (data.entries.length > 0) {
-      const byEntry = new Map(data.entries.map(e => [e.entry_id, e]))
-      setMembers(prev => prev.map(member => {
-        if (!member.entries?.length) return member
-        return {
-          ...member,
-          entries: member.entries.map(entry => {
-            const live = byEntry.get(entry.entry_id)
-            if (!live) return entry
-            return {
-              ...entry,
-              match_points: live.match_points,
-              bonus_points: live.bonus_points,
-              point_adjustment: live.point_adjustment,
-              scored_total_points: live.scored_total_points,
-              current_rank: live.current_rank,
-              previous_rank: live.previous_rank,
-            }
-          }),
-        }
-      }))
+    // A match finished since we loaded: its scores moved into the immutable
+    // half, which a delta cannot express. Rebuild instead of merging.
+    if (needsFullRefresh(matchesRef.current, data)) {
+      router.refresh()
+      return
     }
 
-    // Per-match scores for whatever is in play. Keyed by (entry_id, match_id),
-    // and a match goes live exactly once, so this is a plain upsert.
-    if (data.scores.length > 0) {
-      setMatchScores(prev => {
-        const key = (entryId: string, matchId: string) => `${entryId}:${matchId}`
-        const incoming = new Map(data.scores.map(sc => [key(sc.entry_id, sc.match_id), sc]))
-        const merged = prev.map(sc => {
-          const live = incoming.get(key(sc.entry_id, sc.match_id))
-          if (!live) return sc
-          incoming.delete(key(sc.entry_id, sc.match_id))
-          return { ...sc, score_type: live.score_type, total_points: live.total_points }
-        })
-        // Rows for a match scored for the first time since page load.
-        for (const live of incoming.values()) merged.push(live as unknown as MatchScoreData)
-        return merged
-      })
-    }
+    setMatches(prev => mergeMatches(prev, data))
+    setMembers(prev => mergeMembers(prev, data))
+    setMatchScores(prev => mergeMatchScores(prev, data))
   }, [pool.pool_id, router])
 
   // Ref to check PredictionsFlow unsaved state

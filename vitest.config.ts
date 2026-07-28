@@ -11,7 +11,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
-    include: ['lib/**/*.test.ts', 'lib/**/__tests__/**/*.test.ts'],
+    // app/** was added 2026-07-28 for pure logic that lives next to a component
+    // rather than in lib/ — the /live delta merge, whose paths no production
+    // data can reach (every match is completed, so the live half is empty).
+    include: [
+      'lib/**/*.test.ts',
+      'lib/**/__tests__/**/*.test.ts',
+      'app/**/__tests__/**/*.test.ts',
+    ],
     reporters: ['default'],
   },
   resolve: {
