@@ -14,8 +14,15 @@
 //   go through the same server reads). Remove it => instant rollback.
 //
 // Hard rules:
-//   - bracket_picker pools have NO shadow arm -> always 'prod', regardless of
-//     the flag (a stray id can never break them).
+//   - RETIRED 2026-07-27: "bracket_picker always reads prod". It had no shadow
+//     arm; it now does (migrations 034-036). Shadow matches prod exactly on
+//     bp bonus rows (58,604, incl. byte-identical descriptions) and on totals
+//     (859/859), so the mode no longer needs special-casing and honours the
+//     flag like any other. `predictionMode` is kept on the signature for
+//     callers and future mode-specific rules.
+//     NOTE bracket_picker legitimately has ZERO shadow_match_scores — its
+//     scoring is entirely bonus-based — so readMatchScores returning nothing
+//     for a bp pool is correct, matching prod.
 //   - In 'prod' mode the readers select the exact same columns from the exact
 //     same tables as before, so behaviour is byte-identical while the flag is
 //     off. Only 'shadow' mode maps column names / synthesises keys.
@@ -62,13 +69,13 @@ export async function getShadowReadPools(admin: AdminClient): Promise<Set<string
   return new Set(list.filter((x): x is string => typeof x === 'string'))
 }
 
-// Resolve the source for one pool. bracket_picker is always prod (no shadow arm).
+// Resolve the source for one pool. Every mode now honours the flag — see the
+// header note on the retired bracket_picker hard rule.
 export async function getScoringSource(
   admin: AdminClient,
   poolId: string,
-  predictionMode: string,
+  _predictionMode: string,
 ): Promise<ScoringSource> {
-  if (predictionMode === 'bracket_picker') return 'prod'
   const pools = await getShadowReadPools(admin)
   return pools.has(poolId) ? 'shadow' : 'prod'
 }
