@@ -121,14 +121,13 @@ export function LeaderboardTab({
     return map
   }, [bonusScores])
 
-  // Read stored match points per entry from match_scores
-  const storedMatchPointsMap = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const [entryId, scores] of matchScoresByEntry) {
-      map.set(entryId, scores.reduce((sum, s) => sum + s.total_points, 0))
-    }
-    return map
-  }, [matchScoresByEntry])
+  // NOTE: there used to be a `storedMatchPointsMap` here that summed every entry's
+  // match_scores rows client-side to derive its match points. It was only ever a
+  // FALLBACK behind `entry.match_points`, which the shadow engine (or pool_entries
+  // on prod) already stores precomputed — and the fallback was provably dead:
+  // across all 4,982 entries, 673 have a null match_points and NOT ONE of them has
+  // a single match_scores row, so the sum could only ever return 0. It cost 8,477 kB
+  // of payload on every pool open to compute nothing. Removed 2026-07-28.
 
   // Compute bracket picker scores client-side (bracket picker has different scoring model)
   const computedBPBonusMap = useMemo(() => {
@@ -452,7 +451,7 @@ export function LeaderboardTab({
     }
 
     // Read from stored pool_entries values
-    const matchPts = entry?.match_points ?? storedMatchPointsMap.get(entryId) ?? 0
+    const matchPts = entry?.match_points ?? 0
     const bonusPts = entry?.bonus_points ?? 0
 
     return {
@@ -479,7 +478,7 @@ export function LeaderboardTab({
       const bScore = getPlayerScore(b.entry_id).total_points
       return bScore - aScore
     })
-  }, [leaderboardEntries, storedMatchPointsMap, computedBPBonusMap, bonusScores, predictionMode])
+  }, [leaderboardEntries, computedBPBonusMap, bonusScores, predictionMode])
 
   // =============================================
   // PER-ENTRY STATS (XP, streaks, form, hit rate)
@@ -524,7 +523,7 @@ export function LeaderboardTab({
 
     for (const entry of sorted) {
       const entryPreds = predsByEntry.get(entry.entry_id) || []
-      const mPts = entry.match_points ?? storedMatchPointsMap.get(entry.entry_id) ?? 0
+      const mPts = entry.match_points ?? 0
       const bPts = entry.bonus_points ?? 0
 
       // Get this entry's match scores from DB (sorted by match_number for form display)
@@ -609,7 +608,7 @@ export function LeaderboardTab({
     }
 
     return map
-  }, [sorted, allPredictions, matches, teams, conductData, members, isBracketPicker, storedMatchPointsMap, matchScoresByEntry])
+  }, [sorted, allPredictions, matches, teams, conductData, members, isBracketPicker, matchScoresByEntry])
 
   // =============================================
   // MATCHDAY MVP
@@ -753,7 +752,7 @@ export function LeaderboardTab({
     }
 
     return { ptsBehind, personAboveName, ptsAhead, personBelowName }
-  }, [sorted, currentUserId, storedMatchPointsMap, bonusScores])
+  }, [sorted, currentUserId, bonusScores])
 
   // =============================================
   // POOL SUPERLATIVES
