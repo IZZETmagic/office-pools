@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import {
-  getShadowReadPools,
-  readEntryScoring,
-  readMatchScoreClassification,
-  type MatchScoreClassification,
-} from '@/lib/scoring/readSource'
+import { getShadowReadPools, readEntryScoring } from '@/lib/scoring/readSource'
 
 // GET /api/users/:user_id/home-scoring
 //
@@ -24,8 +19,21 @@ import {
 // It also returns DERIVED aggregates rather than rows. The hook it replaces
 // pulled every scored match for every entry the user owns — thousands of rows
 // — to produce a handful of small numbers. This returns one object per entry.
+//
+// The counting itself happens in Postgres (`entry_match_score_summary`, migration
+// 037) rather than here, so those rows never leave the database at all: 287,098
+// rows across all users collapses to 4,982, one per entry.
 
 type FormResult = 'exact' | 'winner_gd' | 'winner' | 'miss'
+
+type SummaryRow = {
+  entry_id: string
+  total_completed: number
+  exact_count: number
+  correct_count: number
+  streak: number
+  form: FormResult[] | null
+}
 
 export type EntryScoringSummary = {
   entry_id: string
@@ -44,36 +52,44 @@ export type EntryScoringSummary = {
   current_rank: number | null
 }
 
-function summarise(entryId: string, rows: MatchScoreClassification[]): EntryScoringSummary {
-  // paginateByEntry orders by match_number ascending, so the tail is newest.
-  const ordered = [...rows].sort((a, b) => a.match_number - b.match_number)
-
-  let exact = 0
-  let correct = 0
-  for (const r of ordered) {
-    if (r.score_type === 'exact') exact++
-    if (r.score_type !== 'miss') correct++
-  }
-
-  let streak = 0
-  for (let i = ordered.length - 1; i >= 0; i--) {
-    if ((ordered[i].total_points ?? 0) > 0) streak++
-    else break
-  }
-
+/** An entry with no scored matches — bracket_picker entries are always this. */
+function emptySummary(entryId: string): EntryScoringSummary {
   return {
     entry_id: entryId,
-    form: ordered.slice(-5).map((r) => r.score_type),
-    total_completed: ordered.length,
-    exact_count: exact,
-    correct_count: correct,
-    streak,
+    form: [],
+    total_completed: 0,
+    exact_count: 0,
+    correct_count: 0,
+    streak: 0,
     match_points: 0,
     bonus_points: 0,
     point_adjustment: 0,
     scored_total_points: 0,
     current_rank: null,
   }
+}
+
+/**
+ * Aggregates come back already computed — see migration 037 for the counting,
+ * the streak rule and the ordering guarantee (form is newest-LAST).
+ *
+ * The RPC returns at most one row per requested entry, so unlike a raw
+ * match_scores read this can never approach PostgREST's 1,000-row response cap.
+ */
+async function fetchSummaries(
+  admin: ReturnType<typeof createAdminClient>,
+  entryIds: string[],
+  source: 'shadow' | 'prod',
+): Promise<SummaryRow[]> {
+  if (entryIds.length === 0) return []
+  const { data, error } = await admin.rpc('entry_match_score_summary', {
+    p_entry_ids: entryIds,
+    p_source: source,
+  })
+  // Surfaced, not swallowed: a discarded error here is exactly how this screen's
+  // form and accuracy silently rendered empty for everyone before this route.
+  if (error) throw new Error(`entry_match_score_summary(${source}): ${error.message}`)
+  return (data ?? []) as SummaryRow[]
 }
 
 async function handleGET(
@@ -121,39 +137,44 @@ async function handleGET(
     return NextResponse.json({ entries: [] })
   }
 
-  // Both reads are paginated. The accuracy counts describe EVERY scored match,
-  // so a bounded read would silently under-report once a user's rows crossed
-  // PostgREST's 1,000-row cap — which the previous client-side query did.
-  const [shadowRows, prodRows, shadowTotals, prodTotals] = await Promise.all([
-    readMatchScoreClassification(admin, shadowIds, 'shadow'),
-    readMatchScoreClassification(admin, prodIds, 'prod'),
+  const [shadowSummaries, prodSummaries, shadowTotals, prodTotals] = await Promise.all([
+    fetchSummaries(admin, shadowIds, 'shadow'),
+    fetchSummaries(admin, prodIds, 'prod'),
     readEntryScoring(admin, shadowIds, 'shadow'),
     readEntryScoring(admin, prodIds, 'prod'),
   ])
 
-  const byEntry = new Map<string, MatchScoreClassification[]>()
-  for (const id of allIds) byEntry.set(id, [])
-  for (const r of [...shadowRows, ...prodRows]) {
-    byEntry.get(r.entry_id)?.push(r)
+  // Seed every requested entry, then overlay. The RPC omits entries with no
+  // scored matches rather than returning zero rows, so the seed is what makes a
+  // missing row and an all-zero row mean the same thing.
+  const byEntry = new Map<string, EntryScoringSummary>()
+  for (const id of allIds) byEntry.set(id, emptySummary(id))
+
+  for (const row of [...shadowSummaries, ...prodSummaries]) {
+    const summary = byEntry.get(row.entry_id)
+    if (!summary) continue
+    summary.total_completed = row.total_completed
+    summary.exact_count = row.exact_count
+    summary.correct_count = row.correct_count
+    summary.streak = row.streak
+    summary.form = row.form ?? []
   }
 
-  const entries = [...byEntry.entries()].map(([id, rs]) => {
-    const summary = summarise(id, rs)
-    // Points and rank must follow the same source as the pool's leaderboard, or
-    // the home card and the pool disagree for the same member. Bracket-picker
-    // entries have no match_scores at all, so this is the ONLY scoring data
-    // they carry — the form/accuracy half above is legitimately empty for them.
+  // Points and rank must follow the same source as the pool's leaderboard, or
+  // the home card and the pool disagree for the same member. Bracket-picker
+  // entries have no match_scores at all, so this is the ONLY scoring data they
+  // carry — the form/accuracy half is legitimately empty for them.
+  for (const [id, summary] of byEntry) {
     const totals = shadowTotals.get(id) ?? prodTotals.get(id)
-    if (totals) {
-      summary.match_points = totals.match_points
-      summary.bonus_points = totals.bonus_points
-      summary.point_adjustment = totals.point_adjustment
-      summary.scored_total_points = totals.scored_total_points
-      summary.current_rank = totals.current_rank
-    }
-    return summary
-  })
-  return NextResponse.json({ entries })
+    if (!totals) continue
+    summary.match_points = totals.match_points
+    summary.bonus_points = totals.bonus_points
+    summary.point_adjustment = totals.point_adjustment
+    summary.scored_total_points = totals.scored_total_points
+    summary.current_rank = totals.current_rank
+  }
+
+  return NextResponse.json({ entries: [...byEntry.values()] })
 }
 
 export const GET = withPerfLogging('users/home-scoring', handleGET)

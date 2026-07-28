@@ -163,10 +163,36 @@ it worked.
 ### Shape, not just source
 
 The route returns **one small object per entry** — form, accuracy counts, streak,
-points, rank — instead of every scored row for every entry the user owns. For a user
-in ten pools that is ~1,000 rows collapsed to ~10 objects on the client leg. The
-server still reads the rows to aggregate them; doing that aggregation in SQL is the
-obvious follow-up, and is where the remaining Supabase egress on this path lives.
+points, rank — instead of every scored row for every entry the user owns.
+
+The counting happens in Postgres (`entry_match_score_summary`, migration 037), so
+those rows never leave the database at all. Measured platform-wide, if every user
+loaded their home screen once:
+
+| | Rows leaving the database |
+|---|---|
+| Before | 287,098 |
+| After | 4,982 |
+
+**~58×**, and on a 40-entry sample the RPC returned 11 rows where the Node path pulled
+1,042 (**94.7×**), in less wall-clock time (106 ms vs 170 ms).
+
+Parity is exact: zero field-level mismatches across the sample — counts, streak and
+form arrays all identical to the Node derivation it replaces. The function is
+`SECURITY INVOKER` with EXECUTE granted to `service_role` only, so it cannot become a
+route around shadow's deny-all RLS. `EXPLAIN` confirms the unused source table is
+pruned from the plan entirely rather than merely filtered.
+
+### On the 1,000-row cap — a correction
+
+An earlier draft of this audit implied Profile's unpaginated read was actively
+truncating. It was not. The worst-affected real user has **520** scored rows and
+**no user currently exceeds 1,000** — the 1,042-row figure came from a test set that
+deliberately unioned sampled entries, not from anyone's account.
+
+The pagination is still right to have, and becomes load-bearing as soon as a second
+competition lands: a Premier League season is 380 matches, so three PL pools puts a
+user past the cap. But it was a latent risk, not a live one.
 
 ### Failure mode if the OTA lands before the web deploy
 
