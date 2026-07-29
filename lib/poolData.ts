@@ -46,6 +46,29 @@ export const POOL_CACHE_TTL_SECONDS = 45
 export const PREDICTION_COLUMNS =
   'prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id'
 
+// The exact columns behind `MatchData` — nothing more. `matches` has 30 columns;
+// the type declares 23, so `*` was dragging created_at, updated_at,
+// external_match_id, data_source, last_synced_at, result_pushes_sent_at and
+// live_added over the wire for every fixture. Verified zero reads of those in the
+// web UI before narrowing. 100 kB -> 72 kB on a 104-match tournament.
+export const MATCH_COLUMNS =
+  'match_id, tournament_id, match_number, stage, group_letter, home_team_id, away_team_id, ' +
+  'home_team_placeholder, away_team_placeholder, match_date, venue, status, ' +
+  'home_score_ft, away_score_ft, home_score_pso, away_score_pso, winner_team_id, ' +
+  'is_completed, completed_at, status_detail, original_match_date, live_minute, live_period'
+
+// The exact columns behind `MemberData` — nothing more. `pool_members` has 10;
+// the type declares 6. The four dropped (payment_method, payment_notes,
+// has_seen_how_to_play, last_read_at) are read ELSEWHERE from their own queries —
+// has_seen_how_to_play from page.tsx's membership lookup, last_read_at from
+// hooks/useUnreadBanter — never off this array. 66 kB -> 44 kB on 192 members.
+//
+// `pool_entries(*)` stays wide on purpose: EntryData declares all 21 columns the
+// table has, and every one is read somewhere in the web app. Narrowing it would
+// mean changing the type, and a narrowed SELECT under a wide type hands consumers
+// `undefined` silently.
+export const POOL_MEMBER_COLUMNS = 'member_id, pool_id, user_id, role, joined_at, entry_fee_paid'
+
 // Single source of truth for a pool's cache tag — used both when caching
 // (getPoolDataCached) and when invalidating (invalidatePoolCache), so the two
 // can never drift apart.
@@ -152,7 +175,7 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     admin.from('pools').select('*').eq('pool_id', poolId).single(),
     admin
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
+      .select(`${POOL_MEMBER_COLUMNS}, users!inner(user_id, username, full_name, email), pool_entries(*)`)
       .eq('pool_id', poolId),
     admin.from('pool_settings').select('*').eq('pool_id', poolId).single(),
     admin
@@ -176,7 +199,7 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   const { data: matchesRaw } = await admin
     .from('matches')
     .select(
-      `*, home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)`,
+      `${MATCH_COLUMNS}, home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)`,
     )
     .eq('tournament_id', pool.tournament_id)
     .order('match_number', { ascending: true })
