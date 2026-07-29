@@ -543,6 +543,66 @@ competition is the shared object — which is only true once **P4** exists, and 
 
 ---
 
+## 🧮 Scoring engines — the register, and the rule they all follow
+
+> **Added 2026-07-29 on Ryan's instruction.** Two things live here: the RULE that
+> settles how scoring works from now on, and a REGISTER of the engines that
+> implement it. There is more than one engine already and there will be more —
+> the league engine is next — so what each one is FOR has to be written down
+> rather than inferred from the code.
+
+### The rule — settled 2026-07-29
+
+**The backend computes every score and every derived statistic ONCE, when
+something changes, and writes the answer down. Every front end — web and
+mobile — reads those rows and renders them. Clients compute nothing.**
+
+This is not a performance preference; it is the architecture. It was arrived at
+the hard way: the leaderboard shipped 26,770 rows to every viewer so each browser
+could re-derive ten numbers per entry that the scoring path had already worked
+out. Consequences that follow from the rule, and are not up for re-litigation per
+surface:
+
+- **A number a member sees must exist as a stored value**, not as something a
+  screen worked out. If a screen needs a number, the question is "where is it
+  stored", not "how do I compute it here".
+- **An aggregate over a pool is computed in SQL**, not by shipping the raw rows
+  and reducing them in JavaScript. See migrations 038/039 for the shape.
+- **The same stored value feeds web and mobile.** Two surfaces deriving the same
+  number independently is how they came to disagree about levels
+  (fixed 2026-07-29) — the bug is structural, not a slip.
+- **Live updates are pushed, not polled.** One broadcast per pool per scoring
+  pass, carrying the changed rows.
+
+### The register
+
+| Engine | What it does | What it is FOR | State |
+|---|---|---|---|
+| **Node "prod" engine** — `lib/scoring/core.ts`, `lib/scoring/recalculate.ts` | Pull-Compute-Push: reads a pool's rows into Node, scores in JS, writes back | The original engine. Now a running safety net behind `prod_scoring_enabled` | ✅ live, still enabled. Retires only after the parity alarm is clean across a full cycle AND podium ownership moves into SQL |
+| **Shadow engine** — `shadow_*` SQL functions + `shadow_*` tables | Set-based, DB-native scoring: `shadow_score_match`, `shadow_finalize_totals`, rank snapshot, reconcilers (jobid 19/20), diff alarm (jobid 21) | Replacing the Node engine. Covers full_tournament, progressive and bracket_picker | ✅ live and is the READ SOURCE for **all 623 pools** since 2026-07-29 |
+| **Analytics / XP writer** — `lib/analytics/entryAnalytics.ts`, called by `lib/push/badges.ts` | Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into `entry_xp_state` | The per-entry statistics every surface reads instead of deriving | ✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips `dark_horse` |
+| **Per-match aggregates** — migrations 038/039, `pool_match_prediction_accuracy()` | Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline | Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section | ✅ live. Takes `p_submitted_only` because its two callers count different populations |
+| **Podium** — `lib/podium.ts` | Derives the actual and predicted tournament podium | Champion / runner-up / third bonuses | ✅ live in Node. **Must move to SQL before the Node engine can retire** |
+| **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser — the last real violation of the rule above |
+| **League engine** | — | Premier League and other league competitions | 🔵 **NOT BUILT — next.** ⚠️ A league pool currently scores **ZERO silently**: the group/knockout binary is baked into the scoring price lookup, not just the gate. See *League ingestion* |
+
+### Why the register exists
+
+The engines are not variations on one thing. They disagree about what a "point"
+is, which competitions they understand, and which of them owns a given number.
+Two concrete cases already cost real time:
+
+- `point_adjustment` reached shadow for every mode **except** bracket_picker,
+  because a guard written when bracket_picker was out of scope was never
+  revisited. One member's 223 points silently vanished (fixed 2026-07-29).
+- XP had **two** writers with different formulas racing on one column; the level
+  shown depended on which ran last (fixed 2026-07-26).
+
+Both were "which engine owns this?" questions that nothing wrote down. Adding an
+engine without adding its row here is how the next one happens.
+
+---
+
 ## ✅ Recently shipped
 
 > Completed and deployed to production. Kept here for visibility, then pruned once it's old news.
