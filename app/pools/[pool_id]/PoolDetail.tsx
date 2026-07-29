@@ -47,6 +47,7 @@ import type {
   MatchScoreNarrow,
   EntryStatsData,
   MatchdayMVPData,
+  MatchAccuracyData,
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
@@ -132,6 +133,7 @@ type PoolDetailProps = {
   bonusScores: BonusScoreData[]
   entryStats: EntryStatsData[]
   matchdayMVP: MatchdayMVPData | null
+  matchAccuracy: MatchAccuracyData[]
   memberId: string | null
   currentUserId: string
   isAdmin: boolean
@@ -173,6 +175,7 @@ export function PoolDetail({
   bonusScores,
   entryStats: initialEntryStats,
   matchdayMVP,
+  matchAccuracy,
   memberId,
   currentUserId,
   isAdmin,
@@ -1904,6 +1907,7 @@ export function PoolDetail({
                 teams={teams}
                 allPredictions={allPredictions}
                 entryStats={entryStats}
+                matchAccuracy={matchAccuracy}
                 userEntries={userEntries}
                 settings={settings!}
                 conductData={conductData}

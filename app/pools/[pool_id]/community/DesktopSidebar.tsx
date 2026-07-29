@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
-import type { MemberData, MatchData, PredictionData } from '../types'
+import type { MemberData, MatchData, MatchAccuracyData } from '../types'
 import type { MemberWithLevel, SystemEvent } from './types'
 import { getInitials, getLevelPillClasses, getRankTitle, formatMessageTime } from './helpers'
 import { LocalTime } from '@/components/LocalTime'
@@ -33,7 +33,7 @@ type DesktopSidebarProps = {
   memberLevels: Map<string, MemberWithLevel>
   currentUserId: string
   matches: MatchData[]
-  allPredictions: PredictionData[]
+  matchAccuracy: MatchAccuracyData[]
   onlineUsers: OnlineUser[]
   poolId: string
   systemEvents: SystemEvent[]
@@ -268,13 +268,18 @@ function OnlineMembersSection({
 // =====================
 function MatchdayPulseSection({
   matches,
-  allPredictions,
-  members,
+  matchAccuracy,
 }: {
   matches: MatchData[]
-  allPredictions: PredictionData[]
-  members: MemberData[]
+  matchAccuracy: MatchAccuracyData[]
 }) {
+  // Counted in the database (migration 038). This used to filter the pool-wide
+  // predictions array — 13,385 rows in the browser to produce three percentages.
+  const accuracyByMatch = useMemo(
+    () => new Map(matchAccuracy.map(a => [a.match_id, a])),
+    [matchAccuracy],
+  )
+
   const completedMatches = useMemo(() =>
     matches
       .filter(m => m.is_completed && m.home_score_ft !== null)
@@ -291,9 +296,6 @@ function MatchdayPulseSection({
     [matches]
   )
 
-  // Compute accuracy per match
-  const totalMembers = members.length
-
   return (
     <Card className="!p-3">
       <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Matchday Pulse</h4>
@@ -303,16 +305,11 @@ function MatchdayPulseSection({
         const homeName = match.home_team?.country_code ?? '???'
         const awayName = match.away_team?.country_code ?? '???'
 
-        // Count correct predictions
-        const predsForMatch = allPredictions.filter(p => p.match_id === match.match_id)
-        const correctCount = predsForMatch.filter(p => {
-          const predictedWinner = p.predicted_home_score > p.predicted_away_score ? 'home'
-            : p.predicted_away_score > p.predicted_home_score ? 'away' : 'draw'
-          const actualWinner = match.home_score_ft! > match.away_score_ft! ? 'home'
-            : match.away_score_ft! > match.home_score_ft! ? 'away' : 'draw'
-          return predictedWinner === actualWinner
-        }).length
-        const pct = predsForMatch.length > 0 ? Math.round((correctCount / predsForMatch.length) * 100) : 0
+        // Precomputed: same winner-vs-winner rule, evaluated in SQL.
+        const acc = accuracyByMatch.get(match.match_id)
+        const pickedCount = acc?.total ?? 0
+        const correctCount = acc?.correct ?? 0
+        const pct = pickedCount > 0 ? Math.round((correctCount / pickedCount) * 100) : 0
 
         return (
           <div key={match.match_id} className="mb-2 last:mb-0">
@@ -333,7 +330,7 @@ function MatchdayPulseSection({
                 />
               </div>
               <span className="text-[9px] text-neutral-400 tabular-nums w-16 text-right">
-                {correctCount}/{predsForMatch.length} · {pct}%
+                {correctCount}/{pickedCount} · {pct}%
               </span>
             </div>
           </div>
@@ -487,7 +484,7 @@ export function DesktopSidebar({
   memberLevels,
   currentUserId,
   matches,
-  allPredictions,
+  matchAccuracy,
   onlineUsers,
   poolId,
   systemEvents,
@@ -507,8 +504,7 @@ export function DesktopSidebar({
       />
       <MatchdayPulseSection
         matches={matches}
-        allPredictions={allPredictions}
-        members={members}
+        matchAccuracy={matchAccuracy}
       />
       <LeaderboardSnapshotSection
         members={members}

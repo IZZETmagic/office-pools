@@ -59,6 +59,7 @@ export function CommunityTab({
   teams,
   allPredictions,
   entryStats,
+  matchAccuracy,
   userEntries,
   settings,
   conductData,
@@ -1269,7 +1270,7 @@ export function CommunityTab({
               memberLevels={memberLevels}
               currentUserId={currentUserId}
               matches={matches}
-              allPredictions={allPredictions}
+              matchAccuracy={matchAccuracy}
               onlineUsers={onlineUsers}
               poolId={poolId}
               systemEvents={systemEvents}

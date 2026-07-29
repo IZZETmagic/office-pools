@@ -698,7 +698,11 @@ competition is the shared object — which is only true once **P4** exists, and 
 > Stop asking for data we don't use → stop asking repeatedly for unchanged data → stop recomputing
 > what we already computed → *then* cache what's left.
 >
-> ⚠️ **Everything below is local and uncommitted.** Nothing is pushed, deployed, or applied to prod.
+> ⚠️ **Was:** *"Everything below is local and uncommitted."* **No longer true as of 2026-07-29** —
+> steps 2, 3 and most of 7 are on `origin/master` (`db508ce`, `37ed969`, `4b3063a`), and the
+> database-side changes (migrations 026/038, the analytics backfill, the C1 fix, the shadow read
+> widening to all 623 pools, the leaderboard broadcast trigger) were applied directly to prod and
+> did not need a deploy. Steps 1, 4, 5, 6 and the new 8 remain untouched.
 
 ### Measured baseline `Infra` — 2026-07-26
 - **Where DB time goes** *(pg_stat_statements on `ujthamlehjyubbzxbnes`, cumulative since an unknown counter reset — **prod-sourced, unverifiable from this repo**)*: 337.5 total DB-hours. `SELECT predictions.*` **111.3h / 33.0% / 30.0M calls** · realtime WAL decoding 80.9h / 24.0% · `row_to_json(pool_members)` 34.5h / 10.2% at **404–450ms mean** (slowest by mean) · `match_scores` 31.0h / 9.2%. **Top four = 76.4%.**
@@ -719,12 +723,13 @@ competition is the shared object — which is only true once **P4** exists, and 
 | # | Step | State |
 |---|---|---|
 | 1 | **Mobile client cache (react-query)** | Not started. Mobile has **no** client cache at all — hand-rolled `useState`/`useEffect`, six surfaces refetching on `useFocusEffect`, so every tab switch re-runs a full load including the uncached leaderboard route. Largest untapped mobile win; needs no server change |
-| 2 | **Fix the 30s full-page poll** | Not started. `app/pools/[pool_id]/PoolDetail.tsx:666` — `setInterval(() => router.refresh(), 30000)` on a `force-dynamic` page re-runs the *entire* server component every 30s per open tab, on 4 tabs, regardless of visibility, and is redundant with the Realtime subscription directly above it. Most likely explanation for `row_to_json(pool_members)` at 8.6M calls |
-| 3 | **Shrink the pool payload below 2 MB** | Not started — **and it is a hard prerequisite, not a nice-to-have.** At 3,854 kB the largest pool's `getPoolData` **cannot be stored in Vercel Runtime Cache at all** (2 MB per-item limit). Direction: ship *derived* crowd consensus (~100 rows) instead of 13,385 raw prediction rows — now possible because `computeCrowdConsensus` is split out |
+| 2 | **Fix the 30s full-page poll** | ✅ **Shipped 2026-07-29** (`db508ce`). The poll no longer refreshes the page — it calls the `/live` delta, and the interval is now adaptive: 30s while a match is live, 5 min otherwise. ~198 MB/hour of "nothing changed" removed for 50 concurrent viewers |
+| 3 | **Shrink the pool payload below 2 MB** | ✅ **Shipped 2026-07-29** (`db508ce`). **7,721 kB → 457 kB** measured on the 192-entry pool, now well inside the 2 MB cache limit. Note the 3,854 kB figure quoted here was the ON-DISK size; the wire size was 12,683 kB before the column narrowing. Both pool-wide arrays left pool open: the leaderboard reads precomputed rows, the remaining consumers fetch per tab behind `/api/pools/:id/bulk` |
 | 4 | **Tagged SWR cache on the mobile API routes** | Not started. 30s staleness budget (decided). Replaces today's `expire: 0` invalidate-on-every-score, which hard-expires every affected pool at exactly the moment traffic peaks |
 | 5 | **`s-maxage` + SWR on `/play/*`, `/tv/*`** | Not started. The only CDN change recommended |
 | 6 | **React `cache()` request-scoped dedup** | Not started. Free; removes repeat `isPoolCacheEnabled()` / `requireAuth()` / `getScoringSource()` lookups. Mobile separately re-resolves `auth_user_id → user_id` in **11 files** for a value that is constant for the session |
-| 7 | **Flip analytics reads to `entry_xp_state`** | 🔒 **Blocked by R13** — parity failed. Was step 1 of the strategy; it is now last because the correction has to ship and be re-seeded first |
+| 7 | **Flip analytics reads to `entry_xp_state`** | 🟡 **Unblocked and half done, 2026-07-29.** R13 cleared: migration 026 applied, all 623 pools backfilled (697 levels up, 0 down), parity **clean** 331/331. The **leaderboard** now reads the stored row. Form and Banter still compute live — they show the XP *breakdown* and derive badge objects — but both now pass the ratchet floor so every surface agrees on a member's level (`4b3063a`). Remaining: their badge lists would need a parity check before reading `earned_badge_ids` |
+| 8 | **Mobile: switch off per-row CDC to the leaderboard broadcast** | 🔴 **Not started — the web half is already live and mobile is the only consumer left.** `mobile/lib/usePoolEntries.ts:119` still subscribes to `postgres_changes` on `pool_entries`, which emits **one event per row** — 192 events per scoring pass on the largest pool, fanned out per subscriber, billed per recipient (~9,600 messages for one goal at 50 viewers, vs 51 for the broadcast). The DB side needs nothing: the trigger, the private `pool:{id}:leaderboard` topic and the RLS policy all shipped 2026-07-29. This is a client change plus an OTA. **`pool_entries` must stay in the `supabase_realtime` publication until this lands** — removing it would silently kill the mobile leaderboard |
 
 - **Effort:** each step is order-of-magnitude ~0.5–2 days; steps 1–3 hold most of the value and need no new infrastructure. **Not a commitment.**
 - **Done when:** the top-four statement share falls materially against a fresh `pg_stat_statements` baseline, mobile stops refetching on every focus, and the pool payload fits a shared cache.

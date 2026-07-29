@@ -352,6 +352,19 @@ export type EntryStatsData = {
   current_streak: { type: 'hot' | 'cold' | 'none'; length: number }
 }
 
+/**
+ * Per-match "how much of the pool called this right", counted in the database.
+ *
+ * Banter's desktop Matchday Pulse panel needs three of these. It used to derive
+ * them by filtering the pool-wide predictions array — 13,385 rows to produce
+ * three percentages. Migration 038 does the counting in SQL instead.
+ */
+export type MatchAccuracyData = {
+  match_id: string
+  total: number
+  correct: number
+}
+
 /** Best single-match haul on the most recently completed match. Computed
  *  server-side (one match's score rows) rather than by scanning the pool-wide
  *  array in the browser. */

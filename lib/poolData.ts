@@ -35,6 +35,7 @@ import type {
   PodiumResult,
   EntryStatsData,
   MatchdayMVPData,
+  MatchAccuracyData,
 } from '@/app/pools/[pool_id]/types'
 
 export const POOL_CACHE_TTL_SECONDS = 45
@@ -100,6 +101,10 @@ export type PoolSharedData = {
   entryStats: EntryStatsData[]
   // Best haul on the most recently completed match, or null before any is played.
   matchdayMVP: MatchdayMVPData | null
+  // One row per completed match: how many of the pool picked it, how many were
+  // right. Counted in SQL (migration 038) so Banter's Matchday Pulse no longer
+  // needs every prediction in the pool to show three percentages.
+  matchAccuracy: MatchAccuracyData[]
 }
 // NOTE: the bracket_picker all-entries data (allBP*) is intentionally NOT here.
 // Its RLS makes it per-VIEWER (a non-admin member can only read their own
@@ -163,7 +168,7 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     return {
       pool: null, members: [], matches: [], settings: null, teams: [],
       conductData: [], bonusScores: [], bpProvisionalScoring: false,
-      tournamentAwards: null, entryStats: [], matchdayMVP: null,
+      tournamentAwards: null, entryStats: [], matchdayMVP: null, matchAccuracy: [],
     }
   }
 
@@ -294,6 +299,13 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     }
   }
 
+  // Per-match pool accuracy — counted in the database (migration 038). ~104 tiny
+  // rows; the alternative was every prediction in the pool, in the browser.
+  const { data: accuracyRows } = await admin.rpc('pool_match_prediction_accuracy', {
+    p_pool_id: poolId,
+  })
+  const matchAccuracy = (accuracyRows ?? []) as MatchAccuracyData[]
+
   // (Bracket all-entries data is fetched per-viewer in page.tsx — see note on
   // PoolSharedData above. It is per-VIEWER, not shared, so it is not cached.)
 
@@ -331,6 +343,7 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   return {
     pool, members, matches, settings, teams, conductData,
     bonusScores, bpProvisionalScoring, tournamentAwards, entryStats, matchdayMVP,
+    matchAccuracy,
   }
 }
 

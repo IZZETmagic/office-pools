@@ -1,4 +1,4 @@
-import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from '../types'
+import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData, MatchAccuracyData } from '../types'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -158,6 +158,8 @@ export type CommunityTabProps = {
    *  level pill beside a name must be floored the same way the leaderboard and
    *  mobile floor it, or the same person shows two different levels at once. */
   entryStats: EntryStatsData[]
+  /** Per-match pool accuracy for the Matchday Pulse panel, counted in SQL. */
+  matchAccuracy: MatchAccuracyData[]
   userEntries: EntryData[]
   settings: SettingsData
   conductData: MatchConductData[]
