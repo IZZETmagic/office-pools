@@ -6,11 +6,9 @@ import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
 import { withPerfLogging } from '@/lib/api-perf'
-import { matchScoresToPredictionResults, computeStreaks, computeCrowdConsensus, applyCrowdOverlay } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
-import type { PredictionResult } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
-import { computeFullXPBreakdown, computeLevel } from '@/app/pools/[pool_id]/analytics/xpSystem'
-import type { MatchData, PredictionData, MemberData } from '@/app/pools/[pool_id]/types'
-import { getScoringSource, readEntryScoring, readMatchScores } from '@/lib/scoring/readSource'
+import { getScoringSource, readEntryScoring, readMatchScoresNarrow } from '@/lib/scoring/readSource'
+import { readEntryStats } from '@/lib/poolData'
+import { getLevelName } from '@/lib/levelNames'
 import { fetchMatchConductForTournament } from '@/lib/matchConduct'
 
 // =============================================================
@@ -138,29 +136,10 @@ async function handleGET(
       match_points: 0, bonus_points: 0, point_adjustment: 0,
       scored_total_points: 0, current_rank: null as number | null, previous_rank: null as number | null,
     }
-  const allPredictions: any[] = []
-  {
-    const pageSize = 1000
-    let offset = 0
-    let hasMore = true
-    while (hasMore) {
-      const { data: page } = await adminClient
-        .from('predictions')
-        .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-        .in('entry_id', entryIds)
-        .order('entry_id', { ascending: true })
-        .order('match_id', { ascending: true })
-        .range(offset, offset + pageSize - 1)
-
-      if (!page || page.length === 0) {
-        hasMore = false
-      } else {
-        allPredictions.push(...page)
-        offset += page.length
-        if (page.length < pageSize) hasMore = false
-      }
-    }
-  }
+  // NOTE: this route used to page EVERY prediction in the pool here (13,385 rows
+  // on the largest one) and every match_score alongside it, purely to recompute
+  // ten numbers per entry that the scoring path already stores. It reads those
+  // stored rows now. See the analytics block below.
 
   // Normalize data
   const normalizedMatches: MatchWithResult[] = matches.map((m: any) => ({
@@ -177,210 +156,65 @@ async function handleGET(
     country_code: t.country_code?.trim() || '',
   }))
 
-  // Group predictions by entry_id
-  const predictionsByEntry = new Map<string, any[]>()
-  for (const p of allPredictions) {
-    const list = predictionsByEntry.get(p.entry_id) || []
-    list.push(p)
-    predictionsByEntry.set(p.entry_id, list)
-  }
-
   // Build member lookup (member_id → user info)
   const memberMap = new Map<string, any>()
   for (const m of poolMembers) {
     memberMap.set((m as any).member_id, m)
   }
 
-  // Build membersWithEntries in MemberData format for computeCrowdPredictions
-  const membersWithEntries: MemberData[] = poolMembers.map((m: any) => {
-    const memberEntries = entries.filter((e: any) => e.member_id === m.member_id)
-    return {
-      member_id: m.member_id,
-      pool_id,
-      user_id: m.user_id,
-      role: m.role,
-      joined_at: '',
-      entry_fee_paid: false,
-      users: m.users ?? { user_id: m.user_id, username: '', full_name: '', email: '' },
-      entries: memberEntries.map((e: any) => ({
-        entry_id: e.entry_id,
-        member_id: e.member_id,
-        entry_name: e.entry_name,
-        entry_number: e.entry_number,
-        has_submitted_predictions: e.has_submitted_predictions,
-        predictions_submitted_at: null,
-        predictions_locked: false,
-        auto_submitted: false,
-        predictions_last_saved_at: null,
-        // total_points (the DB column) is dead legacy — serve the scored
-        // total here so API consumers reading this field get real points
-        total_points: scoreOf(e.entry_id).scored_total_points,
-        point_adjustment: scoreOf(e.entry_id).point_adjustment,
-        adjustment_reason: null,
-        current_rank: scoreOf(e.entry_id).current_rank,
-        previous_rank: scoreOf(e.entry_id).previous_rank,
-        last_rank_update: null,
-        match_points: scoreOf(e.entry_id).match_points,
-        bonus_points: scoreOf(e.entry_id).bonus_points,
-        scored_total_points: scoreOf(e.entry_id).scored_total_points,
-        created_at: '',
-        fee_paid: e.fee_paid ?? false,
-        fee_paid_at: e.fee_paid_at ?? null,
-      })),
-    }
-  })
+  // The ONLY match_scores this route still needs: one match's rows, to name the
+  // matchday MVP. Previously it read every scored row for every entry.
+  const completedForMvp = normalizedMatches.filter((m) => m.is_completed)
+  const lastCompleted = completedForMvp.length > 0 ? completedForMvp[completedForMvp.length - 1] : null
+  const mvpScores = lastCompleted
+    ? await readMatchScoresNarrow(adminClient, entryIds, source, [lastCompleted.match_id])
+    : []
 
-  // Build allPredictions as PredictionData[] (with prediction_id)
-  const allPredsTyped: PredictionData[] = allPredictions.map((p: any) => ({
-    prediction_id: p.prediction_id || '',
-    entry_id: p.entry_id,
-    match_id: p.match_id,
-    predicted_home_score: p.predicted_home_score,
-    predicted_away_score: p.predicted_away_score,
-    predicted_home_pso: p.predicted_home_pso ?? null,
-    predicted_away_pso: p.predicted_away_pso ?? null,
-    predicted_winner_team_id: p.predicted_winner_team_id ?? null,
-  }))
+  // 5. Assemble each entry's row from stored values.
 
-  // Stored match_scores for all entries (via the read source), grouped by entry.
-  const matchScoresByEntry = new Map<string, any[]>()
-  for (const ms of await readMatchScores(adminClient, entryIds, source)) {
-    const existing = matchScoresByEntry.get(ms.entry_id) || []
-    existing.push(ms)
-    matchScoresByEntry.set(ms.entry_id, existing)
-  }
-
-  // 5. Compute points for each entry
+  // The precomputed analytics row per entry (entry_xp_state), written by the
+  // scoring path on every recalc — form, streak, hit rate, exact count, crowd
+  // stats, XP and the ratcheted level. This replaces recomputing all of it per
+  // request, which is what made this the heaviest read in the product: mobile
+  // calls it on every pool open AND after every scoring broadcast.
   //
-  // The crowd consensus is pool-wide and identical for every entry, so it is
-  // computed ONCE here rather than rebuilt inside the loop below. Previously
-  // each entry re-scanned every prediction in the pool — O(entries x
-  // predictions), ~2.6M iterations per request on the largest pool.
-  const crowdConsensus = computeCrowdConsensus(
-    normalizedMatches as MatchData[],
-    allPredsTyped as PredictionData[],
-    membersWithEntries,
-  )
-
-  // Level high-water marks for the whole pool, in one read (migration 026).
-  // Levels ratchet: a corrected XP formula must never demote someone below a
-  // rank already displayed to them — the same keep-once rule badge_unlocks
-  // applies to badges.
-  const everReachedByEntry = new Map<string, number>()
-  for (let off = 0; off < entryIds.length; off += 500) {
-    const { data: xpRows } = await adminClient
-      .from('entry_xp_state')
-      .select('entry_id, highest_level_reached, current_level')
-      .in('entry_id', entryIds.slice(off, off + 500))
-    for (const r of (xpRows ?? []) as any[]) {
-      everReachedByEntry.set(r.entry_id, Math.max(r.highest_level_reached ?? 1, r.current_level ?? 1))
-    }
-  }
+  // `current_level` is already floored (migration 026), so nothing here needs to
+  // re-apply the ratchet.
+  const statsByEntry = new Map((await readEntryStats(adminClient, entryIds)).map((r) => [r.entry_id, r]))
 
   const leaderboard: LeaderboardEntryResponse[] = []
-  const entryPredResultsMap = new Map<string, PredictionResult[]>()
 
   for (const entry of entries) {
     const member = memberMap.get(entry.member_id)
     if (!member) continue
 
     const userInfo = (member as any).users
-    const predictions = predictionsByEntry.get(entry.entry_id) || []
     const sc = scoreOf(entry.entry_id)
     const adjustment = sc.point_adjustment
+    const stats = statsByEntry.get(entry.entry_id)
 
-    let matchPoints = 0
-    let bonusPoints = 0
+    // An entry with no stored analytics row gets zeros — the same shape this
+    // route has always returned for an entry with no predictions, which is what
+    // bracket_picker entries are (their picks live in bracket_picker_* tables,
+    // not `predictions`). Preserved deliberately rather than "improved": mobile
+    // renders these today and a silent change would move numbers members see.
+    const matchPoints = stats ? sc.match_points : 0
+    const bonusPoints = stats ? sc.bonus_points : 0
 
-    // Analytics fields — defaults
-    let last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[] = []
-    let current_streak: { type: 'hot' | 'cold' | 'none'; length: number } = { type: 'none', length: 0 }
-    let hit_rate = 0
-    let exact_count = 0
-    let level = 1
-    let level_name = 'Rookie'
-    let total_xp = 0
-    let contrarian_wins = 0
-    let crowd_agreement_pct = 0
-    let total_completed = 0
+    const last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[] = stats
+      ? [...(stats.last_five ?? [])]
+      : []
+    while (stats && last_five.length < 5) last_five.unshift('no_pick')
 
-    if (predictions.length > 0) {
-      // Read stored scores (authoritative, computed by the scoring engine)
-      matchPoints = sc.match_points
-      bonusPoints = sc.bonus_points
-
-      // --- Analytics computation ---
-      try {
-        // Build PredictionData[] for this entry
-        const entryPreds: PredictionData[] = predictions.map((p: any) => ({
-          prediction_id: p.prediction_id || '',
-          entry_id: p.entry_id,
-          match_id: p.match_id,
-          predicted_home_score: p.predicted_home_score,
-          predicted_away_score: p.predicted_away_score,
-          predicted_home_pso: p.predicted_home_pso ?? null,
-          predicted_away_pso: p.predicted_away_pso ?? null,
-          predicted_winner_team_id: p.predicted_winner_team_id ?? null,
-        }))
-
-        const entryMatchScores = matchScoresByEntry.get(entry.entry_id) || []
-        const predResults = matchScoresToPredictionResults(entryMatchScores)
-
-        // Store for matchday MVP calculation
-        entryPredResultsMap.set(entry.entry_id, predResults)
-
-        const streaks = computeStreaks(predResults)
-
-        const crowdData = applyCrowdOverlay(crowdConsensus, entryPreds as PredictionData[])
-
-        const xpBreakdown = computeFullXPBreakdown({
-          predictionResults: predResults,
-          matches: normalizedMatches as MatchData[],
-          crowdData,
-          streaks,
-          entryPredictions: entryPreds as PredictionData[],
-          entryRank: sc.current_rank,
-          totalMatches: normalizedMatches.length,
-          // Level ratchet (migration 026) — never display a rank below one this
-          // entry has already been shown.
-          everReachedLevel: everReachedByEntry.get(entry.entry_id),
-        })
-
-        // last_five: take last 5 from predResults, map to type, pad with 'no_pick' if needed
-        const lastFiveResults = predResults.slice(-5)
-        last_five = lastFiveResults.map(r => r.type as 'exact' | 'winner_gd' | 'winner' | 'miss')
-        while (last_five.length < 5) {
-          last_five.unshift('no_pick')
-        }
-
-        // current_streak
-        current_streak = streaks.currentStreak
-
-        // hit_rate: non-miss / total * 100
-        total_completed = predResults.length
-        const nonMiss = predResults.filter(r => r.type !== 'miss').length
-        hit_rate = total_completed > 0 ? (nonMiss / total_completed) * 100 : 0
-
-        // exact_count
-        exact_count = predResults.filter(r => r.type === 'exact').length
-
-        // level and XP
-        level = xpBreakdown.currentLevel.level
-        level_name = xpBreakdown.currentLevel.name
-        total_xp = xpBreakdown.totalXP
-
-        // contrarian_wins: count of crowdData where userIsContrarian && userWasCorrect
-        contrarian_wins = crowdData.filter(c => c.userIsContrarian && c.userWasCorrect).length
-
-        // crowd_agreement_pct: count of !userIsContrarian / total * 100
-        const crowdTotal = crowdData.filter(c => c.userPredictedResult !== null).length
-        const agreements = crowdData.filter(c => !c.userIsContrarian && c.userPredictedResult !== null).length
-        crowd_agreement_pct = crowdTotal > 0 ? (agreements / crowdTotal) * 100 : 0
-      } catch (_e) {
-        // If analytics helpers fail, we still return basic leaderboard data
-        // Analytics fields remain at their defaults
-      }
-    }
+    const current_streak = stats?.current_streak ?? { type: 'none' as const, length: 0 }
+    const hit_rate = stats?.hit_rate ?? 0
+    const exact_count = stats?.exact_count ?? 0
+    const level = stats?.current_level ?? 1
+    const level_name = getLevelName(level)
+    const total_xp = stats?.total_xp ?? 0
+    const contrarian_wins = stats?.contrarian_wins ?? 0
+    const crowd_agreement_pct = stats?.crowd_agreement_pct ?? 0
+    const total_completed = stats?.total_completed ?? 0
 
     leaderboard.push({
       entry_id: entry.entry_id,
@@ -464,27 +298,23 @@ async function handleGET(
   if (faller && faller.previous_rank! - faller.current_rank! < 0) superlatives.push({ type: 'faller', emoji: '📉', title: 'Biggest Faller', entry_id: faller.entry_id, name: faller.entry_name || faller.full_name, detail: `Down ${Math.abs(faller.previous_rank! - faller.current_rank!)} places` })
 
   // --- Matchday MVP ---
-  const completedMatches = normalizedMatches.filter(m => m.is_completed)
-  const lastCompleted = completedMatches.length > 0 ? completedMatches[completedMatches.length - 1] : null
+  // Same rule as before (highest points on the last completed match), but read
+  // from that ONE match's score rows rather than from a per-entry results map
+  // built out of every scored row in the pool.
   let matchday_mvp: { entry_id: string; entry_name: string; full_name: string; match_points: number; match_number: number } | null = null
   if (lastCompleted) {
-    // Find which entry scored most points on this match
-    let bestEntry: LeaderboardEntryResponse | null = null
-    let bestPoints = 0
-    for (const [entryId, results] of entryPredResultsMap) {
-      const matchResult = results.find(r => r.matchId === lastCompleted.match_id)
-      if (matchResult && matchResult.points > bestPoints) {
-        bestPoints = matchResult.points
-        bestEntry = leaderboard.find(e => e.entry_id === entryId) ?? null
-      }
+    let best: { entry_id: string; total_points: number } | null = null
+    for (const row of mvpScores) {
+      if (row.total_points > (best?.total_points ?? 0)) best = { entry_id: row.entry_id, total_points: row.total_points }
     }
-    if (bestEntry && bestPoints > 0) {
-      matchday_mvp = { entry_id: bestEntry.entry_id, entry_name: bestEntry.entry_name, full_name: bestEntry.full_name, match_points: bestPoints, match_number: lastCompleted.match_number }
+    const bestEntry = best ? leaderboard.find(e => e.entry_id === best!.entry_id) ?? null : null
+    if (bestEntry && best && best.total_points > 0) {
+      matchday_mvp = { entry_id: bestEntry.entry_id, entry_name: bestEntry.entry_name, full_name: bestEntry.full_name, match_points: best.total_points, match_number: lastCompleted.match_number }
     }
   }
 
   // --- Matchday Info ---
-  const completedCount = completedMatches.length
+  const completedCount = completedForMvp.length
   const upcomingMatches = normalizedMatches.filter(m => !m.is_completed && m.status !== 'live').sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
   const matchday_info = {
     last_match_number: lastCompleted?.match_number ?? null,
