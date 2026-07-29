@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  gatePoolPredictions,
   computeReveal,
   filterRevealedPredictions,
   type RevealRoundState,
@@ -138,6 +139,80 @@ describe('filterRevealedPredictions', () => {
       { revealed: true, scope: 'rounds', roundKeys: ['group'] },
       new Map(),
     )
+    expect(out).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// gatePoolPredictions — the rule that decides whether another member's picks
+// cross to a browser. Step 3 moved the pool-wide array off pool open and behind
+// GET /api/pools/:id/bulk; this is the gate that route applies.
+// ---------------------------------------------------------------------------
+describe('gatePoolPredictions', () => {
+  const pick = (entryId: string, matchId: string) => ({ entry_id: entryId, match_id: matchId })
+  const stages = new Map([
+    ['m-group', 'group'],
+    ['m-final', 'final'],
+  ])
+
+  it('never leaks another member when nothing is revealed', () => {
+    const out = gatePoolPredictions({
+      predictions: [pick('mine', 'm-group'), pick('theirs', 'm-group')],
+      ownEntryIds: ['mine'],
+      isAdmin: false,
+      reveal: { revealed: false },
+      matchStageById: stages,
+    })
+    expect(out).toEqual([pick('mine', 'm-group')])
+    expect(out.some(p => p.entry_id === 'theirs')).toBe(false)
+  })
+
+  it('always returns your OWN picks, even unrevealed', () => {
+    const out = gatePoolPredictions({
+      predictions: [pick('mine', 'm-group'), pick('mine', 'm-final')],
+      ownEntryIds: ['mine'],
+      isAdmin: false,
+      reveal: { revealed: false },
+      matchStageById: stages,
+    })
+    expect(out).toHaveLength(2)
+  })
+
+  it('reveals others only for locked rounds under progressive scope', () => {
+    const out = gatePoolPredictions({
+      predictions: [
+        pick('theirs', 'm-group'), // group is locked → revealed
+        pick('theirs', 'm-final'), // final still open → withheld
+      ],
+      ownEntryIds: ['mine'],
+      isAdmin: false,
+      reveal: { revealed: true, scope: 'rounds', roundKeys: ['group'] },
+      matchStageById: stages,
+    })
+    expect(out).toEqual([pick('theirs', 'm-group')])
+  })
+
+  it('passes everything through for an admin', () => {
+    const all = [pick('mine', 'm-group'), pick('theirs', 'm-final')]
+    expect(gatePoolPredictions({
+      predictions: all,
+      ownEntryIds: ['mine'],
+      isAdmin: true,
+      reveal: { revealed: false },
+      matchStageById: stages,
+    })).toBe(all)
+  })
+
+  it('withholds a match with no known stage under round scope', () => {
+    // A prediction whose match is missing from the stage map must not fall
+    // through as revealed — unknown scope is not permission.
+    const out = gatePoolPredictions({
+      predictions: [pick('theirs', 'm-unknown')],
+      ownEntryIds: ['mine'],
+      isAdmin: false,
+      reveal: { revealed: true, scope: 'rounds', roundKeys: ['group'] },
+      matchStageById: stages,
+    })
     expect(out).toEqual([])
   })
 })

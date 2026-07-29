@@ -85,6 +85,35 @@ export function filterRevealedPredictions<T extends { match_id: string }>(
   return predictions.filter((p) => allowed.has(matchStageById.get(p.match_id) ?? ''))
 }
 
+/**
+ * The whole gate for a POOL-WIDE predictions array: your own picks always, plus
+ * everyone else's only where the reveal rules allow.
+ *
+ * This is the one rule that decides whether another member's unlocked picks
+ * cross to a browser, so it lives here — pure, and unit-tested — rather than
+ * inline in the route that happens to serve them today. It moved out of
+ * app/pools/[pool_id]/page.tsx when the array stopped riding along on pool open
+ * (drafts/2026-07-29_leaderboard_precomputed_handoff.md, step 3).
+ *
+ * `isAdmin` short-circuits: pool admins already have full visibility through the
+ * RLS admin-read policy and the per-entry view route.
+ */
+export function gatePoolPredictions<T extends { match_id: string; entry_id: string }>(params: {
+  predictions: T[]
+  ownEntryIds: Iterable<string>
+  isAdmin: boolean
+  reveal: RevealResult
+  matchStageById: Map<string, string>
+}): T[] {
+  const { predictions, ownEntryIds, isAdmin, reveal, matchStageById } = params
+  if (isAdmin) return predictions
+  const own = new Set(ownEntryIds)
+  const mine: T[] = []
+  const others: T[] = []
+  for (const p of predictions) (own.has(p.entry_id) ? mine : others).push(p)
+  return [...mine, ...filterRevealedPredictions(others, reveal, matchStageById)]
+}
+
 function isRoundLocked(round: RevealRoundState, now: Date): boolean {
   if (round.state && LOCKED_ROUND_STATES.has(round.state)) return true
   return isDeadlinePassed(round.deadline, now)

@@ -5,23 +5,23 @@ import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
-import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreNarrow, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult } from './types'
+import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult, EntryStatsData, MatchdayMVPData } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
-import { computeStreaks, computeCrowdConsensus, applyCrowdOverlay } from './analytics/analyticsHelpers'
-// Types used implicitly through function returns
-import { computeFullXPBreakdown, computeLevel } from './analytics/xpSystem'
+import { getLevelName } from '@/lib/levelNames'
 
 type LeaderboardTabProps = {
   members: MemberData[]
   poolId: string
-  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
+  /** Precomputed per-entry stats (entry_xp_state) — see EntryStatsData. */
+  entryStats: EntryStatsData[]
+  /** Best haul on the last completed match, computed server-side. */
+  matchdayMVPData: MatchdayMVPData | null
   matches: MatchData[]
   teams: TeamData[]
   conductData: MatchConductData[]
-  allPredictions: PredictionData[]
   poolSettings: PoolSettings
   maxEntriesPerUser: number
   currentUserId: string
@@ -56,12 +56,12 @@ function toTournamentTeams(teams: TeamData[]): Team[] {
 export function LeaderboardTab({
   members,
   poolId,
-  matchScores,
   bonusScores,
+  entryStats,
+  matchdayMVPData,
   matches,
   teams,
   conductData,
-  allPredictions,
   poolSettings,
   maxEntriesPerUser,
   currentUserId,
@@ -88,27 +88,6 @@ export function LeaderboardTab({
     }
     return entries
   }, [members])
-
-  // Build match_scores lookup: entry_id → MatchScoreData[]
-  const matchScoresByEntry = useMemo(() => {
-    const map = new Map<string, MatchScoreNarrow[]>()
-    for (const ms of matchScores) {
-      const existing = map.get(ms.entry_id) || []
-      existing.push(ms)
-      map.set(ms.entry_id, existing)
-    }
-    return map
-  }, [matchScores])
-
-  // Build match_scores lookup: entry_id → match_id → MatchScoreData
-  const matchScoresLookup = useMemo(() => {
-    const map = new Map<string, Map<string, MatchScoreNarrow>>()
-    for (const ms of matchScores) {
-      if (!map.has(ms.entry_id)) map.set(ms.entry_id, new Map())
-      map.get(ms.entry_id)!.set(ms.match_id, ms)
-    }
-    return map
-  }, [matchScores])
 
   const tournamentTeams = useMemo(() => toTournamentTeams(teams), [teams])
 
@@ -503,120 +482,54 @@ export function LeaderboardTab({
 
   const isBracketPicker = predictionMode === 'bracket_picker'
 
+  // Read the precomputed stats. These are computed ONCE by the scoring path
+  // (lib/analytics/entryAnalytics.ts) and stored per entry; this component used
+  // to re-derive them in every browser from every prediction and every score
+  // row in the pool — 26,770 rows on the largest pool to produce ten numbers
+  // per entry. bracket_picker has no rows here (its picks aren't `predictions`)
+  // and never used this map, so it still returns empty for that mode.
   const entryStatsMap = useMemo(() => {
     const map = new Map<string, EntryStats>()
     if (isBracketPicker) return map
 
-    const completedMatches = matches.filter(m => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
-    if (completedMatches.length === 0) return map
-
-    // Group predictions by entry (still needed for crowd/XP computation)
-    const predsByEntry = new Map<string, PredictionData[]>()
-    for (const p of allPredictions) {
-      const arr = predsByEntry.get(p.entry_id) || []
-      arr.push(p)
-      predsByEntry.set(p.entry_id, arr)
-    }
-
-    // Pool-wide and identical for every entry — computed once, not once per row.
-    // This used to re-scan every prediction in the pool inside the loop below,
-    // in the browser, on the largest pools that is ~2.6M iterations per render.
-    const crowdConsensus = computeCrowdConsensus(matches, allPredictions, members)
-
-    for (const entry of sorted) {
-      const entryPreds = predsByEntry.get(entry.entry_id) || []
-      const mPts = entry.match_points ?? 0
-      const bPts = entry.bonus_points ?? 0
-
-      // Get this entry's match scores from DB (sorted by match_number for form display)
-      const entryMatchScores = (matchScoresByEntry.get(entry.entry_id) || [])
-        .slice()
-        .sort((a, b) => a.match_number - b.match_number)
-
-      if (entryMatchScores.length === 0 && entryPreds.length === 0) {
-        map.set(entry.entry_id, {
-          hitRate: 0, exactCount: 0,
-          currentStreak: { type: 'none', length: 0 },
-          last5: [], level: 1, levelName: 'Rookie', totalXP: 0, totalCompleted: 0,
-          contrarianWins: 0, crowdAgreementPct: 0, matchPoints: mPts, bonusPoints: bPts,
-        })
-        continue
-      }
-
-      // Derive prediction results from stored match_scores (single source of truth)
-      const predResults = entryMatchScores.map(ms => ({
-        matchId: ms.match_id,
-        matchNumber: ms.match_number,
-        type: ms.score_type as 'exact' | 'winner_gd' | 'winner' | 'miss',
-        points: ms.total_points,
-        stage: ms.stage,
-      }))
-
-      const streakData = computeStreaks(predResults)
-      const hits = predResults.filter(r => r.type !== 'miss').length
-      const exactCount = predResults.filter(r => r.type === 'exact').length
-      const hitRate = predResults.length > 0 ? (hits / predResults.length) * 100 : 0
-
-      // Last 5 form (oldest left → most recent right)
-      const last5 = predResults
-        .slice(-5)
-        .map(r => r.type)
-
-      // Compute crowd data per entry for XP + contrarian stats
-      const crowdForEntry = applyCrowdOverlay(crowdConsensus, entryPreds)
-      const contrarianWins = crowdForEntry.filter(c => c.userIsContrarian && c.userWasCorrect).length
-      const crowdAgreementPct = crowdForEntry.length > 0
-        ? (crowdForEntry.filter(c => !c.userIsContrarian).length / crowdForEntry.length) * 100
-        : 0
-
-      // Compute XP
-      const entryRank = entry.current_rank ?? null
-      let level = 1
-      let levelName = 'Rookie'
-      let totalXP = 0
-
-      try {
-        const xpBreakdown = computeFullXPBreakdown({
-          predictionResults: predResults,
-          matches,
-          crowdData: crowdForEntry,
-          streaks: streakData,
-          entryPredictions: entryPreds,
-          entryRank,
-          totalMatches: matches.length,
-        })
-        totalXP = xpBreakdown.totalXP
-        const levelInfo = computeLevel(totalXP)
-        level = levelInfo.currentLevel.level
-        levelName = levelInfo.currentLevel.name
-      } catch {
-        // Fallback if XP computation fails
-      }
-
-      map.set(entry.entry_id, {
-        hitRate,
-        exactCount,
-        currentStreak: streakData.currentStreak,
-        last5,
-        level,
-        levelName,
-        totalXP,
-        totalCompleted: predResults.length,
-        contrarianWins,
-        crowdAgreementPct,
-        matchPoints: mPts,
-        bonusPoints: bPts,
+    for (const s of entryStats) {
+      map.set(s.entry_id, {
+        hitRate: s.hit_rate ?? 0,
+        exactCount: s.exact_count ?? 0,
+        currentStreak: s.current_streak ?? { type: 'none', length: 0 },
+        // The writer pads to five with 'no_pick'; the UI renders one dot per
+        // element, so strip the padding to keep an entry with two results
+        // showing two dots rather than three grey ones and two real.
+        last5: (s.last_five ?? []).filter(
+          (t): t is 'exact' | 'winner_gd' | 'winner' | 'miss' => t !== 'no_pick',
+        ),
+        level: s.current_level ?? 1,
+        levelName: getLevelName(s.current_level ?? 1),
+        totalXP: s.total_xp ?? 0,
+        totalCompleted: s.total_completed ?? 0,
+        contrarianWins: s.contrarian_wins ?? 0,
+        crowdAgreementPct: s.crowd_agreement_pct ?? 0,
+        matchPoints: 0,
+        bonusPoints: 0,
       })
     }
 
+    // Points live on the entry itself, not in the stats row.
+    for (const entry of leaderboardEntries) {
+      const stats = map.get(entry.entry_id)
+      if (!stats) continue
+      stats.matchPoints = entry.match_points ?? 0
+      stats.bonusPoints = entry.bonus_points ?? 0
+    }
+
     return map
-  }, [sorted, allPredictions, matches, teams, conductData, members, isBracketPicker, matchScoresByEntry])
+  }, [entryStats, leaderboardEntries, isBracketPicker])
 
   // =============================================
   // MATCHDAY MVP
   // =============================================
 
-  type MatchdayMVPData = {
+  type MatchdayMVPRow = {
     entryId: string
     entryName: string
     username: string
@@ -624,41 +537,23 @@ export function LeaderboardTab({
     matchNumber: number
   } | null
 
-  const matchdayMVP: MatchdayMVPData = useMemo(() => {
-    if (isBracketPicker) return null
-    const completed = matches
-      .filter(m => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
-      .sort((a, b) => b.match_number - a.match_number)
-    if (completed.length === 0) return null
-
-    const lastMatch = completed[0]
-
-    let bestEntry: LeaderboardEntry | null = null
-    let bestPoints = 0
-
-    for (const entry of sorted) {
-      // Look up this entry's score for the last match from stored match_scores
-      const entryScores = matchScoresLookup.get(entry.entry_id)
-      const matchScore = entryScores?.get(lastMatch.match_id)
-      if (!matchScore) continue
-
-      if (matchScore.total_points > bestPoints) {
-        bestPoints = matchScore.total_points
-        bestEntry = entry
-      }
-    }
-
-    if (!bestEntry || bestPoints === 0) return null
+  // Resolved server-side (poolData) from ONE match's score rows. This used to
+  // scan the pool-wide match_scores array for the last completed match — the
+  // only other consumer of that array on this tab.
+  const matchdayMVP: MatchdayMVPRow = useMemo(() => {
+    if (isBracketPicker || !matchdayMVPData) return null
+    const entry = leaderboardEntries.find(e => e.entry_id === matchdayMVPData.entry_id)
+    if (!entry) return null
     return {
-      entryId: bestEntry.entry_id,
+      entryId: entry.entry_id,
       entryName: isMultiEntry
-        ? (bestEntry.entry_name || `Entry ${bestEntry.entry_number}`)
-        : (bestEntry.users?.full_name || bestEntry.users?.username || 'Unknown'),
-      username: bestEntry.users?.username || '',
-      matchPoints: bestPoints,
-      matchNumber: lastMatch.match_number,
+        ? (entry.entry_name || `Entry ${entry.entry_number}`)
+        : (entry.users?.full_name || entry.users?.username || 'Unknown'),
+      username: entry.users?.username || '',
+      matchPoints: matchdayMVPData.match_points,
+      matchNumber: matchdayMVPData.match_number,
     }
-  }, [matches, allPredictions, sorted, poolSettings, teams, conductData, isBracketPicker, isMultiEntry])
+  }, [matchdayMVPData, leaderboardEntries, isBracketPicker, isMultiEntry])
 
   // =============================================
   // POOL AWARDS
@@ -955,6 +850,22 @@ export function LeaderboardTab({
   }, [poolId, selectedEntry?.entry_id])
   const [visibleCount, setVisibleCount] = useState(20)
 
+  // The open entry's own picks, for the predicted-podium section below. Fetched
+  // per entry rather than filtered out of a pool-wide array, so this tab needs
+  // no predictions on pool open. The route applies the SAME server-side reveal
+  // gate page.tsx does, so an unrevealed entry yields nothing here either.
+  const [selectedPredictions, setSelectedPredictions] = useState<PredictionData[]>([])
+  useEffect(() => {
+    const entryId = selectedEntry?.entry_id
+    if (!entryId || predictionMode === 'bracket_picker') { setSelectedPredictions([]); return }
+    let cancelled = false
+    fetch(`/api/pools/${poolId}/entries/${entryId}/predictions`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { predictions: [] }))
+      .then(d => { if (!cancelled) setSelectedPredictions(d.predictions ?? []) })
+      .catch(() => { if (!cancelled) setSelectedPredictions([]) })
+    return () => { cancelled = true }
+  }, [poolId, selectedEntry?.entry_id, predictionMode])
+
   // The selected entry's PREDICTED podium (champion/runner-up/third), derived from
   // their bracket via the same resolver the scoring engine uses. Powers the
   // pick-vs-actual "Tournament Podium" section in the breakdown modal. Computed
@@ -962,8 +873,7 @@ export function LeaderboardTab({
   const selectedPredictedPodium = useMemo<PodiumResult | null>(() => {
     if (!selectedEntry || predictionMode === 'bracket_picker') return null
     const predictionMap: PredictionMap = new Map()
-    for (const p of allPredictions) {
-      if (p.entry_id !== selectedEntry.entry_id) continue
+    for (const p of selectedPredictions) {
       predictionMap.set(p.match_id, {
         home: p.predicted_home_score,
         away: p.predicted_away_score,
@@ -983,7 +893,7 @@ export function LeaderboardTab({
     const norm = (g: GroupStanding | null) =>
       g ? { team_id: g.team_id, country_name: g.country_name, flag_url: g.flag_url ?? null } : null
     return { champion: norm(podium.champion), runnerUp: norm(podium.runnerUp), thirdPlace: norm(podium.thirdPlace) }
-  }, [selectedEntry, allPredictions, matches, tournamentTeams, conductData, predictionMode])
+  }, [selectedEntry, selectedPredictions, matches, tournamentTeams, conductData, predictionMode])
 
   // === ANIMATION: Rank Shuffle (FLIP) ===
   const prevSortOrderRef = useRef<Map<string, number>>(new Map())

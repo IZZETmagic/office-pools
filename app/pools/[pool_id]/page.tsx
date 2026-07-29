@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PoolDetail } from './PoolDetail'
 import { getPoolData, fetchAllPages } from '@/lib/poolData'
-import { computeReveal, filterRevealedPredictions, type PredictionMode } from '@/lib/predictions/revealGate'
 import type {
   ExistingPrediction,
   PoolRoundState,
@@ -60,8 +59,8 @@ export default async function PoolPage({
   if (!pool) redirect('/dashboard')
 
   const {
-    members, matches, settings, teams, allPredictions, conductData, matchScores,
-    bonusScores, bpProvisionalScoring, tournamentAwards,
+    members, matches, settings, teams, conductData,
+    bonusScores, bpProvisionalScoring, tournamentAwards, entryStats, matchdayMVP,
   } = shared
 
   // ---- PER-USER derivations on top of shared data ------------------------
@@ -170,29 +169,10 @@ export default async function PoolPage({
 
   const psoEnabled = settings?.pso_enabled ?? true
 
-  // AIRTIGHT (Phase 3a): never ship OTHER members' unlocked picks to the client.
-  // allPredictions comes from getPoolData via the admin client (bypasses RLS) for
-  // the leaderboard/analytics, so we gate it per-request here before it crosses to
-  // the client component. Your own entries are always included; others' picks only
-  // once revealable (deadline passed, or their round locked for progressive).
-  // Admins keep full visibility — matches the RLS admin-read policy + the view route.
-  const visibleAllPredictions = isAdmin
-    ? allPredictions
-    : (() => {
-        const reveal = computeReveal(
-          {
-            prediction_mode: (pool.prediction_mode ?? 'full_tournament') as PredictionMode,
-            prediction_deadline: pool.prediction_deadline,
-          },
-          roundStates.map((r) => ({ round_key: r.round_key, state: r.state, deadline: r.deadline })),
-          new Date(),
-        )
-        const ownIds = new Set(userEntryIds)
-        const matchStageById = new Map(matches.map((m) => [m.match_id, m.stage ?? ''] as [string, string]))
-        const own = allPredictions.filter((p) => ownIds.has(p.entry_id))
-        const others = allPredictions.filter((p) => !ownIds.has(p.entry_id))
-        return [...own, ...filterRevealedPredictions(others, reveal, matchStageById)]
-      })()
+  // NOTE: the pool-wide predictions array is no longer fetched here at all. It
+  // is loaded per tab from GET /api/pools/:id/bulk, which owns the reveal gate
+  // that used to live at this spot — see the warning in that route. The gate did
+  // not become optional; it moved to the only place that still produces the array.
 
   return (
     <PoolDetail
@@ -203,11 +183,11 @@ export default async function PoolPage({
       matches={matches}
       settings={settings}
       userPredictions={(userPredictions || []) as ExistingPrediction[]}
-      allPredictions={visibleAllPredictions}
       teams={teams}
       conductData={conductData}
-      matchScores={matchScores}
       bonusScores={bonusScores}
+      entryStats={entryStats}
+      matchdayMVP={matchdayMVP}
       memberId={membership?.member_id ?? null}
       currentUserId={userData.user_id}
       isAdmin={isAdmin}

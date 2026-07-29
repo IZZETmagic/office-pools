@@ -33,6 +33,8 @@ import type {
   MatchScoreNarrow,
   BonusScoreData,
   PodiumResult,
+  EntryStatsData,
+  MatchdayMVPData,
 } from '@/app/pools/[pool_id]/types'
 
 export const POOL_CACHE_TTL_SECONDS = 45
@@ -58,6 +60,10 @@ export function poolCacheTag(poolId: string): string {
 //   - any error is swallowed; scoring correctness must not depend on the cache.
 export function invalidatePoolCache(poolId: string): void {
   try {
+    // The per-tab bulk arrays are scored data too — a recalc changes match_scores,
+    // so this tag must expire with the main one or an open Analytics tab would
+    // serve pre-goal scores for up to the TTL.
+    revalidateTag(poolBulkCacheTag(poolId), { expire: 0 })
     // { expire: 0 } = expire the tag immediately (Next 16). This is the
     // documented path for an external/background trigger (our cron-driven
     // scoring sweep) that needs the data fresh now, and it's the clean
@@ -76,7 +82,6 @@ export type PoolSharedData = {
   matches: MatchData[]
   settings: SettingsData | null
   teams: TeamData[]
-  allPredictions: PredictionData[]
   conductData: {
     match_id: string
     team_id: string
@@ -85,12 +90,16 @@ export type PoolSharedData = {
     direct_red_cards: number
     yellow_direct_red_cards: number
   }[]
-  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
   bpProvisionalScoring: boolean
   // Final tournament podium (from tournament_awards), or null until finalized.
   // Drives the "Tournament Podium" pick-vs-actual section in the points breakdown.
   tournamentAwards: PodiumResult | null
+  // Precomputed per-entry leaderboard stats (one row per entry) — replaces the
+  // browser-side derivation over every prediction + score row in the pool.
+  entryStats: EntryStatsData[]
+  // Best haul on the most recently completed match, or null before any is played.
+  matchdayMVP: MatchdayMVPData | null
 }
 // NOTE: the bracket_picker all-entries data (allBP*) is intentionally NOT here.
 // Its RLS makes it per-VIEWER (a non-admin member can only read their own
@@ -152,9 +161,9 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   if (!pool) {
     // Caller (page.tsx) handles the redirect; return an empty shell.
     return {
-      pool: null, members: [], matches: [], settings: null, teams: [], allPredictions: [],
-      conductData: [], matchScores: [], bonusScores: [], bpProvisionalScoring: false,
-      tournamentAwards: null,
+      pool: null, members: [], matches: [], settings: null, teams: [],
+      conductData: [], bonusScores: [], bpProvisionalScoring: false,
+      tournamentAwards: null, entryStats: [], matchdayMVP: null,
     }
   }
 
@@ -236,31 +245,54 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     )
     : []
 
-  // The heavy, per-pool, all-entries pulls — all paginated, all admin client.
-  const [bonusScores, matchScores, allPredictions] = await Promise.all([
-    safeRead(readBonusScores(admin, allEntryIds, source), [] as BonusScoreData[]),
-    // Narrow: the pool-wide array only feeds leaderboard aggregates. The 14
-    // wide columns are read by PointsBreakdownModal and results/MatchCard, which
-    // both look at ONE entry — they fetch those on demand.
-    safeRead(readMatchScoresNarrow(admin, allEntryIds, source), [] as MatchScoreNarrow[]),
-    allEntryIds.length
-      ? fetchAllPages<PredictionData>('predictions', (from, to) =>
-          admin
-            .from('predictions')
-            // Name the columns — this is the single most expensive statement in
-            // the product (~33% of all DB execution time). `*` dragged
-            // confidence_level + created_at + updated_at through json_agg and
-            // over the wire on every render; nothing reads them (PredictionData
-            // is exactly these 8 fields).
-            .select(PREDICTION_COLUMNS)
-            .in('entry_id', allEntryIds)
-            .order('entry_id', { ascending: true })
-            .order('match_id', { ascending: true })
-            .range(from, to),
-        throwOnFetchError,
-      )
-      : Promise.resolve([]),
-  ])
+  // NOTE: the two pool-wide arrays that used to be fetched here —
+  // `match_scores` (3,515 kB) and `predictions` (3,815 kB) on the largest pool —
+  // are NO LONGER part of pool open. They were 95% of a 7,721 kB payload and the
+  // default tab (leaderboard) does not read either any more: it reads the
+  // precomputed `entryStats` below.
+  //
+  // The tabs that genuinely need them (analytics, community, results, members,
+  // the entries list) load them when opened, via getPoolBulkData /
+  // GET /api/pools/:id/bulk. Crucially the PREDICTIONS half must stay behind the
+  // reveal gate, which is why the route applies it per viewer rather than this
+  // shared, cached fetch doing it once for everyone.
+  const bonusScores = await safeRead(readBonusScores(admin, allEntryIds, source), [] as BonusScoreData[])
+
+  // Precomputed leaderboard stats — ONE row per entry, replacing a browser-side
+  // derivation over every prediction + score row in the pool. Written by the
+  // scoring path (lib/push/badges.ts → computePoolEntryAnalytics on every
+  // recalc), so it moves with the score rather than lagging behind it.
+  //
+  // Entries with no predictions have no row; the leaderboard falls back to the
+  // same all-zero shape it renders for them today.
+  const entryStats = await safeRead(readEntryStats(admin, allEntryIds, throwOnFetchError), [] as EntryStatsData[])
+
+  // Matchday MVP — the best single-match haul on the most recently completed
+  // match. This used to scan the pool-wide match_scores array in the browser;
+  // it needs ONE match's rows, so it reads exactly those (via the same source
+  // reader, so shadow-read pools stay consistent with their leaderboard).
+  const lastCompleted = matches
+    .filter((m) => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
+    .sort((a, b) => b.match_number - a.match_number)[0]
+  let matchdayMVP: MatchdayMVPData | null = null
+  if (lastCompleted && allEntryIds.length) {
+    const rows = await safeRead(
+      readMatchScoresNarrow(admin, allEntryIds, source, [lastCompleted.match_id]),
+      [] as MatchScoreNarrow[],
+    )
+    let best: MatchScoreNarrow | null = null
+    for (const r of rows) {
+      if (r.total_points > (best?.total_points ?? 0)) best = r
+    }
+    // Matches the client's rule: no MVP when nobody scored on that match.
+    if (best && best.total_points > 0) {
+      matchdayMVP = {
+        entry_id: best.entry_id,
+        match_points: best.total_points,
+        match_number: lastCompleted.match_number,
+      }
+    }
+  }
 
   // (Bracket all-entries data is fetched per-viewer in page.tsx — see note on
   // PoolSharedData above. It is per-VIEWER, not shared, so it is not cached.)
@@ -297,9 +329,38 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     : null
 
   return {
-    pool, members, matches, settings, teams, allPredictions, conductData, matchScores,
-    bonusScores, bpProvisionalScoring, tournamentAwards,
+    pool, members, matches, settings, teams, conductData,
+    bonusScores, bpProvisionalScoring, tournamentAwards, entryStats, matchdayMVP,
   }
+}
+
+// entry_xp_state, chunked by entry id AND paged inside each chunk. A single
+// `.in()` over every entry would both overflow the request URL on a large pool
+// and silently cap at PostgREST's 1000-row limit (SCALE_PLAN §3 trap #1).
+export async function readEntryStats(
+  admin: ReturnType<typeof createAdminClient>,
+  entryIds: string[],
+  throwOnFetchError = false,
+): Promise<EntryStatsData[]> {
+  if (entryIds.length === 0) return []
+  const CHUNK = 200
+  const out: EntryStatsData[] = []
+  for (let i = 0; i < entryIds.length; i += CHUNK) {
+    const slice = entryIds.slice(i, i + CHUNK)
+    const rows = await fetchAllPages<EntryStatsData>('entry_xp_state', (from, to) =>
+      admin
+        .from('entry_xp_state')
+        .select(
+          'entry_id, hit_rate, exact_count, total_completed, contrarian_wins, crowd_agreement_pct, total_xp, current_level, last_five, current_streak',
+        )
+        .in('entry_id', slice)
+        .order('entry_id', { ascending: true })
+        .range(from, to),
+      throwOnFetchError,
+    )
+    out.push(...rows)
+  }
+  return out
 }
 
 // Per-pool cached wrapper. Built per-call so the cache key AND the invalidation
@@ -331,4 +392,89 @@ export async function isPoolCacheEnabled(): Promise<boolean> {
 
 export async function getPoolData(poolId: string): Promise<PoolSharedData> {
   return (await isPoolCacheEnabled()) ? getPoolDataCached(poolId) : getPoolDataUncached(poolId)
+}
+
+// ============================================================================
+// BULK (per-tab) DATA — the two pool-wide arrays, split out of pool open.
+//
+// Only the tabs that actually read them pay for them, and only when opened:
+// analytics, community, results, members, and the entries list. The default tab
+// (leaderboard) reads neither, which is what took pool open from 7,721 kB to
+// ~445 kB on the largest pool.
+//
+// ⚠ PREDICTIONS ARE UNGATED HERE — this is the raw admin read, identical for
+// every viewer, which is what makes it cacheable. The reveal gate (never ship
+// another member's unlocked picks) is applied PER VIEWER by the route in
+// app/api/pools/[pool_id]/bulk. Never return this straight to a client.
+// ============================================================================
+export type PoolBulkData = {
+  allPredictions: PredictionData[]
+  matchScores: MatchScoreNarrow[]
+}
+
+export function poolBulkCacheTag(poolId: string): string {
+  return `pool-bulk-${poolId}`
+}
+
+export async function getPoolBulkDataUncached(
+  poolId: string,
+  throwOnFetchError = false,
+): Promise<PoolBulkData> {
+  const admin = createAdminClient()
+
+  const { data: pool } = await admin
+    .from('pools')
+    .select('pool_id, prediction_mode')
+    .eq('pool_id', poolId)
+    .single()
+  if (!pool) return { allPredictions: [], matchScores: [] }
+
+  const { data: memberRows } = await admin
+    .from('pool_members')
+    .select('pool_entries(entry_id)')
+    .eq('pool_id', poolId)
+  const allEntryIds = ((memberRows ?? []) as Array<{ pool_entries?: Array<{ entry_id: string }> | null }>)
+    .flatMap((m) => m.pool_entries ?? [])
+    .map((e) => e.entry_id)
+    .filter(Boolean)
+
+  if (allEntryIds.length === 0) return { allPredictions: [], matchScores: [] }
+
+  const source = await getScoringSource(admin, poolId, pool.prediction_mode)
+
+  const [matchScores, allPredictions] = await Promise.all([
+    // Narrow: the 14 wide columns are read by PointsBreakdownModal and
+    // results/MatchCard, which both look at ONE entry and fetch them on demand.
+    readMatchScoresNarrow(admin, allEntryIds, source),
+    fetchAllPages<PredictionData>('predictions', (from, to) =>
+      admin
+        .from('predictions')
+        // Name the columns — this is the single most expensive statement in the
+        // product (~33% of all DB execution time). `*` dragged confidence_level
+        // + created_at + updated_at through json_agg and over the wire;
+        // PredictionData is exactly these 8 fields.
+        .select(PREDICTION_COLUMNS)
+        .in('entry_id', allEntryIds)
+        .order('entry_id', { ascending: true })
+        .order('match_id', { ascending: true })
+        .range(from, to),
+      throwOnFetchError,
+    ),
+  ])
+
+  return { allPredictions, matchScores }
+}
+
+export function getPoolBulkDataCached(poolId: string): Promise<PoolBulkData> {
+  return unstable_cache(
+    () => getPoolBulkDataUncached(poolId, true),
+    ['pool-bulk-data', poolId],
+    // Same TTL as pool open, and its own tag so a score change refreshes it too
+    // (invalidatePoolCache clears both).
+    { tags: [poolBulkCacheTag(poolId)], revalidate: POOL_CACHE_TTL_SECONDS },
+  )()
+}
+
+export async function getPoolBulkData(poolId: string): Promise<PoolBulkData> {
+  return (await isPoolCacheEnabled()) ? getPoolBulkDataCached(poolId) : getPoolBulkDataUncached(poolId)
 }

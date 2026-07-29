@@ -320,6 +320,42 @@ export type MatchScoreNarrow = {
   total_points: number
 }
 
+/**
+ * One entry's precomputed leaderboard stats, straight from `entry_xp_state`.
+ *
+ * These used to be derived in the BROWSER from every prediction and every match
+ * score in the pool — 26,770 rows on the largest pool to produce these ~10
+ * numbers per entry. The scoring path already computes and stores them
+ * (lib/analytics/entryAnalytics.ts, called on every recalc), so the leaderboard
+ * reads them instead. See drafts/2026-07-29_leaderboard_precomputed_handoff.md.
+ *
+ * `current_level` is the RATCHETED level (never below the entry's high-water
+ * mark) — the raw level is deliberately not stored. See migration 026.
+ */
+export type EntryStatsData = {
+  entry_id: string
+  hit_rate: number
+  exact_count: number
+  total_completed: number
+  contrarian_wins: number
+  crowd_agreement_pct: number
+  total_xp: number
+  current_level: number
+  /** Oldest → newest. Padded to 5 with 'no_pick' by the writer; the leaderboard
+   *  strips the padding so an entry with 2 results still shows 2 dots. */
+  last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[]
+  current_streak: { type: 'hot' | 'cold' | 'none'; length: number }
+}
+
+/** Best single-match haul on the most recently completed match. Computed
+ *  server-side (one match's score rows) rather than by scanning the pool-wide
+ *  array in the browser. */
+export type MatchdayMVPData = {
+  entry_id: string
+  match_points: number
+  match_number: number
+}
+
 export type MatchScoreData = {
   id: string
   entry_id: string

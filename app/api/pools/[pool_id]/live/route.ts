@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import type { MatchScoreNarrow } from '@/app/pools/[pool_id]/types'
+import type { MatchScoreNarrow, EntryStatsData } from '@/app/pools/[pool_id]/types'
 import { getScoringSource, readEntryScoring, readMatchScoresNarrow } from '@/lib/scoring/readSource'
+import { readEntryStats } from '@/lib/poolData'
 
 // =============================================================
 // GET /api/pools/:pool_id/live
@@ -28,7 +29,7 @@ import { getScoringSource, readEntryScoring, readMatchScoresNarrow } from '@/lib
 // every refresh.
 // =============================================================
 
-type LiveEntry = {
+export type LiveEntry = {
   entry_id: string
   match_points: number
   bonus_points: number
@@ -39,6 +40,19 @@ type LiveEntry = {
 }
 
 export type PoolLiveResponse = {
+  /**
+   * Precomputed leaderboard stats for entries whose numbers can have moved.
+   *
+   * The leaderboard reads these from `entry_xp_state` instead of deriving them
+   * in the browser, so a delta that carried only points would leave the form
+   * dots, hit rate and streak frozen mid-match — the client no longer holds the
+   * raw rows to re-derive them from. The scoring path rewrites this table on
+   * every recalc, so re-reading it here keeps the whole row live.
+   *
+   * EMPTY between matchdays: with no live match nothing can have changed, and
+   * this is polled every 30s per viewer. Only paid for when it can move.
+   */
+  stats: EntryStatsData[]
   /**
    * Completed-match count. The client holds scores for completed matches from
    * its initial load; if this disagrees with what it has, a match finished and
@@ -127,6 +141,7 @@ async function handleGET(
       completed_matches: completed.length,
       entries: [],
       scores: [],
+      stats: [],
       matches: openMatches,
     } satisfies PoolLiveResponse)
   }
@@ -137,10 +152,14 @@ async function handleGET(
   // Between matchdays there are no live matches, so this runs no query at all
   // and the response is just the leaderboard totals.
   let scores: MatchScoreNarrow[] = []
+  let stats: EntryStatsData[] = []
   if (liveIds.length > 0) {
     // Same reader the full payload uses, so shadow/prod column differences and
     // the synthesised shadow id are handled in one place.
     scores = await readMatchScoresNarrow(admin, entryIds, source, liveIds)
+    // The leaderboard's stats half. Same reader as the initial page load, so
+    // the merged row cannot disagree with the one it replaces.
+    stats = await readEntryStats(admin, entryIds)
   }
 
   const entries: LiveEntry[] = entryIds.map((id) => {
@@ -160,6 +179,7 @@ async function handleGET(
     completed_matches: completed.length,
     entries,
     scores,
+    stats,
     matches: openMatches,
   } satisfies PoolLiveResponse)
 }

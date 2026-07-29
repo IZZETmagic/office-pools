@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { PoolLiveResponse } from '@/app/api/pools/[pool_id]/live/route'
-import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores } from './liveMerge'
+import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live/route'
+import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
@@ -45,6 +45,8 @@ import type {
   ExistingPrediction,
   MatchScoreData,
   MatchScoreNarrow,
+  EntryStatsData,
+  MatchdayMVPData,
   BonusScoreData,
   PoolRoundState,
   EntryRoundSubmission,
@@ -75,6 +77,19 @@ type Tab =
   | 'scoring_config'
   | 'settings'
   | 'rounds'
+
+/**
+ * Tabs that read the pool-wide predictions and/or match_scores arrays.
+ *
+ * Everything NOT in this list — leaderboard (the default), standings, pool info,
+ * scoring rules, fees, settings — renders without either, which is what makes
+ * pool open ~445 kB instead of 7,721 kB on the largest pool.
+ *
+ * `predictions` is here for the multi-entry list (per-entry progress counts),
+ * the post-deadline "everyone else" section and the spectator view; the single
+ * active entry's own picks come from their own per-entry fetch.
+ */
+const TABS_NEEDING_BULK: Tab[] = ['analytics', 'community', 'results', 'members']
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'community', label: 'Banter' },
@@ -112,11 +127,11 @@ type PoolDetailProps = {
   matches: MatchData[]
   settings: SettingsData | null
   userPredictions: ExistingPrediction[]
-  allPredictions: PredictionData[]
   teams: TeamData[]
   conductData: MatchConductData[]
-  matchScores: MatchScoreNarrow[]
   bonusScores: BonusScoreData[]
+  entryStats: EntryStatsData[]
+  matchdayMVP: MatchdayMVPData | null
   memberId: string | null
   currentUserId: string
   isAdmin: boolean
@@ -153,11 +168,11 @@ export function PoolDetail({
   matches: initialMatches,
   settings: initialSettings,
   userPredictions,
-  allPredictions: initialAllPredictions,
   teams,
   conductData,
-  matchScores: initialMatchScores,
   bonusScores,
+  entryStats: initialEntryStats,
+  matchdayMVP,
   memberId,
   currentUserId,
   isAdmin,
@@ -235,9 +250,14 @@ export function PoolDetail({
   const [members, setMembers] = useState(initialMembers)
   const [matches, setMatches] = useState(initialMatches)
   const [settings, setSettings] = useState(initialSettings)
-  const [allPredictions, setAllPredictions] = useState(initialAllPredictions)
+  // Loaded on demand — see loadBulkData below. Empty until a tab needs them.
+  const [allPredictions, setAllPredictions] = useState<PredictionData[]>([])
   // Stateful so the live delta can be merged in without a full RSC refresh.
-  const [matchScores, setMatchScores] = useState(initialMatchScores)
+  const [matchScores, setMatchScores] = useState<MatchScoreNarrow[]>([])
+  const [bulkState, setBulkState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  // Same: the leaderboard's precomputed stats move as scores land, so the live
+  // delta carries them and merges here rather than waiting for a full refresh.
+  const [entryStats, setEntryStats] = useState(initialEntryStats)
   const [showNavWarning, setShowNavWarning] = useState(false)
 
   // Prediction mode flags (defined early so hooks can reference them)
@@ -587,8 +607,15 @@ export function PoolDetail({
   useEffect(() => { setMembers(initialMembers) }, [initialMembers])
   useEffect(() => { setMatches(initialMatches) }, [initialMatches])
   useEffect(() => { setSettings(initialSettings) }, [initialSettings])
-  useEffect(() => { setAllPredictions(initialAllPredictions) }, [initialAllPredictions])
-  useEffect(() => { setMatchScores(initialMatchScores) }, [initialMatchScores])
+  // The two pool-wide arrays are no longer props, so a server refresh cannot
+  // re-seed them the way it re-seeds everything above. Mark them stale instead:
+  // the loader re-fetches if a tab still needs them. Without this, finishing a
+  // match would leave an open Analytics tab showing pre-match scores.
+  const skipFirstRefresh = useRef(true)
+  useEffect(() => {
+    if (skipFirstRefresh.current) { skipFirstRefresh.current = false; return }
+    setBulkState(prev => (prev === 'ready' ? 'idle' : prev))
+  }, [initialMatches])
 
   // ---------------------------------------------------------------------
   // Live refresh
@@ -609,6 +636,40 @@ export function PoolDetail({
   // the 30s interval tears down and re-arms on every score change.
   const matchesRef = useRef(matches)
   useEffect(() => { matchesRef.current = matches }, [matches])
+
+  // ---------------------------------------------------------------------------
+  // Per-tab bulk load: the two pool-wide arrays (every member's picks, every
+  // score row). They were 95% of pool open and the leaderboard reads neither, so
+  // they are fetched only when a tab that needs them is opened.
+  //
+  // The response is reveal-gated SERVER-SIDE by the route — other members'
+  // still-unlocked picks never reach this component.
+  // ---------------------------------------------------------------------------
+  const loadBulkData = useCallback(async () => {
+    setBulkState('loading')
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/bulk`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`bulk ${res.status}`)
+      const data = (await res.json()) as { predictions: PredictionData[]; matchScores: MatchScoreNarrow[] }
+      setAllPredictions(data.predictions ?? [])
+      setMatchScores(data.matchScores ?? [])
+      setBulkState('ready')
+    } catch {
+      // These tabs render empty rather than wrong on failure, and the banner
+      // below offers a retry — silently showing "no picks" would read as data
+      // loss to a member who knows they made picks.
+      setBulkState('error')
+    }
+  }, [pool.pool_id])
+
+  const needsBulk =
+    TABS_NEEDING_BULK.includes(activeTab) ||
+    (activeTab === 'predictions' && (pool.max_entries_per_user > 1 || isPastDeadline))
+
+  useEffect(() => {
+    if (!needsBulk || bulkState !== 'idle') return
+    loadBulkData()
+  }, [needsBulk, bulkState, loadBulkData])
 
   const applyLive = useCallback(async () => {
     // Guard against out-of-order responses: a slow request that lands after a
@@ -637,6 +698,7 @@ export function PoolDetail({
     setMatches(prev => mergeMatches(prev, data))
     setMembers(prev => mergeMembers(prev, data))
     setMatchScores(prev => mergeMatchScores(prev, data))
+    setEntryStats(prev => mergeEntryStats(prev, data))
   }, [pool.pool_id, router])
 
   // Ref to check PredictionsFlow unsaved state
@@ -668,76 +730,81 @@ export function PoolDetail({
     router.push('/pools')
   }
 
-  // Real-time leaderboard updates via Supabase Realtime
-  // Subscribe to pool_entries changes — when recalculatePool() updates scores,
-  // all connected clients get an instant refresh. Debounced so batch updates
-  // (e.g., 12 entries updating) only trigger one refresh.
+  // ---------------------------------------------------------------------------
+  // Real-time leaderboard: Broadcast-from-database.
+  //
+  // WHAT THIS REPLACES: a `postgres_changes` subscription on pool_entries.
+  // Postgres emits ONE EVENT PER ROW, so a 192-entry pool emitted 192 events per
+  // scoring pass, to every subscriber, each billed per recipient — ~9,600
+  // messages for one goal with 50 people watching. And the client used none of
+  // it: it was a doorbell, and then everyone fetched /live over HTTP anyway.
+  //
+  // Now: ONE message per pool per scoring pass, carrying only the rows that
+  // actually moved (shadow_finalize_totals writes diff-aware, so unchanged rows
+  // never reach the trigger's transition table). Same goal, same 50 viewers:
+  // 51 messages. The totals and ranks apply straight from the payload — no
+  // fetch — so the leaderboard moves as soon as the message lands.
+  //
+  // Private topic `pool:{id}:leaderboard`, authorized by the same
+  // realtime.messages policy banter uses (pool membership). Private channels
+  // need the socket to carry the JWT, hence setAuth() before subscribe.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const supabase = createClient()
-    const entryIds = new Set(
-      members.flatMap(m => (m.entries ?? []).map(e => e.entry_id))
-    )
-    if (entryIds.size === 0) return
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-    // Server-side filter so realtime only evaluates/delivers THIS pool's
-    // entry updates to this client (unfiltered, every client received every
-    // pool_entries change app-wide — fan-out scaled with viewer count).
-    // Realtime in-filters have practical size limits, so very large pools
-    // fall back to unfiltered + client-side check (the `entryIds.has` guard
-    // below stays as the correctness filter either way).
-    const entryIdList = Array.from(entryIds)
-    const serverFilter =
-      entryIdList.length > 0 && entryIdList.length <= 100
-        ? `entry_id=in.(${entryIdList.join(',')})`
-        : undefined
+    let active = true
+    let scoresTimer: ReturnType<typeof setTimeout> | null = null
 
     const channel = supabase
-      .channel(`pool-scores-${pool.pool_id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'pool_entries',
-          ...(serverFilter ? { filter: serverFilter } : {}),
-        },
-        (payload) => {
-          // Only refresh if the updated entry belongs to this pool
-          const updatedEntryId = (payload.new as any)?.entry_id
-          if (!updatedEntryId || !entryIds.has(updatedEntryId)) return
+      .channel(`pool:${pool.pool_id}:leaderboard`, { config: { private: true } })
+      .on('broadcast', { event: 'leaderboard_update' }, (msg) => {
+        const payload = (msg as { payload?: { entries?: LiveEntry[] } })?.payload
+        const entries = payload?.entries
+        if (!entries?.length) return
 
-          // Debounce: wait 2s after last update before refreshing
-          // (gives time for all entries to finish writing), plus 0-8s of
-          // random jitter so a goal doesn't make every connected client
-          // refresh in the same second (thundering herd on the server)
-          if (debounceTimer) clearTimeout(debounceTimer)
-          debounceTimer = setTimeout(() => {
-            applyLive()
-          }, 2000 + Math.random() * 8000)
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[realtime] Channel error — falling back to polling')
-        }
+        // Totals and ranks are IN the message — apply immediately.
+        setMembers(prev => mergeMembers(prev, { entries }))
+
+        // The rest of a live row (match scores, form dots, hit rate) still comes
+        // from /live. Debounced with jitter so one goal doesn't make every
+        // connected client fetch in the same second.
+        if (scoresTimer) clearTimeout(scoresTimer)
+        scoresTimer = setTimeout(() => { void applyLive() }, 1500 + Math.random() * 4000)
       })
 
+    // Without the JWT the private-channel policy won't authorize the topic and
+    // no events arrive — silently. Subscribe only after setAuth resolves.
+    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
+      if (active) channel.subscribe()
+    })
+
     return () => {
-      if (debounceTimer) clearTimeout(debounceTimer)
+      active = false
+      if (scoresTimer) clearTimeout(scoresTimer)
       supabase.removeChannel(channel)
     }
-  }, [pool.pool_id, members, applyLive])
+  }, [pool.pool_id, applyLive])
 
-  // Fallback: auto-refresh every 30s on active tabs in case Realtime misses an event
+  // Fallback poll, in case Realtime drops a message (it is a pipe, not a log —
+  // a broadcast sent while the socket is down is gone).
+  //
+  // The interval is deliberately ADAPTIVE. Every 30s regardless of whether
+  // anything could have changed was the single largest source of idle traffic:
+  // 50 people sitting on a finished leaderboard generated ~198 MB/hour of "no
+  // change". With a match live the guarantee is what matters, so the safety net
+  // stays tight; with nothing live nothing CAN move except an admin adjustment,
+  // so a slow tick is enough.
+  const hasLiveMatch = useMemo(
+    () => matches.some(m => m.status === 'live'),
+    [matches],
+  )
   useEffect(() => {
     const autoRefreshTabs: Tab[] = ['leaderboard', 'results', 'my_bracket', 'standings']
     if (!autoRefreshTabs.includes(activeTab)) return
 
-    const interval = setInterval(() => applyLive(), 30000)
+    const intervalMs = hasLiveMatch ? 30_000 : 300_000
+    const interval = setInterval(() => applyLive(), intervalMs)
     return () => clearInterval(interval)
-  }, [activeTab, applyLive])
+  }, [activeTab, applyLive, hasLiveMatch])
 
   const switchTab = useCallback((tab: Tab) => {
     setActiveTab(tab)
@@ -1330,16 +1397,38 @@ export function PoolDetail({
         onTouchEnd={handleTouchEnd}
       >
         <div key={activeTab} className="tab-transition">
+            {/* Tabs built entirely from the pool-wide arrays wait for them rather
+                than rendering an empty state that reads as "your picks are gone". */}
+            {needsBulk && bulkState !== 'ready' && (
+              bulkState === 'error' ? (
+                <div className="rounded-xl p-8 text-center bg-surface border border-border-default">
+                  <p className="text-neutral-500 dark:text-neutral-400 mb-3">
+                    Couldn&apos;t load this tab&apos;s data.
+                  </p>
+                  <button
+                    onClick={() => { setBulkState('idle') }}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                </div>
+              )
+            )}
+            {(!needsBulk || bulkState === 'ready') && <>
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
                 poolId={pool.pool_id}
                 members={members}
-                matchScores={matchScores}
                 bonusScores={bonusScores}
+                entryStats={entryStats}
+                matchdayMVPData={matchdayMVP}
                 matches={matches}
                 teams={teams}
                 conductData={conductData}
-                allPredictions={allPredictions}
                 poolSettings={poolSettings}
                 maxEntriesPerUser={pool.max_entries_per_user}
                 currentUserId={currentUserId}
@@ -1876,6 +1965,7 @@ export function PoolDetail({
                 roundStates={roundStates}
               />
             )}
+            </>}
         </div>
       </main>
 

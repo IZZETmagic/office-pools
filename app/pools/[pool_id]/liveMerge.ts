@@ -1,4 +1,4 @@
-import type { MatchData, MatchScoreNarrow, MemberData } from './types'
+import type { MatchData, MatchScoreNarrow, MemberData, EntryStatsData } from './types'
 import type { PoolLiveResponse } from '@/app/api/pools/[pool_id]/live/route'
 
 /**
@@ -55,8 +55,17 @@ export function mergeMatches(prev: MatchData[], live: PoolLiveResponse): MatchDa
   return changed ? next : prev
 }
 
-/** Apply new totals and ranks to each member's entries. */
-export function mergeMembers(prev: MemberData[], live: PoolLiveResponse): MemberData[] {
+/**
+ * Apply new totals and ranks to each member's entries.
+ *
+ * Takes only the `entries` slice, not the whole response, because two callers
+ * feed it now: the /live HTTP delta and the leaderboard broadcast, which carries
+ * exactly these fields and nothing else.
+ */
+export function mergeMembers(
+  prev: MemberData[],
+  live: Pick<PoolLiveResponse, 'entries'>,
+): MemberData[] {
   if (live.entries.length === 0) return prev
   const byEntry = new Map(live.entries.map((e) => [e.entry_id, e]))
   let changed = false
@@ -119,4 +128,56 @@ export function mergeMatchScores(
   // Whatever is left is a match scored for the first time since page load.
   for (const row of incoming.values()) next.push(row)
   return next
+}
+
+/**
+ * Replace each entry's precomputed leaderboard stats with the fresher row.
+ *
+ * The delta always carries the WHOLE row per entry (they are ~10 fields), so
+ * this is a straight replace rather than a field-wise merge — there is no
+ * partial-stat state to reconcile.
+ *
+ * An entry absent from the delta keeps what it has: the response only omits an
+ * entry when it has no stored row at all (no predictions), and in that case
+ * there was nothing to update. An entry present in the delta but NOT in the
+ * current array is appended — that is an entry whose first-ever row was written
+ * while this page was open.
+ */
+export function mergeEntryStats(
+  prev: EntryStatsData[],
+  live: PoolLiveResponse,
+): EntryStatsData[] {
+  if (live.stats.length === 0) return prev
+  const incoming = new Map(live.stats.map((s) => [s.entry_id, s]))
+
+  let changed = false
+  const next = prev.map((row) => {
+    const update = incoming.get(row.entry_id)
+    if (!update) return row
+    incoming.delete(row.entry_id)
+    // Preserve referential identity when the numbers are unmoved, so an idle
+    // 30s tick doesn't re-render every leaderboard row.
+    if (
+      row.hit_rate === update.hit_rate &&
+      row.exact_count === update.exact_count &&
+      row.total_completed === update.total_completed &&
+      row.contrarian_wins === update.contrarian_wins &&
+      row.crowd_agreement_pct === update.crowd_agreement_pct &&
+      row.total_xp === update.total_xp &&
+      row.current_level === update.current_level &&
+      row.current_streak?.type === update.current_streak?.type &&
+      row.current_streak?.length === update.current_streak?.length &&
+      row.last_five.join() === update.last_five.join()
+    ) {
+      return row
+    }
+    changed = true
+    return update
+  })
+
+  for (const row of incoming.values()) {
+    next.push(row)
+    changed = true
+  }
+  return changed ? next : prev
 }
