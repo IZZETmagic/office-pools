@@ -82,6 +82,10 @@ type Tab =
 /**
  * Tabs that read the pool-wide predictions and/or match_scores arrays.
  *
+ * `analytics` (Form) is deliberately NOT here: it reads the counted crowd
+ * aggregate from /api/pools/:id/crowd plus its own entry's rows, so it opens
+ * without pulling every prediction in the pool.
+ *
  * Everything NOT in this list — leaderboard (the default), standings, pool info,
  * scoring rules, fees, settings — renders without either, which is what makes
  * pool open ~445 kB instead of 7,721 kB on the largest pool.
@@ -90,7 +94,7 @@ type Tab =
  * the post-deadline "everyone else" section and the spectator view; the single
  * active entry's own picks come from their own per-entry fetch.
  */
-const TABS_NEEDING_BULK: Tab[] = ['analytics', 'community', 'results', 'members']
+const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members']
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'community', label: 'Banter' },
@@ -1446,14 +1450,12 @@ export function PoolDetail({
 
             {activeTab === 'analytics' && (
               <AnalyticsTab
+                poolId={pool.pool_id}
                 matches={matches}
-                allPredictions={allPredictions}
-                matchScores={matchScores}
                 entryStats={entryStats}
                 members={members}
                 teams={teams}
                 conductData={conductData}
-                settings={poolSettings}
                 userEntries={entries}
                 currentEntryId={activeEntry?.entry_id || ''}
                 predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}

@@ -3,15 +3,16 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
-import type { PoolSettings } from './results/points'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import {
   matchScoresToPredictionResults,
-  computeCrowdPredictions,
+  applyCrowdOverlay,
+  crowdConsensusFromAggregate,
+  poolWideStatsFromAggregate,
   computeStreaks,
-  computePoolWideStats,
 } from './analytics/analyticsHelpers'
+import type { MatchPredictionAggregate } from './analytics/analyticsHelpers'
 import { computeFullXPBreakdown } from './analytics/xpSystem'
 import { computeFullBPXPBreakdown, computeBPPoolComparison } from './analytics/bracketPickerXpSystem'
 import { XPProgressSection, PoolWideStatsSection } from './analytics/XPProgressSection'
@@ -23,13 +24,11 @@ import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 // =============================================
 
 type AnalyticsTabProps = {
+  poolId: string
   matches: MatchData[]
-  allPredictions: PredictionData[]
-  matchScores: MatchScoreNarrow[]
   members: MemberData[]
   teams: TeamData[]
   conductData: MatchConductData[]
-  settings: PoolSettings
   userEntries: EntryData[]
   currentEntryId: string
   /** Precomputed per-entry rows. Only `highest_level_reached` is read here — the
@@ -66,13 +65,11 @@ function SectionHeader({ emoji, title }: { emoji: string; title: string }) {
 // =============================================
 
 export function AnalyticsTab({
+  poolId,
   matches,
-  allPredictions,
-  matchScores,
   members,
   teams,
   conductData,
-  settings,
   userEntries,
   currentEntryId,
   entryStats,
@@ -88,15 +85,53 @@ export function AnalyticsTab({
   const [selectedEntryId, setSelectedEntryId] = useState(currentEntryId)
   const showEntrySelector = userEntries.length > 1
 
+  // ---------------------------------------------------------------------------
+  // This tab used to receive every prediction and every score row in the pool
+  // (26,770 rows on the largest) and filter them down to ONE entry, plus compute
+  // the crowd split itself. It needs exactly three things, all small:
+  //   1. the pool-wide crowd aggregate — 104 counted rows, from /crowd
+  //   2. the selected entry's own picks
+  //   3. the selected entry's own score rows
+  // 2 and 3 are always the viewer's OWN entries (the selector only lists those),
+  // so no reveal gate applies.
+  // ---------------------------------------------------------------------------
+  const [crowdAggregate, setCrowdAggregate] = useState<MatchPredictionAggregate[]>([])
+  const [entryPredictions, setEntryPredictions] = useState<PredictionData[]>([])
+  const [entryMatchScores, setEntryMatchScores] = useState<MatchScoreNarrow[]>([])
+  // Which entry the fetched rows belong to. Derived rather than a separate
+  // `loading` flag, so switching entries can never show the PREVIOUS entry's
+  // numbers under the new entry's name while the fetch is in flight.
+  const [loadedForEntry, setLoadedForEntry] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/pools/${poolId}/crowd`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { aggregate: [] }))
+      .then(d => { if (!cancelled) setCrowdAggregate(d.aggregate ?? []) })
+      .catch(() => { if (!cancelled) setCrowdAggregate([]) })
+    return () => { cancelled = true }
+  }, [poolId])
+
+  useEffect(() => {
+    if (!selectedEntryId) return
+    let cancelled = false
+    Promise.all([
+      fetch(`/api/pools/${poolId}/entries/${selectedEntryId}/predictions`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : { predictions: [] })).catch(() => ({ predictions: [] })),
+      fetch(`/api/pools/${poolId}/entries/${selectedEntryId}/match-scores`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : { scores: [] })).catch(() => ({ scores: [] })),
+    ]).then(([preds, scores]) => {
+      if (cancelled) return
+      setEntryPredictions(preds.predictions ?? [])
+      setEntryMatchScores(scores.scores ?? [])
+      setLoadedForEntry(selectedEntryId)
+    })
+    return () => { cancelled = true }
+  }, [poolId, selectedEntryId])
+
   // Check if selected entry has been submitted
   const selectedEntry = userEntries.find(e => e.entry_id === selectedEntryId)
   const isEntrySubmitted = selectedEntry?.has_submitted_predictions ?? false
-
-  // Get the selected entry's predictions
-  const entryPredictions = useMemo(() => {
-    if (!isEntrySubmitted) return []
-    return allPredictions.filter(p => p.entry_id === selectedEntryId)
-  }, [allPredictions, selectedEntryId, isEntrySubmitted])
 
   // Check for completed matches
   const completedMatches = useMemo(
@@ -105,16 +140,11 @@ export function AnalyticsTab({
   )
 
   const isBracketPicker = predictionMode === 'bracket_picker'
+  const entryDataLoading = Boolean(selectedEntryId) && loadedForEntry !== selectedEntryId
 
   // =============================================
   // COMPUTED ANALYTICS (memoized)
   // =============================================
-
-  // Per-entry prediction results from stored match_scores (single source of truth)
-  const entryMatchScores = useMemo(() =>
-    matchScores.filter(ms => ms.entry_id === selectedEntryId),
-    [matchScores, selectedEntryId]
-  )
 
   const predictionResults = useMemo(() => {
     if (isBracketPicker || !isEntrySubmitted || entryMatchScores.length === 0) return []
@@ -127,16 +157,21 @@ export function AnalyticsTab({
     [predictionResults]
   )
 
-  // Crowd comparison
+  // Crowd comparison — the consensus half is counted in the database; only the
+  // overlay (was I contrarian? was I right?) is per-entry.
   const crowdData = useMemo(
-    () => computeCrowdPredictions(matches, allPredictions, entryPredictions, members),
-    [matches, allPredictions, entryPredictions, members]
+    () => applyCrowdOverlay(crowdConsensusFromAggregate(matches, crowdAggregate), entryPredictions),
+    [matches, crowdAggregate, entryPredictions]
   )
 
-  // Pool-wide stats
+  // Pool-wide stats — every field is a per-match count or a ratio of them.
   const poolStats = useMemo(
-    () => computePoolWideStats(matches, allPredictions, members, settings),
-    [matches, allPredictions, members, settings]
+    () => poolWideStatsFromAggregate(
+      matches,
+      crowdAggregate,
+      members.reduce((n, m) => n + (m.entries?.length || 0), 0),
+    ),
+    [matches, crowdAggregate, members]
   )
 
   // Permanently-earned badges (append-only badge_unlocks) for the selected
@@ -363,6 +398,18 @@ export function AnalyticsTab({
   // =============================================
   // EMPTY STATE
   // =============================================
+
+  // The entry's own picks and score rows are fetched rather than filtered out of
+  // a pool-wide array now, so wait for them. Without this the tab would render a
+  // full set of zeroed sections for a moment — which reads as "you have no data"
+  // to someone who knows they played.
+  if (entryDataLoading && !isBracketPicker) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    )
+  }
 
   if (completedMatches.length === 0) {
     return (
