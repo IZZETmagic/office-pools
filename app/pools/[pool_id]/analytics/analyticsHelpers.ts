@@ -429,6 +429,127 @@ export function computeCrowdConsensus(
 }
 
 /**
+ * One row of the per-match aggregate (migration 039), counted in the database.
+ * Mirrors what `pool_match_prediction_accuracy(pool_id, submitted_only)` returns.
+ */
+export type MatchPredictionAggregate = {
+  match_id: string
+  total: number
+  correct: number
+  home_count: number
+  draw_count: number
+  away_count: number
+  top_score_home: number
+  top_score_away: number
+  top_score_count: number
+}
+
+/**
+ * The same shape `computeCrowdConsensus` returns, built from the SQL aggregate
+ * instead of from every prediction in the pool.
+ *
+ * Callers must pass the SUBMITTED-ONLY aggregate (`p_submitted_only = true`) —
+ * computeCrowdConsensus ignores unsubmitted drafts, and an unsubmitted draft must
+ * not sway "73% of the pool picked Argentina".
+ *
+ * Verified against computeCrowdConsensus over 312 matches / 3 pools: identical
+ * totals, percentages and majority result. The ONE documented difference is the
+ * top scoreline on a TIE — the JS resolves ties by Map insertion order, the SQL
+ * by (count DESC, home ASC, away ASC). The percentage shown is the same either
+ * way; only which of two equally-popular scorelines is named can differ.
+ */
+export function crowdConsensusFromAggregate(
+  matches: MatchData[],
+  aggregate: MatchPredictionAggregate[],
+): CrowdConsensusMatch[] {
+  const byMatch = new Map(aggregate.map(a => [a.match_id, a]))
+  const results: CrowdConsensusMatch[] = []
+
+  for (const match of matches) {
+    if (!match.is_completed || match.home_score_ft === null || match.away_score_ft === null) continue
+    const a = byMatch.get(match.match_id)
+    // No row means nobody in the pool predicted it — the JS skips those too.
+    if (!a || a.total === 0) continue
+
+    const max = Math.max(a.home_count, a.draw_count, a.away_count)
+    const crowdMajority: 'home' | 'draw' | 'away' =
+      a.home_count === max ? 'home' : a.draw_count === max ? 'draw' : 'away'
+
+    results.push({
+      matchId: match.match_id,
+      matchNumber: match.match_number,
+      stage: match.stage,
+      groupLetter: match.group_letter,
+      homeTeamName: getTeamName(match, 'home'),
+      awayTeamName: getTeamName(match, 'away'),
+      actualHomeScore: match.home_score_ft,
+      actualAwayScore: match.away_score_ft,
+      totalPredictions: a.total,
+      homeWinPct: a.home_count / a.total,
+      drawPct: a.draw_count / a.total,
+      awayWinPct: a.away_count / a.total,
+      mostPopularScore: {
+        home: a.top_score_home,
+        away: a.top_score_away,
+        count: a.top_score_count,
+        pct: a.top_score_count / a.total,
+      },
+      crowdMajorityResult: crowdMajority,
+      actualResult: getWinner(match.home_score_ft, match.away_score_ft),
+    })
+  }
+
+  return results.sort((a, b) => a.matchNumber - b.matchNumber)
+}
+
+/**
+ * `computePoolWideStats` from the same aggregate — every field it returns is a
+ * per-match count or a ratio of them.
+ */
+export function poolWideStatsFromAggregate(
+  matches: MatchData[],
+  aggregate: MatchPredictionAggregate[],
+  totalEntries: number,
+): PoolWideStats {
+  const completed = matches.filter(m => m.is_completed && m.home_score_ft !== null && m.away_score_ft !== null)
+  if (completed.length === 0) {
+    return { mostPredictable: [], leastPredictable: [], avgPoolAccuracy: 0, totalCompletedMatches: 0, totalEntries: 0 }
+  }
+
+  const byMatch = new Map(aggregate.map(a => [a.match_id, a]))
+  const matchStats: MatchPredictability[] = []
+  let correctAcross = 0
+  let totalAcross = 0
+
+  for (const match of completed) {
+    const a = byMatch.get(match.match_id)
+    if (!a || a.total === 0) continue
+    correctAcross += a.correct
+    totalAcross += a.total
+    matchStats.push({
+      matchId: match.match_id,
+      matchNumber: match.match_number,
+      stage: match.stage,
+      homeTeamName: getTeamName(match, 'home'),
+      awayTeamName: getTeamName(match, 'away'),
+      actualScore: `${match.home_score_ft}-${match.away_score_ft}`,
+      totalPredictions: a.total,
+      correctCount: a.correct,
+      hitRate: a.correct / a.total,
+    })
+  }
+
+  const sorted = [...matchStats].sort((a, b) => b.hitRate - a.hitRate)
+  return {
+    mostPredictable: sorted.slice(0, 5),
+    leastPredictable: [...sorted].reverse().slice(0, 5),
+    avgPoolAccuracy: totalAcross > 0 ? correctAcross / totalAcross : 0,
+    totalCompletedMatches: completed.length,
+    totalEntries,
+  }
+}
+
+/**
  * Overlay one entry's picks onto a precomputed consensus. Cheap — one map build
  * over the entry's own predictions, then a lookup per completed match.
  */

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchMatchConductForTournament } from '@/lib/matchConduct'
-import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, computeCrowdPredictions, computePoolWideStats } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
+import { matchScoresToPredictionResults, computeAccuracyByStage, computeOverallAccuracy, computeStreaks, applyCrowdOverlay, crowdConsensusFromAggregate, poolWideStatsFromAggregate } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
+import type { MatchPredictionAggregate } from '@/app/pools/[pool_id]/analytics/analyticsHelpers'
 import { computeFullXPBreakdown, LEVELS, BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/xpSystem'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '@/app/pools/[pool_id]/results/points'
@@ -143,34 +144,21 @@ async function handleGET(
     })),
   }))
 
-  // Get all entry IDs for this pool to fetch all predictions
-  const entryIds = membersData.flatMap(m => m.entries?.map(e => e.entry_id) || [])
-
-  // Fetch all predictions for these entries (needed for crowd data)
-  // Paginate to avoid Supabase's default 1000-row limit
-  let allPredictions: any[] = []
-  if (entryIds.length > 0) {
-    const pageSize = 1000
-    let offset = 0
-    let hasMore = true
-    while (hasMore) {
-      const { data: page } = await adminClient
-        .from('predictions')
-        .select('prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
-        .in('entry_id', entryIds)
-        .order('entry_id', { ascending: true })
-        .order('match_id', { ascending: true })
-        .range(offset, offset + pageSize - 1)
-
-      if (!page || page.length === 0) {
-        hasMore = false
-      } else {
-        allPredictions.push(...page)
-        offset += page.length
-        if (page.length < pageSize) hasMore = false
-      }
-    }
-  }
+  // Per-match crowd aggregate, counted in the database (migration 039).
+  //
+  // This route used to page EVERY prediction in the pool here — 13,385 rows on
+  // the largest — purely to work out how the pool split on each match. Mobile's
+  // Form tab calls this route per viewer with no cache, which made it the
+  // heaviest read left in the product once the leaderboard was fixed.
+  //
+  // `p_submitted_only: true` matches computeCrowdConsensus, which ignores
+  // unsubmitted drafts. Getting that flag wrong would quietly move every
+  // percentage on the page.
+  const { data: aggRows } = await adminClient.rpc('pool_match_prediction_accuracy', {
+    p_pool_id: pool_id,
+    p_submitted_only: true,
+  })
+  const crowdAggregate = (aggRows ?? []) as MatchPredictionAggregate[]
 
   // Normalize match data
   const matchesData: MatchData[] = matches.map((m: any) => ({
@@ -198,18 +186,6 @@ async function handleGET(
     predicted_winner_team_id: p.predicted_winner_team_id ?? null,
   }))
 
-  const allPredsData: PredictionData[] = allPredictions.map((p: any) => ({
-    prediction_id: p.prediction_id,
-    entry_id: p.entry_id,
-    match_id: p.match_id,
-    predicted_home_score: p.predicted_home_score,
-    predicted_away_score: p.predicted_away_score,
-    predicted_home_pso: p.predicted_home_pso ?? null,
-    predicted_away_pso: p.predicted_away_pso ?? null,
-    predicted_winner_team_id: p.predicted_winner_team_id ?? null,
-  }))
-
-  // 7. Compute analytics (wrapped in try/catch so basic data still returns if helpers fail)
   try {
     // Stored match_scores for this entry, via the read source
     const [entryMatchScores, entryScoringMap] = await Promise.all([
@@ -221,8 +197,12 @@ async function handleGET(
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)
-    const crowdData = computeCrowdPredictions(matchesData, allPredsData, entryPredsData, membersData)
-    const poolStats = computePoolWideStats(matchesData, allPredsData, membersData, settings)
+    const crowdData = applyCrowdOverlay(crowdConsensusFromAggregate(matchesData, crowdAggregate), entryPredsData)
+    const poolStats = poolWideStatsFromAggregate(
+      matchesData,
+      crowdAggregate,
+      membersData.reduce((sum, m) => sum + (m.entries?.length || 0), 0),
+    )
     const totalEntries = membersData.reduce((sum, m) => sum + (m.entries?.length || 0), 0)
     // Permanently-recorded unlocks (append-only badge_unlocks ledger) so an
     // earned badge never vanishes from the display when a later recompute no
