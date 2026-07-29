@@ -1446,6 +1446,7 @@ export function PoolDetail({
                 matches={matches}
                 allPredictions={allPredictions}
                 matchScores={matchScores}
+                entryStats={entryStats}
                 members={members}
                 teams={teams}
                 conductData={conductData}
@@ -1902,6 +1903,7 @@ export function PoolDetail({
                 matches={matches}
                 teams={teams}
                 allPredictions={allPredictions}
+                entryStats={entryStats}
                 userEntries={userEntries}
                 settings={settings!}
                 conductData={conductData}

@@ -57,6 +57,7 @@ const stats = (entryId: string, over: Partial<EntryStatsData> = {}): EntryStatsD
   crowd_agreement_pct: 75,
   total_xp: 300,
   current_level: 3,
+  highest_level_reached: 3,
   last_five: ['miss', 'winner', 'exact', 'miss'],
   current_streak: { type: 'none', length: 0 },
   ...over,

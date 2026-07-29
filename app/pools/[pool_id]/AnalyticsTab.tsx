@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from './types'
+import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
 import type { PoolSettings } from './results/points'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
@@ -32,6 +32,10 @@ type AnalyticsTabProps = {
   settings: PoolSettings
   userEntries: EntryData[]
   currentEntryId: string
+  /** Precomputed per-entry rows. Only `highest_level_reached` is read here — the
+   *  rest of this tab still computes live, because it shows the XP BREAKDOWN
+   *  (which events earned what), not just the total. */
+  entryStats: EntryStatsData[]
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   // Bracket picker data
   bpGroupRankings?: BPGroupRanking[]
@@ -71,6 +75,7 @@ export function AnalyticsTab({
   settings,
   userEntries,
   currentEntryId,
+  entryStats,
   predictionMode,
   bpGroupRankings = [],
   bpThirdPlaceRankings = [],
@@ -156,6 +161,16 @@ export function AnalyticsTab({
   // XP SYSTEM (memoized) — Full Tournament & Progressive
   // =============================================
 
+  // Level ratchet (migration 026). Without this the tab computes an UNFLOORED
+  // level, so the same person could read Level 7 here and Level 8 on the
+  // leaderboard — which reads the stored, floored value — and on mobile, whose
+  // API route has always passed this. Same max(highest, current) the route uses.
+  const everReachedLevel = useMemo(() => {
+    const row = entryStats.find(e => e.entry_id === selectedEntryId)
+    if (!row) return undefined
+    return Math.max(row.highest_level_reached ?? 1, row.current_level ?? 1)
+  }, [entryStats, selectedEntryId])
+
   const xpBreakdown = useMemo(() => {
     if (isBracketPicker || !isEntrySubmitted || predictionResults.length === 0) return null
 
@@ -170,8 +185,9 @@ export function AnalyticsTab({
       entryRank,
       totalMatches: matches.length,
       everEarnedBadgeIds,
+      everReachedLevel,
     })
-  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry, everEarnedBadgeIds])
+  }, [predictionResults, matches, crowdData, streaks, entryPredictions, isBracketPicker, isEntrySubmitted, selectedEntry, everEarnedBadgeIds, everReachedLevel])
 
   // =============================================
   // BRACKET PICKER XP SYSTEM (memoized)

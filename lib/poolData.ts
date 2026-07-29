@@ -351,7 +351,7 @@ export async function readEntryStats(
       admin
         .from('entry_xp_state')
         .select(
-          'entry_id, hit_rate, exact_count, total_completed, contrarian_wins, crowd_agreement_pct, total_xp, current_level, last_five, current_streak',
+          'entry_id, hit_rate, exact_count, total_completed, contrarian_wins, crowd_agreement_pct, total_xp, current_level, highest_level_reached, last_five, current_streak',
         )
         .in('entry_id', slice)
         .order('entry_id', { ascending: true })

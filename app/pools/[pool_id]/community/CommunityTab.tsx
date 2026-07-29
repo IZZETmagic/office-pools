@@ -58,6 +58,7 @@ export function CommunityTab({
   matches,
   teams,
   allPredictions,
+  entryStats,
   userEntries,
   settings,
   conductData,
@@ -194,6 +195,11 @@ export function CommunityTab({
     // rebuilt (a full scan of every prediction in the pool) on each iteration.
     const crowdConsensus = computeCrowdConsensus(matches, allPredictions, members)
 
+    // Same max(highest, current) the leaderboard API uses to floor a live level.
+    const everReachedByEntry = new Map(
+      entryStats.map(e => [e.entry_id, Math.max(e.highest_level_reached ?? 1, e.current_level ?? 1)]),
+    )
+
     for (const member of members) {
       const entries = member.entries ?? []
       const bestEntry = entries.length > 0
@@ -262,6 +268,10 @@ export function CommunityTab({
             entryPredictions: entryPreds,
             entryRank: bestEntry.current_rank,
             totalMatches: matches.length,
+            // Level ratchet (migration 026) — same floor the leaderboard reads
+            // and the mobile API applies. Without it the pill beside a name here
+            // disagreed with that member's own leaderboard row.
+            everReachedLevel: everReachedByEntry.get(bestEntry.entry_id),
           })
 
           map.set(member.user_id, {
@@ -281,7 +291,7 @@ export function CommunityTab({
     }
 
     return map
-  }, [members, allPredictions, matches, settings, teams, conductData, predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, poolCreatedAt])
+  }, [members, allPredictions, matches, settings, teams, conductData, predictionMode, allBPGroupRankings, allBPThirdPlaceRankings, allBPKnockoutPicks, poolCreatedAt, entryStats])
 
   // =====================
   // STORED SCORE MAP (single source of truth from DB)

@@ -1,4 +1,4 @@
-import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
+import type { MemberData, MatchData, EntryData, PredictionData, TeamData, SettingsData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from '../types'
 import type { EarnedBadge } from '../analytics/xpSystem'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -154,6 +154,10 @@ export type CommunityTabProps = {
   matches: MatchData[]
   teams: TeamData[]
   allPredictions: PredictionData[]
+  /** Precomputed per-entry rows. Only `highest_level_reached` is read here — the
+   *  level pill beside a name must be floored the same way the leaderboard and
+   *  mobile floor it, or the same person shows two different levels at once. */
+  entryStats: EntryStatsData[]
   userEntries: EntryData[]
   settings: SettingsData
   conductData: MatchConductData[]

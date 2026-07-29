@@ -341,6 +341,11 @@ export type EntryStatsData = {
   crowd_agreement_pct: number
   total_xp: number
   current_level: number
+  /** High-water mark that floors the displayed level, so a corrected formula can
+   *  raise someone's level but never demote them (migration 026). Surfaces that
+   *  recompute XP live must pass this as `everReachedLevel` or they will show an
+   *  unfloored level while the leaderboard and mobile show the floored one. */
+  highest_level_reached: number
   /** Oldest → newest. Padded to 5 with 'no_pick' by the writer; the leaderboard
    *  strips the padding so an entry with 2 results still shows 2 dots. */
   last_five: ('exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick')[]
