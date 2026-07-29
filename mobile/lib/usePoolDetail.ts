@@ -196,6 +196,87 @@ export function usePoolDetail(poolId: string | undefined) {
     };
   }, [poolId]);
 
+  // ---------------------------------------------------------------------------
+  // Live leaderboard, via the same Broadcast-from-database the web client uses.
+  //
+  // WHAT THIS FIXES: mobile's leaderboard was never live. The only realtime
+  // subscription on this screen watches `pool_members` (joins and leaves), and
+  // the leaderboard itself refreshed on screen FOCUS or pull-to-refresh — so
+  // during a match the standings sat still until you navigated away and back.
+  //
+  // The DB trigger (2026-07-29) sends one message per pool per scoring pass on
+  // `pool:{id}:leaderboard`, carrying only the rows whose numbers moved. Points
+  // and ranks apply straight from that payload, so the table reorders within a
+  // second of a goal being scored.
+  //
+  // The message carries the scoring half only — hit rate, form dots, streak and
+  // level come from the leaderboard route — so a debounced refresh follows to
+  // pick those up. Jittered, so one goal does not make every device in the pool
+  // call the API in the same second.
+  useEffect(() => {
+    if (!poolId) return;
+    let active = true;
+    let statsTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const channel = supabase
+      .channel(`pool:${poolId}:leaderboard`, { config: { private: true } })
+      .on('broadcast', { event: 'leaderboard_update' }, (msg) => {
+        const entries = (
+          msg as { payload?: { entries?: Array<Partial<LeaderboardEntry> & { entry_id: string }> } }
+        )?.payload?.entries;
+        if (!entries?.length) return;
+
+        const byEntry = new Map(entries.map((e) => [e.entry_id, e]));
+        setData((prev) => {
+          if (!prev) return prev;
+          let changed = false;
+          const merged = prev.leaderboard.map((row) => {
+            const update = byEntry.get(row.entry_id);
+            if (!update) return row;
+            if (
+              row.match_points === update.match_points &&
+              row.bonus_points === update.bonus_points &&
+              row.total_points === update.total_points &&
+              row.current_rank === update.current_rank &&
+              row.previous_rank === update.previous_rank
+            ) {
+              return row;
+            }
+            changed = true;
+            return { ...row, ...update };
+          });
+          if (!changed) return prev;
+          // The route returns rows already sorted by rank, and a score change
+          // reorders them — re-sort so the table matches what a refresh would
+          // show rather than leaving rows in their pre-goal positions.
+          merged.sort((a, b) => {
+            if (a.current_rank != null && b.current_rank != null && a.current_rank !== b.current_rank) {
+              return a.current_rank - b.current_rank;
+            }
+            return b.total_points - a.total_points;
+          });
+          return { ...prev, leaderboard: merged };
+        });
+
+        if (statsTimer) clearTimeout(statsTimer);
+        statsTimer = setTimeout(() => {
+          void loadRef.current('refresh');
+        }, 1500 + Math.random() * 4000);
+      });
+
+    // Private channels need the socket to carry the user's JWT; setAuth() is
+    // async, so subscribe only after it resolves and only if still mounted.
+    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
+      if (active) channel.subscribe();
+    });
+
+    return () => {
+      active = false;
+      if (statsTimer) clearTimeout(statsTimer);
+      void channel.unsubscribe();
+    };
+  }, [poolId]);
+
   const refresh = useCallback(() => load('refresh'), [load]);
 
   return { data, loading, refreshing, error, refresh };
