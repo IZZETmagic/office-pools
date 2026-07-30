@@ -730,8 +730,8 @@ export function LeaderboardTab({
         type: 'contrarian', emoji: '🎲', title: 'Contrarian King',
         name: getName(bestContrarianEntry),
         detail: `${pct}% picks against consensus`,
-        bgClass: 'bg-[#f3e8ff] dark:bg-[#7c3aed]/10',
-        titleColorClass: 'text-[#7c3aed] dark:text-[#a78bfa]',
+        bgClass: 'bg-primary-600/8',
+        titleColorClass: 'text-primary-700',
       })
     }
 
@@ -1006,48 +1006,58 @@ export function LeaderboardTab({
   // TAILWIND CLASS HELPERS
   // =============================================
 
+  // These mirror LevelPill / FormDots / AwardBadge / rankColor in
+  // mobile/components/pool-detail/leaderboard-shared.tsx. The tint-at-low-alpha
+  // recipe is the app's, and every colour resolves from a token — no literals, so
+  // dark mode follows automatically.
+
   function getLevelPillClasses(level: number): string {
-    if (level >= 10) return 'bg-gradient-to-r from-accent-500 to-warning-500 text-white'
-    if (level >= 8) return 'bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-500'
-    if (level >= 6) return 'bg-warning-100 text-warning-700 dark:bg-warning-500/15 dark:text-warning-500'
-    if (level >= 4) return 'bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-400'
-    return 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+    if (level >= 10) return 'bg-accent-400 text-white'
+    if (level >= 8) return 'bg-warning-500/15 text-warning-700'
+    if (level >= 6) return 'bg-primary-600/12 text-primary-700'
+    if (level >= 4) return 'bg-primary-600/8 text-primary-700'
+    return 'bg-mist text-muted'
   }
 
   function getFormDotClass(type: string): string {
+    // The prediction tiers are mode-invariant in the app, so they use the
+    // --sp-tier-* tokens directly rather than a ramp step. Note `miss` is red
+    // rather than palette.tierMiss — that is what the app actually renders.
     switch (type) {
-      case 'exact': return 'bg-accent-500'
-      case 'winner_gd': return 'bg-success-500'
-      case 'winner': return 'bg-primary-500'
-      case 'miss': return 'bg-danger-400'
-      default: return 'bg-neutral-300 dark:bg-neutral-600'
+      case 'exact': return 'bg-tier-exact'
+      case 'winner_gd': return 'bg-tier-winner-gd'
+      case 'winner': return 'bg-tier-winner'
+      case 'miss': return 'bg-danger-600'
+      default: return 'bg-silver'
     }
   }
 
   function getAwardBadgeClasses(type: string): string {
     switch (type) {
-      case 'mvp': return 'bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-500'
-      case 'contrarian': return 'bg-[#f3e8ff] text-[#7c3aed] dark:bg-[#7c3aed]/15 dark:text-[#a78bfa]'
-      case 'crowd': return 'bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-400'
-      case 'hot': return 'bg-danger-100 text-danger-600 dark:bg-danger-500/15 dark:text-danger-400'
-      case 'cold': return 'bg-primary-100 text-primary-600 dark:bg-primary-500/15 dark:text-primary-400'
-      default: return 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+      case 'mvp': return 'bg-accent-400/15 text-accent-600'
+      // `contrarian` used to be a one-off violet (#f3e8ff/#7c3aed) with no
+      // counterpart anywhere else in the product. It joins `crowd` on primary.
+      case 'contrarian': return 'bg-primary-600/12 text-primary-700'
+      case 'crowd': return 'bg-primary-600/12 text-primary-700'
+      case 'hot': return 'bg-danger-600/12 text-danger-700'
+      case 'cold': return 'bg-primary-600/8 text-primary-700'
+      default: return 'bg-mist text-muted'
     }
   }
 
   function getRankClasses(rank: number): string {
-    if (rank === 1) return 'text-accent-500'
-    if (rank === 2) return 'text-neutral-400'
-    if (rank === 3) return 'text-[#CD7F32]'
-    if (rank <= 10) return 'text-neutral-900 dark:text-white'
-    return 'text-neutral-400 dark:text-neutral-500'
+    if (rank === 1) return 'text-accent-400'
+    if (rank === 2) return 'text-muted'
+    if (rank === 3) return 'text-bronze'
+    if (rank <= 10) return 'text-ink'
+    return 'text-muted'
   }
 
   function getMedalRingClasses(rank: number): string {
-    if (rank === 1) return 'border-accent-500'
-    if (rank === 2) return 'border-neutral-400'
-    if (rank === 3) return 'border-[#CD7F32]'
-    return 'border-neutral-300 dark:border-neutral-600'
+    if (rank === 1) return 'border-accent-400'
+    if (rank === 2) return 'border-silver'
+    if (rank === 3) return 'border-bronze'
+    return 'border-silver'
   }
 
   // Display name helper
@@ -1090,7 +1100,7 @@ export function LeaderboardTab({
 
   if (sorted.length === 0) {
     return (
-      <div className="rounded-xl p-8 text-center bg-surface border border-border-default">
+      <div className="rounded-card p-8 text-center bg-surface border border-border-default">
         <p className="text-neutral-500 dark:text-neutral-400">No members in this pool yet.</p>
       </div>
     )
@@ -1158,11 +1168,14 @@ export function LeaderboardTab({
                 const isFirst = actualRank === 1
                 const delta = getRankDelta(entry, actualRank)
                 const ps = getPlayerScore(entry.entry_id)
+                // Pedestals tint with the same colour as the medal ring: gold, silver,
+                // bronze. Every step now resolves from a token, so the dark variants
+                // that used to be spelled out per-step come for free.
                 const gradientClass = actualRank === 1
-                  ? 'from-accent-100 via-accent-50/60 to-accent-50/20 dark:from-accent-500/20 dark:via-accent-500/8 dark:to-accent-500/[0.03] border-t-2 border-t-accent-500/40'
+                  ? 'from-accent-400/25 via-accent-400/10 to-accent-400/[0.04] border-t-2 border-t-accent-400/40'
                   : actualRank === 2
-                  ? 'from-neutral-200 via-neutral-100/60 to-neutral-100/20 dark:from-neutral-500/20 dark:via-neutral-500/8 dark:to-neutral-500/[0.03] border-t-2 border-t-neutral-400/40'
-                  : 'from-[#F4D0A0]/60 via-[#CD7F32]/15 to-[#CD7F32]/[0.06] dark:from-[#CD7F32]/20 dark:via-[#CD7F32]/8 dark:to-[#CD7F32]/[0.03] border-t-2 border-t-[#CD7F32]/40'
+                  ? 'from-silver/60 via-silver/25 to-silver/[0.08] border-t-2 border-t-silver'
+                  : 'from-bronze/25 via-bronze/10 to-bronze/[0.04] border-t-2 border-t-bronze/40'
                 const pedestalClass = actualRank === 1
                   ? 'h-[130px] sm:h-[180px]'
                   : actualRank === 2
@@ -1183,14 +1196,14 @@ export function LeaderboardTab({
                         >
                           <span className={`${isFirst ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl'}`}>{getMedalEmoji(actualRank)}</span>
                         </div>
-                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black text-white ${
-                          actualRank === 1 ? 'bg-accent-500' : actualRank === 2 ? 'bg-neutral-400' : 'bg-[#CD7F32]'
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-pill flex items-center justify-center t-num text-[10px] sm:text-xs text-white ${
+                          actualRank === 1 ? 'bg-accent-400' : actualRank === 2 ? 'bg-muted' : 'bg-bronze'
                         }`}>
                           {actualRank}
                         </div>
                         {delta !== null && delta !== 0 && (
-                          <div className={`absolute -bottom-1 -left-1 px-1 py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold ${
-                            delta > 0 ? 'bg-success-500 text-white' : 'bg-danger-500 text-white'
+                          <div className={`absolute -bottom-1 -left-1 px-1 py-0.5 rounded-pill text-[8px] sm:text-[9px] font-bold ${
+                            delta > 0 ? 'bg-success-600 text-white' : 'bg-danger-600 text-white'
                           }`}>
                             {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
                           </div>
@@ -1224,7 +1237,7 @@ export function LeaderboardTab({
                       className={`w-full rounded-t-xl bg-gradient-to-b ${gradientClass} flex flex-col items-center justify-start pt-3 sm:pt-4 ${pedestalClass}`}
                     >
                       <div
-                        className="text-xl sm:text-2xl font-black text-primary-500"
+                        className="t-num text-xl sm:text-2xl text-primary-600"
                         style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                       >
                         {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
@@ -1258,26 +1271,25 @@ export function LeaderboardTab({
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-4 gap-y-1">
             <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
             <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
-            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🎲 <span className="text-[#7c3aed] dark:text-[#a78bfa] font-medium">Contrarian King</span></span>
+            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🎲 <span className="text-primary-700 font-medium">Contrarian King</span></span>
             <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
           </div>
+          {/* Driven by getFormDotClass so the key always matches the dots it explains.
+              These were previously hand-written with their own colours, which is how a
+              legend silently starts lying about the thing above it. */}
           <div className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1">
-            <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-success-500" />
-              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Correct</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-accent-500" />
-              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Exact</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-danger-400" />
-              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">Miss</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-full bg-neutral-300 dark:bg-neutral-600" />
-              <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">No Pick</span>
-            </div>
+            {([
+              ['exact', 'Exact'],
+              ['winner_gd', 'W+GD'],
+              ['winner', 'Winner'],
+              ['miss', 'Miss'],
+              ['no_pick', 'No Pick'],
+            ] as const).map(([type, label]) => (
+              <div key={type} className="flex items-center gap-1">
+                <div className={`w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-pill ${getFormDotClass(type)}`} />
+                <span className="text-[10px] sm:text-xs text-muted">{label}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1300,7 +1312,7 @@ export function LeaderboardTab({
       </div>
 
       {/* Desktop leaderboard rows */}
-      <div className="hidden sm:block rounded-xl border border-border-default overflow-hidden bg-surface">
+      <div className="hidden sm:block rounded-card border border-border-default overflow-hidden bg-surface">
         {visibleEntries.map((entry, i) => {
           const rank = sorted.indexOf(entry) + 1
           const ps = getPlayerScore(entry.entry_id)
@@ -1328,7 +1340,7 @@ export function LeaderboardTab({
             >
               {/* Rank */}
               <div className="flex flex-col items-center">
-                <span className="text-sm font-black text-neutral-700 dark:text-neutral-300">#{rank}</span>
+                <span className={`t-num text-sm ${getRankClasses(rank)}`}>#{rank}</span>
                 {delta !== null && delta !== 0 && (
                   <span className={`text-[10px] font-bold ${delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
                     {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
@@ -1400,7 +1412,7 @@ export function LeaderboardTab({
               {/* Stats */}
               <div className="text-right">
                 <div
-                  className="text-base font-black text-primary-500"
+                  className="t-num text-base text-primary-600"
                   style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                 >
                   {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
@@ -1457,7 +1469,7 @@ export function LeaderboardTab({
               <div className="flex items-start gap-2.5">
                 {/* Rank column */}
                 <div className="flex-shrink-0 pt-0.5 flex flex-col items-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-sm font-black text-neutral-700 dark:text-neutral-300">
+                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-chip bg-mist t-num text-sm ${getRankClasses(rank)}`}>
                     #{rank}
                   </span>
                   <div className="mt-0.5">
@@ -1533,7 +1545,7 @@ export function LeaderboardTab({
                 {/* Right stats */}
                 <div className="flex-shrink-0 text-right pt-0.5">
                   <div
-                    className="text-base font-black text-primary-500"
+                    className="t-num text-base text-primary-600"
                     style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                   >
                     {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
@@ -1589,7 +1601,7 @@ export function LeaderboardTab({
       {/* Pool Superlatives */}
       {poolSuperlatives.length > 0 && (
         <div
-          className="bg-surface rounded-xl border border-border-default p-4"
+          className="bg-surface rounded-card border border-border-default p-4"
           style={{ animation: 'fadeUp 0.3s ease 0.3s both' }}
         >
           <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white mb-3">Pool Superlatives</h3>
