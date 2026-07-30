@@ -4,9 +4,9 @@ import { useState } from 'react'
 
 const faqs = [
   {
-    question: 'Is Sport Pool free?',
+    question: 'Is SportPool free?',
     answer:
-      'Yes! Sport Pool is completely free to use. Create unlimited pools and invite as many friends as you want.',
+      'Yes! SportPool is completely free to use. Create unlimited pools and invite as many friends as you want.',
   },
   {
     question: 'When does the 2026 World Cup start?',

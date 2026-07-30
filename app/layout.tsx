@@ -33,8 +33,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://sportpool.io"),
   title: {
-    default: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
-    template: "%s | Sport Pool",
+    default: "SportPool - FIFA World Cup 2026 Prediction Pool",
+    template: "%s | SportPool",
   },
   description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
   manifest: "/manifest.json",
@@ -45,20 +45,20 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Sport Pool",
+    title: "SportPool",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://sportpool.io",
-    siteName: "Sport Pool",
-    title: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+    siteName: "SportPool",
+    title: "SportPool - FIFA World Cup 2026 Prediction Pool",
     description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Sport Pool - FIFA World Cup 2026 Prediction Pool" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "SportPool - FIFA World Cup 2026 Prediction Pool" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sport Pool - FIFA World Cup 2026 Prediction Pool",
+    title: "SportPool - FIFA World Cup 2026 Prediction Pool",
     description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
     images: ["/og-image.png"],
   },

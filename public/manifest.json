@@ -1,6 +1,6 @@
 {
-  "name": "Sport Pool - FIFA World Cup 2026 Prediction Pool",
-  "short_name": "Sport Pool",
+  "name": "SportPool - FIFA World Cup 2026 Prediction Pool",
+  "short_name": "SportPool",
   "description": "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
   "start_url": "/",
   "display": "standalone",

@@ -169,7 +169,7 @@ export default function TVDemoPage() {
           {/* ─── Footer ─── */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
             <div className="flex items-center gap-2 text-sm text-white/30">
-              &#9917; Powered by <span className="font-bold text-white/50">Sport Pool</span> &middot; sportpool.io
+              &#9917; Powered by <span className="font-bold text-white/50">SportPool</span> &middot; sportpool.io
             </div>
             <div className="flex items-center gap-3 px-4 py-2 rounded-xl border border-white/[0.08]" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
               {qrDataUrl ? (

@@ -5,7 +5,7 @@ import { PublicNav } from '@/components/PublicNav'
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description:
-    'Terms of Service for Sport Pool — the free FIFA World Cup 2026 prediction pool platform.',
+    'Terms of Service for SportPool — the free FIFA World Cup 2026 prediction pool platform.',
 }
 
 export default function TermsPage() {
@@ -22,7 +22,7 @@ export default function TermsPage() {
               Terms of Service
             </h1>
             <p className="mt-4 text-lg text-neutral-700 max-w-2xl mx-auto">
-              Please read these terms carefully before using Sport Pool.
+              Please read these terms carefully before using SportPool.
             </p>
           </div>
         </div>
@@ -41,7 +41,7 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Sport Pool (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website at sportpool.io (the &quot;Service&quot;). Sport Pool is a free prediction pool platform that allows users to create and join prediction pools for the FIFA World Cup 2026 and compete with friends on leaderboards.
+                  SportPool (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website at sportpool.io (the &quot;Service&quot;). SportPool is a free prediction pool platform that allows users to create and join prediction pools for the FIFA World Cup 2026 and compete with friends on leaderboards.
                 </p>
                 <p>
                   By accessing or using the Service, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.
@@ -83,13 +83,13 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Sport Pool allows users to create prediction pools, invite friends, and predict match results for the FIFA World Cup 2026. Points are awarded based on the accuracy of predictions, and leaderboards track participant rankings within each pool.
+                  SportPool allows users to create prediction pools, invite friends, and predict match results for the FIFA World Cup 2026. Points are awarded based on the accuracy of predictions, and leaderboards track participant rankings within each pool.
                 </p>
                 <p>
-                  <strong>Sport Pool is not a gambling platform.</strong> No real money, prizes, or anything of monetary value is wagered, won, or lost through the Service. The platform is intended purely for entertainment and friendly competition. See Section 5 for how entry fees and prizes are handled.
+                  <strong>SportPool is not a gambling platform.</strong> No real money, prizes, or anything of monetary value is wagered, won, or lost through the Service. The platform is intended purely for entertainment and friendly competition. See Section 5 for how entry fees and prizes are handled.
                 </p>
                 <p>
-                  Scoring rules, multipliers, and bonus points are customizable by pool administrators. Sport Pool calculates points automatically based on the configured rules and official match results. Pool administrators may also allow members to submit multiple independent entries to a single pool, each with its own predictions and leaderboard position.
+                  Scoring rules, multipliers, and bonus points are customizable by pool administrators. SportPool calculates points automatically based on the configured rules and official match results. Pool administrators may also allow members to submit multiple independent entries to a single pool, each with its own predictions and leaderboard position.
                 </p>
                 <p>
                   The Service includes community features such as in-pool chat, emoji reactions, pinned messages, and @mentions. See Section 7 for rules that apply to content you post.
@@ -107,13 +107,13 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Sport Pool does not collect, hold, process, or disburse money. We are not a payment processor, escrow service, or prize sponsor.
+                  SportPool does not collect, hold, process, or disburse money. We are not a payment processor, escrow service, or prize sponsor.
                 </p>
                 <p>
-                  Pool administrators may independently organize entry fees and prizes with the members of their pool &mdash; for example, collecting contributions through an external payment app and awarding a prize to the winner. Sport Pool provides only an optional tool for admins to mark a member&apos;s entry as paid or unpaid. This flag is a record-keeping convenience; it does not evidence payment to Sport Pool, does not create any obligation on Sport Pool, and does not make Sport Pool a party to any fee or prize arrangement.
+                  Pool administrators may independently organize entry fees and prizes with the members of their pool &mdash; for example, collecting contributions through an external payment app and awarding a prize to the winner. SportPool provides only an optional tool for admins to mark a member&apos;s entry as paid or unpaid. This flag is a record-keeping convenience; it does not evidence payment to SportPool, does not create any obligation on SportPool, and does not make SportPool a party to any fee or prize arrangement.
                 </p>
                 <p>
-                  Any dispute over fees, prizes, or payouts is solely between the members and the pool administrator. You agree that Sport Pool has no liability for any such arrangement and is not responsible for ensuring that fees are collected or that prizes are paid.
+                  Any dispute over fees, prizes, or payouts is solely between the members and the pool administrator. You agree that SportPool has no liability for any such arrangement and is not responsible for ensuring that fees are collected or that prizes are paid.
                 </p>
                 <p>
                   You are responsible for ensuring that any fee or prize arrangement you participate in complies with the laws of your jurisdiction, including any laws governing contests, sweepstakes, or gambling.
@@ -128,13 +128,13 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Organizations, companies, and communities may operate branded (white-labeled) pools on Sport Pool. A branded pool may display a custom name, logo, color, and landing page chosen by the sponsoring organization.
+                  Organizations, companies, and communities may operate branded (white-labeled) pools on SportPool. A branded pool may display a custom name, logo, color, and landing page chosen by the sponsoring organization.
                 </p>
                 <p>
-                  Brand assets displayed in a branded pool remain the property of their respective owners and are used with permission of the sponsoring organization. Sport Pool does not endorse any branded pool, offer, or external prize.
+                  Brand assets displayed in a branded pool remain the property of their respective owners and are used with permission of the sponsoring organization. SportPool does not endorse any branded pool, offer, or external prize.
                 </p>
                 <p>
-                  If you participate in a branded pool, any relationship with the sponsoring organization (including any promotions, prizes, or communications they provide) is between you and that organization. Sport Pool&apos;s role is limited to operating the underlying platform, and platform-wide rules including Section 7 (User-Generated Content) and Section 8 (Acceptable Use) apply inside branded pools.
+                  If you participate in a branded pool, any relationship with the sponsoring organization (including any promotions, prizes, or communications they provide) is between you and that organization. SportPool&apos;s role is limited to operating the underlying platform, and platform-wide rules including Section 7 (User-Generated Content) and Section 8 (Acceptable Use) apply inside branded pools.
                 </p>
               </div>
             </div>
@@ -149,10 +149,10 @@ export default function TermsPage() {
                   Some features of the Service let you post content that other users can see &mdash; including pool names and descriptions, entry names, chat messages, emoji reactions, pinned messages, and @mentions. We call these collectively &quot;User Content.&quot;
                 </p>
                 <p>
-                  You are solely responsible for the User Content you post. You represent that you have the right to post it and that it does not violate any law or any third party&apos;s rights. By posting User Content, you grant Sport Pool a non-exclusive, royalty-free, worldwide license to host, store, reproduce, and display that content as necessary to operate the Service &mdash; for example, showing your chat messages to other members of the same pool.
+                  You are solely responsible for the User Content you post. You represent that you have the right to post it and that it does not violate any law or any third party&apos;s rights. By posting User Content, you grant SportPool a non-exclusive, royalty-free, worldwide license to host, store, reproduce, and display that content as necessary to operate the Service &mdash; for example, showing your chat messages to other members of the same pool.
                 </p>
                 <p>
-                  Pool administrators and Sport Pool may remove User Content that we believe violates these Terms, the Acceptable Use rules in Section 8, or applicable law, and we may do so without notice. We are not obligated to pre-screen or monitor User Content, and we make no guarantee about the accuracy, legality, or safety of content posted by other users.
+                  Pool administrators and SportPool may remove User Content that we believe violates these Terms, the Acceptable Use rules in Section 8, or applicable law, and we may do so without notice. We are not obligated to pre-screen or monitor User Content, and we make no guarantee about the accuracy, legality, or safety of content posted by other users.
                 </p>
               </div>
             </div>
@@ -170,7 +170,7 @@ export default function TermsPage() {
                   <li>Use automated tools, bots, or scripts to access or interact with the Service</li>
                   <li>Harass, bully, threaten, dox, or discriminate against other users, including in pool chat or @mentions</li>
                   <li>Post hate speech, sexually explicit content, or content that encourages violence or self-harm</li>
-                  <li>Impersonate another person, including pool administrators or Sport Pool staff</li>
+                  <li>Impersonate another person, including pool administrators or SportPool staff</li>
                   <li>Post spam, unsolicited promotions, phishing links, or malware in chat, pool names, or any other field</li>
                   <li>Upload or transmit harmful content, spam, or malware</li>
                   <li>Attempt to access other users&apos; accounts or private data</li>
@@ -190,7 +190,7 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  The Service, including its design, features, code, and branding, is owned by Sport Pool and protected by intellectual property laws. You may not copy, modify, distribute, or reverse-engineer any part of the Service without our written consent.
+                  The Service, including its design, features, code, and branding, is owned by SportPool and protected by intellectual property laws. You may not copy, modify, distribute, or reverse-engineer any part of the Service without our written consent.
                 </p>
                 <p>
                   You retain ownership of any content you submit through the Service, such as pool names and descriptions. By submitting content, you grant us a non-exclusive, worldwide license to use, display, and store that content as necessary to operate the Service.
@@ -211,7 +211,7 @@ export default function TermsPage() {
                   We do not guarantee that the Service will be uninterrupted, error-free, or secure. Match results and scoring are processed based on data available to us, and while we strive for accuracy, we do not guarantee the correctness of any data displayed on the platform.
                 </p>
                 <p>
-                  Sport Pool does not provide financial, gambling, or betting advice. The Service is for entertainment purposes only.
+                  SportPool does not provide financial, gambling, or betting advice. The Service is for entertainment purposes only.
                 </p>
               </div>
             </div>
@@ -223,7 +223,7 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  To the maximum extent permitted by law, Sport Pool and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or goodwill, arising out of or in connection with your use of the Service.
+                  To the maximum extent permitted by law, SportPool and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or goodwill, arising out of or in connection with your use of the Service.
                 </p>
                 <p>
                   Our total liability for any claim related to the Service shall not exceed the amount you paid to use the Service (which, as a free platform, is zero).

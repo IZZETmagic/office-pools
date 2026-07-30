@@ -328,7 +328,7 @@ export default function PlayDemoPage() {
       <footer className="py-8 border-t border-neutral-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm text-neutral-400">
-            ⚽ Powered by <span className="font-semibold text-neutral-500">Sport Pool</span> &middot; sportpool.io
+            ⚽ Powered by <span className="font-semibold text-neutral-500">SportPool</span> &middot; sportpool.io
           </p>
         </div>
       </footer>

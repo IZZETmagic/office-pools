@@ -1,25 +1,40 @@
 import { cn } from '@/lib/utils/cn'
 
 /**
- * The SportPool wordmark is type, not an image — "Sport" in ink, "Pool" in the
- * brand blue, set in Nunito 900. Ported from mobile/components/ui/Wordmark.tsx,
- * including its line-height rule (round(size * 1.1)).
+ * The SportPool wordmark is type, not an image — one word, no space, "Sport" in ink
+ * and "Pool" in the brand blue, set in Nunito 900. Ported from
+ * mobile/components/ui/Wordmark.tsx, including its line-height rule
+ * (round(size * 1.1)).
+ *
+ * Use this anywhere the brand appears as a mark. Prose that merely mentions the
+ * product ("Welcome to SportPool") is ordinary text and does not need it.
  */
 type WordmarkProps = {
   /** Font size in px. RN uses 32 in the home header, 44 on the splash. */
   size?: number
-  /** On dark or branded surfaces, "Sport" turns white and "Pool" stays blue. */
+  /** On dark surfaces: "Sport" turns white, "Pool" keeps the brand blue. */
   onDark?: boolean
+  /**
+   * Render the whole wordmark in a single colour, inherited from the parent.
+   * For surfaces that require all-white or all-black — a pool's brand-coloured
+   * header, the TV boards, a monochrome print or favicon context — where the
+   * brand blue would either clash with the background or disappear into it.
+   */
+  mono?: boolean
   className?: string
 }
 
-export function Wordmark({ size = 32, onDark = false, className }: WordmarkProps) {
+export function Wordmark({ size = 32, onDark = false, mono = false, className }: WordmarkProps) {
   return (
     <span
-      className={cn('font-black select-none', onDark ? 'text-white' : 'text-ink', className)}
+      className={cn(
+        'font-black select-none whitespace-nowrap',
+        mono ? undefined : onDark ? 'text-white' : 'text-ink',
+        className,
+      )}
       style={{ fontSize: size, lineHeight: `${Math.round(size * 1.1)}px` }}
     >
-      Sport<span className="text-primary-600">Pool</span>
+      Sport<span className={mono ? undefined : 'text-primary-600'}>Pool</span>
     </span>
   )
 }

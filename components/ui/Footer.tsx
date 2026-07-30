@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Wordmark } from './Wordmark'
 
 const HIDDEN_ROUTES = ['/login', '/signup']
 
@@ -24,13 +25,19 @@ export default function Footer() {
     <footer className="bg-neutral-900 text-neutral-300 dark:bg-surface dark:text-neutral-500 dark:border-t dark:border-border-default">
       {/* Mobile: minimal copyright only (links are in hamburger menu) */}
       <div className="sm:hidden py-4 text-center text-xs">
-        &copy; 2026 Sport Pool. All rights reserved.
+        &copy; 2026 SportPool. All rights reserved.
       </div>
 
       {/* Desktop: compact single-row footer */}
       <div className="hidden sm:block py-4">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between gap-6">
-          <span className="text-white dark:text-neutral-900 text-sm font-bold shrink-0">&#9917; Sport Pool</span>
+          {/* The footer bar is a solid dark slab (inverted in dark mode), so the
+              wordmark goes mono and inherits the bar's colour — the brand blue
+              would not read against it. */}
+          <span className="flex items-center gap-1.5 text-white dark:text-neutral-900 shrink-0">
+            <span className="text-sm">&#9917;</span>
+            <Wordmark size={14} mono />
+          </span>
           <nav className="flex items-center gap-4 text-xs">
             {!isLoggedIn && (
               <>
@@ -43,7 +50,7 @@ export default function Footer() {
             <Link href="/privacy" className="hover:text-white dark:hover:text-neutral-900 transition">Privacy</Link>
             <Link href="/terms" className="hover:text-white dark:hover:text-neutral-900 transition">Terms</Link>
           </nav>
-          <span className="text-xs shrink-0">&copy; 2026 Sport Pool</span>
+          <span className="text-xs shrink-0">&copy; 2026 SportPool</span>
         </div>
       </div>
     </footer>

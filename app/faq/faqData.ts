@@ -15,14 +15,14 @@ export const faqCategories: FAQCategory[] = [
     icon: '📋',
     items: [
       {
-        question: 'What is Sport Pool?',
+        question: 'What is SportPool?',
         answer:
-          'Sport Pool is a free prediction pool platform for the FIFA World Cup 2026. Create or join pools with friends, predict match results for all 104 matches, and compete on live leaderboards.',
+          'SportPool is a free prediction pool platform for the FIFA World Cup 2026. Create or join pools with friends, predict match results for all 104 matches, and compete on live leaderboards.',
       },
       {
-        question: 'Is Sport Pool free?',
+        question: 'Is SportPool free?',
         answer:
-          'Yes! Sport Pool is completely free to use. Create unlimited pools, invite as many friends as you want, and enjoy all features at no cost.',
+          'Yes! SportPool is completely free to use. Create unlimited pools, invite as many friends as you want, and enjoy all features at no cost.',
       },
       {
         question: 'When does the 2026 World Cup start?',
@@ -185,7 +185,7 @@ export const faqCategories: FAQCategory[] = [
     icon: '🔔',
     items: [
       {
-        question: 'What types of emails does Sport Pool send?',
+        question: 'What types of emails does SportPool send?',
         answer:
           'Emails fall into six categories: Pool Activity (member joins, invites, pool updates), Predictions (deadline reminders, confirmations), Match Results (scores and points earned), Leaderboard (rank changes, weekly recaps), Admin (settings changes, member actions), and Community (mentions and broadcasts).',
       },
@@ -213,12 +213,12 @@ export const faqCategories: FAQCategory[] = [
       {
         question: 'Who can see my chat messages?',
         answer:
-          'Chat messages, reactions, pins, and @mentions are visible to every member of that pool. Pool admins and Sport Pool super admins may also view chat content for moderation. Messages are not shared with members of other pools.',
+          'Chat messages, reactions, pins, and @mentions are visible to every member of that pool. Pool admins and SportPool super admins may also view chat content for moderation. Messages are not shared with members of other pools.',
       },
       {
         question: 'Can admins moderate chat?',
         answer:
-          'Yes. Pool admins can remove messages and members that violate our Acceptable Use rules. Sport Pool may also remove content or accounts at our discretion if they break our Terms of Service.',
+          'Yes. Pool admins can remove messages and members that violate our Acceptable Use rules. SportPool may also remove content or accounts at our discretion if they break our Terms of Service.',
       },
     ],
   },
@@ -227,14 +227,14 @@ export const faqCategories: FAQCategory[] = [
     icon: '💳',
     items: [
       {
-        question: 'Does Sport Pool take payments or charge fees?',
+        question: 'Does SportPool take payments or charge fees?',
         answer:
-          'No. Sport Pool is free and does not process payments. We are not a payment processor and we do not collect, hold, or disburse money.',
+          'No. SportPool is free and does not process payments. We are not a payment processor and we do not collect, hold, or disburse money.',
       },
       {
         question: 'How do pool admins collect entry fees?',
         answer:
-          'Any entry fee or prize arrangement is organized off-platform by the pool admin — typically using an external payment app like Venmo, PayPal, or cash. Sport Pool provides only an optional tool for admins to mark each member\'s entry as paid or unpaid. We are not a party to fee or prize arrangements, and any dispute is between the members and the admin.',
+          'Any entry fee or prize arrangement is organized off-platform by the pool admin — typically using an external payment app like Venmo, PayPal, or cash. SportPool provides only an optional tool for admins to mark each member\'s entry as paid or unpaid. We are not a party to fee or prize arrangements, and any dispute is between the members and the admin.',
       },
       {
         question: 'What is a branded pool?',

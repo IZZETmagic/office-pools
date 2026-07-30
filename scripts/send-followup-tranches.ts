@@ -39,7 +39,7 @@ const TRANCHES = Number((args.find((a) => a.startsWith('--tranches=')) || '').sp
 const INTERVAL_MIN = Number((args.find((a) => a.startsWith('--interval-min=')) || '').split('=')[1] || 10)
 const ONLY = (args.find((a) => a.startsWith('--only=')) || '').split('=')[1] || 'all'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
-const FROM = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+const FROM = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
 const LEDGER = resolve(process.cwd(), 'scripts/.followup_send_ledger.jsonl')
 const BATCH = 100
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))

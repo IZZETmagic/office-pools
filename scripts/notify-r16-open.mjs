@@ -38,7 +38,7 @@ const MARKER = resolve(process.cwd(), 'scripts/.notify-r16-open.sent')
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const FROM = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+const FROM = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 const TOPIC_ID = process.env.RESEND_TOPIC_POOL_ACTIVITY || null
 
@@ -68,7 +68,7 @@ function baseTemplate({ preheader, heading, body, ctaText, ctaUrl }) {
     <tr><td align="center">
       <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">SportPool</h1>
         </td></tr>
         <tr><td style="padding:32px;">
           <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
@@ -80,7 +80,7 @@ function baseTemplate({ preheader, heading, body, ctaText, ctaUrl }) {
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
           <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
-            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">SportPool</a> &middot;
             <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
             <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
           </p>

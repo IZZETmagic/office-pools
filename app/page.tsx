@@ -57,20 +57,20 @@ export default function Home() {
       <JsonLd data={{
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "Sport Pool",
+        "name": "SportPool",
         "url": "https://sportpool.io",
         "description": "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
         "applicationCategory": "SportsApplication",
         "operatingSystem": "Web",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "author": { "@type": "Organization", "name": "Sport Pool", "url": "https://sportpool.io" },
+        "author": { "@type": "Organization", "name": "SportPool", "url": "https://sportpool.io" },
       }} />
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-neutral-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="text-xl font-bold text-neutral-900">
-              ⚽ Sport Pool
+              ⚽ SportPool
             </Link>
             <div className="flex items-center gap-3">
               <Button href="/login" variant="outline" size="sm">

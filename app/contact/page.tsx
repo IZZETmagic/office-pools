@@ -5,7 +5,7 @@ import { ContactForm } from './ContactForm'
 export const metadata: Metadata = {
   title: 'Contact Us',
   description:
-    'Get in touch with the Sport Pool team. Have a question, feedback, or need help? Send us a message.',
+    'Get in touch with the SportPool team. Have a question, feedback, or need help? Send us a message.',
 }
 
 export default function ContactPage() {

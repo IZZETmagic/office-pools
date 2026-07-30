@@ -575,7 +575,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               <span className="text-base">{pool.brand_emoji}</span>
                             )}
                             <span className="text-xs font-bold">{pool.brand_name}</span>
-                            <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by Sport Pool</span>
+                            <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by SportPool</span>
                           </div>
                         )}
 

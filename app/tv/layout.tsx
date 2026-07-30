@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'TV Leaderboard | Sport Pool',
+  title: 'TV Leaderboard | SportPool',
 }
 
 export default function TVLayout({ children }: { children: React.ReactNode }) {

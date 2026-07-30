@@ -25,7 +25,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         {/* Top — brand */}
         <div className="relative z-10 grid grid-cols-[auto_1fr] gap-x-3 items-start">
           <span className="text-4xl row-span-2">&#9917;</span>
-          <h1 className="text-3xl font-bold tracking-tight">Sport Pool</h1>
+          <Wordmark size={30} mono />
           <p className="text-primary-200 dark:text-white/50 text-lg">FIFA World Cup 2026</p>
         </div>
 
@@ -58,7 +58,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* Bottom */}
         <div className="relative z-10 text-primary-300 dark:text-white/40 text-sm">
-          &copy; 2026 Sport Pool
+          &copy; 2026 SportPool
         </div>
       </div>
 

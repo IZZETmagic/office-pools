@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'RESEND_AUDIENCE_ID or RESEND_BROADCAST_AUDIENCE_ID not configured' }, { status: 500 })
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
     const segmentKey = segment as SegmentKey
     const broadcastName = `${subject} [${SEGMENTS[segmentKey].label}]`
     let targetAudienceId: string

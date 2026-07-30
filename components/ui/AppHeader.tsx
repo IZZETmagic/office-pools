@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/components/ThemeProvider'
+import { Wordmark } from './Wordmark'
 
 type ColorMode = 'light' | 'dark' | 'system'
 
@@ -64,8 +65,10 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: 
       <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         {/* Left: Brand + breadcrumbs */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-neutral-900 shrink-0">
-            &#9917; Sport Pool
+          <Link href="/dashboard" className="flex items-center gap-1.5 shrink-0">
+            <span className="text-lg sm:text-xl">&#9917;</span>
+            <Wordmark size={20} className="hidden sm:inline" />
+            <Wordmark size={18} className="sm:hidden" />
           </Link>
           {breadcrumbs && breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 text-sm">

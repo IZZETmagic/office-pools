@@ -5,7 +5,7 @@ import { PublicNav } from '@/components/PublicNav'
 export const metadata: Metadata = {
   title: 'Delete Your Account',
   description:
-    'How to delete your Sport Pool account and what happens to your data when you do.',
+    'How to delete your SportPool account and what happens to your data when you do.',
 }
 
 export default function DeleteAccountPage() {
@@ -21,7 +21,7 @@ export default function DeleteAccountPage() {
               Delete Your Account
             </h1>
             <p className="mt-4 text-lg text-neutral-700 max-w-2xl mx-auto">
-              How to request deletion of your Sport Pool account and what
+              How to request deletion of your SportPool account and what
               happens to your data.
             </p>
           </div>
@@ -31,15 +31,15 @@ export default function DeleteAccountPage() {
       {/* Content */}
       <section className="py-16 sm:py-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 text-neutral-800">
-          {/* 1. About Sport Pool */}
+          {/* 1. About SportPool */}
           <div>
             <h2 className="text-2xl font-bold text-neutral-900 mb-3">
-              About Sport Pool
+              About SportPool
             </h2>
             <p>
-              Sport Pool is a free prediction pool platform for sports
+              SportPool is a free prediction pool platform for sports
               tournaments, operated by Ryan Sousa. This page explains how to
-              delete your Sport Pool account along with the data we associate
+              delete your SportPool account along with the data we associate
               with it.
             </p>
           </div>
@@ -50,11 +50,11 @@ export default function DeleteAccountPage() {
               How to delete your account
             </h2>
             <p className="mb-4">
-              You can delete your Sport Pool account directly from the app at
+              You can delete your SportPool account directly from the app at
               any time. No support request or email is required.
             </p>
             <ol className="list-decimal list-inside space-y-2 ml-2">
-              <li>Open the Sport Pool app on your phone (iOS or Android).</li>
+              <li>Open the SportPool app on your phone (iOS or Android).</li>
               <li>Sign in if you are not already signed in.</li>
               <li>
                 Tap the <strong>Profile</strong> tab in the bottom navigation.

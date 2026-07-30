@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'RESEND_AUDIENCE_ID not configured' }, { status: 500 })
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
     const broadcastName = `Countdown: ${milestone} [All Users]`
 
     const { data: broadcast, error: createError } = await resend.broadcasts.create({

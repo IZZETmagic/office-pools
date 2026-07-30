@@ -1116,7 +1116,7 @@ export function PoolDetail({
               {brandLogo}
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-bold text-white truncate">{pool.pool_name}</h1>
-                <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Sport Pool</p>
+                <p className="text-[11px] font-medium hidden sm:block" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by SportPool</p>
               </div>
             </div>
             {/* Desktop nav links */}
@@ -1179,7 +1179,7 @@ export function PoolDetail({
             </div>
           </div>
         ) : (
-          /* ── Standard Sport Pool header ── */
+          /* ── Standard SportPool header ── */
           <AppHeader
             sticky={false}
             breadcrumbs={[

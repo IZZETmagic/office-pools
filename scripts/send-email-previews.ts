@@ -73,7 +73,7 @@ async function main() {
   const width = String(samples.length).length
 
   console.log(`\n  Recipient : ${RECIPIENT}`)
-  console.log(`  From      : ${process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'}`)
+  console.log(`  From      : ${process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'}`)
   console.log(`  Templates : ${samples.length}${ONLY ? ` (group "${ONLY}")` : ''}`)
   console.log(`  Mode      : ${DO_SEND ? 'SEND' : 'DRY RUN (pass --run to send)'}\n`)
 

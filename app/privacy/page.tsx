@@ -5,7 +5,7 @@ import { PublicNav } from '@/components/PublicNav'
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
-    'Privacy Policy for Sport Pool — learn how we collect, use, and protect your personal information.',
+    'Privacy Policy for SportPool — learn how we collect, use, and protect your personal information.',
 }
 
 export default function PrivacyPage() {
@@ -41,10 +41,10 @@ export default function PrivacyPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Sport Pool (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website at sportpool.io (the &quot;Service&quot;). This Privacy Policy describes how we collect, use, and protect your personal information when you use our Service.
+                  SportPool (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website at sportpool.io (the &quot;Service&quot;). This Privacy Policy describes how we collect, use, and protect your personal information when you use our Service.
                 </p>
                 <p>
-                  By using Sport Pool, you agree to the collection and use of information as described in this policy. If you do not agree, please do not use the Service.
+                  By using SportPool, you agree to the collection and use of information as described in this policy. If you do not agree, please do not use the Service.
                 </p>
               </div>
             </div>
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-2">Entry-Fee Tracking</h3>
                   <p>
-                    Pool administrators may track whether members have paid an entry fee. If an admin marks your entry as paid, we store a paid/unpaid flag and the date it was recorded. <strong>Sport Pool does not process payments, and no card, bank, or payment-processor data is collected or stored.</strong> Any actual collection of fees happens outside the Service.
+                    Pool administrators may track whether members have paid an entry fee. If an admin marks your entry as paid, we store a paid/unpaid flag and the date it was recorded. <strong>SportPool does not process payments, and no card, bank, or payment-processor data is collected or stored.</strong> Any actual collection of fees happens outside the Service.
                   </p>
                 </div>
                 <div>
@@ -112,7 +112,7 @@ export default function PrivacyPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-2">Mobile Push Notifications</h3>
                   <p>
-                    When you use the Sport Pool mobile app and grant notification permission, your device&apos;s operating system issues us a push notification token (an APNs device token on iOS or an Expo push token routed via Firebase Cloud Messaging on Android). We store this token, the platform it was issued for, and your per-category notification preferences so we can deliver pushes about pool activity, prediction deadlines, match results, leaderboard changes, mentions, and badges or level-ups you earn. You can revoke notification permission at any time in your device settings, and you can toggle individual categories off from your profile in the app &mdash; in either case we stop sending the affected pushes and remove invalid tokens automatically.
+                    When you use the SportPool mobile app and grant notification permission, your device&apos;s operating system issues us a push notification token (an APNs device token on iOS or an Expo push token routed via Firebase Cloud Messaging on Android). We store this token, the platform it was issued for, and your per-category notification preferences so we can deliver pushes about pool activity, prediction deadlines, match results, leaderboard changes, mentions, and badges or level-ups you earn. You can revoke notification permission at any time in your device settings, and you can toggle individual categories off from your profile in the app &mdash; in either case we stop sending the affected pushes and remove invalid tokens automatically.
                   </p>
                 </div>
               </div>
@@ -131,7 +131,7 @@ export default function PrivacyPage() {
                   <li>Calculate scores, update leaderboards, and process predictions</li>
                   <li>Deliver community features such as pool chat, reactions, and @mentions</li>
                   <li>Send you email notifications about pool activity, prediction deadlines, match results, leaderboard updates, and administrative events, subject to your notification preferences</li>
-                  <li>Send push notifications to your mobile device about the same categories of events when you use the Sport Pool mobile app and have granted notification permission, subject to your per-category notification preferences</li>
+                  <li>Send push notifications to your mobile device about the same categories of events when you use the SportPool mobile app and have granted notification permission, subject to your per-category notification preferences</li>
                   <li>Respond to your contact form inquiries</li>
                   <li>Maintain administrative audit logs so pool and super admin actions remain accountable</li>
                   <li>Improve the Service through analytics and usage patterns (where enabled &mdash; see Section 4)</li>
@@ -188,7 +188,7 @@ export default function PrivacyPage() {
                 5. Third-Party Services
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
-                <p>We use the following third-party services to operate Sport Pool:</p>
+                <p>We use the following third-party services to operate SportPool:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>
                     <strong>Supabase</strong> &mdash; Provides our database and authentication infrastructure. Your account information and activity data are stored securely on Supabase servers.
@@ -197,7 +197,7 @@ export default function PrivacyPage() {
                     <strong>Google Analytics / Google Tag Manager</strong> &mdash; When enabled, collects anonymous usage analytics to help us understand how the Service is used. Subject to your cookie preferences and local law.
                   </li>
                   <li>
-                    <strong>Resend</strong> &mdash; Handles email delivery for notifications, deadline reminders, and contact form messages. We also sync your email address to a Resend audience so that pool admins and Sport Pool can send you broadcast emails to which you are subscribed. Every broadcast email includes a one-click unsubscribe link.
+                    <strong>Resend</strong> &mdash; Handles email delivery for notifications, deadline reminders, and contact form messages. We also sync your email address to a Resend audience so that pool admins and SportPool can send you broadcast emails to which you are subscribed. Every broadcast email includes a one-click unsubscribe link.
                   </li>
                   <li>
                     <strong>Vercel</strong> &mdash; Hosts the Service. Vercel may collect standard server logs including IP addresses and request data.
@@ -209,7 +209,7 @@ export default function PrivacyPage() {
                     <strong>Expo Push Service &amp; Firebase Cloud Messaging (FCM)</strong> &mdash; Used to deliver push notifications to Android devices. Expo&apos;s hosted service relays the notification payload and your Expo push token to Google&apos;s Firebase Cloud Messaging, which then delivers the notification to your device.
                   </li>
                   <li>
-                    <strong>Sentry</strong> &mdash; When enabled in the Sport Pool mobile app, collects anonymized crash reports and error telemetry (stack traces, app version, device model, OS version) so we can diagnose and fix bugs. No prediction content or personal pool data is sent to Sentry.
+                    <strong>Sentry</strong> &mdash; When enabled in the SportPool mobile app, collects anonymized crash reports and error telemetry (stack traces, app version, device model, OS version) so we can diagnose and fix bugs. No prediction content or personal pool data is sent to Sentry.
                   </li>
                 </ul>
                 <p>
@@ -231,7 +231,7 @@ export default function PrivacyPage() {
                   We share data only with the third-party service providers listed above, and only as necessary to operate the Service. Within the Service, your username, predictions, and scores are visible to other members of the pools you join. Your email address is not shared with other users.
                 </p>
                 <p>
-                  Messages, reactions, pins, and @mentions you post in a pool&apos;s community chat are visible to every member of that pool. Pool admins and Sport Pool super admins may also view chat content for moderation purposes.
+                  Messages, reactions, pins, and @mentions you post in a pool&apos;s community chat are visible to every member of that pool. Pool admins and SportPool super admins may also view chat content for moderation purposes.
                 </p>
                 <p>
                   We may disclose your information if required by law, legal process, or government request, or if we believe disclosure is necessary to protect our rights, your safety, or the safety of others.

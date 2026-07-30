@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/Button'
+import { Wordmark } from '@/components/ui/Wordmark'
 
 export async function PublicNav() {
   const supabase = await createClient()
@@ -12,8 +13,9 @@ export async function PublicNav() {
     <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-neutral-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-bold text-neutral-900">
-            ⚽ Sport Pool
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-xl">⚽</span>
+            <Wordmark size={20} />
           </Link>
           <div className="flex items-center gap-3">
             {user ? (

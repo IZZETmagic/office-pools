@@ -13,7 +13,7 @@ type SendEmailParams = {
 
 export async function sendEmail({ to, subject, html, text, topicId, tags, reply_to, headers }: SendEmailParams) {
   const resend = getResendClient()
-  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
 
   const payload = {
     from: fromAddress,
@@ -66,7 +66,7 @@ export async function sendBatchEmails(
   }>
 ) {
   const resend = getResendClient()
-  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Sport Pool <notifications@sportpool.io>'
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
 
   try {
     const { data, error } = await resend.batch.send(

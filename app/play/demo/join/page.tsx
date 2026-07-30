@@ -143,7 +143,7 @@ export default function JoinDemoPage() {
 
             {/* Sign in link (visual only) */}
             <p className="text-center text-sm text-neutral-400 pt-1">
-              Already have a Sport Pool account?{' '}
+              Already have a SportPool account?{' '}
               <span className="font-semibold cursor-pointer transition-colors" style={{ color: POOL_INFO.accentColor }}>
                 Sign in
               </span>
@@ -153,7 +153,7 @@ export default function JoinDemoPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-white/25 mt-6">
-          Powered by <span className="font-semibold text-white/40">Sport Pool</span> &middot; sportpool.io
+          Powered by <span className="font-semibold text-white/40">SportPool</span> &middot; sportpool.io
         </p>
       </div>
     </div>
