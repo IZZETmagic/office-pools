@@ -32,7 +32,6 @@ import { SettingsTab } from './admin/SettingsTab'
 import { FeesTab } from './admin/FeesTab'
 import { RoundsTab } from './admin/RoundsTab'
 import { DEFAULT_POOL_SETTINGS, type PoolSettings } from './results/points'
-import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import type {
   PoolData,
@@ -211,15 +210,12 @@ export function PoolDetail({
   const isDemoPool = initialPool.pool_id === '66b67286-e36e-40fd-8893-2a1fde0d018b'
   const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay || isDemoPool)
 
-  // Unread banter badge (must be above useSlideIndicator so we can pass banterUnreadCount as a layout dep)
+  // Unread banter badge
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
   const { unreadCounts, markAsRead, initialLastReadMap } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
   const banterUnreadCount = unreadCounts.get(initialPool.pool_id) ?? 0
   const hasUnreadBanter = banterUnreadCount > 0 && activeTab !== 'community'
   const banterInitialLastReadAt = initialLastReadMap.get(initialPool.pool_id) ?? null
-
-  const { containerRef: poolDetailTabRef, indicatorStyle: poolDetailIndicator, ready: poolDetailTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
-  const { containerRef: mobileTabRef, indicatorStyle: mobileIndicator, ready: mobileTabReady } = useSlideIndicator(activeTab, banterUnreadCount)
 
   useEffect(() => {
     if (activeTab === 'community') {
@@ -227,7 +223,6 @@ export function PoolDetail({
     }
   }, [activeTab, initialPool.pool_id, markAsRead])
 
-  // Determine indicator color based on active tab
   const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds' || activeTab === 'fees'
 
   // Mark how-to-play as seen on first visit (non-blocking, skip for super admin non-member)
@@ -1072,6 +1067,29 @@ export function PoolDetail({
   }, [activeTab, mobilePrimaryKeys, handleTabSwitch])
 
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
+
+  /**
+   * Pill styling for the tab strips, matching PoolTabBar in the RN app: inactive
+   * pills are `mist` with muted text, the active pill is its accent composited at
+   * ~12% with that accent as the label colour.
+   *
+   * This replaced a sliding solid indicator. The app hard-snaps its highlight and
+   * tints rather than filling, and a tinted pill also carries onto the branded
+   * header, where the solid indicator had to special-case the brand accent.
+   */
+  const tabPillClass = (isActive: boolean) => {
+    if (hasBranding) {
+      return isActive
+        ? 'bg-white/20 text-white'
+        : 'bg-white/10 text-white/60 hover:text-white/85'
+    }
+    if (isActive) {
+      return isAdminTab
+        ? 'bg-warning-500/15 text-warning-700'
+        : 'bg-primary-600/12 text-primary-700'
+    }
+    return 'bg-mist text-muted hover:text-ink'
+  }
   const brandLogo = pool.brand_logo_url ? (
     <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-8 h-8 rounded-md object-cover shrink-0" />
   ) : (
@@ -1202,21 +1220,13 @@ export function PoolDetail({
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
 
             {/* ===== MOBILE tab bar ===== */}
-            <div ref={mobileTabRef} className="sm:hidden relative flex items-center gap-0.5 py-2">
-              <div
-                className={`absolute top-2 bottom-2 ${!hasBranding ? (isAdminTab ? 'bg-warning-600' : 'bg-primary-600') : ''} rounded-xl shadow-sm pointer-events-none ${mobileTabReady ? 'transition-all duration-300 ease-out' : ''}`}
-                style={{ left: mobileIndicator.left, width: mobileIndicator.width, ...(hasBranding && !isAdminTab ? { backgroundColor: pool.brand_accent! } : {}) }}
-              />
+            <div className="sm:hidden relative flex items-center gap-1 py-2">
               {mobilePrimaryTabs.map((tab) => (
                 <button
                   key={tab.key}
                   data-tab-key={tab.key}
                   onClick={() => handleTabSwitch(tab.key)}
-                  className={`relative z-10 flex-1 px-2 py-2 rounded-xl text-xs font-medium whitespace-nowrap text-center transition-colors ${
-                    activeTab === tab.key
-                      ? 'text-white'
-                      : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
+                  className={`flex-1 px-2 py-2 rounded-pill text-xs font-bold whitespace-nowrap text-center transition-colors ${tabPillClass(activeTab === tab.key)}`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {tab.key === 'leaderboard' ? 'Board' : tab.label}
@@ -1233,7 +1243,7 @@ export function PoolDetail({
               {hasBranding && pool.brand_landing_url && (
                 <Link
                   href={pool.brand_landing_url}
-                  className="relative z-10 flex-1 px-2 py-2 rounded-xl text-xs font-medium whitespace-nowrap text-center transition-colors text-white/50 hover:text-white/70"
+                  className="flex-1 px-2 py-2 rounded-pill text-xs font-bold whitespace-nowrap text-center transition-colors bg-white/10 text-white/60 hover:text-white/85"
                 >
                   <span className="inline-flex items-center justify-center gap-0.5">
                     {pool.brand_name}
@@ -1249,11 +1259,7 @@ export function PoolDetail({
                 <div ref={moreMenuRef} className="relative flex-1 min-w-0" data-tab-key={isOverflowTabActive ? activeTab : '__more__'}>
                   <button
                     onClick={() => setMoreMenuOpen(prev => !prev)}
-                    className={`w-full relative z-10 flex items-center justify-center gap-0.5 px-2 py-2 rounded-xl text-xs font-medium text-center transition-colors ${
-                      isOverflowTabActive
-                        ? 'text-white'
-                        : 'text-neutral-700 hover:bg-neutral-100'
-                    }`}
+                    className={`w-full flex items-center justify-center gap-0.5 px-2 py-2 rounded-pill text-xs font-bold text-center transition-colors ${tabPillClass(isOverflowTabActive)}`}
                   >
                     {isOverflowTabActive ? (mobileOverflowTabs.find(t => t.key === activeTab)?.label ?? 'More') : 'More'}
                     <svg className={`w-3 h-3 shrink-0 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1307,21 +1313,13 @@ export function PoolDetail({
             </div>
 
             {/* ===== DESKTOP tab bar ===== */}
-            <div ref={poolDetailTabRef} className="hidden sm:flex relative items-center gap-1 overflow-x-auto scrollbar-hide py-2">
-              <div
-                className={`absolute top-2 bottom-2 ${!hasBranding ? (isAdminTab ? 'bg-warning-600' : 'bg-primary-600') : ''} rounded-xl shadow-sm pointer-events-none ${poolDetailTabReady ? 'transition-all duration-300 ease-out' : ''}`}
-                style={{ left: poolDetailIndicator.left, width: poolDetailIndicator.width, ...(hasBranding && !isAdminTab ? { backgroundColor: pool.brand_accent! } : {}) }}
-              />
+            <div className="hidden sm:flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
               {USER_TABS.map((tab) => (
                 <button
                   key={tab.key}
                   data-tab-key={tab.key}
                   onClick={() => handleTabSwitch(tab.key)}
-                  className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tab.key
-                      ? 'text-white'
-                      : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
+                  className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key)}`}
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {tab.label}
@@ -1338,7 +1336,7 @@ export function PoolDetail({
               {hasBranding && pool.brand_landing_url && (
                 <Link
                   href={pool.brand_landing_url}
-                  className="relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors text-white/50 hover:text-white/70 hover:bg-white/10"
+                  className="shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors bg-white/10 text-white/60 hover:text-white/85"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {pool.brand_name}
@@ -1360,11 +1358,7 @@ export function PoolDetail({
                       key={tab.key}
                       data-tab-key={tab.key}
                       onClick={() => handleTabSwitch(tab.key)}
-                      className={`relative z-10 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                        activeTab === tab.key
-                          ? 'text-white'
-                          : hasBranding ? 'text-white/50 hover:text-white/70' : 'text-neutral-700 hover:bg-neutral-100'
-                      }`}
+                      className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key)}`}
                     >
                       {tab.label}
                     </button>
@@ -1380,7 +1374,7 @@ export function PoolDetail({
                   </div>
                   <button
                     onClick={() => setShowLeaveModal(true)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${hasBranding ? 'text-red-300 hover:bg-white/10' : 'text-danger-600 hover:bg-danger-50'}`}
+                    className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${hasBranding ? 'text-white/70 hover:bg-white/10' : 'text-danger-600 hover:bg-danger-600/10'}`}
                   >
                     Leave Pool
                   </button>
