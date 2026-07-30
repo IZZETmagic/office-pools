@@ -1,5 +1,18 @@
 -- 041: pool archive, part 2 of 2 — THE POLICY CHANGES
 --
+-- ✅ Applied to prod 2026-07-30 (Supabase migration: pool_archive_policies),
+-- AFTER the production deploy of master ee09020, in the correct order.
+-- Post-apply, verified: "Pool admins can delete pools" 0, "Pool admins can
+-- delete predictions" 0, "Super admins can delete pools" 1 (support path
+-- intact), predictions INSERT/UPDATE both carrying the archived_at guard,
+-- 623 pools and 287,789 predictions unchanged. R1 is closed in production.
+--
+-- ⚠️ ONE RESIDUAL, until the mobile OTA ships: installed copies of the app
+-- still show a Delete Pool button. With this migration applied that button is
+-- now HARMLESS but MISLEADING — its single `pools` delete is filtered by RLS,
+-- which returns 0 rows and no error, so the app reports success and navigates
+-- home while the pool survives. Non-destructive; confusing. Ship the OTA.
+--
 -- ⚠️ APPLY THIS *WITH* OR *AFTER* THE CODE DEPLOY, NEVER BEFORE.
 -- Requires 040 (the columns) to be applied first.
 --
