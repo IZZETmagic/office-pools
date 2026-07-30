@@ -1,20 +1,21 @@
 // Consolidated notification preferences. Lifted out of the Profile tab
 // so push permission, push categories, and email preferences live in one
-// dedicated sheet instead of three scrolled-past sections.
+// dedicated page instead of three scrolled-past sections.
 
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text as RNText,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import {
+  DividedList,
+  LoadingRow,
+  NotificationRow,
+  SectionWrapper,
+  SettingsCard,
+  SettingsHeader,
+  type NotificationOption,
+} from '@/components/settings';
+import { Icon } from '@/components/ui';
 import {
   fetchNotificationPrefs,
   fetchPushPrefs,
@@ -24,7 +25,7 @@ import {
 import { usePushPermission, type PushPermissionStatus } from '@/lib/usePushPermission';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-const PUSH_PREF_OPTIONS: Array<{ key: string; label: string; desc: string; icon: string }> = [
+const PUSH_PREF_OPTIONS: NotificationOption[] = [
   { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave a pool, invitations', icon: 'person.3.fill' },
   { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
   { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Per-match outcomes, matchday recaps', icon: 'sportscourt.fill' },
@@ -34,7 +35,7 @@ const PUSH_PREF_OPTIONS: Array<{ key: string; label: string; desc: string; icon:
   { key: 'GAMIFICATION', label: 'Achievements', desc: 'Badges, level-ups, streaks, MVP', icon: 'rosette' },
 ];
 
-const EMAIL_PREF_OPTIONS: Array<{ key: string; label: string; desc: string; icon: string }> = [
+const EMAIL_PREF_OPTIONS: NotificationOption[] = [
   { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave pool, invitations', icon: 'person.3.fill' },
   { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
   { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Results and points earned', icon: 'sportscourt.fill' },
@@ -49,7 +50,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
-      <Header insetTop={insets.top} />
+      <SettingsHeader title="Notifications" />
       <ScrollView
         contentContainerStyle={{
           paddingTop: theme.spacing.md,
@@ -66,51 +67,11 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-function Header({ insetTop }: { insetTop: number }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        paddingHorizontal: theme.spacing.lg,
-        paddingTop: insetTop + theme.spacing.sm,
-        paddingBottom: theme.spacing.sm,
-        backgroundColor: theme.colors.snow,
-      }}
-    >
-      <Pressable
-        onPress={() => router.back()}
-        hitSlop={12}
-        style={({ pressed }) => ({
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: withOpacity(theme.colors.ink, 0.06),
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.6 : 1,
-        })}
-      >
-        <Icon name="chevron.left" size={16} tint={theme.colors.ink} weight="semibold" />
-      </Pressable>
-      <View style={{ flex: 1 }}>
-        <Text variant="cardTitle" numberOfLines={1}>
-          Notifications
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function Intro() {
   const theme = useTheme();
   return (
     <View style={{ paddingHorizontal: theme.spacing.xl, gap: 4 }}>
-      <RNText
-        style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
-      >
+      <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}>
         Control how SportPool reaches you. Push alerts handle the urgent
         stuff; email keeps you in the loop without opening the app.
       </RNText>
@@ -131,7 +92,7 @@ function PushPermissionSection() {
 
   return (
     <SectionWrapper title="Push Notifications">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
+      <SettingsCard>
         <View
           style={{
             flexDirection: 'row',
@@ -190,7 +151,7 @@ function PushPermissionSection() {
             </Pressable>
           ) : null}
         </View>
-      </View>
+      </SettingsCard>
     </SectionWrapper>
   );
 }
@@ -236,7 +197,6 @@ function pushSectionState(
 }
 
 function PushCategoriesSection() {
-  const theme = useTheme();
   const { status } = usePushPermission();
   const [prefs, setPrefs] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -257,7 +217,7 @@ function PushCategoriesSection() {
         if (cancelled) return;
         setPrefs(res.preferences);
       })
-      .catch((err) => console.warn('[notification-settings] failed to load push prefs', err))
+      .catch((err) => console.warn('[settings/notifications] failed to load push prefs', err))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -274,7 +234,7 @@ function PushCategoriesSection() {
       await updatePushPref(key, next);
     } catch (err) {
       setPrefs((p) => ({ ...p, [key]: !next }));
-      console.warn('[notification-settings] push pref toggle failed', err);
+      console.warn('[settings/notifications] push pref toggle failed', err);
     } finally {
       setUpdatingKey(null);
     }
@@ -284,29 +244,29 @@ function PushCategoriesSection() {
 
   return (
     <SectionWrapper title="Push Categories">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {loading ? (
+      {loading ? (
+        <SettingsCard>
           <LoadingRow />
-        ) : (
-          PUSH_PREF_OPTIONS.map((opt, idx) => (
-            <View key={opt.key}>
-              <NotificationRow
-                option={opt}
-                enabled={prefs[opt.key] ?? true}
-                updating={updatingKey === opt.key}
-                onToggle={() => handleToggle(opt.key)}
-              />
-              {idx < PUSH_PREF_OPTIONS.length - 1 ? <Divider /> : null}
-            </View>
-          ))
-        )}
-      </View>
+        </SettingsCard>
+      ) : (
+        <DividedList
+          items={PUSH_PREF_OPTIONS}
+          keyOf={(o) => o.key}
+          render={(o) => (
+            <NotificationRow
+              option={o}
+              enabled={prefs[o.key] ?? true}
+              updating={updatingKey === o.key}
+              onToggle={() => handleToggle(o.key)}
+            />
+          )}
+        />
+      )}
     </SectionWrapper>
   );
 }
 
 function EmailPreferencesSection() {
-  const theme = useTheme();
   const [prefs, setPrefs] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
@@ -319,7 +279,7 @@ function EmailPreferencesSection() {
         setPrefs(res.preferences);
       })
       .catch((err) => {
-        console.warn('[notification-settings] failed to load notification prefs', err);
+        console.warn('[settings/notifications] failed to load notification prefs', err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -337,7 +297,7 @@ function EmailPreferencesSection() {
       await updateNotificationPref(key, next);
     } catch (err) {
       setPrefs((p) => ({ ...p, [key]: !next }));
-      console.warn('[notification-settings] toggle failed', err);
+      console.warn('[settings/notifications] toggle failed', err);
     } finally {
       setUpdatingKey(null);
     }
@@ -345,129 +305,24 @@ function EmailPreferencesSection() {
 
   return (
     <SectionWrapper title="Email Notifications">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {loading ? (
+      {loading ? (
+        <SettingsCard>
           <LoadingRow />
-        ) : (
-          EMAIL_PREF_OPTIONS.map((opt, idx) => (
-            <View key={opt.key}>
-              <NotificationRow
-                option={opt}
-                enabled={prefs[opt.key] ?? true}
-                updating={updatingKey === opt.key}
-                onToggle={() => handleToggle(opt.key)}
-              />
-              {idx < EMAIL_PREF_OPTIONS.length - 1 ? <Divider /> : null}
-            </View>
-          ))
-        )}
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function NotificationRow({
-  option,
-  enabled,
-  updating,
-  onToggle,
-}: {
-  option: { key: string; label: string; desc: string; icon: string };
-  enabled: boolean;
-  updating: boolean;
-  onToggle: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm + 4,
-        paddingHorizontal: theme.spacing.md - 2,
-        paddingVertical: theme.spacing.sm + 2,
-      }}
-    >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: theme.colors.primaryLight,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Icon name={option.icon as never} tint={theme.colors.primary} size={13} weight="semibold" />
-      </View>
-      <View style={{ flex: 1, gap: 1 }}>
-        <RNText
-          style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
-        >
-          {option.label}
-        </RNText>
-        <RNText
-          style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
-        >
-          {option.desc}
-        </RNText>
-      </View>
-      {updating ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
+        </SettingsCard>
       ) : (
-        <Switch
-          value={enabled}
-          onValueChange={onToggle}
-          trackColor={{ false: theme.colors.mist, true: theme.colors.primary }}
+        <DividedList
+          items={EMAIL_PREF_OPTIONS}
+          keyOf={(o) => o.key}
+          render={(o) => (
+            <NotificationRow
+              option={o}
+              enabled={prefs[o.key] ?? true}
+              updating={updatingKey === o.key}
+              onToggle={() => handleToggle(o.key)}
+            />
+          )}
         />
       )}
-    </View>
-  );
-}
-
-function LoadingRow() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: theme.spacing.sm,
-        paddingVertical: theme.spacing.xl,
-      }}
-    >
-      <ActivityIndicator size="small" color={theme.colors.primary} />
-      <RNText
-        style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
-      >
-        Loading preferences...
-      </RNText>
-    </View>
-  );
-}
-
-function SectionWrapper({ title, children }: { title: string; children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View style={{ gap: theme.spacing.sm + 4 }}>
-      <Text variant="sectionHeader" style={{ paddingHorizontal: theme.spacing.xl }}>
-        {title}
-      </Text>
-      <View style={{ paddingHorizontal: theme.spacing.xl }}>{children}</View>
-    </View>
-  );
-}
-
-function Divider() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        height: 0.5,
-        marginHorizontal: theme.spacing.md - 2,
-        backgroundColor: withOpacity(theme.colors.mist, 0.5),
-      }}
-    />
+    </SectionWrapper>
   );
 }
