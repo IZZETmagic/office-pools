@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils/cn'
  * Text sits on the -700 step so it stays legible on the tint in light mode and,
  * because the ramps invert, in dark mode too.
  */
-type BadgeVariant = 'blue' | 'green' | 'yellow' | 'gray' | 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
+type BadgeVariant = 'blue' | 'green' | 'yellow' | 'red' | 'gray' | 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
 
 type BadgeProps = {
   variant?: BadgeVariant
@@ -21,6 +21,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   blue: 'bg-primary-600/12 text-primary-700',
   green: 'bg-success-600/12 text-success-700',
   yellow: 'bg-warning-500/15 text-warning-700',
+  red: 'bg-danger-600/12 text-danger-700',
   gray: 'bg-mist text-muted',
   outline: 'border border-primary-600/40 text-primary-700 bg-transparent',
   'outline-green': 'border border-success-600/40 text-success-700 bg-transparent',

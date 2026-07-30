@@ -16,6 +16,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { useTheme } from '@/components/ThemeProvider'
+import { getFormDotClass } from '@/lib/design/formDots'
 import { formatNumber } from '@/lib/format'
 
 // =====================
@@ -245,12 +246,12 @@ export default function ProfilePage({
           {/* Quick stats in hero — compact on mobile, glass cards on desktop */}
           <div className="flex items-center justify-around mt-3 sm:hidden">
             <div className="text-center">
-              <p className="text-lg font-bold text-white">{poolMemberships.length}</p>
+              <p className="t-num text-lg text-white">{poolMemberships.length}</p>
               <p className="text-[10px] text-primary-200 dark:text-white/50">Pools</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-white">
+              <p className="t-num text-lg text-white">
                 {formatNumber(poolMemberships.reduce((sum, p) => {
                   const ps = playerScoresMap[p.entry_id || p.member_id]
                   return sum + (ps ? ps.total_points : p.total_points)
@@ -260,7 +261,7 @@ export default function ProfilePage({
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-white">
+              <p className="t-num text-lg text-white">
                 {formatNumber(poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0))}
               </p>
               <p className="text-[10px] text-primary-200 dark:text-white/50">Predictions</p>
@@ -268,11 +269,11 @@ export default function ProfilePage({
           </div>
           <div className="hidden sm:grid grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
-              <p className="text-2xl font-bold text-white">{poolMemberships.length}</p>
+              <p className="t-num text-2xl text-white">{poolMemberships.length}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Pools</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
-              <p className="text-2xl font-bold text-white">
+              <p className="t-num text-2xl text-white">
                 {formatNumber(poolMemberships.reduce((sum, p) => {
                   const ps = playerScoresMap[p.entry_id || p.member_id]
                   return sum + (ps ? ps.total_points : p.total_points)
@@ -281,7 +282,7 @@ export default function ProfilePage({
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
-              <p className="text-2xl font-bold text-white">
+              <p className="t-num text-2xl text-white">
                 {formatNumber(poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0))}
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Predictions</p>
@@ -653,7 +654,7 @@ function AchievementsSection({ userId }: { userId: string }) {
           onClick={() => setSelectedBadgeId(null)}
         >
           <div className="w-full sm:max-w-md" onClick={e => e.stopPropagation()}>
-            <Card className="max-h-[80vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+            <Card className="max-h-[80vh] overflow-y-auto rounded-t-2xl sm:rounded-card">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <BadgeMedallion id={selectedBadgeId ?? ''} emoji={selectedDef.emoji} size={40} />
@@ -1005,10 +1006,10 @@ function StatisticsTab({
         <Card>
           <h4 className="text-base font-semibold text-neutral-900 mb-4">Prediction Accuracy</h4>
           <div className="space-y-3">
-            <AccuracyRow label="Exact Scores" color="bg-accent-500" count={totals.exact} total={totals.completed} />
-            <AccuracyRow label="Winner + GD" color="bg-success-500" count={totals.winnerGd} total={totals.completed} />
-            <AccuracyRow label="Winner Only" color="bg-primary-500" count={totals.winnerOnly} total={totals.completed} />
-            <AccuracyRow label="Incorrect" color="bg-danger-400" count={totals.incorrect} total={totals.completed} />
+            <AccuracyRow label="Exact Scores" color={getFormDotClass("exact")} count={totals.exact} total={totals.completed} />
+            <AccuracyRow label="Winner + GD" color={getFormDotClass("winner_gd")} count={totals.winnerGd} total={totals.completed} />
+            <AccuracyRow label="Winner Only" color={getFormDotClass("winner")} count={totals.winnerOnly} total={totals.completed} />
+            <AccuracyRow label="Incorrect" color={getFormDotClass("miss")} count={totals.incorrect} total={totals.completed} />
           </div>
           {totals.accuracy !== null && (
             <div className="mt-4 pt-4 border-t border-neutral-100">
@@ -1088,7 +1089,7 @@ function PerformanceRing({
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-base sm:text-lg font-bold text-neutral-900">{percentage}%</span>
+        <span className="t-num text-base sm:text-lg text-ink">{percentage}%</span>
       </div>
     </div>
   )
@@ -1220,23 +1221,30 @@ function PredictionHistoryTab({
     setCurrentPage(1)
   }
 
+  // `winner` and `winner_gd` both used to render green, which made the two tiers
+  // indistinguishable here even though the form dots on every other screen show
+  // them as different colours. Winner-only is now blue, matching --sp-tier-winner
+  // and the leaderboard legend.
   const classificationBadge = (classification: string) => {
     switch (classification) {
       case 'exact': return <Badge variant="yellow">Exact</Badge>
       case 'winner_gd': return <Badge variant="green">W+GD</Badge>
-      case 'winner': return <Badge variant="green">Winner</Badge>
-      case 'incorrect': return <Badge variant="gray">Miss</Badge>
+      case 'winner': return <Badge variant="blue">Winner</Badge>
+      case 'incorrect': return <Badge variant="red">Miss</Badge>
       default: return <Badge variant="gray">Pending</Badge>
     }
   }
 
+  // Text colours use ramp steps rather than the raw --sp-tier-* hexes: the tier
+  // colours are tuned for 7-8px dots, and gold or sky-blue body text on white is
+  // well under contrast at this size.
   const pointsColor = (classification: string) => {
     switch (classification) {
-      case 'exact': return 'text-accent-700 font-bold'
-      case 'winner_gd':
-      case 'winner': return 'text-success-600 font-semibold'
-      case 'incorrect': return 'text-danger-500'
-      default: return 'text-neutral-400'
+      case 'exact': return 'text-accent-600 font-bold'
+      case 'winner_gd': return 'text-success-700 font-semibold'
+      case 'winner': return 'text-primary-700 font-semibold'
+      case 'incorrect': return 'text-danger-600'
+      default: return 'text-muted'
     }
   }
 
@@ -1911,7 +1919,7 @@ function AccountSettingsTab({
       {/* Password change modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-2xl sm:rounded-card shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100">
               <h3 className="text-lg font-bold text-neutral-900">Change Password</h3>
               <button
@@ -1979,7 +1987,7 @@ function AccountSettingsTab({
       {/* Delete account modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface rounded-t-2xl sm:rounded-card shadow-xl dark:shadow-none dark:border dark:border-border-default sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100">
               <h3 className="text-lg font-bold text-danger-600">Delete Account</h3>
               <button
