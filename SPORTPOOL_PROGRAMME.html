@@ -222,10 +222,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>decisions already made</strong>, so they don't get re-litigated. A <em>programme</em>, not a roadmap,
       because SportPool is now several distinct projects running under one banner rather than one ordered list.</p>
     <div class="src">
-      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>e2da3ab</code> plus the 2026-07-26
-      <em>performance session</em> additions (<em>⚡ Performance &amp; caching</em>, the <em>XP has two writers</em> item, and
-      risks <strong>R13–R16</strong>), <strong>not yet committed</strong>. The markdown is the source of truth —
-      <strong>if these two ever disagree, the markdown wins.</strong>
+      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>6f3980d</code> plus the
+      <strong>2026-07-30 audit corrections</strong> (three risks closed, <strong>R19</strong> opened, R2/R18/Gate B rewritten),
+      which are in the working tree and <strong>not yet committed</strong>. The 2026-07-26 performance session <em>is</em> applied
+      and deployed — migrations 026/037/038/039, the analytics backfill and the shadow read widening are live in production.
+      The markdown is the source of truth — <strong>if these two ever disagree, the markdown wins.</strong>
     </div>
   </div>
 </header>
@@ -237,6 +238,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <a href="#risks">Risk register</a>
     <a href="#order">Order of deliveries</a>
     <a href="#design-system">🏗️ System design</a>
+    <a href="#engines">🧮 Scoring engines</a>
     <a href="#projects">Projects</a>
     <a href="#decisions">Settled decisions</a>
     <a href="#now">🔥 Now</a>
@@ -266,84 +268,96 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 10px">The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
       handful of residual bugs. The record itself is current again: the two things this document was missing, the shadow read-path
       cutover of 2026-07-19 with its rollback and the ~324k-point podium remediation of 2026-07-21, are now written down, so the
-      programme and the code broadly agree for the first time since the final. The picture that leaves is not comfortable.
+      programme and the code broadly agree for the first time since the final. A second full audit against prod and code on
+      <strong>2026-07-30 closed three risks outright</strong> (<strong>R17</strong> the ledger, <strong>R4</strong> shadow's podium,
+      <strong>R13</strong> the XP writers — all three prod-verified) and opened one (<strong>R19</strong>).
+      The picture that leaves is still not comfortable.
       <strong>Three 🔴 risks are live and unmitigated.</strong> Two of them are the same structural failure: <strong>this product has no
       soft-delete anywhere</strong>, and <code>pool_entries</code> carries 21 cascading children — so an admin tapping <em>Delete
       Pool</em> destroys every member's predictions (two surfaces, six pools already gone), and <em>any</em> membership exit — leaving,
       being removed, deleting an account, stop-participating — permanently purges the entry, every prediction, every derived score and
       the append-only badge history, with <strong>no application code involved in three of the four paths</strong> and <strong>no count
       of how often it has already happened</strong>. The third is that any Premier League pool created today would score
-      <strong>zero, silently</strong>, because the group/knockout binary is welded into the scoring price lookup and not just the gate.
-      Behind them sit <strong>nine 🟠</strong> (five, plus four opened by the 2026-07-26 performance session), including one Ryan
+      <strong>zero, silently</strong> — and the mechanism is now traced precisely (2026-07-30): it is <strong>two bugs, gate
+      first</strong>. The team-matching gate zeroes the fixture before the price lookup is ever reached, and <em>behind</em> that the
+      price lookup bills every league fixture at knockout rates. It lives in <strong>the shadow SQL as well as
+      <code>lib/scoring/*</code></strong>, and shadow is what every member reads.
+      Behind them sit <strong>eight 🟠</strong>, including one Ryan
       knowingly accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be
       fixed <em>before the next competition</em> — <strong>that condition is now due</strong>.</p>
     <p style="margin:0 0 10px">The next milestone is the <strong>Premier League 2026/27 season, mid-August</strong>, and on the
       foundations recorded here it is <strong>not reachable</strong>: league scoring and bonuses don't exist, matchweek deadlines and
       auto round-opening don't exist (Decision 7 calls the latter <em>"a prerequisite, not polish"</em>), the sync cron is still
-      single-tenant on three env globals, and the importer plus migration 024 are drafted but uncommitted and unapplied. Almost none of
-      that is blocked on capacity — the <strong>sequencing is blocked on five decisions only Ryan can make</strong>: what "archive"
+      single-tenant on three env globals, and migration 024 is <strong>committed but not applied</strong> — the importer and 024 have
+      been on <code>origin/master</code> since <code>b80395e</code>, so what is holding a league pool out of existence is production's
+      CHECK constraints, not the repo (corrected 2026-07-30). Almost none of
+      that is blocked on capacity — the <strong>sequencing is blocked on six decisions only Ryan can make</strong>: what "archive"
       means now that migration 025b constrains <code>pools.status</code> to <code>('open','completed')</code>; <strong>what leaving a
       pool should do to a member's history</strong>, now that we know it purges it; which engine <em>should</em> score the EPL (the
-      flags are now known — prod is scoring everything, shadow reads are off — so what remains is the choice, not the uncertainty);
+      flags are now known <em>and they moved</em> — prod scoring is still on <strong>and</strong> shadow is the read source for all 623
+      pools, so both engines compute and members read shadow; what remains is the choice, not the uncertainty);
       whether EPL scope shrinks or the date moves; <strong>what "live" has to mean</strong>, since the stated goal says <em>real-time
-      leaderboard</em> and a recorded principle says <em>minute-cadence is sufficient</em> (<a href="#gate-d">Gate D</a>); and whether
-      the post-tournament survey still goes out now that it is past its own time box.</p>
+      leaderboard</em> and a recorded principle says <em>minute-cadence is sufficient</em> (<a href="#gate-d">Gate D</a>); whether
+      the post-tournament survey still goes out now that it is past its own time box; and — new on 2026-07-30 — <strong>whether the
+      analytics-sweep cron stays registered</strong> (<strong>R19</strong>), since it is running every minute in <code>pg_cron</code>
+      against a decision that says it must not be.</p>
     <p style="margin:0 0 10px">A <a href="#design-system">system-design section</a> was added 2026-07-26 from two research workflows, and
-      it turned up one thing that belongs in this summary: <strong>the ledger does not reconcile to itself.</strong> 29 of 4,985 entries
-      show a total their own line items don't support — 26 of them <strong>too high, by 149,525 points</strong>, three carrying points
-      with no line items at all. It is bounded and it does not spread, but "100% accurate scores" is the product's first promise, and
-      right now nothing checks that promise continuously; this was found by asking, not by an alarm.</p>
+      it turned up one thing that belonged in this summary: <strong>the ledger did not reconcile to itself</strong> — 29 of 4,985 entries
+      showed a total their own line items didn't support. ✅ <strong>Re-run 2026-07-30: 0 mismatched of 4,981 entries, 0 carrying points
+      with no line items</strong> (<strong>R17</strong> closed). The number is fixed; <strong>the mechanism is not</strong> — there is
+      still no continuous reconciliation check, so this was found by asking and its recurrence would be found the same way.</p>
     <p style="margin:0 0 10px">One standing caveat on everything above: <strong>fourteen groups of claims here depend on production
-      state and cannot be verified from code</strong> (every measured number in the 2026-07-26 performance session, plus the six ⬜
-      analysis claims in System design) — they are listed in <a href="#unverifiable">the register</a>, and unverified is not done.</p>
+      state and cannot be verified from code</strong> — the 2026-07-30 audit resolved <strong>six of them outright</strong>, the rest are
+      still listed in <a href="#unverifiable">the register</a>, and unverified is not done.</p>
   </div>
   <div class="card warnc">
-    <p style="margin:0"><strong>Added 2026-07-26 (performance session).</strong> A site-wide performance pass measured where the
-      database actually spends its time and, in the process, found another instance of the failure mode above:
-      <code>entry_xp_state.total_xp</code> / <code>.current_level</code> have <strong>two writers computing different
-      quantities</strong>, so the level shown on <code>/pools</code> and <code>/dashboard</code> today is whichever path last touched
-      the row. That is live and user-facing now, and it is <em>not</em> a caching problem — the parity pass meant to unblock a
-      read-path flip is what exposed it. Fixes for it, and for <strong>13 of 14</strong> whole-table <code>match_conduct</code> reads
-      (four inside scoring engines, where PostgREST's silent 1,000-row cap becomes wrong bonuses the moment a second competition
-      exists), are <strong>written, tested and entirely uncommitted</strong>. Nothing is applied or deployed, so <strong>production is
-      unchanged</strong> — treat all of it as still live until migration 026 is applied and the deploy is confirmed. The session also
-      introduced one regression of its own — full-pool analytics on the scoring path (<strong>R15</strong>, since fixed in code) — and left
-      one deliberate blocker in place (<strong>R16</strong>, <code>advance-teams</code>), which must clear before a second competition is
-      ingested. <strong>R15 and R14 were raised by this register, confirmed against the code by Ryan, and fixed the same day; R13's open
-      question on <code>current_level</code> was answered and migration 026's comment rewritten.</strong> None of that changes the headline:
-      it is all still local, and none of it is live.</p>
+    <p style="margin:0"><strong>Added 2026-07-26 (performance session), updated 2026-07-30.</strong> A site-wide performance pass measured
+      where the database actually spends its time and, in the process, found another instance of the failure mode above:
+      <code>entry_xp_state.total_xp</code> / <code>.current_level</code> had <strong>two writers computing different
+      quantities</strong>, so the level shown on <code>/pools</code> and <code>/dashboard</code> was whichever path last touched
+      the row. ✅ <strong>Landed and prod-verified 2026-07-30</strong> — migration 026 is applied, 4,980 rows carry the ratchet and
+      <strong>0 violate it</strong> (<strong>R13</strong> closed). The <code>match_conduct</code> scoping (<strong>13 of 14</strong>
+      whole-table reads, four inside scoring engines, where PostgREST's silent 1,000-row cap becomes wrong bonuses the moment a second
+      competition exists) is on <code>origin/master</code>; <strong>R16</strong>, the deliberate <code>advance-teams</code> blocker, is
+      not, and must clear before a second competition is ingested. The session also introduced one regression of its own — full-pool
+      analytics on the scoring path (<strong>R15</strong>, fixed the same day). <strong>What the 2026-07-30 audit found in the same area
+      is new and open:</strong> the analytics-sweep cron that Ryan decided <em>must not be registered</em> <strong>is registered and
+      firing every minute</strong> — in <code>pg_cron</code>, not <code>vercel.json</code>, which is why the register believed otherwise —
+      writing the very columns R13 just closed (<strong>R19</strong>). It is benign only because no competition is running.</p>
   </div>
 </section>
 
 <!-- ============================ STATUS ============================ -->
 <section id="status">
   <h2 class="sec">Status at a glance</h2>
-  <p class="sec-sub">Counts are of what this document records, on 2026-07-26. Risk levels are defined in the register below.</p>
+  <p class="sec-sub">Counts are of what this document records, on <strong>2026-07-30</strong>. Risk levels are defined in the register
+    below. Closed risks stay on the register and are counted separately, not deleted.</p>
   <div class="strip">
     <div class="stat crit"><div class="n">3</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">10</div><div class="l">🟠 High risks</div></div>
+    <div class="stat high"><div class="n">8</div><div class="l">🟠 High risks</div></div>
     <div class="stat med"><div class="n">3</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
+    <div class="stat low"><div class="n">3</div><div class="l">✅ Closed, prod-verified</div></div>
     <div class="stat pri"><div class="n">4</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">7</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">8+5</div><div class="l">Settled decisions · product + infra</div></div>
-    <div class="stat neu"><div class="n">6</div><div class="l">Still-open questions</div></div>
-    <div class="stat neu"><div class="n">14</div><div class="l">Unverified claim groups</div></div>
+    <div class="stat neu"><div class="n">6</div><div class="l">Decisions needing Ryan</div></div>
+    <div class="stat neu"><div class="n">8</div><div class="l">Unverified claim groups (of 14)</div></div>
   </div>
-  <p class="strip-note">Two risks are marked as already carrying a decision from Ryan: <strong>R6</strong> (accepted /
-    deferred 2026-07-21, on a condition that is now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented).
-    An accepted risk stays on the register — it is not closed. <strong>R12</strong> is new (2026-07-26) and carries no call yet;
-    its blast radius is <strong>uncounted</strong>, not small. <strong>R13–R16</strong> came out of the 2026-07-26 performance session;
-    <strong>R15 is fixed in code and R14 now fails safe</strong> — both raised here, verified by Ryan against the code, fixed the same day,
-    and kept on the register because <strong>a defect fixed in an uncommitted working copy is not a defect production no longer has</strong>.
-    Every fix from that session is <strong>local and uncommitted</strong> — the risks it addresses are still live in production.
-    <strong>R17–R18</strong> came out of the 2026-07-26 system-design research and carry no call yet. Levels are counted at their
-    <em>current</em> value, so <strong>R15</strong> counts 🟢, having been downgraded from 🟠.</p>
+  <p class="strip-note"><strong>Changed 2026-07-30.</strong> <strong>R17</strong> (ledger), <strong>R4</strong> (shadow podium) and
+    <strong>R13</strong> (XP writers) are <strong>✅ closed and prod-verified</strong> — the bar for that mark is that the fix is in
+    production and the closing evidence is a query against production, not a commit and not a passing test. They stay on the register.
+    <strong>R19 is new</strong> and needs a ruling: the analytics-sweep cron is registered in <code>pg_cron</code> against a decision that
+    says it must not be. Two risks carry an existing decision: <strong>R6</strong> (accepted / deferred 2026-07-21, on a condition that is
+    now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented) — an accepted risk stays on the register, it is not closed.
+    <strong>R12</strong>'s blast radius is still <strong>uncounted</strong>, and the 2026-07-30 queries suggest it may not be countable at
+    all: the cascade leaves no residue. Levels are counted at their <em>current</em> value, so <strong>R15</strong> counts 🟢, having been
+    downgraded from 🟠.</p>
 </section>
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R16</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R19 · 3 closed 2026-07-30</span></h2>
   <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
     code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
     whether Ryan has already called it</strong>, plus the backlog item it maps onto so the register and the backlog
@@ -382,11 +396,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td class="id">R1</td>
         <td><strong>"Delete Pool" destroys members' predictions.</strong> Web runs five un-transactional deletes from the
           browser against an asymmetric RLS pair; <strong>mobile is a second, separate door</strong> — a single
-          <code>supabase.from('pools').delete()</code> (<code>mobile/components/pool-detail/SettingsTab.tsx:222</code>).
+          <code>supabase.from('pools').delete()</code> (<code>mobile/components/pool-detail/SettingsTab.tsx:223</code>).
           Scope of this row is <strong>pool destruction</strong>; membership exit is <strong>R12</strong></td>
         <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
-        <td class="blast"><strong>6 pools / 41 entries already destroyed</strong>, earliest in June.
-          <strong>458 pools with an admin</strong> are one tap away, of 623 live</td>
+        <td class="blast"><strong>6 pools / 41 entries already destroyed</strong>, earliest in June. Pools with an admin, one tap
+          away: <strong>458</strong> (2026-07-21 draft) vs <strong>535</strong> (2026-07-30 re-count — distinct <code>pool_id</code>
+          having a <code>role='admin'</code> row), of 623 live. ⚠️ <strong>Two numbers, two methods, unreconciled</strong> — the earlier
+          figure's counting rule was never written down. Plan against the larger until someone reconciles them</td>
         <td>One admin tap, on <strong>either</strong> platform. Elevated now — post-tournament tidying</td>
         <td><strong>None applied.</strong> The zero-deploy policy drop is identified, not run — and it covers the
           <strong>web</strong> door only</td>
@@ -395,17 +411,37 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       </tr>
       <tr class="risk-crit">
         <td class="id">R2</td>
-        <td><strong>A league pool scores zero, silently.</strong> Not just the gate: <code>full.ts:89</code> /
-          <code>progressive.ts:110</code> source predicted teams from a WC-shaped <code>knockoutTeamMap</code>, so a
-          <code>regular_season</code> fixture resolves to null teams → gate false → 0. Bonuses iterate 12 hardcoded groups
-          (<code>lib/tournament.ts:137</code>), so a league pool has no bonus path either. ✅ <strong>Prospective, not live (2026-07-26):</strong> zero <code>stage='regular_season'</code> rows exist in prod (<a href="#design-system">V6</a>) — <strong>level unchanged</strong>, because the trigger is one <code>tournaments</code> row away</td>
+        <td><strong>A league pool scores zero, silently — two bugs, gate first.</strong> ⚠️ <strong>Mechanism corrected 2026-07-30
+          by tracing a <code>regular_season</code> fixture through the <em>live</em> <code>shadow_score_match</code>; the earlier "the
+          price lookup, not just the gate" had the causality backwards.</strong> <strong>(1) The team-matching gate is what zeroes
+          it:</strong> not group stage → not progressive mode → teams <em>are</em> set (a league fixture has real teams from day one) →
+          so it compares predicted teams from <code>shadow_entry_bracket</code>, which has <strong>no rows</strong> for a league →
+          <code>teams_match = false</code> → <code>WHEN stage &lt;&gt; 'group' AND NOT teams_match THEN 'miss'</code> →
+          <strong>0 points</strong>. <strong>(2) Behind that the prices are wrong anyway:</strong>
+          <code>CASE WHEN m.stage='group' THEN group_exact_score ELSE knockout_exact_score END</code> bills every league fixture at
+          <strong>knockout</strong> rates. ⚠️ <strong>It is in the SQL, not only in Node.</strong> Shadow: gate
+          <code>drafts/2026-07-17_shadow_phaseA_1_widen_match_scores.sql:145</code>, price <code>:91</code>. Node: gate
+          <code>lib/scoring/core.ts:142</code> (fed by <code>checkKnockoutTeamsMatch</code> at <code>:88</code>, with
+          <code>full.ts:88</code> / <code>progressive.ts:105</code> sourcing teams from a WC-shaped <code>knockoutTeamMap</code>), price
+          <code>core.ts:153-155</code>. Bonuses iterate 12 hardcoded groups (<code>lib/tournament.ts:137</code>), so a league pool has no
+          bonus path either. ✅ <strong>Prospective, not live:</strong> zero <code>stage='regular_season'</code> rows in prod
+          (<a href="#design-system">V6</a>, re-confirmed 2026-07-30) — <strong>level unchanged</strong>, because the trigger is one
+          <code>tournaments</code> row away</td>
         <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
         <td class="blast"><strong>100% of points</strong> in every EPL pool; scoring trust in the flagship next season. Currently <strong>0 pools affected</strong></td>
         <td>Creating an EPL <code>tournaments</code> row — <strong>both create-pool wizards list tournaments unfiltered</strong>
           (<code>components/pools/CreatePoolModal.tsx:107</code>, <code>mobile/app/create-pool.tsx:144</code>), so the row alone
           makes league pools creatable</td>
-        <td><strong>None.</strong> Migration 024 staying uncommitted is the only thing holding the door shut — treat that as a
-          safety catch, not a plan</td>
+        <td>⚠️ <strong>Mitigation restated 2026-07-30 — the previous entry was false in the dangerous direction.</strong> It read
+          <em>"migration 024 staying uncommitted is the only thing holding the door shut"</em>. <strong>024 is not uncommitted:</strong>
+          <code>lib/migrations/024_multi_competition_league_support.sql</code>,
+          <code>lib/integrations/apiFootball/importLeagueSeason.ts</code> and <code>scripts/import-league-season.ts</code> are
+          <strong>tracked on <code>origin/master</code></strong> (swept in by <code>b80395e</code>). <strong>The real catch is the
+          production CHECK constraints:</strong> <code>tournaments_tournament_type_check</code> still allows only
+          <code>('world_cup','euros','copa_america')</code> and <code>matches_stage_check</code> still has no
+          <code>regular_season</code>, so <strong>the database rejects a league tournament regardless of what is in the repo</strong>
+          (024 confirmed <strong>not applied</strong>, 2026-07-30). That is a safety catch, not a plan — and it is one
+          <code>ALTER TABLE</code> from gone</td>
         <td>Recognised in the item; not scoped or scheduled</td>
         <td><a href="#i-league-ingestion">League ingestion (Premier League)</a> (Multi-sport → Foundational)</td>
       </tr>
@@ -423,25 +459,33 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           ~half a day</td>
         <td><a href="#i-scoring-config">Scoring config is internally inconsistent</a> (🔥 Now); <a href="#d6">Decision 6</a></td>
       </tr>
-      <tr class="risk-high">
+      <tr class="risk-low">
         <td class="id">R4</td>
-        <td><strong>Shadow/prod podium divergence, behind an undocumented live kill switch.</strong> Prod now <em>derives</em>
-          the podium from completed matches (<code>lib/podium.ts</code>); the shadow bonus SQL still <code>JOIN</code>s
-          <code>tournament_awards</code> (<code>drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164</code>) —
-          <strong>the same root cause prod just paid ~324k points to fix</strong></td>
-        <td><span class="chip lvl-high">🟠 HIGH</span></td>
-        <td class="blast">Last occurrence: <strong>669 rows / ~324,375 pts</strong>, concentrated in ~73 pools; 50 changed rank,
-          <strong>13 changed their #1</strong></td>
-        <td>Re-enabling shadow reads, or shadow scoring any competition that has a podium</td>
-        <td>Prod fixed and re-scored; <strong>shadow not fixed</strong>. ✅ 2026-07-26: the flags were read — <code>prod_scoring_enabled = true</code>, <code>shadow_read_enabled_pools = []</code> (<a href="#design-system">V5</a>) — so the divergence is <strong>latent, not live</strong></td>
-        <td>No call recorded — the 07-19 cutover and its rollback were absent from this document until 2026-07-26</td>
-        <td><a href="#i-shadow">Shadow scoring engine</a>; <a href="#i-podium">Podium bonus remediation</a> (✅ Recently shipped)</td>
+        <td>✅ <strong>CLOSED 2026-07-30 — prod-verified. Shadow's podium now uses the derived view.</strong> Was: prod <em>derives</em>
+          the podium from completed matches (<code>lib/podium.ts</code>) while the shadow bonus SQL still <code>JOIN</code>ed
+          <code>tournament_awards</code> — the same root cause prod paid ~324k points to fix. <strong>Migrations 027
+          <code>tournament_podium_view</code> (20260727155217) and 028 <code>shadow_podium_use_view</code> (20260727160124) are both
+          applied</strong>, and podium bonuses are stored at full strength: <code>champion_correct</code> 837 entries / 729,270 pts ·
+          <code>second_place_correct</code> 738 / 42,740 · <code>third_place_correct</code> 167 / 7,470</td>
+        <td><span class="chip lvl-high">🟠</span> → <span class="chip ok">✅ CLOSED</span></td>
+        <td class="blast">Was <strong>669 rows / ~324,375 pts</strong> across ~73 pools; 50 changed rank, 13 changed their #1.
+          <strong>Now zero</strong></td>
+        <td>—</td>
+        <td>⚠️ <strong>The "latent, not live" reasoning recorded on 2026-07-26 was obsolete in the <em>opposite</em> direction and should
+          be read as a warning, not a comfort.</strong> By 2026-07-29 shadow was the read source for <strong>all 623 pools</strong>, so
+          this divergence would have been <strong>live for every member</strong>, not latent. It isn't, only because it was fixed first —
+          two days before the read widening, not because of it</td>
+        <td>No call recorded; none now needed</td>
+        <td><a href="#i-shadow">Shadow scoring engine</a>; <a href="#i-podium">Podium bonus remediation</a> (✅ Recently shipped).
+          Clears <strong>Node-retirement gate 2</strong></td>
       </tr>
       <tr class="risk-high">
         <td class="id">R5</td>
-        <td><strong>EPL mid-August is not reachable on current foundations.</strong> Missing: league scoring + bonuses (R2),
-          matchweek deadlines, <strong>auto round-opening — zero code</strong>, multi-tenant sync
-          (<code>sync-fixtures/route.ts:67</code> still reads three env globals), importer commit + apply</td>
+        <td><strong>EPL mid-August is not reachable on current foundations.</strong> Missing: league scoring + bonuses (R2,
+          <strong>in two engines</strong>), matchweek deadlines, <strong>auto round-opening — zero code</strong>, multi-tenant sync
+          (<code>sync-fixtures/route.ts:67-70</code> still reads three env globals <code>API_FOOTBALL_TOURNAMENT_ID</code> /
+          <code>_LEAGUE_ID</code> / <code>_SEASON</code>), and <strong>applying migration 024</strong> — the importer itself is already
+          committed (corrected 2026-07-30)</td>
         <td><span class="chip lvl-high">🟠 HIGH</span></td>
         <td class="blast">The entire next-season target; Showdown sits behind it</td>
         <td>The fixture list, mid-Aug — a fixed external date</td>
@@ -533,9 +577,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           invisible from the route. <code>badge_unlocks</code> is designed as an <strong>append-only permanent record</strong> and
           cascades away with the entry — the permanent record is not permanent</td>
         <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
-        <td class="blast">⚠️ <strong>Unverified — no count exists.</strong> Unlike R1 there is <strong>no documented incident</strong>,
-          which is not evidence it hasn't been happening: nobody has looked. Requires a production query. Structurally the exposure is
-          <em>every member who has ever left, been removed, or deleted their account</em>, across 623 pools</td>
+        <td class="blast">⚠️ <strong>Still uncounted as of 2026-07-30.</strong> Unlike R1 there is <strong>no documented
+          incident</strong>, which is not evidence it hasn't been happening. What the 2026-07-30 audit could establish:
+          <code>pool_membership_events</code> holds <strong>293 rows total</strong>, and there are <strong>0 orphan predictions</strong>
+          and <strong>0 entries without a member row</strong> in prod. ⚠️ <strong>That is not reassurance — it is the shape of the
+          problem.</strong> Zero orphans means the cascade leaves <em>nothing behind</em>, which is exactly why the loss is unrecoverable
+          and why the count can't be reconstructed after the fact. Structurally the exposure is <em>every member who has ever left, been
+          removed, or deleted their account</em>, across 623 pools</td>
         <td>Four doors: <strong>(1)</strong> self-leave · <strong>(2)</strong> admin removes a member · <strong>(3)</strong> account
           deletion (cascades from <code>users</code>) · <strong>(4)</strong> "stop participating". Doors 1–3 are ordinary product actions
           available to any user</td>
@@ -545,29 +593,60 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           a direction, not yet a decision: see <a href="#gate-a2">Gate A2</a></td>
         <td><strong>None</strong> — this risk has no backlog item yet</td>
       </tr>
-      <tr class="risk-high">
+      <tr class="risk-low">
         <td class="id">R13</td>
-        <td><strong><code>entry_xp_state</code> has two writers with two different formulas — the level shown to users is whichever ran
-          last.</strong> <code>lib/push/badges.ts</code> (pre-fix) wrote <code>Σ match_scores.total_points + badgeXP</code>;
-          <code>lib/analytics/entryAnalytics.ts</code> writes <code>computeFullXPBreakdown</code> XP
-          (<code>BASE_XP[tier] × STAGE_MULTIPLIERS</code> + crowd/streak events + badge XP). Different <strong>quantities</strong>, both
-          measured against the same <code>LEVELS</code> thresholds, both writing the same two columns, last-writer-wins. Because
-          <code>vercel.json</code> is <code>{}</code> the analytics sweep has <strong>never been registered</strong>, so
-          <code>badges.ts</code> is the de facto owner and <code>analytics_updated_at</code> records when the <em>other</em> writer last
-          ran — the timestamp lies</td>
-        <td><span class="chip lvl-high">🟠 HIGH</span></td>
-        <td class="blast"><strong>187 of 331 sampled entries mismatch</strong> (prod, drafts-sourced), split perfectly by mode: 5/5
-          <code>progressive</code> clean, 5/5 <code>full_tournament</code> wrong. Read live at <code>app/pools/page.tsx:95</code> and
-          <code>app/dashboard/page.tsx:188</code>, so two members with identical performance can be shown different levels. Correcting the
-          formula moves <strong>1,048 entries — 817 up, 231 down</strong></td>
-        <td>Already fired. Any recalc after an analytics backfill re-flips the column</td>
-        <td><strong>Written, not landed.</strong> <code>badges.ts</code> now consumes the shared value; migration 026 adds the ratchet;
-          <code>scripts/reseed-entry-xp.ts</code> re-seeds silently. All <strong>uncommitted</strong>; 026 <strong>not applied</strong>;
-          reseed <strong>not run</strong> — prod is unchanged</td>
-        <td><strong>Decided 2026-07-26:</strong> levels never demote (ratchet, mirroring <code>badge_unlocks</code>);
-          <code>total_xp</code> stays honest; <strong>do not register the analytics-sweep cron</strong> — a second writer is what caused
-          this</td>
+        <td>✅ <strong>CLOSED in prod 2026-07-30 — verified.</strong> Was: <code>entry_xp_state</code> had two writers with two different
+          formulas (<code>lib/push/badges.ts</code> wrote <code>Σ match_scores.total_points + badgeXP</code>;
+          <code>lib/analytics/entryAnalytics.ts</code> writes <code>computeFullXPBreakdown</code> XP), both measured against the same
+          <code>LEVELS</code> thresholds, last-writer-wins. <strong>Migration 026 <code>entry_xp_highest_level</code> is applied
+          (20260729010101); 4,980 rows carry the ratchet and 0 violate it</strong>
+          (<code>highest_level_reached &lt; current_level</code>), all 623 pools backfilled, parity clean 331/331</td>
+        <td><span class="chip lvl-high">🟠</span> → <span class="chip ok">✅ CLOSED</span></td>
+        <td class="blast">Was 187 of 331 sampled entries mismatched, split perfectly by mode; the correction moved <strong>697 entries up
+          and 0 down</strong> on the real run. Now zero</td>
+        <td>—</td>
+        <td>Landed: <code>badges.ts</code> consumes the shared value, 026 applied, reseed run, parity re-checked</td>
+        <td><strong>Decided 2026-07-26 and honoured in code:</strong> levels never demote (ratchet via <code>everReachedLevel</code>);
+          <code>total_xp</code> stays honest. ⚠️ <strong>The third clause of that decision — <em>"do not register the analytics-sweep
+          cron"</em> — is being violated in production right now. See R19.</strong></td>
         <td><a href="#i-xp-writers">XP has two writers</a> (🔥 Now)</td>
+      </tr>
+      <tr class="risk-high">
+        <td class="id">R19</td>
+        <td><strong>The analytics sweep is registered and firing every minute, contrary to the decision that it must not be.</strong>
+          ⚠️ <strong>New 2026-07-30.</strong> R13 settled <em>"do not register the analytics-sweep cron — a second writer is what caused
+          this"</em>, and this register's basis for believing it wasn't registered was that <strong><code>vercel.json</code> is
+          <code>{}</code></strong>. <code>vercel.json</code> <strong>is</strong> <code>{}</code> — <strong>registration happened in
+          <code>pg_cron</code>, not Vercel</strong>: jobid <strong>15</strong> <code>analytics-sweep</code>, schedule
+          <code>* * * * *</code>, <code>active = true</code>, <strong>2,880 successful runs in 48 h</strong>, POSTing to
+          <code>sportpool.io/api/cron/analytics-sweep</code>; <code>analytics_sweep_enabled = true</code>;
+          <code>analytics_last_run_at = 2026-07-30T01:14</code>. The route calls <code>writePoolEntryAnalytics</code>, which writes
+          <strong><code>total_xp</code>, <code>current_level</code> and <code>highest_level_reached</code></strong>
+          (<code>lib/analytics/entryAnalytics.ts:247-249</code>, upsert <code>:273</code>) — the exact columns R13 just closed.
+          <strong>And the route header is stale in the load-bearing way:</strong>
+          <code>app/api/cron/analytics-sweep/route.ts:1-23</code> still reads <em>"DRAFT, NOT YET REGISTERED OR ENABLED"</em>,
+          <em>"NOT in vercel.json yet — even deployed, it will not fire until registered"</em> and <em>"Writes ONLY entry_xp_state
+          analytics columns"</em>. <strong>All three are false.</strong> This is precisely the <strong>R15</strong> failure mode: a stale
+          STATUS header is <em>why</em> the regression was tolerable to add</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast"><strong>Benign today, and worth saying why:</strong> both writers now share one XP definition, the ratchet holds
+          (0 violations), and the sweep is event-driven off <code>pool_entries.last_rank_update</code> — so between competitions it no-ops
+          (<strong>0 <code>entry_xp_state</code> rows touched in 24 h</strong>; newest <code>analytics_updated_at</code> 2026-07-29
+          01:06). <strong>It stops being benign at EPL kickoff</strong>, when scoring resumes and it begins writing every minute against a
+          second competition, as a second writer on the columns of a risk this register has just closed</td>
+        <td><strong>A dated trigger: EPL kickoff, mid-August</strong> — or any competition that resumes scoring and starts moving
+          <code>pool_entries.last_rank_update</code></td>
+        <td><strong>None.</strong> The kill switch exists (<code>sync_settings.analytics_sweep_enabled</code>) and is <strong>on</strong>.
+          Note it is also entangled with <strong>Node-retirement gate 4</strong>: the sweep detects work off
+          <code>pool_entries.last_rank_update</code>, a column <strong>only the Node engine writes</strong></td>
+        <td>⏳ <strong>NEEDS RYAN — two options, deliberately not chosen here.</strong> <strong>(a) Reverse the decision</strong> and make
+          the sweep the intended owner — then R13's decision text, this route's header and the <a href="#i-precompute">Leaderboard
+          precompute</a> item's writer note all have to be rewritten to match, and gate 4's detector has to move to
+          <code>shadow_entry_totals.updated_at</code>. <strong>(b) Deactivate jobid 15 and set
+          <code>analytics_sweep_enabled = false</code></strong> — scoring stays sole owner, as decided. <strong>Either way the stale
+          header is a fix in its own right</strong> and doesn't wait on the ruling</td>
+        <td><a href="#i-xp-writers">XP has two writers</a> (🔥 Now); <a href="#i-precompute">Leaderboard precompute</a>;
+          <a href="#engines">Node-retirement gate 4</a></td>
       </tr>
       <tr class="risk-high">
         <td class="id">R14</td>
@@ -592,8 +671,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       </tr>
       <tr class="risk-high">
         <td class="id">R15</td>
-        <td>✅ <strong>FIXED IN CODE 2026-07-26 (not deployed) — the performance work had put full-pool analytics on the scoring
-          path.</strong> <code>lib/push/badges.ts:156</code> calls <code>computePoolEntryAnalytics</code> for the whole pool on every
+        <td>✅ <strong>FIXED IN CODE 2026-07-26; the hoist is now on <code>origin/master</code></strong>
+          (<code>computeCrowdConsensus</code> at <code>lib/analytics/entryAnalytics.ts:201</code>, <code>applyCrowdOverlay</code> at
+          <code>:223</code>, checked 2026-07-30 — <em>whether that commit is deployed on Vercel is still prod state and
+          unverified</em>). <strong>The performance work had put full-pool analytics on the scoring path.</strong>
+          <code>lib/push/badges.ts:156</code> calls <code>computePoolEntryAnalytics</code> for the whole pool on every
           badge run, and badge runs fire from <code>lib/scoring/recalculate.ts:93</code> and <code>:322</code> on every recalc. That
           helper called <code>computeCrowdPredictions</code> <strong>once per entry</strong> — the exact O(entries × predictions) loop
           this same session hoisted out of three other call sites, left un-hoisted in the fourth. <strong>Now hoisted</strong>
@@ -625,39 +707,51 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           data. Conduct today = 206 rows; PL 2026/27 adds ~760 → 966; the competition after that crosses 1,000</td>
         <td>Ingesting a <strong>second competition</strong> — the EPL, mid-August. A fixed external date</td>
         <td><strong>13 of 14 app call sites fixed</strong> via <code>lib/matchConduct.ts</code> (scoped through the
-          <code>match_conduct → matches</code> FK, paginated) — but <strong>uncommitted</strong>, so prod still runs all 14 unscoped.
-          <code>advance-teams</code> and the scripts are excluded from that fix</td>
+          <code>match_conduct → matches</code> FK, paginated). ⚠️ <strong>"Uncommitted" is stale — <code>lib/matchConduct.ts</code> is on
+          <code>origin/master</code></strong> (<code>db4daf3</code>, checked 2026-07-30); <em>whether all 13 call sites went with it was
+          not re-verified</em>. What is <strong>confirmed still unscoped</strong> is <code>advance-teams</code> —
+          <code>route.ts:62</code> matches, <code>:63</code> teams, <code>:65</code> match_conduct, all tournament-wide, blocker comment at
+          <code>:55</code> — plus the four <code>scripts/*.ts</code></td>
         <td><strong>New — no call made.</strong> Must precede league ingestion (step 3d in the delivery order)</td>
         <td><a href="#perf">⚡ Performance &amp; caching</a>; <a href="#i-league-ingestion">League ingestion</a>; R2, R5</td>
       </tr>
-      <tr class="risk-high">
+      <tr class="risk-low">
         <td class="id">R17</td>
-        <td><strong>The ledger does not reconcile to its own line items.</strong> 29 of 4,985 entries have
-          <code>scored_total_points ≠ Σmatch_scores + Σbonus_scores + point_adjustment</code> — <strong>26 over by 149,525 pts</strong>,
-          3 under by 4,975, <strong>3 carrying points with no line items at all</strong>; max single delta 9,825. Verified in prod
-          2026-07-26 (<a href="#design-system">V1</a>). <strong>Does not contradict the 2026-07-21 ledger audit</strong> — that asked "is
-          anyone owed points?", this asks "does the total reconcile to its evidence?"</td>
-        <td><span class="chip lvl-high">🟠 HIGH</span></td>
-        <td class="blast"><strong>29 entries of 4,985 (0.6%)</strong>, ~154,500 pts of discrepancy in total. Bounded and
-          non-propagating — but these are <strong>final standings</strong>, and 26 people are shown a score their line items don't
-          support</td>
-        <td>Already live. Any member opening a points breakdown on an affected entry sees a total that doesn't match its own rows</td>
-        <td><strong>None.</strong> No continuous reconciliation check exists — this was found by asking, not by an alarm</td>
-        <td><strong>New — no call made</strong></td>
-        <td><strong>None yet.</strong> Directly violates <a href="#design-system">P1</a></td>
+        <td>✅ <strong>CLOSED 2026-07-30 — prod-verified. The ledger reconciles.</strong> Was: 29 of 4,985 entries with
+          <code>scored_total_points ≠ Σmatch_scores + Σbonus_scores + point_adjustment</code> — 26 over by 149,525 pts, 3 under by 4,975,
+          3 carrying points with no line items; max delta 9,825 (<a href="#design-system">V1</a>, 2026-07-26). <strong>Re-ran the
+          identical check 2026-07-30: 0 mismatched of 4,981 entries, 0 over, 0 under, 0 carrying points with no line items.</strong>
+          No decision was needed and none was recorded — the shadow C1 fix and the 164 verified point adjustments of 2026-07-29 are the
+          likeliest cause, but <strong>that attribution is inference, not evidence</strong></td>
+        <td><span class="chip lvl-high">🟠</span> → <span class="chip ok">✅ CLOSED</span></td>
+        <td class="blast">Was 29 entries / ~154,500 pts. <strong>Now zero</strong></td>
+        <td>—</td>
+        <td>⚠️ <strong>Closed on the data, not on the mechanism.</strong> There is still <strong>no continuous reconciliation
+          check</strong>: this was found by asking, fixed as a side effect, and confirmed by asking again. If it drifts a third time
+          nothing will say so</td>
+        <td><strong>New — no call made.</strong> The open question this leaves is whether P1's <em>"checked continuously"</em> invariant
+          gets built</td>
+        <td><strong>None yet.</strong> <a href="#design-system">P1</a> is satisfied today and unmonitored</td>
       </tr>
       <tr class="risk-high">
         <td class="id">R18</td>
-        <td><strong>The parity alarm detects into a table nothing reads.</strong> <code>shadow_score_diffs</code>: 849 rows, <strong>418
-          in the last 24 h</strong>, newest 2026-07-26 17:45, 3 <code>diff_kind</code> values. Verified in prod 2026-07-26
-          (<a href="#design-system">V2</a>). <strong>This corrects the earlier belief that the alarm cron was failing</strong> — the cron
-          works; the consumer was never built</td>
+        <td><strong>The parity alarm detects into a table nothing reads.</strong> <code>shadow_detect_diffs()</code> runs every 15 min
+          (jobid 21, 192 runs/48 h, all succeeding) and writes <code>shadow_score_diffs</code> — and <strong>nothing in
+          <code>app/</code>, <code>lib/</code> or <code>mobile/</code> reads that table</strong>; the only readers are
+          <code>drafts/*.sql</code>. ⚠️ <strong>Rewritten 2026-07-30 — the alarming half of the original framing was wrong.</strong>
+          <code>shadow_detect_diffs</code> <strong>DELETEs then re-INSERTs</strong> <code>diff_kind='entry_total_mismatch'</code> on every
+          run, so for that kind it is a <strong>current-state table, not an append-only log</strong> — the row count <em>is</em> the
+          verdict. <strong>Today's verdict is 0 mismatches: prod and shadow agree exactly on totals.</strong> The 431 rows present are
+          fossils of two kinds the function does not manage — <code>only_in_live</code> (341) and <code>value_mismatch</code> (90) — all
+          stamped <strong>2026-07-02</strong>, none newer, 0 in the last 24 h. The earlier "849 rows, 418 in the last 24 h" reading
+          (<a href="#design-system">V2</a>) counted a re-written table as an accumulating one</td>
         <td><span class="chip lvl-high">🟠 HIGH</span></td>
-        <td class="blast">Unknown by construction: the system has been reporting discrepancies all day and <strong>nobody is receiving
-          them</strong>. Whether these 418 rows relate to R17's 29 entries is <strong>an open question, not a claim</strong> — worth
-          checking first, since it is cheap</td>
-        <td>Already live and firing</td>
-        <td><strong>None.</strong> Detection exists; consumption doesn't</td>
+        <td class="blast"><strong>Not "discrepancies nobody is receiving"</strong> — there are none right now. The exposure is the
+          <em>next</em> one: whenever totals do diverge, the only thing that notices is a table with no reader, no alert and no admin
+          surface. Compounded by the alarm's known blind spot — it compares <strong>totals only</strong> and cannot see rank drift
+          (<a href="#engines">Node-retirement gate 1</a>)</td>
+        <td>The next real divergence. Nothing surfaces it</td>
+        <td><strong>None.</strong> Detection exists; consumption doesn't. Building a reader is unblocked and small</td>
         <td><strong>New — no call made</strong></td>
         <td><a href="#i-shadow">Shadow scoring engine</a>. Violates <a href="#design-system">P3</a></td>
       </tr>
@@ -679,6 +773,25 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     fixed in an uncommitted working copy is not a defect production no longer has. R15 is annotated 🟠 → 🟢 and closes on deploy; R14 changes
     <em>kind</em> rather than closing — the code now fails safe, so what remains is a <strong>release-ordering constraint</strong>, and
     constraints are not fixed by commits.
+    <br><br>⚠️ <strong>R14's ordering has probably been discharged by the R13 release</strong> (026 applied → deploy → reseed → parity
+    clean), but the 2026-07-30 audit did <strong>not</strong> check whether any level-up push burst fired to the 697 members whose level
+    moved. Left open and marked unverified rather than closed on inference.
+  </div>
+
+  <div class="note ok" style="margin-top:12px">
+    <strong>R17, R4 and R13, on being closed rather than fixed-in-code.</strong> Three rows are marked ✅ <strong>CLOSED 2026-07-30</strong>
+    and keep their history in place. The bar for that mark is deliberately higher than for R14/R15: <strong>the fix is in production and the
+    closing evidence is a query against production</strong>, not a commit and not a passing test. The rows stay in the register — a closed
+    risk is part of the record of how this system fails, and R4 in particular is only readable as a near-miss if the original entry is still
+    visible next to the correction. <strong>Accepted risks (R6) also stay, marked accepted; they are a different thing from closed.</strong>
+  </div>
+
+  <div class="note warn" style="margin-top:12px">
+    <strong>Two registration mechanisms; the register had only audited one.</strong> <strong>R19</strong> exists because <em>"it isn't in
+    <code>vercel.json</code>"</em> was treated as <em>"it isn't scheduled"</em>. This codebase schedules through <strong><code>pg_cron</code>
+    as well</strong> — jobids 15, 19, 20 and 21 all live there and none of them appear in <code>vercel.json</code>. <strong>Any future claim
+    in this document that a job is unregistered has to name both mechanisms and check both.</strong> That generalisation is the more durable
+    half of R19; the cron itself is a ruling away from settled.
   </div>
 
   <h3 class="grp" id="destruction-class">The destruction class — four doors to one purge (R1 · R12)</h3>
@@ -734,25 +847,40 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul>
       <li>Whether the survey fixes are actually <strong>deployed</strong> on Vercel (they are on <code>origin/master</code>;
         that is not the same thing) — R8.</li>
-      <li><s>All <code>sync_settings</code> flag values</s> — ✅ <strong>resolved 2026-07-26:</strong>
-        <code>prod_scoring_enabled = true</code>, <code>shadow_read_enabled_pools = []</code>, and
-        <code>sweep_time_box_enabled</code> has <strong>no row at all</strong> (<a href="#design-system">V3, V5</a>).
-        <code>analytics_read_from_columns</code> remains unread here.</li>
-      <li><s>pg_cron job health, including the shadow <strong>parity alarm</strong> (jobid 21)</s> — ✅ <strong>partly
-        resolved:</strong> the alarm is <strong>working</strong> and has written 849 rows / 418 in 24 h
-        (<a href="#design-system">V2</a>); the earlier "cron failing" note was wrong. The <strong>reconcilers (jobids 19/20)</strong>
-        are still unverified.</li>
+      <li><s>All <code>sync_settings</code> flag values</s> — ✅ <strong>resolved 2026-07-26, re-read 2026-07-30:</strong>
+        <code>prod_scoring_enabled = true</code> (unchanged), but <code>shadow_read_enabled_pools</code> is <strong>no longer
+        <code>[]</code></strong> — it is an explicit list of ~623 pool IDs, so <strong>both engines compute and shadow is what members
+        read</strong>. <code>sweep_time_box_enabled</code> still has <strong>no row at all</strong> (<a href="#design-system">V3</a>).
+        <code>analytics_read_from_columns</code> <strong>now exists as a <code>sync_settings</code> row, set <code>false</code></strong>
+        — the "exists only in <code>drafts/</code>" line elsewhere in this document is stale.
+        <code>analytics_sweep_enabled = true</code> (<strong>R19</strong>).</li>
+      <li><s>pg_cron job health, including the shadow <strong>parity alarm</strong> (jobid 21) and the <strong>reconcilers
+        (19/20)</strong></s> — ✅ <strong>fully resolved 2026-07-30.</strong> All three <code>active</code> and all succeeding:
+        <strong>19</strong> shadow-reconcile <code>* * * * *</code>, 2,880 runs/48 h, last 2026-07-30 01:13 · <strong>20</strong>
+        shadow-reconcile-adjustments <code>*/2 * * * *</code>, 1,440 runs/48 h, last 01:12 · <strong>21</strong> shadow-parity-alarm
+        <code>*/15 * * * *</code>, 192 runs/48 h, last 01:00. ⚠️ <strong>The same query found a fourth job nobody had audited — jobid 15
+        <code>analytics-sweep</code>, active, 2,880 runs/48 h. See R19.</strong></li>
       <li><strong>The six ⬜ analysis claims A1–A6</strong> in <a href="#design-system">System design</a> — realtime's share of DB time,
         pool payload size (3.8 MB vs 12 MB, unreconciled), <code>max_connections = 60</code>, whether the admin recalculate button can
         succeed, whether ingest failures are recorded as healthy, and the count of unbounded <code>.in()</code> reads. None are measured;
         A3 in particular contradicts the recorded XL→Medium downgrade and must be confirmed before any capacity planning.</li>
-      <li>Whether <strong>migration 024</strong> was applied (it carries no "applied to prod" header, unlike 025/025b — so almost
-        certainly not) — R2.</li>
+      <li><s>Whether <strong>migration 024</strong> was applied</s> — ✅ <strong>resolved 2026-07-30: it is NOT applied.</strong>
+        Confirmed from the constraints themselves, not from a header: <code>tournaments_tournament_type_check</code> =
+        <code>('world_cup','euros','copa_america')</code>, <code>matches_stage_check</code> has no <code>regular_season</code>.
+        <strong>Those constraints, not the repo, are what hold R2's door shut</strong> — 024 and the importer have been on
+        <code>origin/master</code> since <code>b80395e</code>.</li>
       <li>The <strong>RLS policy bodies</strong> behind the delete asymmetry, and the FK cascade definitions behind mobile's
         <code>pools</code> delete — both taken from <code>drafts/2026-07-21_delete_pool_data_loss.md</code>, not re-introspected — R1.</li>
-      <li>The counts <strong>6 destroyed / 458 exposed</strong>, the audience sizes <strong>477 / 3,652</strong>, and the
-        <strong>~243k pts / 155 entries</strong> inflation measurement — all prod queries from their source drafts.</li>
-      <li>Presence of <code>badge_unlocks</code> (+ its backfill) and the <code>trg_enforce_prediction_before_kickoff</code> trigger.</li>
+      <li>The count <strong>6 destroyed</strong>, the audience sizes <strong>477 / 3,652</strong>, and the
+        <strong>~243k pts / 155 entries</strong> inflation measurement — all prod queries from their source drafts.
+        ⚠️ <strong>"458 exposed" is now two numbers</strong>: 458 (the draft) and <strong>535</strong> (2026-07-30, distinct
+        <code>pool_id</code> with a <code>role='admin'</code> row). The methods differ and the draft's rule was never recorded —
+        <strong>needs reconciliation; do not overwrite one with the other</strong> — R1.</li>
+      <li><s>Presence of <code>badge_unlocks</code> (+ its backfill) and the <code>trg_enforce_prediction_before_kickoff</code>
+        trigger</s> — ✅ <strong>resolved 2026-07-30:</strong> <code>badge_unlocks</code> holds <strong>18,580 rows</strong> and
+        <code>trg_enforce_prediction_before_kickoff</code> is present.</li>
+      <li><s>Whether the ledger reconciles (<strong>R17</strong>)</s> — ✅ <strong>resolved 2026-07-30: 0 mismatched of 4,981
+        entries.</strong> Re-runnable, and nothing re-runs it.</li>
       <li><strong>The whole 2026-07-26 performance baseline.</strong> <code>pg_stat_statements</code> on
         <code>ujthamlehjyubbzxbnes</code>: 337.5 total DB-hours, <code>SELECT predictions.*</code> at 111.3h / <strong>33.0%</strong> /
         30.0M calls, realtime WAL decoding 80.9h / 24.0%, <code>row_to_json(pool_members)</code> 34.5h / 10.2% at 404–450ms mean,
@@ -760,7 +888,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         a rate. Source: <code>drafts/2026-07-26_performance_optimization_audit.md</code>.</li>
       <li><strong>The pool-size distribution the caching strategy rests on</strong> — 623 pools, 4,809 memberships,
         <strong>median 1 member</strong>, mean 7.7, 70% ≤5, four pools ≥100, max 192; 288,029 predictions across 4,985 entries; 3,184
-        users in 30d. Every CDN and cache conclusion follows from this table, so if it is wrong the strategy is wrong.</li>
+        users in 30d. Every CDN and cache conclusion follows from this table, so if it is wrong the strategy is wrong.
+        ✅ <strong>Re-counted 2026-07-30 and materially unchanged</strong> — 623 pools (identical), <strong>4,805</strong> memberships,
+        <strong>4,981</strong> entries, <strong>287,789</strong> predictions. The drift is fractions of a percent and changes no
+        conclusion; the shape claims (median, mean, concentration) were not re-measured.</li>
       <li><strong>The payload measurements</strong> — largest pool 5,420 kB → 3,854 kB after column narrowing (29%), and therefore still
         over Vercel Runtime Cache's 2 MB item limit — R13 / ⚡ Performance &amp; caching.</li>
       <li><strong>The parity result and the XP movement</strong> — 187/331 entries mismatched, 5/5 mode split, and 1,048 entries moving
@@ -768,14 +899,16 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         prod; re-runnable, but not from code — <strong>R13</strong>, <strong>R14</strong>.</li>
       <li><strong>That the scoped conduct read returns identical data</strong> (206 = 206 rows across three query shapes) — verified
         against prod by Ryan's side on 2026-07-26, not re-verifiable here — <strong>R16</strong>.</li>
-      <li><strong>R12's blast radius — no count exists at all.</strong> How many entries have already been purged by leave / removal /
-        account deletion / stop-participating is <strong>unknown and unmeasured</strong>; it needs a production query (e.g.
-        <code>pool_membership_events</code> rows of type <code>left</code>/<code>removed</code> against surviving entries). The 21-table
-        cascade itself is also prod-schema-verified by Ryan's side, <strong>not</strong> re-verifiable from this repo — only the two route
-        files are.</li>
+      <li><strong>R12's blast radius — still no count, as of 2026-07-30.</strong> How many entries have already been purged by leave /
+        removal / account deletion / stop-participating remains <strong>unknown and unmeasured</strong>. What the 2026-07-30 pass could
+        get: <code>pool_membership_events</code> = <strong>293 rows total</strong>, <strong>0 orphan predictions</strong>, <strong>0
+        entries without a member row</strong>. ⚠️ <strong>Read that correctly</strong> — zero orphans is not "it hasn't happened", it is
+        "the cascade leaves nothing behind", which is the same fact that makes the loss unrecoverable and the count unreconstructable. A
+        real number needs event-typed history the product does not keep. The 21-table cascade itself is prod-schema-verified by Ryan's
+        side, <strong>not</strong> re-verifiable from this repo — only the two route files are.</li>
     </ul>
     <p style="margin:10px 0 0"><strong>Anything not on this list, and not marked unverified inline, was read in the code on
-      2026-07-26.</strong></p>
+      2026-07-26 or re-verified against prod/code on 2026-07-30.</strong></p>
   </div>
 
   <h3 class="grp">Known drift, found 2026-07-26, not yet actioned</h3>
@@ -794,10 +927,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>2026-07-25_entry_fee_collection_assessment.md</code> (a legal/feasibility assessment ending in a recommendation
         Ryan hasn't ruled on). ✅ <em>Resolved 2026-07-26 for the caching drafts</em> — <code>2026-07-19_caching_infrastructure_plan.md</code>
         and the three new <code>2026-07-26_*</code> drafts now roll up into <a href="#perf">⚡ Performance &amp; caching</a>.</li>
-      <li><strong>Smaller staleness:</strong> the <em>Recurring each knockout round</em> section still reads "SF/Final upcoming"
-        ten days after the final; <code>analytics_read_from_columns</code> still appears zero times in code —
-        <strong>re-verified 2026-07-26</strong>, it exists only in <code>drafts/</code>, so the M4 note remains accurate; auto
-        round-opening has no code at all (feeds <strong>R5</strong>).</li>
+      <li><strong>Smaller staleness:</strong> ✅ <em>Recurring each knockout round</em> said "SF/Final upcoming"
+        <strong>fourteen days after the final</strong> — <strong>fixed 2026-07-30</strong>, the section now reads as closed for WC 2026
+        and recurring for the next knockout competition. ⚠️ <code>analytics_read_from_columns</code> — <strong>this line is itself now
+        stale</strong>: the flag <strong>exists in prod as a <code>sync_settings</code> row set <code>false</code></strong>
+        (2026-07-30), it is not drafts-only. It still appears zero times in application code, so the M4 note's <em>substance</em> holds
+        (nothing reads the flag), but the provenance claim behind it does not. Auto round-opening has no code at all (feeds
+        <strong>R5</strong>).</li>
     </ul>
   </div>
 
@@ -829,7 +965,27 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         live flag value and unverified here (<a href="#gate-b">Gate B</a>).</li>
     </ul>
     <p style="margin:10px 0 0"><strong>Two lines remain, and neither closes on a commit:</strong> the deploy ordering (<strong>R14</strong> —
-      the code now fails safe, the ordering constraint stands) and the fact that none of it is applied or deployed.</p>
+      the code now fails safe, the ordering constraint stands) and <s>the fact that none of it is applied or deployed</s> —
+      ⚠️ <strong>superseded 2026-07-30:</strong> most of it <em>is</em> applied (026/038, the backfill, the shadow read widening) and steps
+      2/3/7 are on <code>origin/master</code>. What is <strong>not</strong> landed is <strong>R16</strong>
+      (<code>advance-teams</code>) and the scripts, which is the half that gates league ingestion.</p>
+  </div>
+
+  <h3 class="grp">Found in the 2026-07-30 audit — drift in the <em>other</em> direction, and the more dangerous kind</h3>
+  <div class="card crit">
+    <ul class="fields">
+      <li>⚠️ <span class="f">R2's mitigation said the safety catch was something that had already gone.</span> <em>"Migration 024 staying
+        uncommitted is the only thing holding the door shut"</em> — 024, <code>importLeagueSeason.ts</code> and
+        <code>import-league-season.ts</code> are all <strong>tracked on <code>origin/master</code></strong> (<code>b80395e</code>). The
+        door is held by the <strong>prod CHECK constraints</strong>, which nobody had checked. <strong>A false mitigation is worse than a
+        missing one: it reads as a reason to relax.</strong> Corrected in the register and in delivery step <strong>3d</strong>.</li>
+      <li>⚠️ <span class="f">Delivery step 3a points at the wrong codebase.</span> It says the <code>regular_season</code> path lands in
+        <code>lib/scoring/core.ts</code>. <strong>Shadow is the read source for all 623 pools</strong>, so the fix has to land in the
+        <strong>shadow SQL</strong>, and — while <code>prod_scoring_enabled = true</code> — in <strong>both engines</strong>. Corrected in
+        place.</li>
+      <li>⚠️ <span class="f">The analytics-sweep cron was believed unregistered on the strength of one registration mechanism.</span>
+        See <strong>R19</strong> and the note under the register.</li>
+    </ul>
   </div>
 </section>
 
@@ -865,13 +1021,16 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       and that difference drives the order inside this step:</p>
     <ul style="margin:0; padding-left:18px">
       <li><strong>R1 has a cheap interim available now</strong> — drop the policy (web) and remove the mobile button. Six pools destroyed,
-        458 one tap away, and it is the lowest-effort mitigation in the register.</li>
+        <strong>458–535 one tap away</strong> (two counting methods, unreconciled — see R1), and it is the lowest-effort mitigation in the
+        register.</li>
       <li><strong>R12 has no interim identified.</strong> The destruction is a schema property, not application logic — three of its four
         doors contain no delete of entries or predictions in code at all. There is no button to remove and no policy to drop; anything real
         here is a schema change (soft-delete, retention, or re-pointed FKs), and its <em>shape</em> depends on Gate A2 below.</li>
-      <li><strong>Counting first is cheap and unblocked.</strong> R12's blast radius is unknown because nobody has queried it. That query
-        needs no decision from anyone and would tell us whether this is a live wound or a latent one — which is exactly what the level and
-        the urgency turn on.</li>
+      <li><strong>Counting first is cheap and unblocked — and 2026-07-30 showed it may not be answerable.</strong> The obvious queries came
+        back <strong>0 orphan predictions, 0 entries without a member row, 293 <code>pool_membership_events</code> rows in total</strong>.
+        The cascade leaves no residue, so the historic count cannot be reconstructed from what survives; establishing it needs event history
+        the product does not keep. <strong>That does not lower the risk — it raises it</strong>, because it means the loss is both silent and
+        unauditable after the fact.</li>
     </ul>
   </div>
 
@@ -925,13 +1084,19 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="gate" id="gate-b">
     <h4>🚦 Gate B — which engine scores the EPL?</h4>
     <p>Must be answered <strong>before</strong> league scoring is designed, because the same fix lands in a different codebase depending
-      on the answer: the Node engine (<code>lib/scoring/*</code>) or the shadow engine's SQL. ✅ <strong>The factual half is now answered
-      (2026-07-26, <a href="#design-system">V5</a>):</strong> <code>prod_scoring_enabled = true</code> and
-      <code>shadow_read_enabled_pools = []</code> — the <strong>prod Node engine is scoring everything</strong>, shadow reads are fully
-      off. The gate is no longer <em>"what is running?"</em> but purely <strong>"which engine should own the EPL?"</strong> — Ryan's call,
-      still open.</p>
-    <p>Related but <strong>not</strong> an EPL gate: shadow still carries the pre-fix podium logic (<strong>R4</strong>) — a league has
-      no podium, so that blocks any <em>re-cutover</em> or any future cup, not the EPL itself.</p>
+      on the answer: the Node engine (<code>lib/scoring/*</code>) or the shadow engine's SQL. ⚠️ <strong>The factual half FLIPPED between
+      2026-07-26 and 2026-07-30, and the earlier answer is now misleading.</strong> <a href="#design-system">V5</a> recorded
+      <code>prod_scoring_enabled = true</code>, <code>shadow_read_enabled_pools = []</code> — <em>"the prod Node engine is scoring
+      everything, shadow reads are fully off."</em> <strong>Now:</strong> <code>prod_scoring_enabled = true</code>
+      (<strong>unchanged</strong>) but <code>shadow_read_enabled_pools</code> is an <strong>explicit list of ~623 pool IDs</strong>. So
+      <strong>both engines compute, and shadow is what every member reads.</strong></p>
+    <p>The practical consequence is not subtle: <em>"which engine should own the EPL?"</em> is still Ryan's call and still open, but
+      <strong>any scoring fix written today has to land in the shadow SQL to be seen at all, and in both engines while
+      <code>prod_scoring_enabled</code> stays true.</strong> Delivery step <strong>3a</strong> was written against
+      <code>lib/scoring/core.ts</code> alone and is corrected below.</p>
+    <p>Related, and now <strong>resolved</strong>: shadow's pre-fix podium logic (<strong>R4</strong>) was fixed by migrations 027/028 and
+      is ✅ <strong>closed</strong>. Note what that near-miss means — it was filed as <em>"latent, because reads are off"</em>, and reads
+      went on for all 623 pools three days later.</p>
   </div>
 
   <div class="step crit-step">
@@ -942,19 +1107,31 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <table>
         <thead><tr><th>Step</th><th>Why it must come where it is</th></tr></thead>
         <tbody>
-          <tr><td><strong>3a.</strong> A <code>regular_season</code> path through the scoring gate <strong>and the price lookup</strong></td>
-            <td>Everything downstream is meaningless without it — a league pool that ingests perfectly still scores nothing.</td></tr>
+          <tr><td><strong>3a.</strong> A <code>regular_season</code> path through the <strong>team-matching gate first</strong>, then the
+            price lookup</td>
+            <td>Everything downstream is meaningless without it — a league pool that ingests perfectly still scores nothing.
+              ⚠️ <strong>Corrected 2026-07-30 — this step named the wrong codebase.</strong> It read as work on
+              <code>lib/scoring/core.ts</code>. <strong>Shadow is the read source for all 623 pools</strong>, so the fix must land in the
+              <strong>shadow SQL</strong> (gate <code>drafts/2026-07-17_shadow_phaseA_1_widen_match_scores.sql:145</code>, price
+              <code>:91</code>) — and in <strong>both</strong> engines while <code>prod_scoring_enabled = true</code> (Node: gate
+              <code>core.ts:142</code>, price <code>core.ts:153-155</code>). Fixing only Node would change nothing a member sees; fixing
+              only shadow leaves the two disagreeing the moment prod scoring writes.</td></tr>
           <tr><td><strong>3b.</strong> Decide the bonus story (build a league bonus path, or ship match-points-only)</td>
             <td><code>calculateGroupStandingsBonuses</code> iterates 12 hardcoded groups; a league has none, so today there is no bonus
               path at all. This is a <strong>scope option for Ryan</strong>, recorded here, not chosen here.</td></tr>
           <tr><td><strong>3c.</strong> Multi-tenant sync — read competition config off the tournament row</td>
             <td>Until this lands, the competition <em>is</em> three env globals (<code>sync-fixtures/route.ts:67</code>); 024 backfills
               the columns it needs.</td></tr>
-          <tr><td><strong>3d.</strong> Apply migration 024 + land the importer</td>
-            <td>Deliberately <strong>after</strong> 3a. 024 staying uncommitted is currently the only thing preventing a zero-scoring
-              league pool from being creatable at all — both create-pool wizards list tournaments unfiltered, so the
-              <code>tournaments</code> row <em>is</em> the trigger. Landing the importer first would open that door before scoring can
-              hold it.</td></tr>
+          <tr><td><strong>3d.</strong> Apply migration 024</td>
+            <td>Deliberately <strong>after</strong> 3a. ⚠️ <strong>Rationale corrected 2026-07-30 — the previous one was false.</strong>
+              It read <em>"024 staying uncommitted is currently the only thing preventing a zero-scoring league pool from being
+              creatable"</em>. <strong>024 and the importer are already on <code>origin/master</code></strong> (<code>b80395e</code>);
+              there is nothing left to "land". What actually holds the door is <strong>production's CHECK constraints</strong> —
+              <code>tournaments_tournament_type_check</code> (<code>world_cup</code>/<code>euros</code>/<code>copa_america</code> only) and
+              <code>matches_stage_check</code> (no <code>regular_season</code>), both still un-widened as of 2026-07-30.
+              <strong>Applying 024 is the act that opens it</strong>, and both create-pool wizards list tournaments unfiltered, so the
+              <code>tournaments</code> row <em>is</em> the trigger. Do not apply 024 before 3a holds in <strong>both</strong>
+              engines.</td></tr>
           <tr><td><strong>3e.</strong> Matchweek deadlines + <strong>auto round-opening</strong></td>
             <td>Decision 7: <em>"a prerequisite, not polish"</em> — the progressive World Cup needed super-admin bulk updates for 7
               rounds; the EPL is 38 matchweeks × every pool.</td></tr>
@@ -1087,7 +1264,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <thead><tr><th>#</th><th>Finding</th><th>Why it matters</th></tr></thead>
         <tbody>
           <tr><td class="id">V1</td>
-            <td><strong>The ledger does not reconcile to itself.</strong> Of 4,985 entries, <strong>29 mismatch</strong>
+            <td>⚠️ <em>Superseded 2026-07-30 — see the note under this table.</em> <strong>The ledger does not reconcile to
+              itself.</strong> Of 4,985 entries, <strong>29 mismatch</strong>
               <code>scored_total_points</code> vs <code>Σmatch_scores + Σbonus_scores + point_adjustment</code>: <strong>26 show MORE than
               earned (149,525 pts over)</strong>, 3 show LESS (4,975 under), <strong>3 carry points with zero line items</strong>. Max
               single delta <strong>9,825</strong></td>
@@ -1095,7 +1273,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               asked <em>"is anyone owed points?"</em> and was essentially right. This asks <em>"does the total reconcile to its
               evidence?"</em>, a different question it never posed. Now <strong>R17</strong></td></tr>
           <tr><td class="id">V2</td>
-            <td><strong>The parity alarm is alive and unconsumed.</strong> <code>shadow_score_diffs</code> holds <strong>849 rows, 418 in
+            <td>⚠️ <em>Superseded 2026-07-30 — misread as well as stale; see the note under this table.</em> <strong>The parity alarm
+              is alive and unconsumed.</strong> <code>shadow_score_diffs</code> holds <strong>849 rows, 418 in
               the last 24 h</strong>, newest 2026-07-26 17:45, across 3 distinct <code>diff_kind</code> values</td>
             <td>It has been detecting discrepancies all day into a table <strong>nothing reads</strong>. <strong>Corrects</strong> the
               earlier note that the alarm cron was failing — it isn't; the consumer is. A <strong>P3</strong> failure. Now
@@ -1113,7 +1292,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <td>Every scoring UPDATE writes WAL that is then <strong>RLS-evaluated per subscriber</strong>. This is the mechanism behind
               the fan-out cost in A1 below</td></tr>
           <tr><td class="id">V5</td>
-            <td><strong>Gate B's factual half is answered:</strong> <code>prod_scoring_enabled = true</code>,
+            <td>⚠️ <em>FLIPPED 2026-07-30 — do not act on this row; see the note under this table.</em> <strong>Gate B's factual half is
+              answered:</strong> <code>prod_scoring_enabled = true</code>,
               <code>shadow_read_enabled_pools = []</code></td>
             <td>The <strong>prod Node engine is scoring everything</strong>; shadow reads are fully off. <strong>R4's divergence is
               therefore latent, not live.</strong> It does <strong>not</strong> decide which engine <em>should</em> score the EPL — still
@@ -1123,11 +1303,35 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <td><strong>R2 is prospective, not live</strong> — materially better than the register implied. The level is unchanged because
               the trigger is still one <code>tournaments</code> row away</td></tr>
           <tr><td class="id">V7</td>
-            <td><strong>Migration 024 is not applied</strong> (expected — deliberately uncommitted). <strong>Migration 026 is also not
+            <td>⚠️ <em>Half superseded 2026-07-30 — 026 IS applied; see the note under this table.</em> <strong>Migration 024 is not
+              applied</strong> (expected — deliberately uncommitted). <strong>Migration 026 is also not
               applied</strong> — <code>entry_xp_state.highest_level_reached</code> does not exist</td>
             <td>024 is the R2 safety catch working as intended. 026 is an unexplained gap: a migration that exists and has not landed</td></tr>
         </tbody>
       </table>
+    </div>
+    <div class="note warn" style="margin-bottom:0">
+      <strong>⚠️ Re-verified against production 2026-07-30 — four of these seven have moved.</strong> The table above is kept as the dated
+      record of what was true on 2026-07-26; this is what is true now:
+      <ul style="margin:8px 0 0; padding-left:18px">
+        <li><strong>V1 → fixed.</strong> 0 mismatched of 4,981 entries, 0 carrying points with no line items. <strong>R17 closed.</strong>
+          P1 is satisfied <em>today</em>; it is still not checked continuously.</li>
+        <li><strong>V2 → misread, not just stale.</strong> <code>shadow_detect_diffs</code> <strong>DELETEs and re-INSERTs</strong> its
+          <code>entry_total_mismatch</code> rows, so that kind is <strong>current state, not a log</strong> — the "849 rows / 418 in 24 h"
+          was an accumulating reading of a table that rewrites itself. Current verdict: <strong>0 <code>entry_total_mismatch</code></strong>,
+          i.e. prod and shadow agree exactly on totals. The 431 rows present are fossils (<code>only_in_live</code> 341,
+          <code>value_mismatch</code> 90) all stamped 2026-07-02. <strong>R18 stays open on the "no reader" half only.</strong></li>
+        <li><strong>V5 → flipped.</strong> <code>prod_scoring_enabled = true</code> still, but <code>shadow_read_enabled_pools</code> is an
+          <strong>explicit list of ~623 pool IDs</strong>. Both engines compute; <strong>shadow is what members read.</strong> The sentence
+          <em>"R4's divergence is therefore latent, not live"</em> was true when written and would have been <strong>false three days
+          later</strong> — R4 was fixed first (027/028), which is the only reason this reads as a near-miss rather than an incident.</li>
+        <li><strong>V7 → half resolved.</strong> <strong>026 is applied</strong> (20260729010101); 4,980 rows, 0 ratchet violations —
+          <strong>R13 closed</strong>. <strong>024 is still not applied</strong>, confirmed from the constraints themselves, but the
+          parenthetical <em>"deliberately uncommitted"</em> is wrong: 024 and the importer are on <code>origin/master</code>. The safety
+          catch is the CHECK constraints, not the repo.</li>
+      </ul>
+      <p style="margin:8px 0 0">V3, V4 and V6 were not re-measured except V6's premise, which still holds: <strong>zero
+        <code>stage='regular_season'</code> rows in prod</strong>.</p>
     </div>
   </div>
 
@@ -1246,8 +1450,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card neutral">
     <p style="margin:0 0 9px">Cross-references, not duplicates. <strong>P1</strong> ↔ <strong>R17</strong>, <strong>R3</strong>,
       <strong>R6</strong> · <strong>P2</strong> ↔ the fan-out work and A1 · <strong>P3</strong> ↔ <strong>R18</strong>, A4 ·
-      <strong>P4</strong> ↔ <strong>R2</strong>, <strong>R5</strong>, and <a href="#i-sync-cron">Sync cron is single-tenant</a>. V5 answers
-      the factual half of <strong>Gate B</strong>; V6 re-characterises <strong>R2</strong>; V3 corrects the <em>XL→Medium</em> item's "last
+      <strong>P4</strong> ↔ <strong>R2</strong>, <strong>R5</strong>, and <a href="#i-sync-cron">Sync cron is single-tenant</a>. ⚠️ V5 answered
+      the factual half of <strong>Gate B</strong> and <strong>that answer flipped on 2026-07-30</strong> — shadow is now the read source for
+      all 623 pools, so re-read <a href="#gate-b">Gate B</a> before acting on it; V6 re-characterises <strong>R2</strong>; V3 corrects the <em>XL→Medium</em> item's "last
       flag to flip". <a href="#d6">Decision 6</a> (one canonical scale) and <a href="#d7">Decision 7</a> (platform as referee, admin
       operability) are the product-side statements of P1 and P3 respectively.</p>
     <p style="margin:0"><strong>Where the design assumes an unanswered gate:</strong> the precompute-over-cache direction assumes the
@@ -1264,6 +1469,177 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p>This is not a contradiction to resolve by picking the newer statement; it is a genuine product question about what "live" has to
       <em>feel</em> like on a match night. <strong>Surfaced, not answered.</strong> Until it is, P2's freshness budget has no target number
       to be measured against.</p>
+  </div>
+</section>
+
+
+<!-- ============================ SCORING ENGINES ============================ -->
+<section id="engines">
+  <h2 class="sec">🧮 Scoring engines — the register, and the rule they all follow <span class="count">7 engines · 6 retirement gates</span></h2>
+  <p class="quote"><strong>Added 2026-07-29 on Ryan's instruction.</strong> Two things live here: the RULE that settles how scoring works
+    from now on, and a REGISTER of the engines that implement it. There is more than one engine already and there will be more — the league
+    engine is next — so what each one is FOR has to be written down rather than inferred from the code.</p>
+
+  <h3 class="grp">The rule — settled 2026-07-29</h3>
+  <div class="card goldc">
+    <p style="margin:0 0 10px"><strong>The backend computes every score and every derived statistic ONCE, when something changes, and writes
+      the answer down. Every front end — web and mobile — reads those rows and renders them. Clients compute nothing.</strong></p>
+    <p style="margin:0 0 10px">This is not a performance preference; it is the architecture. It was arrived at the hard way: the leaderboard
+      shipped 26,770 rows to every viewer so each browser could re-derive ten numbers per entry that the scoring path had already worked out.
+      Consequences that follow from the rule, and are not up for re-litigation per surface:</p>
+    <ul>
+      <li><strong>A number a member sees must exist as a stored value</strong>, not as something a screen worked out. If a screen needs a
+        number, the question is "where is it stored", not "how do I compute it here".</li>
+      <li><strong>An aggregate over a pool is computed in SQL</strong>, not by shipping the raw rows and reducing them in JavaScript. See
+        migrations 038/039 for the shape.</li>
+      <li><strong>The same stored value feeds web and mobile.</strong> Two surfaces deriving the same number independently is how they came
+        to disagree about levels (fixed 2026-07-29) — the bug is structural, not a slip.</li>
+      <li><strong>Live updates are pushed, not polled.</strong> One broadcast per pool per scoring pass, carrying the changed rows.</li>
+    </ul>
+  </div>
+
+  <h3 class="grp">The register</h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Engine</th><th>What it does</th><th>What it is FOR</th><th>State</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Node "prod" engine</strong> — <code>lib/scoring/core.ts</code>, <code>lib/scoring/recalculate.ts</code></td>
+          <td>Pull-Compute-Push: reads a pool's rows into Node, scores in JS, writes back</td>
+          <td>The original engine. Now a running safety net behind <code>prod_scoring_enabled</code></td>
+          <td>✅ live, still enabled (<code>prod_scoring_enabled = true</code>, prod-verified 2026-07-30). <strong>Retirement gates 1 and 2
+            cleared 2026-07-30</strong> — see the gate table below; 3 and 4 not re-checked, and two further blockers were added. Do not
+            switch it off on the strength of the parity alarm alone</td>
+        </tr>
+        <tr>
+          <td><strong>Shadow engine</strong> — <code>shadow_*</code> SQL functions + <code>shadow_*</code> tables</td>
+          <td>Set-based, DB-native scoring: <code>shadow_score_match</code>, <code>shadow_finalize_totals</code>, rank snapshot, reconcilers
+            (jobid 19/20), diff alarm (jobid 21)</td>
+          <td>Replacing the Node engine. Covers full_tournament, progressive and bracket_picker</td>
+          <td>✅ live and is the <strong>READ SOURCE for all 623 pools</strong> since 2026-07-29</td>
+        </tr>
+        <tr>
+          <td><strong>Analytics / XP writer</strong> — <code>lib/analytics/entryAnalytics.ts</code>, called by
+            <code>lib/push/badges.ts</code></td>
+          <td>Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into
+            <code>entry_xp_state</code></td>
+          <td>The per-entry statistics every surface reads instead of deriving</td>
+          <td>✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips <code>dark_horse</code>. ⚠⚠ <strong>ITS TRIGGER IS THE NODE
+            ENGINE</strong>: called directly by <code>recalculatePool</code>, and the standalone sweep (jobid 15) fires off
+            <code>pool_entries.last_rank_update</code>, a column <strong>only Node writes</strong>. Verified 2026-07-29: none of the 19
+            <code>shadow_*</code> functions touch <code>pool_entries</code>. ⚠️ <strong>That sweep is registered and firing every minute —
+            R19</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Per-match aggregates</strong> — migrations 038/039, <code>pool_match_prediction_accuracy()</code></td>
+          <td>Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline</td>
+          <td>Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section</td>
+          <td>✅ live. Takes <code>p_submitted_only</code> because its two callers count different populations</td>
+        </tr>
+        <tr>
+          <td><strong>Podium</strong> — <code>lib/podium.ts</code> <strong>+ <code>tournament_podium_view</code></strong> (migration 027)</td>
+          <td>Derives the actual and predicted tournament podium</td>
+          <td>Champion / runner-up / third bonuses</td>
+          <td>✅ <strong>Now in SQL as well as Node — prod-verified 2026-07-30.</strong> Migrations <strong>027</strong>
+            <code>tournament_podium_view</code> (20260727155217) and <strong>028</strong> <code>shadow_podium_use_view</code>
+            (20260727160124) are applied and shadow reads the view; bonuses stored at full strength (837 champion / 738 runner-up / 167
+            third). <strong>Retirement gate 2 cleared.</strong> <code>lib/podium.ts</code> still runs in Node while
+            <code>prod_scoring_enabled = true</code>. Closes <strong>R4</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Bracket-picker provisional</strong> — <code>lib/bracketPickerScoring.ts</code></td>
+          <td>Client-side scoring of bracket picks for live display</td>
+          <td>Provisional standings before official scoring lands</td>
+          <td>⚠️ still computed in the browser — the last real violation of the rule above, and a <strong>blocker on Node retirement</strong>
+            (2026-07-30)</td>
+        </tr>
+        <tr>
+          <td><strong>League engine</strong></td>
+          <td>—</td>
+          <td>Premier League and other league competitions</td>
+          <td>🔵 <strong>NOT BUILT — next.</strong> ⚠️ A league pool currently scores <strong>ZERO silently</strong>, and it is <strong>two
+            bugs, gate first</strong> (corrected 2026-07-30): the <strong>team-matching gate</strong> returns <code>miss</code> before the
+            price lookup is reached, and <em>behind</em> it the price lookup bills league fixtures at <strong>knockout</strong> rates.
+            <strong>It is in the shadow SQL as well as Node</strong>, so the fix lands in both while prod scoring is on. See
+            <strong>R2</strong> and <a href="#i-league-ingestion">League ingestion</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="grp">Retirement gates — the Node engine</h3>
+  <div class="card warnc">
+    <p style="margin:0 0 10px">All must hold. The first two were known; the third came out of the 2026-07-27 gap audit; <strong>the fourth
+      was found on 2026-07-29 and is a consequence of the read-path work</strong> — making the front ends read stored values made the writer
+      that fills them load-bearing. <strong>Gates 5 and 6 were added by the 2026-07-30 audit</strong>, which found that the <em>stated</em>
+      two-gate version of this bar — <em>"parity alarm clean across a full cycle AND podium ownership moves into SQL"</em> — <strong>had
+      quietly cleared without anyone noticing.</strong> What remains is smaller than what was written, and different in kind.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Gate</th><th>State as of 2026-07-30</th></tr></thead>
+        <tbody>
+          <tr><td><strong>1 · Parity alarm green across a full cycle</strong></td>
+            <td>✅ <strong>Cleared, with the caveat intact.</strong> jobid 21 <code>*/15</code>, 192 runs/48 h, all succeeding;
+              <code>entry_total_mismatch</code> = <strong>0</strong></td></tr>
+          <tr><td><strong>2 · Podium ownership in SQL</strong></td>
+            <td>✅ <strong>Cleared.</strong> Migrations 027/028 applied and shadow reads the view — closes <strong>R4</strong></td></tr>
+          <tr><td><strong>3 · The 13 missing <code>bp_*</code> bonus types</strong></td>
+            <td>⬜ <strong>Not re-checked in this audit.</strong> Carried forward from 2026-07-27 — treat as open</td></tr>
+          <tr><td><strong>4 · Analytics trigger moves off the Node-written column</strong></td>
+            <td>⬜ <strong>Open, and sharper.</strong> The sweep is not dormant: <strong>jobid 15 is registered in <code>pg_cron</code> and
+              firing every minute</strong> (<strong>R19</strong>), detecting off <code>pool_entries.last_rank_update</code>, which only Node
+              writes</td></tr>
+          <tr><td><strong>5 · A reader for <code>shadow_score_diffs</code></strong></td>
+            <td>⬜ <strong>Open — R18.</strong> Nothing in <code>app/</code>, <code>lib/</code> or <code>mobile/</code> reads the diff table.
+              Retiring the safety net while the alarm has no consumer means the <em>only</em> remaining check is one nobody sees</td></tr>
+          <tr><td><strong>6 · <code>lib/bracketPickerScoring.ts</code> stops scoring in the browser</strong></td>
+            <td>⬜ <strong>Open.</strong> Bracket-picker is ~20% of entries and its standings are still derived client-side</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note danger" style="margin-bottom:0"><strong>Gate 1 is necessary, not sufficient.</strong>
+      <code>shadow_detect_diffs</code> compares <strong>totals only</strong>. It cannot see rank drift, and it stayed green through a
+      missing migration, seven hours of failed <code>entry_xp_state</code> writes, and four genuine rank anomalies in prod. And for
+      <code>entry_total_mismatch</code> the table is <strong>rewritten each run</strong>, so "green" means <em>this run found nothing</em>,
+      not <em>nothing has ever been found</em>. Do not read it as "everything agrees".</div>
+  </div>
+
+  <div class="card crit">
+    <h4>Gate 4, in evidence — the number that makes it real</h4>
+    <p style="margin:0 0 8px">Nothing in the shadow engine writes <code>pool_entries</code> — verified across all 19 <code>shadow_*</code>
+      functions — so with Node off, <code>pool_entries.last_rank_update</code> stops moving and the analytics sweep never fires. Scores would
+      keep updating while <strong>every precomputed statistic the leaderboard and Form now read silently freezes</strong>: form dots, hit
+      rate, streaks, levels, badges. No error, and gate 1 cannot detect it.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Signal</th><th>Last written</th></tr></thead>
+        <tbody>
+          <tr><td><code>shadow_entry_totals</code></td><td>2026-07-29 <strong>21:07</strong></td></tr>
+          <tr><td><code>pool_entries.last_rank_update</code></td><td>2026-07-28 <strong>16:39</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:10px 0 0">Shadow had been scoring for over a day while the column that triggers the analytics refresh had not moved.
+      <strong>Fix:</strong> point the sweep's detector at <code>shadow_entry_totals.updated_at</code> instead, and stop depending on a
+      Node-written column. Do this BEFORE switching Node off, not after.</p>
+  </div>
+
+  <h3 class="grp">Why the register exists</h3>
+  <div class="card neutral">
+    <p style="margin:0 0 9px">The engines are not variations on one thing. They disagree about what a "point" is, which competitions they
+      understand, and which of them owns a given number. Three concrete cases already cost real time:</p>
+    <ul>
+      <li><code>point_adjustment</code> reached shadow for every mode <strong>except</strong> bracket_picker, because a guard written when
+        bracket_picker was out of scope was never revisited. One member's 223 points silently vanished (fixed 2026-07-29).</li>
+      <li>XP had <strong>two</strong> writers with different formulas racing on one column; the level shown depended on which ran last
+        (fixed 2026-07-26).</li>
+      <li><strong>2026-07-30:</strong> this register already recorded that <em>"the standalone sweep (jobid 15) fires off
+        <code>pool_entries.last_rank_update</code>"</em> — while the risk register, eleven hundred lines away, stated the same cron
+        <em>"has never been registered"</em>. <strong>Both sentences were in this document at once</strong>, and the wrong one was the one
+        carrying a decision (<strong>R19</strong>). Cross-references between the two registers are not decoration.</li>
+    </ul>
+    <p style="margin:9px 0 0">All three were "which engine owns this?" questions that nothing wrote down. <strong>Adding an engine without
+      adding its row here is how the next one happens.</strong></p>
   </div>
 </section>
 
@@ -1301,16 +1677,19 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 8px">Shadow engine, leaderboard precompute, IO reduction, scoring correctness.</p>
     <p style="margin:0"><strong>Contains:</strong> <a href="#next-scale">Leaderboard precompute · Scale downgrade XL→Medium ·
       Tournament IO reduction · Kickoff write spike · Shadow scoring engine</a> and
-      <a href="#next-scoring">scoring correctness &amp; data integrity</a>. Carries <strong>R4</strong> and <strong>R6</strong>.</p>
+      <a href="#next-scoring">scoring correctness &amp; data integrity</a>, plus the <a href="#engines">🧮 scoring-engine register</a>.
+      Carries <strong>R4</strong> (✅ closed 2026-07-30), <strong>R6</strong>, <strong>R17</strong> (✅ closed) and
+      <strong>R18</strong>.</p>
   </div>
 
   <div class="card okc">
     <h4>⚡ Performance &amp; caching <span class="chip ok">🟢 In flight</span></h4>
-    <p style="margin:0 0 8px">Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; three
-      fixes written locally, none landed.</p>
-    <p style="margin:0"><strong>Contains:</strong> <a href="#perf">the measured baseline, what landed locally, the open sequence and the
-      five infrastructure decisions</a>. Carries <strong>R13</strong>, <strong>R14</strong>, <strong>R15</strong> and
-      <strong>R16</strong>.</p>
+    <p style="margin:0 0 8px">Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26;
+      <s>three fixes written locally, none landed</s> — <strong>steps 2, 3 and most of 7 shipped 2026-07-29</strong> (payload
+      7,721 kB → 457 kB, the <code>/live</code> delta, the analytics read flip); steps 1, 4, 5, 6 and 8–11 open.</p>
+    <p style="margin:0"><strong>Contains:</strong> <a href="#perf">the measured baseline, what landed, the open sequence and the
+      five infrastructure decisions</a>. Carries <strong>R13</strong> (✅ closed), <strong>R14</strong>, <strong>R15</strong>,
+      <strong>R16</strong> and <strong>R19</strong>.</p>
   </div>
 
   <div class="card goldc">
@@ -1586,6 +1965,29 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <h2 class="sec">✅ Recently shipped</h2>
   <p class="sec-sub">Completed and deployed to production. Kept here for visibility, then pruned once it's old news.</p>
 
+  <div class="card okc" id="i-cutover">
+    <h4>Shadow read-path cutover — all 623 pools <span class="chip cat">Infra</span> <span class="chip cat">Scoring</span>
+      <span class="chip ok">SHIPPED 2026-07-28/29</span></h4>
+    <div class="note danger">Added 2026-07-30. <strong>This document had no entry for it</strong> — the largest change since the podium
+      remediation, recorded only in passing inside other items. It is what makes several older statements in this programme read the wrong
+      way round (see <a href="#gate-b">Gate B</a>, <strong>R4</strong>, delivery step <strong>3a</strong>).</div>
+    <ul class="fields">
+      <li><span class="f">What changed:</span> every web and RN read path now goes through <code>lib/scoring/readSource.ts</code>, and
+        <code>sync_settings.shadow_read_enabled_pools</code> is an <strong>explicit list of ~623 pool IDs</strong> (prod-verified
+        2026-07-30) — it was <code>[]</code> on 2026-07-26 after the 07-20 rollback. <strong><code>prod_scoring_enabled</code> is still
+        <code>true</code></strong>, so both engines compute; <strong>shadow is what members see.</strong></li>
+      <li><span class="f">Landed with it:</span> migration <strong>037</strong> (SQL aggregation) and the <code>/live</code> delta —
+        12,683 kB → 33 kB; the C1 <code>point_adjustment</code> fix in both the finalizer and the reconciler (one member's 223 points);
+        all 164 point adjustments verified; migrations 027/028 moving the podium into SQL (<strong>R4</strong> closed).</li>
+      <li>⚠️ <span class="f">What "verified" does and does not cover here</span> <em>(inherited from the cutover's own record, not
+        re-tested on 2026-07-30)</em>: a green build is not a browser, and the <code>/live</code> merge cannot be exercised until a match
+        is actually live — 19 unit tests stand in for it. Rollbacks live in <code>drafts/2026-07-29_*</code>.</li>
+      <li><span class="f">Why it belongs in the record</span> and not only in the <a href="#engines">engine register</a>: three separate
+        entries in this document were written on the assumption that shadow reads were off. Anything that changes <em>which engine a member
+        reads</em> changes where every future scoring fix has to land.</li>
+    </ul>
+  </div>
+
   <div class="card okc" id="i-podium">
     <h4>Podium bonus remediation <span class="chip cat">Scoring</span> <span class="chip cat">Bug</span>
       <span class="chip ok">SHIPPED 2026-07-21</span></h4>
@@ -1645,10 +2047,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         entry and <strong>returns no error</strong>. Any abort after step 1 leaves the pool alive with every member's predictions
         gone.</li>
       <li><span class="f">Impact:</span> <strong>6 pools / 41 entries already destroyed</strong>, the earliest in June — this has
-        been happening quietly for weeks. <strong>458 pools with an admin are one click away.</strong> Risk is elevated
+        been happening quietly for weeks. <strong>Pools with an admin, one click away: 458 or 535</strong> — 458 comes from the
+        2026-07-21 draft, 535 from a 2026-07-30 re-count (distinct <code>pool_id</code> with a <code>role='admin'</code> row).
+        ⚠️ <strong>The methods differ and the earlier one was never written down; both are recorded until someone reconciles
+        them.</strong> Risk is elevated
         post-tournament, when people tidy up pools.</li>
       <li>⚠️ <span class="f">There is a second door, on mobile (added 2026-07-26).</span>
-        <code>mobile/components/pool-detail/SettingsTab.tsx:222</code> runs its own
+        <code>mobile/components/pool-detail/SettingsTab.tsx:223</code> runs its own
         <code>supabase.from('pools').delete().eq('pool_id', …)</code> — a different shape (one statement, relying on FK cascades)
         reached from the same admin Settings screen. It is <strong>not</strong> covered by the zero-deploy mitigation below, and
         "remove Delete Pool from admins entirely" is therefore <strong>two</strong> removals, not one. Whether the cascade completes
@@ -1746,8 +2151,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card crit" id="i-xp-writers">
     <h4>XP has two writers — the level shown to users is whichever ran last <span class="chip cat">Bug</span>
       <span class="chip cat">Scoring</span> <span class="chip danger">🔥 R13</span> <span class="chip danger">R14</span></h4>
-    <p class="quote" style="margin:0 0 10px">Added 2026-07-26 from the analytics read-path parity pass. The fix is written and tested;
-      <strong>nothing is applied or deployed</strong>, so this is live.</p>
+    <p class="quote" style="margin:0 0 10px">Added 2026-07-26 from the analytics read-path parity pass. ✅ <strong>R13 CLOSED,
+      prod-verified 2026-07-30:</strong> migration 026 applied (20260729010101), 4,980 rows carry the ratchet, <strong>0
+      violations</strong>, all 623 pools backfilled, parity clean. <strong>The item stays open on two counts.</strong>
+      (1) <strong>R19</strong> — the analytics-sweep cron the decision below says must not be registered <strong>is registered and firing
+      every minute in <code>pg_cron</code></strong>, writing <code>total_xp</code> / <code>current_level</code> /
+      <code>highest_level_reached</code>; that needs Ryan's ruling. (2) <strong>R14's</strong> ordering was discharged by that release —
+      the backfill ran and moved 697 entries up — but <strong>whether a level-up push burst fired to those 697 members was not
+      checked</strong>, and that was the whole point of the constraint. Unverified, not done.</p>
     <ul class="fields">
       <li><span class="f">Is:</span> <code>entry_xp_state.total_xp</code> / <code>.current_level</code> were written by two independent
         paths computing <strong>different quantities</strong>, both compared against the same <code>LEVELS.xpRequired</code> thresholds,
@@ -1765,20 +2176,30 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         residual, and two entries with the identical badge set both give exactly <strong>355</strong>. Alternatives ruled out by re-running
         with the crowd refactor stashed (identical), checking input freshness, membership drift, and <code>numeric(5,2)</code> rounding
         (real, cosmetic, 0 failures).</li>
-      <li><span class="f">Why nobody caught it:</span> <code>vercel.json</code> is <code>{}</code> — the analytics-sweep cron
-        (<code>app/api/cron/analytics-sweep/route.ts</code>, which says so in its own header) has <strong>never been registered</strong>, so
-        <code>badges.ts</code> is the de facto owner and <code>analytics_updated_at</code> records when the <em>other</em> writer last ran.
-        <strong>The timestamp lies.</strong></li>
-      <li><span class="f">What's written (local, uncommitted):</span> <code>badges.ts</code> consumes the shared value and omits the columns
+      <li><s><span class="f">Why nobody caught it:</span> <code>vercel.json</code> is <code>{}</code> — the analytics-sweep cron has
+        <strong>never been registered</strong>, so <code>badges.ts</code> is the de facto owner.</s> ⚠️ <strong>FALSE, corrected 2026-07-30
+        (R19).</strong> <code>vercel.json</code> <strong>is</strong> <code>{}</code>, and the route header <strong>does</strong> still say it
+        isn't registered — but the job was registered in <strong><code>pg_cron</code></strong>: jobid <strong>15</strong>
+        <code>analytics-sweep</code>, <code>* * * * *</code>, <strong>active</strong>, <strong>2,880 successful runs in 48 h</strong>,
+        <code>analytics_sweep_enabled = true</code>. So <code>badges.ts</code> is <strong>not</strong> the sole owner, and
+        <code>analytics_updated_at</code> is not recording the other writer — it is recording this one. The original diagnosis of the
+        <em>bug</em> stands; the explanation of <em>why it survived</em> was wrong, and it was wrong because only one of two scheduling
+        mechanisms was ever checked.</li>
+      <li><s><span class="f">What's written (local, uncommitted):</span></s> <span class="f">What shipped</span> <em>(applied to prod
+        2026-07-29, verified 2026-07-30)</em>: <code>badges.ts</code> consumes the shared value and omits the columns
         entirely when it can't compute one rather than guessing (<code>lib/push/badges.ts:213</code>); <code>everReachedLevel</code> added
         to <code>computeFullXPBreakdown</code> (<code>xpSystem.ts:570</code>); <code>lib/migrations/026_entry_xp_highest_level.sql</code>;
         <code>scripts/reseed-entry-xp.ts</code>; two new test files. Suite <strong>157/157 green</strong>, no type errors in any touched
         file.</li>
       <li><span class="f">Decisions 2026-07-26:</span> <strong>levels never demote</strong> — the corrected formula moves 1,048 entries and
         <strong>231 of them down</strong>, so a ratchet mirrors the keep-once rule <code>badge_unlocks</code> already applies to badges;
-        <code>total_xp</code> stays honest and may fall; and <strong>the analytics-sweep cron is not to be registered</strong> — scoring
-        maintains the columns, and a second writer path is precisely what caused this.</li>
-      <li>🔒 <span class="f">Blocked on a release, in a fixed order (R14):</span> apply 026 → deploy the <code>badges.ts</code> fix → run
+        <code>total_xp</code> stays honest and may fall (the real run moved <strong>697 up, 0 down</strong>); and <strong>the
+        analytics-sweep cron is not to be registered</strong> — scoring maintains the columns, and a second writer path is precisely what
+        caused this. ⏳ <strong>That third clause is being violated in production (R19) and needs a ruling: reverse the decision, or
+        deactivate jobid 15. Not decided here.</strong></li>
+      <li>✅ <s>🔒 <span class="f">Blocked on a release, in a fixed order (R14)</span></s> — <strong>the release happened
+        2026-07-29</strong> (026 applied, 623 pools backfilled, parity clean). The order was: apply 026 → deploy the
+        <code>badges.ts</code> fix → run
         <code>scripts/reseed-entry-xp.ts</code> <strong>immediately</strong> → re-run the parity check. Deploying before the migration means
         PostgREST rejects the whole <code>entry_xp_state</code> upsert on the unknown <code>highest_level_reached</code> column —
         <strong>as of 2026-07-26 that now fails loudly and skips the push</strong> rather than silently, so the consequence is quiet
@@ -1787,9 +2208,12 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Two defects in this fix were found after it was called done</span> — the missing <code>entryAnalytics</code> hoist
         (R15) and the unchecked upsert (R14) — both raised by this register, confirmed by Ryan against the code, and fixed 2026-07-26. Tests
         and typecheck re-run <strong>after</strong> those fixes: 157/157, clean.</li>
-      <li><span class="f">Effort:</span> the code is done — ~1–2 hours of ops in one window, plus the parity re-run.
-        <span class="f">Done when:</span> parity comes back clean, <code>/pools</code> and <code>/dashboard</code> show a level with one
-        definition behind it, and no user received a level-up push for a formula change.</li>
+      <li><span class="f">Effort:</span> the code and the release are done. What's left is a ruling on <strong>R19</strong> (minutes) plus
+        the header fix (minutes), and a check on whether the 697 level-ups pushed.
+        <span class="f">Done when:</span> <s>parity comes back clean</s> ✅ (331/331, 2026-07-29), <code>/pools</code> and
+        <code>/dashboard</code> show a level with one definition behind it ✅, <strong><code>entry_xp_state</code> has exactly one writer by
+        decision <em>and</em> in <code>pg_cron</code></strong>, and it is confirmed that no user received a level-up push for a formula
+        change.</li>
     </ul>
   </div>
 
@@ -1816,9 +2240,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RECURRING ============================ -->
 <section id="recurring">
-  <h2 class="sec">🔁 Recurring each knockout round — SF/Final upcoming</h2>
-  <p class="sec-sub">Not "done"-able — re-run <strong>before every knockout round</strong> or scores don't sync / pools don't open.
-    <em>(Known staleness: this heading still reads "SF/Final upcoming" after the 16 Jul final — see Known drift.)</em></p>
+  <h2 class="sec">🔁 Recurring each knockout round <span class="count">dormant · nothing outstanding for WC 2026</span></h2>
+  <p class="sec-sub">Not "done"-able — re-run <strong>before every knockout round</strong> or scores don't sync / pools don't open.</p>
+  <div class="note warn">⚠️ <strong>Heading corrected 2026-07-30.</strong> It read <em>"SF/Final upcoming"</em> <strong>fourteen days after
+    the final (16 Jul)</strong>. The World Cup is complete and <strong>no knockout round is outstanding</strong>. This section is a playbook,
+    not a work queue — it wakes up at the <strong>next knockout competition</strong>, which on the current plan is <em>not</em> the EPL (a
+    league has no knockout rounds; matchweek deadlines and auto round-opening are the equivalent, and they are step <strong>3e</strong>,
+    unbuilt). The per-round records below are kept as the WC 2026 log.</div>
 
   <div class="card neutral">
     <h4>Knockout fixture API-linking <span class="chip cat">Ops</span></h4>
@@ -1829,9 +2257,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         (<code>lib/integrations/apiFootball/linkKnockoutFixtures.ts</code>) but only fires once api-football publishes the fixture.</li>
       <li><span class="f">Effort:</span> ~15–30 min per round.</li>
       <li><span class="f">Done when:</span> every knockout match for the round has an <code>external_match_id</code> and live scores
-        flow. Done: R32 (06-28), R16 (07-04), QF (07-07 + #100 07-12), <strong>both SFs linked 2026-07-12 (#101 France–Spain
-        <code>1585131</code>, #102 England–Argentina <code>1586077</code>)</strong>. Remaining: #103 (3rd place) + #104 (final) once
-        teams resolve.</li>
+        flow. WC 2026 log: R32 (06-28), R16 (07-04), QF (07-07 + #100 07-12), <strong>both SFs linked 2026-07-12 (#101 France–Spain
+        <code>1585131</code>, #102 England–Argentina <code>1586077</code>)</strong>, and #103 (3rd place) + #104 (final) linked 2026-07-16.
+        ✅ <strong>Nothing remaining — the tournament finished 2026-07-16</strong> <em>(the closing entry is from the round's own ops record,
+        not re-queried on 2026-07-30)</em>.</li>
     </ul>
   </div>
 
@@ -1842,8 +2271,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Touches:</span> <code>pool_round_states</code> UPDATE (guard <code>state='locked'</code>); announce via
         <code>scripts/notify-r16-open.mjs</code> (Resend "Pool Activity" topic).</li>
       <li><span class="f">Effort:</span> ~30–60 min per round.</li>
-      <li><span class="f">Done when:</span> all pools for the round are open by deadline. Done: R16 (07-04, 194 pools/796 emails), QF
-        (07-07, 250 pools). Recurs SF/Final.</li>
+      <li><span class="f">Done when:</span> all pools for the round are open by deadline. WC 2026 log: R16 (07-04, 194 pools/796 emails),
+        QF (07-07, 250 pools), SF + final/3rd place opened through 07-16. ✅ <strong>All rounds complete; recurs at the next knockout
+        competition, not the EPL</strong> <em>(closing entry from the round's ops record, not re-queried 2026-07-30)</em>.</li>
     </ul>
   </div>
 </section>
@@ -1854,7 +2284,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <p class="sec-sub">These four overlap — they're one coordinated "get off expensive compute and scale to thousands" program, not
     four separate efforts.</p>
 
-  <div class="card neutral">
+  <div class="card neutral" id="i-precompute">
     <h4>Leaderboard precompute (read-path flip) <span class="chip cat">Infra</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> The leaderboard recomputes per-entry analytics on <em>every</em> page load; that's what saturated
@@ -1868,18 +2298,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>computeStreaks</code>/<code>computeFullXPBreakdown</code> and recomputes per-read (zero <code>entry_xp_state</code>
         reads); flag <code>analytics_read_from_columns</code> appears only in prose, never in code. The cited design doc
         <code>drafts/M4_read_path_flip.md</code> is <strong>missing from the repo</strong> — recreate it or drop the reference.</li>
-      <li>🔒 <span class="f">Blocked 2026-07-26 — the parity pass was run and it FAILED.</span> "Backfill-vs-live parity = 0 diffs" is the
-        <em>Done when</em> on this item, and the first real run came back <strong>187 of 331 entries mismatched</strong>. The cause is not
-        staleness and not the caching work: <code>entry_xp_state</code> has <strong>two writers with different formulas</strong>
-        (<strong>R13</strong>). Until that has one owner, is deployed, and the re-seed has run, this flip cannot proceed. Result:
-        <code>drafts/2026-07-26_analytics_parity_result.md</code>; checker: <code>scripts/verify-analytics-parity.ts</code> (read-only,
-        exits non-zero on failure, so it can gate the deploy).</li>
-      <li>⚠️ <span class="f">The writer named in this item no longer applies.</span> It says the writer is "the
-        <code>analytics-sweep</code> cron + <code>lib/analytics/entryAnalytics.ts</code>". <code>vercel.json</code> is <code>{}</code> —
-        <strong>that cron has never been registered</strong>, and Ryan's decision 2026-07-26 is <strong>not to register it</strong>:
-        scoring maintains the columns via <code>lib/push/badges.ts</code> → <code>computePoolEntryAnalytics</code>. The flip's freshness
-        guarantee therefore now rests on the scoring path, not on a sweep — a different design, and it needs re-validating on that
-        basis.</li>
+      <li>✅ <s>🔒 <span class="f">Blocked 2026-07-26 — the parity pass was run and it FAILED</span></s> (187 of 331 mismatched, cause
+        <strong>R13</strong>) — <strong>unblocked 2026-07-29 and prod-verified 2026-07-30</strong>: 026 applied, 623 pools backfilled,
+        parity <strong>clean 331/331</strong>, 0 ratchet violations. The leaderboard now reads the stored row (step 7 of
+        <a href="#perf">⚡ Performance &amp; caching</a>). Result: <code>drafts/2026-07-26_analytics_parity_result.md</code>; checker:
+        <code>scripts/verify-analytics-parity.ts</code>.</li>
+      <li>⚠️ <span class="f">The writer named in this item is wrong in both directions — corrected 2026-07-30.</span> It says the writer is
+        "the <code>analytics-sweep</code> cron + <code>lib/analytics/entryAnalytics.ts</code>". The 2026-07-26 correction then said that
+        cron <em>"has never been registered"</em> because <code>vercel.json</code> is <code>{}</code>. <strong>Both are now known to be
+        off:</strong> the sweep <strong>is</strong> registered — in <strong><code>pg_cron</code></strong>, jobid 15,
+        <code>* * * * *</code>, active, 2,880 runs/48 h (<strong>R19</strong>) — so the columns have <strong>two</strong> maintainers again:
+        the scoring path via <code>lib/push/badges.ts</code> → <code>computePoolEntryAnalytics</code>, <em>and</em> the sweep. Ryan's
+        2026-07-26 decision was <strong>not to register it</strong>. Until R19 is ruled on, <strong>this item cannot state who owns the
+        freshness guarantee</strong>, which is the one thing a read-path flip depends on.</li>
+      <li>⚠️ <span class="f"><code>analytics_read_from_columns</code> exists in prod</span> as a <code>sync_settings</code> row set
+        <code>false</code> (2026-07-30) — the earlier note that it "appears only in prose" is half-right: it is still absent from application
+        code, but it is no longer drafts-only.</li>
       <li><span class="f">Effort:</span> ~2–3 days (calm-window deploy + load test), <strong>plus</strong> the R13 release ahead of it.
         Bracket pools need a <strong>separate</strong> parallel-analytics track (~2–3 days more) — they score via
         <code>bonus_scores</code>, not <code>predictions</code>.</li>
@@ -1987,18 +2421,24 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       gates reads per pool on <code>sync_settings.shadow_read_enabled_pools</code>; <code>lib/scoring/prodScoringFlag.ts:29</code> can
       disable the Node engine outright. <code>drafts/2026-07-19_caching_infrastructure_plan.md:20</code> records the state on
       2026-07-19 as <em>"<code>shadow_read_enabled_pools = [all pools]</code> (shadow is the sole scorer as of the 2026-07-19
-      cutover)"</em>; the rollback path is <code>drafts/2026-07-19_prod_scoring_rollback.sql</code>. <strong>Which engine is scoring
-      right now is a live flag value and is unverified here.</strong> Nobody should plan the EPL without answering that first.</div>
-    <div class="note warn">🟠 <strong>Shadow's podium logic is the pre-fix version.</strong> Prod's podium was rebuilt to
-      <em>derive</em> from completed matches (<code>lib/podium.ts</code>, <code>ea8d9da</code>); shadow's bonus SQL still
-      <code>JOIN</code>s <code>tournament_awards</code>
-      (<code>drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164</code>) — the exact root cause of the ~324k-point
-      error remediated on 2026-07-21. <strong>Shadow must not score a competition with a podium until this is fixed.</strong> See
-      <a href="#i-podium">Podium bonus remediation</a> and <strong>R4</strong>.</div>
+      cutover)"</em>; the rollback path is <code>drafts/2026-07-19_prod_scoring_rollback.sql</code>. <s><strong>Which engine is scoring
+      right now is a live flag value and is unverified here.</strong></s> ✅ <strong>Answered, prod-verified 2026-07-30:</strong>
+      <code>prod_scoring_enabled = true</code> <strong>and</strong> <code>shadow_read_enabled_pools</code> is an explicit list of
+      <strong>~623 pool IDs</strong> — <strong>both engines compute; shadow is what every member reads.</strong> See
+      <a href="#i-cutover">Shadow read-path cutover</a> under ✅ Recently shipped, and <a href="#gate-b">Gate B</a>.</div>
+    <div class="note ok">✅ <s>🟠 <strong>Shadow's podium logic is the pre-fix version.</strong></s> <strong>FIXED, prod-verified
+      2026-07-30.</strong> Shadow's bonus SQL used to <code>JOIN tournament_awards</code>
+      (<code>drafts/2026-07-02_shadow_calculate_bonuses_scoped_changeonly.sql:164</code>) — the exact root cause of the ~324k-point error
+      remediated on 2026-07-21. Migrations <strong>027</strong> <code>tournament_podium_view</code> and <strong>028</strong>
+      <code>shadow_podium_use_view</code> are applied and shadow now scores off the derived view; podium bonuses are stored at full strength
+      (837 / 738 / 167 entries). <strong>R4 closed</strong>; <a href="#engines">Node-retirement gate 2</a> cleared. ⚠️ Keep the warning that
+      produced it: this was filed as <em>"latent, because shadow reads are off"</em> on 2026-07-26, and shadow became the read source for all
+      623 pools three days later.</div>
     <ul class="fields">
       <li><span class="f">Done when:</span> predicted brackets resolved once at entry submission (removing re-materialization);
-        shadow's podium arm matches <code>lib/podium.ts</code>; and a read-path flip is validated <strong>per pool</strong> before any
-        wider customer-facing flip (the 07-19 flip went to all pools at once and was rolled back at tournament end).</li>
+        <s>shadow's podium arm matches <code>lib/podium.ts</code></s> ✅ (027/028); and a read-path flip is validated <strong>per
+        pool</strong> before any wider customer-facing flip — ⚠️ <strong>note that the 2026-07-29 re-cutover again went to all 623 pools at
+        once</strong>, which is the second time this <em>Done when</em> has been overtaken by the flip it describes.</li>
     </ul>
   </div>
 
@@ -2026,9 +2466,12 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <code>drafts/2026-07-26_analytics_parity_result.md</code> (the blocker it found). Supersedes the caching-only scope of
     <code>drafts/2026-07-19_caching_infrastructure_plan.md</code>, which stays valid as the layer design.</p>
 
-  <div class="note danger" style="margin-bottom:14px">
-    <strong>Everything in this section is local and uncommitted.</strong> Nothing is pushed, deployed, or applied to prod — so the risks
-    these changes address are <strong>still live in production exactly as before</strong>.
+  <div class="note ok" style="margin-bottom:14px">
+    ⚠️ <strong>Was:</strong> <em>"Everything in this section is local and uncommitted."</em> <strong>No longer true as of
+    2026-07-29</strong> — steps 2, 3 and most of 7 are on <code>origin/master</code> (<code>db508ce</code>, <code>37ed969</code>,
+    <code>4b3063a</code>), and the database-side changes (migrations 026/038, the analytics backfill, the C1 fix, the shadow read widening
+    to all 623 pools, the leaderboard broadcast trigger) were applied directly to prod and did not need a deploy. Steps 1, 4, 5, 6 and the
+    new 8–11 remain untouched.
   </div>
 
   <div class="card neutral">
@@ -2056,7 +2499,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         cumulative since an unknown counter reset — a total, not a rate.</li>
       <li><span class="f">Realtime WAL decoding at 24% is flagged and deliberately NOT addressed</span> — it is a publication-configuration
         question, not app code. It deserves its own pass; it is not in this one.</li>
-      <li><span class="f">The distribution that drives every caching decision:</span> 623 pools, 4,809 memberships,
+      <li><span class="f">The distribution that drives every caching decision</span> <em>(re-counted 2026-07-30: 623 / <strong>4,805</strong>
+        memberships / <strong>287,789</strong> predictions / <strong>4,981</strong> entries — drift under 1%, no conclusion changes)</em>:
+        623 pools, 4,809 memberships,
         <strong>median pool = 1 member</strong>, mean 7.7, 70% ≤5 members, <strong>only 4 pools ≥100</strong> (max 192); 288,029
         predictions across 4,985 entries. High key cardinality, near-1:1 read-per-fetch for 90% of pools, extreme concentration in four. A
         cache only pays when one fetch serves many reads — so the strategy is <strong>"cache the few genuinely shared things, precompute
@@ -2065,7 +2510,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 
   <div class="card okc">
-    <h4>What landed locally <span class="chip cat">Infra</span> <span class="chip ok">verified in code 2026-07-26</span></h4>
+    <h4>What landed <span class="chip cat">Infra</span> <span class="chip ok">verified in code 2026-07-26</span>
+      <span class="chip ok">on origin/master 2026-07-29</span></h4>
     <ul class="fields">
       <li><span class="f"><code>predictions.select('*')</code> → 8 named columns.</span> <code>lib/poolData.ts:247</code> now uses the shared
         <code>PREDICTION_COLUMNS</code> constant (<code>lib/poolData.ts:43</code>). <code>predictions</code> has 11 columns;
@@ -2119,15 +2565,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               six surfaces refetching on <code>useFocusEffect</code>, so every tab switch re-runs a full load including the uncached
               leaderboard route. Largest untapped mobile win; needs no server change</td></tr>
           <tr><td>2</td><td><strong>Fix the 30s full-page poll</strong></td>
-            <td>Not started. <code>app/pools/[pool_id]/PoolDetail.tsx:666</code> — <code>setInterval(() =&gt; router.refresh(), 30000)</code>
-              on a <code>force-dynamic</code> page re-runs the <em>entire</em> server component every 30s per open tab, on 4 tabs,
-              regardless of visibility, and is redundant with the Realtime subscription directly above it. Most likely explanation for
-              <code>row_to_json(pool_members)</code> at 8.6M calls</td></tr>
+            <td>✅ <strong>Shipped 2026-07-29</strong> (<code>db508ce</code>). The poll no longer refreshes the page — it calls the
+              <code>/live</code> delta, and the interval is now adaptive: 30s while a match is live, 5 min otherwise. ~198 MB/hour of
+              "nothing changed" removed for 50 concurrent viewers</td></tr>
           <tr><td>3</td><td><strong>Shrink the pool payload below 2 MB</strong></td>
-            <td>Not started — <strong>and it is a hard prerequisite, not a nice-to-have.</strong> At 3,854 kB the largest pool's
-              <code>getPoolData</code> <strong>cannot be stored in Vercel Runtime Cache at all</strong> (2 MB per-item limit). Direction:
-              ship <em>derived</em> crowd consensus (~100 rows) instead of 13,385 raw prediction rows — now possible because
-              <code>computeCrowdConsensus</code> is split out</td></tr>
+            <td>✅ <strong>Shipped 2026-07-29</strong> (<code>db508ce</code>). <strong>7,721 kB → 457 kB</strong> measured on the 192-entry
+              pool, now well inside the 2 MB cache limit. Note the 3,854 kB figure quoted in this section was the ON-DISK size; the wire size
+              was 12,683 kB before the column narrowing. Both pool-wide arrays left pool open: the leaderboard reads precomputed rows, the
+              remaining consumers fetch per tab behind <code>/api/pools/:id/bulk</code></td></tr>
           <tr><td>4</td><td><strong>Tagged SWR cache on the mobile API routes</strong></td>
             <td>Not started. 30s staleness budget (decided). Replaces today's <code>expire: 0</code> invalidate-on-every-score, which hard-
               expires every affected pool at exactly the moment traffic peaks</td></tr>
@@ -2138,8 +2583,49 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               <code>getScoringSource()</code> lookups. Mobile separately re-resolves <code>auth_user_id → user_id</code> in
               <strong>11 files</strong> for a value that is constant for the session</td></tr>
           <tr><td>7</td><td><strong>Flip analytics reads to <code>entry_xp_state</code></strong></td>
-            <td>🔒 <strong>Blocked by R13</strong> — parity failed. Was step 1 of the strategy; it is now last because the correction has to
-              ship and be re-seeded first</td></tr>
+            <td>🟡 <strong>Unblocked and half done, 2026-07-29.</strong> R13 cleared: migration 026 applied, all 623 pools backfilled (697
+              levels up, 0 down), parity <strong>clean 331/331</strong>. The <strong>leaderboard</strong> now reads the stored row. Form and
+              Banter still compute live — they show the XP <em>breakdown</em> and derive badge objects — but both now pass the ratchet floor
+              so every surface agrees on a member's level (<code>4b3063a</code>). Remaining: their badge lists would need a parity check
+              before reading <code>earned_badge_ids</code></td></tr>
+          <tr><td>8</td><td><strong>Mobile: live leaderboard via the broadcast</strong></td>
+            <td>✅ <strong>Shipped to the repo 2026-07-29 — needs an OTA to reach devices.</strong> ⚠️ <strong>The premise recorded here
+              yesterday was WRONG and is corrected:</strong> mobile was <em>not</em> paying the per-row CDC fan-out. Every mobile
+              <code>pool_entries</code> subscription is filtered to the user's <strong>own</strong> <code>member_id</code>
+              (<code>usePoolEntries.ts:124</code>) — one or two rows, not 192. The real finding is worse and more useful: <strong>mobile's
+              leaderboard was never live at all.</strong> Its only realtime channel on that screen watches <code>pool_members</code>
+              (joins/leaves), so during a match the standings sat still until the user navigated away and back.
+              <code>usePoolDetail.ts</code> now subscribes to <code>pool:{id}:leaderboard</code>, applies points/ranks from the payload and
+              re-sorts, with a jittered refresh behind it for the stats half. <strong><code>pool_entries</code> still belongs in the
+              <code>supabase_realtime</code> publication</strong> — those filtered subscriptions are legitimate and unrelated</td></tr>
+          <tr><td>9</td><td><strong>Banter: read stored badges</strong></td>
+            <td>🔴 <strong>BLOCKED — parity checked 2026-07-29</strong>, <code>drafts/2026-07-29_banter_badge_parity_result.md</code>. 266 of
+              341 members differ, and every difference has a named cause. (a) <code>badges.ts</code> is a <em>slim</em> implementation that
+              SKIPS <code>dark_horse</code> — flipping today would strip 🐴 from 78% of members; now cheap to fix because migration 039
+              provides the crowd split it lacked. (b) <code>legend</code> stored for 9 who no longer derive it — stored is CORRECT, levels
+              ratchet. (c) <code>top_dog</code> stored for 4 who are no longer #1 — <strong>needs a product ruling</strong>: does Top Dog mean
+              you ARE #1 or you REACHED #1? <code>xpSystem</code>'s displayedBadges says the first, the keep-once principle says the second.
+              Banter is the last consumer pulling the pool-wide arrays for an aggregate reason</td></tr>
+          <tr><td>10</td><td><strong>Form tab: precompute the analytics, display only</strong></td>
+            <td>🔵 <strong>DIRECTION SET BY RYAN 2026-07-29 — deliberately NOT done for the World Cup.</strong> WC is finished, and league
+              analytics will be a different shape, so building it against WC semantics would be building it twice. <strong>The design is
+              settled</strong>: do to Form what was done to the leaderboard — the BACKEND computes every analytic once when a score changes
+              and writes it down; the front end (web AND mobile) just reads rows and renders them, computing nothing. Half the inputs already
+              exist: <code>entry_xp_state</code> stores hit rate, exact count, streak, last-five, level and total XP, and migration 039 stores
+              the per-match crowd split. Still computed at request time: the XP BREAKDOWN line items, accuracy-by-stage, and the badge set
+              (see step 9's <code>dark_horse</code> gap)</td></tr>
+          <tr><td>11</td><td><strong>Nightly self-healing re-score (01:00 UTC)</strong></td>
+            <td>🔵 <strong>DEFERRED BY RYAN 2026-07-29 — record it, do not build it yet.</strong> No competition is running, so there is
+              nothing to heal; add it before the EPL season starts. <strong>What it is:</strong>
+              <code>SELECT shadow_finalize_totals(null)</code> on a cron at <strong>01:00 UTC</strong>, re-scoring and re-ranking every pool.
+              <strong>Why it is worth having:</strong> measured 2026-07-29 at <strong>9.5 seconds for all 623 pools</strong> (287,789
+              predictions, 287,066 score rows) — cheap enough to run blind — and that single test run <strong>corrected 12 genuinely stale
+              rows</strong> in <em>Mastek Asylum project</em> whose ranks no reconciler had revisited. The reconcilers (jobid 19/20) are
+              event-driven: a pool whose inputs shifted in a way the detector does not watch keeps stale ranks indefinitely.
+              ⚠️ <strong>The parity alarm cannot catch this</strong> — <code>shadow_detect_diffs</code> compares TOTALS only and was green
+              throughout. Write-safe by construction: <code>shadow_finalize_totals</code> is diff-aware, so a correct pool is not rewritten and
+              fires no broadcast (that run rewrote 12 of 4,272 rows and sent 1 message). ⚠️ Pick the hour against the fixture list when leagues
+              start — 01:00 UTC is quiet for the World Cup, not necessarily for the EPL</td></tr>
         </tbody>
       </table>
     </div>
@@ -3141,14 +3627,23 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <div class="card crit" id="i-league-ingestion">
     <h4>League ingestion (Premier League) <span class="chip cat">Multi-sport</span> <span class="chip danger">🔥 R2</span></h4>
-    <p style="margin:0 0 8px">Migration <code>024_multi_competition_league_support.sql</code>,
-      <code>lib/integrations/apiFootball/importLeagueSeason.ts</code> and <code>scripts/import-league-season.ts</code> are
-      <strong>drafted, not applied</strong>.</p>
-    <div class="note danger">⚠️ <strong>A league pool scores zero today, silently:</strong> <code>checkKnockoutTeamsMatch</code>
-      (<code>lib/scoring/core.ts:88</code>) returns <code>true</code> only for <code>'group'</code> or when teams aren't set; a
-      <code>'regular_season'</code> fixture is neither, so it falls to <code>return false</code> and <code>core.ts:141</code> zeroes the
-      match. Even after fixing the gate, <code>isGroupStage</code> selects the <strong>point values</strong> — the group/knockout binary is
-      welded into the price lookup, not just the gate. Importing fixtures is <strong>not</strong> the last step before a working league
+    <p style="margin:0 0 8px">⚠️ <strong>Status corrected 2026-07-30.</strong> Migration
+      <code>024_multi_competition_league_support.sql</code>, <code>lib/integrations/apiFootball/importLeagueSeason.ts</code> and
+      <code>scripts/import-league-season.ts</code> are <s>drafted</s> <strong>committed and tracked on <code>origin/master</code></strong>
+      (<code>b80395e</code>) — but <strong>024 is not applied to production</strong>. What keeps a league pool from existing at all is
+      therefore <strong>not</strong> the repo: it is the prod CHECK constraints,
+      <code>tournaments_tournament_type_check</code> = <code>('world_cup','euros','copa_america')</code> and
+      <code>matches_stage_check</code> with no <code>regular_season</code>.</p>
+    <div class="note danger">⚠️ <strong>A league pool scores zero today, silently — two bugs, gate first, and in both engines.</strong>
+      <strong>(1) The gate:</strong> <code>checkKnockoutTeamsMatch</code> (<code>lib/scoring/core.ts:88</code>) returns <code>true</code>
+      only for <code>'group'</code> or when teams aren't set; a <code>'regular_season'</code> fixture is neither — it has real teams from day
+      one and there is no <code>shadow_entry_bracket</code>/<code>knockoutTeamMap</code> row to match them against — so it falls to
+      <code>return false</code> and <code>core.ts:142</code> returns <code>miss</code>. The <strong>live shadow SQL has the identical
+      shape</strong> (<code>WHEN stage &lt;&gt; 'group' AND NOT teams_match THEN 'miss'</code>), and shadow is what members read.
+      <strong>(2) Behind the gate, the prices:</strong> <code>isGroupStage</code> selects the point values
+      (<code>core.ts:153-155</code>; shadow <code>CASE WHEN m.stage='group' THEN group_exact_score ELSE knockout_exact_score END</code>), so
+      every league fixture is billed at <strong>knockout</strong> rates. Fixing the price without the gate changes nothing; fixing Node
+      without shadow changes nothing a member sees. Importing fixtures is <strong>not</strong> the last step before a working league
       pool.</div>
   </div>
 
@@ -3250,7 +3745,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         pagination. Do <strong>not</strong> raise <code>max-rows</code>.</li>
       <li><span class="f">Audit 2026-07-12:</span> the first, confirmed instance (mobile pool-card in <code>useHomeData.ts</code>) is
         <strong>still unfixed</strong> — nothing from this sweep has landed yet.</li>
-      <li>✅ <span class="f">First landings, 2026-07-26 (local, uncommitted):</span> the <code>match_conduct</code> family — 13 of 14
+      <li>✅ <span class="f">First landings, 2026-07-26 (<s>local, uncommitted</s> — <code>lib/matchConduct.ts</code> is on
+        <code>origin/master</code> as of <code>db4daf3</code>, checked 2026-07-30):</span> the <code>match_conduct</code> family — 13 of 14
         unfiltered whole-table reads now scoped and paginated via <code>lib/matchConduct.ts</code> — plus <code>predictions</code> narrowed
         to its 8 used columns and three unscoped <code>teams</code> reads filtered. That is this sweep's exact anti-pattern, and it was
         <strong>live inside the scoring engines</strong>. See <a href="#perf">⚡ Performance &amp; caching</a>. <code>useHomeData.ts</code>
@@ -3302,18 +3798,20 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card warnc">
     <p style="margin:0">The distinction is the point of this programme. Claims are verified against <strong>code, migrations and git
       history</strong> unless they appear on the <a href="#unverifiable">⚠️ Unverifiable without prod access</a> list in the risk register —
-      thirteen groups of claims that depend on production state and are carried on the authority of the drafts and runbooks that recorded
-      them, including <strong>every measured number in the 2026-07-26 performance session</strong>.
+      fourteen groups of claims that depend on production state and are carried on the authority of the drafts and runbooks that recorded
+      them, including <strong>every measured number in the 2026-07-26 performance session</strong>. <strong>Six of the fourteen were
+      resolved by the 2026-07-30 prod audit</strong> and are struck through there; the rest stand.
       <strong>Unverified is not done.</strong></p>
   </div>
 
   <h3 class="grp">About this file</h3>
   <div class="card neutral">
     <p style="margin:0 0 6px">A view of <code>SPORTPOOL_PROGRAMME.md</code> as it stands in the working copy — commit
-      <code>e2da3ab</code> plus the uncommitted 2026-07-26 <em>performance session</em> additions
-      (<a href="#perf">⚡ Performance &amp; caching</a>, <a href="#i-xp-writers">XP has two writers</a>, risks R13–R16, and step
-      <a href="#order">2b</a>). It is updated in the same piece of work as the markdown, never as a follow-up — a stale view is worse than
-      no view, because it looks authoritative.</p>
+      <code>6f3980d</code> plus the uncommitted <strong>2026-07-30 audit corrections</strong> (R17/R4/R13 closed, <strong>R19</strong>
+      opened, R2 / R18 / <a href="#gate-b">Gate B</a> rewritten, the <a href="#engines">🧮 scoring-engine register</a> added here for the
+      first time). It is updated in the same piece of work as the markdown, never as a follow-up — a stale view is worse than
+      no view, because it looks authoritative. <em>This file had drifted three days behind the markdown before the 2026-07-30 rebuild;
+      that is exactly the failure this line exists to prevent.</em></p>
     <p style="margin:0">Self-contained by design: no CDN, no external fonts, no images, no network calls. Colour tokens are SportPool's own,
       from <code>mobile/theme/colors.ts</code>, with light and dark handled by <code>prefers-color-scheme</code>.</p>
   </div>
@@ -3323,8 +3821,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <footer>
   <div class="wrap">
-    <p><strong>SportPool Programme</strong> — generated view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
-      <code>e2da3ab</code> + the uncommitted 2026-07-26 performance-session additions. Self-contained: no network calls, no external
+    <p><strong>SportPool Programme</strong> — hand-built view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
+      <code>6f3980d</code> + the uncommitted 2026-07-30 audit corrections. Rebuilt 2026-07-30. Self-contained: no network calls, no external
       fonts, no CDN. Colours are the SportPool tokens from
       <code>mobile/theme/colors.ts</code>, light/dark via <code>prefers-color-scheme</code>.</p>
     <p>The markdown is the source of truth. This file is a view of it and is updated in the same piece of work — if they
