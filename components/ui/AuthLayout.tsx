@@ -1,3 +1,6 @@
+import { Icon } from './Icon'
+import { Wordmark } from './Wordmark'
+
 type AuthLayoutProps = {
   children: React.ReactNode
 }
@@ -6,8 +9,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
 
-      {/* Left side — branding panel (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.15_0.05_265)] text-white flex-col justify-between p-12 relative overflow-hidden">
+      {/* Left side — branding panel (hidden on mobile).
+          The dark gradient used to be three inline oklch literals. It now uses the
+          low steps of the primary ramp, which in dark mode ARE the dark navies
+          (#223056 → #1A2440 → #16203A) because the ramp inverts. */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 dark:from-primary-200 dark:via-primary-100 dark:to-primary-50 text-white flex-col justify-between p-12 relative overflow-hidden">
 
         {/* Decorative background shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -32,19 +38,21 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             Join your friends and compete to see who knows the beautiful game best.
           </p>
 
+          {/* Icon tiles, replacing the emoji — the app uses Hugeicons glyphs here and
+              emoji render differently on every platform. */}
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#127942;</span>
-              <span className="text-primary-100 dark:text-white/60">Predict match scores &amp; climb the leaderboard</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#128202;</span>
-              <span className="text-primary-100 dark:text-white/60">Track your stats and accuracy over time</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 text-xl">&#128101;</span>
-              <span className="text-primary-100 dark:text-white/60">Create or join pools with friends &amp; family</span>
-            </div>
+            {[
+              { icon: 'trophy.fill', label: 'Predict match scores & climb the leaderboard' },
+              { icon: 'chart.bar.fill', label: 'Track your stats and accuracy over time' },
+              { icon: 'person.3.fill', label: 'Create or join pools with friends & family' },
+            ].map(({ icon, label }) => (
+              <div key={icon} className="flex items-center gap-3">
+                <span className="flex items-center justify-center w-10 h-10 rounded-control bg-white/10 shrink-0">
+                  <Icon name={icon} size={20} weight="semibold" tint="#FFFFFF" />
+                </span>
+                <span className="text-primary-100 dark:text-white/60">{label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -57,11 +65,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       {/* Right side — form content */}
       <div className="flex-1 flex flex-col bg-surface-secondary">
 
-        {/* Mobile-only brand header + tagline — pinned to top */}
+        {/* Mobile-only brand header + tagline — pinned to top.
+            Uses the real wordmark; the dark panel above cannot, because "Pool" is
+            set in the brand blue and would disappear into a blue background. */}
         <div className="lg:hidden px-6 pt-6 pb-4 grid grid-cols-[auto_1fr] gap-x-2 items-start">
           <span className="text-3xl row-span-2">&#9917;</span>
-          <h1 className="text-2xl font-bold text-neutral-900">Sport Pool</h1>
-          <p className="text-neutral-500 text-sm">FIFA World Cup 2026</p>
+          <Wordmark size={24} />
+          <p className="t-body text-muted">FIFA World Cup 2026</p>
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 py-8 lg:py-12">
