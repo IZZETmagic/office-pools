@@ -454,6 +454,60 @@ export function memberRemovedTemplate(params: {
   }
 }
 
+// Sent to every member (except the admin who acted) when a pool is archived.
+// The members did not choose this and their trophy counts change because of it,
+// so the email states the mechanism plainly rather than softening it: nothing is
+// deleted, it is read-only, it stops counting, and it can come back.
+export function poolArchivedTemplate(params: {
+  userName: string
+  poolName: string
+  actorName: string
+  archiveUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, actorName, archiveUrl } = params
+  return {
+    subject: `${poolName} has been archived`,
+    html: baseTemplate({
+      preheader: `${actorName} archived ${poolName} — nothing has been deleted`,
+      heading: 'Pool archived',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;"><strong>${actorName}</strong> archived <strong>${poolName}</strong>.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Nothing has been deleted. Every prediction, score and badge from that pool is still there, and we have moved it to Archived in your profile where you can still look through it.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">While it is archived it stops counting toward your trophies and your overall stats, so you may see those numbers drop. If a pool admin restores it, everything comes straight back.</p>
+        <p style="color:#525252;line-height:1.6;margin:0;">Only a pool admin can restore it.</p>
+      `,
+      ctaText: 'View Archived Pools',
+      ctaUrl: archiveUrl,
+    }),
+  }
+}
+
+// The undo half. Sent when an admin restores a pool, because the archive email
+// promised these numbers would come back and members should hear that they have.
+export function poolRestoredTemplate(params: {
+  userName: string
+  poolName: string
+  actorName: string
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, actorName, poolUrl } = params
+  return {
+    subject: `${poolName} is back`,
+    html: baseTemplate({
+      preheader: `${actorName} restored ${poolName}`,
+      heading: 'Pool restored',
+      body: `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;"><strong>${actorName}</strong> restored <strong>${poolName}</strong>, so it is active again.</p>
+        <p style="color:#525252;line-height:1.6;margin:0;">It counts toward your trophies and your overall stats again, exactly as it did before.</p>
+      `,
+      ctaText: 'Open Pool',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
 export function deadlineChangedTemplate(params: {
   userName: string
   poolName: string

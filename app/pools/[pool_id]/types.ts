@@ -8,6 +8,14 @@ export type PoolData = {
   status: string
   /** Join-ability, independent of `status` (migration 025). Null on pre-migration rows. */
   accepting_members: boolean | null
+  /**
+   * When an admin archived this pool; NULL = active (migration 040). Deliberately
+   * NOT a `status` value: `status` is the competition lifecycle, this is visibility,
+   * and a pool can be both completed and archived. Restore sets it back to NULL.
+   */
+  archived_at: string | null
+  /** Who archived it, so members can be told who and when. Kept on restore. */
+  archived_by: string | null
   is_private: boolean
   max_participants: number | null
   max_entries_per_user: number

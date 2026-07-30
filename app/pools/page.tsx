@@ -33,6 +33,7 @@ export default async function PoolsPage() {
         pool_code,
         description,
         status,
+        archived_at,
         is_private,
         prediction_deadline,
         prediction_mode,
@@ -268,15 +269,20 @@ export default async function PoolsPage() {
     })
   )
 
+  // Archived pools (migration 040) are excluded from this list entirely and
+  // from every stat on it. They live under Profile → Archived, read-only, and
+  // come back here the moment an admin restores them.
+  const visiblePools = pools.filter(p => !p.archived_at)
+
   // Stats for hero
-  const totalPools = pools.length
-  const activePools = pools.filter((p: any) => p.status === 'open' || p.status === 'active').length
-  const totalPoints = pools.reduce((sum: number, p: any) => sum + (p.total_points ?? 0), 0)
+  const totalPools = visiblePools.length
+  const activePools = visiblePools.filter(p => p.status === 'open').length
+  const totalPoints = visiblePools.reduce((sum: number, p: any) => sum + (p.total_points ?? 0), 0)
 
   return (
     <PoolsClient
       user={userData}
-      pools={pools}
+      pools={visiblePools}
       stats={{ totalPools, activePools, totalPoints }}
     />
   )

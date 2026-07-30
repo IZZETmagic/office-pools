@@ -4,7 +4,7 @@
 // account deletion route through their existing handlers / endpoints.
 
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -32,7 +32,7 @@ import { Icon, Text } from '@/components/ui';
 import { badgeIcon } from '@/components/pool-detail/badge-icons';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
-import { fetchNotificationPrefs, updateNotificationPref, deleteAccount, fetchPushPrefs, updatePushPref } from '@/lib/api';
+import { fetchNotificationPrefs, updateNotificationPref, deleteAccount, fetchPushPrefs, updatePushPref, restorePool } from '@/lib/api';
 import type { PoolSummary } from '@/lib/useHomeData';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { supabase } from '@/lib/supabase';
@@ -120,6 +120,8 @@ export default function ProfileScreen() {
         )}
 
         <TrophyCaseSection />
+
+        <ArchivedPoolsSection />
 
         <AccountSection
           username={data?.username ?? ''}
@@ -1565,10 +1567,17 @@ function TrophyCaseSection() {
         if (!cancelled) setBadges([]);
         return;
       }
+      // Archived pools are excluded (migration 040): an archived pool stops
+      // counting toward trophies until it is restored. `!inner` makes the
+      // embedded pools row a join rather than a left-join, so `.is()` on it
+      // actually filters the outer rows. Must stay in step with the web
+      // Trophy Case (app/profile/ProfilePage.tsx) — two surfaces deriving the
+      // same number differently is how they came to disagree about levels.
       const { data } = await supabase
         .from('badge_unlocks')
-        .select('badge_id')
-        .eq('user_id', appUserId);
+        .select('badge_id, pool:pools!inner(archived_at)')
+        .eq('user_id', appUserId)
+        .is('pool.archived_at', null);
       if (cancelled) return;
       const counts = new Map<string, number>();
       for (const row of (data ?? []) as { badge_id: string }[]) {
@@ -1652,6 +1661,191 @@ function TrophyCaseSection() {
             </View>
           );
         })}
+      </View>
+    </SectionWrapper>
+  );
+}
+
+// Archived pools (migration 040). Filed away down here on purpose: an archived
+// pool is the exception, not something anyone should be browsing daily.
+//
+// Every member sees this, not just admins — a pool vanishing for fourteen
+// people with no explanation is exactly what the archive replaced. Only an
+// admin gets Restore (Ryan's call 2026-07-30).
+//
+// Must stay in step with the web version (app/profile/ProfilePage.tsx →
+// ArchivedPoolsTab): two surfaces deriving the same thing differently is how
+// they came to disagree about levels.
+type ArchivedRow = {
+  poolId: string;
+  poolName: string;
+  archivedAt: string;
+  role: string;
+  archivedByName: string | null;
+};
+
+function ArchivedPoolsSection() {
+  const theme = useTheme();
+  const { user } = useAuth();
+  const { refresh: refreshHomeData } = useHomeData();
+  const [rows, setRows] = useState<ArchivedRow[] | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('auth_user_id', user.id)
+      .single();
+    const appUserId = (userRow as { user_id: string } | null)?.user_id;
+    if (!appUserId) {
+      setRows([]);
+      return;
+    }
+
+    // `!inner` + `.not(...)` so the filter applies to the outer rows; a
+    // left-join would return every membership with a null pool.
+    const { data } = await supabase
+      .from('pool_members')
+      .select('role, pool:pools!inner(pool_id, pool_name, archived_at, archived_by)')
+      .eq('user_id', appUserId)
+      .not('pool.archived_at', 'is', null);
+
+    type EmbeddedPool = {
+      pool_id: string;
+      pool_name: string;
+      archived_at: string;
+      archived_by: string | null;
+    };
+    type MembershipRow = { role: string; pool: EmbeddedPool | EmbeddedPool[] };
+
+    const list = ((data ?? []) as unknown as MembershipRow[]).map((r) => {
+      const p = Array.isArray(r.pool) ? r.pool[0] : r.pool;
+      return {
+        poolId: p.pool_id,
+        poolName: p.pool_name,
+        archivedAt: p.archived_at,
+        role: r.role,
+        archivedBy: p.archived_by,
+      };
+    });
+
+    // One query for the archivers' names rather than one per row.
+    const actorIds = [
+      ...new Set(list.map((l) => l.archivedBy).filter((v): v is string => Boolean(v))),
+    ];
+    const names = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('user_id, username, full_name')
+        .in('user_id', actorIds);
+      for (const u of (users ?? []) as {
+        user_id: string;
+        username: string | null;
+        full_name: string | null;
+      }[]) {
+        names.set(u.user_id, u.full_name || u.username || 'an admin');
+      }
+    }
+
+    setRows(
+      list
+        .map((l) => ({
+          poolId: l.poolId,
+          poolName: l.poolName,
+          archivedAt: l.archivedAt,
+          role: l.role,
+          archivedByName: l.archivedBy ? (names.get(l.archivedBy) ?? null) : null,
+        }))
+        .sort((a, b) => b.archivedAt.localeCompare(a.archivedAt)),
+    );
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function handleRestore(row: ArchivedRow) {
+    setRestoringId(row.poolId);
+    try {
+      await restorePool(row.poolId);
+      void refreshHomeData();
+      await load();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't restore",
+        err instanceof Error ? err.message : 'Unknown error',
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  // Nothing archived is the normal case — render nothing at all rather than an
+  // empty-state card, so the profile doesn't grow a permanent dead section.
+  if (rows === null || rows.length === 0) return null;
+
+  return (
+    <SectionWrapper title="Archived Pools">
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text variant="caption" style={{ color: theme.colors.slate }}>
+          Everything in these is kept, but they&apos;re read-only and don&apos;t count toward your
+          trophies or stats until an admin restores them.
+        </Text>
+
+        {rows.map((row) => (
+          <View
+            key={row.poolId}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: theme.spacing.md,
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.radii.lg,
+              padding: theme.spacing.lg,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="body" numberOfLines={1} style={{ fontFamily: fontFamilies.semibold }}>
+                {row.poolName}
+              </Text>
+              <Text variant="caption" style={{ color: theme.colors.slate }}>
+                Archived
+                {row.archivedByName ? ` by ${row.archivedByName}` : ''} on{' '}
+                {new Date(row.archivedAt).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+            </View>
+
+            {row.role === 'admin' ? (
+              <Pressable
+                onPress={() => void handleRestore(row)}
+                disabled={restoringId === row.poolId}
+                style={({ pressed }) => ({
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  borderRadius: theme.radii.md,
+                  backgroundColor: theme.colors.primary,
+                  opacity: restoringId === row.poolId ? 0.45 : pressed ? 0.7 : 1,
+                })}
+              >
+                <Text variant="caption" style={{ color: '#fff', fontFamily: fontFamilies.semibold }}>
+                  {restoringId === row.poolId ? 'Restoring…' : 'Restore'}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text variant="caption" style={{ color: theme.colors.slate }}>
+                Admin can restore
+              </Text>
+            )}
+          </View>
+        ))}
       </View>
     </SectionWrapper>
   );

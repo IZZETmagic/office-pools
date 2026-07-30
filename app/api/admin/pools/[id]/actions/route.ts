@@ -212,55 +212,84 @@ export async function POST(
         return NextResponse.json({ error: 'Pool name confirmation does not match' }, { status: 400 })
       }
 
+      // This is now the ONLY delete-a-pool path in the product. The pool-admin
+      // buttons were removed on both surfaces (decision 2026-07-25, migrations
+      // 040/041); admins archive instead, which is reversible.
+      //
+      // REWRITTEN 2026-07-30. The previous version hand-rolled a cascade over
+      // seven child tables, one un-transactional `await` at a time, and had
+      // three problems:
+      //
+      //   1. INCOMPLETE. `pool_entries` has 21 ON DELETE CASCADE children, not
+      //      seven — the list was missing point_adjustments, badge_unlocks,
+      //      entry_xp_state, the three bracket_picker_* tables and all eight
+      //      shadow_* tables. Postgres was cleaning those up anyway; the manual
+      //      loop only ever duplicated work it did correctly.
+      //   2. NOT ATOMIC. Any failure mid-loop left a pool with some members'
+      //      data destroyed and the pool still standing — the same stranding
+      //      hazard as the admin-side version this replaced.
+      //   3. IT DESTROYED THE AUDIT TRAIL. `admin_audit_log_pool_id_fkey` is
+      //      ON DELETE **SET NULL** precisely so the record of what admins did
+      //      survives the pool. The old code deleted those rows first, and
+      //      never wrote a row for the deletion itself — so a super-admin could
+      //      erase a pool and leave no trace of it or of anything done to it.
+      //
+      // Now: count the blast radius, write the audit row FIRST, then let the FK
+      // graph do the cascade in one atomic statement.
       const adminSupabase = createAdminClient()
 
-      // Get all member IDs for this pool
-      const { data: members } = await supabase
+      const { data: members } = await adminSupabase
         .from('pool_members')
-        .select('member_id')
+        .select('member_id, user_id')
         .eq('pool_id', id)
 
       const memberIds = members?.map((m) => m.member_id) || []
 
-      // Get all entry IDs for this pool
       let entryIds: string[] = []
       if (memberIds.length > 0) {
-        const { data: entries } = await supabase
+        const { data: entries } = await adminSupabase
           .from('pool_entries')
           .select('entry_id')
           .in('member_id', memberIds)
         entryIds = entries?.map((e) => e.entry_id) || []
       }
 
-      // Cascade delete entry data (FK-safe order)
-      if (entryIds.length > 0) {
-        for (const table of [
-          'match_scores',
-          'bonus_scores',
-          'predictions',
-          'group_predictions',
-          'special_predictions',
-          'player_scores',
-          'entry_round_submissions',
-        ]) {
-          await adminSupabase.from(table).delete().in('entry_id', entryIds)
+      // Chunked: `.in()` with thousands of ids blows past URL limits, and an
+      // unbounded select silently truncates at PostgREST's 1,000-row cap.
+      async function countFor(table: string, ids: string[]) {
+        if (ids.length === 0) return 0
+        let total = 0
+        for (let i = 0; i < ids.length; i += 200) {
+          const { count } = await adminSupabase
+            .from(table)
+            .select('*', { count: 'exact', head: true })
+            .in('entry_id', ids.slice(i, i + 200))
+          total += count ?? 0
         }
-        await adminSupabase.from('pool_entries').delete().in('entry_id', entryIds)
+        return total
       }
 
-      // Delete pool members
-      if (memberIds.length > 0) {
-        await adminSupabase.from('pool_members').delete().in('member_id', memberIds)
-      }
+      const [predictionCount, badgeUnlockCount] = await Promise.all([
+        countFor('predictions', entryIds),
+        countFor('badge_unlocks', entryIds),
+      ])
 
-      // Delete pool-level data
-      await adminSupabase.from('pool_round_states').delete().eq('pool_id', id)
-      await adminSupabase.from('pool_settings').delete().eq('pool_id', id)
+      // Audit BEFORE destroying. If the delete fails we are left with a "tried
+      // to delete" row, which is better than the inverse. This row's own
+      // pool_id is SET NULL by the cascade moments later, which is why the
+      // pool name and counts are written into details.
+      await audit('delete_pool', `Permanently deleted pool "${targetPool.pool_name}"`, {
+        pool_name: targetPool.pool_name,
+        pool_code: targetPool.pool_code,
+        members: members?.length ?? 0,
+        distinct_users: new Set((members ?? []).map((m) => m.user_id)).size,
+        entries: entryIds.length,
+        predictions: predictionCount,
+        badge_unlocks: badgeUnlockCount,
+      })
 
-      // Clean up audit log references (best-effort)
-      await adminSupabase.from('admin_audit_log').delete().eq('pool_id', id)
-
-      // Delete pool record
+      // ONE statement. The FK graph cascades through all 21 children inside
+      // Postgres, atomically. Do not reintroduce a manual per-table loop.
       const { error: deleteError } = await adminSupabase
         .from('pools')
         .delete()
@@ -270,7 +299,30 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to delete pool record' }, { status: 500 })
       }
 
-      return NextResponse.json({ success: true, deleted: true })
+      // RLS filters DELETEs silently rather than erroring, so a "successful"
+      // delete that removed nothing is a real possibility. Confirm it is gone.
+      const { count: stillThere } = await adminSupabase
+        .from('pools')
+        .select('*', { count: 'exact', head: true })
+        .eq('pool_id', id)
+
+      if ((stillThere ?? 0) > 0) {
+        return NextResponse.json(
+          { error: 'Delete reported success but the pool is still present' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        deleted: true,
+        destroyed: {
+          members: members?.length ?? 0,
+          entries: entryIds.length,
+          predictions: predictionCount,
+          badge_unlocks: badgeUnlockCount,
+        },
+      })
     }
 
     // ===== REMOVE MEMBER =====

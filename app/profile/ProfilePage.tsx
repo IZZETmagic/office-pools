@@ -69,7 +69,7 @@ type Prediction = {
   }
 }
 
-type Tab = 'statistics' | 'achievements' | 'predictions' | 'account'
+type Tab = 'statistics' | 'achievements' | 'predictions' | 'archived' | 'account'
 
 type PlayerScoreEntry = {
   match_points: number
@@ -159,6 +159,18 @@ const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.Re
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0" />
+      </svg>
+    ),
+  },
+  {
+    // Deliberately filed away here rather than anywhere prominent: archived
+    // pools are the exception, not something anyone should be browsing daily.
+    key: 'archived',
+    label: 'Archived Pools',
+    mobileLabel: 'Archived',
+    icon: (
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
       </svg>
     ),
   },
@@ -317,6 +329,9 @@ export default function ProfilePage({
             {activeTab === 'achievements' && (
               <AchievementsSection userId={profile.user_id} />
             )}
+            {activeTab === 'archived' && (
+              <ArchivedPoolsTab userId={profile.user_id} />
+            )}
             {activeTab === 'predictions' && (
               <PredictionHistoryTab
                 predictions={predictions}
@@ -335,6 +350,165 @@ export default function ProfilePage({
           </div>
         </div>
       </main>
+    </div>
+  )
+}
+
+// =====================
+// TAB: ARCHIVED POOLS
+// =====================
+
+// Archived pools (migration 040) are read-only and excluded from every
+// cross-pool stat and from the Trophy Case until restored. They live here
+// rather than anywhere prominent — an archived pool is the exception.
+//
+// Every member sees this list, not just admins: a pool vanishing for fourteen
+// people with no explanation is the thing the archive replaced. Only an admin
+// gets the Restore button (Ryan's call 2026-07-30).
+type ArchivedPoolRow = {
+  pool_id: string
+  pool_name: string
+  archived_at: string
+  role: string
+  archived_by_name: string | null
+}
+
+function ArchivedPoolsTab({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<ArchivedPoolRow[] | null>(null)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    // `!inner` + `.not(...)` so the filter applies to the outer rows; a
+    // left-join would return every membership with a null pool.
+    const { data } = await createClient()
+      .from('pool_members')
+      .select('role, pool:pools!inner(pool_id, pool_name, archived_at, archived_by)')
+      .eq('user_id', userId)
+      .not('pool.archived_at', 'is', null)
+
+    // PostgREST types an embedded row as either the object or a one-element
+    // array depending on how it infers the relationship, so normalise both.
+    type EmbeddedPool = {
+      pool_id: string
+      pool_name: string
+      archived_at: string
+      archived_by: string | null
+    }
+    type MembershipRow = { role: string; pool: EmbeddedPool | EmbeddedPool[] }
+
+    const list = ((data ?? []) as unknown as MembershipRow[]).map(r => {
+      const p = Array.isArray(r.pool) ? r.pool[0] : r.pool
+      return {
+        pool_id: p.pool_id,
+        pool_name: p.pool_name,
+        archived_at: p.archived_at,
+        role: r.role,
+        archived_by: p.archived_by,
+      }
+    })
+
+    // Resolve the archiver's display name in one query rather than per row.
+    const actorIds = [...new Set(list.map(l => l.archived_by).filter((v): v is string => Boolean(v)))]
+    const names = new Map<string, string>()
+    if (actorIds.length > 0) {
+      const { data: users } = await createClient()
+        .from('users')
+        .select('user_id, username, full_name')
+        .in('user_id', actorIds)
+      for (const u of (users ?? []) as { user_id: string; username: string | null; full_name: string | null }[]) {
+        names.set(u.user_id, u.full_name || u.username || 'an admin')
+      }
+    }
+
+    setRows(
+      list
+        .map(l => ({ ...l, archived_by_name: l.archived_by ? names.get(l.archived_by) ?? null : null }))
+        .sort((a, b) => b.archived_at.localeCompare(a.archived_at)),
+    )
+  }, [userId])
+
+  useEffect(() => {
+    // load() sets state asynchronously (after awaits), not synchronously
+    // during the effect, so this does not cascade renders.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [load])
+
+  async function handleRestore(poolId: string) {
+    setRestoringId(poolId)
+    setError(null)
+    const res = await fetch(`/api/pools/${poolId}/restore`, { method: 'POST' })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setError(body?.error || 'Could not restore that pool.')
+      setRestoringId(null)
+      return
+    }
+    await load()
+    setRestoringId(null)
+  }
+
+  if (rows === null) {
+    return <p className="text-sm text-neutral-500">Loading…</p>
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-neutral-500">
+          No archived pools. When an admin archives a pool you&apos;re in, it moves here — nothing
+          gets deleted.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-neutral-600">
+        These pools are archived. Everything in them is kept, but they&apos;re read-only and
+        don&apos;t count toward your trophies or stats until an admin restores them.
+      </p>
+
+      {error && (
+        <div className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-800">
+          {error}
+        </div>
+      )}
+
+      <ul className="space-y-3">
+        {rows.map(row => (
+          <li
+            key={row.pool_id}
+            className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 p-4"
+          >
+            <div className="min-w-0">
+              <p className="font-semibold text-neutral-900 truncate">{row.pool_name}</p>
+              <p className="text-sm text-neutral-500">
+                Archived
+                {row.archived_by_name ? ` by ${row.archived_by_name}` : ''} on{' '}
+                {new Date(row.archived_at).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+            </div>
+            {row.role === 'admin' ? (
+              <button
+                onClick={() => handleRestore(row.pool_id)}
+                disabled={restoringId === row.pool_id}
+                className="shrink-0 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {restoringId === row.pool_id ? 'Restoring…' : 'Restore'}
+              </button>
+            ) : (
+              <span className="shrink-0 text-xs text-neutral-400">Admin can restore</span>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -361,10 +535,20 @@ function AchievementsSection({ userId }: { userId: string }) {
     ;(async () => {
       // One row per unlock, newest first, with the pool name resolved via the
       // badge_unlocks -> pools FK. RLS: a member can read their own pools' unlocks.
+      //
+      // Archived pools are excluded (migration 040): an archived pool stops
+      // counting toward trophies until it is restored. `!inner` makes the
+      // embedded pools row a join rather than a left-join, so `.is()` on it
+      // actually filters the outer rows — without `!inner` the badge_unlocks
+      // row survives with a null pool and the count stays wrong.
+      //
+      // The ledger itself stays append-only; this filters at READ, which is
+      // what makes restore exact rather than approximate.
       const { data } = await createClient()
         .from('badge_unlocks')
-        .select('badge_id, unlocked_at, pool:pools(pool_name)')
+        .select('badge_id, unlocked_at, pool:pools!inner(pool_name, archived_at)')
         .eq('user_id', userId)
+        .is('pool.archived_at', null)
         .order('unlocked_at', { ascending: false })
       if (cancelled) return
       const mapped: BadgeUnlockRow[] = (data ?? []).map((r: any) => ({

@@ -13,7 +13,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { router } from 'expo-router';
 
-import { stopParticipating } from '@/lib/api';
+import { archivePool, stopParticipating } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { usePoolEntries } from '@/lib/usePoolEntries';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
@@ -125,9 +125,9 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   const [savedFlash, setSavedFlash] = useState(false);
   const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
   const [copiedKey, setCopiedKey] = useState<'code' | 'link' | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [deleting, setDeleting] = useState(false);
+  // No delete state: "Delete Pool" was removed in favour of a reversible
+  // archive (decision 2026-07-25, migration 040). True deletion is a
+  // service-role support action. Do not re-add a delete control here.
   // Stop Participating uses two ConfirmDialog instances — one to ask,
   // one to acknowledge. `stopParticipatingBusy` keeps both the
   // destructive-confirm and any reopen-of-row gated while the API call
@@ -216,29 +216,6 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
     }
   }
 
-  async function handleDelete() {
-    if (deleteConfirmText !== pool.poolName) return;
-    setDeleting(true);
-    try {
-      const { error } = await supabase.from('pools').delete().eq('pool_id', pool.poolId);
-      if (error) throw error;
-      setShowDeleteModal(false);
-      setDeleteConfirmText('');
-      // Refresh the home dashboard's pool list FIRST so by the time we
-      // land on the home tab the deleted pool card is already gone.
-      // Fire-and-forget — the navigation below doesn't wait for it.
-      void refreshHomeData();
-      // Replace (not push) so the now-defunct pool detail screen isn't
-      // left in the back stack — trying to navigate back to a deleted
-      // pool would 404 or show a stale shell.
-      router.replace('/(tabs)');
-    } catch (err) {
-      Alert.alert("Couldn't delete", err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   // "Stop Participating" — admin-only action that pulls the admin out of
   // the competition without removing them from the pool. They keep the
   // admin role, the settings tab, banter access, etc. Only their
@@ -322,15 +299,19 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
     setShowArchiveConfirm(true);
   }
 
+  // Archive goes through the API, which stamps archived_at, writes the audit
+  // row and tells every member. The previous version wrote status='completed'
+  // straight from the app — which was a lie (it overwrote the competition
+  // lifecycle) and told nobody.
   async function performArchive() {
     setShowArchiveConfirm(false);
     try {
-      const { error } = await supabase
-        .from('pools')
-        .update({ status: 'completed' })
-        .eq('pool_id', pool.poolId);
-      if (error) throw error;
+      await archivePool(pool.poolId);
+      // Refresh the home dashboard first so the archived pool is already gone
+      // from the list by the time we land back on the home tab.
+      void refreshHomeData();
       onSaved?.();
+      router.replace('/(tabs)');
     } catch (err) {
       setArchiveError(err instanceof Error ? err.message : 'Unknown error');
     }
@@ -722,35 +703,15 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         <DangerRow
           icon="archivebox"
           title="Archive Pool"
-          subtitle="Preserve data but prevent new activity"
+          subtitle="Files it away for everyone; you can restore it"
           color={theme.colors.amber}
           onPress={handleArchive}
-        />
-        <DangerRow
-          icon="trash"
-          title="Delete Pool"
-          subtitle="Permanently delete pool and all data"
-          color={theme.colors.red}
-          onPress={() => setShowDeleteModal(true)}
         />
       </Card>
 
       {hasChanges || savedFlash ? (
         <SaveBar saving={saving} flashSaved={savedFlash} onSave={handleSave} />
       ) : null}
-
-      <DeleteConfirmModal
-        visible={showDeleteModal}
-        poolName={pool.poolName}
-        confirmText={deleteConfirmText}
-        onChangeText={setDeleteConfirmText}
-        deleting={deleting}
-        onCancel={() => {
-          setShowDeleteModal(false);
-          setDeleteConfirmText('');
-        }}
-        onConfirm={() => void handleDelete()}
-      />
 
       {/* Destructive confirm — asks "really?" before clearing entries.
           Same floating-card chrome as the PromptDialog in PredictionsTab,
@@ -792,7 +753,7 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       <ConfirmDialog
         visible={showArchiveConfirm}
         title="Archive Pool"
-        description="Members can still view results but no new predictions or changes will be allowed. You can reactivate later."
+        description="Nothing is deleted. The pool moves to Archived in everyone's profile, read-only, and stops counting toward trophies and stats until it's restored. Every member will be told that you archived it. You can restore it at any time."
         cancelLabel="Cancel"
         confirmLabel="Archive"
         destructive
@@ -1441,141 +1402,6 @@ function ScoringConfigCard({ onPress }: { onPress?: () => void }) {
         <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
       </View>
     </Pressable>
-  );
-}
-
-function DeleteConfirmModal({
-  visible,
-  poolName,
-  confirmText,
-  onChangeText,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  visible: boolean;
-  poolName: string;
-  confirmText: string;
-  onChangeText: (v: string) => void;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const theme = useTheme();
-  const matched = confirmText === poolName;
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          justifyContent: 'center',
-          padding: theme.spacing.xl,
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.lg,
-            padding: theme.spacing.lg,
-            gap: theme.spacing.md,
-          }}
-        >
-          <RNText
-            style={{
-              fontFamily: fontFamilies.bold,
-              fontSize: 17,
-              color: theme.colors.ink,
-            }}
-          >
-            Delete Pool?
-          </RNText>
-          <RNText
-            style={{
-              fontFamily: fontFamilies.regular,
-              fontSize: 13,
-              lineHeight: 18,
-              color: theme.colors.slate,
-            }}
-          >
-            Type{' '}
-            <RNText style={{ fontFamily: fontFamilies.bold, color: theme.colors.ink }}>
-              {poolName}
-            </RNText>{' '}
-            to confirm. This will permanently delete the pool, all predictions, and all member data. This cannot be undone.
-          </RNText>
-          <TextInput
-            value={confirmText}
-            onChangeText={onChangeText}
-            placeholder={poolName}
-            placeholderTextColor={theme.colors.slate}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={{
-              fontFamily: fontFamilies.regular,
-              fontSize: 14,
-              color: theme.colors.ink,
-              backgroundColor: theme.colors.mist,
-              borderRadius: theme.radii.sm,
-              paddingHorizontal: theme.spacing.md,
-              paddingVertical: 10,
-            }}
-          />
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <Pressable
-              onPress={onCancel}
-              disabled={deleting}
-              style={({ pressed }) => ({
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: theme.radii.md,
-                backgroundColor: withOpacity(theme.colors.ink, 0.06),
-                alignItems: 'center',
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 14,
-                  color: theme.colors.ink,
-                }}
-              >
-                Cancel
-              </RNText>
-            </Pressable>
-            <Pressable
-              onPress={onConfirm}
-              disabled={!matched || deleting}
-              style={({ pressed }) => ({
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: theme.radii.md,
-                backgroundColor: matched
-                  ? withOpacity(theme.colors.red, 0.15)
-                  : withOpacity(theme.colors.red, 0.06),
-                borderWidth: 1,
-                borderColor: matched
-                  ? withOpacity(theme.colors.red, 0.4)
-                  : 'transparent',
-                alignItems: 'center',
-                opacity: !matched || deleting ? 0.45 : pressed ? 0.7 : 1,
-              })}
-            >
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 14,
-                  color: theme.colors.red,
-                }}
-              >
-                {deleting ? 'Deleting…' : 'Delete'}
-              </RNText>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }
 

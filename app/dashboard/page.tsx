@@ -37,6 +37,7 @@ export default async function DashboardPage() {
         pool_code,
         description,
         status,
+        archived_at,
         prediction_deadline,
         tournament_id,
         prediction_mode,
@@ -372,8 +373,15 @@ export default async function DashboardPage() {
     })
   )
 
-  // Filter to only active pools for dashboard display
-  const activePools = pools.filter((p: any) => p.status === 'open' || p.status === 'active')
+  // Filter to only active pools for dashboard display.
+  //
+  // `archived_at` (migration 040) is a separate axis from `status`: status is the
+  // competition lifecycle, archive is visibility, and an archived pool must not
+  // count toward any cross-pool stat until it is restored.
+  //
+  // ('active' is not a value `pools_status_check` permits — it only allows
+  // 'open' and 'completed' — so that clause was dead. Kept out deliberately.)
+  const activePools = pools.filter((p: any) => p.status === 'open' && !p.archived_at)
 
   // Calculate stats from active pools
   const totalPools = activePools.length
@@ -385,10 +393,13 @@ export default async function DashboardPage() {
       return p.current_rank < best ? p.current_rank : best
     }, null as number | null)
 
-  // Build activity feed from multiple sources (from all pools, not just active)
+  // Build activity feed from multiple sources. Completed pools still contribute
+  // (their history is worth seeing), but ARCHIVED pools do not — an archived
+  // pool is excluded from stats, trophies and anything else until restored.
   const allActivities: any[] = []
   for (const m of (userPools ?? [])) {
     const pool = (m as any).pools
+    if (pool?.archived_at) continue
     const poolName = pool.pool_name
     const poolId = pool.pool_id
     const entries = ((m as any).pool_entries || []) as any[]

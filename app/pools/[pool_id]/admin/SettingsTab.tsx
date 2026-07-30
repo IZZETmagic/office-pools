@@ -56,14 +56,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Archive state
+  // Archive state. There is deliberately no delete state: "Delete Pool" was
+  // removed in favour of a reversible archive (decision 2026-07-25, migration
+  // 040). True deletion is a service-role support action.
   const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [archiving, setArchiving] = useState(false)
-
-  // Delete state
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteConfirmName, setDeleteConfirmName] = useState('')
-  const [deleting, setDeleting] = useState(false)
 
   // Track if form has unsaved changes
   const initialDeadlineDate = pool.prediction_deadline
@@ -214,94 +211,31 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     setSaving(false)
   }
 
+  // Archive is a single server-side operation, not a client write plus a
+  // notification call. The route owns admin verification, stamping
+  // archived_at/archived_by, the membership event and the member fan-out — so
+  // an archive can never land without the people in the pool being told.
+  //
+  // It writes `archived_at`, NOT `status`. The previous version set
+  // status='completed', which conflated "the competition finished" with "the
+  // admin filed this away" and destroyed the lifecycle value on the way past.
   async function handleArchivePool() {
     setArchiving(true)
-
-    const { error } = await supabase
-      .from('pools')
-      .update({ status: 'completed', updated_at: new Date().toISOString() })
-      .eq('pool_id', pool.pool_id)
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setPool({ ...pool, status: 'completed' })
-      setStatus('completed')
-      showToast('Pool archived successfully.', 'success')
-    }
-    setArchiving(false)
-    setShowArchiveModal(false)
-  }
-
-  async function handleDeletePool() {
-    if (deleteConfirmName !== pool.pool_name) return
-
-    setDeleting(true)
     setError(null)
 
-    // Delete in order: predictions -> entries -> pool_members -> pool_settings -> pools
-    const memberIds = members.map((m) => m.member_id)
-    const entryIds = members.flatMap((m) => (m.entries || []).map(e => e.entry_id))
+    const res = await fetch(`/api/pools/${pool.pool_id}/archive`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
 
-    if (entryIds.length > 0) {
-      const { error: predErr } = await supabase
-        .from('predictions')
-        .delete()
-        .in('entry_id', entryIds)
-
-      if (predErr) {
-        setError('Failed to delete predictions: ' + predErr.message)
-        setDeleting(false)
-        return
-      }
-    }
-
-    if (memberIds.length > 0) {
-      const { error: entryErr } = await supabase
-        .from('pool_entries')
-        .delete()
-        .in('member_id', memberIds)
-
-      if (entryErr) {
-        setError('Failed to delete entries: ' + entryErr.message)
-        setDeleting(false)
-        return
-      }
-    }
-
-    const { error: memErr } = await supabase
-      .from('pool_members')
-      .delete()
-      .eq('pool_id', pool.pool_id)
-
-    if (memErr) {
-      setError('Failed to delete members: ' + memErr.message)
-      setDeleting(false)
+    if (!res.ok) {
+      setError(body?.error || 'Failed to archive the pool.')
+      setArchiving(false)
       return
     }
 
-    const { error: setErr } = await supabase
-      .from('pool_settings')
-      .delete()
-      .eq('pool_id', pool.pool_id)
-
-    if (setErr) {
-      setError('Failed to delete settings: ' + setErr.message)
-      setDeleting(false)
-      return
-    }
-
-    const { error: poolErr } = await supabase
-      .from('pools')
-      .delete()
-      .eq('pool_id', pool.pool_id)
-
-    if (poolErr) {
-      setError('Failed to delete pool: ' + poolErr.message)
-      setDeleting(false)
-      return
-    }
-
+    setPool({ ...pool, archived_at: body.archived_at, archived_by: body.archived_by })
+    showToast('Pool archived. Members have been notified.', 'success')
+    setArchiving(false)
+    setShowArchiveModal(false)
     router.push('/dashboard')
   }
 
@@ -699,32 +633,29 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             Danger Zone
           </h3>
 
-          <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
-            {/* Archive */}
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h4 className="text-sm font-semibold text-neutral-900">Archive Pool</h4>
-                <p className="text-sm text-neutral-500">Preserve data but prevent new activity.</p>
-              </div>
-              <Button variant="warning" size="sm" className="shrink-0 w-20" onClick={() => setShowArchiveModal(true)}>
-                Archive
-              </Button>
+          {/*
+            Delete Pool was removed here (decision 2026-07-25). It destroyed every
+            member's predictions irreversibly on one tap. Archive replaces it and is
+            reversible; genuine deletion is a support action run with service-role
+            credentials. Do not re-add a delete control to this screen.
+          */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-semibold text-neutral-900">Archive Pool</h4>
+              <p className="text-sm text-neutral-500">
+                Files the pool away for everyone. Nothing is deleted, and you can restore it
+                at any time from your profile.
+              </p>
             </div>
-
-            {/* Divider - desktop only */}
-            <div className="hidden sm:block absolute inset-y-0 left-1/2 w-px bg-neutral-200" />
-
-            {/* Delete */}
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h4 className="text-sm font-semibold text-neutral-900">Delete Pool</h4>
-                <p className="text-sm text-neutral-500">Permanently delete this pool and all data.</p>
-              </div>
-              <Button variant="danger" size="sm" className="shrink-0 w-20" onClick={() => setShowDeleteModal(true)}>
-                Delete
-              </Button>
-            </div>
+            <Button variant="warning" size="sm" className="shrink-0 w-20" onClick={() => setShowArchiveModal(true)}>
+              Archive
+            </Button>
           </div>
+
+          <p className="mt-4 text-xs text-neutral-500">
+            Need a pool permanently deleted? Contact support — it can&apos;t be undone, so we
+            do it by hand.
+          </p>
         </Card>
       </div>
 
@@ -770,9 +701,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                 {pool.pool_name}
               </p>
               <ul className="text-sm text-warning-800 space-y-1">
-                <li>&#8226; Members will still be able to view data</li>
-                <li>&#8226; No new predictions or changes can be made</li>
-                <li>&#8226; The pool can be reactivated later</li>
+                <li>&#8226; Nothing is deleted — every prediction and result is kept</li>
+                <li>&#8226; It moves to Archived in everyone&apos;s profile, read-only</li>
+                <li>&#8226; It stops counting toward trophies and stats until restored</li>
+                <li>&#8226; All {members.length} members will be told that you archived it</li>
+                <li>&#8226; You can restore it at any time</li>
               </ul>
             </div>
 
@@ -797,73 +730,6 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !deleting) {
-              setShowDeleteModal(false)
-              setDeleteConfirmName('')
-            }
-          }}
-        >
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
-              Delete Pool
-            </h3>
-
-            <p className="text-sm text-neutral-700 mb-3">
-              You are about to permanently delete this pool:
-            </p>
-
-            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-4">
-              <p className="text-sm font-bold text-danger-800 mb-2">
-                {pool.pool_name}
-              </p>
-              <ul className="text-sm text-danger-800 space-y-1">
-                <li>&#8226; {members.length} members will lose access</li>
-                <li>&#8226; All predictions will be deleted</li>
-                <li>&#8226; All member data will be deleted</li>
-                <li>&#8226; This action cannot be undone</li>
-              </ul>
-            </div>
-
-            <FormField label={`Type "${pool.pool_name}" to confirm:`}>
-              <Input
-                type="text"
-                value={deleteConfirmName}
-                onChange={(e) => setDeleteConfirmName(e.target.value)}
-                placeholder={pool.pool_name}
-              />
-            </FormField>
-
-            <div className="flex gap-3 justify-end mt-4">
-              <Button
-                variant="gray"
-                onClick={() => {
-                  setShowDeleteModal(false)
-                  setDeleteConfirmName('')
-                }}
-                disabled={deleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={handleDeletePool}
-                disabled={deleteConfirmName !== pool.pool_name || deleting}
-                loading={deleting}
-                loadingText="Deleting..."
-              >
-                I Understand, Delete Forever
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -954,3 +954,38 @@ export async function fetchHomeScoring(userId: string): Promise<EntryScoringSumm
   );
   return res.entries ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Pool archive / restore (migration 040)
+//
+// "Delete Pool" was removed from both surfaces (decision 2026-07-25): it
+// destroyed every member's predictions irreversibly on one tap. Archiving is
+// reversible and destroys nothing.
+//
+// These go through the API rather than writing `pools` directly from the app,
+// because the route also records the audit row and tells every member — and an
+// archive must never land silently, since it changes other people's trophy
+// counts. Writing the column straight from here would skip all of that.
+// ---------------------------------------------------------------------------
+
+export type ArchivePoolResponse = {
+  archived_at: string
+  archived_by: string | null
+  notified?: number
+  already?: boolean
+};
+
+export function archivePool(poolId: string) {
+  return apiFetch<ArchivePoolResponse>(`/api/pools/${poolId}/archive`, { method: 'POST' });
+}
+
+export type RestorePoolResponse = {
+  archived_at: null
+  notified?: number
+  already?: boolean
+};
+
+/** Admin-only, same as archiving (Ryan's call 2026-07-30). */
+export function restorePool(poolId: string) {
+  return apiFetch<RestorePoolResponse>(`/api/pools/${poolId}/restore`, { method: 'POST' });
+}
