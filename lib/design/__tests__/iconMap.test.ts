@@ -81,13 +81,27 @@ describe('web Icon renderer', () => {
     }
   })
 
-  it('does not import the Pro package while it cannot be resolved', () => {
-    // @hugeicons-pro/* needs HUGEICONS_NPM_TOKEN. A stray import would pass locally for
-    // anyone who has the token exported and break the Vercel build for everyone else.
-    const uncommented = webSource
-      .split('\n')
-      .filter((l) => !l.trim().startsWith('*') && !l.trim().startsWith('//'))
-      .join('\n')
-    expect(uncommented).not.toContain("from '@hugeicons-pro")
+  it('resolves solid glyphs from the Pro package', () => {
+    // @hugeicons-pro/* installs from Hugeicons' private registry via the root .npmrc,
+    // which reads HUGEICONS_NPM_TOKEN. If this import is present, that variable must
+    // also be set in the Vercel project or the build cannot install the package.
+    expect(webSource).toContain("from '@hugeicons-pro/core-solid-rounded'")
+  })
+
+  it('the web solid map covers exactly the SF names the RN app fills', () => {
+    const webSolid = mapKeys(webSource, 'SOLID_ICON_MAP')
+    const mobileSolid = mapKeys(mobileSource, 'SOLID_ICON_MAP')
+    expect(webSolid, 'could not parse SOLID_ICON_MAP from the web Icon').not.toBeNull()
+    expect(mobileSolid, 'could not parse SOLID_ICON_MAP from the RN Icon').not.toBeNull()
+    expect([...webSolid!].sort()).toEqual([...mobileSolid!].sort())
+  })
+
+  it('every solid name also has an outline fallback', () => {
+    // `solid` is opt-in per call site, so a name present only in SOLID_ICON_MAP would
+    // render the fallback Circle whenever a caller omitted the prop.
+    const outline = mapKeys(webSource, 'ICON_MAP') ?? []
+    for (const name of mapKeys(webSource, 'SOLID_ICON_MAP') ?? []) {
+      expect(outline).toContain(name)
+    }
   })
 })

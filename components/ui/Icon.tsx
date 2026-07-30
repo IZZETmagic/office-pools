@@ -110,6 +110,14 @@ import {
   WaveIcon,
 } from '@hugeicons/core-free-icons'
 
+// Pro solid-rounded variants — opt-in via the `solid` prop, one entry per name in
+// SOLID_ICON_MAP below.
+import {
+  ChampionIcon as ChampionSolidIcon,
+  Fire03Icon as Fire03SolidIcon,
+  FlashIcon as FlashSolidIcon,
+} from '@hugeicons-pro/core-solid-rounded'
+
 import type { ColorToken } from '@/lib/design/tokens'
 
 // Hugeicons constants are arrays of SVG path tuples. The package exports no
@@ -149,33 +157,22 @@ type IconProps = {
 }
 
 /**
- * Sparse SF-name → Pro solid-rounded mapping, mirroring SOLID_ICON_MAP in the RN app
- * (which fills `bolt.fill`, `flame.fill` and the trophies).
+ * Sparse SF-name → Pro solid-rounded mapping, mirroring SOLID_ICON_MAP in the RN app.
+ * Only names listed here respond to the `solid` prop; anything else falls through to
+ * the free outline icon, which keeps the migration opt-in per component rather than
+ * flipping every glyph at once.
  *
- * Empty on web because `@hugeicons-pro/core-solid-rounded` installs from Hugeicons'
- * private registry and needs HUGEICONS_NPM_TOKEN, which is not yet set in the web
- * project or on Vercel. Importing it before it can resolve would fail the build, so
- * `solid` degrades to the outline icon until then. To enable, once the token is set:
- *
- *   npm i @hugeicons-pro/core-solid-rounded
- *
- *   import {
- *     ChampionIcon as ChampionSolidIcon,
- *     Fire03Icon as Fire03SolidIcon,
- *     FlashIcon as FlashSolidIcon,
- *   } from '@hugeicons-pro/core-solid-rounded'
- *
- *   const SOLID_ICON_MAP: Record<string, IconConstant> = {
- *     'bolt.fill': FlashSolidIcon,
- *     'flame.fill': Fire03SolidIcon,
- *     'trophy': ChampionSolidIcon,
- *     'trophy.circle.fill': ChampionSolidIcon,
- *     'trophy.fill': ChampionSolidIcon,
- *   }
- *
- * `strokeWidthFor` already omits strokeWidth for solid icons — see the note there.
+ * @hugeicons-pro/* resolves from Hugeicons' private registry via the root .npmrc,
+ * which reads HUGEICONS_NPM_TOKEN from the environment. That variable must also be
+ * set in the Vercel project or the build cannot install this package.
  */
-const SOLID_ICON_MAP: Record<string, IconConstant> = {}
+const SOLID_ICON_MAP: Record<string, IconConstant> = {
+  'bolt.fill': FlashSolidIcon,
+  'flame.fill': Fire03SolidIcon,
+  'trophy': ChampionSolidIcon,
+  'trophy.circle.fill': ChampionSolidIcon,
+  'trophy.fill': ChampionSolidIcon,
+}
 
 // SF Symbol name → Hugeicons constant, alphabetised. Several SF names collapse onto
 // one constant because the free tier has no `.fill` variants, so `archivebox` and
