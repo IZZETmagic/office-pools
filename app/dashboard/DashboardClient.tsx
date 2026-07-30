@@ -15,6 +15,7 @@ import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
 import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
+import { getFormDotClass } from '@/lib/design/formDots'
 
 // =====================
 // TYPES
@@ -164,15 +165,6 @@ function getStatusTagClass(status: string): string {
 
 function getStatusLabel(status: string): string {
   return poolStatusDisplay({ status }).label
-}
-
-function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): string {
-  switch (type) {
-    case 'exact': return 'bg-accent-500'
-    case 'winner_gd': return 'bg-success-500'
-    case 'winner': return 'bg-primary-500'
-    case 'miss': return 'bg-danger-400'
-  }
 }
 
 function formatDateTime(d: Date) {
@@ -358,8 +350,18 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`w-56 h-full min-h-[9rem] rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
+      className={`w-56 h-full min-h-[9rem] rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface flex hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
     >
+      {/* Mode stripe — the 5px full-height bar down the left edge of every pool card
+          in the app. Branded pools show their banner instead, as RN's PoolCard does. */}
+      {!hasBranding && (
+        <span
+          aria-hidden="true"
+          className="w-[5px] shrink-0"
+          style={{ background: getModeStripe(pool.prediction_mode) }}
+        />
+      )}
+      <div className="flex-1 flex flex-col min-w-0">
       {hasBranding && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
           {pool.brand_logo_url ? (
@@ -396,7 +398,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
           <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Rank</p>
           {pool.hasScoringStarted && pool.current_rank != null ? (
             <>
-              <p className="text-lg font-bold text-neutral-900 dark:text-white leading-tight">
+              <p className="t-num text-lg text-ink leading-tight">
                 {pool.current_rank}
               </p>
               <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">
@@ -404,19 +406,19 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
               </p>
             </>
           ) : (
-            <p className="text-lg font-bold text-neutral-400 dark:text-neutral-500 leading-tight">
+            <p className="t-num text-lg text-muted leading-tight">
               —
             </p>
           )}
         </div>
         <div className="text-center">
           <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Level</p>
-          <p className="text-lg font-bold text-neutral-900 dark:text-white leading-tight">{level.level}</p>
+          <p className="t-num text-lg text-ink leading-tight">{level.level}</p>
           <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">{level.name}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Points</p>
-          <p className="text-lg font-bold text-primary-600 dark:text-primary-400 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
+          <p className="t-num text-lg text-primary-600 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
         </div>
       </div>
 
@@ -426,13 +428,14 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
         <div className="flex items-center gap-[5px]">
           {pool.form.length > 0
             ? pool.form.map((type, i) => (
-                <div key={i} className={`w-[7px] h-[7px] rounded-full ${getFormDotColor(type)}`} />
+                <div key={i} className={`w-[7px] h-[7px] rounded-pill ${getFormDotClass(type)}`} />
               ))
             : [0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-[7px] h-[7px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                <div key={i} className={`w-[7px] h-[7px] rounded-pill ${getFormDotClass('no_pick')}`} />
               ))
           }
         </div>
+      </div>
       </div>
       </div>
     </Link>
@@ -469,6 +472,13 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
         className="flex"
         style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
       >
+        {!hasBranding && (
+          <span
+            aria-hidden="true"
+            className="w-[5px] shrink-0"
+            style={{ background: getModeStripe(pool.prediction_mode) }}
+          />
+        )}
         <div className="flex-1 p-4">
           {/* Header row */}
           <div className="flex items-center justify-between gap-3 mb-2">
@@ -544,7 +554,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
               <div className="flex items-center justify-end gap-[5px] mt-1.5">
                 {pool.form.length > 0
                   ? pool.form.map((type, i) => (
-                      <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotColor(type)}`} />
+                      <div key={i} className={`w-[10px] h-[10px] rounded-pill ${getFormDotClass(type)}`} />
                     ))
                   : [0, 1, 2, 3, 4].map((i) => (
                       <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />

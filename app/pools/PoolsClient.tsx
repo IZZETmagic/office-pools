@@ -15,6 +15,7 @@ import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
 import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
+import { getFormDotClass } from '@/lib/design/formDots'
 
 // =====================
 // TYPES
@@ -174,15 +175,6 @@ function getStatusTagClass(status: string): string {
 
 function getStatusLabel(status: string): string {
   return poolStatusDisplay({ status }).label
-}
-
-function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): string {
-  switch (type) {
-    case 'exact': return 'bg-accent-500'
-    case 'winner_gd': return 'bg-success-500'
-    case 'winner': return 'bg-primary-500'
-    case 'miss': return 'bg-danger-400'
-  }
 }
 
 // =====================
@@ -698,7 +690,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     <div className="flex items-center justify-end gap-[5px] mt-1.5">
                                       {pool.form.length > 0
                                         ? pool.form.map((type, i) => (
-                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotColor(type)}`} />
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotClass(type)}`} />
                                           ))
                                         : [0, 1, 2, 3, 4].map((i) => (
                                             <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
@@ -852,7 +844,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     <div className="flex items-center justify-end gap-[5px] mt-1.5">
                                       {pool.form.length > 0
                                         ? pool.form.map((type, i) => (
-                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotColor(type)}`} />
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotClass(type)}`} />
                                           ))
                                         : [0, 1, 2, 3, 4].map((i) => (
                                             <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />

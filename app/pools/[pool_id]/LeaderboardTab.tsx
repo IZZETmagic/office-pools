@@ -5,6 +5,7 @@ import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
+import { getFormDotClass, FORM_LEGEND } from '@/lib/design/formDots'
 import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult, EntryStatsData, MatchdayMVPData } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
@@ -1019,19 +1020,6 @@ export function LeaderboardTab({
     return 'bg-mist text-muted'
   }
 
-  function getFormDotClass(type: string): string {
-    // The prediction tiers are mode-invariant in the app, so they use the
-    // --sp-tier-* tokens directly rather than a ramp step. Note `miss` is red
-    // rather than palette.tierMiss — that is what the app actually renders.
-    switch (type) {
-      case 'exact': return 'bg-tier-exact'
-      case 'winner_gd': return 'bg-tier-winner-gd'
-      case 'winner': return 'bg-tier-winner'
-      case 'miss': return 'bg-danger-600'
-      default: return 'bg-silver'
-    }
-  }
-
   function getAwardBadgeClasses(type: string): string {
     switch (type) {
       case 'mvp': return 'bg-accent-400/15 text-accent-600'
@@ -1278,13 +1266,7 @@ export function LeaderboardTab({
               These were previously hand-written with their own colours, which is how a
               legend silently starts lying about the thing above it. */}
           <div className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1">
-            {([
-              ['exact', 'Exact'],
-              ['winner_gd', 'W+GD'],
-              ['winner', 'Winner'],
-              ['miss', 'Miss'],
-              ['no_pick', 'No Pick'],
-            ] as const).map(([type, label]) => (
+            {FORM_LEGEND.map(([type, label]) => (
               <div key={type} className="flex items-center gap-1">
                 <div className={`w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-pill ${getFormDotClass(type)}`} />
                 <span className="text-[10px] sm:text-xs text-muted">{label}</span>
