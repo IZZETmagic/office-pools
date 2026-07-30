@@ -578,13 +578,46 @@ surface:
 
 | Engine | What it does | What it is FOR | State |
 |---|---|---|---|
-| **Node "prod" engine** — `lib/scoring/core.ts`, `lib/scoring/recalculate.ts` | Pull-Compute-Push: reads a pool's rows into Node, scores in JS, writes back | The original engine. Now a running safety net behind `prod_scoring_enabled` | ✅ live, still enabled. Retires only after the parity alarm is clean across a full cycle AND podium ownership moves into SQL |
+| **Node "prod" engine** — `lib/scoring/core.ts`, `lib/scoring/recalculate.ts` | Pull-Compute-Push: reads a pool's rows into Node, scores in JS, writes back | The original engine. Now a running safety net behind `prod_scoring_enabled` | ✅ live, still enabled. **Four gates before it can go — see *Retirement gates* below.** Do not switch it off on the strength of the parity alarm alone |
 | **Shadow engine** — `shadow_*` SQL functions + `shadow_*` tables | Set-based, DB-native scoring: `shadow_score_match`, `shadow_finalize_totals`, rank snapshot, reconcilers (jobid 19/20), diff alarm (jobid 21) | Replacing the Node engine. Covers full_tournament, progressive and bracket_picker | ✅ live and is the READ SOURCE for **all 623 pools** since 2026-07-29 |
-| **Analytics / XP writer** — `lib/analytics/entryAnalytics.ts`, called by `lib/push/badges.ts` | Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into `entry_xp_state` | The per-entry statistics every surface reads instead of deriving | ✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips `dark_horse` |
+| **Analytics / XP writer** — `lib/analytics/entryAnalytics.ts`, called by `lib/push/badges.ts` | Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into `entry_xp_state` | The per-entry statistics every surface reads instead of deriving | ✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips `dark_horse`. ⚠⚠ **ITS TRIGGER IS THE NODE ENGINE**: called directly by `recalculatePool`, and the standalone sweep (jobid15) fires off `pool_entries.last_rank_update`, a column **only Node writes**. Verified 2026-07-29: none of the 19 `shadow_*` functions touch `pool_entries` |
 | **Per-match aggregates** — migrations 038/039, `pool_match_prediction_accuracy()` | Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline | Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section | ✅ live. Takes `p_submitted_only` because its two callers count different populations |
 | **Podium** — `lib/podium.ts` | Derives the actual and predicted tournament podium | Champion / runner-up / third bonuses | ✅ live in Node. **Must move to SQL before the Node engine can retire** |
 | **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser — the last real violation of the rule above |
 | **League engine** | — | Premier League and other league competitions | 🔵 **NOT BUILT — next.** ⚠️ A league pool currently scores **ZERO silently**: the group/knockout binary is baked into the scoring price lookup, not just the gate. See *League ingestion* |
+
+### Retirement gates — the Node engine
+
+All four must hold. The first two were known; the third came out of the
+2026-07-27 gap audit; **the fourth was found on 2026-07-29 and is a consequence
+of the read-path work** — making the front ends read stored values made the
+writer that fills them load-bearing.
+
+1. **Parity alarm green across a full cycle** (jobid21, every 15 min).
+   ⚠ Necessary, not sufficient: `shadow_detect_diffs` compares **totals only**.
+   It cannot see rank drift, and it stayed green through a missing migration,
+   seven hours of failed `entry_xp_state` writes, and four genuine rank anomalies
+   in prod. Do not read it as "everything agrees".
+2. **Podium ownership moves into SQL** — `lib/podium.ts` still owns the
+   champion/runner-up/third derivation in Node.
+3. **The 13 missing `bp_*` bonus types** land in the shadow arm (2026-07-27 audit).
+4. **The analytics trigger moves onto the shadow path.** Nothing in the shadow
+   engine writes `pool_entries` — verified across all 19 `shadow_*` functions — so
+   with Node off, `pool_entries.last_rank_update` stops moving and the analytics
+   sweep never fires. Scores would keep updating while **every precomputed
+   statistic the leaderboard and Form now read silently freezes**: form dots, hit
+   rate, streaks, levels, badges. No error, and gate 1 cannot detect it.
+   The evidence that this is real, not theoretical, as of 2026-07-29:
+
+   | | |
+   |---|---|
+   | `shadow_entry_totals` last written | 2026-07-29 **21:07** |
+   | `pool_entries.last_rank_update` | 2026-07-28 **16:39** |
+
+   Shadow had been scoring for over a day while the column that triggers the
+   analytics refresh had not moved. **Fix:** point the sweep's detector at
+   `shadow_entry_totals.updated_at` instead, and stop depending on a Node-written
+   column. Do this BEFORE switching Node off, not after.
 
 ### Why the register exists
 
