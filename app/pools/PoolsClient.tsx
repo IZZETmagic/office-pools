@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Icon } from '@/components/ui/Icon'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
@@ -444,18 +445,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-700 bg-neutral-100 dark:bg-neutral-600/50 border border-neutral-200 dark:border-neutral-500/50 rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700/60 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
-              </svg>
+              <Icon name="person.badge.plus" size={16} weight="semibold" />
               Join
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+              <Icon name="plus" size={16} weight="semibold" />
               Create
             </button>
           </div>
@@ -709,9 +706,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               </span>
                               {deadline.text !== 'No deadline set' && (
                                 <span className={`inline-flex items-center gap-1 text-xs font-semibold ${deadline.className}`}>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
+                                  <Icon name="clock" size={14} weight="semibold" />
                                   {deadline.text}
                                 </span>
                               )}
@@ -863,9 +858,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               </span>
                               {deadline.text !== 'No deadline set' && (
                                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
+                                  <Icon name="clock" size={14} weight="semibold" />
                                   {deadline.text}
                                 </span>
                               )}
@@ -1000,9 +993,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               </span>
                               {deadline.text !== 'No deadline set' && (
                                 <span className={`inline-flex items-center gap-1 text-xs font-semibold ${deadline.className}`}>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
+                                  <Icon name="clock" size={14} weight="semibold" />
                                   {deadline.text}
                                 </span>
                               )}
@@ -1056,9 +1047,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               </span>
                               {deadline.text !== 'No deadline set' && (
                                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
+                                  <Icon name="clock" size={14} weight="semibold" />
                                   {deadline.text}
                                 </span>
                               )}

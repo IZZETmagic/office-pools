@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live/route'
 import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
@@ -1142,13 +1143,9 @@ export function PoolDetail({
                 aria-label="Navigation menu"
               >
                 {brandedNavOpen ? (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <Icon name="xmark" size={18} weight="semibold" />
                 ) : (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                  </svg>
+                  <Icon name="line.3.horizontal" size={18} weight="semibold" />
                 )}
               </button>
 
@@ -1204,9 +1201,7 @@ export function PoolDetail({
         {isSuperAdminViewing && (
           <div className="bg-warning-100 dark:bg-warning-900/30 border-b border-warning-300 dark:border-warning-700">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
-              <svg className="w-4 h-4 text-warning-700 dark:text-warning-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+              <Icon name="exclamationmark.triangle.fill" size={16} weight="semibold" className="text-warning-700 dark:text-warning-400 shrink-0" />
               <span className="text-xs sm:text-sm font-medium text-warning-800 dark:text-warning-300">
                 Viewing as Super Admin — You are not a member of this pool
               </span>
@@ -1247,9 +1242,7 @@ export function PoolDetail({
                 >
                   <span className="inline-flex items-center justify-center gap-0.5">
                     {pool.brand_name}
-                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                    </svg>
+                    <Icon name="arrow.up.right" size={12} weight="semibold" />
                   </span>
                 </Link>
               )}
@@ -1262,9 +1255,12 @@ export function PoolDetail({
                     className={`w-full flex items-center justify-center gap-0.5 px-2 py-2 rounded-pill text-xs font-bold text-center transition-colors ${tabPillClass(isOverflowTabActive)}`}
                   >
                     {isOverflowTabActive ? (mobileOverflowTabs.find(t => t.key === activeTab)?.label ?? 'More') : 'More'}
-                    <svg className={`w-3 h-3 shrink-0 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <Icon
+                      name="chevron.down"
+                      size={12}
+                      weight="bold"
+                      className={`shrink-0 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`}
+                    />
                   </button>
 
                   {moreMenuOpen && (
@@ -1340,9 +1336,7 @@ export function PoolDetail({
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {pool.brand_name}
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                    </svg>
+                    <Icon name="arrow.up.right" size={12} weight="semibold" />
                   </span>
                 </Link>
               )}
@@ -1529,9 +1523,7 @@ export function PoolDetail({
                       onClick={handleBackToList}
                       className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium mb-4 transition-colors"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
+                      <Icon name="chevron.left" size={16} weight="semibold" />
                       Back to Entries
                     </button>
                     <div className="flex items-center gap-2 mb-4">
@@ -1625,9 +1617,7 @@ export function PoolDetail({
                       onClick={handleBackToList}
                       className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium mb-4 transition-colors"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
+                      <Icon name="chevron.left" size={16} weight="semibold" />
                       Back to Entries
                     </button>
                     <div className="flex items-center gap-2 mb-4">
@@ -1788,9 +1778,7 @@ export function PoolDetail({
                             className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors shrink-0"
                             title="Rename entry"
                           >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
+                            <Icon name="pencil.line" size={16} weight="semibold" />
                           </button>
                         )}
 
