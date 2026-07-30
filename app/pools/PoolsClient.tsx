@@ -14,6 +14,7 @@ import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
+import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
 
 // =====================
 // TYPES
@@ -135,12 +136,6 @@ function getStatusAccentColor(status: string): string {
   }
 }
 
-function getStatusBorderColor(pool: PoolData): string {
-  const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  if (needsPredictions) return 'border-l-[3px] border-l-warning-400'
-  return ''
-}
-
 function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check' | null; className: string; isButton: boolean } {
   if (pool.status === 'completed') return {
     label: 'Results',
@@ -173,30 +168,12 @@ function getPoolStatusText(pool: PoolData): string {
   return `${formatNumber(pool.total_points)} pts`
 }
 
-function getModeName(mode: string): string {
-  switch (mode) {
-    case 'full_tournament': return 'Full'
-    case 'progressive': return 'Progressive'
-    case 'bracket_picker': return 'Bracket'
-    default: return mode
-  }
-}
-
 function getStatusTagClass(status: string): string {
   return toneToTagClass(poolStatusDisplay({ status }).tone)
 }
 
 function getStatusLabel(status: string): string {
   return poolStatusDisplay({ status }).label
-}
-
-function getModeTagClass(mode: string): string {
-  switch (mode) {
-    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-500'
-    case 'progressive': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-    case 'bracket_picker': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-700'
-  }
 }
 
 function getFormDotColor(type: 'exact' | 'winner_gd' | 'winner' | 'miss'): string {
@@ -597,7 +574,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <Link
                         key={pool.pool_id}
                         href={`/pools/${pool.pool_id}`}
-                        className={`block rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        className={`block rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
                         style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* Branded accent strip */}
@@ -618,6 +595,16 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           className="md:hidden flex"
                           style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
                         >
+                          {/* Mode stripe — the 5px full-height bar on every pool card in
+                              the app. Branded pools get the brand banner above instead,
+                              so they skip it, exactly as PoolListItem does in RN. */}
+                          {!hasBranding && (
+                            <span
+                              aria-hidden="true"
+                              className="w-[5px] shrink-0"
+                              style={{ background: getModeStripe(pool.prediction_mode) }}
+                            />
+                          )}
                           <div className="flex-1 px-4 py-3.5">
                             {/* Header: name + tags + action pill */}
                             <div className="flex items-center justify-between gap-3 mb-3">
@@ -769,6 +756,13 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           className="hidden md:flex"
                           style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
                         >
+                          {!hasBranding && (
+                            <span
+                              aria-hidden="true"
+                              className="w-[5px] shrink-0"
+                              style={{ background: getModeStripe(pool.prediction_mode) }}
+                            />
+                          )}
                           <div className="flex-1 p-4">
                             {/* Header row */}
                             <div className="flex items-center justify-between gap-3 mb-2">

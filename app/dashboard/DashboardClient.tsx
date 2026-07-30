@@ -14,6 +14,7 @@ import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
+import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
 
 // =====================
 // TYPES
@@ -147,11 +148,6 @@ function formatDeadline(deadline: string | null) {
   }
 }
 
-function getStatusBorderColor(pool: PoolCardData): string {
-  const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  if (needsPredictions) return 'border-l-[3px] border-l-warning-400'
-  return ''
-}
 
 function getPoolStatusText(pool: PoolCardData): string {
   if (pool.total_points === 0 && !pool.has_submitted_predictions) return 'No results yet'
@@ -161,24 +157,6 @@ function getPoolStatusText(pool: PoolCardData): string {
   return `${formatNumber(pool.total_points)} pts`
 }
 
-
-function getModeName(mode: string): string {
-  switch (mode) {
-    case 'full_tournament': return 'Full'
-    case 'progressive': return 'Progressive'
-    case 'bracket_picker': return 'Bracket'
-    default: return mode
-  }
-}
-
-function getModeTagClass(mode: string): string {
-  switch (mode) {
-    case 'full_tournament': return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-500'
-    case 'progressive': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-    case 'bracket_picker': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-    default: return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-  }
-}
 
 function getStatusTagClass(status: string): string {
   return toneToTagClass(poolStatusDisplay({ status }).tone)
@@ -380,7 +358,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`w-56 h-full min-h-[9rem] rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
+      className={`w-56 h-full min-h-[9rem] rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface flex flex-col hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
     >
       {hasBranding && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
@@ -473,7 +451,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`block rounded-xl ${hasBranding ? '' : `border border-neutral-200 dark:border-border-default ${getStatusBorderColor(pool)}`} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
+      className={`block rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
       style={{ animationDelay: `${index * 0.06}s` }}
     >
       {hasBranding && (
