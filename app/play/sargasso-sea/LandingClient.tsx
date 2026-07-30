@@ -333,7 +333,7 @@ export default function SargassoSeaLandingPage({ players, memberCount, isMock }:
       <footer className="py-8 border-t border-neutral-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm text-neutral-400">
-            <span>&#9917;</span> Powered by <span className="font-semibold text-neutral-500">SportPool</span>
+            Powered by <span className="font-semibold text-neutral-500">SportPool</span>
           </p>
         </div>
       </footer>

@@ -23,8 +23,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         {/* Top — brand */}
-        <div className="relative z-10 grid grid-cols-[auto_1fr] gap-x-3 items-start">
-          <span className="text-4xl row-span-2">&#9917;</span>
+        <div className="relative z-10">
           <Wordmark size={30} mono />
           <p className="text-primary-200 dark:text-white/50 text-lg">FIFA World Cup 2026</p>
         </div>
@@ -68,8 +67,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         {/* Mobile-only brand header + tagline — pinned to top.
             Uses the real wordmark; the dark panel above cannot, because "Pool" is
             set in the brand blue and would disappear into a blue background. */}
-        <div className="lg:hidden px-6 pt-6 pb-4 grid grid-cols-[auto_1fr] gap-x-2 items-start">
-          <span className="text-3xl row-span-2">&#9917;</span>
+        <div className="lg:hidden px-6 pt-6 pb-4">
           <Wordmark size={24} />
           <p className="t-body text-muted">FIFA World Cup 2026</p>
         </div>

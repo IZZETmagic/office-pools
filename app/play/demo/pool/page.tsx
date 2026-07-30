@@ -84,7 +84,7 @@ export default function PoolDemoPage() {
       <footer className="py-6 border-t border-neutral-100 bg-white mt-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <p className="text-xs text-neutral-400">
-            ⚽ Powered by <span className="font-semibold text-neutral-500">SportPool</span>
+            Powered by <span className="font-semibold text-neutral-500">SportPool</span>
           </p>
           <Link href="/tv/demo" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
             📺 TV Leaderboard →

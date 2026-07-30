@@ -35,7 +35,6 @@ export default function Footer() {
               wordmark goes mono and inherits the bar's colour — the brand blue
               would not read against it. */}
           <span className="flex items-center gap-1.5 text-white dark:text-neutral-900 shrink-0">
-            <span className="text-sm">&#9917;</span>
             <Wordmark size={14} mono />
           </span>
           <nav className="flex items-center gap-4 text-xs">
