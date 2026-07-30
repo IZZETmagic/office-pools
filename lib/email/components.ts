@@ -213,10 +213,3 @@ export function scoreline(text: string): string {
       </td></tr>
     </table>`
 }
-
-/** A thin gold rule — the accent flourish from the RN app. */
-export function accentRule(): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
-      <tr><td style="background:${color('accent')};height:3px;line-height:3px;font-size:0;border-radius:${emailRadii.pill}px;width:44px;">&nbsp;</td></tr>
-    </table>`
-}

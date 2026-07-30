@@ -101,7 +101,6 @@ export function brandedTemplate(params: {
             </tr>
           </table>
         </td></tr>
-        <tr><td style="background:${color('accent')};height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
         <tr><td class="sp-pad" style="padding:32px;">
           <h1 class="${cls.heading}" style="margin:0 0 18px;color:${color('heading')};${FONT}font-size:${type.heading.size}px;line-height:${type.heading.lineHeight}px;font-weight:${weights.black};letter-spacing:-0.3px;">${heading}</h1>
           ${body}
