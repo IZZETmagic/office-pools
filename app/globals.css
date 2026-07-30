@@ -3,317 +3,304 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =============================================
-   THEME: CSS Custom Properties
+   SPORTPOOL DESIGN TOKENS
 
-   New palette (default) — 5 semantic families + 1 accent:
-   - Primary (Blue)    — brand, CTAs, links, active states
-   - Success (Emerald) — completed, correct, positive
-   - Danger  (Red)     — errors, live, misses, destructive
-   - Warning (Amber)   — caution, deadlines, active/draft
-   - Neutral (Slate)   — text, borders, backgrounds
-   - Accent  (Gold)    — exact predictions, bonuses, rewards
+   Ported from the React Native app. `mobile/theme/` is the design source of
+   truth for the whole product (app, web, email).
 
-   Classic palette — toggled via html.theme-classic class
-   Dark mode — toggled via html.dark class
+   These values are deliberately duplicated rather than imported: `mobile/**`
+   is listed in `.vercelignore`, so the directory does not exist in the
+   deployed bundle and any production import from web code would fail the
+   Vercel build. `lib/design/tokens.ts` holds the TypeScript mirror for JS
+   consumers, and `lib/design/__tests__/tokens.test.ts` imports the mobile
+   palette and asserts that both it and this file still match — test files
+   never ship, so the guard is free. Same pattern as `lib/email/brand.ts`.
+
+   RAMP CONVENTION: a higher step number always means more contrast against
+   the page background. In light mode 50 is the palest tint and 900 the
+   darkest; in dark mode that inverts, so 50 is the darkest tint and 900 the
+   lightest. Anchors that must not move without a matching change in
+   `mobile/theme/colors.ts`:
+
+     --primary-600  #3B6EFF  palette.primary  (brand blue, every CTA)
+     --success-600  #22C55E  palette.green
+     --danger-600   #EF4444  palette.red
+     --warning-500  #F59E0B  palette.amber
+     --accent-400   #F5C518  palette.accent   (gold: trophies, 1st place)
+
+   Dark mode is toggled via `html.dark` (see components/ThemeProvider.tsx).
+   There is no alternate palette — the `theme-classic` variant was retired
+   with the redesign, because maintaining four permutations guaranteed drift
+   from the app.
    ============================================= */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 
-  /* ---- Primary (Blue) ---- */
-  --primary-50:  oklch(0.97 0.014 254.6);
-  --primary-100: oklch(0.932 0.032 255.585);
-  --primary-200: oklch(0.882 0.059 254.128);
-  --primary-300: oklch(0.809 0.105 256);
-  --primary-400: oklch(0.715 0.165 258);
-  --primary-500: oklch(0.623 0.214 259.815);
-  --primary-600: oklch(0.546 0.245 262.881);
-  --primary-700: oklch(0.488 0.243 264.376);
-  --primary-800: oklch(0.424 0.199 265.638);
-  --primary-900: oklch(0.379 0.146 265.522);
+  /* The page sits on `snow`, cards sit on `surface` white. Nothing is
+     white-on-white: this two-layer background is what separates content,
+     because the shadows are deliberately almost invisible. */
+  --background: #F7F8FC;
+  --foreground: #1B2340;
 
-  /* ---- Success (Emerald — new palette) ---- */
-  --success-50:  oklch(0.979 0.021 166.113);
-  --success-100: oklch(0.95 0.052 163.051);
-  --success-200: oklch(0.905 0.093 164.15);
-  --success-300: oklch(0.845 0.143 164.978);
-  --success-400: oklch(0.765 0.155 163.5);
-  --success-500: oklch(0.696 0.17 162.48);
-  --success-600: oklch(0.596 0.145 163.225);
-  --success-700: oklch(0.508 0.118 165.612);
-  --success-800: oklch(0.432 0.095 166.913);
-  --success-900: oklch(0.365 0.075 168);
+  /* ---- Primary (brand blue) — anchored on palette.primary ---- */
+  --primary-50:  #F7F9FF;
+  --primary-100: #E8EEFF;
+  --primary-200: #CBD9FF;
+  --primary-300: #A3BCFF;
+  --primary-400: #7395FF;
+  --primary-500: #5280FF;
+  --primary-600: #3B6EFF;
+  --primary-700: #2B57D9;
+  --primary-800: #2244AB;
+  --primary-900: #1C3785;
 
-  /* ---- Danger (Red) ---- */
-  --danger-50:  oklch(0.971 0.013 17.38);
-  --danger-100: oklch(0.936 0.032 17.717);
-  --danger-200: oklch(0.885 0.062 18.334);
-  --danger-300: oklch(0.808 0.114 19.571);
-  --danger-400: oklch(0.704 0.191 22.216);
-  --danger-500: oklch(0.637 0.237 25.331);
-  --danger-600: oklch(0.577 0.245 27.325);
-  --danger-700: oklch(0.505 0.213 27.518);
-  --danger-800: oklch(0.444 0.177 26.899);
-  --danger-900: oklch(0.375 0.14 26);
+  /* ---- Success (green) — anchored on palette.green ---- */
+  --success-50:  #ECFDF5;
+  --success-100: #D3F9E3;
+  --success-200: #A8F0C6;
+  --success-300: #71E3A2;
+  --success-400: #45D47E;
+  --success-500: #2FCC6B;
+  --success-600: #22C55E;
+  --success-700: #1BA34D;
+  --success-800: #17803E;
+  --success-900: #135F2F;
 
-  /* ---- Warning (Amber — new palette) ---- */
-  --warning-50:  oklch(0.987 0.022 95.277);
-  --warning-100: oklch(0.962 0.059 95.617);
-  --warning-200: oklch(0.924 0.12 95.946);
-  --warning-300: oklch(0.879 0.169 91.605);
-  --warning-400: oklch(0.828 0.189 84.429);
-  --warning-500: oklch(0.769 0.188 70.08);
-  --warning-600: oklch(0.666 0.179 58.318);
-  --warning-700: oklch(0.555 0.163 48.998);
-  --warning-800: oklch(0.473 0.137 46.201);
-  --warning-900: oklch(0.395 0.11 43);
+  /* ---- Danger (red) — anchored on palette.red ---- */
+  --danger-50:  #FEF2F2;
+  --danger-100: #FDE3E3;
+  --danger-200: #FBC7C7;
+  --danger-300: #F79E9E;
+  --danger-400: #F47575;
+  --danger-500: #F15757;
+  --danger-600: #EF4444;
+  --danger-700: #CE2F2F;
+  --danger-800: #A62525;
+  --danger-900: #7F1D1D;
 
-  /* ---- Neutral (Slate — new palette) ---- */
-  --neutral-50:  oklch(0.984 0.003 247.858);
-  --neutral-100: oklch(0.968 0.007 247.896);
-  --neutral-200: oklch(0.929 0.013 255.508);
-  --neutral-300: oklch(0.869 0.022 252.894);
-  --neutral-400: oklch(0.704 0.04 256.788);
-  --neutral-500: oklch(0.554 0.046 257.417);
-  --neutral-600: oklch(0.446 0.043 257.281);
-  --neutral-700: oklch(0.372 0.044 257.287);
-  --neutral-800: oklch(0.279 0.041 260.031);
-  --neutral-900: oklch(0.208 0.042 265.755);
+  /* ---- Warning (amber) — anchored on palette.amber ---- */
+  --warning-50:  #FFFBEB;
+  --warning-100: #FEF3C7;
+  --warning-200: #FDE68A;
+  --warning-300: #FCD34D;
+  --warning-400: #FBBF24;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+  --warning-700: #B45309;
+  --warning-800: #92400E;
+  --warning-900: #78350F;
 
-  /* ---- Accent (Gold — new palette) ---- */
-  --accent-50:  #FDF8E8;
-  --accent-100: #FAF0C8;
-  --accent-300: #F0D060;
-  --accent-400: #E2B830;
-  --accent-500: #D4A017;
-  --accent-600: #B8880F;
-  --accent-700: #946F0E;
+  /* ---- Neutral — snow / mist / silver / slate / ink from the RN palette ---- */
+  --neutral-50:  #F7F8FC; /* palette.snow */
+  --neutral-100: #EEF1F8; /* palette.mist */
+  --neutral-200: #D4DAE8; /* palette.silver */
+  --neutral-300: #B6BED3;
+  --neutral-400: #99A3BD;
+  --neutral-500: #7B87A8; /* palette.slate */
+  --neutral-600: #636E8E;
+  --neutral-700: #4B5574;
+  --neutral-800: #333C5A;
+  --neutral-900: #1B2340; /* palette.ink */
+
+  /* ---- Accent (gold) — anchored on palette.accent ---- */
+  --accent-50:  #FFF8E1; /* palette.accentLight */
+  --accent-100: #FDEFC0;
+  --accent-200: #FBE28C;
+  --accent-300: #F8D451;
+  --accent-400: #F5C518; /* palette.accent */
+  --accent-500: #DCAE10;
+  --accent-600: #B98F0D;
+  --accent-700: #94720B;
+  --accent-800: #6F5608;
   --accent-900: #5C440A;
 
-  /* ---- Semantic Surface Tokens ---- */
-  --surface:           #ffffff;
-  --surface-secondary: oklch(0.984 0.003 247.858);
-  --surface-tertiary:  oklch(0.968 0.007 247.896);
-  --surface-inset:     oklch(0.929 0.013 255.508);
+  /* ---- Semantic surface tokens ---- */
+  --surface:           #FFFFFF; /* palette.surface */
+  --surface-secondary: #F7F8FC; /* palette.snow */
+  --surface-tertiary:  #EEF1F8; /* palette.mist */
+  --surface-inset:     #E4E9F4;
 
-  /* ---- Semantic Border Tokens ---- */
-  --border-default: oklch(0.929 0.013 255.508);
-  --border-subtle:  oklch(0.968 0.007 247.896);
-  --border-strong:  oklch(0.869 0.022 252.894);
+  /* ---- Semantic border tokens ---- */
+  --border-default: #D4DAE8; /* palette.silver */
+  --border-subtle:  #EEF1F8; /* palette.mist */
+  --border-strong:  #B6BED3;
+
+  /* ---- RN-native token names ----
+     A complete 1:1 mirror of `palette` in mobile/theme/colors.ts: every key,
+     kebab-cased, with the same value. Keeping it exhaustive means the RN
+     vocabulary is available verbatim on the web, `app/admin/super/sp-admin.css`
+     can consume it instead of keeping its own copy, and the drift test can
+     assert coverage of every mobile token rather than a hand-picked subset. */
+  --sp-snow:          #F7F8FC;
+  --sp-surface:       #FFFFFF;
+  --sp-mist:          #EEF1F8;
+  --sp-silver:        #D4DAE8;
+  --sp-slate:         #7B87A8;
+  --sp-ink:           #1B2340;
+  --sp-midnight:      #0B0F1A;
+
+  --sp-primary:       #3B6EFF;
+  --sp-primary-light: #F7F9FF;
+
+  --sp-accent:        #F5C518;
+  --sp-accent-light:  #FFF8E1;
+
+  --sp-green:         #22C55E;
+  --sp-green-light:   #ECFDF5;
+  --sp-red:           #EF4444;
+  --sp-red-light:     #FEF2F2;
+  --sp-amber:         #F59E0B;
+  --sp-amber-light:   #FFFBEB;
+
+  /* Prediction tiers and streaks are mode-invariant in the app — same values
+     in light and dark — so they are declared once here. */
+  --sp-tier-exact:     #E2B830;
+  --sp-tier-winner-gd: #52D660;
+  --sp-tier-winner:    #30B7FF;
+  --sp-tier-miss:      #A1A6A0;
+  --sp-hot-streak:     #F4C41B;
+  --sp-cold-streak:    #8DE2FF;
+  --sp-bronze:         #CD7F32;
 }
 
 /* =============================================
-   CLASSIC PALETTE OVERRIDE
-   Toggled via html.theme-classic class.
-   Maps semantic tokens back to original Tailwind colors.
-   ============================================= */
+   DARK MODE
+   Activated via html.dark. Values come from the `dark` half of
+   mobile/theme/colors.ts.
 
-html.theme-classic {
-  /* Primary stays Blue (same) */
-
-  /* Success → Green (original) */
-  --success-50:  oklch(0.982 0.018 155.826);
-  --success-100: oklch(0.962 0.044 156.743);
-  --success-200: oklch(0.925 0.084 155.995);
-  --success-300: oklch(0.871 0.15 154.449);
-  --success-400: oklch(0.795 0.185 152);
-  --success-500: oklch(0.723 0.219 149.579);
-  --success-600: oklch(0.627 0.194 149.214);
-  --success-700: oklch(0.527 0.154 150.069);
-  --success-800: oklch(0.448 0.119 151.328);
-  --success-900: oklch(0.375 0.095 152);
-
-  /* Danger stays Red (same) */
-
-  /* Warning → Yellow (original) */
-  --warning-50:  oklch(0.987 0.026 102.212);
-  --warning-100: oklch(0.973 0.071 103.193);
-  --warning-200: oklch(0.945 0.129 101.726);
-  --warning-300: oklch(0.905 0.182 98.111);
-  --warning-400: oklch(0.852 0.199 91.936);
-  --warning-500: oklch(0.795 0.184 86.047);
-  --warning-600: oklch(0.681 0.162 75.834);
-  --warning-700: oklch(0.554 0.135 66.442);
-  --warning-800: oklch(0.476 0.114 61.907);
-  --warning-900: oklch(0.40 0.09 59);
-
-  /* Neutral → Gray (original) */
-  --neutral-50:  oklch(0.985 0 0);
-  --neutral-100: oklch(0.967 0.001 286.375);
-  --neutral-200: oklch(0.928 0.006 264.532);
-  --neutral-300: oklch(0.872 0.01 258.338);
-  --neutral-400: oklch(0.707 0.022 261.325);
-  --neutral-500: oklch(0.551 0.027 264.364);
-  --neutral-600: oklch(0.446 0.03 256.802);
-  --neutral-700: oklch(0.373 0.034 259.733);
-  --neutral-800: oklch(0.278 0.033 256.848);
-  --neutral-900: oklch(0.21 0.034 264.665);
-
-  /* Accent → Purple (original) */
-  --accent-50:  oklch(0.977 0.014 308.299);
-  --accent-100: oklch(0.946 0.033 307.174);
-  --accent-300: oklch(0.82 0.12 306);
-  --accent-400: oklch(0.74 0.18 305);
-  --accent-500: oklch(0.627 0.265 303.9);
-  --accent-600: oklch(0.56 0.265 303);
-  --accent-700: oklch(0.496 0.265 301.924);
-  --accent-900: oklch(0.35 0.18 300);
-}
-
-/* =============================================
-   DARK MODE OVERRIDES
-   Activated via html.dark class.
+   Mobile's dark mode is nominal rather than audited — a number of RN
+   components still hardcode #FFFFFF — so treat light as canonical and verify
+   dark on its own terms rather than assuming parity.
    ============================================= */
 
 html.dark {
   color-scheme: dark;
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #121520; /* palette.snow.dark */
+  --foreground: #E8EAF0; /* palette.ink.dark */
 
-  /* ---- Surface ---- */
-  --surface:           oklch(0.17 0.02 260);
-  --surface-secondary: oklch(0.13 0.015 260);
-  --surface-tertiary:  oklch(0.21 0.02 260);
-  --surface-inset:     oklch(0.25 0.02 260);
-
-  /* ---- Border ---- */
-  --border-default: oklch(0.30 0.02 260);
-  --border-subtle:  oklch(0.22 0.015 260);
-  --border-strong:  oklch(0.38 0.025 260);
-
-  /* ---- Primary (slightly boosted for dark bg contrast) ---- */
-  --primary-50:  oklch(0.20 0.04 254);
-  --primary-100: oklch(0.25 0.06 255);
-  --primary-200: oklch(0.35 0.10 254);
-  --primary-300: oklch(0.45 0.14 256);
-  --primary-400: oklch(0.55 0.17 258);
-  --primary-500: oklch(0.65 0.20 259);
-  --primary-600: oklch(0.60 0.22 262);
-  --primary-700: oklch(0.55 0.23 264);
-  --primary-800: oklch(0.50 0.20 265);
-  --primary-900: oklch(0.45 0.16 265);
+  /* ---- Primary ---- */
+  --primary-50:  #16203A;
+  --primary-100: #1A2440; /* palette.primaryLight.dark */
+  --primary-200: #223056;
+  --primary-300: #2F4478;
+  --primary-400: #3F5CA8;
+  --primary-500: #4B76DC;
+  --primary-600: #5B8AFF; /* palette.primary.dark */
+  --primary-700: #7FA4FF;
+  --primary-800: #A3BEFF;
+  --primary-900: #C7D8FF;
 
   /* ---- Success ---- */
-  --success-50:  oklch(0.20 0.04 165);
-  --success-100: oklch(0.25 0.06 163);
-  --success-200: oklch(0.35 0.10 164);
-  --success-300: oklch(0.45 0.14 164);
-  --success-400: oklch(0.58 0.155 163);
-  --success-500: oklch(0.72 0.17 162);
-  --success-600: oklch(0.62 0.15 163);
-  --success-700: oklch(0.55 0.12 165);
-  --success-800: oklch(0.48 0.10 166);
-  --success-900: oklch(0.38 0.08 167);
+  --success-50:  #0F2A1A; /* palette.greenLight.dark */
+  --success-100: #14361F;
+  --success-200: #1A4A2A;
+  --success-300: #21663A;
+  --success-400: #29894C;
+  --success-500: #2FB260;
+  --success-600: #34D972; /* palette.green.dark */
+  --success-700: #5FE391;
+  --success-800: #8CEDB1;
+  --success-900: #B9F6D0;
 
   /* ---- Danger ---- */
-  --danger-50:  oklch(0.20 0.03 17);
-  --danger-100: oklch(0.25 0.05 17);
-  --danger-200: oklch(0.35 0.08 18);
-  --danger-300: oklch(0.45 0.12 19);
-  --danger-400: oklch(0.60 0.19 22);
-  --danger-500: oklch(0.68 0.23 25);
-  --danger-600: oklch(0.62 0.24 27);
-  --danger-700: oklch(0.55 0.21 27);
-  --danger-800: oklch(0.48 0.18 26);
-  --danger-900: oklch(0.38 0.14 25);
+  --danger-50:  #2A1010; /* palette.redLight.dark */
+  --danger-100: #3A1616;
+  --danger-200: #4E1D1D;
+  --danger-300: #6B2828;
+  --danger-400: #933838;
+  --danger-500: #C55252;
+  --danger-600: #F87171; /* palette.red.dark */
+  --danger-700: #FA9494;
+  --danger-800: #FCB7B7;
+  --danger-900: #FDD9D9;
 
   /* ---- Warning ---- */
-  --warning-50:  oklch(0.20 0.04 95);
-  --warning-100: oklch(0.25 0.06 95);
-  --warning-200: oklch(0.35 0.12 95);
-  --warning-300: oklch(0.45 0.17 91);
-  --warning-400: oklch(0.60 0.19 84);
-  --warning-500: oklch(0.80 0.19 70);
-  --warning-600: oklch(0.70 0.18 58);
-  --warning-700: oklch(0.60 0.16 48);
-  --warning-800: oklch(0.50 0.14 46);
-  --warning-900: oklch(0.40 0.11 43);
+  --warning-50:  #2A2210; /* palette.amberLight.dark */
+  --warning-100: #3A2F14;
+  --warning-200: #4E3F1A;
+  --warning-300: #6B5622;
+  --warning-400: #A88530;
+  --warning-500: #FBBF24; /* palette.amber.dark */
+  --warning-600: #FCCE52;
+  --warning-700: #FDD97C;
+  --warning-800: #FDE4A5;
+  --warning-900: #FEEFCF;
 
-  /* ---- Neutral (inverted for dark mode) ---- */
-  --neutral-50:  oklch(0.17 0.01 247);
-  --neutral-100: oklch(0.21 0.01 247);
-  --neutral-200: oklch(0.28 0.015 255);
-  --neutral-300: oklch(0.35 0.02 252);
-  --neutral-400: oklch(0.50 0.03 256);
-  --neutral-500: oklch(0.60 0.035 257);
-  --neutral-600: oklch(0.72 0.03 257);
-  --neutral-700: oklch(0.80 0.025 257);
-  --neutral-800: oklch(0.88 0.015 260);
-  --neutral-900: oklch(0.93 0.01 265);
+  /* ---- Neutral (inverted: 50 darkest, 900 lightest) ---- */
+  --neutral-50:  #121520; /* palette.snow.dark */
+  --neutral-100: #1C2030; /* palette.surface.dark */
+  --neutral-200: #232840; /* palette.mist.dark */
+  --neutral-300: #2E3448; /* palette.silver.dark */
+  --neutral-400: #5D6680;
+  --neutral-500: #8B97B8; /* palette.slate.dark */
+  --neutral-600: #AAB3CB;
+  --neutral-700: #C9CEDD;
+  --neutral-800: #DCE0EA;
+  --neutral-900: #E8EAF0; /* palette.ink.dark */
 
   /* ---- Accent ---- */
-  --accent-50:  oklch(0.20 0.04 85);
-  --accent-100: oklch(0.30 0.06 85);
-  --accent-300: oklch(0.55 0.10 85);
-  --accent-400: oklch(0.65 0.13 85);
-  --accent-500: oklch(0.78 0.16 85);
-  --accent-600: oklch(0.72 0.15 83);
-  --accent-700: oklch(0.65 0.14 80);
-  --accent-900: oklch(0.45 0.08 80);
-}
+  --accent-50:  #2A2210; /* palette.accentLight.dark */
+  --accent-100: #3A2F14;
+  --accent-200: #6B5622;
+  --accent-300: #B08E1D;
+  --accent-400: #F5C518; /* palette.accent.dark */
+  --accent-500: #F7D047;
+  --accent-600: #F9DA76;
+  --accent-700: #FAE4A5;
+  --accent-800: #FCEDC5;
+  --accent-900: #FDF4DE;
 
-/* Classic palette + dark mode combined overrides */
-html.theme-classic.dark {
-  /* Success → Green (dark mode) */
-  --success-50:  oklch(0.20 0.03 155);
-  --success-100: oklch(0.25 0.06 156);
-  --success-200: oklch(0.35 0.09 155);
-  --success-300: oklch(0.45 0.15 154);
-  --success-400: oklch(0.60 0.185 152);
-  --success-500: oklch(0.75 0.22 149);
-  --success-600: oklch(0.65 0.19 149);
-  --success-700: oklch(0.58 0.15 150);
-  --success-800: oklch(0.50 0.12 151);
-  --success-900: oklch(0.40 0.10 152);
+  /* ---- Semantic surface tokens ---- */
+  --surface:           #1C2030; /* palette.surface.dark */
+  --surface-secondary: #121520; /* palette.snow.dark */
+  --surface-tertiary:  #232840; /* palette.mist.dark */
+  --surface-inset:     #2E3448; /* palette.silver.dark */
 
-  /* Warning → Yellow (dark mode) */
-  --warning-50:  oklch(0.20 0.04 102);
-  --warning-100: oklch(0.25 0.07 103);
-  --warning-200: oklch(0.35 0.13 101);
-  --warning-300: oklch(0.45 0.18 98);
-  --warning-400: oklch(0.60 0.20 91);
-  --warning-500: oklch(0.82 0.18 86);
-  --warning-600: oklch(0.72 0.16 75);
-  --warning-700: oklch(0.60 0.14 66);
-  --warning-800: oklch(0.50 0.11 61);
-  --warning-900: oklch(0.40 0.09 59);
+  /* ---- Semantic border tokens ---- */
+  --border-default: #2E3448; /* palette.silver.dark */
+  --border-subtle:  #232840; /* palette.mist.dark */
+  --border-strong:  #5D6680;
 
-  /* Neutral → Gray (dark mode inverted) */
-  --neutral-50:  oklch(0.17 0.005 0);
-  --neutral-100: oklch(0.21 0.005 286);
-  --neutral-200: oklch(0.28 0.008 264);
-  --neutral-300: oklch(0.35 0.01 258);
-  --neutral-400: oklch(0.50 0.02 261);
-  --neutral-500: oklch(0.60 0.025 264);
-  --neutral-600: oklch(0.72 0.02 256);
-  --neutral-700: oklch(0.80 0.02 259);
-  --neutral-800: oklch(0.88 0.01 256);
-  --neutral-900: oklch(0.93 0.008 264);
+  /* ---- RN-native token names ---- */
+  --sp-snow:          #121520;
+  --sp-surface:       #1C2030;
+  --sp-mist:          #232840;
+  --sp-silver:        #2E3448;
+  --sp-slate:         #8B97B8;
+  --sp-ink:           #E8EAF0;
+  --sp-midnight:      #0B0F1A;
 
-  /* Accent → Purple (dark mode) */
-  --accent-50:  oklch(0.20 0.03 308);
-  --accent-100: oklch(0.28 0.05 307);
-  --accent-300: oklch(0.50 0.15 305);
-  --accent-400: oklch(0.58 0.20 304);
-  --accent-500: oklch(0.65 0.26 303);
-  --accent-600: oklch(0.60 0.26 302);
-  --accent-700: oklch(0.55 0.26 301);
-  --accent-900: oklch(0.38 0.15 300);
+  --sp-primary:       #5B8AFF;
+  --sp-primary-light: #1A2440;
+
+  --sp-accent:        #F5C518;
+  --sp-accent-light:  #2A2210;
+
+  --sp-green:         #34D972;
+  --sp-green-light:   #0F2A1A;
+  --sp-red:           #F87171;
+  --sp-red-light:     #2A1010;
+  --sp-amber:         #FBBF24;
+  --sp-amber-light:   #2A2210;
+  /* tier / streak / bronze are mode-invariant — inherited from :root */
 }
 
 /* =============================================
    TAILWIND v4 THEME TOKEN REGISTRATION
-   Maps CSS custom properties to Tailwind design tokens.
-   Generates utility classes: bg-primary-600, text-success-700, etc.
+   Maps the custom properties above onto Tailwind design tokens, generating
+   utilities like bg-primary-600, text-neutral-700, bg-surface, rounded-card.
    ============================================= */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 
+  /* Nunito is the app's only UI face. It was already being loaded in
+     layout.tsx but never rendered, because an `@layer base` rule pinned the
+     body to Arial — see the base layer below. */
+  --font-sans: var(--font-nunito);
+  --font-mono: var(--font-geist-mono);
 
   /* Primary */
   --color-primary-50:  var(--primary-50);
@@ -378,11 +365,13 @@ html.theme-classic.dark {
   /* Accent */
   --color-accent-50:  var(--accent-50);
   --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
   --color-accent-300: var(--accent-300);
   --color-accent-400: var(--accent-400);
   --color-accent-500: var(--accent-500);
   --color-accent-600: var(--accent-600);
   --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
   --color-accent-900: var(--accent-900);
 
   /* Surface */
@@ -396,6 +385,204 @@ html.theme-classic.dark {
   --color-border-subtle:  var(--border-subtle);
   --color-border-strong:  var(--border-strong);
 
+  /* RN-native names: bg-snow, text-ink, text-muted, border-silver, text-gold,
+     text-tier-exact, …
+     `slate` is exposed as `muted` and `accent` as `gold`, because Tailwind
+     already ships `slate-*` and `accent-*` scales and a bare `text-slate`
+     sitting beside `text-slate-500` reads as a typo. */
+  --color-snow:     var(--sp-snow);
+  --color-mist:     var(--sp-mist);
+  --color-silver:   var(--sp-silver);
+  --color-muted:    var(--sp-slate);
+  --color-ink:      var(--sp-ink);
+  --color-midnight: var(--sp-midnight);
+  --color-gold:     var(--sp-accent);
+
+  --color-tier-exact:     var(--sp-tier-exact);
+  --color-tier-winner-gd: var(--sp-tier-winner-gd);
+  --color-tier-winner:    var(--sp-tier-winner);
+  --color-tier-miss:      var(--sp-tier-miss);
+  --color-hot:            var(--sp-hot-streak);
+  --color-cold:           var(--sp-cold-streak);
+  --color-bronze:         var(--sp-bronze);
+
+  /* ---- STOCK TAILWIND PALETTE ALIASES ----
+     The redesign inherited roughly 4,100 hard-coded colour utilities
+     (bg-gray-100, text-slate-600, bg-green-500, …) spread over 116 files.
+     Re-pointing the stock scales at the SportPool palette brings all of them
+     onto the new colours without editing a single call site, and keeps them
+     dark-mode-correct for free.
+
+     This is a compatibility shim, not the intended API — new work should use
+     the semantic names above. If it ever needs backing out, deleting this one
+     block restores stock Tailwind colours everywhere. */
+
+  /* Neutral families → neutral ramp */
+  --color-gray-50:   var(--neutral-50);
+  --color-gray-100:  var(--neutral-100);
+  --color-gray-200:  var(--neutral-200);
+  --color-gray-300:  var(--neutral-300);
+  --color-gray-400:  var(--neutral-400);
+  --color-gray-500:  var(--neutral-500);
+  --color-gray-600:  var(--neutral-600);
+  --color-gray-700:  var(--neutral-700);
+  --color-gray-800:  var(--neutral-800);
+  --color-gray-900:  var(--neutral-900);
+  --color-gray-950:  var(--neutral-900);
+
+  --color-slate-50:  var(--neutral-50);
+  --color-slate-100: var(--neutral-100);
+  --color-slate-200: var(--neutral-200);
+  --color-slate-300: var(--neutral-300);
+  --color-slate-400: var(--neutral-400);
+  --color-slate-500: var(--neutral-500);
+  --color-slate-600: var(--neutral-600);
+  --color-slate-700: var(--neutral-700);
+  --color-slate-800: var(--neutral-800);
+  --color-slate-900: var(--neutral-900);
+  --color-slate-950: var(--neutral-900);
+
+  --color-zinc-50:   var(--neutral-50);
+  --color-zinc-100:  var(--neutral-100);
+  --color-zinc-200:  var(--neutral-200);
+  --color-zinc-300:  var(--neutral-300);
+  --color-zinc-400:  var(--neutral-400);
+  --color-zinc-500:  var(--neutral-500);
+  --color-zinc-600:  var(--neutral-600);
+  --color-zinc-700:  var(--neutral-700);
+  --color-zinc-800:  var(--neutral-800);
+  --color-zinc-900:  var(--neutral-900);
+  --color-zinc-950:  var(--neutral-900);
+
+  --color-stone-50:  var(--neutral-50);
+  --color-stone-100: var(--neutral-100);
+  --color-stone-200: var(--neutral-200);
+  --color-stone-300: var(--neutral-300);
+  --color-stone-400: var(--neutral-400);
+  --color-stone-500: var(--neutral-500);
+  --color-stone-600: var(--neutral-600);
+  --color-stone-700: var(--neutral-700);
+  --color-stone-800: var(--neutral-800);
+  --color-stone-900: var(--neutral-900);
+  --color-stone-950: var(--neutral-900);
+
+  /* Greens → success */
+  --color-green-50:  var(--success-50);
+  --color-green-100: var(--success-100);
+  --color-green-200: var(--success-200);
+  --color-green-300: var(--success-300);
+  --color-green-400: var(--success-400);
+  --color-green-500: var(--success-500);
+  --color-green-600: var(--success-600);
+  --color-green-700: var(--success-700);
+  --color-green-800: var(--success-800);
+  --color-green-900: var(--success-900);
+  --color-green-950: var(--success-900);
+
+  --color-emerald-50:  var(--success-50);
+  --color-emerald-100: var(--success-100);
+  --color-emerald-200: var(--success-200);
+  --color-emerald-300: var(--success-300);
+  --color-emerald-400: var(--success-400);
+  --color-emerald-500: var(--success-500);
+  --color-emerald-600: var(--success-600);
+  --color-emerald-700: var(--success-700);
+  --color-emerald-800: var(--success-800);
+  --color-emerald-900: var(--success-900);
+  --color-emerald-950: var(--success-900);
+
+  /* Reds → danger */
+  --color-red-50:  var(--danger-50);
+  --color-red-100: var(--danger-100);
+  --color-red-200: var(--danger-200);
+  --color-red-300: var(--danger-300);
+  --color-red-400: var(--danger-400);
+  --color-red-500: var(--danger-500);
+  --color-red-600: var(--danger-600);
+  --color-red-700: var(--danger-700);
+  --color-red-800: var(--danger-800);
+  --color-red-900: var(--danger-900);
+  --color-red-950: var(--danger-900);
+
+  --color-rose-50:  var(--danger-50);
+  --color-rose-100: var(--danger-100);
+  --color-rose-200: var(--danger-200);
+  --color-rose-300: var(--danger-300);
+  --color-rose-400: var(--danger-400);
+  --color-rose-500: var(--danger-500);
+  --color-rose-600: var(--danger-600);
+  --color-rose-700: var(--danger-700);
+  --color-rose-800: var(--danger-800);
+  --color-rose-900: var(--danger-900);
+  --color-rose-950: var(--danger-900);
+
+  /* Ambers → warning */
+  --color-amber-50:  var(--warning-50);
+  --color-amber-100: var(--warning-100);
+  --color-amber-200: var(--warning-200);
+  --color-amber-300: var(--warning-300);
+  --color-amber-400: var(--warning-400);
+  --color-amber-500: var(--warning-500);
+  --color-amber-600: var(--warning-600);
+  --color-amber-700: var(--warning-700);
+  --color-amber-800: var(--warning-800);
+  --color-amber-900: var(--warning-900);
+  --color-amber-950: var(--warning-900);
+
+  --color-yellow-50:  var(--warning-50);
+  --color-yellow-100: var(--warning-100);
+  --color-yellow-200: var(--warning-200);
+  --color-yellow-300: var(--warning-300);
+  --color-yellow-400: var(--warning-400);
+  --color-yellow-500: var(--warning-500);
+  --color-yellow-600: var(--warning-600);
+  --color-yellow-700: var(--warning-700);
+  --color-yellow-800: var(--warning-800);
+  --color-yellow-900: var(--warning-900);
+  --color-yellow-950: var(--warning-900);
+
+  /* Blues → primary */
+  --color-blue-50:  var(--primary-50);
+  --color-blue-100: var(--primary-100);
+  --color-blue-200: var(--primary-200);
+  --color-blue-300: var(--primary-300);
+  --color-blue-400: var(--primary-400);
+  --color-blue-500: var(--primary-500);
+  --color-blue-600: var(--primary-600);
+  --color-blue-700: var(--primary-700);
+  --color-blue-800: var(--primary-800);
+  --color-blue-900: var(--primary-900);
+  --color-blue-950: var(--primary-900);
+
+  --color-indigo-50:  var(--primary-50);
+  --color-indigo-100: var(--primary-100);
+  --color-indigo-200: var(--primary-200);
+  --color-indigo-300: var(--primary-300);
+  --color-indigo-400: var(--primary-400);
+  --color-indigo-500: var(--primary-500);
+  --color-indigo-600: var(--primary-600);
+  --color-indigo-700: var(--primary-700);
+  --color-indigo-800: var(--primary-800);
+  --color-indigo-900: var(--primary-900);
+  --color-indigo-950: var(--primary-900);
+
+  /* ---- Shape ----
+     mobile/theme/radii.ts. Deliberately NOT bound to Tailwind's own
+     --radius-lg / --radius-2xl, because that silently reshapes every existing
+     `rounded-*` in the app; components opt in by name instead. */
+  --radius-card:    24px; /* radii.lg  — cards, list rows, dialogs */
+  --radius-control: 18px; /* radii.md  — buttons, inputs, banners */
+  --radius-chip:    12px; /* radii.sm */
+  --radius-sheet:   32px; /* radii.xl  — bottom-sheet top corners */
+  --radius-pill:   999px; /* radii.pill */
+
+  /* ---- Elevation ----
+     mobile/theme/shadows.ts. These are much softer than they look wrong —
+     the app gets its separation from the snow/surface value step, not from
+     shadow, so resist the urge to deepen them. */
+  --shadow-card:          0 2px 10px rgb(0 0 0 / 0.04);
+  --shadow-card-elevated: 0 4px 16px rgb(0 0 0 / 0.08);
+
   /* Animations */
   --animate-fade-up: fadeUp 0.25s ease both;
   --animate-slide-in-right: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -408,8 +595,73 @@ html.theme-classic.dark {
   body {
     background: var(--background);
     color: var(--foreground);
-    font-family: Arial, Helvetica, sans-serif;
+    /* Nunito 500 is the app's body weight. Previously this line read
+       `Arial, Helvetica, sans-serif`, which silently defeated all three
+       webfonts the layout loads. */
+    font-family: var(--font-nunito), ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-weight: 500;
   }
+}
+
+/* =============================================
+   TYPOGRAPHY UTILITIES
+   A 1:1 port of the seven variants in mobile/theme/typography.ts, so a web
+   screen can be written against the same names as its RN counterpart.
+   ============================================= */
+
+@utility t-page-title {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 2rem;       /* 32 */
+  line-height: 2.375rem; /* 38 */
+}
+
+@utility t-section-header {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.25rem; /* 20 */
+  line-height: 1.5rem; /* 24 */
+}
+
+@utility t-card-title {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1rem;     /* 16 */
+  line-height: 1.25rem; /* 20 */
+}
+
+@utility t-body {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 0.875rem; /* 14 */
+  line-height: 1.25rem; /* 20 */
+}
+
+@utility t-caption {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.6875rem; /* 11 */
+  line-height: 0.875rem; /* 14 */
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+@utility t-detail {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 0.625rem;   /* 10 */
+  line-height: 0.8125rem; /* 13 */
+}
+
+/* Every number in the app — ranks, points, scores, levels — renders in a bold
+   monospace face (Menlo-Bold on iOS, `monospace` on Android). It is the single
+   most recognisable part of the type system, so it gets its own utility rather
+   than being reassembled at each call site. */
+@utility t-num {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 /* Hide scrollbar for tab navigation on mobile */
@@ -569,11 +821,6 @@ html.theme-classic.dark {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(40px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 /* Progress bar fill animation — uses custom property for target width */
 @keyframes barGrow {
   from { transform: scaleX(0); }
@@ -612,8 +859,8 @@ html.theme-classic.dark {
 
 /* Tournament Run – exact-score node pulsing glow */
 @keyframes exactGlow {
-  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
-  50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.4); }
+  0%, 100% { box-shadow: 0 0 8px rgb(from var(--accent-400) r g b / 0.4); }
+  50% { box-shadow: 0 0 22px rgb(from var(--accent-400) r g b / 0.4); }
 }
 
 /* Hot streak flame flicker */
@@ -625,7 +872,7 @@ html.theme-classic.dark {
 /* Journey path thin scrollbar */
 .journey-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #475569 transparent;
+  scrollbar-color: var(--neutral-400) transparent;
 }
 .journey-scrollbar::-webkit-scrollbar {
   height: 4px;
@@ -634,7 +881,7 @@ html.theme-classic.dark {
   background: transparent;
 }
 .journey-scrollbar::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: var(--neutral-400);
   border-radius: 2px;
 }
 
@@ -674,7 +921,10 @@ html.theme-classic.dark {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Match tab slide transitions */
+/* Match / journey slide transitions.
+   `slideInRight` was previously declared twice — once at 40px for the journey
+   path and again at 30px here, with the second silently winning. Now declared
+   once, at the 30px the app has actually been rendering. */
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(30px); }
   to { opacity: 1; transform: translateX(0); }

@@ -82,7 +82,7 @@ export default function PrivacyPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-2">Local Device Storage</h3>
                   <p>
-                    To improve your experience, we store a small amount of data in your browser&apos;s local storage: your chosen theme (<code className="text-sm">sport-pool-theme</code>), your light/dark color-mode preference (<code className="text-sm">sport-pool-color-mode</code>), and temporary backups of in-progress predictions (<code className="text-sm">predictions_backup_*</code>) so you don&apos;t lose work if you go offline or refresh the page. This data lives on your device only and is cleared when you clear your browser data.
+                    To improve your experience, we store a small amount of data in your browser&apos;s local storage: your light/dark color-mode preference (<code className="text-sm">sport-pool-color-mode</code>), and temporary backups of in-progress predictions (<code className="text-sm">predictions_backup_*</code>) so you don&apos;t lose work if you go offline or refresh the page. This data lives on your device only and is cleared when you clear your browser data.
                   </p>
                 </div>
                 <div>

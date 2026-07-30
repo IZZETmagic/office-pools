@@ -24,7 +24,9 @@ const nunito = Nunito({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#3b5bdb",
+  // palette.primary from mobile/theme/colors.ts. Keep in step with `theme_color` in
+  // public/manifest.json — these two paint the PWA/browser chrome.
+  themeColor: "#3B6EFF",
   viewportFit: "cover",
 };
 
@@ -77,9 +79,6 @@ export default function RootLayout({
         {/* Prevent flash-of-wrong-theme by reading localStorage before first paint */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
-            if (localStorage.getItem('sport-pool-theme') === 'classic') {
-              document.documentElement.classList.add('theme-classic');
-            }
             var cm = localStorage.getItem('sport-pool-color-mode');
             if (cm === 'dark' || (cm !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
               document.documentElement.classList.add('dark');

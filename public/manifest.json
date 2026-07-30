@@ -4,8 +4,8 @@
   "description": "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b5bdb",
+  "background_color": "#F7F8FC",
+  "theme_color": "#3B6EFF",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
