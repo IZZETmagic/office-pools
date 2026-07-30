@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
@@ -80,20 +81,18 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 flex flex-col dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 flex flex-col dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100">
-          <h2 id="join-pool-title" className="text-lg font-bold text-neutral-900">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border-subtle">
+          <h2 id="join-pool-title" className="t-card-title text-ink">
             {initialPoolName ? 'Join Pool' : 'Join a Pool'}
           </h2>
           <button
             onClick={() => !loading && onClose()}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
+            className="p-1.5 -mr-1.5 text-muted hover:text-ink hover:bg-mist rounded-pill transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40"
             aria-label="Close"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Icon name="xmark" size={18} weight="semibold" />
           </button>
         </div>
 
@@ -101,12 +100,12 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
         <div className="px-4 sm:px-6 py-4 sm:py-5">
           {initialPoolName ? (
             <>
-              <p className="text-sm text-neutral-600 mb-1">Would you like to join</p>
-              <p className="text-base font-semibold text-neutral-900">{initialPoolName}?</p>
+              <p className="t-body text-muted mb-1">Would you like to join</p>
+              <p className="t-card-title text-ink">{initialPoolName}?</p>
             </>
           ) : (
             <>
-              <p className="text-sm text-neutral-600 mb-4">Enter the pool code shared with you to join.</p>
+              <p className="t-body text-muted mb-4">Enter the pool code shared with you to join.</p>
 
               <FormField label="Pool Code">
                 <Input

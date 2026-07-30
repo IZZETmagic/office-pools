@@ -32,8 +32,24 @@ function isPoolMode(mode: string): mode is PoolMode {
   return mode in MODE_NAME
 }
 
+/** Short label, for pills and cards where space is tight. */
 export function getModeName(mode: string): string {
   return isPoolMode(mode) ? MODE_NAME[mode] : mode
+}
+
+/**
+ * Full label, for surfaces with room to spell it out — currently the invite/join
+ * page, which is often someone's first encounter with the product and should not
+ * greet them with "Bracket".
+ */
+const MODE_LONG_NAME: Record<PoolMode, string> = {
+  full_tournament: 'Full Tournament',
+  progressive: 'Progressive',
+  bracket_picker: 'Bracket Picker',
+}
+
+export function getModeLongName(mode: string): string {
+  return isPoolMode(mode) ? MODE_LONG_NAME[mode] : mode
 }
 
 export function getModeTagClass(mode: string): string {
