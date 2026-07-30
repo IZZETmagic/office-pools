@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email/send'
+import { brandedTemplate } from '@/lib/email/templates'
+import { dataRows, panel, paragraph, sectionLabel } from '@/lib/email/components'
 import { withPerfLogging } from '@/lib/api-perf'
 
 async function handlePOST(request: NextRequest) {
@@ -31,27 +33,27 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    const html = `
-      <div style="font-family: sans-serif; max-width: 600px;">
-        <h2 style="color: #1e293b;">New Contact Form Submission</h2>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; vertical-align: top; width: 80px;"><strong>Name:</strong></td>
-            <td style="padding: 8px 0; color: #1e293b;">${escapeHtml(name)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; vertical-align: top;"><strong>Email:</strong></td>
-            <td style="padding: 8px 0; color: #1e293b;">${escapeHtml(email)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; vertical-align: top;"><strong>Subject:</strong></td>
-            <td style="padding: 8px 0; color: #1e293b;">${escapeHtml(subject)}</td>
-          </tr>
-        </table>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
-        <div style="color: #1e293b; white-space: pre-wrap;">${escapeHtml(message)}</div>
-      </div>
-    `
+    // Internal notification to the support inbox — same shell as everything else, but
+    // `footer: 'none'` because nobody subscribed to this and an unsubscribe link on an
+    // ops email would be nonsense. Every interpolation stays escaped: this body is
+    // entirely attacker-controlled.
+    const html = brandedTemplate({
+      preheader: `${escapeHtml(name)}: ${escapeHtml(subject)}`,
+      heading: 'New contact form submission',
+      headerLabel: 'Contact',
+      footer: 'none',
+      body: `
+        ${panel(
+          dataRows([
+            { label: 'Name', value: escapeHtml(name) },
+            { label: 'Email', value: escapeHtml(email) },
+            { label: 'Subject', value: escapeHtml(subject) },
+          ])
+        )}
+        ${sectionLabel('Message')}
+        ${paragraph(escapeHtml(message).replace(/\n/g, '<br>'), { marginBottom: 0 })}
+      `,
+    })
 
     const result = await sendEmail({
       to: 'support@sportpool.io',

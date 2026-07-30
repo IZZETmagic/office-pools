@@ -1,115 +1,136 @@
+import {
+  type CalloutVariant,
+  cls,
+  color,
+  darkModeStyles,
+  emailRadii,
+  FONT_STACK,
+  type,
+  weights,
+} from './brand'
+import {
+  bulletList,
+  callout,
+  calloutLine,
+  calloutList,
+  codeChip,
+  dataRows,
+  greeting,
+  lead,
+  panel,
+  paragraph,
+  quoteBlock,
+  scoreline,
+  secondaryButton,
+  sectionLabel,
+  standingsTable,
+  statBlock,
+} from './components'
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
-export function baseTemplate(params: {
-  preheader: string
-  heading: string
-  body: string
-  ctaText?: string
-  ctaUrl?: string
-}): string {
-  const { preheader, heading, body, ctaText, ctaUrl } = params
+const FONT = `font-family:${FONT_STACK};`
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
-          ${body}
-          ${ctaText && ctaUrl ? `
-          <div style="text-align:center;margin:24px 0;">
-            <a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a>
-          </div>` : ''}
-        </td></tr>
-        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
-          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
-            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
-            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
-            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
-}
-
-// Branded email shell matching the RN app identity (mobile/theme + Wordmark/Splash):
-// two-tone "SportPool" wordmark in Nunito 900 on a midnight header, gold accent strip,
-// primary-blue CTA. Reusable — the legacy green `baseTemplate` above still backs the
-// older transactional emails; migrate them here one at a time.
-const BRAND = {
-  primary: '#3B6EFF', // palette.primary.light
-  primaryDark: '#5B8AFF', // palette.primary.dark — brighter, for the dark header
-  accent: '#F5C518', // palette.accent — champion gold
-  ink: '#1B2340', // palette.ink.light — headings
-  bodyText: '#3D4560', // navy-tinted body copy
-  slate: '#7B87A8', // palette.slate — muted / footer
-  midnight: '#0E1220', // header background (between palette.midnight & snow.dark)
-  snow: '#F7F8FC', // palette.snow.light — page background
-  hairline: '#EEF1F8', // palette.mist.light — borders
-} as const
-
-const BRAND_FONT =
-  "'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-
+/**
+ * The SportPool email shell — the RN app's identity in HTML: two-tone "SportPool"
+ * wordmark in Nunito 900 on a midnight header (matching mobile/components/ui/Wordmark.tsx
+ * with onDark), primary-blue CTA, tokens from ./brand.
+ *
+ * Light and dark both ship. Dark reaches Apple Mail, iOS Mail and Outlook macOS/iOS via
+ * prefers-color-scheme, and Outlook.com via [data-ogsc]. Gmail and Outlook for Windows
+ * ignore both and run their own force-invert over the inline light styles — nothing we
+ * can hook, so the light design stays the source of truth there.
+ *
+ * `unsubscribeUrl` exists for broadcast sends, which need Resend's
+ * {{{RESEND_UNSUBSCRIBE_URL}}} merge tag instead of the profile settings link.
+ */
 export function brandedTemplate(params: {
   preheader: string
   heading: string
   body: string
   ctaText?: string
   ctaUrl?: string
+  unsubscribeUrl?: string
+  /** Right-aligned label in the header band, e.g. "Support". */
+  headerLabel?: string
+  /**
+   * Which footer to render:
+   *  - `subscription` (default) — site link, notification settings, unsubscribe.
+   *  - `support` — a human reply, so it offers a reply prompt and NO unsubscribe.
+   *  - `none` — internal ops mail nobody subscribed to; wordmark only.
+   */
+  footer?: 'subscription' | 'support' | 'none'
 }): string {
-  const { preheader, heading, body, ctaText, ctaUrl } = params
+  const { preheader, heading, body, ctaText, ctaUrl, headerLabel } = params
+  const footer = params.footer ?? 'subscription'
+  const unsubscribeUrl = params.unsubscribeUrl || `${APP_URL}/profile?tab=settings`
+
+  // `sportClass` matters: on the footer the "Sport" half sits on the card, so it needs a
+  // dark hook or it stays near-black on a near-black surface. In the header it sits on the
+  // always-midnight band, so it is hard-white in both modes and takes no class.
+  const wordmark = (
+    size: number,
+    sportColor: string,
+    poolColor: string,
+    sportClass = ''
+  ) =>
+    `<span class="${sportClass}" style="${FONT}font-size:${size}px;line-height:${Math.round(size * 1.15)}px;font-weight:${weights.black};letter-spacing:-0.5px;color:${sportColor};">Sport<span class="${cls.wordmarkPool}" style="color:${poolColor};">Pool</span></span>`
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
-  <!-- Font import kept in its own block: clients that strip @import (Gmail) still keep the responsive rules below. Nunito falls back to the system stack everywhere it isn't supported. -->
-  <style>@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap');</style>
-  <style>
-    body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%;}
-    a{text-decoration:none;}
-    @media only screen and (max-width:600px){
-      .sp-container{width:100%!important;border-radius:0!important;}
-      .sp-pad{padding-left:24px!important;padding-right:24px!important;}
-    }
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <!-- Font import kept in its own block: clients that strip @import (Gmail) still keep the rules below. Nunito falls back to the system stack everywhere it isn't supported. -->
+  <style>@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;900&display=swap');</style>
+  <style>${darkModeStyles()}
   </style>
 </head>
-<body style="margin:0;padding:0;background:${BRAND.snow};font-family:${BRAND_FONT};">
+<body class="${cls.page}" style="margin:0;padding:0;background:${color('page')};${FONT}">
   <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</span>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.snow};padding:32px 16px;">
+  <table role="presentation" class="${cls.page}" width="100%" cellpadding="0" cellspacing="0" style="background:${color('page')};padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" class="sp-container" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.hairline};box-shadow:0 6px 20px rgba(27,35,64,0.08);">
-        <tr><td style="background:${BRAND.midnight};padding:28px 32px;text-align:center;">
-          <span style="font-family:${BRAND_FONT};font-size:26px;font-weight:900;letter-spacing:-0.5px;color:#FFFFFF;">Sport<span style="color:${BRAND.primaryDark};">Pool</span></span>
+      <table role="presentation" class="sp-container ${cls.card}" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;background:${color('surface')};border-radius:${emailRadii.md}px;overflow:hidden;border:1px solid ${color('hairline')};">
+        <tr><td style="background:${color('header')};padding:26px 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="text-align:${headerLabel ? 'left' : 'center'};">${wordmark(type.wordmark.size, '#FFFFFF', color('primary', 'dark'))}</td>
+              ${headerLabel ? `<td style="text-align:right;${FONT}color:${color('muted')};font-size:${type.caption.size}px;font-weight:${weights.bold};letter-spacing:1.2px;text-transform:uppercase;">${headerLabel}</td>` : ''}
+            </tr>
+          </table>
         </td></tr>
+        <tr><td style="background:${color('accent')};height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
         <tr><td class="sp-pad" style="padding:32px;">
-          <h1 style="margin:0 0 16px;color:${BRAND.ink};font-family:${BRAND_FONT};font-size:20px;font-weight:800;letter-spacing:-0.2px;">${heading}</h1>
+          <h1 class="${cls.heading}" style="margin:0 0 18px;color:${color('heading')};${FONT}font-size:${type.heading.size}px;line-height:${type.heading.lineHeight}px;font-weight:${weights.black};letter-spacing:-0.3px;">${heading}</h1>
           ${body}
-          ${ctaText && ctaUrl ? `
-          <div style="text-align:center;margin:28px 0 8px;">
-            <a href="${ctaUrl}" style="display:inline-block;padding:14px 36px;background:${BRAND.primary};color:#FFFFFF;font-family:${BRAND_FONT};font-weight:800;font-size:15px;border-radius:10px;box-shadow:0 4px 12px rgba(59,110,255,0.35);">${ctaText}</a>
-          </div>` : ''}
+          ${
+            ctaText && ctaUrl
+              ? `
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 8px;">
+            <tr><td class="${cls.cta}" style="background:${color('primary')};border-radius:${emailRadii.sm}px;">
+              <a href="${ctaUrl}" class="${cls.cta}" style="display:inline-block;${FONT}color:#FFFFFF;font-weight:${weights.black};font-size:15px;line-height:20px;padding:14px 36px;border-radius:${emailRadii.sm}px;">${ctaText}</a>
+            </td></tr>
+          </table>`
+              : ''
+          }
         </td></tr>
-        <tr><td class="sp-pad" style="padding:20px 32px 24px;border-top:1px solid ${BRAND.hairline};text-align:center;">
-          <p style="margin:0 0 6px;font-family:${BRAND_FONT};font-size:13px;font-weight:800;color:${BRAND.ink};">Sport<span style="color:${BRAND.primary};">Pool</span></p>
-          <p style="margin:0;color:${BRAND.slate};font-family:${BRAND_FONT};font-size:12px;line-height:1.6;">
-            <a href="${APP_URL}" style="color:${BRAND.slate};">sportpool.io</a> &middot;
-            <a href="${APP_URL}/profile?tab=settings" style="color:${BRAND.slate};">Notification Settings</a> &middot;
-            <a href="${APP_URL}/profile?tab=settings" style="color:${BRAND.slate};">Unsubscribe</a>
-          </p>
+        <tr><td class="sp-pad ${cls.hairline}" style="padding:20px 32px 26px;border-top:1px solid ${color('hairline')};text-align:center;">
+          <p style="margin:0 0 8px;">${wordmark(14, color('heading'), color('primary'), cls.heading)}</p>
+          ${
+            footer === 'none'
+              ? ''
+              : `<p class="${cls.muted}" style="margin:0;color:${color('muted')};${FONT}font-size:12px;line-height:20px;">
+            <a href="${APP_URL}" class="${cls.link}" style="color:${color('muted')};">sportpool.io</a> &middot;
+            ${
+              footer === 'support'
+                ? 'Need more help? Just reply to this email'
+                : `<a href="${APP_URL}/profile?tab=settings" class="${cls.link}" style="color:${color('muted')};">Notification Settings</a> &middot;
+            <a href="${unsubscribeUrl}" class="${cls.link}" style="color:${color('muted')};">Unsubscribe</a>`
+            }
+          </p>`
+          }
         </td></tr>
       </table>
     </td></tr>
@@ -117,6 +138,11 @@ export function brandedTemplate(params: {
 </body></html>`
 }
 
+/**
+ * Support replies. Same tokens and shell as everything else — it reads as support
+ * rather than as marketing through the header label and the reply-to footer, not
+ * through a different palette.
+ */
 export function supportTemplate(params: {
   preheader: string
   heading: string
@@ -126,44 +152,17 @@ export function supportTemplate(params: {
 }): string {
   const { preheader, heading, body, ctaText, ctaUrl } = params
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr><td style="background:#1e293b;padding:20px 32px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="text-align:left;">
-                <h1 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
-              </td>
-              <td style="text-align:right;">
-                <span style="color:#94a3b8;font-size:12px;font-weight:500;">Support</span>
-              </td>
-            </tr>
-          </table>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
-          ${body}
-          ${ctaText && ctaUrl ? `
-          <div style="text-align:center;margin:24px 0;">
-            <a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#1e293b;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a>
-          </div>` : ''}
-        </td></tr>
-        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
-          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
-            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
-            Need more help? Reply to this email
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
+  // A support reply is a human answering a question, not a subscription — so it carries
+  // a reply prompt and no unsubscribe link. `footer: 'support'` is what enforces that.
+  return brandedTemplate({
+    preheader,
+    heading,
+    body,
+    ctaText,
+    ctaUrl,
+    headerLabel: 'Support',
+    footer: 'support',
+  })
 }
 
 // --- Pool Activity Templates ---
@@ -177,13 +176,13 @@ export function poolJoinedTemplate(params: {
   const { userName, poolName, poolCode, poolUrl } = params
   return {
     subject: `Welcome to ${poolName}!`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You've joined ${poolName} - time to make your predictions!`,
       heading: `Welcome to ${poolName}!`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You've successfully joined the pool <strong>${poolName}</strong> (code: <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:13px;">${poolCode}</code>).</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Head over to the pool and start making your predictions before the deadline!</p>
+        ${greeting(userName)}
+        ${paragraph(`You've successfully joined the pool <strong>${poolName}</strong> (code: ${codeChip(poolCode)}).`)}
+        ${paragraph(`Head over to the pool and start making your predictions before the deadline!`)}
       `,
       ctaText: 'Make Predictions',
       ctaUrl: `${poolUrl}?tab=predictions`,
@@ -203,16 +202,14 @@ export function predictionsSubmittedTemplate(params: {
   const { userName, poolName, entryName, matchCount, poolUrl } = params
   return {
     subject: `Predictions submitted for ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Your predictions for ${entryName} in ${poolName} are locked in!`,
       heading: 'Predictions Submitted!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Your predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong> have been submitted successfully.</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#166534;margin:0;font-size:14px;"><strong>${matchCount}</strong> match predictions locked in</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Good luck!</p>
+        ${greeting(userName)}
+        ${paragraph(`Your predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong> have been submitted successfully.`)}
+        ${callout('success', calloutLine('success', `<strong>${matchCount}</strong> match predictions locked in`))}
+        ${paragraph('Good luck!', { marginBottom: 0 })}
       `,
       ctaText: 'View Pool',
       ctaUrl: poolUrl,
@@ -232,17 +229,15 @@ export function predictionsAutoSubmittedTemplate(params: {
   const isPartial = totalMatches > 0 && matchCount < totalMatches
   return {
     subject: `Your draft predictions were auto-submitted for ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `The deadline passed and your draft for ${entryName} was automatically submitted`,
       heading: 'Draft Auto-Submitted',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.</p>
-        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#92400e;margin:0;font-size:14px;"><strong>${matchCount}</strong> of <strong>${totalMatches}</strong> match predictions submitted${isPartial ? ' (partial)' : ''}</p>
-        </div>
-        ${isPartial ? '<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Matches without predictions will not earn any points.</p>' : ''}
-        <p style="color:#525252;line-height:1.6;margin:0;">Good luck!</p>
+        ${greeting(userName)}
+        ${paragraph(`The prediction deadline for <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.`)}
+        ${callout('warning', calloutLine('warning', `<strong>${matchCount}</strong> of <strong>${totalMatches}</strong> match predictions submitted${isPartial ? ' (partial)' : ''}`))}
+        ${isPartial ? paragraph('Matches without predictions will not earn any points.') : ''}
+        ${paragraph('Good luck!', { marginBottom: 0 })}
       `,
       ctaText: 'View Pool',
       ctaUrl: poolUrl,
@@ -258,22 +253,20 @@ export function deadlineReminderTemplate(params: {
   poolUrl: string
 }): { subject: string; html: string } {
   const { userName, poolName, deadline, unsubmittedEntries, poolUrl } = params
-  const entriesList = unsubmittedEntries
-    .map((e) => `<li style="color:#525252;padding:2px 0;">${e}</li>`)
-    .join('')
   return {
     subject: `Prediction deadline approaching for ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Less than 24 hours to submit your predictions for ${poolName}!`,
       heading: 'Deadline Approaching!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${poolName}</strong> is <strong>${deadline}</strong>.</p>
-        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#92400e;margin:0 0 8px;font-weight:600;">Unsubmitted entries:</p>
-          <ul style="margin:0;padding-left:20px;">${entriesList}</ul>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Don't miss out - submit your predictions now!</p>
+        ${greeting(userName)}
+        ${paragraph(`The prediction deadline for <strong>${poolName}</strong> is <strong>${deadline}</strong>.`)}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', 'Unsubmitted entries:', { bold: true, marginBottom: 8 })}
+           ${calloutList('warning', unsubmittedEntries)}`
+        )}
+        ${paragraph(`Don't miss out - submit your predictions now!`, { marginBottom: 0 })}
       `,
       ctaText: 'Submit Predictions',
       ctaUrl: `${poolUrl}?tab=predictions`,
@@ -295,33 +288,23 @@ export function matchResultTemplate(params: {
 }): { subject: string; html: string } {
   const { userName, homeTeam, awayTeam, homeScore, awayScore, entries, poolName, poolUrl } = params
   const scoreStr = `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`
-  const entriesHtml = entries
-    .map(
-      (e) => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;">${e.entryName}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;text-align:right;font-weight:600;">
-          ${e.pointsEarned > 0 ? `+${e.pointsEarned} pts` : '0 pts'}
-          ${e.isExact ? ' <span style="color:#16a34a;">&#10003; Exact</span>' : ''}
-        </td>
-      </tr>`
-    )
-    .join('')
 
   return {
     subject: `${scoreStr} - ${poolName} results`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${scoreStr} - see how your predictions did!`,
       heading: 'Match Result',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;margin:0 0 16px;">
-          <p style="margin:0;font-size:18px;font-weight:700;color:#171717;">${scoreStr}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's how your entries did in <strong>${poolName}</strong>:</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
-          ${entriesHtml}
-        </table>
+        ${greeting(userName)}
+        ${scoreline(scoreStr)}
+        ${paragraph(`Here's how your entries did in <strong>${poolName}</strong>:`)}
+        ${standingsTable(
+          entries.map((e) => ({
+            name: e.entryName,
+            value: `${e.pointsEarned > 0 ? `+${e.pointsEarned}` : '0'} pts${e.isExact ? ' &#10003; Exact' : ''}`,
+            valueVariant: e.isExact ? ('success' as const) : undefined,
+          }))
+        )}
       `,
       ctaText: 'View Results',
       ctaUrl: `${poolUrl}?tab=results`,
@@ -345,16 +328,18 @@ export function rankChangeTemplate(params: {
   const emoji = improved ? '&#x1F4C8;' : '&#x1F4C9;'
   return {
     subject: `${improved ? 'You moved up' : 'Rank update'} in ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${entryName}: #${oldRank} → #${newRank} in ${poolName}`,
       heading: `Rank Update ${emoji}`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Your entry <strong>${entryName}</strong> in <strong>${poolName}</strong> has ${improved ? 'moved up' : 'changed position'}:</p>
-        <div style="background:${improved ? '#f0fdf4' : '#fef2f2'};border:1px solid ${improved ? '#bbf7d0' : '#fecaca'};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0;font-size:24px;font-weight:700;color:${improved ? '#166534' : '#991b1b'};">#${oldRank} &rarr; #${newRank}</p>
-          <p style="margin:4px 0 0;color:#737373;font-size:13px;">${totalPoints} total points</p>
-        </div>
+        ${greeting(userName)}
+        ${paragraph(`Your entry <strong>${entryName}</strong> in <strong>${poolName}</strong> has ${improved ? 'moved up' : 'changed position'}:`)}
+        ${statBlock({
+          label: improved ? 'Moved up' : 'New position',
+          value: `#${oldRank} &rarr; #${newRank}`,
+          sub: `${totalPoints} total points`,
+          variant: improved ? 'success' : 'danger',
+        })}
       `,
       ctaText: 'View Leaderboard',
       ctaUrl: `${poolUrl}?tab=leaderboard`,
@@ -373,34 +358,25 @@ export function weeklyRecapTemplate(params: {
   poolUrl: string
 }): { subject: string; html: string } {
   const { userName, poolName, currentRank, totalPoints, weekPoints, totalEntrants, topFive, poolUrl } = params
-  const topFiveHtml = topFive
-    .map(
-      (e) => `
-      <tr>
-        <td style="padding:6px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;">#${e.rank}</td>
-        <td style="padding:6px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;">${e.entryName}</td>
-        <td style="padding:6px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;text-align:right;font-weight:600;">${e.points} pts</td>
-      </tr>`
-    )
-    .join('')
 
   return {
     subject: `Weekly recap: #${currentRank} in ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You're ranked #${currentRank} of ${totalEntrants} in ${poolName} this week`,
       heading: `Weekly Recap - ${poolName}`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 16px;">Here's your weekly standings update for <strong>${poolName}</strong>:</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:0 0 16px;">
-          <p style="margin:0;font-size:14px;color:#166534;">Your Rank</p>
-          <p style="margin:4px 0;font-size:28px;font-weight:700;color:#166534;">#${currentRank} <span style="font-size:14px;font-weight:400;">of ${totalEntrants}</span></p>
-          <p style="margin:4px 0 0;color:#737373;font-size:13px;">${totalPoints} total pts (+${weekPoints} this week)</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 8px;font-weight:600;">Top 5:</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
-          ${topFiveHtml}
-        </table>
+        ${greeting(userName)}
+        ${paragraph(`Here's your weekly standings update for <strong>${poolName}</strong>:`, { marginBottom: 16 })}
+        ${statBlock({
+          label: 'Your rank',
+          value: `#${currentRank} of ${totalEntrants}`,
+          sub: `${totalPoints} total pts (+${weekPoints} this week)`,
+          variant: 'success',
+        })}
+        ${sectionLabel('Top 5')}
+        ${standingsTable(
+          topFive.map((e) => ({ rank: `#${e.rank}`, name: e.entryName, value: `${e.points} pts` }))
+        )}
       `,
       ctaText: 'View Full Leaderboard',
       ctaUrl: `${poolUrl}?tab=leaderboard`,
@@ -419,13 +395,13 @@ export function predictionsUnlockedTemplate(params: {
   const { userName, poolName, entryName, poolUrl } = params
   return {
     subject: `Predictions unlocked in ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Your predictions for ${entryName} have been unlocked for editing`,
       heading: 'Predictions Unlocked',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">A pool admin has unlocked your predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong>.</p>
-        <p style="color:#525252;line-height:1.6;margin:0;">You can now edit and resubmit your predictions.</p>
+        ${greeting(userName)}
+        ${paragraph(`A pool admin has unlocked your predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong>.`)}
+        ${paragraph('You can now edit and resubmit your predictions.', { marginBottom: 0 })}
       `,
       ctaText: 'Edit Predictions',
       ctaUrl: `${poolUrl}?tab=predictions`,
@@ -440,13 +416,13 @@ export function memberRemovedTemplate(params: {
   const { userName, poolName } = params
   return {
     subject: `You've been removed from ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You are no longer a member of ${poolName}`,
       heading: 'Removed from Pool',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">A pool admin has removed you from <strong>${poolName}</strong>.</p>
-        <p style="color:#525252;line-height:1.6;margin:0;">If you believe this was a mistake, please contact the pool administrator.</p>
+        ${greeting(userName)}
+        ${paragraph(`A pool admin has removed you from <strong>${poolName}</strong>.`)}
+        ${paragraph('If you believe this was a mistake, please contact the pool administrator.', { marginBottom: 0 })}
       `,
       ctaText: 'Browse Pools',
       ctaUrl: `${APP_URL}/pools?tab=discover`,
@@ -467,15 +443,15 @@ export function poolArchivedTemplate(params: {
   const { userName, poolName, actorName, archiveUrl } = params
   return {
     subject: `${poolName} has been archived`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${actorName} archived ${poolName} — nothing has been deleted`,
       heading: 'Pool archived',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;"><strong>${actorName}</strong> archived <strong>${poolName}</strong>.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Nothing has been deleted. Every prediction, score and badge from that pool is still there, and we have moved it to Archived in your profile where you can still look through it.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">While it is archived it stops counting toward your trophies and your overall stats, so you may see those numbers drop. If a pool admin restores it, everything comes straight back.</p>
-        <p style="color:#525252;line-height:1.6;margin:0;">Only a pool admin can restore it.</p>
+        ${greeting(userName)}
+        ${paragraph(`<strong>${actorName}</strong> archived <strong>${poolName}</strong>.`)}
+        ${paragraph('Nothing has been deleted. Every prediction, score and badge from that pool is still there, and we have moved it to Archived in your profile where you can still look through it.')}
+        ${paragraph('While it is archived it stops counting toward your trophies and your overall stats, so you may see those numbers drop. If a pool admin restores it, everything comes straight back.')}
+        ${paragraph('Only a pool admin can restore it.', { marginBottom: 0 })}
       `,
       ctaText: 'View Archived Pools',
       ctaUrl: archiveUrl,
@@ -494,13 +470,13 @@ export function poolRestoredTemplate(params: {
   const { userName, poolName, actorName, poolUrl } = params
   return {
     subject: `${poolName} is back`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${actorName} restored ${poolName}`,
       heading: 'Pool restored',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;"><strong>${actorName}</strong> restored <strong>${poolName}</strong>, so it is active again.</p>
-        <p style="color:#525252;line-height:1.6;margin:0;">It counts toward your trophies and your overall stats again, exactly as it did before.</p>
+        ${greeting(userName)}
+        ${paragraph(`<strong>${actorName}</strong> restored <strong>${poolName}</strong>, so it is active again.`)}
+        ${paragraph('It counts toward your trophies and your overall stats again, exactly as it did before.', { marginBottom: 0 })}
       `,
       ctaText: 'Open Pool',
       ctaUrl: poolUrl,
@@ -517,17 +493,19 @@ export function deadlineChangedTemplate(params: {
   const { userName, poolName, newDeadline, poolUrl } = params
   return {
     subject: `Deadline updated for ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `The prediction deadline for ${poolName} has been changed`,
       heading: 'Deadline Updated',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${poolName}</strong> has been updated.</p>
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0;color:#1e40af;font-weight:600;">New Deadline</p>
-          <p style="margin:4px 0 0;color:#1e40af;font-size:16px;">${newDeadline}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Make sure your predictions are submitted before then!</p>
+        ${greeting(userName)}
+        ${paragraph(`The prediction deadline for <strong>${poolName}</strong> has been updated.`)}
+        ${callout(
+          'info',
+          `${calloutLine('info', 'New deadline', { bold: true, size: 11, marginBottom: 4 })}
+           ${calloutLine('info', newDeadline, { bold: true, size: 17 })}`,
+          { align: 'center' }
+        )}
+        ${paragraph('Make sure your predictions are submitted before then!', { marginBottom: 0 })}
       `,
       ctaText: 'View Pool',
       ctaUrl: poolUrl,
@@ -551,17 +529,18 @@ export function roundOpenTemplate(params: {
   })
   return {
     subject: `${roundName} predictions now open - ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${roundName} is ready! Make your predictions for ${matchCount} matches.`,
       heading: `${roundName} Predictions Open!`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The <strong>${roundName}</strong> is now open for predictions in <strong>${poolName}</strong>!</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#166534;margin:0 0 8px;font-size:14px;font-weight:600;">${matchCount} matches to predict</p>
-          <p style="color:#166534;margin:0;font-size:13px;">Deadline: ${deadlineFormatted}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Head over to the pool and make your predictions before the deadline!</p>
+        ${greeting(userName)}
+        ${paragraph(`The <strong>${roundName}</strong> is now open for predictions in <strong>${poolName}</strong>!`)}
+        ${callout(
+          'success',
+          `${calloutLine('success', `${matchCount} matches to predict`, { bold: true, marginBottom: 6 })}
+           ${calloutLine('success', `Deadline: ${deadlineFormatted}`, { size: 13 })}`
+        )}
+        ${paragraph('Head over to the pool and make your predictions before the deadline!', { marginBottom: 0 })}
       `,
       ctaText: 'Make Predictions',
       ctaUrl: poolUrl,
@@ -580,16 +559,14 @@ export function roundSubmittedTemplate(params: {
   const { userName, poolName, roundName, entryName, matchCount, poolUrl } = params
   return {
     subject: `${roundName} predictions submitted - ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Your ${roundName} predictions for ${entryName} in ${poolName} are locked in!`,
       heading: `${roundName} Predictions Submitted!`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Your <strong>${roundName}</strong> predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong> have been submitted.</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#166534;margin:0;font-size:14px;"><strong>${matchCount}</strong> match predictions locked in</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Good luck! Points will be awarded as matches complete.</p>
+        ${greeting(userName)}
+        ${paragraph(`Your <strong>${roundName}</strong> predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong> have been submitted.`)}
+        ${callout('success', calloutLine('success', `<strong>${matchCount}</strong> match predictions locked in`))}
+        ${paragraph('Good luck! Points will be awarded as matches complete.', { marginBottom: 0 })}
       `,
       ctaText: 'View Pool',
       ctaUrl: poolUrl,
@@ -609,16 +586,17 @@ export function roundAutoSubmittedTemplate(params: {
   const { userName, poolName, roundName, entryName, matchCount, totalRoundMatches, poolUrl } = params
   return {
     subject: `${roundName} predictions auto-submitted - ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Your draft ${roundName} predictions for ${entryName} were auto-submitted.`,
       heading: `${roundName} Auto-Submitted`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The deadline for <strong>${roundName}</strong> in <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.</p>
-        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#92400e;margin:0;font-size:14px;"><strong>${matchCount}</strong> of <strong>${totalRoundMatches}</strong> matches had predictions saved</p>
-          ${matchCount < totalRoundMatches ? `<p style="color:#92400e;margin:4px 0 0;font-size:13px;">Matches without predictions will score 0 points.</p>` : ''}
-        </div>
+        ${greeting(userName)}
+        ${paragraph(`The deadline for <strong>${roundName}</strong> in <strong>${poolName}</strong> has passed. Your draft predictions for <strong>${entryName}</strong> were automatically submitted.`)}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', `<strong>${matchCount}</strong> of <strong>${totalRoundMatches}</strong> matches had predictions saved`, { marginBottom: matchCount < totalRoundMatches ? 4 : 0 })}
+           ${matchCount < totalRoundMatches ? calloutLine('warning', 'Matches without predictions will score 0 points.', { size: 13 }) : ''}`
+        )}
       `,
       ctaText: 'View Pool',
       ctaUrl: poolUrl,
@@ -638,23 +616,25 @@ export function roundDeadlineReminderTemplate(params: {
   const deadlineFormatted = new Date(deadline).toLocaleString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
   })
-  const entriesList = unsubmittedEntries.map(e => `<li style="color:#92400e;font-size:13px;">${e}</li>`).join('')
   return {
     subject: `Reminder: ${roundName} predictions closing soon - ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Don't miss out! ${roundName} predictions close soon.`,
       heading: `${roundName} Deadline Approaching`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The <strong>${roundName}</strong> deadline for <strong>${poolName}</strong> is approaching.</p>
-        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#92400e;margin:0 0 8px;font-weight:600;">Deadline: ${deadlineFormatted}</p>
-          ${unsubmittedEntries.length > 0 ? `
-          <p style="color:#92400e;margin:0 0 4px;font-size:13px;">Unsubmitted entries:</p>
-          <ul style="margin:0;padding-left:20px;">${entriesList}</ul>
-          ` : ''}
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Submit your predictions before time runs out!</p>
+        ${greeting(userName)}
+        ${paragraph(`The <strong>${roundName}</strong> deadline for <strong>${poolName}</strong> is approaching.`)}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', `Deadline: ${deadlineFormatted}`, { bold: true, marginBottom: unsubmittedEntries.length > 0 ? 8 : 0 })}
+           ${
+             unsubmittedEntries.length > 0
+               ? `${calloutLine('warning', 'Unsubmitted entries:', { size: 13, marginBottom: 4 })}
+                  ${calloutList('warning', unsubmittedEntries)}`
+               : ''
+           }`
+        )}
+        ${paragraph('Submit your predictions before time runs out!', { marginBottom: 0 })}
       `,
       ctaText: 'Submit Predictions',
       ctaUrl: poolUrl,
@@ -680,9 +660,9 @@ export function allTeamsAnnouncementTemplate(params: {
       .map(
         (g) => `
         <td width="33%" style="padding:6px;vertical-align:top;">
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">
-            <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Group ${g.letter}</p>
-            ${g.teams.map((t) => `<p style="margin:0;padding:2px 0;color:#374151;font-size:13px;line-height:1.5;white-space:nowrap;"><img src="${t.flagUrl}" width="16" height="11" alt="" style="vertical-align:middle;margin-right:5px;border-radius:1px;" />${t.code}</p>`).join('')}
+          <div class="${cls.callout('neutral')}" style="background:${color('neutralBg')};border:1px solid ${color('hairline')};border-radius:${emailRadii.sm}px;padding:10px 12px;">
+            <p class="${cls.muted}" style="${FONT}margin:0 0 6px;font-size:11px;font-weight:${weights.bold};color:${color('primary')};text-transform:uppercase;letter-spacing:1.2px;white-space:nowrap;">Group ${g.letter}</p>
+            ${g.teams.map((t) => `<p class="${cls.body}" style="${FONT}margin:0;padding:2px 0;color:${color('body')};font-size:13px;line-height:20px;white-space:nowrap;"><img src="${t.flagUrl}" width="16" height="11" alt="" style="vertical-align:middle;margin-right:5px;border-radius:1px;" />${t.code}</p>`).join('')}
           </div>
         </td>`
       )
@@ -692,25 +672,26 @@ export function allTeamsAnnouncementTemplate(params: {
 
   return {
     subject: `The field is set — World Cup 2026 kicks off in ${daysUntilKickoff} days!`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `All 48 teams confirmed for FIFA World Cup 2026. ${daysUntilKickoff} days to go!`,
       heading: `All 48 Teams Are Confirmed!`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The wait is over — all <strong>48 teams</strong> for the FIFA World Cup 2026 have been decided. Here's the full draw:</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
+        ${greeting(userName)}
+        ${paragraph(`The wait is over — all <strong>48 teams</strong> for the FIFA World Cup 2026 have been decided. Here's the full draw:`)}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
           ${groupRows.join('')}
         </table>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0;font-size:14px;color:#166534;">Kickoff: <strong>June 11, 2026</strong></p>
-          <p style="margin:4px 0 0;font-size:24px;font-weight:700;color:#166534;">${daysUntilKickoff} days to go</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now is the perfect time to get ready. Whether you need to create a new pool, join one, or spread the word about yours — here's what to do:</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li><strong>New here?</strong> Create a pool and invite your group.</li>
-          <li><strong>Looking to join?</strong> Ask a friend for their pool code and jump in.</li>
-          <li><strong>Already in a pool?</strong> Share your pool code with friends, family, and coworkers — the more people, the more fun!</li>
-        </ul>
+        ${statBlock({
+          label: 'Kickoff: June 11, 2026',
+          value: `${daysUntilKickoff} days to go`,
+          variant: 'success',
+        })}
+        ${paragraph(`Now is the perfect time to get ready. Whether you need to create a new pool, join one, or spread the word about yours — here's what to do:`)}
+        ${bulletList([
+          `<strong>New here?</strong> Create a pool and invite your group.`,
+          `<strong>Looking to join?</strong> Ask a friend for their pool code and jump in.`,
+          `<strong>Already in a pool?</strong> Share your pool code with friends, family, and coworkers — the more people, the more fun!`,
+        ])}
       `,
       ctaText: 'Get Started',
       ctaUrl: dashboardUrl,
@@ -722,6 +703,8 @@ export function allTeamsAnnouncementTemplate(params: {
 
 export type CountdownMilestone = '60days' | '30days' | '14days' | '7days' | '1day'
 
+// The urgency ramp: calm green while there is time, amber as it tightens, red on the
+// eve. Previously three loose hexes per milestone; now one semantic variant.
 const COUNTDOWN_CONFIG: Record<
   CountdownMilestone,
   {
@@ -729,9 +712,7 @@ const COUNTDOWN_CONFIG: Record<
     preheader: (days: number) => string
     heading: string
     emoji: string
-    accentBg: string
-    accentBorder: string
-    accentText: string
+    variant: CalloutVariant
   }
 > = {
   '60days': {
@@ -739,102 +720,92 @@ const COUNTDOWN_CONFIG: Record<
     preheader: (d) => `FIFA World Cup 2026 kicks off in ${d} days. Create or join a pool now!`,
     heading: 'Two Months to Go!',
     emoji: '&#x1F3C6;',
-    accentBg: '#f0fdf4',
-    accentBorder: '#bbf7d0',
-    accentText: '#166534',
+    variant: 'success',
   },
   '30days': {
     subject: (d) => `One month to go — World Cup 2026 is almost here!`,
     preheader: (d) => `Just ${d} days until kickoff. Make sure your pool is ready!`,
     heading: 'One Month to Go!',
     emoji: '&#x26BD;',
-    accentBg: '#f0fdf4',
-    accentBorder: '#bbf7d0',
-    accentText: '#166534',
+    variant: 'success',
   },
   '14days': {
     subject: (d) => `Two weeks until kickoff — is your pool ready?`,
     preheader: (d) => `${d} days to go. Invite your friends before it's too late!`,
     heading: 'Two Weeks to Go!',
     emoji: '&#x1F525;',
-    accentBg: '#fffbeb',
-    accentBorder: '#fde68a',
-    accentText: '#92400e',
+    variant: 'warning',
   },
   '7days': {
     subject: (d) => `One week until the World Cup — predictions open soon!`,
     preheader: (d) => `Just ${d} days left. Get your pool and predictions ready!`,
     heading: 'One Week to Go!',
     emoji: '&#x1F6A8;',
-    accentBg: '#fffbeb',
-    accentBorder: '#fde68a',
-    accentText: '#92400e',
+    variant: 'warning',
   },
   '1day': {
     subject: () => `TOMORROW — FIFA World Cup 2026 kicks off!`,
     preheader: () => `It's almost here! Make sure your predictions are locked in.`,
     heading: "It's Tomorrow!",
     emoji: '&#x1F389;',
-    accentBg: '#fef2f2',
-    accentBorder: '#fecaca',
-    accentText: '#991b1b',
+    variant: 'danger',
   },
 }
 
 const COUNTDOWN_BODY: Record<CountdownMilestone, (params: { daysUntilKickoff: number; dashboardUrl: string }) => string> = {
   '60days': ({ daysUntilKickoff }) => `
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 is just <strong>${daysUntilKickoff} days away</strong> and the excitement is building! All 48 teams have been confirmed and the group stage draw is set.</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now's the time to rally your friends, family, and coworkers:</p>
-    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-      <li><strong>Create a pool</strong> and share the code with your group</li>
-      <li><strong>Join a pool</strong> if someone's already sent you a code</li>
-      <li><strong>Spread the word</strong> — the more people, the better the competition</li>
-    </ul>
+    ${greeting('{{{FIRST_NAME|there}}}')}
+    ${paragraph(`The FIFA World Cup 2026 is just <strong>${daysUntilKickoff} days away</strong> and the excitement is building! All 48 teams have been confirmed and the group stage draw is set.`)}
+    ${paragraph(`Now's the time to rally your friends, family, and coworkers:`)}
+    ${bulletList([
+      `<strong>Create a pool</strong> and share the code with your group`,
+      `<strong>Join a pool</strong> if someone's already sent you a code`,
+      `<strong>Spread the word</strong> — the more people, the better the competition`,
+    ])}
   `,
 
   '30days': ({ daysUntilKickoff }) => `
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Can you believe it? The World Cup is just <strong>${daysUntilKickoff} days away</strong>. We're counting down and we hope you are too!</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's what to do next:</p>
-    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-      <li><strong>Share your pool code</strong> with anyone who hasn't joined yet</li>
-      <li><strong>Check the groups</strong> — start thinking about your predictions</li>
-      <li><strong>Create another pool</strong> for a different friend group or office</li>
-    </ul>
-    <p style="color:#525252;line-height:1.6;margin:0;">Don't wait — the best pools are the ones that start early!</p>
+    ${greeting('{{{FIRST_NAME|there}}}')}
+    ${paragraph(`Can you believe it? The World Cup is just <strong>${daysUntilKickoff} days away</strong>. We're counting down and we hope you are too!`)}
+    ${paragraph(`Here's what to do next:`)}
+    ${bulletList([
+      `<strong>Share your pool code</strong> with anyone who hasn't joined yet`,
+      `<strong>Check the groups</strong> — start thinking about your predictions`,
+      `<strong>Create another pool</strong> for a different friend group or office`,
+    ])}
+    ${paragraph(`Don't wait — the best pools are the ones that start early!`, { marginBottom: 0 })}
   `,
 
   '14days': ({ daysUntilKickoff }) => `
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">We're just <strong>${daysUntilKickoff} days</strong> from the biggest World Cup in history. 48 teams. 3 host nations. This is going to be special.</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's your checklist:</p>
-    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-      <li>Last call to <strong>invite friends</strong> to your pools</li>
-      <li>Group Stage predictions will <strong>open soon</strong></li>
-      <li>Start doing your <strong>homework on the groups</strong></li>
-    </ul>
+    ${greeting('{{{FIRST_NAME|there}}}')}
+    ${paragraph(`We're just <strong>${daysUntilKickoff} days</strong> from the biggest World Cup in history. 48 teams. 3 host nations. This is going to be special.`)}
+    ${paragraph(`Here's your checklist:`)}
+    ${bulletList([
+      `Last call to <strong>invite friends</strong> to your pools`,
+      `Group Stage predictions will <strong>open soon</strong>`,
+      `Start doing your <strong>homework on the groups</strong>`,
+    ])}
   `,
 
   '7days': ({ daysUntilKickoff }) => `
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 16px;"><strong>${daysUntilKickoff} days.</strong> That's it. The World Cup is almost here.</p>
-    <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 16px;">
-      <p style="color:#171717;margin:0 0 8px;font-weight:600;">Your pre-kickoff checklist:</p>
-      <p style="color:#525252;margin:0;font-size:14px;line-height:1.8;">&#9744; Invite any last friends<br/>&#9744; Make your Group Stage predictions when they open<br/>&#9744; Clear your schedule for June 11!</p>
-    </div>
+    ${greeting('{{{FIRST_NAME|there}}}')}
+    ${paragraph(`<strong>${daysUntilKickoff} days.</strong> That's it. The World Cup is almost here.`, { marginBottom: 16 })}
+    ${panel(
+      `${sectionLabel('Your pre-kickoff checklist')}
+       ${paragraph(`&#9744; Invite any last friends<br/>&#9744; Make your Group Stage predictions when they open<br/>&#9744; Clear your schedule for June 11!`, { marginBottom: 0 })}`
+    )}
   `,
 
   '1day': () => `
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;font-size:16px;"><strong>IT'S ALMOST HERE.</strong></p>
-    <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 kicks off <strong>tomorrow, June 11th</strong>. 48 teams. 104 matches. One champion.</p>
-    <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-      <li>Double-check your <strong>Group Stage predictions</strong></li>
-      <li>Share your pool code one last time — the more the merrier</li>
-      <li>Get ready for the beautiful game</li>
-    </ul>
-    <p style="color:#525252;line-height:1.6;margin:0;">See you on the pitch. &#x26BD;</p>
+    ${greeting('{{{FIRST_NAME|there}}}')}
+    ${lead(`IT'S ALMOST HERE.`, { marginBottom: 12 })}
+    ${paragraph(`The FIFA World Cup 2026 kicks off <strong>tomorrow, June 11th</strong>. 48 teams. 104 matches. One champion.`)}
+    ${bulletList([
+      `Double-check your <strong>Group Stage predictions</strong>`,
+      `Share your pool code one last time — the more the merrier`,
+      `Get ready for the beautiful game`,
+    ])}
+    ${paragraph(`See you on the pitch. &#x26BD;`, { marginBottom: 0 })}
   `,
 }
 
@@ -849,15 +820,16 @@ export function countdownReminderTemplate(params: {
 
   return {
     subject: config.subject(daysUntilKickoff),
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: config.preheader(daysUntilKickoff),
       heading: `${config.emoji} ${config.heading}`,
       body: `
         ${bodyFn({ daysUntilKickoff, dashboardUrl })}
-        <div style="background:${config.accentBg};border:1px solid ${config.accentBorder};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0;font-size:14px;color:${config.accentText};">Kickoff: <strong>June 11, 2026</strong></p>
-          <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:${config.accentText};">${daysUntilKickoff} days</p>
-        </div>
+        ${statBlock({
+          label: 'Kickoff: June 11, 2026',
+          value: `${daysUntilKickoff} days`,
+          variant: config.variant,
+        })}
       `,
       ctaText: 'Go to Dashboard',
       ctaUrl: dashboardUrl,
@@ -896,12 +868,9 @@ export function pendingPredictionsReminderTemplate(params: {
         minute: '2-digit',
         timeZoneName: 'short',
       })
-      const urgencyColor =
-        p.daysLeft <= 1 ? '#991b1b' : p.daysLeft <= 3 ? '#92400e' : '#1e40af'
-      const urgencyBg =
-        p.daysLeft <= 1 ? '#fef2f2' : p.daysLeft <= 3 ? '#fffbeb' : '#eff6ff'
-      const urgencyBorder =
-        p.daysLeft <= 1 ? '#fecaca' : p.daysLeft <= 3 ? '#fde68a' : '#bfdbfe'
+      // Urgency ramp: blue while there is room, amber inside three days, red on the day.
+      const variant: CalloutVariant =
+        p.daysLeft <= 1 ? 'danger' : p.daysLeft <= 3 ? 'warning' : 'info'
       const daysText =
         p.daysLeft === 0
           ? 'Today!'
@@ -909,40 +878,39 @@ export function pendingPredictionsReminderTemplate(params: {
             ? '1 day left'
             : `${p.daysLeft} days left`
 
-      return `
-        <div style="background:${urgencyBg};border:1px solid ${urgencyBorder};border-radius:8px;padding:16px;margin:0 0 12px;">
-          <p style="margin:0 0 8px;font-weight:600;color:#171717;font-size:15px;">${p.poolName}</p>
-          <table style="width:100%;border-collapse:collapse;">
-            <tr>
-              <td style="color:#737373;font-size:13px;padding:2px 0;">Predictions remaining</td>
-              <td style="color:${urgencyColor};font-weight:600;font-size:13px;text-align:right;padding:2px 0;">${p.predictionsLeft} of ${p.totalPredictions}</td>
-            </tr>
-            <tr>
-              <td style="color:#737373;font-size:13px;padding:2px 0;">Deadline</td>
-              <td style="color:${urgencyColor};font-size:13px;text-align:right;padding:2px 0;">${deadlineFormatted}</td>
-            </tr>
-            <tr>
-              <td style="color:#737373;font-size:13px;padding:2px 0;">Time remaining</td>
-              <td style="color:${urgencyColor};font-weight:700;font-size:13px;text-align:right;padding:2px 0;">${daysText}</td>
-            </tr>
-          </table>
-          <div style="text-align:center;margin:12px 0 0;">
-            <a href="${p.poolUrl}" style="display:inline-block;padding:8px 20px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:13px;">Make Predictions</a>
-          </div>
-        </div>`
+      return callout(
+        variant,
+        `${calloutLine(variant, p.poolName, { bold: true, size: 16, marginBottom: 10 })}
+         ${dataRows([
+           {
+             label: 'Predictions remaining',
+             value: `${p.predictionsLeft} of ${p.totalPredictions}`,
+             valueVariant: variant,
+           },
+           { label: 'Deadline', value: deadlineFormatted, valueVariant: variant },
+           {
+             label: 'Time remaining',
+             value: daysText,
+             emphasis: true,
+             valueVariant: variant,
+           },
+         ])}
+         ${secondaryButton('Make Predictions', p.poolUrl)}`,
+        { marginBottom: 12 }
+      )
     })
     .join('')
 
   return {
     subject,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You have ${poolCount === 1 ? 'predictions' : `predictions in ${poolCount} pools`} that still need to be submitted!`,
       heading: 'Predictions Still Needed!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 16px;">You still have predictions to submit. Don't miss out on earning points!</p>
+        ${greeting(firstName)}
+        ${paragraph(`You still have predictions to submit. Don't miss out on earning points!`, { marginBottom: 16 })}
         ${poolRows}
-        <p style="color:#525252;line-height:1.6;margin:12px 0 0;">Submit your predictions before the deadline — any unsaved predictions won't earn points!</p>
+        ${paragraph(`Submit your predictions before the deadline — any unsaved predictions won't earn points!`, { marginBottom: 0 })}
       `,
     }),
   }
@@ -960,17 +928,14 @@ export function emptyPoolNudgeTemplate(params: {
   const { firstName, poolName, poolCode, dashboardUrl } = params
   return {
     subject: `Your pool "${poolName}" is waiting for members!`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You created ${poolName} — now it's time to invite people and get the competition started!`,
       heading: 'Your Pool Needs Players!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You created <strong>${poolName}</strong> — great start! But a pool is no fun without people to compete against.</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0 0 4px;color:#166534;font-size:13px;">Your pool code</p>
-          <p style="margin:0;font-size:24px;font-weight:700;color:#166534;letter-spacing:0.05em;">${poolCode}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Share this code with friends, family, or coworkers to get them in. The more people, the better the competition!</p>
+        ${greeting(firstName)}
+        ${paragraph(`You created <strong>${poolName}</strong> — great start! But a pool is no fun without people to compete against.`)}
+        ${statBlock({ label: 'Your pool code', value: poolCode, variant: 'success' })}
+        ${paragraph('Share this code with friends, family, or coworkers to get them in. The more people, the better the competition!')}
       `,
       ctaText: 'Go to Your Pool',
       ctaUrl: dashboardUrl,
@@ -988,17 +953,14 @@ export function soloPoolNudgeTemplate(params: {
   const { firstName, poolName, poolCode, dashboardUrl } = params
   return {
     subject: `You're the only one in "${poolName}" — invite your crew!`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${poolName} has one member (you!). Share your pool code and get the competition going.`,
       heading: "It's Lonely at the Top",
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're currently the only member of <strong>${poolName}</strong>. It's hard to have bragging rights with no one to brag to!</p>
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0 0 4px;color:#1e40af;font-size:13px;">Share your pool code</p>
-          <p style="margin:0;font-size:24px;font-weight:700;color:#1e40af;letter-spacing:0.05em;">${poolCode}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Text it to your group chat, drop it in Slack, or share it at the office. Pools are the most fun with 5+ people!</p>
+        ${greeting(firstName)}
+        ${paragraph(`You're currently the only member of <strong>${poolName}</strong>. It's hard to have bragging rights with no one to brag to!`)}
+        ${statBlock({ label: 'Share your pool code', value: poolCode, variant: 'info' })}
+        ${paragraph('Text it to your group chat, drop it in Slack, or share it at the office. Pools are the most fun with 5+ people!')}
       `,
       ctaText: 'Go to Your Pool',
       ctaUrl: dashboardUrl,
@@ -1016,18 +978,15 @@ export function smallPoolBoostTemplate(params: {
   const { firstName, poolName, memberCount, poolCode, dashboardUrl } = params
   return {
     subject: `"${poolName}" is growing — keep the momentum going!`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You've got ${memberCount} members in ${poolName}. A few more and you'll have a real competition!`,
       heading: 'Your Pool Is Growing!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Nice work — <strong>${poolName}</strong> now has <strong>${memberCount} members</strong>. You're building something fun!</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Pools really come alive with 8-10+ people. One more share could make all the difference:</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
-          <p style="margin:0 0 4px;color:#166534;font-size:13px;">Pool code</p>
-          <p style="margin:0;font-size:24px;font-weight:700;color:#166534;letter-spacing:0.05em;">${poolCode}</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">Send it to anyone who loves football — the more the merrier!</p>
+        ${greeting(firstName)}
+        ${paragraph(`Nice work — <strong>${poolName}</strong> now has <strong>${memberCount} members</strong>. You're building something fun!`)}
+        ${paragraph('Pools really come alive with 8-10+ people. One more share could make all the difference:')}
+        ${statBlock({ label: 'Pool code', value: poolCode, variant: 'success' })}
+        ${paragraph('Send it to anyone who loves football — the more the merrier!', { marginBottom: 0 })}
       `,
       ctaText: 'View Your Pool',
       ctaUrl: dashboardUrl,
@@ -1042,20 +1001,20 @@ export function startAPoolTemplate(params: {
   const { firstName, dashboardUrl } = params
   return {
     subject: 'Love being in a pool? Start your own!',
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You're already in a pool — now create one for your other group of friends, family, or coworkers!`,
       heading: 'Start Your Own Pool',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're already part of the action — but why stop at one pool?</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Create a pool for:</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li>Your <strong>office</strong> or work team</li>
-          <li>Your <strong>family</strong> group chat</li>
-          <li>Your <strong>fantasy league</strong> crew</li>
-          <li>Your <strong>local pub</strong> or sports bar</li>
-        </ul>
-        <p style="color:#525252;line-height:1.6;margin:0;">It only takes 30 seconds to set up. You'll be the commissioner!</p>
+        ${greeting(firstName)}
+        ${paragraph(`You're already part of the action — but why stop at one pool?`)}
+        ${paragraph('Create a pool for:')}
+        ${bulletList([
+          `Your <strong>office</strong> or work team`,
+          `Your <strong>family</strong> group chat`,
+          `Your <strong>fantasy league</strong> crew`,
+          `Your <strong>local pub</strong> or sports bar`,
+        ])}
+        ${paragraph(`It only takes 30 seconds to set up. You'll be the commissioner!`, { marginBottom: 0 })}
       `,
       ctaText: 'Create a Pool',
       ctaUrl: `${dashboardUrl}/pools/create`,
@@ -1070,18 +1029,18 @@ export function weMissYouTemplate(params: {
   const { firstName, dashboardUrl } = params
   return {
     subject: "The World Cup is coming — don't miss out!",
-    html: baseTemplate({
-      preheader: `You signed up for Sport Pool but haven't joined a pool yet. The World Cup is around the corner!`,
+    html: brandedTemplate({
+      preheader: `You signed up for SportPool but haven't joined a pool yet. The World Cup is around the corner!`,
       heading: "We Saved Your Spot",
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You created a Sport Pool account a while back but haven't joined a pool yet. The FIFA World Cup 2026 is getting closer and you don't want to miss the fun!</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's how to get started:</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li><strong>Got a pool code?</strong> Join an existing pool in seconds</li>
-          <li><strong>Want to run one?</strong> Create your own and invite friends</li>
-        </ul>
-        <p style="color:#525252;line-height:1.6;margin:0;">48 teams, 104 matches, and bragging rights on the line. Don't sit this one out.</p>
+        ${greeting(firstName)}
+        ${paragraph(`You created a SportPool account a while back but haven't joined a pool yet. The FIFA World Cup 2026 is getting closer and you don't want to miss the fun!`)}
+        ${paragraph(`Here's how to get started:`)}
+        ${bulletList([
+          `<strong>Got a pool code?</strong> Join an existing pool in seconds`,
+          `<strong>Want to run one?</strong> Create your own and invite friends`,
+        ])}
+        ${paragraph(`48 teams, 104 matches, and bragging rights on the line. Don't sit this one out.`, { marginBottom: 0 })}
       `,
       ctaText: 'Get Started',
       ctaUrl: dashboardUrl,
@@ -1096,18 +1055,18 @@ export function readyToJoinTemplate(params: {
   const { firstName, dashboardUrl } = params
   return {
     subject: 'Ready to join a pool? Here\'s how to get started',
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You signed up recently — now join or create a pool before the World Cup starts!`,
       heading: 'Time to Jump In!',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Welcome to Sport Pool! You've signed up — now it's time to get in on the action.</p>
-        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="color:#171717;margin:0 0 12px;font-weight:600;">Two ways to play:</p>
-          <p style="color:#525252;margin:0 0 8px;font-size:14px;"><strong>1. Join a pool</strong> — Ask a friend for their pool code and enter it on the dashboard</p>
-          <p style="color:#525252;margin:0;font-size:14px;"><strong>2. Create a pool</strong> — Set one up in 30 seconds and share the code with your group</p>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">The World Cup is coming — make sure you're part of the competition!</p>
+        ${greeting(firstName)}
+        ${paragraph(`Welcome to SportPool! You've signed up — now it's time to get in on the action.`)}
+        ${panel(
+          `${sectionLabel('Two ways to play')}
+           ${paragraph(`<strong>1. Join a pool</strong> — Ask a friend for their pool code and enter it on the dashboard`, { marginBottom: 8 })}
+           ${paragraph(`<strong>2. Create a pool</strong> — Set one up in 30 seconds and share the code with your group`, { marginBottom: 0 })}`
+        )}
+        ${paragraph(`The World Cup is coming — make sure you're part of the competition!`, { marginBottom: 0 })}
       `,
       ctaText: 'Go to Dashboard',
       ctaUrl: dashboardUrl,
@@ -1122,20 +1081,20 @@ export function pastPredictorHypeTemplate(params: {
   const { firstName, dashboardUrl } = params
   return {
     subject: "You've done this before — World Cup 2026 is calling",
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `You're a proven predictor. The World Cup is approaching — time to defend your honor!`,
       heading: 'The Prediction Pro Returns',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You've been here before — you know the thrill of nailing a prediction and watching your name climb the leaderboard.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 is around the corner, and this one is going to be <strong>bigger than ever</strong> — 48 teams, 104 matches, three host nations.</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's what you can do right now:</p>
-        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li><strong>Invite more people</strong> to your pools — bigger pool, bigger glory</li>
-          <li><strong>Create a new pool</strong> for a different group</li>
-          <li><strong>Study the groups</strong> — predictions open soon</li>
-        </ul>
-        <p style="color:#525252;line-height:1.6;margin:0;">You've got the experience. Time to put it to work.</p>
+        ${greeting(firstName)}
+        ${paragraph(`You've been here before — you know the thrill of nailing a prediction and watching your name climb the leaderboard.`)}
+        ${paragraph(`The FIFA World Cup 2026 is around the corner, and this one is going to be <strong>bigger than ever</strong> — 48 teams, 104 matches, three host nations.`)}
+        ${paragraph(`Here's what you can do right now:`)}
+        ${bulletList([
+          `<strong>Invite more people</strong> to your pools — bigger pool, bigger glory`,
+          `<strong>Create a new pool</strong> for a different group`,
+          `<strong>Study the groups</strong> — predictions open soon`,
+        ])}
+        ${paragraph(`You've got the experience. Time to put it to work.`, { marginBottom: 0 })}
       `,
       ctaText: 'Go to Dashboard',
       ctaUrl: dashboardUrl,
@@ -1161,16 +1120,16 @@ export function poolAdminFeedbackSurveyTemplate(params: {
       preheader: 'Six short questions on what worked, what didn\'t, and what we should build next.',
       heading: 'Help shape what comes next',
       body: `
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Thanks for running a pool this tournament — it doesn't happen without admins like you doing the legwork. Now that the dust has settled, I'd love your honest take.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Six short questions, about three minutes. The answers shape what gets built before the next tournament — and which sports we tackle next.</p>
-        <ul style="color:#3D4560;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li>What took the most work?</li>
-          <li>What worked well?</li>
-          <li>What was confusing or broken?</li>
-          <li>Would you run another pool with us?</li>
-        </ul>
-        <p style="color:#3D4560;line-height:1.6;margin:0;">Wild ideas, complaints, and kind words all welcome.</p>
+        ${greeting(firstName)}
+        ${paragraph(`Thanks for running a pool this tournament — it doesn't happen without admins like you doing the legwork. Now that the dust has settled, I'd love your honest take.`)}
+        ${paragraph(`Six short questions, about three minutes. The answers shape what gets built before the next tournament — and which sports we tackle next.`)}
+        ${bulletList([
+          `What took the most work?`,
+          `What worked well?`,
+          `What was confusing or broken?`,
+          `Would you run another pool with us?`,
+        ])}
+        ${paragraph(`Wild ideas, complaints, and kind words all welcome.`, { marginBottom: 0 })}
       `,
       ctaText: 'Take the survey',
       ctaUrl: POOL_ADMIN_FEEDBACK_SURVEY_URL,
@@ -1189,16 +1148,16 @@ export function playerFeedbackSurveyTemplate(params: {
       preheader: 'Five short questions on your favorite moment, biggest frustration, and what\'s next.',
       heading: 'What did you think?',
       body: `
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Thanks for playing this tournament. Hopefully you had as much fun making picks as we had building it.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Five short questions, about two minutes. Your answers help us decide what to fix, what to keep, and which tournament to do next.</p>
-        <ul style="color:#3D4560;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
-          <li>Favorite moment?</li>
-          <li>Biggest frustration?</li>
-          <li>Would you play again?</li>
-          <li>What sport would you want next?</li>
-        </ul>
-        <p style="color:#3D4560;line-height:1.6;margin:0;">Honest feedback is the best gift you can give a small team. Thanks in advance.</p>
+        ${greeting(firstName)}
+        ${paragraph(`Thanks for playing this tournament. Hopefully you had as much fun making picks as we had building it.`)}
+        ${paragraph(`Five short questions, about two minutes. Your answers help us decide what to fix, what to keep, and which tournament to do next.`)}
+        ${bulletList([
+          `Favorite moment?`,
+          `Biggest frustration?`,
+          `Would you play again?`,
+          `What sport would you want next?`,
+        ])}
+        ${paragraph(`Honest feedback is the best gift you can give a small team. Thanks in advance.`, { marginBottom: 0 })}
       `,
       ctaText: 'Take the survey',
       ctaUrl: PLAYER_FEEDBACK_SURVEY_URL,
@@ -1222,11 +1181,11 @@ export function poolAdminFollowupTemplate(params: {
       preheader: 'Already sent your feedback? Thank you. If not, the survey\'s still open — about 3 minutes.',
       heading: 'Thank you — and a quick reminder',
       body: `
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">The World Cup's wrapped, and pools like yours are the whole reason it was any fun. Running one is real work — chasing picks, fielding questions, keeping everyone honest — and it doesn't happen without admins like you. Thank you.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">A little while back we sent a short survey about what running your pool was actually like. <strong>If you already filled it out — genuinely, thank you.</strong> Those answers are exactly what we're using to decide what gets built before the next tournament.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;"><strong>If you haven't gotten to it yet, it's still open</strong> — six questions, about three minutes. Even a line or two makes a difference.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0;">Either way, thanks for being part of this one.</p>
+        ${greeting(firstName)}
+        ${paragraph(`The World Cup's wrapped, and pools like yours are the whole reason it was any fun. Running one is real work — chasing picks, fielding questions, keeping everyone honest — and it doesn't happen without admins like you. Thank you.`)}
+        ${paragraph(`A little while back we sent a short survey about what running your pool was actually like. <strong>If you already filled it out — genuinely, thank you.</strong> Those answers are exactly what we're using to decide what gets built before the next tournament.`)}
+        ${paragraph(`<strong>If you haven't gotten to it yet, it's still open</strong> — six questions, about three minutes. Even a line or two makes a difference.`)}
+        ${paragraph(`Either way, thanks for being part of this one.`, { marginBottom: 0 })}
       `,
       ctaText: 'Take the survey',
       ctaUrl: POOL_ADMIN_FEEDBACK_SURVEY_URL,
@@ -1245,11 +1204,11 @@ export function playerFollowupTemplate(params: {
       preheader: 'Already did the survey? Thank you. If not, it\'s still open — about 2 minutes.',
       heading: 'Thanks for playing — one last thing',
       body: `
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">That's a wrap on the World Cup. Thanks for making your picks and sticking it out to the final whistle — the whole thing is more fun with more people in it.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;">A bit ago we sent a quick survey — favorite moment, biggest frustration, what you'd want next. <strong>If you already sent yours back, thank you, truly</strong> — we've read every single one.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0 0 12px;"><strong>If you haven't yet, it's still open and takes about two minutes.</strong> Your answer genuinely shapes what we do next — including which tournament or sport comes after this one.</p>
-        <p style="color:#3D4560;line-height:1.6;margin:0;">Thanks either way. See you next tournament.</p>
+        ${greeting(firstName)}
+        ${paragraph(`That's a wrap on the World Cup. Thanks for making your picks and sticking it out to the final whistle — the whole thing is more fun with more people in it.`)}
+        ${paragraph(`A bit ago we sent a quick survey — favorite moment, biggest frustration, what you'd want next. <strong>If you already sent yours back, thank you, truly</strong> — we've read every single one.`)}
+        ${paragraph(`<strong>If you haven't yet, it's still open and takes about two minutes.</strong> Your answer genuinely shapes what we do next — including which tournament or sport comes after this one.`)}
+        ${paragraph(`Thanks either way. See you next tournament.`, { marginBottom: 0 })}
       `,
       ctaText: 'Take the survey',
       ctaUrl: PLAYER_FEEDBACK_SURVEY_URL,
@@ -1270,34 +1229,28 @@ export function pointsAdjustedTemplate(params: {
 }): { subject: string; html: string } {
   const { userName, poolName, entryName, adjustment, reason, newTotal, poolUrl } = params
   const sign = adjustment > 0 ? '+' : ''
-  const color = adjustment > 0 ? '#16a34a' : '#dc2626'
+  const adjustmentVariant: CalloutVariant = adjustment > 0 ? 'success' : 'danger'
   return {
     subject: `Points adjusted in ${poolName} (${sign}${adjustment})`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `Your points for ${entryName} in ${poolName} have been adjusted by ${sign}${adjustment}`,
       heading: 'Points Adjusted',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 16px;">A pool admin has adjusted your points for <strong>${entryName}</strong> in <strong>${poolName}</strong>.</p>
-        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 16px;">
-          <table style="width:100%;border-collapse:collapse;">
-            <tr>
-              <td style="color:#737373;font-size:13px;padding:4px 0;">Adjustment</td>
-              <td style="color:${color};font-weight:700;font-size:16px;text-align:right;padding:4px 0;">${sign}${adjustment} pts</td>
-            </tr>
-            <tr>
-              <td style="color:#737373;font-size:13px;padding:4px 0;">New Total</td>
-              <td style="color:#171717;font-weight:700;font-size:16px;text-align:right;padding:4px 0;">${newTotal} pts</td>
-            </tr>
-            <tr>
-              <td colspan="2" style="padding:8px 0 0;border-top:1px solid #e5e5e5;">
-                <p style="color:#737373;font-size:12px;margin:0 0 2px;">Reason</p>
-                <p style="color:#404040;font-size:14px;margin:0;">${reason}</p>
-              </td>
-            </tr>
-          </table>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0;">If you have questions about this adjustment, contact your pool admin.</p>
+        ${greeting(userName)}
+        ${paragraph(`A pool admin has adjusted your points for <strong>${entryName}</strong> in <strong>${poolName}</strong>.`, { marginBottom: 16 })}
+        ${panel(
+          `${dataRows([
+            { label: 'Adjustment', value: `${sign}${adjustment} pts`, emphasis: true, valueVariant: adjustmentVariant },
+            { label: 'New total', value: `${newTotal} pts`, emphasis: true },
+          ])}
+           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 0;">
+             <tr><td class="${cls.hairline}" style="border-top:1px solid ${color('hairline')};padding:10px 0 0;">
+               ${sectionLabel('Reason')}
+               ${paragraph(reason, { marginBottom: 0 })}
+             </td></tr>
+           </table>`
+        )}
+        ${paragraph('If you have questions about this adjustment, contact your pool admin.', { marginBottom: 0 })}
       `,
       ctaText: 'View Leaderboard',
       ctaUrl: `${poolUrl}?tab=leaderboard`,
@@ -1314,32 +1267,34 @@ export function bracketFixTemplate(params: {
   const { userName, poolName, entryName, poolUrl } = params
   return {
     subject: `Action needed: re-submit your knockout picks in ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `We aligned the bracket with FIFA's official schedule. Your group and R32 picks are safe; please re-do R16 through the final.`,
       heading: 'Bracket aligned with FIFA — please re-pick R16 onward',
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">A pool member spotted that our knockout-stage match numbers and pairings did not match FIFA's official 2026 World Cup schedule. We've corrected this so every match number, venue, and bracket route now matches FIFA exactly.</p>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="margin:0 0 8px;color:#15803d;font-size:14px;font-weight:600;">What's preserved for <strong>${entryName}</strong>:</p>
-          <ul style="margin:0;padding-left:20px;color:#166534;font-size:14px;line-height:1.6;">
-            <li>All your group-stage predictions</li>
-            <li>All your Round of 32 picks (the fixtures didn't change &mdash; just their match numbers)</li>
-          </ul>
-        </div>
-        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="margin:0 0 8px;color:#92400e;font-size:14px;font-weight:600;">What needs your attention:</p>
-          <p style="margin:0 0 8px;color:#78350f;font-size:14px;line-height:1.6;">Because the bracket routes changed, your picks for these rounds need to be re-submitted:</p>
-          <ul style="margin:0;padding-left:20px;color:#78350f;font-size:14px;line-height:1.6;">
-            <li>Round of 16</li>
-            <li>Quarter-finals</li>
-            <li>Semi-finals</li>
-            <li>Third-place match</li>
-            <li>Final</li>
-          </ul>
-        </div>
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The tournament starts June 11, so you have time to re-do those picks. Open your bracket and step through R16 onward whenever you're ready.</p>
-        <p style="color:#525252;line-height:1.6;margin:0;">Sorry for the inconvenience &mdash; we want every fixture, route, and Annex C third-place assignment to match FIFA's official bracket so scoring is fair.</p>
+        ${greeting(userName)}
+        ${paragraph(`A pool member spotted that our knockout-stage match numbers and pairings did not match FIFA's official 2026 World Cup schedule. We've corrected this so every match number, venue, and bracket route now matches FIFA exactly.`)}
+        ${callout(
+          'success',
+          `${calloutLine('success', `What's preserved for <strong>${entryName}</strong>:`, { bold: true, marginBottom: 8 })}
+           ${calloutList('success', [
+             'All your group-stage predictions',
+             `All your Round of 32 picks (the fixtures didn't change &mdash; just their match numbers)`,
+           ])}`
+        )}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', 'What needs your attention:', { bold: true, marginBottom: 8 })}
+           ${calloutLine('warning', 'Because the bracket routes changed, your picks for these rounds need to be re-submitted:', { size: 13, marginBottom: 8 })}
+           ${calloutList('warning', [
+             'Round of 16',
+             'Quarter-finals',
+             'Semi-finals',
+             'Third-place match',
+             'Final',
+           ])}`
+        )}
+        ${paragraph(`The tournament starts June 11, so you have time to re-do those picks. Open your bracket and step through R16 onward whenever you're ready.`)}
+        ${paragraph(`Sorry for the inconvenience &mdash; we want every fixture, route, and Annex C third-place assignment to match FIFA's official bracket so scoring is fair.`, { marginBottom: 0 })}
       `,
       ctaText: 'Update My Picks',
       ctaUrl: `${poolUrl}?tab=predictions`,
@@ -1358,15 +1313,13 @@ export function mentionNotificationTemplate(params: {
   const truncated = messageContent.length > 200 ? messageContent.slice(0, 200) + '...' : messageContent
   return {
     subject: `@${mentionerName} mentioned you in ${poolName}`,
-    html: baseTemplate({
+    html: brandedTemplate({
       preheader: `${mentionerName} mentioned you in the ${poolName} chat`,
       heading: `You were mentioned in ${poolName}`,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${recipientName},</p>
-        <p style="color:#525252;line-height:1.6;margin:0 0 16px;"><strong>${mentionerName}</strong> mentioned you in the <strong>${poolName}</strong> chat:</p>
-        <div style="background:#f5f5f5;border-left:3px solid #16a34a;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 16px;">
-          <p style="color:#404040;line-height:1.6;margin:0;font-size:14px;">${truncated}</p>
-        </div>
+        ${greeting(recipientName)}
+        ${paragraph(`<strong>${mentionerName}</strong> mentioned you in the <strong>${poolName}</strong> chat:`, { marginBottom: 16 })}
+        ${quoteBlock(truncated)}
       `,
       ctaText: 'View in Chat',
       ctaUrl: `${poolUrl}?tab=community`,

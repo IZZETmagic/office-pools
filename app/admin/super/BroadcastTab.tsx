@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { useToast } from '@/components/ui/Toast'
+import { brandedTemplate } from '@/lib/email/templates'
+import { greeting, paragraph } from '@/lib/email/components'
 
 const SEGMENTS = {
   all: { label: 'All Users', description: 'Every registered user' },
@@ -174,39 +176,22 @@ export function BroadcastTab() {
   const [previewHtml, setPreviewHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
 
+  // This builds the HTML that is both previewed and POSTed to /api/admin/broadcast —
+  // the route sends what it is given. It used to hold its own hand-copied shell, which
+  // is how broadcasts drifted a whole re-brand behind the transactional emails; it now
+  // calls the shared one so that cannot happen again.
   function buildHtml() {
-    const APP_URL = window.location.origin
-    return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <span style="display:none;max-height:0;overflow:hidden;">${subject}</span>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading || subject}</h2>
-          <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi {{{FIRST_NAME|there}}},</p>
-          <div style="color:#525252;line-height:1.6;">${body.replace(/\n/g, '<br>')}</div>
-          ${ctaText && ctaUrl ? `
-          <div style="text-align:center;margin:24px 0;">
-            <a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a>
-          </div>` : ''}
-        </td></tr>
-        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
-          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
-            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
-            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
-            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
+    return brandedTemplate({
+      preheader: subject,
+      heading: heading || subject,
+      body: `
+        ${greeting('{{{FIRST_NAME|there}}}')}
+        ${paragraph(body.replace(/\n/g, '<br>'), { marginBottom: 0 })}
+      `,
+      ctaText: ctaText || undefined,
+      ctaUrl: ctaUrl || undefined,
+      unsubscribeUrl: '{{{RESEND_UNSUBSCRIBE_URL}}}',
+    })
   }
 
   function selectPreset(preset: BroadcastPreset) {

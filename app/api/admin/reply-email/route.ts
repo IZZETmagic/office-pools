@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/send'
 import { supportTemplate } from '@/lib/email/templates'
+import { greeting, paragraph } from '@/lib/email/components'
 
 const SUPPORT_EMAIL = process.env.RESEND_SUPPORT_EMAIL || 'support@sportpool.io'
 
@@ -51,9 +52,9 @@ export async function POST(request: NextRequest) {
   const html = supportTemplate({
     preheader: body.subject,
     heading: body.subject.replace(/^Re:\s*/i, ''),
-    body: `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-      <div style="color:#525252;line-height:1.6;">${bodyHtml}</div>
-      <p style="color:#737373;line-height:1.6;margin:16px 0 0;font-size:13px;">— The Sport Pool Team</p>`,
+    body: `${greeting(firstName)}
+      ${paragraph(bodyHtml, { marginBottom: 16 })}
+      ${paragraph('— The SportPool Team', { marginBottom: 0 })}`,
   })
 
   // Preview mode — return HTML without sending, include resolved name

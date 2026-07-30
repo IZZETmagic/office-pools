@@ -3,8 +3,9 @@ import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/paginate'
 import { sendBatchEmails } from '@/lib/email/send'
+import { greeting, paragraph } from '@/lib/email/components'
 import {
-  baseTemplate,
+  brandedTemplate,
   supportTemplate,
   deadlineReminderTemplate,
   roundDeadlineReminderTemplate,
@@ -690,12 +691,12 @@ async function handleCustom(
 
   const emails: EmailPayload[] = recipients.map((r) => {
     const bodyHtml = (body.body_text as string).replace(/\n/g, '<br>')
-    const html = baseTemplate({
+    const html = brandedTemplate({
       preheader: body.subject,
       heading: body.heading || body.subject,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${r.firstName},</p>
-        <div style="color:#525252;line-height:1.6;">${bodyHtml}</div>
+        ${greeting(r.firstName)}
+        ${paragraph(bodyHtml, { marginBottom: 0 })}
       `,
       ctaText: body.cta_text || undefined,
       ctaUrl: body.cta_url || undefined,
@@ -843,9 +844,9 @@ async function handleSupportReply(
       preheader: body.subject,
       heading: body.heading || body.subject,
       body: `
-        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${firstName},</p>
-        <div style="color:#525252;line-height:1.6;">${bodyHtml}</div>
-        <p style="color:#737373;line-height:1.6;margin:16px 0 0;font-size:13px;">— The Sport Pool Team</p>
+        ${greeting(firstName)}
+        ${paragraph(bodyHtml, { marginBottom: 16 })}
+        ${paragraph('— The SportPool Team', { marginBottom: 0 })}
       `,
       ctaText: body.cta_text || undefined,
       ctaUrl: body.cta_url || undefined,
