@@ -1,6 +1,16 @@
+import { cn } from '@/lib/utils/cn'
+
+/**
+ * The RN card: white `surface` on the `snow` page, a 24px radius, and a shadow so
+ * soft it is nearly invisible. The separation comes from the surface/snow value
+ * step, not the shadow — deepening it is the most common way to make web stop
+ * looking like the app.
+ */
 type CardProps = {
   children: React.ReactNode
   padding?: 'md' | 'lg'
+  /** Hairline border instead of a shadow, matching Card's `bordered` prop in RN. */
+  bordered?: boolean
   className?: string
 }
 
@@ -9,9 +19,20 @@ const paddingClasses = {
   lg: 'p-8',
 }
 
-export function Card({ children, padding = 'md', className }: CardProps) {
+export function Card({ children, padding = 'md', bordered = false, className }: CardProps) {
   return (
-    <div className={`bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default ${paddingClasses[padding]} ${className ?? ''}`}>
+    <div
+      className={cn(
+        'bg-surface rounded-card',
+        // Shadows read as muddy smears on a dark surface, so dark mode swaps to a
+        // hairline — as the app does.
+        bordered
+          ? 'border border-silver/50'
+          : 'shadow-card dark:shadow-none dark:border dark:border-border-default',
+        paddingClasses[padding],
+        className,
+      )}
+    >
       {children}
     </div>
   )

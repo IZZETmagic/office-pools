@@ -1,5 +1,14 @@
 import { poolStatusDisplay, toneToBadgeVariant } from '@/lib/poolStatus'
+import { cn } from '@/lib/utils/cn'
 
+/**
+ * The RN pill: fully rounded, 11px bold, and a background that is the text colour
+ * composited at ~12% rather than a separate tint from the ramp. That one recipe
+ * covers every badge in the app — ADMIN, YOU, mode labels, status chips.
+ *
+ * Text sits on the -700 step so it stays legible on the tint in light mode and,
+ * because the ramps invert, in dark mode too.
+ */
 type BadgeVariant = 'blue' | 'green' | 'yellow' | 'gray' | 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
 
 type BadgeProps = {
@@ -9,19 +18,25 @@ type BadgeProps = {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  blue: 'bg-primary-100 text-primary-800',
-  green: 'bg-success-100 text-success-800',
-  yellow: 'bg-warning-100 text-warning-800',
-  gray: 'bg-neutral-100 text-neutral-700',
-  outline: 'border border-primary-500 text-neutral-700 bg-transparent',
-  'outline-green': 'border border-success-500 text-neutral-700 bg-transparent',
-  'outline-yellow': 'border border-warning-500 text-neutral-700 bg-transparent',
-  'outline-gray': 'border border-neutral-400 text-neutral-700 bg-transparent',
+  blue: 'bg-primary-600/12 text-primary-700',
+  green: 'bg-success-600/12 text-success-700',
+  yellow: 'bg-warning-500/15 text-warning-700',
+  gray: 'bg-mist text-muted',
+  outline: 'border border-primary-600/40 text-primary-700 bg-transparent',
+  'outline-green': 'border border-success-600/40 text-success-700 bg-transparent',
+  'outline-yellow': 'border border-warning-500/40 text-warning-700 bg-transparent',
+  'outline-gray': 'border border-silver text-muted bg-transparent',
 }
 
 export function Badge({ variant = 'blue', children, className }: BadgeProps) {
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-xl font-medium ${variantClasses[variant]} ${className ?? ''}`}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-bold whitespace-nowrap',
+        variantClasses[variant],
+        className,
+      )}
+    >
       {children}
     </span>
   )

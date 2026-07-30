@@ -338,7 +338,6 @@ export function Icon({
   const iconConstant = (solid ? SOLID_ICON_MAP[name] : undefined) ?? ICON_MAP[name] ?? CircleIcon
 
   if (process.env.NODE_ENV !== 'production' && !ICON_MAP[name] && !SOLID_ICON_MAP[name]) {
-    // eslint-disable-next-line no-console
     console.warn(`[Icon] No Hugeicons mapping for "${name}" — rendering fallback Circle.`)
   }
 

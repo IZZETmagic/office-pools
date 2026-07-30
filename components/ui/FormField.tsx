@@ -1,3 +1,12 @@
+import { cn } from '@/lib/utils/cn'
+
+/**
+ * Field label + help text.
+ *
+ * The label uses the RN `caption` type variant — 11px bold, uppercase, 1.5px
+ * tracking — which is what the app puts above every input. It reads much smaller
+ * than the old 14px sentence-case label; that is the intended change.
+ */
 type FormFieldProps = {
   label: string
   helperText?: string
@@ -9,14 +18,14 @@ type FormFieldProps = {
 export function FormField({ label, helperText, error, children, className }: FormFieldProps) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-neutral-700 mb-2">
+      <label className={cn('block t-caption text-muted mb-2')}>
         {label}
       </label>
       {children}
       {error ? (
-        <p className="text-xs text-danger-600 mt-1">{error}</p>
+        <p className="t-detail text-danger-600 mt-1.5">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-neutral-700 mt-1">{helperText}</p>
+        <p className="t-detail text-muted mt-1.5">{helperText}</p>
       ) : null}
     </div>
   )

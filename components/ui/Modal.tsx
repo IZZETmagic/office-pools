@@ -2,6 +2,9 @@
 
 import { useEffect, useCallback, type ReactNode } from 'react'
 
+import { cn } from '@/lib/utils/cn'
+import { Icon } from './Icon'
+
 type ModalSize = 'sm' | 'md' | 'lg' | 'full'
 
 type ModalProps = {
@@ -56,37 +59,35 @@ export function Modal({
       aria-modal="true"
       aria-labelledby={ariaId}
     >
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      {/* RN uses rgba(0,0,0,0.4–0.45) behind both sheets and dialogs. */}
+      <div className="fixed inset-0 bg-black/45" onClick={onClose} />
       <div
-        className={`relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl ${SIZE_CLASSES[size]} w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up ${className ?? ''}`}
+        className={cn(
+          // Bottom sheet on mobile with the app's 32px top corners; centred dialog
+          // with a 24px card radius from sm up.
+          'relative bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated',
+          SIZE_CLASSES[size],
+          'w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up',
+          className,
+        )}
       >
+        {/* Grabber — sheet affordance on mobile only, as in the app's sheets. */}
+        <div className="sm:hidden shrink-0 flex justify-center pt-2.5 pb-1">
+          <div className="h-1 w-9 rounded-full bg-silver/60" />
+        </div>
+
         {/* Header — rendered when a title string is provided */}
         {title && (
-          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default shrink-0">
-            <h2
-              id={ariaId}
-              className="text-lg font-bold text-neutral-900 dark:text-neutral-100"
-            >
+          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border-subtle shrink-0">
+            <h2 id={ariaId} className="t-card-title text-ink">
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-colors"
+              className="p-1.5 -mr-1.5 text-muted hover:text-ink hover:bg-mist rounded-pill transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40"
               aria-label="Close"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <Icon name="xmark" size={18} weight="semibold" />
             </button>
           </div>
         )}
