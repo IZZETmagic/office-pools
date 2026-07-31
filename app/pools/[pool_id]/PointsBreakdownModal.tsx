@@ -1079,7 +1079,11 @@ export function PointsBreakdownModal({
                   when the teams you sent through never arrived. Without this the
                   row reads as a plain miss rather than a bracket that broke. */}
               {d.predictedHomeTeam && (
-                <div className="flex items-center gap-1 ml-18 min-w-0">
+                /* ml-20 puts this under the Pred scoreline, not the column edge:
+                   the column is w-9 and the numerals are centred in it, so the
+                   column's own left edge sits ~7px left of the digits and read as
+                   misaligned. Measured at 112px against the scoreline's 111.4px. */
+                <div className="flex items-center gap-1 ml-20 min-w-0">
                   <Icon name="arrow.triangle.branch" size={11} weight="medium" className="shrink-0 text-warning-500" />
                   <span className="t-detail text-warning-500 truncate">
                     You predicted: {d.predictedHomeTeam} v {d.predictedAwayTeam}
