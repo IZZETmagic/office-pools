@@ -405,6 +405,8 @@ html.dark {
   --color-midnight: var(--sp-midnight);
   --color-gold:     var(--sp-accent);
 
+  --color-primary-light:  var(--sp-primary-light);
+
   --color-tier-exact:     var(--sp-tier-exact);
   --color-tier-winner-gd: var(--sp-tier-winner-gd);
   --color-tier-winner:    var(--sp-tier-winner);
