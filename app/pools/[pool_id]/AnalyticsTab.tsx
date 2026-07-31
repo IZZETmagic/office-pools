@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
+import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import {
   matchScoresToPredictionResults,
@@ -205,6 +206,58 @@ export function AnalyticsTab({
     if (!row) return undefined
     return Math.max(row.highest_level_reached ?? 1, row.current_level ?? 1)
   }, [entryStats, selectedEntryId])
+
+
+  /**
+   * Which teams THIS entry had reaching each knockout tie, resolved from their own
+   * bracket by the same resolver the scoring engine uses.
+   *
+   * In full-tournament and progressive pools the knockout fixtures are unknown at
+   * prediction time, so a row showing "Spain v Argentina" is the ACTUAL tie — it
+   * says nothing about who this entry thought would get there. This supplies the
+   * other half of that comparison, keyed by match number.
+   *
+   * bracket_picker has its own path (BPXPProgressSection) and is skipped.
+   */
+  const predictedKnockoutTeams = useMemo(() => {
+    if (isBracketPicker || entryPredictions.length === 0) return new Map<number, { home: string | null; away: string | null }>()
+
+    const predictionMap: PredictionMap = new Map()
+    for (const p of entryPredictions) {
+      predictionMap.set(p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null,
+        awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      })
+    }
+
+    const tournamentTeams: Team[] = teams.map(t => ({
+      team_id: t.team_id,
+      country_name: t.country_name,
+      country_code: t.country_code,
+      group_letter: t.group_letter,
+      fifa_ranking_points: t.fifa_ranking_points,
+      flag_url: t.flag_url,
+    }))
+
+    try {
+      const bracket = resolvePredictedBracket({ matches, predictionMap, teams: tournamentTeams })
+      const out = new Map<number, { home: string | null; away: string | null }>()
+      bracket.knockoutTeamMap.forEach((v, matchNumber) => {
+        out.set(matchNumber, {
+          home: v.home?.country_name ?? null,
+          away: v.away?.country_name ?? null,
+        })
+      })
+      return out
+    } catch {
+      // A malformed or partial bracket should cost the reader one column, not the
+      // whole Form tab.
+      return new Map<number, { home: string | null; away: string | null }>()
+    }
+  }, [isBracketPicker, entryPredictions, matches, teams])
 
   const xpBreakdown = useMemo(() => {
     if (isBracketPicker || !isEntrySubmitted || predictionResults.length === 0) return null
@@ -473,7 +526,7 @@ export function AnalyticsTab({
       {xpBreakdown && (
         <div>
           <SectionHeader emoji="⚡" title="XP Progression" />
-          <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} />
+          <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} predictedKnockoutTeams={predictedKnockoutTeams} />
         </div>
       )}
 

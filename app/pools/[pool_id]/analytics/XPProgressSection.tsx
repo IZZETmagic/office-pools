@@ -22,6 +22,8 @@ type XPProgressSectionProps = {
   poolStats: PoolWideStats
   entryPredictions: PredictionData[]
   predictionResults: PredictionResult[]
+  /** match_number -> the teams THIS entry had in that knockout tie. */
+  predictedKnockoutTeams?: Map<number, { home: string | null; away: string | null }>
 }
 
 // =============================================
@@ -873,11 +875,13 @@ function MatchResultsSection({
   crowdData,
   entryPredictions,
   predictionResults,
+  predictedKnockoutTeams,
 }: {
   matchXP: MatchXP[]
   crowdData: CrowdMatch[]
   entryPredictions: PredictionData[]
   predictionResults: PredictionResult[]
+  predictedKnockoutTeams?: Map<number, { home: string | null; away: string | null }>
 }) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -957,14 +961,18 @@ function MatchResultsSection({
   if (cardData.length === 0) return null
 
   return (
-    <div style={{ animation: 'fadeUp 0.35s ease 0.1s both' }}>
-      {/* Section Heading */}
-      <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
-        Match Results
-      </h4>
+    <div
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
+      style={{ animation: 'fadeUp 0.35s ease 0.35s both' }}
+    >
+      {/* Header, filters and rows all live inside one card now, like every other
+          section on this tab — they used to sit loose above a separate card. */}
+      <div className="flex items-baseline justify-between px-4 pt-3 pb-2">
+        <h3 className="t-section-header text-ink">Match Results</h3>
+        <span className="t-num text-xs text-muted">{counts.all} matches</span>
+      </div>
 
-      {/* Filter Pills */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 px-4 pb-3">
         {([
           { key: 'all' as FilterMode, label: 'All Matches', count: counts.all, color: 'var(--primary-600)' },
           { key: 'hits' as FilterMode, label: 'Hits', count: counts.hits, color: 'var(--success-600)' },
@@ -1002,10 +1010,14 @@ function MatchResultsSection({
           grid of five-row cards meant ten matches filled a screen; as rows they fit
           in a fraction of the height and stay scannable down the score columns. */}
       {displayList.length > 0 && (
-        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="border-t border-border-subtle">
           <MatchListHeader />
           {displayList.map(card => (
-            <MatchCard key={card.matchId} card={card} />
+            <MatchCard
+              key={card.matchId}
+              card={card}
+              predictedTie={predictedKnockoutTeams?.get(card.matchNumber)}
+            />
           ))}
         </div>
       )}
@@ -1091,7 +1103,7 @@ function MatchListHeader() {
  * Colours come from lib/design/formDots. The copy that was here was the ninth of
  * that mapping, and it collapsed winner_gd and winner onto the same green.
  */
-function MatchCard({ card }: { card: MatchCardData }) {
+function MatchCard({ card, predictedTie }: { card: MatchCardData; predictedTie?: { home: string | null; away: string | null } }) {
   const tier = card.resultType === 'miss' ? 'miss' : card.resultType
   const color = tierColor(tier)
   const isExact = card.resultType === 'exact'
@@ -1112,11 +1124,21 @@ function MatchCard({ card }: { card: MatchCardData }) {
         {STAGE_LABELS[card.stage] ?? card.stage}{card.groupLetter ? ` ${card.groupLetter}` : ''}
       </span>
 
-      <span className={`${COL.fixture} text-[13px] text-ink truncate`}>
-        {card.homeTeamName} v {card.awayTeamName}
-        {card.isContrarian && (
-          <span className="hidden md:inline ml-2 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-primary-600/12 text-primary-700">
-            Contrarian
+      <span className={`${COL.fixture} min-w-0`}>
+        <span className="block text-[13px] text-ink truncate">
+          {card.homeTeamName} v {card.awayTeamName}
+          {card.isContrarian && (
+            <span className="hidden md:inline ml-2 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-primary-600/12 text-primary-700">
+              Contrarian
+            </span>
+          )}
+        </span>
+        {/* Knockout ties are unknown at prediction time, so the fixture above is
+            the ACTUAL one. Show who this entry had reaching it whenever that
+            differs — otherwise the row silently implies they picked this tie. */}
+        {predictedTie && (predictedTie.home !== card.homeTeamName || predictedTie.away !== card.awayTeamName) && (
+          <span className="block text-[11px] text-muted truncate">
+            You had: {predictedTie.home ?? '—'} v {predictedTie.away ?? '—'}
           </span>
         )}
       </span>
@@ -1274,7 +1296,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
 // MAIN COMPONENT
 // =============================================
 
-export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, entryPredictions, predictionResults }: XPProgressSectionProps) {
+export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, entryPredictions, predictionResults, predictedKnockoutTeams }: XPProgressSectionProps) {
   const [showRoadmap, setShowRoadmap] = useState(false)
 
   return (
@@ -1303,6 +1325,7 @@ export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, 
         crowdData={crowdData}
         entryPredictions={entryPredictions}
         predictionResults={predictionResults}
+        predictedKnockoutTeams={predictedKnockoutTeams}
       />
 
       {/* Level Roadmap Modal */}
