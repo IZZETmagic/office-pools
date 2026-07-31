@@ -445,134 +445,73 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
 // HOT & COLD STREAKS
 // =============================================
 
+function StreakBar({ kind, value, color }: { kind: 'hot' | 'cold'; value: number; color: string }) {
+  const filled = Math.min(value, 5)
+  return (
+    <div className="flex gap-[3px] my-0.5">
+      {Array.from({ length: 5 }, (_, i) => {
+        const isFilled = i < filled
+        // The app ramps the cold bar's opacity across segments (0.32 → 1.0), so a
+        // long cold run reads as deepening rather than only longer.
+        const background = !isFilled
+          ? 'var(--sp-mist)'
+          : kind === 'cold'
+            ? `color-mix(in srgb, ${color} ${Math.round((0.15 + 0.17 * (i + 1)) * 100)}%, transparent)`
+            : color
+        return <span key={i} className="w-5 h-[5px] rounded-pill" style={{ background }} />
+      })}
+    </div>
+  )
+}
+
+function StreakCard({ icon, caption, value, color, kind, bordered, footer }: {
+  icon: string; caption: string; value: number; color: string
+  kind: 'hot' | 'cold'; bordered?: boolean; footer: React.ReactNode
+}) {
+  return (
+    <div
+      className="flex-1 flex flex-col items-center gap-1.5 bg-surface rounded-card py-3 px-2 shadow-card dark:shadow-none"
+      style={bordered ? { border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` } : undefined}
+    >
+      <Icon name={icon} size={22} weight="semibold" tint={color} />
+      <span className="text-[10px] font-semibold uppercase tracking-[0.4px] text-muted text-center">{caption}</span>
+      <span className="t-num font-black text-[36px] leading-10" style={{ color }}>{value}</span>
+      <StreakBar kind={kind} value={value} color={color} />
+      {footer}
+    </div>
+  )
+}
+
+/**
+ * HotColdStreakCards from the app: two cards, not three, and no decorative
+ * background artwork. "Best hot streak" is the hot card's footer, so the pair
+ * reads as current-state vs personal-worst. Colours are --sp-hot-streak and
+ * --sp-cold-streak, which is what the app means by these cards — amber and a
+ * danger red were standing in for them here.
+ */
 function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
   const { currentStreak, longestHotStreak, longestColdStreak } = streaks
   const currentHot = currentStreak.type === 'hot' ? currentStreak.length : 0
-  const currentCold = currentStreak.type === 'cold' ? currentStreak.length : 0
-  const isCurrentlyCold = currentStreak.type === 'cold'
 
   if (longestHotStreak === 0 && longestColdStreak === 0) return null
 
   return (
     <div style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}>
-      <div className="flex gap-2.5">
-        {/* ===== HOT STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none border border-warning-500/20 py-[18px] px-[14px] text-center">
-          {/* Background flame (decorative, 6% opacity) */}
-          <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.06] pointer-events-none">
-            <svg viewBox="0 0 24 24" fill="var(--warning-500)" className="w-full h-full">
-              <path d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" />
-            </svg>
-          </div>
-
-          <div className="relative z-10">
-            {/* Animated flame icon */}
-            <div className="mx-auto w-8 h-8 mb-2" style={{ animation: 'flameWave 1.8s ease-in-out infinite' }}>
-              <svg viewBox="0 0 24 24" fill="var(--warning-500)" className="w-full h-full">
-                <path d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03z" />
-                <path d="M12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" opacity="0.7" />
-              </svg>
-            </div>
-
-            {/* Label */}
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted mb-1">
-              Current Streak
-            </div>
-
-            {/* Number */}
-            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: 'var(--warning-500)' }}>
-              {currentHot}
-            </div>
-
-            {/* Progress pips (5 = "On Fire" milestone) */}
-            <div className="flex items-center justify-center gap-[3px] mb-2">
-              {Array.from({ length: 5 }, (_, i) => {
-                const filled = i < Math.min(currentHot, 5)
-                return (
-                  <div
-                    key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-mist dark:bg-[var(--sp-midnight)]' : ''}`}
-                    style={filled ? {
-                      background: 'linear-gradient(to right, var(--warning-600), var(--warning-500))',
-                      boxShadow: '0 0 8px color-mix(in srgb, var(--warning-500) 25%, transparent)',
-                    } : undefined}
-                  />
-                )
-              })}
-            </div>
-
-            {/* Personal best */}
-            <div className="text-[10px] text-muted">
-              Personal best: <span className="font-bold" style={{ color: 'var(--warning-500)' }}>{longestHotStreak}</span>
-              {' '}— can you beat it? 🔥
-            </div>
-          </div>
-        </div>
-
-        {/* ===== COLD STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none border border-border-subtle dark:border-border-default py-[18px] px-[14px] text-center">
-          {/* Background snowflake (decorative, 4% opacity) */}
-          <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.04] pointer-events-none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
-              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" strokeWidth="1.5" />
-              <path d="M12 2l-2 2m2-2l2 2m-2 18l-2-2m2 2l2-2M2 12l2-2m-2 2l2 2m18-2l-2-2m2 2l-2 2" strokeWidth="1.2" />
-              <circle cx="12" cy="12" r="1.5" fill="var(--sp-level-sky)" stroke="none" />
-            </svg>
-          </div>
-
-          <div className="relative z-10">
-            {/* Static snowflake icon (no animation — intentional contrast) */}
-            <div className="mx-auto w-8 h-8 mb-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
-                <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" strokeWidth="1.5" />
-                <path d="M12 2l-2 2m2-2l2 2m-2 18l-2-2m2 2l2-2M2 12l2-2m-2 2l2 2m18-2l-2-2m2 2l-2 2" strokeWidth="1.2" />
-                <circle cx="12" cy="12" r="1.5" fill="var(--sp-level-sky)" stroke="none" />
-              </svg>
-            </div>
-
-            {/* Label */}
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted mb-1">
-              Worst Cold Streak
-            </div>
-
-            {/* Number */}
-            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: 'var(--sp-level-sky)' }}>
-              {longestColdStreak}
-            </div>
-
-            {/* Progress pips (progressive opacity — cold intensifying) */}
-            <div className="flex items-center justify-center gap-[3px] mb-2">
-              {Array.from({ length: 5 }, (_, i) => {
-                const filled = i < Math.min(longestColdStreak, 5)
-                return (
-                  <div
-                    key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-mist dark:bg-[var(--sp-midnight)]' : ''}`}
-                    style={filled ? {
-                      backgroundColor: `rgba(56, 189, 248, ${0.10 + 0.18 * (i + 1)})`,
-                    } : undefined}
-                  />
-                )
-              })}
-            </div>
-
-            {/* Status line */}
-            <div className="text-[10px] text-muted">
-              Currently:{' '}
-              {isCurrentlyCold ? (
-                <>
-                  <span className="font-bold" style={{ color: 'var(--sp-level-sky)' }}>{currentCold}</span>
-                  {' '}— cold spell active
-                </>
-              ) : (
-                <>
-                  <span className="font-bold" style={{ color: 'var(--success-600)' }}>0</span>
-                  {' '}— streak broken ✓
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="flex gap-2">
+        <StreakCard
+          kind="hot" icon="flame.fill" caption="Current Hot Streak"
+          value={currentHot} color="var(--sp-hot-streak)" bordered
+          footer={
+            <span className="text-[11px] font-medium text-muted text-center">
+              Personal best: <span className="font-bold text-ink">{longestHotStreak}</span>
+            </span>
+          }
+        />
+        <StreakCard
+          kind="cold" icon="snowflake" caption="Worst Cold Streak"
+          value={longestColdStreak} color="var(--sp-cold-streak)"
+          footer={<span className="text-[11px] font-medium text-muted text-center">Keep this one low!</span>}
+        />
       </div>
     </div>
   )
@@ -763,326 +702,187 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
 // YOU VS THE CROWD
 // =============================================
 
-function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
-  const matchesWithPred = crowdData.filter(m => m.userPredictedResult !== null)
-  if (matchesWithPred.length === 0) return null
-
-  // --- User stats ---
-  const userCorrect = matchesWithPred.filter(m => m.userWasCorrect).length
-  const userAccuracy = matchesWithPred.length > 0
-    ? Math.round((userCorrect / matchesWithPred.length) * 100) : 0
-
-  // Crowd accuracy = how often crowd majority was correct
-  const crowdCorrect = crowdData.filter(m => {
-    const actual = m.actualHomeScore > m.actualAwayScore ? 'home'
-      : m.actualHomeScore < m.actualAwayScore ? 'away' : 'draw'
-    return m.crowdMajorityResult === actual
-  }).length
-  const crowdAccuracy = crowdData.length > 0
-    ? Math.round((crowdCorrect / crowdData.length) * 100) : 0
-
-  // User battle metrics
-  const consensusCount = matchesWithPred.filter(m => !m.userIsContrarian).length
-  const contrarianCount = matchesWithPred.filter(m => m.userIsContrarian).length
-  const contrarianWins = matchesWithPred.filter(m => m.userIsContrarian && m.userWasCorrect).length
-
-  // Estimated crowd averages (from distribution data)
-  const crowdAvgConsensus = Math.round(
-    crowdData.reduce((sum, m) => sum + Math.max(m.homeWinPct, m.drawPct, m.awayWinPct), 0)
-  )
-  const crowdAvgContrarian = Math.max(0, matchesWithPred.length - crowdAvgConsensus)
-  const crowdAccRate = crowdData.length > 0 ? crowdCorrect / crowdData.length : 0
-  const crowdAvgContrarianWins = Math.round(crowdAvgContrarian * crowdAccRate)
-
-  // Performance comparison
-  const accuracyDiff = userAccuracy - crowdAccuracy
-  const isOutperforming = accuracyDiff > 0
-
-  // Contrarian insight
-  const userContrarianWinPct = contrarianCount > 0 ? Math.round((contrarianWins / contrarianCount) * 100) : 0
-  const crowdContrarianWinPct = crowdAvgContrarian > 0 ? Math.round((crowdAvgContrarianWins / crowdAvgContrarian) * 100) : 0
-  const contrarianAdv = userContrarianWinPct - crowdContrarianWinPct
-
-  const bars = [
-    { label: 'Consensus Picks', you: consensusCount, crowd: crowdAvgConsensus },
-    { label: 'Contrarian Picks', you: contrarianCount, crowd: crowdAvgContrarian },
-    { label: 'Contrarian Wins', you: contrarianWins, crowd: crowdAvgContrarianWins },
-  ]
-
+function BattleBar({ label, you, crowd, crowdLabel = 'crowd' }: {
+  label: string; you: number; crowd: number; crowdLabel?: string
+}) {
+  const total = you + crowd
+  const youPct = total > 0 ? (you / total) * 100 : 50
+  const crowdPct = total > 0 ? (crowd / total) * 100 : 50
   return (
-    <div
-      className="relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
-      style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
-    >
-      {/* Ambient corner glows */}
-      <div
-        className="absolute top-[-20px] right-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 25%, transparent), transparent 70%)' }}
-      />
-      <div
-        className="absolute top-[-20px] left-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 20%, transparent), transparent 70%)' }}
-      />
-
-      {/* Content */}
-      <div className="relative z-10 p-[18px]">
-        {/* Heading */}
-        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
-          You vs The Crowd
-        </h4>
-
-        {/* VS Faceoff */}
-        <div className="flex items-center justify-around mb-8">
-          {/* Player */}
-          <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
-              You
-            </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--primary-600)' }}>
-              {userAccuracy}%
-            </div>
-          </div>
-
-          {/* VS Badge */}
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-border-subtle dark:border-[var(--sp-midnight)]"
-            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 12%, transparent), color-mix(in srgb, var(--primary-600) 20%, transparent))' }}
-          >
-            <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
-          </div>
-
-          {/* Crowd */}
-          <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
-              Pool Avg
-            </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--neutral-400)' }}>
-              {crowdAccuracy}%
-            </div>
-          </div>
-        </div>
-
-        {/* Battle Bars */}
-        <div className="space-y-5">
-          {bars.map((bar, idx) => {
-            const total = bar.you + bar.crowd
-            const youPct = total > 0 ? (bar.you / total) * 100 : 50
-            const crowdPct = total > 0 ? (bar.crowd / total) * 100 : 50
-
-            return (
-              <div key={bar.label}>
-                {/* Label row */}
-                <div className="flex items-center justify-between mb-[5px]">
-                  <span className="text-[11px] text-muted dark:text-[var(--neutral-400)]">{bar.label}</span>
-                  <span className="text-[10px] font-mono text-muted dark:text-[var(--neutral-500)]">
-                    {bar.you} vs {bar.crowd}
-                  </span>
-                </div>
-                {/* Bar track */}
-                <div className="relative h-2 rounded bg-mist dark:bg-[var(--sp-midnight)]">
-                  {/* Player fill (grows from left) */}
-                  <div
-                    className="absolute top-0 left-0 h-full rounded-l"
-                    style={{
-                      width: `calc(${youPct}% - 1px)`,
-                      background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
-                      boxShadow: '0 0 8px color-mix(in srgb, var(--primary-600) 25%, transparent)',
-                      animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
-                      transformOrigin: 'left',
-                    }}
-                  />
-                  {/* Crowd fill (grows from right) */}
-                  <div
-                    className="absolute top-0 right-0 h-full rounded-r"
-                    style={{
-                      width: `calc(${crowdPct}% - 1px)`,
-                      background: 'linear-gradient(to right, color-mix(in srgb, var(--primary-600) 67%, transparent), var(--primary-600))',
-                      animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
-                      transformOrigin: 'right',
-                    }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Performance Callout */}
-        <div className="mt-7">
-          {isOutperforming ? (
-            <div
-              className="flex items-start gap-2 rounded-chip"
-              style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--success-600) 10%, transparent), transparent)',
-                border: '1px solid color-mix(in srgb, var(--success-600) 13%, transparent)',
-                padding: '10px 14px',
-              }}
-            >
-              <span className="text-[18px] leading-none flex-shrink-0">📈</span>
-              <div>
-                <div className="text-xs font-bold" style={{ color: 'var(--success-600)' }}>
-                  Outperforming the crowd by {accuracyDiff}%
-                </div>
-                {contrarianCount > 0 && contrarianAdv > 0 && (
-                  <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
-                    Your contrarian win rate is {contrarianAdv}% higher than average
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div
-              className="flex items-start gap-2 rounded-chip"
-              style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 10%, transparent), transparent)',
-                border: '1px solid color-mix(in srgb, var(--primary-600) 13%, transparent)',
-                padding: '10px 14px',
-              }}
-            >
-              <span className="text-[18px] leading-none flex-shrink-0">🎯</span>
-              <div>
-                <div className="text-xs font-bold" style={{ color: 'var(--primary-600)' }}>
-                  {accuracyDiff === 0
-                    ? 'Neck and neck with the crowd'
-                    : 'The crowd has a slight edge — time to go contrarian?'}
-                </div>
-                <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
-                  {accuracyDiff === 0
-                    ? "You\u2019re matching the crowd wisdom perfectly"
-                    : `Only ${Math.abs(accuracyDiff)}% behind — one bold call could flip it`}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] text-muted">{label}</span>
+        <span className="t-num text-[11px] font-semibold text-muted">{you} vs {crowd} {crowdLabel}</span>
+      </div>
+      <div className="flex gap-0.5 h-2">
+        <span className="rounded-pill bg-primary-600" style={{ flex: youPct, minWidth: 2 }} />
+        <span className="rounded-pill bg-silver" style={{ flex: crowdPct, minWidth: 2 }} />
       </div>
     </div>
   )
 }
 
+function PerformanceCallout({ isOutperforming, accuracyDiff, contrarianRate, showContrarian }: {
+  isOutperforming: boolean; accuracyDiff: number; contrarianRate: number; showContrarian: boolean
+}) {
+  const accent = isOutperforming ? 'var(--success-600)' : 'var(--primary-600)'
+  return (
+    <div
+      className="flex items-start gap-2 p-3 rounded-chip"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${accent} 8%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${accent} 13%, transparent)`,
+      }}
+    >
+      <Icon name={isOutperforming ? 'chart.line.uptrend.xyaxis' : 'target'} size={18} weight="semibold" tint={accent} />
+      <div className="flex-1 flex flex-col gap-0.5">
+        <span className="text-sm font-bold" style={{ color: accent }}>
+          {isOutperforming
+            ? `Outperforming the crowd by ${accuracyDiff}%`
+            : `The crowd leads by ${Math.abs(accuracyDiff)}%`}
+        </span>
+        {showContrarian && (
+          <span className="text-xs text-muted">You won {contrarianRate}% of your contrarian picks</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * CrowdSection from the app: a VS faceoff, three battle bars and a callout, in one
+ * card. Both faceoff numbers are real — yours from userWasCorrect, the crowd's from
+ * how often crowdMajorityResult matched the final score. There is no per-player
+ * crowd average in this payload, so the bars compare pairs that genuinely have two
+ * sides rather than inventing an "average opponent".
+ */
+function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
+  if (crowdData.length === 0) return null
+
+  const withPrediction = crowdData.filter(m => m.userPredictedResult !== null)
+  const contrarianCount = withPrediction.filter(m => m.userIsContrarian).length
+  const consensusCount = withPrediction.length - contrarianCount
+  const contrarianCorrect = withPrediction.filter(m => m.userIsContrarian && m.userWasCorrect).length
+  const userCorrect = withPrediction.filter(m => m.userWasCorrect).length
+  const crowdCorrect = crowdData.filter(m => {
+    const actual = m.actualHomeScore > m.actualAwayScore ? 'home'
+      : m.actualHomeScore < m.actualAwayScore ? 'away' : 'draw'
+    return m.crowdMajorityResult === actual
+  }).length
+
+  const userAccuracy = withPrediction.length > 0 ? Math.round((userCorrect / withPrediction.length) * 100) : 0
+  const crowdAccuracy = crowdData.length > 0 ? Math.round((crowdCorrect / crowdData.length) * 100) : 0
+  const accuracyDiff = userAccuracy - crowdAccuracy
+
+  return (
+    <div
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
+      style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
+    >
+      <div className="px-4 pt-4 flex flex-col gap-3">
+        <h3 className="t-section-header text-ink">You vs The Crowd</h3>
+        <div className="flex items-center justify-around pb-2">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[10px] font-bold tracking-[0.5px] text-primary-600">YOU</span>
+            <span className="t-num font-black text-[32px] leading-9 text-primary-600">{userAccuracy}%</span>
+          </div>
+          <span className="w-9 h-9 rounded-pill bg-mist border-[0.5px] border-silver flex items-center justify-center text-[11px] font-black text-muted">
+            VS
+          </span>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[10px] font-bold tracking-[0.5px] text-muted">POOL AVG</span>
+            <span className="t-num font-black text-[32px] leading-9 text-muted">{crowdAccuracy}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 px-4 pb-4">
+        <BattleBar label="Correct Picks" you={userCorrect} crowd={crowdCorrect} />
+        <BattleBar label="Consensus Picks" you={consensusCount} crowd={contrarianCount} crowdLabel="contrarian" />
+        <BattleBar label="Contrarian Wins" you={contrarianCorrect} crowd={contrarianCount - contrarianCorrect} crowdLabel="lost" />
+      </div>
+
+      {accuracyDiff !== 0 && (
+        <div className="px-4 pb-4">
+          <PerformanceCallout
+            isOutperforming={accuracyDiff > 0}
+            accuracyDiff={accuracyDiff}
+            contrarianRate={contrarianCount > 0 ? Math.round((contrarianCorrect / contrarianCount) * 100) : 0}
+            showContrarian={contrarianCount > 0}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 // =============================================
 // POOL-WIDE STATS
 // =============================================
 
+function PoolStatColumn({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-0.5">
+      <span className="t-num font-black text-2xl leading-7 text-ink">{value}</span>
+      <span className="text-[11px] font-medium text-muted text-center">{label}</span>
+    </div>
+  )
+}
+
+function PredictableBlock({ icon, title, color, matches }: {
+  icon: string; title: string; color: string
+  matches: { matchId: string; homeTeamName: string; awayTeamName: string; hitRate: number }[]
+}) {
+  if (matches.length === 0) return null
+  return (
+    <div className="px-4 pb-4 flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Icon name={icon} size={14} weight="semibold" tint={color} />
+        <span className="text-[11px] font-bold uppercase tracking-[0.4px]" style={{ color }}>{title}</span>
+      </div>
+      {matches.slice(0, 3).map(m => (
+        <div key={m.matchId} className="flex items-center justify-between gap-2">
+          <span className="text-[13px] text-ink truncate">{m.homeTeamName} v {m.awayTeamName}</span>
+          <span className="t-num text-[13px] shrink-0" style={{ color }}>{Math.round(m.hitRate * 100)}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * PoolStatsSection from the app: one card, the header inside it, three columns,
+ * then the two predictability blocks. This was three separate stat cards plus a
+ * Recharts bar chart and two more cards — five surfaces for what the app treats as
+ * one. Three cards read as three unrelated facts; one reads as a summary of this
+ * pool.
+ */
 export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }) {
   const { mostPredictable, leastPredictable, avgPoolAccuracy, totalCompletedMatches, totalEntries } = poolStats
 
   if (totalCompletedMatches === 0) return null
 
-  // Cap to 3 items per list
-  const topPredictable = mostPredictable.slice(0, 3)
-  const topUpsets = leastPredictable.slice(0, 3)
-
   return (
-    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default">
-      <div className="p-[18px]">
-        {/* Heading */}
-        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
-          Pool-Wide Stats
-        </h4>
-
-        {/* Summary Stats Row */}
-        <div className="flex items-center justify-around mb-[18px]">
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {Math.round(avgPoolAccuracy * 100)}%
-            </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Avg Pool Accuracy
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {totalEntries}
-            </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Competitors
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {totalCompletedMatches}
-            </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Matches Scored
-            </div>
-          </div>
-        </div>
-
-        {/* Most Predictable */}
-        <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-sm">🏆</span>
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--success-600)' }}>Most Predictable</span>
-          </div>
-          <div>
-            {topPredictable.map((m, idx) => (
-              <div
-                key={m.matchId}
-                className={`flex items-center justify-between py-2 ${
-                  idx < topPredictable.length - 1 ? 'border-b border-border-subtle dark:border-[var(--sp-midnight)]' : ''
-                }`}
-              >
-                <span className="text-xs text-muted dark:text-[var(--neutral-400)] truncate mr-2">
-                  {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
-                </span>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-mist dark:bg-[var(--sp-midnight)]">
-                    <div
-                      className="h-full rounded-sm"
-                      style={{
-                        width: `${Math.round(m.hitRate * 100)}%`,
-                        backgroundColor: 'var(--success-600)',
-                      }}
-                    />
-                  </div>
-                  <span className="text-[11px] font-semibold font-mono" style={{ color: 'var(--success-600)' }}>
-                    {Math.round(m.hitRate * 100)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Biggest Upsets */}
-        <div className="mt-3.5">
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-sm">😱</span>
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--danger-600)' }}>Biggest Upsets</span>
-          </div>
-          <div>
-            {topUpsets.map((m, idx) => (
-              <div
-                key={m.matchId}
-                className={`flex items-center justify-between py-2 ${
-                  idx < topUpsets.length - 1 ? 'border-b border-border-subtle dark:border-[var(--sp-midnight)]' : ''
-                }`}
-              >
-                <span className="text-xs text-muted dark:text-[var(--neutral-400)] truncate mr-2">
-                  {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
-                </span>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-mist dark:bg-[var(--sp-midnight)]">
-                    <div
-                      className="h-full rounded-sm"
-                      style={{
-                        width: `${Math.round(m.hitRate * 100)}%`,
-                        backgroundColor: 'var(--danger-600)',
-                      }}
-                    />
-                  </div>
-                  <span className="text-[11px] font-semibold font-mono" style={{ color: 'var(--danger-600)' }}>
-                    {Math.round(m.hitRate * 100)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
+      style={{ animation: 'fadeUp 0.3s ease 0.3s both' }}
+    >
+      <div className="px-4 pt-4 pb-3">
+        <h3 className="t-section-header text-ink">Pool-Wide Stats</h3>
       </div>
+      <div className="flex px-4 pb-4">
+        <PoolStatColumn label="Avg Pool Accuracy" value={`${Math.round(avgPoolAccuracy * 100)}%`} />
+        <PoolStatColumn label="Competitors" value={`${totalEntries}`} />
+        <PoolStatColumn label="Matches Scored" value={`${totalCompletedMatches}`} />
+      </div>
+
+      <PredictableBlock
+        icon="trophy.fill" title="Most Predictable"
+        color="var(--success-600)" matches={mostPredictable}
+      />
+      <PredictableBlock
+        icon="exclamationmark.triangle.fill" title="Biggest Upsets"
+        color="var(--danger-600)" matches={leastPredictable}
+      />
     </div>
   )
 }
