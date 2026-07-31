@@ -2,6 +2,8 @@
 
 import { useState, useRef, useMemo, useCallback } from 'react'
 import { levelPillClass } from '@/lib/design/levels'
+import { rarityColor, rarityTint } from '@/lib/design/badges'
+import { Icon } from '@/components/ui/Icon'
 import { createPortal } from 'react-dom'
 import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from './xpSystem'
 import type { StreakData, CrowdMatch, PoolWideStats, PredictionResult } from './analyticsHelpers'
@@ -26,13 +28,6 @@ type XPProgressSectionProps = {
 // CONSTANTS
 // =============================================
 
-const TIER_BORDER_COLORS: Record<string, string> = {
-  Bronze: 'border-l-warning-500',
-  Silver: 'border-l-neutral-400',
-  Gold: 'border-l-accent-500',
-  Platinum: 'border-l-accent-500',
-}
-
 const TIER_BG_COLORS: Record<string, string> = {
   Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400',
   Silver: 'bg-neutral-200 dark:bg-neutral-700 text-muted',
@@ -40,13 +35,9 @@ const TIER_BG_COLORS: Record<string, string> = {
   Platinum: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
 }
 
-const RARITY_COLORS: Record<string, string> = {
-  Common: 'text-muted',
-  Uncommon: 'text-success-600 dark:text-success-400',
-  Rare: 'text-primary-600 dark:text-primary-400',
-  'Very Rare': 'text-accent-500 dark:text-accent-500',
-  Legendary: 'text-warning-500 dark:text-warning-400',
-}
+// Rarity colours live in lib/design/badges.ts, shared with the app's
+// useRarityColor. The copy that was here had Very Rare on gold and
+// Legendary on amber — both wrong, and effectively swapped.
 
 // Journey path node config per XP tier
 const NODE_COLORS: Record<XPTier, { color: string; glowColor: string; label: string }> = {
@@ -174,49 +165,46 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
   const def = badge || BADGE_DEFINITIONS[0] // fallback, shouldn't happen
   if (!badge && !earned) return null
 
+  // BadgeCell in mobile/components/pool-detail/FormTab.tsx: no card, no border, no
+  // tier stripe — a 64px medallion well, the name, and the XP. The card-per-badge
+  // treatment this replaced is what made the grid look like a spreadsheet, and its
+  // locked state (`dark:bg-neutral-400/90`) rendered as a mid-grey slab in dark mode.
+  const tint = rarityColor(def.rarity)
+
   return (
     <div className="group relative hover:z-10">
-      <div
-        className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
-          earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-border-subtle shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
-            : 'bg-mist dark:bg-neutral-400/90 border border-border-subtle dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
-        } ${def.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
+      <button
+        type="button"
         onClick={onSelect}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+        className="w-20 flex flex-col items-center gap-1 transition-opacity hover:opacity-70 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40 rounded-chip"
       >
-        {/* Emoji / medallion */}
-        <div className={`mb-1.5 ${earned ? '' : 'grayscale opacity-50 dark:opacity-70'}`}>
-          <BadgeMedallion id={def.id} emoji={def.emoji} size={40} className="mx-auto" />
-        </div>
+        <span
+          className="relative w-16 h-16 rounded-pill flex items-center justify-center"
+          // Earned badges with artwork sit on nothing; the rest get the rarity
+          // composited at 15%, and locked ones get `mist`.
+          style={{ backgroundColor: earned ? rarityTint(def.rarity) : 'var(--sp-mist)' }}
+        >
+          {earned ? (
+            <BadgeMedallion id={def.id} emoji={def.emoji} size={64} />
+          ) : (
+            <Icon name="lock.fill" size={20} weight="semibold" className="text-muted" />
+          )}
+        </span>
 
-        {/* Name */}
-        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-ink' : 'text-muted dark:text-muted'}`}>
+        <span
+          className="text-[11px] font-medium text-center leading-tight truncate w-full"
+          style={{ color: earned ? 'var(--sp-ink)' : 'var(--sp-silver)' }}
+        >
           {def.name}
-        </div>
+        </span>
 
-        {/* XP bonus */}
-        {earned ? (
-          <div className="text-[10px] font-bold text-success-600 dark:text-success-400">
-            +{def.xpBonus} XP
-          </div>
-        ) : (
-          <div className={`text-[10px] font-medium ${RARITY_COLORS[def.rarity]}`}>
-            {def.rarity}
-          </div>
-        )}
-
-        {/* Lock overlay for unearned */}
-        {!earned && (
-          <div className="absolute top-1.5 right-1.5">
-            <svg className="w-3.5 h-3.5 text-muted dark:text-muted" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        )}
-      </div>
+        <span
+          className="t-num text-[9px]"
+          style={{ color: earned ? tint : 'var(--sp-silver)' }}
+        >
+          +{def.xpBonus.toLocaleString()} XP
+        </span>
+      </button>
 
       {/* Desktop hover tooltip — hidden on mobile, shown on sm+ hover */}
       <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-card-elevated pointer-events-none">
@@ -275,7 +263,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
             <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_BG_COLORS[badge.tier]}`}>
               {badge.tier}
             </span>
-            <span className={`text-[10px] font-semibold ${RARITY_COLORS[badge.rarity]}`}>
+            <span className="text-[10px] font-semibold" style={{ color: rarityColor(badge.rarity) }}>
               {badge.rarity}
             </span>
           </div>
@@ -351,19 +339,17 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
   return (
     <>
       <div
-        className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+        className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
         style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
       >
-        <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
-              <span>🏅</span>
-              <span>Badges</span>
-            </h4>
-            <span className="text-xs font-medium text-muted">
-              {earnedBadges.length} / {BADGE_DEFINITIONS.length} earned
-            </span>
-          </div>
+        {/* SectionHeader in the app: title in the sectionHeader variant with a
+            12px muted count, baseline-aligned, and no rule beneath it — the card
+            edge already separates it from what follows. */}
+        <div className="flex items-baseline justify-between px-4 sm:px-5 pt-3 pb-2">
+          <h4 className="t-section-header text-ink">Badges</h4>
+          <span className="t-num text-xs font-medium text-muted">
+            {earnedBadges.length} / {BADGE_DEFINITIONS.length} earned
+          </span>
         </div>
         <div className="p-4 sm:p-5">
           {/* Mobile: swipeable 2-page carousel (3×2 grid per page) */}
