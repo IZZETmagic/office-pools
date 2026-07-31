@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { levelPillClass } from '@/lib/design/levels'
-import type { BPXPBreakdown, BPPoolComparison, BPKnockoutPickXP } from './bracketPickerXpSystem'
+import type { BPXPBreakdown, BPPoolComparison, BPKnockoutPickXP, BPGroupXPSummary, BPThirdPlaceXP } from './bracketPickerXpSystem'
 import { Icon } from '@/components/ui/Icon'
 import type { EarnedBadge, BadgeDefinition, LevelDefinition } from './xpSystem'
 import { LEVELS } from './xpSystem'
@@ -218,7 +218,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
           <div className={`text-5xl mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
             {badge.emoji}
           </div>
-          <h3 className="text-lg font-bold text-ink mb-1.5">
+          <h3 className="t-section-header text-ink mb-1.5">
             {badge.name}
           </h3>
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -299,7 +299,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
       >
         <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
+            <h4 className="t-section-header text-ink flex items-center gap-2">
               <span>🏅</span>
               <span>Bracket Badges</span>
             </h4>
@@ -640,7 +640,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
     >
       <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
+          <h4 className="t-section-header text-ink flex items-center gap-2">
             <span>🎯</span>
             <span>Bonus Events</span>
           </h4>
@@ -687,7 +687,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle flex-shrink-0">
-          <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+          <h3 className="t-section-header text-ink flex items-center gap-2">
             <span>🗺️</span>
             <span>Level Roadmap</span>
           </h3>
@@ -793,6 +793,166 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
 
 
 /**
+ * One card shell for every section on this tab, so the header size, padding,
+ * radius and shadow cannot drift between them. The sections here had reached
+ * three different header treatments — `text-sm font-semibold`, `text-lg
+ * font-bold`, and the section-header variant — which is what made the tab read
+ * as assembled rather than designed.
+ */
+function BPSectionCard({
+  title,
+  subtitle,
+  children,
+  animDelay = 0,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+  animDelay?: number
+}) {
+  return (
+    <div
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
+      style={{ animation: `fadeUp 0.3s ease ${animDelay}s both` }}
+    >
+      <div className="flex items-baseline justify-between px-4 pt-3 pb-2">
+        <h3 className="t-section-header text-ink">{title}</h3>
+        {subtitle ? <span className="t-num text-xs text-muted">{subtitle}</span> : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** Shared column widths, so every pick list on this tab lines up identically. */
+const BP_COL = {
+  mark: 'w-4 shrink-0 flex items-center justify-center',
+  round: 'w-16 shrink-0 text-[10px] font-semibold text-muted truncate',
+  yours: 'flex-1 min-w-0 text-[13px] truncate',
+  actual: 'flex-1 min-w-0 text-[13px] truncate',
+  xp: 'w-10 shrink-0 text-right t-num text-[11px]',
+}
+
+function BPPickHeader({ left, right }: { left: string; right: string }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle">
+      <span className={BP_COL.mark} />
+      <span className={`${BP_COL.round} t-caption`}>Round</span>
+      <span className={`${BP_COL.yours} t-caption text-muted`}>{left}</span>
+      <span className={`${BP_COL.actual} t-caption text-muted`}>{right}</span>
+      <span className={`${BP_COL.xp} t-caption text-muted`}>XP</span>
+    </div>
+  )
+}
+
+/** Correct / wrong / not-yet-decided, as one consistent marker. */
+function BPMark({ state }: { state: 'correct' | 'wrong' | 'pending' }) {
+  if (state === 'pending') return <span className="w-2 h-2 rounded-pill bg-silver" />
+  return (
+    <Icon
+      name={state === 'correct' ? 'checkmark' : 'xmark'}
+      size={11}
+      weight="bold"
+      tint={state === 'correct' ? 'var(--sp-tier-winner-gd)' : 'var(--danger-600)'}
+    />
+  )
+}
+
+function pickColor(state: 'correct' | 'wrong' | 'pending') {
+  return state === 'pending'
+    ? 'var(--sp-slate)'
+    : state === 'correct' ? 'var(--sp-tier-winner-gd)' : 'var(--danger-600)'
+}
+
+/**
+ * Group-stage picks: the position this entry gave each team, against where the
+ * team actually finished. Same shape as the knockout list so the two read as one
+ * idea — your pick on the left under its own heading, what happened on the right.
+ */
+function BPGroupPicksSection({ groups, teams }: { groups: BPGroupXPSummary[]; teams: TeamData[] }) {
+  const positions = groups.flatMap(g => g.positions)
+  if (positions.length === 0) return null
+
+  const nameOf = (id: string) => teams.find(t => t.team_id === id)?.country_name ?? 'Unknown'
+  const decided = positions.filter(p => p.actual_position !== null)
+  const correct = decided.filter(p => p.correct).length
+
+  return (
+    <BPSectionCard
+      title="Your Group Picks"
+      subtitle={decided.length > 0 ? `${correct}/${decided.length} correct` : 'Awaiting results'}
+      animDelay={0.15}
+    >
+      <BPPickHeader left="You had them" right="They finished" />
+      {positions.map(pos => {
+        const state = pos.actual_position === null ? 'pending' : pos.correct ? 'correct' : 'wrong'
+        return (
+          <div
+            key={`${pos.group_letter}-${pos.team_id}`}
+            className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle last:border-b-0"
+          >
+            <span className={BP_COL.mark}><BPMark state={state} /></span>
+            <span className={BP_COL.round}>Group {pos.group_letter}</span>
+            <span className={BP_COL.yours} style={{ color: pickColor(state) }}>
+              {nameOf(pos.team_id)} · {pos.predicted_position}
+              {pos.predicted_position === 1 ? 'st' : pos.predicted_position === 2 ? 'nd' : pos.predicted_position === 3 ? 'rd' : 'th'}
+            </span>
+            <span className={`${BP_COL.actual} text-ink`}>
+              {pos.actual_position === null
+                ? <span className="text-muted">Not decided</span>
+                : `${pos.actual_position}${pos.actual_position === 1 ? 'st' : pos.actual_position === 2 ? 'nd' : pos.actual_position === 3 ? 'rd' : 'th'}`}
+            </span>
+            <span className={BP_COL.xp} style={{ color: pos.correct ? 'var(--success-700)' : 'var(--sp-slate)' }}>
+              +{pos.xp}
+            </span>
+          </div>
+        )
+      })}
+    </BPSectionCard>
+  )
+}
+
+/** Third-place qualifiers this entry backed, against who actually went through. */
+function BPThirdPlaceSection({ picks, teams }: { picks: BPThirdPlaceXP[]; teams: TeamData[] }) {
+  const backed = picks.filter(p => p.predicted_qualifies)
+  if (backed.length === 0) return null
+
+  const nameOf = (id: string) => teams.find(t => t.team_id === id)?.country_name ?? 'Unknown'
+  const correct = backed.filter(p => p.correct).length
+
+  return (
+    <BPSectionCard
+      title="Your Third-Place Picks"
+      subtitle={`${correct}/${backed.length} correct`}
+      animDelay={0.18}
+    >
+      <BPPickHeader left="You backed" right="Qualified" />
+      {backed.map(pick => {
+        const state = pick.correct ? 'correct' : 'wrong'
+        return (
+          <div
+            key={pick.team_id}
+            className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle last:border-b-0"
+          >
+            <span className={BP_COL.mark}><BPMark state={state} /></span>
+            <span className={BP_COL.round}>Group {pick.group_letter}</span>
+            <span className={BP_COL.yours} style={{ color: pickColor(state) }}>
+              {nameOf(pick.team_id)}
+            </span>
+            <span className={`${BP_COL.actual} text-ink`}>
+              {pick.actually_qualifies ? 'Went through' : <span className="text-muted">Did not qualify</span>}
+            </span>
+            <span className={BP_COL.xp} style={{ color: pick.correct ? 'var(--success-700)' : 'var(--sp-slate)' }}>
+              +{pick.xp}
+            </span>
+          </div>
+        )
+      })}
+    </BPSectionCard>
+  )
+}
+
+/**
  * Your knockout picks, round by round.
  *
  * The bracket Form tab reported knockout accuracy only as a count — "Knockout
@@ -813,74 +973,37 @@ function BPKnockoutPicksSection({ picks, teams }: { picks: BPKnockoutPickXP[]; t
   const decided = picks.filter(p => p.actual_winner !== null)
   const correct = decided.filter(p => p.correct).length
 
-  const byStage = new Map<string, BPKnockoutPickXP[]>()
-  for (const p of picks) {
-    const list = byStage.get(p.stage) ?? []
-    list.push(p)
-    byStage.set(p.stage, list)
-  }
-
   return (
-    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-      <div className="flex items-baseline justify-between px-4 pt-3 pb-2">
-        <h3 className="t-section-header text-ink">Your Knockout Picks</h3>
-        <span className="t-num text-xs text-muted">
-          {decided.length > 0 ? `${correct}/${decided.length} correct` : 'Awaiting results'}
-        </span>
-      </div>
-
-      {/* Column headings, so "your pick" and "went through" are never confused. */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle">
-        <span className="w-4 shrink-0" />
-        <span className="w-16 shrink-0 t-caption text-muted">Round</span>
-        <span className="flex-1 min-w-0 t-caption text-muted">Your pick</span>
-        <span className="flex-1 min-w-0 t-caption text-muted">Went through</span>
-        <span className="w-10 shrink-0 text-right t-caption text-muted">XP</span>
-      </div>
-
-      {[...byStage.entries()].map(([stage, items]) =>
-        items.map(pick => {
-          const yours = nameOf(pick.predicted_winner)
-          const actual = nameOf(pick.actual_winner)
-          const pending = pick.actual_winner === null
-          const color = pending
-            ? 'var(--sp-slate)'
-            : pick.correct ? 'var(--sp-tier-winner-gd)' : 'var(--danger-600)'
-
-          return (
-            <div
-              key={pick.match_id}
-              className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle last:border-b-0"
-            >
-              <span className="w-4 shrink-0 flex items-center justify-center">
-                {pending
-                  ? <span className="w-2 h-2 rounded-pill bg-silver" />
-                  : <Icon name={pick.correct ? 'checkmark' : 'xmark'} size={11} weight="bold" tint={color} />}
-              </span>
-
-              <span className="w-16 shrink-0 text-[10px] font-semibold text-muted truncate">
-                {BP_STAGE_LABELS[stage] ?? stage}
-              </span>
-
-              <span className="flex-1 min-w-0 text-[13px] truncate" style={{ color }}>
-                {yours ?? '—'}
-              </span>
-
-              <span className="flex-1 min-w-0 text-[13px] text-ink truncate">
-                {pending ? <span className="text-muted">Not decided</span> : actual}
-              </span>
-
-              <span
-                className="w-10 shrink-0 text-right t-num text-[11px]"
-                style={{ color: pick.correct ? 'var(--success-700)' : 'var(--sp-slate)' }}
-              >
-                +{pick.xp}
-              </span>
-            </div>
-          )
-        }),
-      )}
-    </div>
+    <BPSectionCard
+      title="Your Knockout Picks"
+      subtitle={decided.length > 0 ? `${correct}/${decided.length} correct` : 'Awaiting results'}
+      animDelay={0.21}
+    >
+      <BPPickHeader left="Your pick" right="Went through" />
+      {picks.map(pick => {
+        const state = pick.actual_winner === null ? 'pending' : pick.correct ? 'correct' : 'wrong'
+        return (
+          <div
+            key={pick.match_id}
+            className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle last:border-b-0"
+          >
+            <span className={BP_COL.mark}><BPMark state={state} /></span>
+            <span className={BP_COL.round}>{BP_STAGE_LABELS[pick.stage] ?? pick.stage}</span>
+            <span className={BP_COL.yours} style={{ color: pickColor(state) }}>
+              {nameOf(pick.predicted_winner) ?? '—'}
+            </span>
+            <span className={`${BP_COL.actual} text-ink`}>
+              {state === 'pending'
+                ? <span className="text-muted">Not decided</span>
+                : nameOf(pick.actual_winner)}
+            </span>
+            <span className={BP_COL.xp} style={{ color: pick.correct ? 'var(--success-700)' : 'var(--sp-slate)' }}>
+              +{pick.xp}
+            </span>
+          </div>
+        )
+      })}
+    </BPSectionCard>
   )
 }
 
@@ -905,6 +1028,8 @@ export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: 
       {/* Badge Grid */}
       <BPBadgeGrid earnedBadges={bpXpBreakdown.earnedBadges} />
 
+      <BPGroupPicksSection groups={bpXpBreakdown.groupXP} teams={teams} />
+      <BPThirdPlaceSection picks={bpXpBreakdown.thirdPlaceXP} teams={teams} />
       <BPKnockoutPicksSection picks={bpXpBreakdown.knockoutXP} teams={teams} />
 
       {/* You vs The Pool + Pool Stats (side by side on desktop) */}
