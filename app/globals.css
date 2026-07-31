@@ -664,11 +664,32 @@ html.dark {
    monospace face (Menlo-Bold on iOS, `monospace` on Android). It is the single
    most recognisable part of the type system, so it gets its own utility rather
    than being reassembled at each call site. */
+/* Bold monospace numerals — the app's single most distinctive signature. The
+   weight goes through a custom property rather than a literal so the heavier
+   variants below can lift it without depending on utility source order (a
+   plain `font-extrabold` alongside `t-num` is a same-layer conflict, and which
+   one wins is not something a call site should have to reason about). */
 @utility t-num {
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 700;
+  font-weight: var(--t-num-weight, 700);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* The weights the app actually renders: 400 where mobile uses fontFamilies.mono
+   (in-row scorelines), 800 for stat values, 900 for the one hero figure in a
+   group. Reach for these rather than a bare `font-normal`/`font-extrabold`
+   beside `t-num` — that is a same-layer font-weight conflict. */
+@utility t-num-regular {
+  --t-num-weight: 400;
+}
+
+@utility t-num-extrabold {
+  --t-num-weight: 800;
+}
+
+@utility t-num-black {
+  --t-num-weight: 900;
 }
 
 /* Hide scrollbar for tab navigation on mobile */

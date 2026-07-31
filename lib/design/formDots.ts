@@ -49,6 +49,27 @@ export function tierTint(type: string, percent = 20): string {
   return `color-mix(in srgb, ${tierColor(type)} ${percent}%, transparent)`
 }
 
+/**
+ * The tier pill: the tier colour as the label, the same colour at 12% as the
+ * fill. Mirrors MatchRow in mobile/app/pool/[id]/breakdown.tsx, which builds it
+ * with `withOpacity(typeColor, 0.12)`.
+ *
+ * Written out as whole class strings because Tailwind scans source text — a
+ * composed `text-tier-${type}` never reaches the stylesheet.
+ */
+const TIER_CHIP_CLASS: Record<string, string> = {
+  exact: 'text-tier-exact bg-tier-exact/12',
+  winner_gd: 'text-tier-winner-gd bg-tier-winner-gd/12',
+  winner: 'text-tier-winner bg-tier-winner/12',
+  miss: 'text-tier-miss bg-tier-miss/12',
+  submitted: 'text-muted bg-muted/12',
+  no_pick: 'text-muted bg-muted/12',
+}
+
+export function tierChipClass(type: string): string {
+  return TIER_CHIP_CLASS[type] ?? TIER_CHIP_CLASS.no_pick
+}
+
 /** Label for each tier, used by the leaderboard legend. */
 export const FORM_LEGEND: readonly (readonly [FormResult, string])[] = [
   ['exact', 'Exact'],

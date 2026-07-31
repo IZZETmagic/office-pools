@@ -459,7 +459,7 @@ function StreakCard({ icon, caption, value, color, kind, bordered, footer }: {
     >
       <Icon name={icon} size={22} weight="semibold" tint={color} />
       <span className="text-[10px] font-semibold uppercase tracking-[0.4px] text-muted text-center">{caption}</span>
-      <span className="t-num font-black text-[36px] leading-10" style={{ color }}>{value}</span>
+      <span className="t-num t-num-black text-[36px] leading-10" style={{ color }}>{value}</span>
       <StreakBar kind={kind} value={value} color={color} />
       {footer}
     </div>
@@ -732,14 +732,14 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
         <div className="flex items-center justify-around pb-2">
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] font-bold tracking-[0.5px] text-primary-600">YOU</span>
-            <span className="t-num font-black text-[32px] leading-9 text-primary-600">{userAccuracy}%</span>
+            <span className="t-num t-num-black text-[32px] leading-9 text-primary-600">{userAccuracy}%</span>
           </div>
           <span className="w-9 h-9 rounded-pill bg-mist border-[0.5px] border-silver flex items-center justify-center text-[11px] font-black text-muted">
             VS
           </span>
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] font-bold tracking-[0.5px] text-muted">POOL AVG</span>
-            <span className="t-num font-black text-[32px] leading-9 text-muted">{crowdAccuracy}%</span>
+            <span className="t-num t-num-black text-[32px] leading-9 text-muted">{crowdAccuracy}%</span>
           </div>
         </div>
       </div>
@@ -770,7 +770,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
 function PoolStatColumn({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-0.5">
-      <span className="t-num font-black text-2xl leading-7 text-ink">{value}</span>
+      <span className="t-num t-num-black text-2xl leading-7 text-ink">{value}</span>
       <span className="text-[11px] font-medium text-muted text-center">{label}</span>
     </div>
   )

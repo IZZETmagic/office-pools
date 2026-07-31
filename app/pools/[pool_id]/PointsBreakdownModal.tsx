@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, MatchScoreData, PodiumResult } from './types'
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
+import { tierChipClass } from '@/lib/design/formDots'
 
 type PointAdjustmentRecord = {
   id: string
@@ -67,16 +68,10 @@ const TYPE_LABELS: Record<string, string> = {
   miss: 'Miss',
 }
 
-// Tier colours come from lib/design/formDots. The copy that was here had exact on
-// green, winner_gd on blue and winner on amber — all three shifted a step, so the
-// modal explaining your points disagreed with the leaderboard you opened it from.
-const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  exact: { bg: 'bg-tier-exact/15', text: 'text-accent-600' },
-  winner_gd: { bg: 'bg-tier-winner-gd/15', text: 'text-success-700' },
-  winner: { bg: 'bg-tier-winner/15', text: 'text-primary-700' },
-  miss: { bg: 'bg-mist', text: 'text-muted' },
-}
-
+// Tier colours come from lib/design/formDots (tierChipClass). The private copy
+// that was here had exact on green, winner_gd on blue and winner on amber — all
+// three shifted a step, so the modal explaining your points disagreed with the
+// leaderboard you opened it from.
 const BONUS_CATEGORY_ORDER = ['group_standings', 'qualification', 'bracket', 'tournament'] as const
 
 const BONUS_CATEGORY_CONFIG: Record<string, { label: string }> = {
@@ -87,10 +82,13 @@ const BONUS_CATEGORY_CONFIG: Record<string, { label: string }> = {
 }
 
 // Bracket Picker prediction status colors and labels
-const BP_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  correct: { bg: 'bg-tier-winner-gd/15', text: 'text-success-700' },
-  miss: { bg: 'bg-mist', text: 'text-muted' },
-  pending: { bg: 'bg-warning-500/15', text: 'text-warning-700' },
+/* statusColor in the RN breakdown screen — green / amber / slate, each as its
+   own label colour over the same colour at 12%. Whole strings so Tailwind's
+   scanner sees them. */
+const BP_STATUS_CHIP: Record<string, string> = {
+  correct: 'text-success-600 bg-success-600/12',
+  pending: 'text-warning-500 bg-warning-500/12',
+  miss: 'text-muted bg-muted/12',
 }
 
 const BP_TYPE_LABELS: Record<string, string> = {
@@ -126,18 +124,15 @@ const BP_CATEGORY_CONFIG: Record<string, { label: string }> = {
 
 /** SummaryCell from the RN breakdown screen: caption label over a mono numeral. */
 function SummaryCell({
-  label, value, color, bold, signed,
+  label, value, tone, bold, signed,
 }: {
-  label: string; value: number; color: string; bold?: boolean; signed?: boolean
+  label: string; value: number; tone: string; bold?: boolean; signed?: boolean
 }) {
   const display = signed && value > 0 ? `+${value.toLocaleString()}` : value.toLocaleString()
   return (
     <div className="flex-1 flex flex-col items-center gap-1">
       <span className="t-caption text-muted">{label}</span>
-      <span
-        className={`t-num ${bold ? 'text-2xl font-black' : 'text-xl font-extrabold'}`}
-        style={{ color }}
-      >
+      <span className={`t-num ${bold ? 't-num-black text-2xl' : 't-num-extrabold text-xl'} ${tone}`}>
         {display}
       </span>
     </div>
@@ -521,23 +516,23 @@ export function PointsBreakdownModal({
             <SummaryCell
               label={predictionMode === 'bracket_picker' ? 'Picks' : 'Match'}
               value={matchPoints}
-              color="var(--primary-600)"
+              tone="text-primary-600"
             />
             <SummaryDivider />
-            <SummaryCell label="Bonus" value={bonusPoints} color="var(--warning-500)" />
+            <SummaryCell label="Bonus" value={bonusPoints} tone="text-warning-500" />
             {(entry.point_adjustment ?? 0) !== 0 && (
               <>
                 <SummaryDivider />
                 <SummaryCell
                   label="Adj."
                   value={entry.point_adjustment ?? 0}
-                  color={(entry.point_adjustment ?? 0) > 0 ? 'var(--success-600)' : 'var(--danger-600)'}
+                  tone={(entry.point_adjustment ?? 0) > 0 ? 'text-success-600' : 'text-danger-600'}
                   signed
                 />
               </>
             )}
             <SummaryDivider />
-            <SummaryCell label="Total" value={totalPoints} color="var(--sp-ink)" bold />
+            <SummaryCell label="Total" value={totalPoints} tone="text-ink" bold />
           </div>
 
           {/* ========================================== */}
@@ -628,17 +623,17 @@ export function PointsBreakdownModal({
                           {stats && (stats.correct > 0 || stats.miss > 0 || stats.pending > 0) && (
                             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle">
                               {stats.correct > 0 && (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.correct.bg} ${BP_TYPE_COLORS.correct.text}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${BP_STATUS_CHIP.correct}`}>
                                   {stats.correct} Correct
                                 </span>
                               )}
                               {stats.miss > 0 && (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.miss.bg} ${BP_TYPE_COLORS.miss.text}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${BP_STATUS_CHIP.miss}`}>
                                   {stats.miss} Miss
                                 </span>
                               )}
                               {stats.pending > 0 && (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${BP_TYPE_COLORS.pending.bg} ${BP_TYPE_COLORS.pending.text}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${BP_STATUS_CHIP.pending}`}>
                                   {stats.pending} Pending
                                 </span>
                               )}
@@ -655,7 +650,9 @@ export function PointsBreakdownModal({
                                   className="flex items-center justify-between px-3 py-2 text-xs"
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <span className={`flex-shrink-0 text-[10px] font-medium w-14 text-center py-0.5 rounded ${BP_TYPE_COLORS[status].bg} ${BP_TYPE_COLORS[status].text}`}>
+                                    <span
+                                      className={`shrink-0 w-14 text-center rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${BP_STATUS_CHIP[status]}`}
+                                    >
                                       {BP_TYPE_LABELS[status]}
                                     </span>
                                     <span className={`leading-snug truncate ${status === 'correct' ? 'text-muted' : status === 'pending' ? 'text-warning-600' : 'text-muted'}`}>
@@ -993,22 +990,22 @@ export function PointsBreakdownModal({
         {/* Hit type summary bar */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle">
           {stats.exact > 0 && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TYPE_COLORS.exact.bg} ${TYPE_COLORS.exact.text}`}>
+            <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass('exact')}`}>
               {stats.exact} Exact
             </span>
           )}
           {stats.winnerGd > 0 && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TYPE_COLORS.winner_gd.bg} ${TYPE_COLORS.winner_gd.text}`}>
+            <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass('winner_gd')}`}>
               {stats.winnerGd} W+GD
             </span>
           )}
           {stats.winner > 0 && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TYPE_COLORS.winner.bg} ${TYPE_COLORS.winner.text}`}>
+            <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass('winner')}`}>
               {stats.winner} Winner
             </span>
           )}
           {stats.miss > 0 && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TYPE_COLORS.miss.bg} ${TYPE_COLORS.miss.text}`}>
+            <span className={`inline-flex items-center gap-1 rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass('miss')}`}>
               {stats.miss} Miss
             </span>
           )}
@@ -1023,19 +1020,18 @@ export function PointsBreakdownModal({
           {details.map((d) => (
             <div key={d.matchNumber} className="flex items-center gap-2 px-4 py-1.5">
               <span
-                className={`shrink-0 text-center px-1.5 py-0.5 rounded-pill text-[9px] font-bold ${TYPE_COLORS[d.type].bg} ${TYPE_COLORS[d.type].text}`}
-                style={{ width: 52 }}
+                className={`shrink-0 w-13 text-center rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass(d.type)}`}
               >
                 {TYPE_LABELS[d.type]}
               </span>
 
               <span className="shrink-0 w-9 flex flex-col items-center gap-px">
-                <span className="t-num text-xs text-ink">{d.predictedHome}-{d.predictedAway}</span>
+                <span className="t-num t-num-regular text-xs text-ink">{d.predictedHome}-{d.predictedAway}</span>
                 <span className="text-[8px] font-medium text-muted">Pred</span>
               </span>
 
               <span className="shrink-0 w-10 flex flex-col items-center gap-px">
-                <span className="t-num text-xs text-ink">{d.actualHome}-{d.actualAway}</span>
+                <span className="t-num t-num-regular text-xs text-ink">{d.actualHome}-{d.actualAway}</span>
                 <span className="text-[8px] font-medium text-muted">Actual</span>
               </span>
 
@@ -1044,8 +1040,7 @@ export function PointsBreakdownModal({
               </span>
 
               <span
-                className="shrink-0 t-num text-xs"
-                style={{ color: d.points > 0 ? 'var(--success-600)' : 'var(--sp-slate)' }}
+                className={`shrink-0 t-num t-num-extrabold text-xs ${d.points > 0 ? 'text-success-600' : 'text-muted'}`}
               >
                 {d.points > 0 ? `+${formatNumber(d.points)}` : '0'}
               </span>
