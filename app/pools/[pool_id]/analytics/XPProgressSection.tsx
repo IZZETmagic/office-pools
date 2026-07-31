@@ -35,13 +35,13 @@ const TIER_BORDER_COLORS: Record<string, string> = {
 
 const TIER_BG_COLORS: Record<string, string> = {
   Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400',
-  Silver: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300',
+  Silver: 'bg-neutral-200 dark:bg-neutral-700 text-muted',
   Gold: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
   Platinum: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
 }
 
 const RARITY_COLORS: Record<string, string> = {
-  Common: 'text-neutral-500 dark:text-neutral-400',
+  Common: 'text-muted',
   Uncommon: 'text-success-600 dark:text-success-400',
   Rare: 'text-primary-600 dark:text-primary-400',
   'Very Rare': 'text-accent-500 dark:text-accent-500',
@@ -104,7 +104,7 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
           {/* Level info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white truncate">
+              <h3 className="text-xl sm:text-2xl font-bold text-ink truncate">
                 {currentLevel.name}
               </h3>
               {isMaxLevel && (
@@ -113,7 +113,7 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
                 </span>
               )}
             </div>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-muted">
               {isMaxLevel
                 ? `${totalXP.toLocaleString()} XP earned — legendary status achieved`
                 : `${totalXP.toLocaleString()} XP — ${xpBreakdown.xpToNextLevel.toLocaleString()} XP to ${nextLevel.name}`
@@ -125,9 +125,9 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
           <div className="flex-shrink-0 flex items-center gap-2">
             <div className="text-right hidden sm:block">
               <div className="text-2xl font-black text-accent-500">{totalXP.toLocaleString()}</div>
-              <div className="text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Total XP</div>
+              <div className="text-xs font-medium uppercase tracking-wider text-muted">Total XP</div>
             </div>
-            <svg className="w-5 h-5 text-neutral-300 dark:text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5 text-neutral-300 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </div>
@@ -136,10 +136,10 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
         {/* XP Progress Bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+            <span className="text-xs font-semibold text-muted">
               Level {currentLevel.level}
             </span>
-            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+            <span className="text-xs font-semibold text-muted">
               {isMaxLevel ? 'MAX LEVEL' : `Level ${nextLevel.level}`}
             </span>
           </div>
@@ -153,10 +153,10 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
             />
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-[10px] text-neutral-400">
+            <span className="text-[10px] text-muted">
               {currentLevel.xpRequired.toLocaleString()} XP
             </span>
-            <span className="text-[10px] text-neutral-400">
+            <span className="text-[10px] text-muted">
               {isMaxLevel ? '' : `${nextLevel.xpRequired.toLocaleString()} XP`}
             </span>
           </div>
@@ -179,8 +179,8 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
       <div
         className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
           earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-neutral-200 dark:border-neutral-700 shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
-            : 'bg-neutral-100 dark:bg-neutral-400/90 border border-neutral-200 dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
+            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-border-subtle shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
+            : 'bg-mist dark:bg-neutral-400/90 border border-border-subtle dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
         } ${def.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
         onClick={onSelect}
         role="button"
@@ -193,7 +193,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         </div>
 
         {/* Name */}
-        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-600'}`}>
+        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-ink' : 'text-muted dark:text-muted'}`}>
           {def.name}
         </div>
 
@@ -211,7 +211,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         {/* Lock overlay for unearned */}
         {!earned && (
           <div className="absolute top-1.5 right-1.5">
-            <svg className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-3.5 h-3.5 text-muted dark:text-muted" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
             </svg>
           </div>
@@ -225,7 +225,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         {earned ? (
           <div className="text-success-400 font-bold mt-1">✓ Earned · +{def.xpBonus} XP</div>
         ) : (
-          <div className="text-neutral-400 mt-1">🔒 Locked</div>
+          <div className="text-muted mt-1">🔒 Locked</div>
         )}
         {/* Tooltip arrow */}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-700" />
@@ -252,7 +252,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors z-10"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors z-10"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -266,7 +266,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
           </div>
 
           {/* Badge name */}
-          <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1.5">
+          <h3 className="text-lg font-bold text-ink mb-1.5">
             {badge.name}
           </h3>
 
@@ -281,7 +281,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
           </div>
 
           {/* Condition description */}
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-5">
+          <p className="text-sm text-muted mb-5">
             {badge.condition}
           </p>
 
@@ -294,11 +294,11 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
               <span className="text-sm font-semibold text-success-700 dark:text-success-300">Earned · +{badge.xpBonus} XP</span>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
-              <svg className="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-mist border border-border-subtle">
+              <svg className="w-4 h-4 text-muted" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
-              <span className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Locked · +{badge.xpBonus} XP</span>
+              <span className="text-sm font-medium text-muted">Locked · +{badge.xpBonus} XP</span>
             </div>
           )}
         </div>
@@ -354,13 +354,13 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
         className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
       >
-        <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
+        <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
               <span>🏅</span>
               <span>Badges</span>
             </h4>
-            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+            <span className="text-xs font-medium text-muted">
               {earnedBadges.length} / {BADGE_DEFINITIONS.length} earned
             </span>
           </div>
@@ -454,7 +454,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Label */}
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-neutral-500 dark:text-neutral-400 mb-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted mb-1">
               Current Streak
             </div>
 
@@ -470,7 +470,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
                 return (
                   <div
                     key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[var(--sp-midnight)]' : ''}`}
+                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-mist dark:bg-[var(--sp-midnight)]' : ''}`}
                     style={filled ? {
                       background: 'linear-gradient(to right, var(--warning-600), var(--warning-500))',
                       boxShadow: '0 0 8px rgba(245, 158, 11, 0.25)',
@@ -481,7 +481,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Personal best */}
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+            <div className="text-[10px] text-muted">
               Personal best: <span className="font-bold" style={{ color: 'var(--warning-500)' }}>{longestHotStreak}</span>
               {' '}— can you beat it? 🔥
             </div>
@@ -489,7 +489,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
         </div>
 
         {/* ===== COLD STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-neutral-200 dark:border-border-default py-[18px] px-[14px] text-center">
+        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-border-subtle dark:border-border-default py-[18px] px-[14px] text-center">
           {/* Background snowflake (decorative, 4% opacity) */}
           <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.04] pointer-events-none">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
@@ -510,7 +510,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Label */}
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-neutral-500 dark:text-neutral-400 mb-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted mb-1">
               Worst Cold Streak
             </div>
 
@@ -526,7 +526,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
                 return (
                   <div
                     key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[var(--sp-midnight)]' : ''}`}
+                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-mist dark:bg-[var(--sp-midnight)]' : ''}`}
                     style={filled ? {
                       backgroundColor: `rgba(56, 189, 248, ${0.10 + 0.18 * (i + 1)})`,
                     } : undefined}
@@ -536,7 +536,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Status line */}
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+            <div className="text-[10px] text-muted">
               Currently:{' '}
               {isCurrentlyCold ? (
                 <>
@@ -590,13 +590,13 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
       onClick={() => setTooltip(null)}
     >
       {/* Header */}
-      <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
+      <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
             <span>🏃</span>
             <span>Your Tournament Run</span>
           </h4>
-          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <span className="text-xs font-medium text-muted">
             {sorted.length} matches
           </span>
         </div>
@@ -642,7 +642,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                 <div
                   key={match.matchId}
                   className={`flex-shrink-0 w-[34px] h-[34px] rounded-full border-2 flex items-center justify-center cursor-default ${
-                    isMiss ? 'bg-neutral-50 dark:bg-[var(--sp-midnight)]' : ''
+                    isMiss ? 'bg-snow dark:bg-[var(--sp-midnight)]' : ''
                   }`}
                   style={{
                     borderColor: isMiss ? 'rgba(71, 85, 105, 0.55)' : config.color,
@@ -690,7 +690,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
 
       {/* Legend */}
       <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-        <div className="border-t border-neutral-200 dark:border-neutral-700 pt-3">
+        <div className="border-t border-border-subtle pt-3">
           <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
             {JOURNEY_LEGEND.map((item) => (
               <div key={item.label} className="flex items-center gap-1.5">
@@ -701,7 +701,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                     boxShadow: item.glow ? `0 0 6px ${hexWithAlpha(item.color, 0.27)}` : 'none',
                   }}
                 />
-                <span className="text-[10px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                <span className="text-[10px] text-muted whitespace-nowrap">
                   {item.label}
                 </span>
               </div>
@@ -805,7 +805,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
       {/* Content */}
       <div className="relative z-10 p-[18px]">
         {/* Heading */}
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
+        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
           You vs The Crowd
         </h4>
 
@@ -823,7 +823,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
 
           {/* VS Badge */}
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[var(--sp-midnight)]"
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-border-subtle dark:border-[var(--sp-midnight)]"
             style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
           >
             <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
@@ -851,13 +851,13 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
               <div key={bar.label}>
                 {/* Label row */}
                 <div className="flex items-center justify-between mb-[5px]">
-                  <span className="text-[11px] text-neutral-500 dark:text-[var(--neutral-400)]">{bar.label}</span>
-                  <span className="text-[10px] font-mono text-neutral-400 dark:text-[var(--neutral-500)]">
+                  <span className="text-[11px] text-muted dark:text-[var(--neutral-400)]">{bar.label}</span>
+                  <span className="text-[10px] font-mono text-muted dark:text-[var(--neutral-500)]">
                     {bar.you} vs {bar.crowd}
                   </span>
                 </div>
                 {/* Bar track */}
-                <div className="relative h-2 rounded bg-neutral-100 dark:bg-[var(--sp-midnight)]">
+                <div className="relative h-2 rounded bg-mist dark:bg-[var(--sp-midnight)]">
                   {/* Player fill (grows from left) */}
                   <div
                     className="absolute top-0 left-0 h-full rounded-l"
@@ -955,14 +955,14 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
     <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default">
       <div className="p-[18px]">
         {/* Heading */}
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
+        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
           Pool-Wide Stats
         </h4>
 
         {/* Summary Stats Row */}
         <div className="flex items-center justify-around mb-[18px]">
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
+            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
               {Math.round(avgPoolAccuracy * 100)}%
             </div>
             <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
@@ -970,7 +970,7 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
+            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
               {totalEntries}
             </div>
             <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
@@ -978,7 +978,7 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
+            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
               {totalCompletedMatches}
             </div>
             <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
@@ -998,15 +998,15 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
               <div
                 key={m.matchId}
                 className={`flex items-center justify-between py-2 ${
-                  idx < topPredictable.length - 1 ? 'border-b border-neutral-100 dark:border-[var(--sp-midnight)]' : ''
+                  idx < topPredictable.length - 1 ? 'border-b border-border-subtle dark:border-[var(--sp-midnight)]' : ''
                 }`}
               >
-                <span className="text-xs text-neutral-500 dark:text-[var(--neutral-400)] truncate mr-2">
+                <span className="text-xs text-muted dark:text-[var(--neutral-400)] truncate mr-2">
                   {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
                 </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[var(--sp-midnight)]">
+                  <div className="w-10 h-1 rounded-sm bg-mist dark:bg-[var(--sp-midnight)]">
                     <div
                       className="h-full rounded-sm"
                       style={{
@@ -1035,15 +1035,15 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
               <div
                 key={m.matchId}
                 className={`flex items-center justify-between py-2 ${
-                  idx < topUpsets.length - 1 ? 'border-b border-neutral-100 dark:border-[var(--sp-midnight)]' : ''
+                  idx < topUpsets.length - 1 ? 'border-b border-border-subtle dark:border-[var(--sp-midnight)]' : ''
                 }`}
               >
-                <span className="text-xs text-neutral-500 dark:text-[var(--neutral-400)] truncate mr-2">
+                <span className="text-xs text-muted dark:text-[var(--neutral-400)] truncate mr-2">
                   {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
                 </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[var(--sp-midnight)]">
+                  <div className="w-10 h-1 rounded-sm bg-mist dark:bg-[var(--sp-midnight)]">
                     <div
                       className="h-full rounded-sm"
                       style={{
@@ -1193,7 +1193,7 @@ function MatchResultsSection({
   return (
     <div style={{ animation: 'fadeUp 0.35s ease 0.1s both' }}>
       {/* Section Heading */}
-      <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
+      <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
         Match Results
       </h4>
 
@@ -1241,7 +1241,7 @@ function MatchResultsSection({
 
       {/* Empty state for filter */}
       {displayList.length === 0 && (
-        <div className="py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">
+        <div className="py-8 text-center text-sm text-muted">
           No matches match this filter.
         </div>
       )}
@@ -1251,7 +1251,7 @@ function MatchResultsSection({
         <div className="flex items-center justify-center gap-3 mt-4">
           <button
             onClick={() => setVisibleCount(v => v + 10)}
-            className="text-sm font-medium px-4 py-2 rounded-chip transition-colors bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            className="text-sm font-medium px-4 py-2 rounded-chip transition-colors bg-mist text-muted hover:bg-neutral-200 dark:hover:bg-neutral-700"
           >
             Show 10 more
           </button>
@@ -1320,7 +1320,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         {/* Top row: Match meta + Status badge */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
+            <span className="text-[10px] font-medium text-muted">
               #{card.matchNumber}
             </span>
             <span
@@ -1362,27 +1362,27 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         <div className="flex items-center justify-between mb-1.5">
           {/* Team names */}
           <div className="flex-1 min-w-0 mr-3">
-            <div className="text-sm font-semibold text-neutral-900 dark:text-[var(--neutral-100)] truncate">
+            <div className="text-sm font-semibold text-ink dark:text-[var(--neutral-100)] truncate">
               {card.homeTeamName}
             </div>
-            <div className="text-sm font-semibold text-neutral-900 dark:text-[var(--neutral-100)] truncate">
+            <div className="text-sm font-semibold text-ink dark:text-[var(--neutral-100)] truncate">
               {card.awayTeamName}
             </div>
           </div>
 
           {/* Actual score */}
           <div className="text-right mr-3">
-            <div className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">
+            <div className="text-[10px] font-medium text-muted mb-0.5">
               Actual
             </div>
-            <div className="font-mono text-[17px] font-extrabold text-neutral-900 dark:text-white leading-tight">
+            <div className="font-mono text-[17px] font-extrabold text-ink leading-tight">
               {card.actualHomeScore} - {card.actualAwayScore}
             </div>
           </div>
 
           {/* Predicted score */}
           <div className="text-right">
-            <div className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">
+            <div className="text-[10px] font-medium text-muted mb-0.5">
               Yours
             </div>
             <div
@@ -1397,7 +1397,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         </div>
 
         {/* Bottom row: XP earned + Consensus */}
-        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800/50">
+        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border-subtle/50">
           <div className="flex items-center gap-2">
             {/* XP pill */}
             <span
@@ -1413,7 +1413,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
 
           {/* Consensus % */}
           {card.consensusPct !== null && (
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+            <span className="text-[10px] text-muted">
               {Math.round(card.consensusPct * 100)}% of pool got this right
             </span>
           )}
@@ -1461,14 +1461,14 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0">
-          <h3 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle flex-shrink-0">
+          <h3 className="text-lg font-bold text-ink flex items-center gap-2">
             <span>🗺️</span>
             <span>Level Roadmap</span>
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1491,14 +1491,14 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
                       ? 'bg-accent-50 dark:bg-accent-50 border border-accent-500/30'
                       : isReached
                         ? 'bg-success-50/50 dark:bg-success-900/10'
-                        : 'bg-neutral-50 dark:bg-neutral-800/30'
+                        : 'bg-snow/30'
                   }`}
                 >
                   {/* Check / number circle */}
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                     isReached
                       ? 'bg-success-500 text-white'
-                      : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
+                      : 'bg-neutral-200 dark:bg-neutral-700 text-muted'
                   }`}>
                     {isReached ? (
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1513,13 +1513,13 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm font-semibold ${
                       isCurrent ? 'text-accent-700 dark:text-accent-500'
-                        : isReached ? 'text-neutral-900 dark:text-white'
-                          : 'text-neutral-500 dark:text-neutral-600'
+                        : isReached ? 'text-ink'
+                          : 'text-muted dark:text-muted'
                     }`}>
                       {level.name}
                     </div>
                     {level.badge && (
-                      <div className="text-[10px] text-neutral-400 dark:text-neutral-600">
+                      <div className="text-[10px] text-muted dark:text-muted">
                         Unlocks: {level.badge}
                       </div>
                     )}
@@ -1529,7 +1529,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
                   <span className={`text-xs font-medium tabular-nums flex-shrink-0 ${
                     isCurrent ? 'text-accent-700 dark:text-accent-500'
                       : isReached ? 'text-success-600 dark:text-success-400'
-                        : 'text-neutral-400 dark:text-neutral-600'
+                        : 'text-muted dark:text-muted'
                   }`}>
                     {level.xpRequired.toLocaleString()} XP
                   </span>
@@ -1539,9 +1539,9 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
           </div>
 
           {/* Current XP summary at bottom */}
-          <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700 text-center">
+          <div className="mt-4 pt-4 border-t border-border-subtle text-center">
             <div className="text-2xl font-black text-accent-500">{xpBreakdown.totalXP.toLocaleString()} XP</div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+            <div className="text-xs text-muted mt-0.5">
               {xpBreakdown.nextLevel
                 ? `${xpBreakdown.xpToNextLevel.toLocaleString()} XP to ${xpBreakdown.nextLevel.name}`
                 : 'Maximum level reached'

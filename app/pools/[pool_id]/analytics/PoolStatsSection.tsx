@@ -69,33 +69,33 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+      <h3 className="text-lg font-semibold text-ink">
         Pool-Wide Stats
       </h3>
 
       {/* Summary Row */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-neutral-900 dark:text-white">
+          <p className="text-3xl font-bold text-ink">
             {Math.round(avgPoolAccuracy * 100)}%
           </p>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mt-1">
+          <p className="text-xs font-medium text-muted uppercase mt-1">
             Avg Pool Accuracy
           </p>
         </div>
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-neutral-900 dark:text-white">
+          <p className="text-3xl font-bold text-ink">
             {totalCompletedMatches}
           </p>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mt-1">
+          <p className="text-xs font-medium text-muted uppercase mt-1">
             Completed Matches
           </p>
         </div>
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-neutral-900 dark:text-white">
+          <p className="text-3xl font-bold text-ink">
             {totalEntries}
           </p>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mt-1">
+          <p className="text-xs font-medium text-muted uppercase mt-1">
             Submitted Entries
           </p>
         </div>
@@ -104,8 +104,8 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
       {/* Predictability Chart */}
       {chartData.length > 0 && (
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Match Predictability</h4>
+          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
+            <h4 className="text-sm font-semibold text-ink">Match Predictability</h4>
           </div>
           <div className="p-4 sm:p-5">
             <div className="h-[240px] sm:h-[300px]">
@@ -141,8 +141,8 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Most Predictable */}
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Most Predictable</h4>
+          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
+            <h4 className="text-sm font-semibold text-ink">Most Predictable</h4>
           </div>
           <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {mostPredictable.map((m, idx) => (
@@ -152,10 +152,10 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
                     {idx + 1}.
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-ink truncate">
                       {m.homeTeamName} vs {m.awayTeamName}
                     </p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    <p className="text-xs text-muted">
                       {STAGE_LABELS[m.stage] ?? m.stage} &middot; {m.actualScore}
                     </p>
                   </div>
@@ -164,7 +164,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
                   <p className="text-sm font-bold text-success-600 dark:text-success-400">
                     {Math.round(m.hitRate * 100)}%
                   </p>
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                  <p className="text-[10px] text-muted">
                     {m.correctCount}/{m.totalPredictions}
                   </p>
                 </div>
@@ -175,8 +175,8 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
 
         {/* Biggest Upsets */}
         <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Biggest Upsets</h4>
+          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
+            <h4 className="text-sm font-semibold text-ink">Biggest Upsets</h4>
           </div>
           <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {leastPredictable.map((m, idx) => (
@@ -186,10 +186,10 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
                     {idx + 1}.
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-ink truncate">
                       {m.homeTeamName} vs {m.awayTeamName}
                     </p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    <p className="text-xs text-muted">
                       {STAGE_LABELS[m.stage] ?? m.stage} &middot; {m.actualScore}
                     </p>
                   </div>
@@ -198,7 +198,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
                   <p className="text-sm font-bold text-danger-600 dark:text-danger-400">
                     {Math.round(m.hitRate * 100)}%
                   </p>
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                  <p className="text-[10px] text-muted">
                     {m.correctCount}/{m.totalPredictions}
                   </p>
                 </div>

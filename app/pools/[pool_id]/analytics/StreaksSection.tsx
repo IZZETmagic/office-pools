@@ -38,7 +38,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+      <h3 className="text-lg font-semibold text-ink">
         Hot & Cold Streaks
       </h3>
 
@@ -56,10 +56,10 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
                 {currentStreak.length}
               </span>
             ) : (
-              <span className="text-3xl font-bold text-neutral-400">-</span>
+              <span className="text-3xl font-bold text-muted">-</span>
             )}
           </div>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">
+          <p className="text-xs font-medium text-muted uppercase">
             {currentStreak.type === 'hot'
               ? 'Current Hot Streak'
               : currentStreak.type === 'cold'
@@ -73,7 +73,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
           <p className="text-3xl font-bold text-success-600 dark:text-success-400 mb-1">
             {longestHotStreak}
           </p>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">
+          <p className="text-xs font-medium text-muted uppercase">
             Best Hot Streak
           </p>
         </div>
@@ -83,7 +83,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
           <p className="text-3xl font-bold text-danger-600 dark:text-danger-400 mb-1">
             {longestColdStreak}
           </p>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">
+          <p className="text-xs font-medium text-muted uppercase">
             Worst Cold Streak
           </p>
         </div>
@@ -91,8 +91,8 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
 
       {/* Timeline */}
       <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
-          <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Match Timeline</h4>
+        <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
+          <h4 className="text-sm font-semibold text-ink">Match Timeline</h4>
         </div>
         <div className="p-4 sm:p-5">
           <div className="overflow-x-auto pb-2">
@@ -118,11 +118,11 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
           </div>
 
           {/* Timeline Legend */}
-          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-border-subtle">
             {Object.entries(DOT_LABELS).map(([key, label]) => (
               <div key={key} className="flex items-center gap-1.5">
                 <div className={`w-2.5 h-2.5 rounded-full ${DOT_COLORS[key]}`} />
-                <span className="text-xs text-neutral-600 dark:text-neutral-400">{label}</span>
+                <span className="text-xs text-muted">{label}</span>
               </div>
             ))}
           </div>
