@@ -1003,6 +1003,7 @@ function MatchResultsSection({
           in a fraction of the height and stay scannable down the score columns. */}
       {displayList.length > 0 && (
         <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <MatchListHeader />
           {displayList.map(card => (
             <MatchCard key={card.matchId} card={card} />
           ))}
@@ -1053,6 +1054,43 @@ function MatchResultsSection({
  * that mapping, and it collapsed winner_gd and winner onto the same green, so the
  * two tiers were indistinguishable — the same conflation the profile had.
  */
+/** Column widths shared by the header and every row, so the numbers line up. */
+const COL = {
+  tier: 'w-4 shrink-0',
+  num: 'w-8 shrink-0 text-right',
+  stage: 'hidden sm:block w-14 shrink-0',
+  fixture: 'flex-1 min-w-0',
+  score: 'w-12 shrink-0 text-right tabular-nums',
+  xp: 'w-12 shrink-0 text-right tabular-nums',
+}
+
+/** Labels the two score columns, so it is obvious which is the result and which is yours. */
+function MatchListHeader() {
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 border-b border-border-subtle">
+      <span className={COL.tier} />
+      <span className={`${COL.num} t-caption text-muted`}>#</span>
+      <span className={`${COL.stage} t-caption text-muted`}>Stage</span>
+      <span className={`${COL.fixture} t-caption text-muted`}>Match</span>
+      <span className={`${COL.score} t-caption text-muted`}>Result</span>
+      <span className={`${COL.score} t-caption text-muted`}>Yours</span>
+      <span className={`${COL.xp} t-caption text-muted`}>XP</span>
+    </div>
+  )
+}
+
+/**
+ * One line per match.
+ *
+ * Every column is a fixed width shared with MatchListHeader, so scores, XP and the
+ * tier marker line up down the list — a run of results is meant to be scannable
+ * vertically. The tier marker sits in its own slot at the LEFT rather than trailing
+ * the row, because it only appears on exact scores and was pushing the right-hand
+ * columns out of alignment on those rows.
+ *
+ * Colours come from lib/design/formDots. The copy that was here was the ninth of
+ * that mapping, and it collapsed winner_gd and winner onto the same green.
+ */
 function MatchCard({ card }: { card: MatchCardData }) {
   const tier = card.resultType === 'miss' ? 'miss' : card.resultType
   const color = tierColor(tier)
@@ -1061,45 +1099,42 @@ function MatchCard({ card }: { card: MatchCardData }) {
 
   return (
     <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 border-b border-border-subtle last:border-b-0">
-      <span className="shrink-0 w-2 h-2 rounded-pill" style={{ background: color }} />
+      {/* Fixed slot: a star for exact, otherwise the tier dot. */}
+      <span className={`${COL.tier} flex items-center justify-center`}>
+        {isExact
+          ? <Icon name="star.fill" size={12} weight="bold" tint={color} />
+          : <span className="w-2 h-2 rounded-pill" style={{ background: color }} />}
+      </span>
 
-      <span className="t-num text-[11px] text-muted w-7 shrink-0">#{card.matchNumber}</span>
+      <span className={`${COL.num} t-num text-[11px] text-muted`}>{card.matchNumber}</span>
 
-      <span
-        className="hidden sm:inline shrink-0 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-mist text-muted"
-      >
+      <span className={`${COL.stage} text-[10px] font-semibold text-muted truncate`}>
         {STAGE_LABELS[card.stage] ?? card.stage}{card.groupLetter ? ` ${card.groupLetter}` : ''}
       </span>
 
-      <span className="flex-1 min-w-0 text-[13px] text-ink truncate">
+      <span className={`${COL.fixture} text-[13px] text-ink truncate`}>
         {card.homeTeamName} v {card.awayTeamName}
+        {card.isContrarian && (
+          <span className="hidden md:inline ml-2 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-primary-600/12 text-primary-700">
+            Contrarian
+          </span>
+        )}
       </span>
 
-      {card.isContrarian && (
-        <span className="hidden md:inline shrink-0 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-primary-600/12 text-primary-700">
-          Contrarian
-        </span>
-      )}
-
-      {/* Actual, then yours in the tier's colour — the comparison is the point, so
-          they sit adjacent rather than in separate labelled blocks. */}
-      <span className="t-num text-[13px] text-muted shrink-0 tabular-nums">
+      {/* Result then yours, in matching columns — the comparison is the point. */}
+      <span className={`${COL.score} t-num text-[13px] text-ink`}>
         {card.actualHomeScore}-{card.actualAwayScore}
       </span>
-      <span className="t-num text-[13px] shrink-0 tabular-nums" style={{ color }}>
+      <span className={`${COL.score} t-num text-[13px]`} style={{ color }}>
         {card.predictedHomeScore}-{card.predictedAwayScore}
       </span>
 
       <span
-        className="t-num text-[11px] shrink-0 w-10 text-right"
+        className={`${COL.xp} t-num text-[11px]`}
         style={{ color: isHit ? 'var(--success-700)' : 'var(--sp-slate)' }}
       >
         +{card.xpEarned}
       </span>
-
-      {isExact && (
-        <Icon name="star.fill" size={11} weight="bold" tint={color} className="shrink-0 hidden sm:block" />
-      )}
     </div>
   )
 }

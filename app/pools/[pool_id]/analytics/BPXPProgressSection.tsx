@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { levelPillClass } from '@/lib/design/levels'
-import type { BPXPBreakdown, BPPoolComparison } from './bracketPickerXpSystem'
+import type { BPXPBreakdown, BPPoolComparison, BPKnockoutPickXP } from './bracketPickerXpSystem'
+import { Icon } from '@/components/ui/Icon'
 import type { EarnedBadge, BadgeDefinition, LevelDefinition } from './xpSystem'
 import { LEVELS } from './xpSystem'
 import { BP_BADGE_DEFINITIONS } from './bracketPickerXpSystem'
@@ -790,6 +791,109 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
 // MAIN COMPONENT
 // =============================================
 
+
+/**
+ * Your knockout picks, round by round.
+ *
+ * The bracket Form tab reported knockout accuracy only as a count — "Knockout
+ * Picks: 8 vs 6" — so there was no way to see WHICH teams you backed or where you
+ * went wrong. knockoutXP has carried predicted_winner, actual_winner and correct
+ * per match all along; it was simply never rendered.
+ *
+ * Each row names your pick and, when it was wrong, the team that actually went
+ * through, so the two are never ambiguous: yours is labelled and coloured by
+ * outcome, the actual result sits beside it under its own heading.
+ */
+function BPKnockoutPicksSection({ picks, teams }: { picks: BPKnockoutPickXP[]; teams: TeamData[] }) {
+  if (picks.length === 0) return null
+
+  const nameOf = (id: string | null) =>
+    id ? (teams.find(t => t.team_id === id)?.country_name ?? 'Unknown') : null
+
+  const decided = picks.filter(p => p.actual_winner !== null)
+  const correct = decided.filter(p => p.correct).length
+
+  const byStage = new Map<string, BPKnockoutPickXP[]>()
+  for (const p of picks) {
+    const list = byStage.get(p.stage) ?? []
+    list.push(p)
+    byStage.set(p.stage, list)
+  }
+
+  return (
+    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="flex items-baseline justify-between px-4 pt-3 pb-2">
+        <h3 className="t-section-header text-ink">Your Knockout Picks</h3>
+        <span className="t-num text-xs text-muted">
+          {decided.length > 0 ? `${correct}/${decided.length} correct` : 'Awaiting results'}
+        </span>
+      </div>
+
+      {/* Column headings, so "your pick" and "went through" are never confused. */}
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle">
+        <span className="w-4 shrink-0" />
+        <span className="w-16 shrink-0 t-caption text-muted">Round</span>
+        <span className="flex-1 min-w-0 t-caption text-muted">Your pick</span>
+        <span className="flex-1 min-w-0 t-caption text-muted">Went through</span>
+        <span className="w-10 shrink-0 text-right t-caption text-muted">XP</span>
+      </div>
+
+      {[...byStage.entries()].map(([stage, items]) =>
+        items.map(pick => {
+          const yours = nameOf(pick.predicted_winner)
+          const actual = nameOf(pick.actual_winner)
+          const pending = pick.actual_winner === null
+          const color = pending
+            ? 'var(--sp-slate)'
+            : pick.correct ? 'var(--sp-tier-winner-gd)' : 'var(--danger-600)'
+
+          return (
+            <div
+              key={pick.match_id}
+              className="flex items-center gap-3 px-4 py-2 border-b border-border-subtle last:border-b-0"
+            >
+              <span className="w-4 shrink-0 flex items-center justify-center">
+                {pending
+                  ? <span className="w-2 h-2 rounded-pill bg-silver" />
+                  : <Icon name={pick.correct ? 'checkmark' : 'xmark'} size={11} weight="bold" tint={color} />}
+              </span>
+
+              <span className="w-16 shrink-0 text-[10px] font-semibold text-muted truncate">
+                {BP_STAGE_LABELS[stage] ?? stage}
+              </span>
+
+              <span className="flex-1 min-w-0 text-[13px] truncate" style={{ color }}>
+                {yours ?? '—'}
+              </span>
+
+              <span className="flex-1 min-w-0 text-[13px] text-ink truncate">
+                {pending ? <span className="text-muted">Not decided</span> : actual}
+              </span>
+
+              <span
+                className="w-10 shrink-0 text-right t-num text-[11px]"
+                style={{ color: pick.correct ? 'var(--success-700)' : 'var(--sp-slate)' }}
+              >
+                +{pick.xp}
+              </span>
+            </div>
+          )
+        }),
+      )}
+    </div>
+  )
+}
+
+const BP_STAGE_LABELS: Record<string, string> = {
+  round_32: 'R32',
+  round_16: 'R16',
+  quarter_final: 'QF',
+  semi_final: 'SF',
+  third_place: '3rd',
+  final: 'Final',
+  finals: 'Final',
+}
+
 export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: BPXPProgressSectionProps) {
   const [showRoadmap, setShowRoadmap] = useState(false)
 
@@ -800,6 +904,8 @@ export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: 
 
       {/* Badge Grid */}
       <BPBadgeGrid earnedBadges={bpXpBreakdown.earnedBadges} />
+
+      <BPKnockoutPicksSection picks={bpXpBreakdown.knockoutXP} teams={teams} />
 
       {/* You vs The Pool + Pool Stats (side by side on desktop) */}
       {bpPoolComparison && (
