@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { levelColor, XP_SOURCE_COLOR } from '@/lib/design/levels'
 import { rarityColor, rarityTint } from '@/lib/design/badges'
-import { tierColor, tierTint } from '@/lib/design/formDots'
+import { FORM_LEGEND, tierColor, tierTint } from '@/lib/design/formDots'
 import { Icon } from '@/components/ui/Icon'
-import { createPortal } from 'react-dom'
 import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from './xpSystem'
 import type { StreakData, CrowdMatch, PoolWideStats, PredictionResult } from './analyticsHelpers'
 import type { PredictionData } from '../types'
@@ -41,23 +40,6 @@ const TIER_BG_COLORS: Record<string, string> = {
 // Legendary on amber — both wrong, and effectively swapped.
 
 // Journey path node config per XP tier
-const NODE_COLORS: Record<XPTier, { color: string; glowColor: string; label: string }> = {
-  // Colours come from lib/design/formDots so the run path agrees with the form dots
-  // and the leaderboard. The copy that was here had exact on amber and winner on the
-  // brand blue — so the same result was gold on one screen and amber on this one.
-  exact: { color: tierColor('exact'), glowColor: tierTint('exact', 40), label: 'Exact Score' },
-  winner_gd: { color: tierColor('winner_gd'), glowColor: tierTint('winner_gd', 27), label: 'Winner + GD' },
-  winner: { color: tierColor('winner'), glowColor: tierTint('winner', 27), label: 'Correct Result' },
-  submitted: { color: tierColor('submitted'), glowColor: 'none', label: 'Miss' },
-}
-
-const JOURNEY_LEGEND: { label: string; color: string; glow: boolean }[] = [
-  { label: 'Exact Score', color: tierColor('exact'), glow: true },
-  { label: 'Winner + GD', color: tierColor('winner_gd'), glow: false },
-  { label: 'Correct Result', color: tierColor('winner'), glow: true },
-  { label: 'Miss', color: tierColor('submitted'), glow: false },
-]
-
 
 // =============================================
 // LEVEL HERO CARD
@@ -521,187 +503,151 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
 // TOURNAMENT RUN (JOURNEY PATH)
 // =============================================
 
-function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crowdData: CrowdMatch[] }) {
-  const sorted = [...matchXP].sort((a, b) => b.matchNumber - a.matchNumber)
-  const crowdMap = useMemo(() => new Map(crowdData.map(c => [c.matchId, c])), [crowdData])
-  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number; matchId: string } | null>(null)
+function TierIcon({ tier, color }: { tier: string; color: string }) {
+  if (tier === 'exact') return <Icon name="star.fill" size={12} weight="bold" tint={color} />
+  if (tier === 'winner_gd') return <Icon name="checkmark" size={11} weight="bold" tint={color} />
+  if (tier === 'winner') {
+    return <span className="font-black text-sm leading-none" style={{ color }}>~</span>
+  }
+  return <Icon name="xmark" size={10} weight="bold" tint={color} />
+}
 
-  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, text: string, matchId: string) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltip({ text, x: rect.left + rect.width / 2, y: rect.top, matchId })
-  }, [])
-
-  const handleMouseLeave = useCallback(() => setTooltip(null), [])
-
-  const handleTap = useCallback((e: React.MouseEvent<HTMLDivElement>, text: string, matchId: string) => {
-    e.stopPropagation()
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltip(prev =>
-      prev?.matchId === matchId ? null : { text, x: rect.left + rect.width / 2, y: rect.top, matchId }
-    )
-  }, [])
-
-  if (sorted.length === 0) return null
-
+/** RunLegend from the app: 7px dots with 11px muted labels, wrapping. */
+function RunLegend() {
   return (
-    <div
-      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
-      style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
-      onClick={() => setTooltip(null)}
-    >
-      {/* Header */}
-      <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-ink flex items-center gap-2">
-            <span>🏃</span>
-            <span>Your Tournament Run</span>
-          </h4>
-          <span className="text-xs font-medium text-muted">
-            {sorted.length} matches
+    <div className="flex flex-wrap gap-3">
+      {FORM_LEGEND.filter(([t]) => t !== 'no_pick').map(([type, label]) => (
+        <span key={type} className="flex items-center gap-1">
+          <span
+            className="w-[7px] h-[7px] rounded-pill"
+            style={{ background: tierColor(type === 'miss' ? 'submitted' : type) }}
+          />
+          <span className="text-[11px] font-medium text-muted">
+            {label === 'W+GD' ? 'Winner + GD' : label === 'Winner' ? 'Correct Result' : label}
           </span>
-        </div>
-      </div>
-
-      {/* Journey Path */}
-      <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-2">
-        <div className="overflow-x-auto journey-scrollbar pb-2">
-          <div className="flex items-center" style={{ minWidth: 'fit-content' }}>
-            {sorted.flatMap((match, idx) => {
-              const config = NODE_COLORS[match.tier]
-              const isMiss = match.tier === 'submitted'
-              const delay = 0.6 + idx * 0.06
-              const elements: React.ReactNode[] = []
-
-              // Connector (not before first node)
-              if (idx > 0) {
-                const prevTier = sorted[idx - 1].tier
-                const isMutedConnector = prevTier === 'submitted'
-
-                elements.push(
-                  <div
-                    key={`c-${idx}`}
-                    className="flex-shrink-0 h-[2px] w-5"
-                    style={{
-                      // Connector in the app: the PREVIOUS node's tier at 35%,
-                      // or silver at 30% when that node was a miss.
-                      background: isMutedConnector
-                        ? tierTint('submitted', 30)
-                        : `linear-gradient(to right, ${tierTint(prevTier, 40)}, ${tierTint(prevTier, 15)})`,
-                      animation: `nodeEnter 0.4s ease ${delay}s both`,
-                    }}
-                  />
-                )
-              }
-
-              // Node with hover tooltip
-              const crowd = crowdMap.get(match.matchId)
-              const tooltipText = crowd
-                ? `#${match.matchNumber} · ${crowd.homeTeamName} ${crowd.actualHomeScore} - ${crowd.actualAwayScore} ${crowd.awayTeamName}`
-                : `#${match.matchNumber} · ${config.label}`
-
-              elements.push(
-                <div
-                  key={match.matchId}
-                  className={`flex-shrink-0 w-[34px] h-[34px] rounded-full border-2 flex items-center justify-center cursor-default ${
-                    isMiss ? 'bg-snow dark:bg-[var(--sp-midnight)]' : ''
-                  }`}
-                  style={{
-                    borderColor: isMiss ? 'var(--sp-silver)' : config.color,
-                    background: isMiss
-                      ? undefined
-                      : `radial-gradient(circle, ${tierTint(match.tier, 35)}, ${tierTint(match.tier, 15)})`,
-                    boxShadow: !isMiss && match.tier !== 'exact'
-                      ? `0 0 8px ${config.glowColor}`
-                      : 'none',
-                    color: isMiss ? 'var(--sp-slate)' : config.color,
-                    animation: match.tier === 'exact'
-                      ? `nodeEnter 0.4s ease ${delay}s both, exactGlow 2s ease-in-out ${delay + 0.4}s infinite`
-                      : `nodeEnter 0.4s ease ${delay}s both`,
-                  }}
-                  onMouseEnter={(e) => handleMouseEnter(e, tooltipText, match.matchId)}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => handleTap(e, tooltipText, match.matchId)}
-                >
-                  {match.tier === 'exact' && (
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  )}
-                  {match.tier === 'winner_gd' && (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                  {match.tier === 'winner' && (
-                    <span className="text-sm font-black leading-none select-none">~</span>
-                  )}
-                  {match.tier === 'submitted' && (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-              )
-
-              return elements
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-        <div className="border-t border-border-subtle pt-3">
-          <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
-            {JOURNEY_LEGEND.map((item) => (
-              <div key={item.label} className="flex items-center gap-1.5">
-                <div
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor: item.color,
-                    boxShadow: item.glow ? `0 0 6px color-mix(in srgb, ${item.color} 27%, transparent)` : 'none',
-                  }}
-                />
-                <span className="text-[10px] text-muted whitespace-nowrap">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Portal tooltip — renders above all overflow containers */}
-      {tooltip && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{ left: tooltip.x, top: tooltip.y - 8, transform: 'translate(-50%, -100%)' }}
-        >
-          <div
-            className="whitespace-nowrap rounded-chip px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-card-elevated"
-            style={{ background: 'var(--neutral-800)' }}
-          >
-            {tooltip.text}
-            <div
-              className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-              style={{
-                borderLeft: '5px solid transparent',
-                borderRight: '5px solid transparent',
-                borderTop: '5px solid var(--neutral-800)',
-              }}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
+        </span>
+      ))}
     </div>
   )
 }
 
-// =============================================
-// YOU VS THE CROWD
-// =============================================
+/**
+ * TournamentNode from the app: a 32px circle filled with its tier at 20%, a 2px
+ * border in the tier colour, a soft glow of the same, and the tier's glyph inside.
+ * The match number sits beneath in 8px muted type. Misses use `mist` and `silver`
+ * so they recede instead of competing.
+ */
+function TournamentNode({ tier, matchNumber, label, onTap, tapped }: {
+  tier: string; matchNumber: number; label: string
+  onTap: () => void; tapped: boolean
+}) {
+  const isMiss = tier === 'submitted'
+  const color = isMiss ? tierColor('submitted') : tierColor(tier)
+  return (
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onTap}
+          className="w-8 h-8 rounded-pill border-2 flex items-center justify-center transition-opacity active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40"
+          style={{
+            backgroundColor: isMiss ? 'var(--sp-mist)' : tierTint(tier, 20),
+            borderColor: color,
+            boxShadow: isMiss ? 'none' : `0 0 4px ${tierTint(tier, 25)}`,
+          }}
+        >
+          <TierIcon tier={tier} color={color} />
+        </button>
+        {tapped && (
+          <span className="pointer-events-none absolute bottom-[38px] left-1/2 -translate-x-1/2 w-[120px] flex justify-center">
+            <span className="bg-ink text-white text-[10px] font-semibold px-2 py-1 rounded-chip whitespace-nowrap truncate max-w-full">
+              {label}
+            </span>
+          </span>
+        )}
+      </div>
+      <span className="t-num text-[8px] text-muted">#{matchNumber}</span>
+    </div>
+  )
+}
 
+/** Connector from the app: 14x2, the PREVIOUS node's tier at 35%. */
+function Connector({ prevTier }: { prevTier: string }) {
+  const isMiss = prevTier === 'submitted'
+  return (
+    <span
+      className="shrink-0 h-[2px] w-3.5"
+      style={{ background: isMiss ? tierTint('submitted', 30) : tierTint(prevTier, 35) }}
+    />
+  )
+}
+
+/**
+ * TournamentRunSection from the app: one card, a section header carrying the match
+ * count, a horizontal run of nodes joined by connectors, and the legend beneath.
+ *
+ * The web version this replaces was a 34px node on a radial gradient with a
+ * per-node entrance animation, an infinite pulsing glow on exact scores, a custom
+ * scrollbar and a hover-tracking tooltip driven by mouse coordinates. None of that
+ * is in the app, and the pulsing glow in particular made the row restless.
+ */
+function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crowdData: CrowdMatch[] }) {
+  const [tapped, setTapped] = useState<string | null>(null)
+  const sorted = [...matchXP].sort((a, b) => b.matchNumber - a.matchNumber)
+  const crowdMap = new Map(crowdData.map(c => [c.matchNumber, c]))
+
+  return (
+    <div
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
+      style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
+    >
+      <div className="flex items-baseline justify-between px-4 pt-3 pb-2">
+        <h3 className="t-section-header text-ink">Your Tournament Run</h3>
+        <span className="t-num text-xs text-muted">
+          {sorted.length > 0 ? `${sorted.length} ${sorted.length === 1 ? 'match' : 'matches'}` : 'Awaiting kickoff'}
+        </span>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="px-4 pb-3 flex flex-col gap-3">
+          <p className="text-[13px] leading-[18px] text-muted">
+            Your match-by-match journey will appear here as fixtures complete. Each pick
+            gets a tier — exact, winner + goal-difference, correct result, or miss.
+          </p>
+          <RunLegend />
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto scrollbar-hide">
+            <div className="flex items-center px-4 py-1 min-w-max">
+              {sorted.map((match, idx) => {
+                const crowd = crowdMap.get(match.matchNumber)
+                const label = crowd
+                  ? `${crowd.homeTeamName} ${crowd.actualHomeScore}-${crowd.actualAwayScore} ${crowd.awayTeamName}`
+                  : `Match #${match.matchNumber}`
+                return (
+                  <div key={match.matchId} className="flex items-center">
+                    {idx > 0 && <Connector prevTier={sorted[idx - 1].tier} />}
+                    <TournamentNode
+                      tier={match.tier}
+                      matchNumber={match.matchNumber}
+                      label={label}
+                      tapped={tapped === match.matchId}
+                      onTap={() => setTapped(cur => (cur === match.matchId ? null : match.matchId))}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <div className="px-4 pb-3 pt-1">
+            <RunLegend />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 function BattleBar({ label, you, crowd, crowdLabel = 'crowd' }: {
   label: string; you: number; crowd: number; crowdLabel?: string
 }) {
