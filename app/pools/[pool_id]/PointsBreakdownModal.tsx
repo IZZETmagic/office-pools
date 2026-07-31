@@ -7,6 +7,7 @@ import type { LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchData, Matc
 import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
 import { tierChipClass } from '@/lib/design/formDots'
+import { rankChipTone, rankChipTextClass } from '@/lib/design/rank'
 
 type PointAdjustmentRecord = {
   id: string
@@ -459,7 +460,11 @@ export function PointsBreakdownModal({
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-4 bg-surface shadow-card dark:shadow-none dark:border-b dark:border-border-default shrink-0 relative z-10">
           <div className="flex items-center gap-3 min-w-0">
             {rank && (
-              <span className={`font-bold text-primary-600 dark:text-primary-400 flex-shrink-0 bg-primary-50 dark:bg-primary-500/10 rounded-control py-1 ${rank >= 10 ? 'text-xl px-2' : 'text-2xl px-2.5'}`}>#{rank}</span>
+              <span
+                className={`shrink-0 inline-flex items-center justify-center min-w-13 h-11 px-3 rounded-pill text-white t-num t-num-black ${rankChipTone(rank).bg} ${rankChipTextClass(rank)}`}
+              >
+                #{rank}
+              </span>
             )}
             <div className="min-w-0">
               {isMultiEntry ? (
@@ -628,17 +633,17 @@ export function PointsBreakdownModal({
                           {stats && (stats.correct > 0 || stats.miss > 0 || stats.pending > 0) && (
                             <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
                               {stats.correct > 0 && (
-                                <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${BP_STATUS_CHIP.correct}`}>
+                                <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${BP_STATUS_CHIP.correct}`}>
                                   {stats.correct} Correct
                                 </span>
                               )}
                               {stats.miss > 0 && (
-                                <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${BP_STATUS_CHIP.miss}`}>
+                                <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${BP_STATUS_CHIP.miss}`}>
                                   {stats.miss} Miss
                                 </span>
                               )}
                               {stats.pending > 0 && (
-                                <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${BP_STATUS_CHIP.pending}`}>
+                                <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${BP_STATUS_CHIP.pending}`}>
                                   {stats.pending} Pending
                                 </span>
                               )}
@@ -656,7 +661,7 @@ export function PointsBreakdownModal({
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <span
-                                      className={`shrink-0 w-14 text-center rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${BP_STATUS_CHIP[status]}`}
+                                      className={`shrink-0 w-16 text-center rounded-pill font-bold px-2 py-1 text-[11px] leading-none ${BP_STATUS_CHIP[status]}`}
                                     >
                                       {BP_TYPE_LABELS[status]}
                                     </span>
@@ -995,22 +1000,22 @@ export function PointsBreakdownModal({
         {/* Hit type summary bar */}
         <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
           {stats.exact > 0 && (
-            <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${tierChipClass('exact')}`}>
+            <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${tierChipClass('exact')}`}>
               {stats.exact} Exact
             </span>
           )}
           {stats.winnerGd > 0 && (
-            <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${tierChipClass('winner_gd')}`}>
+            <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${tierChipClass('winner_gd')}`}>
               {stats.winnerGd} W+GD
             </span>
           )}
           {stats.winner > 0 && (
-            <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${tierChipClass('winner')}`}>
+            <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${tierChipClass('winner')}`}>
               {stats.winner} Winner
             </span>
           )}
           {stats.miss > 0 && (
-            <span className={`inline-flex items-center rounded-pill font-semibold px-2 py-0.75 text-[10px] ${tierChipClass('miss')}`}>
+            <span className={`inline-flex items-center shrink-0 whitespace-nowrap rounded-pill font-semibold px-2.5 py-1 text-[11px] leading-none ${tierChipClass('miss')}`}>
               {stats.miss} Miss
             </span>
           )}
@@ -1025,7 +1030,7 @@ export function PointsBreakdownModal({
           {details.map((d) => (
             <div key={d.matchNumber} className="flex items-center gap-2 px-4 py-1.5">
               <span
-                className={`shrink-0 w-13 text-center rounded-pill font-bold px-1.5 py-0.75 text-[9px] ${tierChipClass(d.type)}`}
+                className={`shrink-0 w-16 text-center rounded-pill font-bold px-2 py-1 text-[11px] leading-none ${tierChipClass(d.type)}`}
               >
                 {TYPE_LABELS[d.type]}
               </span>
