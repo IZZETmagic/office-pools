@@ -1023,7 +1023,7 @@ function MatchResultsSection({
           {/* Footer row of the table itself — the controls used to float below the
               card, which read as page furniture rather than part of the list. */}
           {remaining > 0 && (
-            <div className="flex items-center justify-center gap-3 px-4 py-2.5 border-t border-border-subtle bg-snow dark:bg-transparent">
+            <div className="flex items-center justify-center gap-3 px-4 py-2.5 border-t border-border-subtle">
               <button
                 onClick={() => setVisibleCount(v => v + 10)}
                 className="text-[13px] font-bold px-3 py-1.5 rounded-pill transition-colors bg-mist text-muted hover:text-ink"
