@@ -9,6 +9,7 @@ import { formatNumber } from '@/lib/format'
 import { tierChipClass } from '@/lib/design/formDots'
 import { rankChipTone, rankChipTextClass } from '@/lib/design/rank'
 import { Icon } from '@/components/ui/Icon'
+import { formatBonusDescription } from '@/lib/bonusDescription'
 
 type PointAdjustmentRecord = {
   id: string
@@ -444,7 +445,7 @@ export function PointsBreakdownModal({
             const status = getBpPredictionStatus(bs)
             lines.push([
               esc(BP_TYPE_LABELS[status]),
-              esc(bs.description),
+              esc(formatBonusDescription(bs)),
               bs.points_earned,
             ].join(','))
           }
@@ -460,7 +461,7 @@ export function PointsBreakdownModal({
           for (const bs of entries) {
             lines.push([
               esc(config.label),
-              esc(bs.description),
+              esc(formatBonusDescription(bs)),
               bs.points_earned,
             ].join(','))
           }
@@ -698,7 +699,7 @@ export function PointsBreakdownModal({
                                       {BP_TYPE_LABELS[status]}
                                     </span>
                                     <span className={`leading-snug truncate ${status === 'correct' ? 'text-muted' : status === 'pending' ? 'text-warning-600' : 'text-muted'}`}>
-                                      {bs.description}
+                                      {formatBonusDescription(bs)}
                                     </span>
                                   </div>
                                   <span className={`font-semibold flex-shrink-0 ml-2 ${bs.points_earned > 0 ? 'text-success-600' : 'text-muted'}`}>
@@ -856,7 +857,7 @@ export function PointsBreakdownModal({
                                 className="flex items-start justify-between px-4 py-2 text-xs"
                               >
                                 <span className="text-muted pr-3 leading-snug">
-                                  {bs.description}
+                                  {formatBonusDescription(bs)}
                                 </span>
                                 <span className={`t-num t-num-extrabold text-xs shrink-0 ${bs.points_earned > 0 ? 'text-warning-500' : 'text-muted'}`}>
                                   {bs.points_earned > 0 ? `+${formatNumber(bs.points_earned)}` : '0'}
