@@ -65,7 +65,11 @@ export function Modal({
         className={cn(
           // Bottom sheet on mobile with the app's 32px top corners; centred dialog
           // with a 24px card radius from sm up.
-          'relative bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated',
+          // `overflow-hidden` is load-bearing, not tidiness: any child that paints
+          // its own background — a filled header, a first section card — squares
+          // off these corners otherwise, and the consumer has no reason to suspect
+          // the modal. Clipping here makes the radius hold for every caller.
+          'relative bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden',
           SIZE_CLASSES[size],
           'w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up',
           className,
