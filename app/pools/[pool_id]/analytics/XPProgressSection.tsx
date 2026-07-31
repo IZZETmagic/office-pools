@@ -1019,6 +1019,25 @@ function MatchResultsSection({
               predictedTie={predictedKnockoutTeams?.get(card.matchNumber)}
             />
           ))}
+
+          {/* Footer row of the table itself — the controls used to float below the
+              card, which read as page furniture rather than part of the list. */}
+          {remaining > 0 && (
+            <div className="flex items-center justify-center gap-3 px-4 py-2.5 border-t border-border-subtle bg-snow dark:bg-transparent">
+              <button
+                onClick={() => setVisibleCount(v => v + 10)}
+                className="text-[13px] font-bold px-3 py-1.5 rounded-pill transition-colors bg-mist text-muted hover:text-ink"
+              >
+                Show 10 more
+              </button>
+              <button
+                onClick={() => setVisibleCount(filteredData.length)}
+                className="text-[13px] font-bold px-3 py-1.5 rounded-pill transition-colors text-primary-600 hover:bg-primary-600/10"
+              >
+                Show all {filteredData.length}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1029,23 +1048,6 @@ function MatchResultsSection({
         </div>
       )}
 
-      {/* Show more / Show all */}
-      {remaining > 0 && (
-        <div className="flex items-center justify-center gap-3 mt-4">
-          <button
-            onClick={() => setVisibleCount(v => v + 10)}
-            className="text-sm font-medium px-4 py-2 rounded-pill transition-colors bg-mist text-muted hover:bg-neutral-200 dark:hover:bg-neutral-700"
-          >
-            Show 10 more
-          </button>
-          <button
-            onClick={() => setVisibleCount(filteredData.length)}
-            className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
-          >
-            Show all {filteredData.length}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
