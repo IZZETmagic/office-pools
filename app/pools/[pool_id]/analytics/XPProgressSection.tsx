@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { levelPillClass } from '@/lib/design/levels'
+import { levelColor, XP_SOURCE_COLOR } from '@/lib/design/levels'
 import { rarityColor, rarityTint } from '@/lib/design/badges'
 import { Icon } from '@/components/ui/Icon'
 import { createPortal } from 'react-dom'
@@ -65,11 +65,58 @@ function hexWithAlpha(hex: string, alpha: number): string {
 // LEVEL HERO CARD
 // =============================================
 
-// Level bands live in lib/design/levels.ts, shared with the app's useLevelColor.
+/**
+ * ProgressRing from the app's FormTab: a 72px ring at 6px stroke, filled to the
+ * level's progress in that level's colour, with the level number in the middle.
+ * The track is `mist`, so it reads in both modes without a dark: override.
+ */
+function LevelRing({ level, progress }: { level: number; progress: number }) {
+  const size = 72
+  const stroke = 6
+  const r = (size - stroke) / 2
+  const circumference = 2 * Math.PI * r
+  const clamped = Math.max(0, Math.min(1, progress))
+
+  return (
+    <span className="relative shrink-0" style={{ width: size, height: size }}>
+      {/* -rotate-90 puts 0% at twelve o'clock rather than three. */}
+      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke="var(--sp-mist)" strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={levelColor(level)} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - clamped)}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center t-num text-2xl text-ink">
+        {level}
+      </span>
+    </span>
+  )
+}
+
+/** XPStatColumn from the app: the value in its source colour over a muted label. */
+function XPStatColumn({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-0.5">
+      <span className="t-num text-sm" style={{ color }}>
+        {value.toLocaleString()}
+      </span>
+      <span className="text-[11px] font-semibold text-muted">{label}</span>
+    </div>
+  )
+}
+
+// Level colours live in lib/design/levels.ts, shared with the app's useLevelColor.
 // The copy that used to sit here was a band out of step with mobile — it put L6 on
 // amber and L4 on primary, where the app has L6 on primary and L4 on sky, so the
 // same level rendered a different colour depending on which platform you opened.
-const getLevelTierStyle = levelPillClass
+// The level pill it fed is gone: the hero shows a progress ring now, which carries
+// the level colour in the ring itself.
 
 function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; onOpenRoadmap: () => void }) {
   const { currentLevel, nextLevel, totalXP, levelProgress } = xpBreakdown
@@ -84,73 +131,63 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenRoadmap() }}
     >
-      <div className="p-5 sm:p-6">
-        {/* Top row: Level circle + info */}
-        <div className="flex items-center gap-4 sm:gap-5 mb-5">
-          {/* Level circle */}
-          <div className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center ${getLevelTierStyle(currentLevel.level)}`}>
-            <span className="text-2xl sm:text-3xl font-black">{currentLevel.level}</span>
-          </div>
+      {/* XPHeroCard in the app: a progress ring carrying the level number, the
+          level name and XP beside it, one progress bar in the level's own colour,
+          and the three XP sources along the bottom. The web version used to put
+          the progress into a primary→gold gradient, which meant the bar said
+          nothing about what level you were on. */}
+      <div className="p-4 sm:p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <LevelRing level={currentLevel.level} progress={levelProgress} />
 
-          {/* Level info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-xl sm:text-2xl font-bold text-ink truncate">
-                {currentLevel.name}
-              </h3>
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <h3 className="t-section-header text-ink truncate">{currentLevel.name}</h3>
               {isMaxLevel && (
-                <span className="flex-shrink-0 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-accent-100 dark:bg-accent-100 text-accent-700 dark:text-accent-500">
-                  MAX
+                <span className="shrink-0 t-caption px-2 py-0.5 rounded-pill bg-accent-400/15 text-accent-600">
+                  Max
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted">
-              {isMaxLevel
-                ? `${totalXP.toLocaleString()} XP earned — legendary status achieved`
-                : `${totalXP.toLocaleString()} XP — ${xpBreakdown.xpToNextLevel.toLocaleString()} XP to ${nextLevel.name}`
-              }
-            </p>
+
+            <span className="t-num text-[13px] text-muted">{totalXP.toLocaleString()} XP</span>
+
+            {!isMaxLevel && (
+              <span className="flex items-center gap-1">
+                <span className="t-num text-[11px] text-muted">
+                  {xpBreakdown.xpToNextLevel.toLocaleString()} XP to
+                </span>
+                <span
+                  className="text-[10px] font-bold"
+                  style={{ color: levelColor(nextLevel.level) }}
+                >
+                  {nextLevel.name}
+                </span>
+              </span>
+            )}
           </div>
 
-          {/* Total XP badge + chevron hint */}
-          <div className="flex-shrink-0 flex items-center gap-2">
-            <div className="text-right hidden sm:block">
-              <div className="text-2xl font-black text-accent-500">{totalXP.toLocaleString()}</div>
-              <div className="text-xs font-medium uppercase tracking-wider text-muted">Total XP</div>
-            </div>
-            <svg className="w-5 h-5 text-neutral-300 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
+          <Icon name="chevron.right" size={16} className="shrink-0 text-muted" />
         </div>
 
-        {/* XP Progress Bar */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-muted">
-              Level {currentLevel.level}
-            </span>
-            <span className="text-xs font-semibold text-muted">
-              {isMaxLevel ? 'MAX LEVEL' : `Level ${nextLevel.level}`}
-            </span>
-          </div>
-          <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
+        {!isMaxLevel && (
+          <div className="h-2 rounded-pill bg-mist overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500 origin-left"
+              className="h-full rounded-pill origin-left"
               style={{
-                width: `${Math.round(levelProgress * 100)}%`,
+                width: `${Math.max(3, Math.round(levelProgress * 100))}%`,
+                backgroundColor: levelColor(currentLevel.level),
                 animation: 'barGrow 0.8s ease 0.3s both',
               }}
             />
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-[10px] text-muted">
-              {currentLevel.xpRequired.toLocaleString()} XP
-            </span>
-            <span className="text-[10px] text-muted">
-              {isMaxLevel ? '' : `${nextLevel.xpRequired.toLocaleString()} XP`}
-            </span>
-          </div>
+        )}
+
+        {/* Where the XP came from — match, bonus, badges. */}
+        <div className="flex">
+          <XPStatColumn label="Match" value={xpBreakdown.totalBaseXP} color={XP_SOURCE_COLOR.match} />
+          <XPStatColumn label="Bonus" value={xpBreakdown.totalBonusXP} color={XP_SOURCE_COLOR.bonus} />
+          <XPStatColumn label="Badges" value={xpBreakdown.totalBadgeXP} color={XP_SOURCE_COLOR.badge} />
         </div>
       </div>
     </div>
