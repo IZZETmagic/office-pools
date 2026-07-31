@@ -310,7 +310,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   }}
                   className={`flex items-center gap-2 text-xs font-medium transition-colors ${
                     step.key === currentStep
-                      ? 'text-success-600'
+                      ? 'text-primary-600'
                       : idx < currentStepIndex
                         ? 'text-neutral-700'
                         : 'text-neutral-400'
@@ -319,7 +319,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   <span
                     className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                       step.key === currentStep
-                        ? 'bg-success-600 text-white'
+                        ? 'bg-primary-600 text-white'
                         : idx < currentStepIndex
                           ? 'bg-neutral-200 text-neutral-700'
                           : 'bg-neutral-100 text-neutral-400'
@@ -355,7 +355,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
                   {tournamentsLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <div className="w-6 h-6 border-2 border-success-600 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : tournaments.length === 0 ? (
                     <div className="text-center py-8">
@@ -369,7 +369,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           onClick={() => setSelectedTournamentId(t.tournament_id)}
                           className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                             selectedTournamentId === t.tournament_id
-                              ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
+                              ? 'border-primary-600 bg-primary-600/8 ring-1 ring-primary-600/25'
                               : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                           }`}
                         >
@@ -388,7 +388,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                             </div>
                             <div className="shrink-0 mt-0.5">
                               {selectedTournamentId === t.tournament_id ? (
-                                <div className="w-5 h-5 rounded-full bg-success-600 flex items-center justify-center">
+                                <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
                                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
@@ -460,12 +460,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         onClick={() => setPredictionMode(opt.value)}
                         className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                           predictionMode === opt.value
-                            ? 'border-success-500 bg-success-50 ring-1 ring-success-200'
+                            ? 'border-primary-600 bg-primary-600/8 ring-1 ring-primary-600/25'
                             : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span className={predictionMode === opt.value ? 'text-success-600' : 'text-neutral-400'}>{opt.icon}</span>
+                          <span className={predictionMode === opt.value ? 'text-primary-600' : 'text-neutral-400'}>{opt.icon}</span>
                           <h3 className="text-sm font-semibold text-neutral-900">{opt.label}</h3>
                         </div>
                         <p className="text-xs text-neutral-500 mt-1.5">{opt.desc}</p>
@@ -495,7 +495,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       value={poolName}
                       onChange={(e) => setPoolName(e.target.value)}
                       placeholder={selectedTournament ? `e.g. Office ${selectedTournament.name}` : 'e.g. Office World Cup 2026'}
-                      focusColor="green"
                     />
                   </FormField>
 
@@ -505,7 +504,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Tell people about your pool..."
                       rows={2}
-                      className="w-full px-4 py-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-success-500 focus:border-transparent text-neutral-900"
+                      className="w-full px-4 py-3 rounded-control bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
                     />
                   </FormField>
                 </div>
@@ -525,7 +524,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="date"
                           value={deadlineDate}
                           onChange={(e) => setDeadlineDate(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-4 py-3 rounded-control text-sm bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
                         />
                       </div>
                       <div>
@@ -534,7 +533,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           type="time"
                           value={deadlineTime}
                           onChange={(e) => setDeadlineTime(e.target.value)}
-                          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-success-500 focus:border-transparent"
+                          className="px-4 py-3 rounded-control text-sm bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
                         />
                       </div>
                     </div>
@@ -664,7 +663,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
               {currentStepIndex < STEPS.length - 1 ? (
                 <Button
-                  variant="green"
+                  variant="primary"
                   onClick={goNext}
                   disabled={!canProceed()}
                   className="flex-1"
@@ -673,7 +672,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 </Button>
               ) : (
                 <Button
-                  variant="green"
+                  variant="primary"
                   onClick={handleCreatePool}
                   disabled={loading || !poolName.trim() || !selectedTournamentId}
                   loading={loading}
