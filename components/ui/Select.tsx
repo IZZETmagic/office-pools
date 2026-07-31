@@ -78,12 +78,14 @@ export function Select({
         </span>
       ) : null}
 
-      <Icon
-        name="chevron.down"
-        size={14}
-        weight="bold"
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-      />
+      {/* Full-height flex column rather than `top-1/2 -translate-y-1/2`. Centring an
+          icon with a transform depends on the transform actually composing, and when
+          it doesn't the chevron drops out of place — it is also one more thing that
+          has to survive whatever the icon renderer does with className. A flex box
+          spanning inset-y-0 centres it with no transform involved. */}
+      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+        <Icon name="chevron.down" size={14} weight="bold" className="text-muted" />
+      </span>
     </div>
   )
 }
