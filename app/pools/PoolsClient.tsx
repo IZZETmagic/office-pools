@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Icon } from '@/components/ui/Icon'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
@@ -408,15 +409,15 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Tab bar + Action buttons */}
         <div className="flex items-center justify-between mb-6">
-          <div ref={poolTabRef} className="relative flex gap-1 bg-neutral-100 rounded-xl p-1">
+          <div ref={poolTabRef} className="relative flex gap-1 bg-mist rounded-pill p-1">
             <div
-              className={`absolute top-1 bottom-1 bg-surface rounded-lg shadow-sm pointer-events-none ${poolTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+              className={`absolute top-1 bottom-1 bg-surface rounded-pill shadow-sm pointer-events-none ${poolTabReady ? 'transition-all duration-300 ease-out' : ''}`}
               style={{ left: poolIndicator.left, width: poolIndicator.width }}
             />
             <button
               data-tab-key="my-pools"
               onClick={() => setActiveTab('my-pools')}
-              className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`relative z-10 px-4 py-2 rounded-pill text-sm font-bold transition-colors ${
                 activeTab === 'my-pools'
                   ? 'text-neutral-900'
                   : 'text-neutral-600 hover:text-neutral-900'
@@ -427,7 +428,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
             <button
               data-tab-key="discover"
               onClick={() => setActiveTab('discover')}
-              className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`relative z-10 px-4 py-2 rounded-pill text-sm font-bold transition-colors ${
                 activeTab === 'discover'
                   ? 'text-neutral-900'
                   : 'text-neutral-600 hover:text-neutral-900'
@@ -472,28 +473,26 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 />
               </div>
               <div className="flex gap-2">
-                <select
+                <Select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
+                                  >
                   <option value="all">All Statuses</option>
                   {availableStatuses.map((s) => (
                     <option key={s} value={s}>
                       {getStatusLabel(s)}
                     </option>
                   ))}
-                </select>
-                <select
+                </Select>
+                <Select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
+                                  >
                   <option value="newest">Newest Joined</option>
                   <option value="oldest">Oldest Joined</option>
                   <option value="name">Name A-Z</option>
                   <option value="points">Most Points</option>
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -563,7 +562,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <Link
                         key={pool.pool_id}
                         href={`/pools/${pool.pool_id}`}
-                        className={`block rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
+                        className={`flex flex-col h-full rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up`}
                         style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* Branded accent strip */}
@@ -740,7 +739,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                         {/* ========== DESKTOP CARD ========== */}
                         <div
-                          className="hidden md:flex"
+                          className="hidden md:flex flex-1"
                           style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
                         >
                           {!hasBranding && (
@@ -750,7 +749,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               style={{ background: getModeStripe(pool.prediction_mode) }}
                             />
                           )}
-                          <div className="flex-1 p-4">
+                          {/* Column, so the status row below can be pushed to the
+                              bottom when the grid stretches this card to match a
+                              taller sibling. */}
+                          <div className="flex-1 min-w-0 p-4 flex flex-col">
                             {/* Header row */}
                             <div className="flex items-center justify-between gap-3 mb-2">
                               <div className="min-w-0 flex-1">
@@ -851,8 +853,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               )
                             })()}
 
-                            {/* Bottom row */}
-                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                            {/* Bottom row — mt-auto pins it to the card's foot so a
+                                stretched card puts its whitespace in the middle
+                                rather than dangling below the status line. */}
+                            <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
                               <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                 {statusText}
                               </span>
@@ -911,15 +915,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   placeholder="Search public pools by name, code, or description..."
                 />
               </div>
-              <select
+              <Select
                 value={discoverSort}
                 onChange={(e) => setDiscoverSort(e.target.value as 'newest' | 'members' | 'deadline')}
-                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
+                              >
                 <option value="newest">Newest</option>
                 <option value="members">Most Players</option>
                 <option value="deadline">Ending Soon</option>
-              </select>
+              </Select>
             </div>
 
             {discoverLoading ? (
@@ -944,7 +947,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                       <button
                         key={pool.pool_id}
                         onClick={() => handleJoinFromDiscover(pool.pool_code, pool.pool_name)}
-                        className="w-full text-left rounded-xl border border-neutral-200 dark:border-border-default bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up cursor-pointer"
+                        className="w-full h-full flex flex-col text-left rounded-card border border-border-subtle bg-surface hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 overflow-hidden animate-fade-up cursor-pointer"
                         style={{ animationDelay: `${i * 0.06}s` }}
                       >
                         {/* ========== DISCOVER MOBILE CARD ========== */}
@@ -1003,7 +1006,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                         {/* ========== DISCOVER DESKTOP CARD ========== */}
                         <div className="hidden md:flex">
-                          <div className="flex-1 p-4">
+                          {/* Column, so the status row below can be pushed to the
+                              bottom when the grid stretches this card to match a
+                              taller sibling. */}
+                          <div className="flex-1 min-w-0 p-4 flex flex-col">
                             {/* Header row */}
                             <div className="mb-2">
                               <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
@@ -1040,8 +1046,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                               )}
                             </div>
 
-                            {/* Bottom row */}
-                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                            {/* Bottom row — mt-auto pins it to the card's foot so a
+                                stretched card puts its whitespace in the middle
+                                rather than dangling below the status line. */}
+                            <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
                               <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
                                 Created {formatTimeAgo(pool.created_at)}
                               </span>
