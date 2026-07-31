@@ -45,7 +45,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
       {/* Streak Stats */}
       <div className="grid grid-cols-3 gap-3">
         {/* Current Streak */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <div className="text-2xl mb-1">
             {currentStreak.type === 'hot' ? (
               <span className="text-3xl font-bold text-success-600 dark:text-success-400">
@@ -69,7 +69,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
         </div>
 
         {/* Best Hot Streak */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <p className="text-3xl font-bold text-success-600 dark:text-success-400 mb-1">
             {longestHotStreak}
           </p>
@@ -79,7 +79,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
         </div>
 
         {/* Worst Cold Streak */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <p className="text-3xl font-bold text-danger-600 dark:text-danger-400 mb-1">
             {longestColdStreak}
           </p>
@@ -90,7 +90,7 @@ export function StreaksSection({ streaks }: StreaksSectionProps) {
       </div>
 
       {/* Timeline */}
-      <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
           <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Match Timeline</h4>
         </div>

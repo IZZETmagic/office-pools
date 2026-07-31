@@ -153,6 +153,11 @@
   --sp-amber:         #F59E0B;
   --sp-amber-light:   #FFFBEB;
 
+  /* The one colour in the level ladder that is not already a palette entry —
+     the L4–5 band. Declared inline in mobile's FormTab (useLevelColor); named
+     here so both platforms can point at the same value. */
+  --sp-level-sky:      #57D0FF;
+
   /* Prediction tiers and streaks are mode-invariant in the app — same values
      in light and dark — so they are declared once here. */
   --sp-tier-exact:     #E2B830;

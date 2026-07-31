@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { levelPillClass } from '@/lib/design/levels'
 import type { BPXPBreakdown, BPPoolComparison } from './bracketPickerXpSystem'
 import type { EarnedBadge, BadgeDefinition, LevelDefinition } from './xpSystem'
 import { LEVELS } from './xpSystem'
@@ -48,13 +49,11 @@ const RARITY_COLORS: Record<string, string> = {
 // HERO CARD
 // =============================================
 
-function getLevelTierStyle(level: number): string {
-  if (level >= 10) return 'bg-gradient-to-br from-accent-500 to-warning-500 text-white shimmer-effect'
-  if (level >= 8) return 'bg-accent-100 dark:bg-accent-100 text-accent-700 dark:text-accent-500'
-  if (level >= 6) return 'bg-warning-100 dark:bg-warning-100 text-warning-700 dark:text-warning-500'
-  if (level >= 4) return 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-400'
-  return 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300'
-}
+// Level bands live in lib/design/levels.ts, shared with the app's useLevelColor.
+// The copy that used to sit here was a band out of step with mobile — it put L6 on
+// amber and L4 on primary, where the app has L6 on primary and L4 on sky, so the
+// same level rendered a different colour depending on which platform you opened.
+const getLevelTierStyle = levelPillClass
 
 function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; onOpenRoadmap: () => void }) {
   const { currentLevel, nextLevel, totalXP, levelProgress } = breakdown
@@ -62,7 +61,7 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
 
   return (
     <div
-      className="bg-surface rounded-xl shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
+      className="bg-surface rounded-control shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
       style={{ animation: 'fadeUp 0.3s ease 0s both' }}
       onClick={onOpenRoadmap}
       role="button"
@@ -145,9 +144,9 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
   return (
     <div className="group relative hover:z-10">
       <div
-        className={`relative rounded-xl p-3 text-center transition-all cursor-pointer ${
+        className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
           earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[badge.tier]} border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-none hover:shadow-md dark:hover:border-neutral-600`
+            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[badge.tier]} border border-neutral-200 dark:border-neutral-700 shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
             : 'bg-neutral-100 dark:bg-neutral-400/90 border border-neutral-200 dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
         } ${badge.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
         onClick={onSelect}
@@ -179,7 +178,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
         )}
       </div>
 
-      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-lg pointer-events-none">
+      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-card-elevated pointer-events-none">
         <div className="font-semibold mb-0.5">{badge.name}</div>
         <div className="text-neutral-300">{badge.condition}</div>
         {earned ? (
@@ -201,7 +200,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
         style={{ animation: 'modal-overlay-fade 0.3s ease both' }}
       />
       <div
-        className="relative w-full sm:max-w-xs bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:border dark:border-border-default overflow-hidden"
+        className="relative w-full sm:max-w-xs bg-surface rounded-t-2xl sm:rounded-card shadow-card-elevated dark:border dark:border-border-default overflow-hidden"
         style={{ animation: 'modal-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -233,14 +232,14 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
             {badge.condition}
           </p>
           {earned ? (
-            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
               <svg className="w-4 h-4 text-success-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
               <span className="text-sm font-semibold text-success-700 dark:text-success-300">Earned · +{badge.xpBonus} XP</span>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
               <svg className="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
@@ -294,7 +293,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
   return (
     <>
       <div
-        className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+        className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
       >
         <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
@@ -370,17 +369,17 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
   return (
     <div>
       <div className="flex items-center justify-between mb-[5px]">
-        <span className="text-[11px] text-neutral-500 dark:text-[#94a3b8]">{label}</span>
-        <span className="text-[10px] font-mono text-neutral-400 dark:text-[#64748b]">
+        <span className="text-[11px] text-neutral-500 dark:text-[var(--neutral-400)]">{label}</span>
+        <span className="text-[10px] font-mono text-neutral-400 dark:text-[var(--neutral-500)]">
           {you} vs {crowd}
         </span>
       </div>
-      <div className="relative h-2 rounded bg-neutral-100 dark:bg-[#0f1525]">
+      <div className="relative h-2 rounded bg-neutral-100 dark:bg-[var(--sp-midnight)]">
         <div
           className="absolute top-0 left-0 h-full rounded-l"
           style={{
             width: `calc(${youPct}% - 1px)`,
-            background: 'linear-gradient(to right, #3b82f6, #60a5fa)',
+            background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
             boxShadow: '0 0 8px rgba(59,130,246,0.25)',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'left',
@@ -390,7 +389,7 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
           className="absolute top-0 right-0 h-full rounded-r"
           style={{
             width: `calc(${crowdPct}% - 1px)`,
-            background: 'linear-gradient(to right, rgba(139,92,246,0.67), #8b5cf6)',
+            background: 'linear-gradient(to right, rgba(139,92,246,0.67), var(--primary-600))',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'right',
           }}
@@ -428,7 +427,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
 
   return (
     <div
-      className="relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+      className="relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
     >
       {/* Ambient corner glows */}
@@ -443,33 +442,33 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
 
       <div className="relative z-10 p-[18px]">
         {/* Heading */}
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
           You vs The Pool
         </h4>
 
         {/* VS Faceoff */}
         <div className="flex items-center justify-around mb-8">
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#3b82f6' }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
               You
             </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#3b82f6' }}>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--primary-600)' }}>
               {userOverallAccuracy}%
             </div>
           </div>
 
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[#1c2333]"
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[var(--sp-midnight)]"
             style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
           >
-            <span className="text-[11px] font-extrabold" style={{ color: '#64748b' }}>VS</span>
+            <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
           </div>
 
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#8b5cf6' }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
               Pool Avg
             </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#94a3b8' }}>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--neutral-400)' }}>
               {poolAvgOverallAccuracy}%
             </div>
           </div>
@@ -487,7 +486,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
         {/* Consensus/Contrarian Bars */}
         {showContrarianBars && (
           <>
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-neutral-400 dark:text-[#64748b] mb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-neutral-400 dark:text-[var(--neutral-500)] mb-3">
               Bracket Boldness
             </div>
             <div className="space-y-5">
@@ -502,7 +501,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
         <div className="mt-7">
           {isOutperforming ? (
             <div
-              className="flex items-start gap-2 rounded-lg"
+              className="flex items-start gap-2 rounded-chip"
               style={{
                 background: 'linear-gradient(135deg, rgba(34,197,94,0.1), transparent)',
                 border: '1px solid rgba(34,197,94,0.13)',
@@ -511,11 +510,11 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             >
               <span className="text-[18px] leading-none flex-shrink-0">📈</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: '#22c55e' }}>
+                <div className="text-xs font-bold" style={{ color: 'var(--success-600)' }}>
                   Outperforming the pool by {accuracyDiff}%
                 </div>
                 {contrarianCount > 0 && contrarianAdv > 0 && (
-                  <div className="text-[10px] mt-px" style={{ color: '#64748b' }}>
+                  <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
                     Your contrarian win rate is {contrarianAdv}% higher than average
                   </div>
                 )}
@@ -523,7 +522,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             </div>
           ) : (
             <div
-              className="flex items-start gap-2 rounded-lg"
+              className="flex items-start gap-2 rounded-chip"
               style={{
                 background: 'linear-gradient(135deg, rgba(59,130,246,0.1), transparent)',
                 border: '1px solid rgba(59,130,246,0.13)',
@@ -532,12 +531,12 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             >
               <span className="text-[18px] leading-none flex-shrink-0">🎯</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: '#3b82f6' }}>
+                <div className="text-xs font-bold" style={{ color: 'var(--primary-600)' }}>
                   {accuracyDiff === 0
                     ? 'Neck and neck with the pool'
                     : 'The pool has a slight edge — time to trust your gut?'}
                 </div>
-                <div className="text-[10px] mt-px" style={{ color: '#64748b' }}>
+                <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
                   {accuracyDiff === 0
                     ? "You\u2019re matching the pool average perfectly"
                     : `Only ${Math.abs(accuracyDiff)}% behind — one bold call could flip it`}
@@ -560,35 +559,35 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
   const teamLookup = new Map(teams.map(t => [t.team_id, t]))
 
   return (
-    <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default">
+    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default">
       <div className="p-[18px]">
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
           Pool-Wide Stats
         </h4>
 
         {/* Summary Stats Row */}
         <div className="flex items-center justify-around mb-[18px]">
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {poolAvgOverallAccuracy}%
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Avg Pool Accuracy
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {totalEntries}
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Competitors
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {totalScoredPicks}
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Picks Scored
             </div>
           </div>
@@ -598,8 +597,8 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
         {mostPopularChampion && (() => {
           const team = teamLookup.get(mostPopularChampion.team_id)
           return (
-            <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
-              <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-neutral-400 dark:text-[#64748b] mb-2">
+            <div className="border border-neutral-200 dark:border-neutral-700 rounded-chip p-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-neutral-400 dark:text-[var(--neutral-500)] mb-2">
                 Pool&apos;s Favorite Champion
               </div>
               <div className="flex items-center gap-3">
@@ -635,7 +634,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
 
   return (
     <div
-      className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+      className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.35s both' }}
     >
       <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
@@ -651,7 +650,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
         {bonusEvents.map((event, idx) => (
           <div
             key={`${event.type}-${idx}`}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-accent-50 dark:from-accent-900/10 to-transparent border border-accent-200/50 dark:border-accent-800/20"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-chip bg-gradient-to-r from-accent-50 dark:from-accent-900/10 to-transparent border border-accent-200/50 dark:border-accent-800/20"
           >
             <span className="text-xl flex-shrink-0">{event.emoji}</span>
             <div className="flex-1 min-w-0">
@@ -682,7 +681,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
         style={{ animation: 'modal-overlay-fade 0.3s ease both' }}
       />
       <div
-        className="relative w-full sm:max-w-md bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:border dark:border-border-default overflow-hidden max-h-[85vh] flex flex-col"
+        className="relative w-full sm:max-w-md bg-surface rounded-t-2xl sm:rounded-card shadow-card-elevated dark:border dark:border-border-default overflow-hidden max-h-[85vh] flex flex-col"
         style={{ animation: 'modal-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -710,7 +709,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
               return (
                 <div
                   key={level.level}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${
                     isCurrent
                       ? 'bg-accent-50 dark:bg-accent-50 border border-accent-500/30'
                       : isReached
@@ -767,15 +766,15 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
             </div>
 
             <div className="flex flex-wrap justify-center gap-2 mt-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
                 <span className="text-xs font-medium text-primary-600 dark:text-primary-400">Group XP</span>
                 <span className="text-xs font-bold text-primary-700 dark:text-primary-300">{(breakdown.totalGroupBaseXP + breakdown.totalGroupBonusXP).toLocaleString()}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
                 <span className="text-xs font-medium text-success-600 dark:text-success-400">Knockout XP</span>
                 <span className="text-xs font-bold text-success-700 dark:text-success-300">{(breakdown.totalKnockoutBaseXP + breakdown.totalKnockoutBonusXP).toLocaleString()}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
                 <span className="text-xs font-medium text-warning-600 dark:text-warning-400">Badge XP</span>
                 <span className="text-xs font-bold text-warning-700 dark:text-warning-300">{breakdown.totalBadgeXP.toLocaleString()}</span>
               </div>

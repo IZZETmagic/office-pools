@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo, useCallback } from 'react'
+import { levelPillClass } from '@/lib/design/levels'
 import { createPortal } from 'react-dom'
 import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from './xpSystem'
 import type { StreakData, CrowdMatch, PoolWideStats, PredictionResult } from './analyticsHelpers'
@@ -49,17 +50,17 @@ const RARITY_COLORS: Record<string, string> = {
 
 // Journey path node config per XP tier
 const NODE_COLORS: Record<XPTier, { color: string; glowColor: string; label: string }> = {
-  exact: { color: '#f59e0b', glowColor: 'rgba(245, 158, 11, 0.4)', label: 'Exact Score' },
-  winner_gd: { color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.27)', label: 'Winner + GD' },
-  winner: { color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.27)', label: 'Correct Result' },
-  submitted: { color: '#475569', glowColor: 'none', label: 'Miss' },
+  exact: { color: 'var(--warning-500)', glowColor: 'rgba(245, 158, 11, 0.4)', label: 'Exact Score' },
+  winner_gd: { color: 'var(--success-600)', glowColor: 'rgba(34, 197, 94, 0.27)', label: 'Winner + GD' },
+  winner: { color: 'var(--primary-600)', glowColor: 'rgba(59, 130, 246, 0.27)', label: 'Correct Result' },
+  submitted: { color: 'var(--neutral-600)', glowColor: 'none', label: 'Miss' },
 }
 
 const JOURNEY_LEGEND: { label: string; color: string; glow: boolean }[] = [
-  { label: 'Exact Score', color: '#f59e0b', glow: true },
-  { label: 'Winner + GD', color: '#22c55e', glow: false },
-  { label: 'Correct Result', color: '#3b82f6', glow: true },
-  { label: 'Miss', color: '#475569', glow: false },
+  { label: 'Exact Score', color: 'var(--warning-500)', glow: true },
+  { label: 'Winner + GD', color: 'var(--success-600)', glow: false },
+  { label: 'Correct Result', color: 'var(--primary-600)', glow: true },
+  { label: 'Miss', color: 'var(--neutral-600)', glow: false },
 ]
 
 function hexWithAlpha(hex: string, alpha: number): string {
@@ -73,13 +74,11 @@ function hexWithAlpha(hex: string, alpha: number): string {
 // LEVEL HERO CARD
 // =============================================
 
-function getLevelTierStyle(level: number): string {
-  if (level >= 10) return 'bg-gradient-to-br from-accent-500 to-warning-500 text-white shimmer-effect'
-  if (level >= 8) return 'bg-accent-100 dark:bg-accent-100 text-accent-700 dark:text-accent-500'
-  if (level >= 6) return 'bg-warning-100 dark:bg-warning-100 text-warning-700 dark:text-warning-500'
-  if (level >= 4) return 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-400'
-  return 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300'
-}
+// Level bands live in lib/design/levels.ts, shared with the app's useLevelColor.
+// The copy that used to sit here was a band out of step with mobile — it put L6 on
+// amber and L4 on primary, where the app has L6 on primary and L4 on sky, so the
+// same level rendered a different colour depending on which platform you opened.
+const getLevelTierStyle = levelPillClass
 
 function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; onOpenRoadmap: () => void }) {
   const { currentLevel, nextLevel, totalXP, levelProgress } = xpBreakdown
@@ -87,7 +86,7 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
 
   return (
     <div
-      className="bg-surface rounded-xl shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
+      className="bg-surface rounded-control shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
       style={{ animation: 'fadeUp 0.3s ease 0s both' }}
       onClick={onOpenRoadmap}
       role="button"
@@ -178,9 +177,9 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
   return (
     <div className="group relative hover:z-10">
       <div
-        className={`relative rounded-xl p-3 text-center transition-all cursor-pointer ${
+        className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
           earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-none hover:shadow-md dark:hover:border-neutral-600`
+            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[def.tier]} border border-neutral-200 dark:border-neutral-700 shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
             : 'bg-neutral-100 dark:bg-neutral-400/90 border border-neutral-200 dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
         } ${def.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
         onClick={onSelect}
@@ -220,7 +219,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
       </div>
 
       {/* Desktop hover tooltip — hidden on mobile, shown on sm+ hover */}
-      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-lg pointer-events-none">
+      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-card-elevated pointer-events-none">
         <div className="font-semibold mb-0.5">{def.name}</div>
         <div className="text-neutral-300">{def.condition}</div>
         {earned ? (
@@ -246,7 +245,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
 
       {/* Modal content */}
       <div
-        className="relative w-full sm:max-w-xs bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:border dark:border-border-default overflow-hidden"
+        className="relative w-full sm:max-w-xs bg-surface rounded-t-2xl sm:rounded-card shadow-card-elevated dark:border dark:border-border-default overflow-hidden"
         style={{ animation: 'modal-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -288,14 +287,14 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
 
           {/* Status pill */}
           {earned ? (
-            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
               <svg className="w-4 h-4 text-success-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
               <span className="text-sm font-semibold text-success-700 dark:text-success-300">Earned · +{badge.xpBonus} XP</span>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
               <svg className="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
@@ -352,7 +351,7 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
   return (
     <>
       <div
-        className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+        className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
       >
         <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-700 rounded-t-xl">
@@ -437,10 +436,10 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
     <div style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}>
       <div className="flex gap-2.5">
         {/* ===== HOT STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none border border-warning-500/20 py-[18px] px-[14px] text-center">
+        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-warning-500/20 py-[18px] px-[14px] text-center">
           {/* Background flame (decorative, 6% opacity) */}
           <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.06] pointer-events-none">
-            <svg viewBox="0 0 24 24" fill="#f59e0b" className="w-full h-full">
+            <svg viewBox="0 0 24 24" fill="var(--warning-500)" className="w-full h-full">
               <path d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" />
             </svg>
           </div>
@@ -448,7 +447,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
           <div className="relative z-10">
             {/* Animated flame icon */}
             <div className="mx-auto w-8 h-8 mb-2" style={{ animation: 'flameWave 1.8s ease-in-out infinite' }}>
-              <svg viewBox="0 0 24 24" fill="#f59e0b" className="w-full h-full">
+              <svg viewBox="0 0 24 24" fill="var(--warning-500)" className="w-full h-full">
                 <path d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03z" />
                 <path d="M12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" opacity="0.7" />
               </svg>
@@ -460,7 +459,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Number */}
-            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: '#f59e0b' }}>
+            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: 'var(--warning-500)' }}>
               {currentHot}
             </div>
 
@@ -471,9 +470,9 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
                 return (
                   <div
                     key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[#0f1525]' : ''}`}
+                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[var(--sp-midnight)]' : ''}`}
                     style={filled ? {
-                      background: 'linear-gradient(to right, #d97706, #f59e0b)',
+                      background: 'linear-gradient(to right, var(--warning-600), var(--warning-500))',
                       boxShadow: '0 0 8px rgba(245, 158, 11, 0.25)',
                     } : undefined}
                   />
@@ -483,30 +482,30 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
 
             {/* Personal best */}
             <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-              Personal best: <span className="font-bold" style={{ color: '#f59e0b' }}>{longestHotStreak}</span>
+              Personal best: <span className="font-bold" style={{ color: 'var(--warning-500)' }}>{longestHotStreak}</span>
               {' '}— can you beat it? 🔥
             </div>
           </div>
         </div>
 
         {/* ===== COLD STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none border border-neutral-200 dark:border-border-default py-[18px] px-[14px] text-center">
+        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-neutral-200 dark:border-border-default py-[18px] px-[14px] text-center">
           {/* Background snowflake (decorative, 4% opacity) */}
           <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.04] pointer-events-none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeLinecap="round" className="w-full h-full">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
               <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" strokeWidth="1.5" />
               <path d="M12 2l-2 2m2-2l2 2m-2 18l-2-2m2 2l2-2M2 12l2-2m-2 2l2 2m18-2l-2-2m2 2l-2 2" strokeWidth="1.2" />
-              <circle cx="12" cy="12" r="1.5" fill="#38bdf8" stroke="none" />
+              <circle cx="12" cy="12" r="1.5" fill="var(--sp-level-sky)" stroke="none" />
             </svg>
           </div>
 
           <div className="relative z-10">
             {/* Static snowflake icon (no animation — intentional contrast) */}
             <div className="mx-auto w-8 h-8 mb-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeLinecap="round" className="w-full h-full">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
                 <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" strokeWidth="1.5" />
                 <path d="M12 2l-2 2m2-2l2 2m-2 18l-2-2m2 2l2-2M2 12l2-2m-2 2l2 2m18-2l-2-2m2 2l-2 2" strokeWidth="1.2" />
-                <circle cx="12" cy="12" r="1.5" fill="#38bdf8" stroke="none" />
+                <circle cx="12" cy="12" r="1.5" fill="var(--sp-level-sky)" stroke="none" />
               </svg>
             </div>
 
@@ -516,7 +515,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
             </div>
 
             {/* Number */}
-            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: '#38bdf8' }}>
+            <div className="text-[38px] font-extrabold leading-none mb-3" style={{ color: 'var(--sp-level-sky)' }}>
               {longestColdStreak}
             </div>
 
@@ -527,7 +526,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
                 return (
                   <div
                     key={i}
-                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[#0f1525]' : ''}`}
+                    className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-neutral-100 dark:bg-[var(--sp-midnight)]' : ''}`}
                     style={filled ? {
                       backgroundColor: `rgba(56, 189, 248, ${0.10 + 0.18 * (i + 1)})`,
                     } : undefined}
@@ -541,12 +540,12 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
               Currently:{' '}
               {isCurrentlyCold ? (
                 <>
-                  <span className="font-bold" style={{ color: '#38bdf8' }}>{currentCold}</span>
+                  <span className="font-bold" style={{ color: 'var(--sp-level-sky)' }}>{currentCold}</span>
                   {' '}— cold spell active
                 </>
               ) : (
                 <>
-                  <span className="font-bold" style={{ color: '#22c55e' }}>0</span>
+                  <span className="font-bold" style={{ color: 'var(--success-600)' }}>0</span>
                   {' '}— streak broken ✓
                 </>
               )}
@@ -586,7 +585,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
 
   return (
     <div
-      className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+      className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
       onClick={() => setTooltip(null)}
     >
@@ -643,7 +642,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                 <div
                   key={match.matchId}
                   className={`flex-shrink-0 w-[34px] h-[34px] rounded-full border-2 flex items-center justify-center cursor-default ${
-                    isMiss ? 'bg-neutral-50 dark:bg-[#0f1525]' : ''
+                    isMiss ? 'bg-neutral-50 dark:bg-[var(--sp-midnight)]' : ''
                   }`}
                   style={{
                     borderColor: isMiss ? 'rgba(71, 85, 105, 0.55)' : config.color,
@@ -653,7 +652,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                     boxShadow: !isMiss && match.tier !== 'exact'
                       ? `0 0 8px ${config.glowColor}`
                       : 'none',
-                    color: isMiss ? '#64748b' : config.color,
+                    color: isMiss ? 'var(--neutral-500)' : config.color,
                     animation: match.tier === 'exact'
                       ? `nodeEnter 0.4s ease ${delay}s both, exactGlow 2s ease-in-out ${delay + 0.4}s infinite`
                       : `nodeEnter 0.4s ease ${delay}s both`,
@@ -718,8 +717,8 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
           style={{ left: tooltip.x, top: tooltip.y - 8, transform: 'translate(-50%, -100%)' }}
         >
           <div
-            className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-lg"
-            style={{ background: '#1e293b' }}
+            className="whitespace-nowrap rounded-chip px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-card-elevated"
+            style={{ background: 'var(--neutral-800)' }}
           >
             {tooltip.text}
             <div
@@ -727,7 +726,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
               style={{
                 borderLeft: '5px solid transparent',
                 borderRight: '5px solid transparent',
-                borderTop: '5px solid #1e293b',
+                borderTop: '5px solid var(--neutral-800)',
               }}
             />
           </div>
@@ -790,7 +789,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
 
   return (
     <div
-      className="relative overflow-hidden bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default"
+      className="relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
     >
       {/* Ambient corner glows */}
@@ -806,7 +805,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
       {/* Content */}
       <div className="relative z-10 p-[18px]">
         {/* Heading */}
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
           You vs The Crowd
         </h4>
 
@@ -814,28 +813,28 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
         <div className="flex items-center justify-around mb-8">
           {/* Player */}
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#3b82f6' }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
               You
             </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#3b82f6' }}>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--primary-600)' }}>
               {userAccuracy}%
             </div>
           </div>
 
           {/* VS Badge */}
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[#1c2333]"
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-neutral-200 dark:border-[var(--sp-midnight)]"
             style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
           >
-            <span className="text-[11px] font-extrabold" style={{ color: '#64748b' }}>VS</span>
+            <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
           </div>
 
           {/* Crowd */}
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: '#8b5cf6' }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
               Pool Avg
             </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: '#94a3b8' }}>
+            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--neutral-400)' }}>
               {crowdAccuracy}%
             </div>
           </div>
@@ -852,19 +851,19 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
               <div key={bar.label}>
                 {/* Label row */}
                 <div className="flex items-center justify-between mb-[5px]">
-                  <span className="text-[11px] text-neutral-500 dark:text-[#94a3b8]">{bar.label}</span>
-                  <span className="text-[10px] font-mono text-neutral-400 dark:text-[#64748b]">
+                  <span className="text-[11px] text-neutral-500 dark:text-[var(--neutral-400)]">{bar.label}</span>
+                  <span className="text-[10px] font-mono text-neutral-400 dark:text-[var(--neutral-500)]">
                     {bar.you} vs {bar.crowd}
                   </span>
                 </div>
                 {/* Bar track */}
-                <div className="relative h-2 rounded bg-neutral-100 dark:bg-[#0f1525]">
+                <div className="relative h-2 rounded bg-neutral-100 dark:bg-[var(--sp-midnight)]">
                   {/* Player fill (grows from left) */}
                   <div
                     className="absolute top-0 left-0 h-full rounded-l"
                     style={{
                       width: `calc(${youPct}% - 1px)`,
-                      background: 'linear-gradient(to right, #3b82f6, #60a5fa)',
+                      background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
                       boxShadow: '0 0 8px rgba(59,130,246,0.25)',
                       animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
                       transformOrigin: 'left',
@@ -875,7 +874,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
                     className="absolute top-0 right-0 h-full rounded-r"
                     style={{
                       width: `calc(${crowdPct}% - 1px)`,
-                      background: 'linear-gradient(to right, rgba(139,92,246,0.67), #8b5cf6)',
+                      background: 'linear-gradient(to right, rgba(139,92,246,0.67), var(--primary-600))',
                       animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
                       transformOrigin: 'right',
                     }}
@@ -890,7 +889,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
         <div className="mt-7">
           {isOutperforming ? (
             <div
-              className="flex items-start gap-2 rounded-lg"
+              className="flex items-start gap-2 rounded-chip"
               style={{
                 background: 'linear-gradient(135deg, rgba(34,197,94,0.1), transparent)',
                 border: '1px solid rgba(34,197,94,0.13)',
@@ -899,11 +898,11 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
             >
               <span className="text-[18px] leading-none flex-shrink-0">📈</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: '#22c55e' }}>
+                <div className="text-xs font-bold" style={{ color: 'var(--success-600)' }}>
                   Outperforming the crowd by {accuracyDiff}%
                 </div>
                 {contrarianCount > 0 && contrarianAdv > 0 && (
-                  <div className="text-[10px] mt-px" style={{ color: '#64748b' }}>
+                  <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
                     Your contrarian win rate is {contrarianAdv}% higher than average
                   </div>
                 )}
@@ -911,7 +910,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
             </div>
           ) : (
             <div
-              className="flex items-start gap-2 rounded-lg"
+              className="flex items-start gap-2 rounded-chip"
               style={{
                 background: 'linear-gradient(135deg, rgba(59,130,246,0.1), transparent)',
                 border: '1px solid rgba(59,130,246,0.13)',
@@ -920,12 +919,12 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
             >
               <span className="text-[18px] leading-none flex-shrink-0">🎯</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: '#3b82f6' }}>
+                <div className="text-xs font-bold" style={{ color: 'var(--primary-600)' }}>
                   {accuracyDiff === 0
                     ? 'Neck and neck with the crowd'
                     : 'The crowd has a slight edge — time to go contrarian?'}
                 </div>
-                <div className="text-[10px] mt-px" style={{ color: '#64748b' }}>
+                <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
                   {accuracyDiff === 0
                     ? "You\u2019re matching the crowd wisdom perfectly"
                     : `Only ${Math.abs(accuracyDiff)}% behind — one bold call could flip it`}
@@ -953,36 +952,36 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
   const topUpsets = leastPredictable.slice(0, 3)
 
   return (
-    <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default">
+    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default">
       <div className="p-[18px]">
         {/* Heading */}
-        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+        <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
           Pool-Wide Stats
         </h4>
 
         {/* Summary Stats Row */}
         <div className="flex items-center justify-around mb-[18px]">
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {Math.round(avgPoolAccuracy * 100)}%
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Avg Pool Accuracy
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {totalEntries}
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Competitors
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[#f1f5f9]">
+            <div className="text-2xl font-extrabold text-neutral-900 dark:text-[var(--neutral-100)]">
               {totalCompletedMatches}
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: '#64748b' }}>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
               Matches Scored
             </div>
           </div>
@@ -992,31 +991,31 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
         <div>
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-sm">🏆</span>
-            <span className="text-[11px] font-semibold" style={{ color: '#22c55e' }}>Most Predictable</span>
+            <span className="text-[11px] font-semibold" style={{ color: 'var(--success-600)' }}>Most Predictable</span>
           </div>
           <div>
             {topPredictable.map((m, idx) => (
               <div
                 key={m.matchId}
                 className={`flex items-center justify-between py-2 ${
-                  idx < topPredictable.length - 1 ? 'border-b border-neutral-100 dark:border-[#1c2333]' : ''
+                  idx < topPredictable.length - 1 ? 'border-b border-neutral-100 dark:border-[var(--sp-midnight)]' : ''
                 }`}
               >
-                <span className="text-xs text-neutral-500 dark:text-[#94a3b8] truncate mr-2">
+                <span className="text-xs text-neutral-500 dark:text-[var(--neutral-400)] truncate mr-2">
                   {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
                 </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[#0f1525]">
+                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[var(--sp-midnight)]">
                     <div
                       className="h-full rounded-sm"
                       style={{
                         width: `${Math.round(m.hitRate * 100)}%`,
-                        backgroundColor: '#22c55e',
+                        backgroundColor: 'var(--success-600)',
                       }}
                     />
                   </div>
-                  <span className="text-[11px] font-semibold font-mono" style={{ color: '#22c55e' }}>
+                  <span className="text-[11px] font-semibold font-mono" style={{ color: 'var(--success-600)' }}>
                     {Math.round(m.hitRate * 100)}%
                   </span>
                 </div>
@@ -1029,31 +1028,31 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
         <div className="mt-3.5">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-sm">😱</span>
-            <span className="text-[11px] font-semibold" style={{ color: '#ef4444' }}>Biggest Upsets</span>
+            <span className="text-[11px] font-semibold" style={{ color: 'var(--danger-600)' }}>Biggest Upsets</span>
           </div>
           <div>
             {topUpsets.map((m, idx) => (
               <div
                 key={m.matchId}
                 className={`flex items-center justify-between py-2 ${
-                  idx < topUpsets.length - 1 ? 'border-b border-neutral-100 dark:border-[#1c2333]' : ''
+                  idx < topUpsets.length - 1 ? 'border-b border-neutral-100 dark:border-[var(--sp-midnight)]' : ''
                 }`}
               >
-                <span className="text-xs text-neutral-500 dark:text-[#94a3b8] truncate mr-2">
+                <span className="text-xs text-neutral-500 dark:text-[var(--neutral-400)] truncate mr-2">
                   {idx + 1}. {m.homeTeamName} vs {m.awayTeamName}
                 </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {/* Mini progress bar */}
-                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[#0f1525]">
+                  <div className="w-10 h-1 rounded-sm bg-neutral-100 dark:bg-[var(--sp-midnight)]">
                     <div
                       className="h-full rounded-sm"
                       style={{
                         width: `${Math.round(m.hitRate * 100)}%`,
-                        backgroundColor: '#ef4444',
+                        backgroundColor: 'var(--danger-600)',
                       }}
                     />
                   </div>
-                  <span className="text-[11px] font-semibold font-mono" style={{ color: '#ef4444' }}>
+                  <span className="text-[11px] font-semibold font-mono" style={{ color: 'var(--danger-600)' }}>
                     {Math.round(m.hitRate * 100)}%
                   </span>
                 </div>
@@ -1194,27 +1193,27 @@ function MatchResultsSection({
   return (
     <div style={{ animation: 'fadeUp 0.35s ease 0.1s both' }}>
       {/* Section Heading */}
-      <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[#f1f5f9] mb-3">
+      <h4 className="text-[15px] font-bold text-neutral-900 dark:text-[var(--neutral-100)] mb-3">
         Match Results
       </h4>
 
       {/* Filter Pills */}
       <div className="flex flex-wrap gap-2 mb-4">
         {([
-          { key: 'all' as FilterMode, label: 'All Matches', count: counts.all, color: '#3b82f6' },
-          { key: 'hits' as FilterMode, label: 'Hits', count: counts.hits, color: '#22c55e' },
-          { key: 'misses' as FilterMode, label: 'Misses', count: counts.misses, color: '#ef4444' },
-          { key: 'exact' as FilterMode, label: 'Exact', count: counts.exact, color: '#f59e0b' },
+          { key: 'all' as FilterMode, label: 'All Matches', count: counts.all, color: 'var(--primary-600)' },
+          { key: 'hits' as FilterMode, label: 'Hits', count: counts.hits, color: 'var(--success-600)' },
+          { key: 'misses' as FilterMode, label: 'Misses', count: counts.misses, color: 'var(--danger-600)' },
+          { key: 'exact' as FilterMode, label: 'Exact', count: counts.exact, color: 'var(--warning-500)' },
         ]).map(pill => {
           const isActive = filter === pill.key
           return (
             <button
               key={pill.key}
               onClick={() => handleFilterChange(pill.key)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 rounded-chip px-3 py-1.5 text-xs font-semibold transition-all"
               style={{
                 background: isActive ? pill.color : undefined,
-                color: isActive ? '#ffffff' : '#94a3b8',
+                color: isActive ? '#ffffff' : 'var(--neutral-400)',
                 border: isActive ? 'none' : '1px solid rgba(148,163,184,0.2)',
               }}
             >
@@ -1223,7 +1222,7 @@ function MatchResultsSection({
                 className="rounded-md px-1.5 py-px text-[10px] font-bold"
                 style={{
                   background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(148,163,184,0.1)',
-                  color: isActive ? '#ffffff' : '#94a3b8',
+                  color: isActive ? '#ffffff' : 'var(--neutral-400)',
                 }}
               >
                 {pill.count}
@@ -1252,7 +1251,7 @@ function MatchResultsSection({
         <div className="flex items-center justify-center gap-3 mt-4">
           <button
             onClick={() => setVisibleCount(v => v + 10)}
-            className="text-sm font-medium px-4 py-2 rounded-lg transition-colors bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            className="text-sm font-medium px-4 py-2 rounded-chip transition-colors bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700"
           >
             Show 10 more
           </button>
@@ -1286,19 +1285,19 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
 
   // Status badge config
   const statusConfig = isExact
-    ? { label: '★ EXACT', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' }
+    ? { label: '★ EXACT', bg: 'rgba(245,158,11,0.15)', color: 'var(--warning-500)' }
     : card.resultType === 'winner_gd'
-      ? { label: '✓ RESULT + GD', bg: 'rgba(34,197,94,0.12)', color: '#22c55e' }
+      ? { label: '✓ RESULT + GD', bg: 'rgba(34,197,94,0.12)', color: 'var(--success-600)' }
       : card.resultType === 'winner'
-        ? { label: '✓ CORRECT', bg: 'rgba(34,197,94,0.12)', color: '#22c55e' }
-        : { label: '✗ MISS', bg: 'rgba(239,68,68,0.1)', color: '#ef4444' }
+        ? { label: '✓ CORRECT', bg: 'rgba(34,197,94,0.12)', color: 'var(--success-600)' }
+        : { label: '✗ MISS', bg: 'rgba(239,68,68,0.1)', color: 'var(--danger-600)' }
 
   // Bragging rights — exact score on a match where <25% got the result right
   const isRareExact = isExact && card.consensusPct !== null && card.consensusPct < 0.25
 
   return (
     <div
-      className="relative bg-surface rounded-xl overflow-hidden transition-all duration-150 hover:-translate-y-px group"
+      className="relative bg-surface rounded-control overflow-hidden transition-all duration-150 hover:-translate-y-px group"
       style={{
         border: `1px solid ${borderColor}`,
         boxShadow: isExact
@@ -1311,7 +1310,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         <div
           className="absolute top-0 left-0 right-0 h-[2px]"
           style={{
-            background: 'linear-gradient(90deg, transparent, #f59e0b, transparent)',
+            background: 'linear-gradient(90deg, transparent, var(--warning-500), transparent)',
             animation: 'shimmerLine 3s ease-in-out infinite',
           }}
         />
@@ -1328,7 +1327,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
               className="text-[10px] font-semibold px-1.5 py-px rounded"
               style={{
                 background: 'rgba(148,163,184,0.1)',
-                color: '#94a3b8',
+                color: 'var(--neutral-400)',
               }}
             >
               {STAGE_LABELS[card.stage] ?? card.stage}
@@ -1339,7 +1338,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
                 className="text-[10px] font-semibold px-1.5 py-px rounded"
                 style={{
                   background: 'rgba(139,92,246,0.12)',
-                  color: '#a78bfa',
+                  color: 'var(--primary-500)',
                 }}
               >
                 Contrarian
@@ -1363,10 +1362,10 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         <div className="flex items-center justify-between mb-1.5">
           {/* Team names */}
           <div className="flex-1 min-w-0 mr-3">
-            <div className="text-sm font-semibold text-neutral-900 dark:text-[#f1f5f9] truncate">
+            <div className="text-sm font-semibold text-neutral-900 dark:text-[var(--neutral-100)] truncate">
               {card.homeTeamName}
             </div>
-            <div className="text-sm font-semibold text-neutral-900 dark:text-[#f1f5f9] truncate">
+            <div className="text-sm font-semibold text-neutral-900 dark:text-[var(--neutral-100)] truncate">
               {card.awayTeamName}
             </div>
           </div>
@@ -1389,7 +1388,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
             <div
               className="font-mono text-[17px] font-extrabold leading-tight"
               style={{
-                color: isExact ? '#f59e0b' : isHit ? '#22c55e' : '#ef4444',
+                color: isExact ? 'var(--warning-500)' : isHit ? 'var(--success-600)' : 'var(--danger-600)',
               }}
             >
               {card.predictedHomeScore} - {card.predictedAwayScore}
@@ -1405,7 +1404,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
               className="text-[10px] font-bold px-2 py-0.5 rounded-md"
               style={{
                 background: isHit ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.08)',
-                color: isHit ? '#22c55e' : '#64748b',
+                color: isHit ? 'var(--success-600)' : 'var(--neutral-500)',
               }}
             >
               +{card.xpEarned} XP
@@ -1423,14 +1422,14 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
         {/* Bragging rights callout for rare exact scores */}
         {isRareExact && (
           <div
-            className="mt-2.5 flex items-center gap-1.5 rounded-lg py-1.5 px-2.5"
+            className="mt-2.5 flex items-center gap-1.5 rounded-chip py-1.5 px-2.5"
             style={{
               background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.04))',
               border: '1px solid rgba(245,158,11,0.15)',
             }}
           >
             <span className="text-xs leading-none">🔮</span>
-            <span className="text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
+            <span className="text-[10px] font-semibold" style={{ color: 'var(--warning-500)' }}>
               Only {Math.round((card.consensusPct ?? 0) * 100)}% predicted this result — pure oracle energy
             </span>
           </div>
@@ -1457,7 +1456,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
 
       {/* Modal content */}
       <div
-        className="relative w-full sm:max-w-md bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl dark:border dark:border-border-default overflow-hidden max-h-[85vh] flex flex-col"
+        className="relative w-full sm:max-w-md bg-surface rounded-t-2xl sm:rounded-card shadow-card-elevated dark:border dark:border-border-default overflow-hidden max-h-[85vh] flex flex-col"
         style={{ animation: 'modal-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1487,7 +1486,7 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
               return (
                 <div
                   key={level.level}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${
                     isCurrent
                       ? 'bg-accent-50 dark:bg-accent-50 border border-accent-500/30'
                       : isReached
@@ -1551,15 +1550,15 @@ function LevelRoadmapModal({ xpBreakdown, onClose }: { xpBreakdown: XPBreakdown;
 
             {/* XP Breakdown Pills */}
             <div className="flex flex-wrap justify-center gap-2 mt-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
                 <span className="text-xs font-medium text-primary-600 dark:text-primary-400">Match XP</span>
                 <span className="text-xs font-bold text-primary-700 dark:text-primary-300">{xpBreakdown.totalBaseXP.toLocaleString()}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
                 <span className="text-xs font-medium text-success-600 dark:text-success-400">Bonus XP</span>
                 <span className="text-xs font-bold text-success-700 dark:text-success-300">{xpBreakdown.totalBonusXP.toLocaleString()}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
                 <span className="text-xs font-medium text-warning-600 dark:text-warning-400">Badge XP</span>
                 <span className="text-xs font-bold text-warning-700 dark:text-warning-300">{xpBreakdown.totalBadgeXP.toLocaleString()}</span>
               </div>

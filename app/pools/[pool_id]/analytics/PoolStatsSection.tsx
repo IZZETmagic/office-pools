@@ -18,7 +18,7 @@ const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false })
 // =============================================
 
 const TOOLTIP_STYLE = {
-  background: '#1f2937',
+  background: 'var(--neutral-800)',
   border: 'none',
   borderRadius: '8px',
   fontSize: '12px',
@@ -75,7 +75,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
 
       {/* Summary Row */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <p className="text-3xl font-bold text-neutral-900 dark:text-white">
             {Math.round(avgPoolAccuracy * 100)}%
           </p>
@@ -83,7 +83,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
             Avg Pool Accuracy
           </p>
         </div>
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <p className="text-3xl font-bold text-neutral-900 dark:text-white">
             {totalCompletedMatches}
           </p>
@@ -91,7 +91,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
             Completed Matches
           </p>
         </div>
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
           <p className="text-3xl font-bold text-neutral-900 dark:text-white">
             {totalEntries}
           </p>
@@ -103,7 +103,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
 
       {/* Predictability Chart */}
       {chartData.length > 0 && (
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
           <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Match Predictability</h4>
           </div>
@@ -111,9 +111,9 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
             <div className="h-[240px] sm:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" barSize={16}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} unit="%" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} width={40} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--neutral-200)" opacity={0.5} />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--neutral-400)' }} unit="%" />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--neutral-400)' }} width={40} />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
                     formatter={(value: any, _name: any, props: any) => [
@@ -125,7 +125,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
                     {chartData.map((entry, idx) => (
                       <Cell
                         key={idx}
-                        fill={entry.hitRate >= 70 ? '#10b981' : entry.hitRate >= 40 ? '#f59e0b' : '#ef4444'}
+                        fill={entry.hitRate >= 70 ? 'var(--success-600)' : entry.hitRate >= 40 ? 'var(--warning-500)' : 'var(--danger-600)'}
                         radius={[0, 4, 4, 0] as any}
                       />
                     ))}
@@ -140,7 +140,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
       {/* Two-Column: Most Predictable + Biggest Upsets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Most Predictable */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
           <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Most Predictable</h4>
           </div>
@@ -174,7 +174,7 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
         </div>
 
         {/* Biggest Upsets */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
           <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Biggest Upsets</h4>
           </div>

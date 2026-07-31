@@ -87,7 +87,7 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-chip transition-colors ${
               filter === f
                 ? 'bg-primary-500 text-white'
                 : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
@@ -101,7 +101,7 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
       </div>
 
       {/* Match List */}
-      <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
           {displayList.length > 0 ? (
             displayList.map(match => (
@@ -222,7 +222,7 @@ function CrowdMatchCard({ match }: { match: CrowdMatch }) {
 
 function SummaryCard({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
-    <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4">
+    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4">
       <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
         {label}
       </p>

@@ -22,10 +22,10 @@ const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: fals
 // =============================================
 
 const TYPE_COLORS = {
-  exact: '#10b981',    // success green
-  winnerGd: '#3b82f6', // primary blue
-  winner: '#f59e0b',   // warning amber
-  miss: '#d1d5db',     // neutral gray
+  exact: 'var(--success-600)',    // success green
+  winnerGd: 'var(--primary-600)', // primary blue
+  winner: 'var(--warning-500)',   // warning amber
+  miss: 'var(--neutral-300)',     // neutral gray
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -36,7 +36,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const TOOLTIP_STYLE = {
-  background: '#1f2937',
+  background: 'var(--neutral-800)',
   border: 'none',
   borderRadius: '8px',
   fontSize: '12px',
@@ -109,7 +109,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Stacked Bar Chart */}
-        <div className="lg:col-span-2 bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="lg:col-span-2 bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
           <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Accuracy by Stage</h4>
           </div>
@@ -118,9 +118,9 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
               <div className="h-[220px] sm:h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} barSize={28}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
-                    <XAxis dataKey="stage" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--neutral-200)" opacity={0.5} />
+                    <XAxis dataKey="stage" tick={{ fontSize: 11, fill: 'var(--neutral-400)' }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: 'var(--neutral-400)' }} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
                     <Bar dataKey="Exact" stackId="a" fill={TYPE_COLORS.exact} radius={[0, 0, 0, 0]} />
                     <Bar dataKey="W+GD" stackId="a" fill={TYPE_COLORS.winnerGd} />
@@ -150,7 +150,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
         </div>
 
         {/* Donut Chart */}
-        <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
           <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Prediction Breakdown</h4>
           </div>
@@ -199,7 +199,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
       </div>
 
       {/* Stage Detail Table (mobile-friendly) */}
-      <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+      <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
         <div className="px-4 sm:px-5 py-3 bg-neutral-100 dark:bg-neutral-200 border-b border-neutral-200 dark:border-neutral-700">
           <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Stage Details</h4>
         </div>
@@ -250,7 +250,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-surface rounded-xl shadow dark:shadow-none dark:border dark:border-border-default p-4">
+    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4">
       <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
         {label}
       </p>
