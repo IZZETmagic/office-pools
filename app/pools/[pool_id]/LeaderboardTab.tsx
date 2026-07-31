@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } fr
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
-import { computeEntryPredictedPodium } from '@/lib/bracketResolver'
+import { computeEntryPredictedPodium, resolvePredictedBracket } from '@/lib/bracketResolver'
 import { getFormDotClass, FORM_LEGEND } from '@/lib/design/formDots'
 import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult, EntryStatsData, MatchdayMVPData } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
@@ -867,6 +867,42 @@ export function LeaderboardTab({
     return () => { cancelled = true }
   }, [poolId, selectedEntry?.entry_id, predictionMode])
 
+  // Which teams the selected entry actually had in each knockout slot. A knockout
+  // fixture is scored on the scoreline you predicted even when the teams you sent
+  // through never got there, so without this the breakdown shows "3-0 Pred" against
+  // England v DR Congo with no hint that you had England v Uzbekistan. Same resolver
+  // the scoring engine uses; the Form tab derives its "You had" column the same way.
+  const selectedKnockoutTeams = useMemo<Map<number, { home: string | null; away: string | null }>>(() => {
+    const empty = new Map<number, { home: string | null; away: string | null }>()
+    if (!selectedEntry || predictionMode === 'bracket_picker') return empty
+    const predictionMap: PredictionMap = new Map()
+    for (const p of selectedPredictions) {
+      predictionMap.set(p.match_id, {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        homePso: p.predicted_home_pso ?? null,
+        awayPso: p.predicted_away_pso ?? null,
+        winnerTeamId: p.predicted_winner_team_id ?? null,
+      })
+    }
+    if (predictionMap.size === 0) return empty
+    try {
+      const bracket = resolvePredictedBracket({ matches, predictionMap, teams: tournamentTeams })
+      const out = new Map<number, { home: string | null; away: string | null }>()
+      bracket.knockoutTeamMap.forEach((v, matchNumber) => {
+        out.set(matchNumber, {
+          home: v.home?.country_name ?? null,
+          away: v.away?.country_name ?? null,
+        })
+      })
+      return out
+    } catch {
+      // A partial or malformed bracket should cost one annotation line, not the
+      // whole breakdown.
+      return empty
+    }
+  }, [selectedEntry, selectedPredictions, matches, tournamentTeams, predictionMode])
+
   // The selected entry's PREDICTED podium (champion/runner-up/third), derived from
   // their bracket via the same resolver the scoring engine uses. Powers the
   // pick-vs-actual "Tournament Podium" section in the breakdown modal. Computed
@@ -1638,6 +1674,7 @@ export function LeaderboardTab({
           predictionMode={predictionMode}
           actualPodium={tournamentAwards}
           predictedPodium={selectedPredictedPodium}
+          knockoutTeams={selectedKnockoutTeams}
         />
       )}
     </div>

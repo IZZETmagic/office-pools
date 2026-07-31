@@ -8,6 +8,7 @@ import type { PoolSettings } from './results/points'
 import { formatNumber } from '@/lib/format'
 import { tierChipClass } from '@/lib/design/formDots'
 import { rankChipTone, rankChipTextClass } from '@/lib/design/rank'
+import { Icon } from '@/components/ui/Icon'
 
 type PointAdjustmentRecord = {
   id: string
@@ -34,6 +35,9 @@ type PointsBreakdownModalProps = {
   // Drive the always-visible "Tournament Podium" pick-vs-actual section.
   actualPodium?: PodiumResult | null
   predictedPodium?: PodiumResult | null
+  // Teams this entry had in each knockout slot, by match_number. Resolved by the
+  // parent (LeaderboardTab) because only it holds the entry's predictions.
+  knockoutTeams?: Map<number, { home: string | null; away: string | null }>
 }
 
 type MatchPointDetail = {
@@ -50,6 +54,9 @@ type MatchPointDetail = {
   multiplier: number
   psoPoints: number
   stage: string
+  // Set only where the entry's knockout teams differ from who actually played.
+  predictedHomeTeam: string | null
+  predictedAwayTeam: string | null
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -170,6 +177,7 @@ export function PointsBreakdownModal({
   predictionMode = 'full_tournament',
   actualPodium = null,
   predictedPodium = null,
+  knockoutTeams,
 }: PointsBreakdownModalProps) {
   const matchPoints = playerScore?.match_points ?? entry.total_points ?? 0
   const bonusPoints = playerScore?.bonus_points ?? 0
@@ -203,10 +211,20 @@ export function PointsBreakdownModal({
 
     for (const ms of entryMatchScores) {
       const m = matchLookup.get(ms.match_id)
+      const homeTeam = m?.home_team?.country_name ?? m?.home_team_placeholder ?? '?'
+      const awayTeam = m?.away_team?.country_name ?? m?.away_team_placeholder ?? '?'
+
+      // Only knockout slots can diverge — group fixtures are fixed for everyone.
+      const had = ms.stage !== 'group' ? knockoutTeams?.get(ms.match_number) : undefined
+      const teamsDiffer =
+        !!had && !!had.home && !!had.away && (had.home !== homeTeam || had.away !== awayTeam)
+
       details.push({
         matchNumber: ms.match_number,
-        homeTeam: m?.home_team?.country_name ?? m?.home_team_placeholder ?? '?',
-        awayTeam: m?.away_team?.country_name ?? m?.away_team_placeholder ?? '?',
+        homeTeam,
+        awayTeam,
+        predictedHomeTeam: teamsDiffer ? had.home : null,
+        predictedAwayTeam: teamsDiffer ? had.away : null,
         actualHome: ms.actual_home_score,
         actualAway: ms.actual_away_score,
         predictedHome: ms.predicted_home_score,
@@ -222,7 +240,7 @@ export function PointsBreakdownModal({
 
     details.sort((a, b) => a.matchNumber - b.matchNumber)
     return details
-  }, [entryMatchScores, matchLookup])
+  }, [entryMatchScores, matchLookup, knockoutTeams])
 
   // Group match details by stage
   const matchesByStage = useMemo(() => {
@@ -1028,7 +1046,8 @@ export function PointsBreakdownModal({
             which made you read a sentence to work out which was yours. */}
         <div>
           {details.map((d) => (
-            <div key={d.matchNumber} className="flex items-center gap-2 px-4 py-1.5">
+            <div key={d.matchNumber} className="flex flex-col gap-1 px-4 py-1.5">
+              <div className="flex items-center gap-2">
               <span
                 className={`shrink-0 w-16 text-center rounded-pill font-bold px-2 py-1 text-[11px] leading-none ${tierChipClass(d.type)}`}
               >
@@ -1053,7 +1072,20 @@ export function PointsBreakdownModal({
                 className={`shrink-0 t-num t-num-extrabold text-xs ${d.points > 0 ? 'text-success-600' : 'text-muted'}`}
               >
                 {d.points > 0 ? `+${formatNumber(d.points)}` : '0'}
-              </span>
+                </span>
+              </div>
+
+              {/* A knockout fixture is scored on the scoreline you predicted even
+                  when the teams you sent through never arrived. Without this the
+                  row reads as a plain miss rather than a bracket that broke. */}
+              {d.predictedHomeTeam && (
+                <div className="flex items-center gap-1 ml-18 min-w-0">
+                  <Icon name="arrow.triangle.branch" size={11} weight="medium" className="shrink-0 text-warning-500" />
+                  <span className="t-detail text-warning-500 truncate">
+                    You predicted: {d.predictedHomeTeam} v {d.predictedAwayTeam}
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>
