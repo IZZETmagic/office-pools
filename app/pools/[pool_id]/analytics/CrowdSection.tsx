@@ -53,7 +53,7 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <h3 className="text-lg font-semibold text-ink">
+      <h3 className="t-section-header text-ink">
         Crowd Comparison
       </h3>
 
@@ -87,10 +87,10 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-chip transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-pill transition-colors ${
               filter === f
-                ? 'bg-primary-500 text-white'
-                : 'bg-mist text-muted hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                ? 'bg-primary-600/12 text-primary-700'
+                : 'bg-mist text-muted hover:text-ink'
             }`}
           >
             {f === 'all' ? 'All Matches' : f === 'contrarian' ? 'Contrarian' : 'Consensus'}
@@ -101,8 +101,8 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
       </div>
 
       {/* Match List */}
-      <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+      <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="divide-y divide-border-subtle">
           {displayList.length > 0 ? (
             displayList.map(match => (
               <CrowdMatchCard key={match.matchId} match={match} />
@@ -222,7 +222,7 @@ function CrowdMatchCard({ match }: { match: CrowdMatch }) {
 
 function SummaryCard({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
-    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4">
+    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default p-4">
       <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
         {label}
       </p>

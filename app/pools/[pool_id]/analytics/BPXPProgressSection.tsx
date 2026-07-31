@@ -61,7 +61,7 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
 
   return (
     <div
-      className="bg-surface rounded-control shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
+      className="bg-surface rounded-card shadow-card dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
       style={{ animation: 'fadeUp 0.3s ease 0s both' }}
       onClick={onOpenRoadmap}
       role="button"
@@ -293,7 +293,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
   return (
     <>
       <div
-        className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+        className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.1s both' }}
       >
         <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
@@ -427,7 +427,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
 
   return (
     <div
-      className="relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+      className="relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
     >
       {/* Ambient corner glows */}
@@ -559,7 +559,7 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
   const teamLookup = new Map(teams.map(t => [t.team_id, t]))
 
   return (
-    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default">
+    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default">
       <div className="p-[18px]">
         <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
           Pool-Wide Stats
@@ -634,7 +634,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
 
   return (
     <div
-      className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.35s both' }}
     >
       <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">

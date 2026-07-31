@@ -78,7 +78,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <h3 className="text-lg font-semibold text-ink">
+      <h3 className="t-section-header text-ink">
         Your Prediction Accuracy
       </h3>
 
@@ -109,9 +109,9 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Stacked Bar Chart */}
-        <div className="lg:col-span-2 bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-            <h4 className="text-sm font-semibold text-ink">Accuracy by Stage</h4>
+        <div className="lg:col-span-2 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <div className="px-4 sm:px-5 pt-3 pb-2">
+            <h4 className="t-card-title text-ink">Accuracy by Stage</h4>
           </div>
           <div className="p-4 sm:p-5">
             {chartData.length > 0 ? (
@@ -150,9 +150,9 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
         </div>
 
         {/* Donut Chart */}
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-            <h4 className="text-sm font-semibold text-ink">Prediction Breakdown</h4>
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <div className="px-4 sm:px-5 pt-3 pb-2">
+            <h4 className="t-card-title text-ink">Prediction Breakdown</h4>
           </div>
           <div className="p-4 sm:p-5">
             {donutData.length > 0 ? (
@@ -199,9 +199,9 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
       </div>
 
       {/* Stage Detail Table (mobile-friendly) */}
-      <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-        <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-          <h4 className="text-sm font-semibold text-ink">Stage Details</h4>
+      <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="px-4 sm:px-5 pt-3 pb-2">
+          <h4 className="t-card-title text-ink">Stage Details</h4>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -250,7 +250,7 @@ export function AccuracySection({ stageAccuracy, overall }: AccuracySectionProps
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4">
+    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default p-4">
       <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
         {label}
       </p>

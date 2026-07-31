@@ -124,7 +124,7 @@ function XPHeroCard({ xpBreakdown, onOpenRoadmap }: { xpBreakdown: XPBreakdown; 
 
   return (
     <div
-      className="bg-surface rounded-control shadow dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
+      className="bg-surface rounded-card shadow-card dark:shadow-none border-2 border-accent-500/30 dark:border-accent-500/20 overflow-hidden cursor-pointer transition-all hover:border-accent-500/50 dark:hover:border-accent-500/40 active:scale-[0.995]"
       style={{ animation: 'fadeUp 0.3s ease 0s both' }}
       onClick={onOpenRoadmap}
       role="button"
@@ -459,7 +459,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
     <div style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}>
       <div className="flex gap-2.5">
         {/* ===== HOT STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-warning-500/20 py-[18px] px-[14px] text-center">
+        <div className="flex-1 relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none border border-warning-500/20 py-[18px] px-[14px] text-center">
           {/* Background flame (decorative, 6% opacity) */}
           <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.06] pointer-events-none">
             <svg viewBox="0 0 24 24" fill="var(--warning-500)" className="w-full h-full">
@@ -512,7 +512,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
         </div>
 
         {/* ===== COLD STREAK CARD ===== */}
-        <div className="flex-1 relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none border border-border-subtle dark:border-border-default py-[18px] px-[14px] text-center">
+        <div className="flex-1 relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none border border-border-subtle dark:border-border-default py-[18px] px-[14px] text-center">
           {/* Background snowflake (decorative, 4% opacity) */}
           <div className="absolute bottom-[-25px] left-1/2 -translate-x-1/2 w-[120px] h-[120px] opacity-[0.04] pointer-events-none">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--sp-level-sky)" strokeLinecap="round" className="w-full h-full">
@@ -608,7 +608,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
 
   return (
     <div
-      className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+      className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.2s both' }}
       onClick={() => setTooltip(null)}
     >
@@ -812,7 +812,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
 
   return (
     <div
-      className="relative overflow-hidden bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default"
+      className="relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
       style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
     >
       {/* Ambient corner glows */}
@@ -975,7 +975,7 @@ export function PoolWideStatsSection({ poolStats }: { poolStats: PoolWideStats }
   const topUpsets = leastPredictable.slice(0, 3)
 
   return (
-    <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default">
+    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default">
       <div className="p-[18px]">
         {/* Heading */}
         <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
@@ -1274,7 +1274,7 @@ function MatchResultsSection({
         <div className="flex items-center justify-center gap-3 mt-4">
           <button
             onClick={() => setVisibleCount(v => v + 10)}
-            className="text-sm font-medium px-4 py-2 rounded-chip transition-colors bg-mist text-muted hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            className="text-sm font-medium px-4 py-2 rounded-pill transition-colors bg-mist text-muted hover:bg-neutral-200 dark:hover:bg-neutral-700"
           >
             Show 10 more
           </button>

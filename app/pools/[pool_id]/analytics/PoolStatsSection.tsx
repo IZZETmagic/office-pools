@@ -39,6 +39,16 @@ const STAGE_LABELS: Record<string, string> = {
 // COMPONENT
 // =============================================
 
+/** PoolStatColumn from the app: a black numeral over a muted label. */
+function PoolStatColumn({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-0.5">
+      <span className="t-num font-black text-2xl leading-7 text-ink">{value}</span>
+      <span className="text-[11px] font-medium text-muted text-center">{label}</span>
+    </div>
+  )
+}
+
 type PoolStatsSectionProps = {
   poolStats: PoolWideStats
 }
@@ -68,44 +78,25 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
 
   return (
     <div className="space-y-4">
-      {/* Section Header */}
-      <h3 className="text-lg font-semibold text-ink">
-        Pool-Wide Stats
-      </h3>
-
-      {/* Summary Row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-ink">
-            {Math.round(avgPoolAccuracy * 100)}%
-          </p>
-          <p className="text-xs font-medium text-muted uppercase mt-1">
-            Avg Pool Accuracy
-          </p>
+      {/* PoolStatsSection in the app: one card with the header inside and three
+          columns beneath it, rather than three separate cards. Three cards read as
+          three unrelated facts; one card reads as a summary of this pool. */}
+      <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="px-4 pt-4 pb-3">
+          <h3 className="t-section-header text-ink">Pool-Wide Stats</h3>
         </div>
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-ink">
-            {totalCompletedMatches}
-          </p>
-          <p className="text-xs font-medium text-muted uppercase mt-1">
-            Completed Matches
-          </p>
-        </div>
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default p-4 text-center">
-          <p className="text-3xl font-bold text-ink">
-            {totalEntries}
-          </p>
-          <p className="text-xs font-medium text-muted uppercase mt-1">
-            Submitted Entries
-          </p>
+        <div className="flex px-4 pb-4">
+          <PoolStatColumn label="Avg Pool Accuracy" value={`${Math.round(avgPoolAccuracy * 100)}%`} />
+          <PoolStatColumn label="Competitors" value={`${totalEntries}`} />
+          <PoolStatColumn label="Matches Scored" value={`${totalCompletedMatches}`} />
         </div>
       </div>
 
       {/* Predictability Chart */}
       {chartData.length > 0 && (
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-            <h4 className="text-sm font-semibold text-ink">Match Predictability</h4>
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <div className="px-4 sm:px-5 pt-3 pb-2">
+            <h4 className="t-card-title text-ink">Match Predictability</h4>
           </div>
           <div className="p-4 sm:p-5">
             <div className="h-[240px] sm:h-[300px]">
@@ -140,11 +131,11 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
       {/* Two-Column: Most Predictable + Biggest Upsets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Most Predictable */}
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-            <h4 className="text-sm font-semibold text-ink">Most Predictable</h4>
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <div className="px-4 sm:px-5 pt-3 pb-2">
+            <h4 className="t-card-title text-ink">Most Predictable</h4>
           </div>
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+          <div className="divide-y divide-border-subtle">
             {mostPredictable.map((m, idx) => (
               <div key={m.matchId} className="px-4 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
@@ -174,11 +165,11 @@ export function PoolStatsSection({ poolStats }: PoolStatsSectionProps) {
         </div>
 
         {/* Biggest Upsets */}
-        <div className="bg-surface rounded-control shadow dark:shadow-none dark:border dark:border-border-default overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 bg-mist dark:bg-neutral-200 border-b border-border-subtle">
-            <h4 className="text-sm font-semibold text-ink">Biggest Upsets</h4>
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          <div className="px-4 sm:px-5 pt-3 pb-2">
+            <h4 className="t-card-title text-ink">Biggest Upsets</h4>
           </div>
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+          <div className="divide-y divide-border-subtle">
             {leastPredictable.map((m, idx) => (
               <div key={m.matchId} className="px-4 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
