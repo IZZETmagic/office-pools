@@ -15,9 +15,15 @@ import { Icon } from './Icon'
  * WIDTH: sized to its longest option, not its current one. A native select left
  * to itself is sized by the browser from the selected value, so the control —
  * and everything laid out beside it — resizes as the user changes the filter.
- * An invisible sizer holding the longest label shares a single grid cell with
- * the select, so the cell is always as wide as the widest choice and the layout
- * never shifts.
+ * An invisible sizer holding the longest label shares one grid cell with the
+ * select, so the cell is always as wide as the widest choice.
+ *
+ * The structural properties — the grid, the shared cell, the chevron's position
+ * — are INLINE STYLES on purpose. Tailwind only emits classes it finds when it
+ * scans, so a utility used in exactly one new file can be missing from the
+ * served stylesheet until the dev server restarts, and this component then
+ * silently loses both its width and its chevron placement. Colour and type stay
+ * as classes because those fail visibly and harmlessly; layout does not.
  */
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
   focusColor?: 'blue' | 'green'
@@ -42,6 +48,17 @@ function longestOptionLabel(children: React.ReactNode): string {
   return longest
 }
 
+// Shared box model: the sizer must match the select exactly or the width is wrong.
+const BOX: React.CSSProperties = {
+  paddingTop: 12,
+  paddingBottom: 12,
+  paddingLeft: 16,
+  paddingRight: 40,
+  fontSize: 14,
+  fontWeight: 600,
+  lineHeight: '20px',
+}
+
 export function Select({
   focusColor = 'blue',
   fullWidth = false,
@@ -50,14 +67,21 @@ export function Select({
   ...props
 }: SelectProps) {
   const sizer = longestOptionLabel(children)
+  const useSizer = !fullWidth && sizer.length > 0
 
   return (
-    <div className={cn('relative inline-grid', fullWidth && 'w-full')}>
+    <span
+      style={{
+        position: 'relative',
+        display: fullWidth ? 'block' : 'inline-grid',
+        width: fullWidth ? '100%' : undefined,
+      }}
+    >
       <select
         {...props}
+        style={{ ...BOX, gridArea: '1 / 1', width: '100%', appearance: 'none' }}
         className={cn(
-          'col-start-1 row-start-1 w-full appearance-none pl-4 pr-10 py-3 rounded-control bg-mist text-ink',
-          'text-sm font-semibold cursor-pointer',
+          'rounded-control bg-mist text-ink cursor-pointer',
           'border border-transparent focus:outline-none focus:ring-2 transition-colors',
           focusClasses[focusColor],
           'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -67,25 +91,35 @@ export function Select({
         {children}
       </select>
 
-      {/* Sizer — same box model and type as the select, never shown, never read.
-          Skipped when fullWidth, where the container dictates the width. */}
-      {!fullWidth && sizer ? (
+      {/* Sizer — same box model and type as the select, never shown, never read. */}
+      {useSizer ? (
         <span
           aria-hidden="true"
-          className="col-start-1 row-start-1 invisible pointer-events-none pl-4 pr-10 py-3 text-sm font-semibold whitespace-nowrap"
+          style={{
+            ...BOX,
+            gridArea: '1 / 1',
+            visibility: 'hidden',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+          }}
         >
           {sizer}
         </span>
       ) : null}
 
-      {/* Full-height flex column rather than `top-1/2 -translate-y-1/2`. Centring an
-          icon with a transform depends on the transform actually composing, and when
-          it doesn't the chevron drops out of place — it is also one more thing that
-          has to survive whatever the icon renderer does with className. A flex box
-          spanning inset-y-0 centres it with no transform involved. */}
-      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+      <span
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          right: 12,
+          display: 'flex',
+          alignItems: 'center',
+          pointerEvents: 'none',
+        }}
+      >
         <Icon name="chevron.down" size={14} weight="bold" className="text-muted" />
       </span>
-    </div>
+    </span>
   )
 }
