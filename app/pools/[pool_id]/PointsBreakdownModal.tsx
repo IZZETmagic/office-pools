@@ -1079,15 +1079,20 @@ export function PointsBreakdownModal({
                   when the teams you sent through never arrived. Without this the
                   row reads as a plain miss rather than a bracket that broke. */}
               {d.predictedHomeTeam && (
-                /* ml-20 puts this under the Pred scoreline, not the column edge:
-                   the column is w-9 and the numerals are centred in it, so the
-                   column's own left edge sits ~7px left of the digits and read as
-                   misaligned. Measured at 112px against the scoreline's 111.4px. */
-                <div className="flex items-center gap-1 ml-20 min-w-0">
-                  <Icon name="arrow.triangle.branch" size={11} weight="medium" className="shrink-0 text-warning-500" />
-                  <span className="t-detail text-warning-500 truncate">
-                    You predicted: {d.predictedHomeTeam} v {d.predictedAwayTeam}
-                  </span>
+                /* Indented to sit under the Pred scoreline. Built from the same
+                   pieces as the row above rather than one hand-computed margin:
+                   the spacer carries the tier pill's own w-16, so if that pill is
+                   ever resized this tracks it instead of silently drifting. Only
+                   pl-2 is a constant — the Pred column is w-9 with the numerals
+                   centred, so its left edge sits ~8px left of the digits. */
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-16 shrink-0" aria-hidden="true" />
+                  <div className="flex items-center gap-1 min-w-0 pl-2">
+                    <Icon name="arrow.triangle.branch" size={11} weight="medium" className="shrink-0 text-warning-500" />
+                    <span className="t-detail text-warning-500 truncate">
+                      You predicted: {d.predictedHomeTeam} v {d.predictedAwayTeam}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
