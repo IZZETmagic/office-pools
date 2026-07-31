@@ -279,6 +279,20 @@ export function PointsBreakdownModal({
       existing.push(bs)
       grouped.set(bs.bonus_category, existing)
     }
+
+    // Order group-scoped bonuses A→L. They arrive in whatever order the query
+    // returned, so "Group F" could sit above "Group B" and you had to read every
+    // row to find the group you wanted.
+    //
+    // Applied to every category rather than just group_standings: bp_group and
+    // bp_third_place carry the same letters and had the same problem. Where a
+    // category has no letters at all — bracket, qualification, tournament,
+    // bp_bonus, bp_knockout — every comparison is 0 and, since sort is stable,
+    // the existing order is preserved untouched.
+    const letter = (bs: BonusScoreData) => bs.related_group_letter ?? '￿'
+    for (const entries of grouped.values()) {
+      entries.sort((a, b) => letter(a).localeCompare(letter(b)))
+    }
     return grouped
   }, [bonusScores])
 
