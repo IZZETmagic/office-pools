@@ -873,13 +873,11 @@ function MatchResultsSection({
   crowdData,
   entryPredictions,
   predictionResults,
-  totalEntries,
 }: {
   matchXP: MatchXP[]
   crowdData: CrowdMatch[]
   entryPredictions: PredictionData[]
   predictionResults: PredictionResult[]
-  totalEntries: number
 }) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -1000,12 +998,16 @@ function MatchResultsSection({
         })}
       </div>
 
-      {/* Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {displayList.map(card => (
-          <MatchCard key={card.matchId} card={card} totalEntries={totalEntries} />
-        ))}
-      </div>
+      {/* One card holding divided rows, rather than a grid of cards. A two-column
+          grid of five-row cards meant ten matches filled a screen; as rows they fit
+          in a fraction of the height and stay scannable down the score columns. */}
+      {displayList.length > 0 && (
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+          {displayList.map(card => (
+            <MatchCard key={card.matchId} card={card} />
+          ))}
+        </div>
+      )}
 
       {/* Empty state for filter */}
       {displayList.length === 0 && (
@@ -1039,170 +1041,65 @@ function MatchResultsSection({
 // MATCH CARD
 // =============================================
 
-function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: number }) {
+/**
+ * One line per match, in a single divided card.
+ *
+ * This was a two-column grid of cards that each stacked five rows — meta, status
+ * badge, two team names, two score blocks, then XP and consensus — plus an optional
+ * callout. Ten matches filled a screen. A match result is a small amount of
+ * information, so it gets a row: tier dot, number, stage, fixture, both scores, XP.
+ *
+ * Colours come from lib/design/formDots. The copy that was here was the NINTH of
+ * that mapping, and it collapsed winner_gd and winner onto the same green, so the
+ * two tiers were indistinguishable — the same conflation the profile had.
+ */
+function MatchCard({ card }: { card: MatchCardData }) {
+  const tier = card.resultType === 'miss' ? 'miss' : card.resultType
+  const color = tierColor(tier)
   const isExact = card.resultType === 'exact'
   const isHit = card.resultType !== 'miss'
-  const isContrarian = card.isContrarian
-
-  // Tier-based border color
-  const borderColor = isExact
-    ? 'color-mix(in srgb, var(--warning-500) 50%, transparent)'
-    : isHit
-      ? 'color-mix(in srgb, var(--success-600) 30%, transparent)'
-      : 'color-mix(in srgb, var(--sp-slate) 15%, transparent)'
-
-  // Status badge config
-  const statusConfig = isExact
-    ? { label: '★ EXACT', bg: 'color-mix(in srgb, var(--warning-500) 15%, transparent)', color: 'var(--warning-500)' }
-    : card.resultType === 'winner_gd'
-      ? { label: '✓ RESULT + GD', bg: 'color-mix(in srgb, var(--success-600) 12%, transparent)', color: 'var(--success-600)' }
-      : card.resultType === 'winner'
-        ? { label: '✓ CORRECT', bg: 'color-mix(in srgb, var(--success-600) 12%, transparent)', color: 'var(--success-600)' }
-        : { label: '✗ MISS', bg: 'color-mix(in srgb, var(--danger-600) 10%, transparent)', color: 'var(--danger-600)' }
-
-  // Bragging rights — exact score on a match where <25% got the result right
-  const isRareExact = isExact && card.consensusPct !== null && card.consensusPct < 0.25
 
   return (
-    <div
-      className="relative bg-surface rounded-control overflow-hidden transition-all duration-150 hover:-translate-y-px group"
-      style={{
-        border: `1px solid ${borderColor}`,
-        boxShadow: isExact
-          ? '0 1px 4px color-mix(in srgb, var(--warning-500) 8%, transparent)'
-          : '0 1px 3px rgba(0,0,0,0.04)',
-      }}
-    >
-      {/* Shimmer line for exact scores */}
-      {isExact && (
-        <div
-          className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{
-            background: 'linear-gradient(90deg, transparent, var(--warning-500), transparent)',
-            animation: 'shimmerLine 3s ease-in-out infinite',
-          }}
-        />
+    <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 border-b border-border-subtle last:border-b-0">
+      <span className="shrink-0 w-2 h-2 rounded-pill" style={{ background: color }} />
+
+      <span className="t-num text-[11px] text-muted w-7 shrink-0">#{card.matchNumber}</span>
+
+      <span
+        className="hidden sm:inline shrink-0 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-mist text-muted"
+      >
+        {STAGE_LABELS[card.stage] ?? card.stage}{card.groupLetter ? ` ${card.groupLetter}` : ''}
+      </span>
+
+      <span className="flex-1 min-w-0 text-[13px] text-ink truncate">
+        {card.homeTeamName} v {card.awayTeamName}
+      </span>
+
+      {card.isContrarian && (
+        <span className="hidden md:inline shrink-0 text-[10px] font-semibold px-1.5 py-px rounded-pill bg-primary-600/12 text-primary-700">
+          Contrarian
+        </span>
       )}
 
-      <div className="p-3.5 sm:p-4">
-        {/* Top row: Match meta + Status badge */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-muted">
-              #{card.matchNumber}
-            </span>
-            <span
-              className="text-[10px] font-semibold px-1.5 py-px rounded"
-              style={{
-                background: 'color-mix(in srgb, var(--sp-slate) 10%, transparent)',
-                color: 'var(--neutral-400)',
-              }}
-            >
-              {STAGE_LABELS[card.stage] ?? card.stage}
-              {card.groupLetter ? ` ${card.groupLetter}` : ''}
-            </span>
-            {isContrarian && (
-              <span
-                className="text-[10px] font-semibold px-1.5 py-px rounded"
-                style={{
-                  background: 'color-mix(in srgb, var(--primary-600) 12%, transparent)',
-                  color: 'var(--primary-500)',
-                }}
-              >
-                Contrarian
-              </span>
-            )}
-          </div>
+      {/* Actual, then yours in the tier's colour — the comparison is the point, so
+          they sit adjacent rather than in separate labelled blocks. */}
+      <span className="t-num text-[13px] text-muted shrink-0 tabular-nums">
+        {card.actualHomeScore}-{card.actualAwayScore}
+      </span>
+      <span className="t-num text-[13px] shrink-0 tabular-nums" style={{ color }}>
+        {card.predictedHomeScore}-{card.predictedAwayScore}
+      </span>
 
-          {/* Status badge */}
-          <span
-            className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-            style={{
-              background: statusConfig.bg,
-              color: statusConfig.color,
-            }}
-          >
-            {statusConfig.label}
-          </span>
-        </div>
+      <span
+        className="t-num text-[11px] shrink-0 w-10 text-right"
+        style={{ color: isHit ? 'var(--success-700)' : 'var(--sp-slate)' }}
+      >
+        +{card.xpEarned}
+      </span>
 
-        {/* Main score row */}
-        <div className="flex items-center justify-between mb-1.5">
-          {/* Team names */}
-          <div className="flex-1 min-w-0 mr-3">
-            <div className="text-sm font-semibold text-ink dark:text-[var(--neutral-100)] truncate">
-              {card.homeTeamName}
-            </div>
-            <div className="text-sm font-semibold text-ink dark:text-[var(--neutral-100)] truncate">
-              {card.awayTeamName}
-            </div>
-          </div>
-
-          {/* Actual score */}
-          <div className="text-right mr-3">
-            <div className="text-[10px] font-medium text-muted mb-0.5">
-              Actual
-            </div>
-            <div className="font-mono text-[17px] font-extrabold text-ink leading-tight">
-              {card.actualHomeScore} - {card.actualAwayScore}
-            </div>
-          </div>
-
-          {/* Predicted score */}
-          <div className="text-right">
-            <div className="text-[10px] font-medium text-muted mb-0.5">
-              Yours
-            </div>
-            <div
-              className="font-mono text-[17px] font-extrabold leading-tight"
-              style={{
-                color: isExact ? 'var(--warning-500)' : isHit ? 'var(--success-600)' : 'var(--danger-600)',
-              }}
-            >
-              {card.predictedHomeScore} - {card.predictedAwayScore}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom row: XP earned + Consensus */}
-        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border-subtle/50">
-          <div className="flex items-center gap-2">
-            {/* XP pill */}
-            <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-              style={{
-                background: isHit ? 'color-mix(in srgb, var(--success-600) 10%, transparent)' : 'color-mix(in srgb, var(--sp-slate) 8%, transparent)',
-                color: isHit ? 'var(--success-600)' : 'var(--neutral-500)',
-              }}
-            >
-              +{card.xpEarned} XP
-            </span>
-          </div>
-
-          {/* Consensus % */}
-          {card.consensusPct !== null && (
-            <span className="text-[10px] text-muted">
-              {Math.round(card.consensusPct * 100)}% of pool got this right
-            </span>
-          )}
-        </div>
-
-        {/* Bragging rights callout for rare exact scores */}
-        {isRareExact && (
-          <div
-            className="mt-2.5 flex items-center gap-1.5 rounded-chip py-1.5 px-2.5"
-            style={{
-              background: 'linear-gradient(135deg, color-mix(in srgb, var(--warning-500) 10%, transparent), color-mix(in srgb, var(--warning-500) 4%, transparent))',
-              border: '1px solid color-mix(in srgb, var(--warning-500) 15%, transparent)',
-            }}
-          >
-            <span className="text-xs leading-none">🔮</span>
-            <span className="text-[10px] font-semibold" style={{ color: 'var(--warning-500)' }}>
-              Only {Math.round((card.consensusPct ?? 0) * 100)}% predicted this result — pure oracle energy
-            </span>
-          </div>
-        )}
-      </div>
+      {isExact && (
+        <Icon name="star.fill" size={11} weight="bold" tint={color} className="shrink-0 hidden sm:block" />
+      )}
     </div>
   )
 }
@@ -1371,7 +1268,6 @@ export function XPProgressSection({ xpBreakdown, streaks, crowdData, poolStats, 
         crowdData={crowdData}
         entryPredictions={entryPredictions}
         predictionResults={predictionResults}
-        totalEntries={poolStats.totalEntries}
       />
 
       {/* Level Roadmap Modal */}
