@@ -61,7 +61,9 @@ const TIER_CHIP_CLASS: Record<string, string> = {
   exact: 'text-tier-exact bg-tier-exact/12',
   winner_gd: 'text-tier-winner-gd bg-tier-winner-gd/12',
   winner: 'text-tier-winner bg-tier-winner/12',
-  miss: 'text-tier-miss bg-tier-miss/12',
+  // slate, not palette.tierMiss — matchTypeColor in the RN breakdown screen
+  // falls through to slate, and tierMiss is unused on both platforms.
+  miss: 'text-muted bg-muted/12',
   submitted: 'text-muted bg-muted/12',
   no_pick: 'text-muted bg-muted/12',
 }
