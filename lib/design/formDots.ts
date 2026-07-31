@@ -26,6 +26,29 @@ export function getFormDotClass(type: string): string {
   return FORM_DOT_CLASS[type as FormResult] ?? FORM_DOT_CLASS.no_pick
 }
 
+/**
+ * CSS colour per tier — for SVG, gradients, borders and inline styles, where a
+ * background-utility class cannot reach. Mirrors `useTierColor` in the app's
+ * FormTab. `submitted` is the tournament-run's name for a miss.
+ */
+const TIER_CSS: Record<string, string> = {
+  exact: 'var(--sp-tier-exact)',
+  winner_gd: 'var(--sp-tier-winner-gd)',
+  winner: 'var(--sp-tier-winner)',
+  miss: 'var(--danger-600)',
+  submitted: 'var(--sp-silver)',
+  no_pick: 'var(--sp-silver)',
+}
+
+export function tierColor(type: string): string {
+  return TIER_CSS[type] ?? TIER_CSS.no_pick
+}
+
+/** The tier composited at low alpha — the app's fill for run nodes and chips. */
+export function tierTint(type: string, percent = 20): string {
+  return `color-mix(in srgb, ${tierColor(type)} ${percent}%, transparent)`
+}
+
 /** Label for each tier, used by the leaderboard legend. */
 export const FORM_LEGEND: readonly (readonly [FormResult, string])[] = [
   ['exact', 'Exact'],

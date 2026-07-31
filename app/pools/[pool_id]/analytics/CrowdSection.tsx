@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { CrowdMatch } from './analyticsHelpers'
+import { Icon } from '@/components/ui/Icon'
 
 // =============================================
 // CONSTANTS
@@ -28,6 +29,89 @@ type CrowdSectionProps = {
   crowdData: CrowdMatch[]
 }
 
+/**
+ * BattleBar from the app: a label, the two values, and a single bar split between
+ * them — yours in primary, the other side in `silver`.
+ */
+function BattleBar({
+  label,
+  you,
+  crowd,
+  crowdLabel = 'crowd',
+}: {
+  label: string
+  you: number
+  crowd: number
+  crowdLabel?: string
+}) {
+  const total = you + crowd
+  const youPct = total > 0 ? (you / total) * 100 : 50
+  const crowdPct = total > 0 ? (crowd / total) * 100 : 50
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] text-muted">{label}</span>
+        <span className="t-num text-[11px] font-semibold text-muted">
+          {you} vs {crowd} {crowdLabel}
+        </span>
+      </div>
+      <div className="flex gap-0.5 h-2">
+        <span
+          className="rounded-pill bg-primary-600"
+          style={{ flex: youPct, minWidth: 2 }}
+        />
+        <span
+          className="rounded-pill bg-silver"
+          style={{ flex: crowdPct, minWidth: 2 }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** PerformanceCallout from the app: tinted panel, icon, verdict, optional detail. */
+function PerformanceCallout({
+  isOutperforming,
+  accuracyDiff,
+  contrarianRate,
+  showContrarian,
+}: {
+  isOutperforming: boolean
+  accuracyDiff: number
+  contrarianRate: number
+  showContrarian: boolean
+}) {
+  const accent = isOutperforming ? 'var(--success-600)' : 'var(--primary-600)'
+  return (
+    <div
+      className="flex items-start gap-2 p-3 rounded-chip"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${accent} 8%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${accent} 13%, transparent)`,
+      }}
+    >
+      <Icon
+        name={isOutperforming ? 'chart.line.uptrend.xyaxis' : 'target'}
+        size={18}
+        weight="semibold"
+        tint={accent}
+      />
+      <div className="flex-1 flex flex-col gap-0.5">
+        <span className="text-sm font-bold" style={{ color: accent }}>
+          {isOutperforming
+            ? `Outperforming the crowd by ${accuracyDiff}%`
+            : `The crowd leads by ${Math.abs(accuracyDiff)}%`}
+        </span>
+        {showContrarian && (
+          <span className="text-xs text-muted">
+            You won {contrarianRate}% of your contrarian picks
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function CrowdSection({ crowdData }: CrowdSectionProps) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [expanded, setExpanded] = useState(false)
@@ -39,6 +123,28 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
   const contrarianCount = matchesWithPrediction.filter(m => m.userIsContrarian).length
   const consensusCount = matchesWithPrediction.length - contrarianCount
   const contrarianCorrect = matchesWithPrediction.filter(m => m.userIsContrarian && m.userWasCorrect).length
+
+  // The faceoff needs both sides' hit rate. Yours comes straight off userWasCorrect;
+  // the crowd's is how often the majority pick matched the actual result, derived
+  // from crowdMajorityResult against the final score. Both are real measurements —
+  // there is no per-player crowd average in this payload, so nothing here is a
+  // stand-in for one.
+  const userCorrect = matchesWithPrediction.filter(m => m.userWasCorrect).length
+  const crowdCorrect = crowdData.filter(m => {
+    const actual =
+      m.actualHomeScore > m.actualAwayScore ? 'home'
+        : m.actualHomeScore < m.actualAwayScore ? 'away'
+          : 'draw'
+    return m.crowdMajorityResult === actual
+  }).length
+
+  const userAccuracy = matchesWithPrediction.length > 0
+    ? Math.round((userCorrect / matchesWithPrediction.length) * 100)
+    : 0
+  const crowdAccuracy = crowdData.length > 0
+    ? Math.round((crowdCorrect / crowdData.length) * 100)
+    : 0
+  const accuracyDiff = userAccuracy - crowdAccuracy
 
   // Filter
   const filtered = useMemo(() => {
@@ -52,33 +158,49 @@ export function CrowdSection({ crowdData }: CrowdSectionProps) {
 
   return (
     <div className="space-y-4">
-      {/* Section Header */}
-      <h3 className="t-section-header text-ink">
-        Crowd Comparison
-      </h3>
+      {/* CrowdSection in the app: a VS faceoff, three battle bars, and a callout —
+          all inside one card. The four separate summary cards this replaced stated
+          the numbers without ever putting you against the crowd, which is the whole
+          point of the section. */}
+      <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden">
+        <div className="px-4 pt-4 flex flex-col gap-3">
+          <h3 className="t-section-header text-ink">You vs The Crowd</h3>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryCard
-          label="Consensus Picks"
-          value={consensusCount}
-          sub={`of ${matchesWithPrediction.length} matches`}
-        />
-        <SummaryCard
-          label="Contrarian Picks"
-          value={contrarianCount}
-          sub={`${matchesWithPrediction.length > 0 ? Math.round((contrarianCount / matchesWithPrediction.length) * 100) : 0}% of picks`}
-        />
-        <SummaryCard
-          label="Contrarian Wins"
-          value={contrarianCorrect}
-          sub={contrarianCount > 0 ? `${Math.round((contrarianCorrect / contrarianCount) * 100)}% success` : 'no contrarian picks'}
-        />
-        <SummaryCard
-          label="Pool Size"
-          value={crowdData[0]?.totalPredictions ?? 0}
-          sub="entries compared"
-        />
+          <div className="flex items-center justify-around pb-2">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-bold tracking-[0.5px] text-primary-600">YOU</span>
+              <span className="t-num font-black text-[32px] leading-9 text-primary-600">
+                {userAccuracy}%
+              </span>
+            </div>
+            <span className="w-9 h-9 rounded-pill bg-mist border-[0.5px] border-silver flex items-center justify-center text-[11px] font-black text-muted">
+              VS
+            </span>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-bold tracking-[0.5px] text-muted">POOL AVG</span>
+              <span className="t-num font-black text-[32px] leading-9 text-muted">
+                {crowdAccuracy}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 pb-4">
+          <BattleBar label="Correct Picks" you={userCorrect} crowd={crowdCorrect} />
+          <BattleBar label="Consensus Picks" you={consensusCount} crowd={contrarianCount} crowdLabel="contrarian" />
+          <BattleBar label="Contrarian Wins" you={contrarianCorrect} crowd={contrarianCount - contrarianCorrect} crowdLabel="lost" />
+        </div>
+
+        {accuracyDiff !== 0 && (
+          <div className="px-4 pb-4">
+            <PerformanceCallout
+              isOutperforming={accuracyDiff > 0}
+              accuracyDiff={accuracyDiff}
+              contrarianRate={contrarianCount > 0 ? Math.round((contrarianCorrect / contrarianCount) * 100) : 0}
+              showContrarian={contrarianCount > 0}
+            />
+          </div>
+        )}
       </div>
 
       {/* Filter Tabs */}
@@ -220,14 +342,3 @@ function CrowdMatchCard({ match }: { match: CrowdMatch }) {
 // SUMMARY CARD
 // =============================================
 
-function SummaryCard({ label, value, sub }: { label: string; value: number; sub: string }) {
-  return (
-    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default p-4">
-      <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-ink">{value}</p>
-      <p className="text-xs text-muted mt-0.5">{sub}</p>
-    </div>
-  )
-}

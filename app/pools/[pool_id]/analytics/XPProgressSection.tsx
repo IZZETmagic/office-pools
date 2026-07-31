@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
 import { levelColor, XP_SOURCE_COLOR } from '@/lib/design/levels'
 import { rarityColor, rarityTint } from '@/lib/design/badges'
+import { tierColor, tierTint } from '@/lib/design/formDots'
 import { Icon } from '@/components/ui/Icon'
 import { createPortal } from 'react-dom'
 import type { XPBreakdown, EarnedBadge, BadgeDefinition, MatchXP, XPTier } from './xpSystem'
@@ -41,25 +42,22 @@ const TIER_BG_COLORS: Record<string, string> = {
 
 // Journey path node config per XP tier
 const NODE_COLORS: Record<XPTier, { color: string; glowColor: string; label: string }> = {
-  exact: { color: 'var(--warning-500)', glowColor: 'rgba(245, 158, 11, 0.4)', label: 'Exact Score' },
-  winner_gd: { color: 'var(--success-600)', glowColor: 'rgba(34, 197, 94, 0.27)', label: 'Winner + GD' },
-  winner: { color: 'var(--primary-600)', glowColor: 'rgba(59, 130, 246, 0.27)', label: 'Correct Result' },
-  submitted: { color: 'var(--neutral-600)', glowColor: 'none', label: 'Miss' },
+  // Colours come from lib/design/formDots so the run path agrees with the form dots
+  // and the leaderboard. The copy that was here had exact on amber and winner on the
+  // brand blue — so the same result was gold on one screen and amber on this one.
+  exact: { color: tierColor('exact'), glowColor: tierTint('exact', 40), label: 'Exact Score' },
+  winner_gd: { color: tierColor('winner_gd'), glowColor: tierTint('winner_gd', 27), label: 'Winner + GD' },
+  winner: { color: tierColor('winner'), glowColor: tierTint('winner', 27), label: 'Correct Result' },
+  submitted: { color: tierColor('submitted'), glowColor: 'none', label: 'Miss' },
 }
 
 const JOURNEY_LEGEND: { label: string; color: string; glow: boolean }[] = [
-  { label: 'Exact Score', color: 'var(--warning-500)', glow: true },
-  { label: 'Winner + GD', color: 'var(--success-600)', glow: false },
-  { label: 'Correct Result', color: 'var(--primary-600)', glow: true },
-  { label: 'Miss', color: 'var(--neutral-600)', glow: false },
+  { label: 'Exact Score', color: tierColor('exact'), glow: true },
+  { label: 'Winner + GD', color: tierColor('winner_gd'), glow: false },
+  { label: 'Correct Result', color: tierColor('winner'), glow: true },
+  { label: 'Miss', color: tierColor('submitted'), glow: false },
 ]
 
-function hexWithAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
 
 // =============================================
 // LEVEL HERO CARD
@@ -496,7 +494,7 @@ function HotColdStreaksSection({ streaks }: { streaks: StreakData }) {
                     className={`w-[22px] h-[5px] rounded-[3px] ${!filled ? 'bg-mist dark:bg-[var(--sp-midnight)]' : ''}`}
                     style={filled ? {
                       background: 'linear-gradient(to right, var(--warning-600), var(--warning-500))',
-                      boxShadow: '0 0 8px rgba(245, 158, 11, 0.25)',
+                      boxShadow: '0 0 8px color-mix(in srgb, var(--warning-500) 25%, transparent)',
                     } : undefined}
                   />
                 )
@@ -638,7 +636,6 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
               // Connector (not before first node)
               if (idx > 0) {
                 const prevTier = sorted[idx - 1].tier
-                const prevConfig = NODE_COLORS[prevTier]
                 const isMutedConnector = prevTier === 'submitted'
 
                 elements.push(
@@ -646,9 +643,11 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                     key={`c-${idx}`}
                     className="flex-shrink-0 h-[2px] w-5"
                     style={{
+                      // Connector in the app: the PREVIOUS node's tier at 35%,
+                      // or silver at 30% when that node was a miss.
                       background: isMutedConnector
-                        ? 'rgba(71, 85, 105, 0.2)'
-                        : `linear-gradient(to right, ${hexWithAlpha(prevConfig.color, 0.4)}, rgba(71, 85, 105, 0.15))`,
+                        ? tierTint('submitted', 30)
+                        : `linear-gradient(to right, ${tierTint(prevTier, 40)}, ${tierTint(prevTier, 15)})`,
                       animation: `nodeEnter 0.4s ease ${delay}s both`,
                     }}
                   />
@@ -668,14 +667,14 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                     isMiss ? 'bg-snow dark:bg-[var(--sp-midnight)]' : ''
                   }`}
                   style={{
-                    borderColor: isMiss ? 'rgba(71, 85, 105, 0.55)' : config.color,
+                    borderColor: isMiss ? 'var(--sp-silver)' : config.color,
                     background: isMiss
                       ? undefined
-                      : `radial-gradient(circle, ${hexWithAlpha(config.color, 0.35)}, ${hexWithAlpha(config.color, 0.15)})`,
+                      : `radial-gradient(circle, ${tierTint(match.tier, 35)}, ${tierTint(match.tier, 15)})`,
                     boxShadow: !isMiss && match.tier !== 'exact'
                       ? `0 0 8px ${config.glowColor}`
                       : 'none',
-                    color: isMiss ? 'var(--neutral-500)' : config.color,
+                    color: isMiss ? 'var(--sp-slate)' : config.color,
                     animation: match.tier === 'exact'
                       ? `nodeEnter 0.4s ease ${delay}s both, exactGlow 2s ease-in-out ${delay + 0.4}s infinite`
                       : `nodeEnter 0.4s ease ${delay}s both`,
@@ -721,7 +720,7 @@ function TournamentRunSection({ matchXP, crowdData }: { matchXP: MatchXP[]; crow
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{
                     backgroundColor: item.color,
-                    boxShadow: item.glow ? `0 0 6px ${hexWithAlpha(item.color, 0.27)}` : 'none',
+                    boxShadow: item.glow ? `0 0 6px color-mix(in srgb, ${item.color} 27%, transparent)` : 'none',
                   }}
                 />
                 <span className="text-[10px] text-muted whitespace-nowrap">
@@ -818,11 +817,11 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
       {/* Ambient corner glows */}
       <div
         className="absolute top-[-20px] right-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.25), transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 25%, transparent), transparent 70%)' }}
       />
       <div
         className="absolute top-[-20px] left-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.2), transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 20%, transparent), transparent 70%)' }}
       />
 
       {/* Content */}
@@ -847,7 +846,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
           {/* VS Badge */}
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-border-subtle dark:border-[var(--sp-midnight)]"
-            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 12%, transparent), color-mix(in srgb, var(--primary-600) 20%, transparent))' }}
           >
             <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
           </div>
@@ -887,7 +886,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
                     style={{
                       width: `calc(${youPct}% - 1px)`,
                       background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
-                      boxShadow: '0 0 8px rgba(59,130,246,0.25)',
+                      boxShadow: '0 0 8px color-mix(in srgb, var(--primary-600) 25%, transparent)',
                       animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
                       transformOrigin: 'left',
                     }}
@@ -897,7 +896,7 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
                     className="absolute top-0 right-0 h-full rounded-r"
                     style={{
                       width: `calc(${crowdPct}% - 1px)`,
-                      background: 'linear-gradient(to right, rgba(139,92,246,0.67), var(--primary-600))',
+                      background: 'linear-gradient(to right, color-mix(in srgb, var(--primary-600) 67%, transparent), var(--primary-600))',
                       animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${0.3 + idx * 0.1}s both`,
                       transformOrigin: 'right',
                     }}
@@ -914,8 +913,8 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
             <div
               className="flex items-start gap-2 rounded-chip"
               style={{
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.1), transparent)',
-                border: '1px solid rgba(34,197,94,0.13)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--success-600) 10%, transparent), transparent)',
+                border: '1px solid color-mix(in srgb, var(--success-600) 13%, transparent)',
                 padding: '10px 14px',
               }}
             >
@@ -935,8 +934,8 @@ function YouVsCrowdSection({ crowdData }: { crowdData: CrowdMatch[] }) {
             <div
               className="flex items-start gap-2 rounded-chip"
               style={{
-                background: 'linear-gradient(135deg, rgba(59,130,246,0.1), transparent)',
-                border: '1px solid rgba(59,130,246,0.13)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 10%, transparent), transparent)',
+                border: '1px solid color-mix(in srgb, var(--primary-600) 13%, transparent)',
                 padding: '10px 14px',
               }}
             >
@@ -1237,14 +1236,14 @@ function MatchResultsSection({
               style={{
                 background: isActive ? pill.color : undefined,
                 color: isActive ? '#ffffff' : 'var(--neutral-400)',
-                border: isActive ? 'none' : '1px solid rgba(148,163,184,0.2)',
+                border: isActive ? 'none' : '1px solid color-mix(in srgb, var(--sp-slate) 20%, transparent)',
               }}
             >
               {pill.label}
               <span
                 className="rounded-md px-1.5 py-px text-[10px] font-bold"
                 style={{
-                  background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(148,163,184,0.1)',
+                  background: isActive ? 'rgba(255,255,255,0.2)' : 'color-mix(in srgb, var(--sp-slate) 10%, transparent)',
                   color: isActive ? '#ffffff' : 'var(--neutral-400)',
                 }}
               >
@@ -1301,19 +1300,19 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
 
   // Tier-based border color
   const borderColor = isExact
-    ? 'rgba(245, 158, 11, 0.5)'
+    ? 'color-mix(in srgb, var(--warning-500) 50%, transparent)'
     : isHit
-      ? 'rgba(34, 197, 94, 0.3)'
-      : 'rgba(148, 163, 184, 0.15)'
+      ? 'color-mix(in srgb, var(--success-600) 30%, transparent)'
+      : 'color-mix(in srgb, var(--sp-slate) 15%, transparent)'
 
   // Status badge config
   const statusConfig = isExact
-    ? { label: '★ EXACT', bg: 'rgba(245,158,11,0.15)', color: 'var(--warning-500)' }
+    ? { label: '★ EXACT', bg: 'color-mix(in srgb, var(--warning-500) 15%, transparent)', color: 'var(--warning-500)' }
     : card.resultType === 'winner_gd'
-      ? { label: '✓ RESULT + GD', bg: 'rgba(34,197,94,0.12)', color: 'var(--success-600)' }
+      ? { label: '✓ RESULT + GD', bg: 'color-mix(in srgb, var(--success-600) 12%, transparent)', color: 'var(--success-600)' }
       : card.resultType === 'winner'
-        ? { label: '✓ CORRECT', bg: 'rgba(34,197,94,0.12)', color: 'var(--success-600)' }
-        : { label: '✗ MISS', bg: 'rgba(239,68,68,0.1)', color: 'var(--danger-600)' }
+        ? { label: '✓ CORRECT', bg: 'color-mix(in srgb, var(--success-600) 12%, transparent)', color: 'var(--success-600)' }
+        : { label: '✗ MISS', bg: 'color-mix(in srgb, var(--danger-600) 10%, transparent)', color: 'var(--danger-600)' }
 
   // Bragging rights — exact score on a match where <25% got the result right
   const isRareExact = isExact && card.consensusPct !== null && card.consensusPct < 0.25
@@ -1324,7 +1323,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
       style={{
         border: `1px solid ${borderColor}`,
         boxShadow: isExact
-          ? '0 1px 4px rgba(245,158,11,0.08)'
+          ? '0 1px 4px color-mix(in srgb, var(--warning-500) 8%, transparent)'
           : '0 1px 3px rgba(0,0,0,0.04)',
       }}
     >
@@ -1349,7 +1348,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
             <span
               className="text-[10px] font-semibold px-1.5 py-px rounded"
               style={{
-                background: 'rgba(148,163,184,0.1)',
+                background: 'color-mix(in srgb, var(--sp-slate) 10%, transparent)',
                 color: 'var(--neutral-400)',
               }}
             >
@@ -1360,7 +1359,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
               <span
                 className="text-[10px] font-semibold px-1.5 py-px rounded"
                 style={{
-                  background: 'rgba(139,92,246,0.12)',
+                  background: 'color-mix(in srgb, var(--primary-600) 12%, transparent)',
                   color: 'var(--primary-500)',
                 }}
               >
@@ -1426,7 +1425,7 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-md"
               style={{
-                background: isHit ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.08)',
+                background: isHit ? 'color-mix(in srgb, var(--success-600) 10%, transparent)' : 'color-mix(in srgb, var(--sp-slate) 8%, transparent)',
                 color: isHit ? 'var(--success-600)' : 'var(--neutral-500)',
               }}
             >
@@ -1447,8 +1446,8 @@ function MatchCard({ card, totalEntries }: { card: MatchCardData; totalEntries: 
           <div
             className="mt-2.5 flex items-center gap-1.5 rounded-chip py-1.5 px-2.5"
             style={{
-              background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.04))',
-              border: '1px solid rgba(245,158,11,0.15)',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--warning-500) 10%, transparent), color-mix(in srgb, var(--warning-500) 4%, transparent))',
+              border: '1px solid color-mix(in srgb, var(--warning-500) 15%, transparent)',
             }}
           >
             <span className="text-xs leading-none">🔮</span>

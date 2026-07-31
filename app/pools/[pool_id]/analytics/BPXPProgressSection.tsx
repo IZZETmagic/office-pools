@@ -380,7 +380,7 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
           style={{
             width: `calc(${youPct}% - 1px)`,
             background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
-            boxShadow: '0 0 8px rgba(59,130,246,0.25)',
+            boxShadow: '0 0 8px color-mix(in srgb, var(--primary-600) 25%, transparent)',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'left',
           }}
@@ -389,7 +389,7 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
           className="absolute top-0 right-0 h-full rounded-r"
           style={{
             width: `calc(${crowdPct}% - 1px)`,
-            background: 'linear-gradient(to right, rgba(139,92,246,0.67), var(--primary-600))',
+            background: 'linear-gradient(to right, color-mix(in srgb, var(--primary-600) 67%, transparent), var(--primary-600))',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'right',
           }}
@@ -433,11 +433,11 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
       {/* Ambient corner glows */}
       <div
         className="absolute top-[-20px] right-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.25), transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 25%, transparent), transparent 70%)' }}
       />
       <div
         className="absolute top-[-20px] left-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.2), transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 20%, transparent), transparent 70%)' }}
       />
 
       <div className="relative z-10 p-[18px]">
@@ -459,7 +459,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
 
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-border-subtle dark:border-[var(--sp-midnight)]"
-            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.2))' }}
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 12%, transparent), color-mix(in srgb, var(--primary-600) 20%, transparent))' }}
           >
             <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
           </div>
@@ -503,8 +503,8 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             <div
               className="flex items-start gap-2 rounded-chip"
               style={{
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.1), transparent)',
-                border: '1px solid rgba(34,197,94,0.13)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--success-600) 10%, transparent), transparent)',
+                border: '1px solid color-mix(in srgb, var(--success-600) 13%, transparent)',
                 padding: '10px 14px',
               }}
             >
@@ -524,8 +524,8 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             <div
               className="flex items-start gap-2 rounded-chip"
               style={{
-                background: 'linear-gradient(135deg, rgba(59,130,246,0.1), transparent)',
-                border: '1px solid rgba(59,130,246,0.13)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 10%, transparent), transparent)',
+                border: '1px solid color-mix(in srgb, var(--primary-600) 13%, transparent)',
                 padding: '10px 14px',
               }}
             >
