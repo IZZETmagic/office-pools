@@ -19,6 +19,8 @@
  * sentence carried ("Correct winner (Mexico)") cannot be recovered here.
  */
 
+import { ROUND_LABELS, type RoundKey } from '@/lib/tournament'
+
 /** Only the exact shadow shape — anything already prose is left alone. */
 const RAW_ENUM_DESCRIPTION = /^Group [A-Z]: [a-z_]+$/
 
@@ -36,7 +38,43 @@ export type BonusDescriptionInput = {
   description: string
 }
 
-export function formatBonusDescription(bs: BonusDescriptionInput): string {
+/**
+ * The fixture a bracket bonus was earned on, resolved by the caller from
+ * `related_match_id`. Both bracket bonus types store a single fixed sentence
+ * — "Correct match winner", "R32 correct pairing" — so on their own they can't
+ * tell you *which* match or *who*. Every one of those rows carries a
+ * `related_match_id`, and the breakdown already holds the tournament's matches,
+ * so the detail is recoverable at display time without touching the column.
+ */
+export type BonusMatchContext = {
+  matchNumber: number
+  stage: string
+  homeTeam: string | null
+  awayTeam: string | null
+  winnerTeam: string | null
+}
+
+function matchPrefix(m: BonusMatchContext): string {
+  const round = ROUND_LABELS[m.stage as RoundKey]
+  return round ? `Match ${m.matchNumber}, ${round}` : `Match ${m.matchNumber}`
+}
+
+export function formatBonusDescription(
+  bs: BonusDescriptionInput,
+  match?: BonusMatchContext | null,
+): string {
+  // Bracket bonuses: name the fixture and the teams. Falls through to the
+  // stored sentence whenever the match can't be resolved, so a missing lookup
+  // degrades to today's wording rather than to a blank or a half-sentence.
+  if (match) {
+    if (bs.bonus_type === 'match_winner_correct' && match.winnerTeam) {
+      return `${matchPrefix(match)}: Correct winner — ${match.winnerTeam}`
+    }
+    if (bs.bonus_type === 'correct_bracket_pairing' && match.homeTeam && match.awayTeam) {
+      return `${matchPrefix(match)}: Correct pairing — ${match.homeTeam} v ${match.awayTeam}`
+    }
+  }
+
   if (!bs.description || !RAW_ENUM_DESCRIPTION.test(bs.description)) return bs.description
 
   const label = GROUP_STANDINGS_LABEL[bs.bonus_type]

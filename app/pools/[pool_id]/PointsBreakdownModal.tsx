@@ -9,7 +9,7 @@ import { formatNumber } from '@/lib/format'
 import { tierChipClass } from '@/lib/design/formDots'
 import { rankChipTone, rankChipTextClass } from '@/lib/design/rank'
 import { Icon } from '@/components/ui/Icon'
-import { formatBonusDescription } from '@/lib/bonusDescription'
+import { formatBonusDescription, type BonusMatchContext } from '@/lib/bonusDescription'
 
 type PointAdjustmentRecord = {
   id: string
@@ -206,6 +206,19 @@ export function PointsBreakdownModal({
     return map
   }, [matches])
 
+  const bonusMatchContext = useCallback((matchId: string | null): BonusMatchContext | null => {
+    if (!matchId) return null
+    const m = matchLookup.get(matchId)
+    if (!m) return null
+    const home = m.home_team?.country_name ?? m.home_team_placeholder ?? null
+    const away = m.away_team?.country_name ?? m.away_team_placeholder ?? null
+    const winner =
+      m.winner_team_id && m.winner_team_id === m.home_team_id ? home
+      : m.winner_team_id && m.winner_team_id === m.away_team_id ? away
+      : null
+    return { matchNumber: m.match_number, stage: m.stage, homeTeam: home, awayTeam: away, winnerTeam: winner }
+  }, [matchLookup])
+
   // Build per-match point details from stored match_scores
   const matchDetails = useMemo(() => {
     const details: MatchPointDetail[] = []
@@ -290,12 +303,18 @@ export function PointsBreakdownModal({
     // category has no letters at all — bracket, qualification, tournament,
     // bp_bonus, bp_knockout — every comparison is 0 and, since sort is stable,
     // the existing order is preserved untouched.
+    // Secondary key: the fixture. Bracket bonuses carry no group letter, so
+    // before this they kept DB order — which, once the rows started naming their
+    // match, read as 76, 80, 92, 100, 102, 104, 76, 80, 92: every "correct
+    // winner" then every "correct pairing", jumping backwards in the middle.
     const letter = (bs: BonusScoreData) => bs.related_group_letter ?? '￿'
+    const matchNo = (bs: BonusScoreData) =>
+      (bs.related_match_id && matchLookup.get(bs.related_match_id)?.match_number) || 0
     for (const entries of grouped.values()) {
-      entries.sort((a, b) => letter(a).localeCompare(letter(b)))
+      entries.sort((a, b) => letter(a).localeCompare(letter(b)) || matchNo(a) - matchNo(b))
     }
     return grouped
-  }, [bonusScores])
+  }, [bonusScores, matchLookup])
 
   // Category subtotals
   const categorySubtotals = useMemo(() => {
@@ -445,7 +464,7 @@ export function PointsBreakdownModal({
             const status = getBpPredictionStatus(bs)
             lines.push([
               esc(BP_TYPE_LABELS[status]),
-              esc(formatBonusDescription(bs)),
+              esc(formatBonusDescription(bs, bonusMatchContext(bs.related_match_id))),
               bs.points_earned,
             ].join(','))
           }
@@ -461,7 +480,7 @@ export function PointsBreakdownModal({
           for (const bs of entries) {
             lines.push([
               esc(config.label),
-              esc(formatBonusDescription(bs)),
+              esc(formatBonusDescription(bs, bonusMatchContext(bs.related_match_id))),
               bs.points_earned,
             ].join(','))
           }
@@ -479,7 +498,7 @@ export function PointsBreakdownModal({
     a.download = `points_breakdown_${safeName}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [playerName, entryName, isMultiEntry, rank, matchPoints, bonusPoints, totalPoints, matchDetails, stageStats, bonusScores, groupedBonuses, predictionMode, bpCategoryStats, categorySubtotals, entry])
+  }, [playerName, entryName, isMultiEntry, rank, matchPoints, bonusPoints, totalPoints, matchDetails, stageStats, bonusScores, groupedBonuses, predictionMode, bpCategoryStats, categorySubtotals, entry, bonusMatchContext])
 
   return (
     <Modal
@@ -699,7 +718,7 @@ export function PointsBreakdownModal({
                                       {BP_TYPE_LABELS[status]}
                                     </span>
                                     <span className={`leading-snug truncate ${status === 'correct' ? 'text-muted' : status === 'pending' ? 'text-warning-600' : 'text-muted'}`}>
-                                      {formatBonusDescription(bs)}
+                                      {formatBonusDescription(bs, bonusMatchContext(bs.related_match_id))}
                                     </span>
                                   </div>
                                   <span className={`font-semibold flex-shrink-0 ml-2 ${bs.points_earned > 0 ? 'text-success-600' : 'text-muted'}`}>
@@ -857,7 +876,7 @@ export function PointsBreakdownModal({
                                 className="flex items-start justify-between px-4 py-2 text-xs"
                               >
                                 <span className="text-muted pr-3 leading-snug">
-                                  {formatBonusDescription(bs)}
+                                  {formatBonusDescription(bs, bonusMatchContext(bs.related_match_id))}
                                 </span>
                                 <span className={`t-num t-num-extrabold text-xs shrink-0 ${bs.points_earned > 0 ? 'text-warning-500' : 'text-muted'}`}>
                                   {bs.points_earned > 0 ? `+${formatNumber(bs.points_earned)}` : '0'}
