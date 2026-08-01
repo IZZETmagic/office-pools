@@ -14,7 +14,7 @@ type CardProps = {
    * short of the border on both sides and reads as a floating band rather than
    * a selected row.
    */
-  padding?: 'none' | 'md' | 'lg'
+  padding?: 'none' | 'sm' | 'md' | 'lg'
   /** Hairline border instead of a shadow, matching Card's `bordered` prop in RN. */
   bordered?: boolean
   className?: string
@@ -22,6 +22,8 @@ type CardProps = {
 
 const paddingClasses = {
   none: '',
+  // RN's spacing.lg — the padding its cards actually use (mobile/theme/spacing).
+  sm: 'p-4',
   md: 'p-6',
   lg: 'p-8',
 }

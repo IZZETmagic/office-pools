@@ -10,13 +10,69 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
-import { FormField } from '@/components/ui/FormField'
 
 type SettingsTabProps = {
   pool: PoolData
   setPool: (pool: PoolData) => void
   members: MemberData[]
   onDirtyChange?: (dirty: boolean) => void
+}
+
+
+/* ── Building blocks mirrored from the RN settings screen ────────────────────
+   Card / Caption / Divider / FieldRow / SettingsRow / DangerRow in
+   mobile/components/pool-detail/SettingsTab.tsx. Sizes are RN's: a 12px slate
+   field label above its control, a 14px semibold row title with an 11px slate
+   subtitle beside it, and a half-pixel silver rule at 50%. */
+
+function Caption({ children }: { children: React.ReactNode }) {
+  return <h3 className="t-caption text-muted">{children}</h3>
+}
+
+function Divider() {
+  return <div className="h-px bg-silver/50 my-1" />
+}
+
+function FieldRow({
+  label, children, className, helperText,
+}: { label: string; children: React.ReactNode; className?: string; helperText?: string }) {
+  return (
+    <div className={`flex flex-col gap-1 ${className ?? ''}`}>
+      <span className="text-xs font-medium text-muted">{label}</span>
+      {children}
+      {helperText && <span className="text-[11px] text-muted">{helperText}</span>}
+    </div>
+  )
+}
+
+function SettingsRow({
+  label, subtitle, children,
+}: { label: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <span className="text-sm font-semibold text-ink">{label}</span>
+        {subtitle && <span className="text-[11px] text-muted">{subtitle}</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function DangerRow({
+  icon, title, subtitle, tone, onClick,
+}: { icon: string; title: string; subtitle: string; tone: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="w-full flex items-center gap-3 py-2 text-left transition-opacity hover:opacity-70">
+      <Icon name={icon} size={16} weight="semibold" className={`shrink-0 ${tone}`} />
+      <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <span className={`text-sm font-bold ${tone}`}>{title}</span>
+        <span className="text-[11px] text-muted">{subtitle}</span>
+      </span>
+      <Icon name="chevron.right" size={11} weight="semibold" className="shrink-0 text-muted" />
+    </button>
+  )
 }
 
 export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsTabProps) {
@@ -282,23 +338,23 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   return (
     <div className="relative pb-20">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">Pool Settings</h2>
+        <h2 className="text-2xl font-bold text-ink">Pool Settings</h2>
         <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-sm text-neutral-500">Code:</span>
+          <span className="text-sm text-muted">Code:</span>
           <button
             onClick={() => {
               navigator.clipboard.writeText(pool.pool_code)
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             }}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded-chip transition cursor-pointer"
             title="Copy pool code"
           >
             {pool.pool_code}
             {copied ? (
               <Icon name="checkmark" size={14} className="text-success-500" />
             ) : (
-              <Icon name="doc.on.doc" size={14} className="text-neutral-400" />
+              <Icon name="doc.on.doc" size={14} className="text-muted" />
             )}
           </button>
         </div>
@@ -316,83 +372,83 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       <div className="space-y-4">
         {/* ── Pool Information ── */}
         <Card>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">
+          <Caption>
             Pool Information
-          </h3>
+          </Caption>
 
           <div className="space-y-4">
-            <FormField label="Pool Name *">
+            <FieldRow label="Pool Name *">
               <Input
                 type="text"
                 value={poolName}
                 onChange={(e) => setPoolName(e.target.value)}
                 placeholder="Enter pool name"
               />
-            </FormField>
+            </FieldRow>
 
-            <FormField label="Description">
+            <FieldRow label="Description">
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your pool..."
                 rows={3}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-xl bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
+                className="w-full px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent text-ink"
               />
-            </FormField>
+            </FieldRow>
 
-            <FormField label="Pool Status">
-              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+            <FieldRow label="Pool Status">
+              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
                 {statusOptions.map((s) => (
                   <button
                     key={s.value}
                     type="button"
                     onClick={() => setStatus(s.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
                       status === s.value
                         ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                        : 'bg-surface text-ink hover:bg-snow'
                     }`}
                   >
                     {s.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-neutral-500 mt-1.5">
+              <p className="text-xs text-muted mt-1.5">
                 {statusOptions.find(s => s.value === status)?.desc}
               </p>
-            </FormField>
+            </FieldRow>
 
-            <FormField label="New Members">
-              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+            <FieldRow label="New Members">
+              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
                 {acceptingOptions.map((o) => (
                   <button
                     key={String(o.value)}
                     type="button"
                     onClick={() => setAcceptingMembers(o.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
                       acceptingMembers === o.value
                         ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                        : 'bg-surface text-ink hover:bg-snow'
                     }`}
                   >
                     {o.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-neutral-500 mt-1.5">
+              <p className="text-xs text-muted mt-1.5">
                 {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
                 {' '}Independent of pool status — the pool stays visible to existing members either way.
               </p>
-            </FormField>
+            </FieldRow>
           </div>
         </Card>
 
         {/* ── Prediction Deadline ── */}
         <Card>
           <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            <Caption>
               {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
-            </h3>
+            </Caption>
             {pool.prediction_mode === 'progressive' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
                 Progressive
@@ -408,7 +464,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
           {currentDeadline && (
             <div className="mb-4">
-              <p className="text-sm text-neutral-600">
+              <p className="text-sm text-muted">
                 Current Deadline:{' '}
                 <span className="font-medium">
                   {currentDeadline.toLocaleDateString('en-US', {
@@ -423,7 +479,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                 </span>
               </p>
               {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
-                <p className="text-sm text-neutral-600">
+                <p className="text-sm text-muted">
                   Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
                 </p>
               )}
@@ -437,25 +493,25 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
           <div className="flex gap-3 mb-4 flex-wrap">
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
+              <label className="block text-xs font-medium text-muted mb-1">
                 Date
               </label>
               <input
                 type="date"
                 value={deadlineDate}
                 onChange={(e) => setDeadlineDate(e.target.value)}
-                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
+              <label className="block text-xs font-medium text-muted mb-1">
                 Time
               </label>
               <input
                 type="time"
                 value={deadlineTime}
                 onChange={(e) => setDeadlineTime(e.target.value)}
-                className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 bg-surface focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
               />
             </div>
           </div>
@@ -463,19 +519,19 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setQuickDeadline('tournament_start')}
-              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
             >
               Tournament Start (Jun 11)
             </button>
             <button
               onClick={() => setQuickDeadline('one_day_before')}
-              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
             >
               1 Day Before Start
             </button>
             <button
               onClick={() => setQuickDeadline('one_week_before')}
-              className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
+              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
             >
               1 Week Before Start
             </button>
@@ -484,38 +540,40 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
         {/* ── Access & Limits ── */}
         <Card>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-4">
+          <Caption>
             Access & Limits
-          </h3>
+          </Caption>
 
           <div className="space-y-4">
-            <FormField label="Pool Visibility">
-              <div className="inline-flex rounded-xl overflow-hidden border border-neutral-200">
+            <FieldRow label="Pool Visibility">
+              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
                 {visibilityOptions.map((opt) => (
                   <button
                     key={String(opt.value)}
                     type="button"
                     onClick={() => setIsPrivate(opt.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-neutral-200 cursor-pointer ${
+                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
                       isPrivate === opt.value
                         ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-neutral-700 hover:bg-neutral-50'
+                        : 'bg-surface text-ink hover:bg-snow'
                     }`}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-neutral-500 mt-1.5">
+              <p className="text-xs text-muted mt-1.5">
                 {visibilityOptions.find(o => o.value === isPrivate)?.desc}
               </p>
-            </FormField>
+            </FieldRow>
 
-            <FormField
-              label="Maximum Members"
-              helperText="Set to 0 for unlimited"
+            <Divider />
+
+            <SettingsRow
+              label="Cap on total members"
+              subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : 'Set to 0 for unlimited'}
             >
-              <div className="w-[10.3125rem]">
+              <div className="w-28 shrink-0">
                 <Input
                   type="number"
                   min="0"
@@ -523,21 +581,21 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   onChange={(e) => setMaxParticipants(e.target.value)}
                 />
               </div>
-            </FormField>
+            </SettingsRow>
           </div>
         </Card>
 
         {/* ── Prediction Entries ── */}
         <Card>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1">
+          <Caption>
             Prediction Entries
-          </h3>
-          <p className="text-sm text-neutral-500 mb-4">
+          </Caption>
+          <p className="text-sm text-muted mb-4">
             Allow members to submit multiple sets of predictions. Each entry is scored independently.
           </p>
 
           <div className="space-y-4">
-            <FormField label="Max Entries Per Member">
+            <FieldRow label="Max Entries Per Member">
               <div className="flex">
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                   <button
@@ -547,14 +605,14 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                     className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
                       parseInt(maxEntries) === n
                         ? 'bg-primary-500 text-white border-primary-500 z-10'
-                        : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                        : 'bg-surface text-ink border-border-default hover:bg-mist'
                     }`}
                   >
                     {n}
                   </button>
                 ))}
               </div>
-            </FormField>
+            </FieldRow>
 
             {parseInt(maxEntries) > 1 && (
               <Alert variant="info" className="text-xs">
@@ -566,16 +624,16 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
         {/* ── Entry Fees ── */}
         <Card>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1">
+          <Caption>
             Entry Fees
-          </h3>
-          <p className="text-sm text-neutral-500 mb-4">
+          </Caption>
+          <p className="text-sm text-muted mb-4">
             Set an entry fee that members pay for each entry. Leave blank for a free pool.
           </p>
 
           <div className="space-y-4">
             <div className="flex gap-3">
-              <FormField label="Fee Amount" className="flex-1">
+              <FieldRow label="Fee Amount" className="flex-1">
                 <Input
                   type="number"
                   min="0"
@@ -584,12 +642,12 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   value={entryFee}
                   onChange={(e) => setEntryFee(e.target.value)}
                 />
-              </FormField>
-              <FormField label="Currency" className="w-28">
+              </FieldRow>
+              <FieldRow label="Currency" className="w-28">
                 <select
                   value={entryFeeCurrency}
                   onChange={(e) => setEntryFeeCurrency(e.target.value)}
-                  className="w-full h-10 px-3 border border-neutral-200 rounded-xl text-sm text-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:border-neutral-700 dark:text-white dark:bg-neutral-800"
+                  className="w-full h-10 px-3 border border-border-default rounded-control text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 "
                 >
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
@@ -602,7 +660,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
                   <option value="CHF">CHF (Fr)</option>
                   <option value="BMD">BMD ($)</option>
                 </select>
-              </FormField>
+              </FieldRow>
             </div>
 
             {entryFee && parseFloat(entryFee) > 0 && (
@@ -615,9 +673,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
         {/* ── Danger Zone ── */}
         <Card className="border border-danger-200">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-danger-500 mb-4">
+          <Caption>
             Danger Zone
-          </h3>
+          </Caption>
 
           {/*
             Delete Pool was removed here (decision 2026-07-25). It destroyed every
@@ -625,20 +683,15 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             reversible; genuine deletion is a support action run with service-role
             credentials. Do not re-add a delete control to this screen.
           */}
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-neutral-900">Archive Pool</h4>
-              <p className="text-sm text-neutral-500">
-                Files the pool away for everyone. Nothing is deleted, and you can restore it
-                at any time from your profile.
-              </p>
-            </div>
-            <Button variant="warning" size="sm" className="shrink-0 w-20" onClick={() => setShowArchiveModal(true)}>
-              Archive
-            </Button>
-          </div>
+          <DangerRow
+            icon="archivebox"
+            title="Archive Pool"
+            subtitle="Files the pool away for everyone. Nothing is deleted, and you can restore it at any time from your profile."
+            tone="text-warning-800"
+            onClick={() => setShowArchiveModal(true)}
+          />
 
-          <p className="mt-4 text-xs text-neutral-500">
+          <p className="mt-3 text-[11px] text-muted">
             Need a pool permanently deleted? Contact support — it can&apos;t be undone, so we
             do it by hand.
           </p>
@@ -647,9 +700,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
       {/* ── Sticky save bar ── */}
       {hasChanges && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-default bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
           <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
-            <p className="text-sm text-neutral-600">You have unsaved changes</p>
+            <p className="text-sm text-muted">You have unsaved changes</p>
             <Button
               onClick={handleSaveAll}
               loading={saving}
@@ -673,12 +726,12 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             }
           }}
         >
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
+            <h3 className="text-lg font-bold text-ink mb-3">
               Archive Pool
             </h3>
 
-            <p className="text-sm text-neutral-700 mb-3">
+            <p className="text-sm text-ink mb-3">
               Are you sure you want to archive this pool?
             </p>
 
