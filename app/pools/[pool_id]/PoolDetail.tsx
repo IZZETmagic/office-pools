@@ -995,42 +995,23 @@ export function PoolDetail({
   const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
   const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
-  // Mobile: split tabs into primary (always visible) and overflow ("More" menu)
-  const mobilePrimaryKeys = useMemo<Tab[]>(
-    () => isBracketPicker
-      ? ['community', 'leaderboard', 'analytics', 'predictions']
-      : ['community', 'leaderboard', 'analytics', 'predictions'],
-    [isBracketPicker]
-  )
-
-  const mobilePrimaryTabs = useMemo(
-    () => tabs.filter(t => mobilePrimaryKeys.includes(t.key)),
-    [tabs, mobilePrimaryKeys]
-  )
-  const mobileOverflowTabs = useMemo(
-    () => tabs.filter(t => !mobilePrimaryKeys.includes(t.key)),
-    [tabs, mobilePrimaryKeys]
-  )
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
-  const moreMenuRef = useRef<HTMLDivElement>(null)
-
-  // Close "More" menu on outside click
-  useEffect(() => {
-    if (!moreMenuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
-        setMoreMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [moreMenuOpen])
-
-  // Is the active tab in the overflow menu?
-  const isOverflowTabActive = mobileOverflowTabs.some(t => t.key === activeTab)
-
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
+  // Keep the active pill in view. The strip is one scrollable row at every
+  // width now, so on a phone the later tabs (Members, Fees, Settings) start
+  // off-screen; landing on one directly — via a deep link or a swipe — would
+  // otherwise leave the strip showing a tab you are not on. Mirrors the
+  // animated scrollTo in the RN PoolTabBar.
+  const tabStripRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const strip = tabStripRef.current
+    if (!strip) return
+    const pill = strip.querySelector<HTMLElement>(`[data-tab-key="${activeTab}"]`)
+    if (!pill) return
+    const left = pill.offsetLeft - (strip.clientWidth - pill.offsetWidth) / 2
+    strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
+  }, [activeTab])
+
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1054,8 +1035,8 @@ export function PoolDetail({
     const target = e.target as HTMLElement
     if (target.closest('input, textarea, select, [contenteditable], .overflow-x-auto, .overflow-x-scroll')) return
 
-    // Swipe only cycles through mobile primary tabs
-    const swipeKeys = mobilePrimaryKeys
+    // Swipe follows the tab strip, in strip order
+    const swipeKeys = allTabKeys
     const currentIndex = swipeKeys.indexOf(activeTab)
     if (currentIndex === -1) return
 
@@ -1066,7 +1047,7 @@ export function PoolDetail({
     if (nextIndex !== currentIndex) {
       handleTabSwitch(swipeKeys[nextIndex])
     }
-  }, [activeTab, mobilePrimaryKeys, handleTabSwitch])
+  }, [activeTab, allTabKeys, handleTabSwitch])
 
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
@@ -1215,102 +1196,9 @@ export function PoolDetail({
         <div className="relative">
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
 
-            {/* ===== MOBILE tab bar ===== */}
-            <div className="sm:hidden relative flex items-center gap-1 py-2">
-              {mobilePrimaryTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  data-tab-key={tab.key}
-                  onClick={() => handleTabSwitch(tab.key)}
-                  className={`flex-1 px-2 py-2 rounded-pill text-xs font-bold whitespace-nowrap text-center transition-colors ${tabPillClass(activeTab === tab.key)}`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {tab.key === 'leaderboard' ? 'Board' : tab.label}
-                    {tab.key === 'community' && hasUnreadBanter && (
-                      <span className="min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white text-[9px] font-bold flex items-center justify-center">
-                        {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              ))}
 
-              {/* Bar landing page link tab */}
-              {hasBranding && pool.brand_landing_url && (
-                <Link
-                  href={pool.brand_landing_url}
-                  className="flex-1 px-2 py-2 rounded-pill text-xs font-bold whitespace-nowrap text-center transition-colors bg-white/10 text-white/60 hover:text-white/85"
-                >
-                  <span className="inline-flex items-center justify-center gap-0.5">
-                    {pool.brand_name}
-                    <Icon name="arrow.up.right" size={12} weight="semibold" />
-                  </span>
-                </Link>
-              )}
-
-              {/* More button + dropdown */}
-              {mobileOverflowTabs.length > 0 && (
-                <div ref={moreMenuRef} className="relative flex-1 min-w-0" data-tab-key={isOverflowTabActive ? activeTab : '__more__'}>
-                  <button
-                    onClick={() => setMoreMenuOpen(prev => !prev)}
-                    className={`w-full flex items-center justify-center gap-0.5 px-2 py-2 rounded-pill text-xs font-bold text-center transition-colors ${tabPillClass(isOverflowTabActive)}`}
-                  >
-                    {isOverflowTabActive ? (mobileOverflowTabs.find(t => t.key === activeTab)?.label ?? 'More') : 'More'}
-                    <Icon
-                      name="chevron.down"
-                      size={12}
-                      weight="bold"
-                      className={`shrink-0 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {moreMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-surface rounded-xl shadow-lg border border-border-default py-1 z-50">
-                      {mobileOverflowTabs.map((tab, i) => {
-                        const isAdminOverflow = ADMIN_TABS.some(a => a.key === tab.key) || tab.key === 'rounds'
-                        const showDivider = i > 0 && isAdminOverflow && !ADMIN_TABS.some(a => a.key === mobileOverflowTabs[i - 1].key) && mobileOverflowTabs[i - 1].key !== 'rounds'
-                        return (
-                          <div key={tab.key}>
-                            {showDivider && <div className="my-1 border-t border-border-default" />}
-                            <button
-                              onClick={() => { handleTabSwitch(tab.key); setMoreMenuOpen(false) }}
-                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                                activeTab === tab.key
-                                  ? isAdminOverflow ? 'bg-warning-500/12 text-warning-800 font-medium' : 'bg-primary-600/12 text-primary-800 font-medium'
-                                  : isAdminOverflow ? 'text-warning-800 hover:bg-warning-500/12' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200'
-                              }`}
-                            >
-                              <span className="inline-flex items-center gap-1.5">
-                                {tab.label}
-                                {tab.key === 'community' && hasUnreadBanter && (
-                                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold inline-flex items-center justify-center">
-                                    {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
-                                  </span>
-                                )}
-                              </span>
-                            </button>
-                          </div>
-                        )
-                      })}
-                      {!isSoleAdmin && !isSuperAdminViewing && (
-                        <>
-                          <div className="my-1 border-t border-border-default" />
-                          <button
-                            onClick={() => { setShowLeaveModal(true); setMoreMenuOpen(false) }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
-                          >
-                            Leave Pool
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ===== DESKTOP tab bar ===== */}
-            <div className="hidden sm:flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
+            {/* ===== Tab bar — one scrollable strip at every width ===== */}
+            <div ref={tabStripRef} className="flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
               {USER_TABS.map((tab) => (
                 <button
                   key={tab.key}
