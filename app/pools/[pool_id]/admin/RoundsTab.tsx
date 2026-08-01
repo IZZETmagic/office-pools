@@ -160,7 +160,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 dark:text-neutral-600">Deadline</span>
+                  <span className="text-muted">Deadline</span>
                   <span className={isPastDeadline && round.state === 'open' ? 'text-red-600 font-medium' : 'text-neutral-700 dark:text-neutral-500'}>
                     {formatDeadline(round.deadline)}
                   </span>
@@ -168,11 +168,11 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
                 {round.state !== 'locked' && (
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-500 dark:text-neutral-600">Matches</span>
+                    <span className="text-muted">Matches</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div className="w-16 h-1.5 bg-mist rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-green-500 rounded-full"
+                          className="h-full bg-primary-600 rounded-full"
                           style={{
                             width: round.match_count > 0
                               ? `${(round.completed_match_count / round.match_count) * 100}%`
@@ -189,7 +189,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
                 {round.admin_stats && (
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-500 dark:text-neutral-600">Submissions</span>
+                    <span className="text-muted">Submissions</span>
                     <span className="text-neutral-700 dark:text-neutral-500">
                       {round.admin_stats.submitted_entries} / {round.admin_stats.total_entries}
                     </span>
@@ -296,7 +296,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                           </span>
                           <div className="w-16 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-green-500 rounded-full"
+                              className="h-full bg-primary-600 rounded-full"
                               style={{
                                 width: round.match_count > 0
                                   ? `${(round.completed_match_count / round.match_count) * 100}%`

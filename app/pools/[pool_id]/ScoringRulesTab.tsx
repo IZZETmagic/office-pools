@@ -214,19 +214,19 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
         <h4 className="text-lg font-semibold text-ink mb-3">How Points Work</h4>
         <div className="space-y-3 text-sm text-ink">
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">1</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">1</span>
             <p><strong>Group Rankings:</strong> Predict the finishing order (1st to 4th) for all 12 groups. You earn points for each team in the correct position.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">2</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">2</span>
             <p><strong>Third-Place Picks:</strong> Rank the 12 third-place teams to predict which 8 qualify and which 4 are eliminated.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">3</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">3</span>
             <p><strong>Knockout Bracket:</strong> Pick the winner of every knockout match from the Round of 32 through the Final. Points increase for later rounds.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">4</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">4</span>
             <p><strong>Bonus Points:</strong> Earn a big bonus for correctly predicting the champion ({s.bp_champion_bonus} pts), perfectly ranking all third-place qualifiers ({s.bp_third_all_correct_bonus} pts), and predicting penalty shootout outcomes.</p>
           </div>
         </div>
@@ -370,25 +370,25 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
         <h4 className="text-lg font-semibold text-ink mb-3">How Points Work</h4>
         <div className="space-y-3 text-sm text-ink">
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">1</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">1</span>
             <p><strong>Match Predictions:</strong> Predict the full-time score of every match. The closer your prediction, the more points you earn.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">2</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">2</span>
             <p><strong>Tiered Scoring:</strong> Only the highest tier applies per match &mdash; exact score, correct winner + goal difference, or correct result.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">3</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">3</span>
             <p><strong>Knockout Multipliers:</strong> Later rounds are worth more. The Final has an {s.final_multiplier}x multiplier.</p>
           </div>
           {s.pso_enabled && (
             <div className="flex items-start gap-3">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">4</span>
+              <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">4</span>
               <p><strong>Penalty Shootouts:</strong> If a knockout match goes to penalties, you can earn additional bonus points for predicting the PSO score.</p>
             </div>
           )}
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">{s.pso_enabled ? '5' : '4'}</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">{s.pso_enabled ? '5' : '4'}</span>
             <p><strong>Bonus Points:</strong> Extra points are available for group standings predictions, bracket accuracy, and tournament-level picks (champion, top scorer, etc.).</p>
           </div>
         </div>

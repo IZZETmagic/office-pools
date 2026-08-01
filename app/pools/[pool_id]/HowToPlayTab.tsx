@@ -13,7 +13,7 @@ type HowToPlayTabProps = {
 function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="shrink-0 w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold">{number}</span>
+      <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">{number}</span>
       <p className="text-sm text-neutral-700"><strong>{title}:</strong> {children}</p>
     </div>
   )
@@ -40,15 +40,15 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
         <p className="text-xs text-neutral-500 mb-4">FIFA World Cup 2026 &mdash; United States, Mexico & Canada</p>
         <div className="space-y-3 text-sm text-neutral-700">
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">1</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">1</span>
             <p><strong>Group Stage:</strong> 48 teams divided into 12 groups of 4. Each team plays 3 matches. The top 2 from each group plus the 8 best 3rd-place teams advance (32 teams total).</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">2</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">2</span>
             <p><strong>Round of 32:</strong> The first knockout round. 32 teams compete in single-elimination matches.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-success-100 text-success-700 flex items-center justify-center text-xs font-bold">3</span>
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600/12 text-primary-800 flex items-center justify-center text-xs font-bold">3</span>
             <p><strong>Round of 16 &rarr; Final:</strong> Winners advance through the Round of 16, Quarter Finals, Semi Finals, Third Place Match, and the Final.</p>
           </div>
         </div>
