@@ -112,6 +112,25 @@ function QuickDeadlineButton({ label, onClick }: { label: string; onClick: () =>
   )
 }
 
+/* ShareButton: half-width primary-tinted pill, icon + 13px bold label. Flips to
+   a success tint and a checkmark for two seconds after copying. (RN ShareButton) */
+function ShareButton({
+  label, icon, active, onClick,
+}: { label: string; icon: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-chip text-[13px] font-bold transition-colors ${
+        active ? 'bg-success-600/12 text-success-900' : 'bg-primary-600/10 text-primary-800'
+      }`}
+    >
+      <Icon name={icon} size={14} weight="semibold" className="shrink-0" />
+      {label}
+    </button>
+  )
+}
+
 function Caption({ children, tone }: { children: React.ReactNode; tone?: string }) {
   return <h3 className={`t-caption ${tone ?? 'text-muted'}`}>{children}</h3>
 }
@@ -182,7 +201,8 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   const [entryFee, setEntryFee] = useState(pool.entry_fee?.toString() || '')
   const [entryFeeCurrency, setEntryFeeCurrency] = useState(pool.entry_fee_currency || 'USD')
 
-  const [copied, setCopied] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<'code' | 'link' | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   // Deadline
   const [deadlineDate, setDeadlineDate] = useState(
@@ -417,6 +437,34 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     { value: false as const, label: 'Not accepting', desc: 'No new members can join' },
   ]
 
+  const inviteLink = typeof window === 'undefined' ? '' : `${window.location.origin}/join/${pool.pool_code}`
+
+  // Rendered client-side on mount: `qrcode` is a Node-flavoured module and the
+  // link needs window.location.origin, which does not exist during SSR.
+  useEffect(() => {
+    let cancelled = false
+    if (!inviteLink) return
+    import('qrcode')
+      .then((m) => m.default.toDataURL(inviteLink, {
+        width: 360,
+        margin: 1,
+        // Hard-coded, deliberately NOT tokens. `ink` flips to near-white in dark
+        // mode, which would put a white code on the white QR plate and stop it
+        // scanning. QR contrast has to stay dark-on-light whatever the theme —
+        // the same reason the RN version hard-codes these two values.
+        color: { dark: '#1B2340', light: '#FFFFFF' },
+      }))
+      .then((url) => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => { /* the code below the QR is the fallback */ })
+    return () => { cancelled = true }
+  }, [inviteLink])
+
+  function copyShare(kind: 'code' | 'link') {
+    navigator.clipboard.writeText(kind === 'code' ? pool.pool_code : inviteLink)
+    setCopiedKey(kind)
+    setTimeout(() => setCopiedKey(null), 2000)
+  }
+
   const visibilityOptions = [
     { value: false as const, label: 'Public', desc: 'Anyone with code can join' },
     { value: true as const, label: 'Private', desc: 'Requires pool code to join' },
@@ -426,25 +474,6 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     <div className="relative pb-20">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-ink">Pool Settings</h2>
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-sm text-muted">Code:</span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(pool.pool_code)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded-chip transition cursor-pointer"
-            title="Copy pool code"
-          >
-            {pool.pool_code}
-            {copied ? (
-              <Icon name="checkmark" size={14} className="text-success-500" />
-            ) : (
-              <Icon name="doc.on.doc" size={14} className="text-muted" />
-            )}
-          </button>
-        </div>
       </div>
 
       {error && (
@@ -457,6 +486,50 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
       )}
 
       <div className="space-y-4">
+
+        {/* Share & Invite. The QR is inline rather than behind a modal so an
+            admin can hold the screen up and let someone scan straight away; the
+            code underneath is the spoken/typed fallback. Mirrors the RN card. */}
+        <Card padding="sm" className="flex flex-col gap-2.5">
+          <Caption>Share &amp; Invite</Caption>
+
+          <div className="flex flex-col items-center gap-3">
+            {/* Solid white plate regardless of theme — QR readers need a light
+                quiet zone, and a themed surface would break scanning in dark. */}
+            <div className="p-3 rounded-card bg-white shadow-card">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrDataUrl} alt={`QR code to join with pool code ${pool.pool_code}`}
+                     width={180} height={180} className="block w-[180px] h-[180px]" />
+              ) : (
+                <div className="w-[180px] h-[180px] rounded-chip bg-mist animate-pulse" aria-hidden="true" />
+              )}
+            </div>
+
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[13px] font-medium text-muted">Pool Code</span>
+              <span className="t-num t-num-extrabold text-[22px] text-ink tracking-[0.125em]">
+                {pool.pool_code}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <ShareButton
+              label={copiedKey === 'code' ? 'Copied!' : 'Copy Code'}
+              icon={copiedKey === 'code' ? 'checkmark' : 'doc.on.doc'}
+              active={copiedKey === 'code'}
+              onClick={() => copyShare('code')}
+            />
+            <ShareButton
+              label={copiedKey === 'link' ? 'Copied!' : 'Copy Link'}
+              icon={copiedKey === 'link' ? 'checkmark' : 'link'}
+              active={copiedKey === 'link'}
+              onClick={() => copyShare('link')}
+            />
+          </div>
+        </Card>
+
         {/* ── Pool Information ── */}
         <Card>
           <Caption>
