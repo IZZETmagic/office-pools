@@ -15,6 +15,7 @@ type SettingsTabProps = {
   pool: PoolData
   setPool: (pool: PoolData) => void
   members: MemberData[]
+  currentUserId: string
   onDirtyChange?: (dirty: boolean) => void
 }
 
@@ -181,7 +182,7 @@ function DangerRow({
   )
 }
 
-export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsTabProps) {
+export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChange }: SettingsTabProps) {
   const supabase = createClient()
   const router = useRouter()
   const { showToast } = useToast()
@@ -202,6 +203,8 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
   const [entryFeeCurrency, setEntryFeeCurrency] = useState(pool.entry_fee_currency || 'USD')
 
   const [copiedKey, setCopiedKey] = useState<'code' | 'link' | null>(null)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   // Deadline
@@ -436,6 +439,51 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
     { value: true as const, label: 'Accepting', desc: 'Anyone with the code can join' },
     { value: false as const, label: 'Not accepting', desc: 'No new members can join' },
   ]
+
+  /**
+   * The admin's own entries in this pool. Drives whether the Stop Participating
+   * row shows at all: with no entries the action is a no-op and the row would
+   * only confuse. RN gates it the same way (`hasParticipation`).
+   */
+  const myEntryCount = useMemo(
+    () => members.find((m) => m.user_id === currentUserId)?.entries?.length ?? 0,
+    [members, currentUserId],
+  )
+
+  /**
+   * Pulls the admin out of the competition without removing them from the pool —
+   * they keep the admin role, this tab, banter, everything. Only their
+   * pool_entries go, and with them the cascading predictions and scores.
+   *
+   * Routed through the API rather than a client-side delete on pool_entries:
+   * three of the cascade children (bonus_scores, match_scores, player_scores)
+   * have RLS on with no user-facing DELETE policy, so a client cascade is
+   * rejected by those children and rolls the whole transaction back. The
+   * endpoint uses the admin client to bypass RLS. Its header documents this at
+   * length — it has existed for a while with no caller; this is the first.
+   */
+  async function performStopParticipating() {
+    setStopping(true)
+    try {
+      const res = await fetch(`/api/pools/${pool.pool_id}/stop-participating`, { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.error ?? 'Could not remove your entries')
+      const n = body.removed_entries ?? 0
+      setShowStopConfirm(false)
+      showToast(
+        n === 1
+          ? 'Your entry was removed. You are still an admin.'
+          : `${n} entries removed. You are still an admin.`,
+        'success',
+      )
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove your entries')
+      setShowStopConfirm(false)
+    } finally {
+      setStopping(false)
+    }
+  }
 
   const inviteLink = typeof window === 'undefined' ? '' : `${window.location.origin}/join/${pool.pool_code}`
 
@@ -779,6 +827,16 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             reversible; genuine deletion is a support action run with service-role
             credentials. Do not re-add a delete control to this screen.
           */}
+          {myEntryCount > 0 && (
+            <DangerRow
+              icon="person.badge.minus"
+              title="Stop Participating"
+              subtitle="Delete your entries; stay on as admin"
+              tone="text-warning-800"
+              onClick={() => setShowStopConfirm(true)}
+            />
+          )}
+
           <DangerRow
             icon="archivebox"
             title="Archive Pool"
@@ -809,6 +867,47 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           </div>
         </div>
       )}
+
+      {/* Stop Participating confirmation. Destructive and irreversible — the
+          entries and every cascading prediction and score go — so it names what
+          is lost and how many entries, and says plainly that admin is kept. */}
+      {showStopConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget && !stopping) setShowStopConfirm(false) }}
+        >
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+            <h3 className="text-lg font-bold text-ink mb-3">Stop Participating</h3>
+
+            <Alert variant="warning">
+              <p className="font-bold mb-2">{pool.pool_name}</p>
+              <ul className="space-y-1">
+                <li>&#8226; Your {myEntryCount === 1 ? 'entry' : `${myEntryCount} entries`} will be removed from the leaderboard</li>
+                <li>&#8226; Your predictions, standings and scores are deleted</li>
+                <li>&#8226; You stay an admin and keep every other privilege</li>
+                <li>&#8226; This cannot be undone</li>
+              </ul>
+            </Alert>
+
+            <div className="flex gap-3 justify-end">
+              <Button variant="gray" onClick={() => setShowStopConfirm(false)} disabled={stopping}>
+                Cancel
+              </Button>
+              <Button
+                variant="warning"
+                onClick={() => void performStopParticipating()}
+                loading={stopping}
+                loadingText="Removing..."
+              >
+                Stop Participating
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Archive Confirmation Modal */}
       {showArchiveModal && (

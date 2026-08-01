@@ -1834,6 +1834,7 @@ export function PoolDetail({
                 pool={pool}
                 setPool={setPool}
                 members={members}
+                currentUserId={currentUserId}
                 onDirtyChange={(dirty) => { settingsDirtyRef.current = dirty }}
               />
             )}
