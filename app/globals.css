@@ -686,6 +686,10 @@ html.dark {
   --t-num-weight: 400;
 }
 
+@utility t-num-medium {
+  --t-num-weight: 500;
+}
+
 @utility t-num-extrabold {
   --t-num-weight: 800;
 }

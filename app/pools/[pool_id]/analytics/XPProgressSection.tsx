@@ -366,7 +366,7 @@ function XPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
             edge already separates it from what follows. */}
         <div className="flex items-baseline justify-between px-4 sm:px-5 pt-3 pb-2">
           <h4 className="t-section-header text-ink">Badges</h4>
-          <span className="t-num text-xs font-medium text-muted">
+          <span className="t-num t-num-medium text-xs text-muted">
             {earnedBadges.length} / {BADGE_DEFINITIONS.length} earned
           </span>
         </div>
@@ -660,7 +660,7 @@ function BattleBar({ label, you, crowd, crowdLabel = 'crowd' }: {
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
         <span className="text-[13px] text-muted">{label}</span>
-        <span className="t-num text-[11px] font-semibold text-muted">{you} vs {crowd} {crowdLabel}</span>
+        <span className="t-num t-num-medium text-[11px] text-muted">{you} vs {crowd} {crowdLabel}</span>
       </div>
       <div className="flex gap-0.5 h-2">
         <span className="rounded-pill bg-primary-600" style={{ flex: youPct, minWidth: 2 }} />

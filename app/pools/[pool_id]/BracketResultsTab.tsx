@@ -169,9 +169,9 @@ function GroupComparison({
   return (
     <Card padding="md">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-neutral-900">Group {groupLetter}</h3>
+        <h3 className="text-sm font-bold text-ink">Group {groupLetter}</h3>
         {groupPoints !== null && (
-          <span className="text-xs font-medium text-neutral-400 tabular-nums">
+          <span className="t-num t-num-medium text-xs text-muted">
             {groupPoints} {groupPoints === 1 ? 'pt' : 'pts'}
           </span>
         )}
@@ -180,7 +180,7 @@ function GroupComparison({
       <div className="grid grid-cols-2 gap-3">
         {/* Predicted column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -197,10 +197,10 @@ function GroupComparison({
                       ? 'bg-success-50 text-success-800 ring-1 ring-success-200'
                       : isWrong
                         ? 'bg-danger-50 text-danger-700 ring-1 ring-danger-200'
-                        : 'bg-neutral-50 text-neutral-700'
+                        : 'bg-snow text-ink'
                   }`}
                 >
-                  <span className="font-mono text-[10px] text-neutral-400 w-3">{idx + 1}</span>
+                  <span className="font-mono text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                   {isCorrect && <span className="text-success-600 text-xs flex-shrink-0">&#10003;</span>}
                   {isWrong && <span className="text-danger-500 text-xs flex-shrink-0">&#10007;</span>}
@@ -212,11 +212,11 @@ function GroupComparison({
 
         {/* Actual column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
-            <div className="text-xs text-neutral-400 italic py-2">
+            <div className="text-xs text-muted italic py-2">
               No results yet
             </div>
           ) : (
@@ -224,9 +224,9 @@ function GroupComparison({
               {actualStandings.map((team, idx) => (
                 <div
                   key={team.team_id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-200 text-neutral-700"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-silver text-ink"
                 >
-                  <span className="font-mono text-[10px] text-neutral-400 w-3">{idx + 1}</span>
+                  <span className="font-mono text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               ))}
@@ -267,11 +267,11 @@ function ThirdPlaceComparison({
     <Card padding="md">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-base font-bold text-neutral-900">Third-Place Rankings</h3>
-          <span className="text-xs text-neutral-500">Top 8 qualify</span>
+          <h3 className="text-base font-bold text-ink">Third-Place Rankings</h3>
+          <span className="text-xs text-muted">Top 8 qualify</span>
         </div>
         {thirdPlacePoints !== null && (
-          <span className="text-xs font-medium text-neutral-400 tabular-nums">
+          <span className="t-num t-num-medium text-xs text-muted">
             {thirdPlacePoints} {thirdPlacePoints === 1 ? 'pt' : 'pts'}
           </span>
         )}
@@ -280,7 +280,7 @@ function ThirdPlaceComparison({
       <div className="grid grid-cols-2 gap-4">
         {/* Predicted */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -304,9 +304,9 @@ function ThirdPlaceComparison({
                 <Fragment key={pick.team_id}>
                   {idx === 8 && (
                     <div className="flex items-center gap-2 py-0.5">
-                      <div className="flex-1 border-t border-dashed border-neutral-300" />
-                      <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
-                      <div className="flex-1 border-t border-dashed border-neutral-300" />
+                      <div className="flex-1 border-t border-dashed border-border-default" />
+                      <span className="text-[9px] text-muted uppercase tracking-wider">Eliminated</span>
+                      <div className="flex-1 border-t border-dashed border-border-default" />
                     </div>
                   )}
                   <div
@@ -323,14 +323,14 @@ function ThirdPlaceComparison({
                                 ? 'bg-danger-50 text-danger-700 ring-1 ring-danger-200'
                                 : isQualifier
                                   ? 'bg-primary-50 text-primary-700'
-                                  : 'bg-neutral-50 text-neutral-600'
+                                  : 'bg-snow text-muted'
                     }`}
                   >
-                    <span className="font-mono text-[10px] text-neutral-400 w-4">{idx + 1}</span>
+                    <span className="font-mono text-[10px] text-muted w-4">{idx + 1}</span>
                     <span className="truncate flex-1 font-medium">
                       {team?.country_name ?? 'Unknown'}
                     </span>
-                    <span className="text-[10px] text-neutral-400">{pick.group_letter}</span>
+                    <span className="text-[10px] text-muted">{pick.group_letter}</span>
                     {(isCorrectQualifier || isCorrectlyEliminated) && <span className="text-success-600 text-xs flex-shrink-0">&#10003;</span>}
                     {(isMissedQualifier || isWrongTeam) && <span className="text-danger-500 text-xs flex-shrink-0">&#10007;</span>}
                     {isWronglyEliminated && <span className="text-warning-600 text-xs flex-shrink-0">!</span>}
@@ -343,11 +343,11 @@ function ThirdPlaceComparison({
 
         {/* Actual */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
-            <div className="text-xs text-neutral-400 italic py-2">
+            <div className="text-xs text-muted italic py-2">
               No results yet
             </div>
           ) : (
@@ -358,21 +358,21 @@ function ThirdPlaceComparison({
                   <Fragment key={team.team_id}>
                     {idx === 8 && (
                       <div className="flex items-center gap-2 py-0.5">
-                        <div className="flex-1 border-t border-dashed border-neutral-300" />
-                        <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
-                        <div className="flex-1 border-t border-dashed border-neutral-300" />
+                        <div className="flex-1 border-t border-dashed border-border-default" />
+                        <span className="text-[9px] text-muted uppercase tracking-wider">Eliminated</span>
+                        <div className="flex-1 border-t border-dashed border-border-default" />
                       </div>
                     )}
                     <div
                       className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
                         isQualifier
                           ? 'bg-primary-100 text-primary-700'
-                          : 'bg-neutral-200 text-neutral-600'
+                          : 'bg-silver text-muted'
                       }`}
                     >
-                      <span className="font-mono text-[10px] text-neutral-400 w-4">{idx + 1}</span>
+                      <span className="font-mono text-[10px] text-muted w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
-                      <span className="text-[10px] text-neutral-400">{team.group_letter}</span>
+                      <span className="text-[10px] text-muted">{team.group_letter}</span>
                     </div>
                   </Fragment>
                 )
@@ -422,23 +422,23 @@ function getCellRowClass(data: BracketCellData, side: 'home' | 'away') {
     // Winner you picked correctly
     if (isActualWinner && isPickedWinner) return 'bg-success-50 font-semibold text-success-800'
     // Winner you didn't pick
-    if (isActualWinner && !isPickedWinner) return 'font-semibold text-neutral-800'
+    if (isActualWinner && !isPickedWinner) return 'font-semibold text-ink'
     // Loser you incorrectly picked as winner
     if (!isActualWinner && isPickedWinner) return 'text-danger-500 line-through'
     // Loser (not picked) — still strike through as eliminated
-    return 'text-neutral-400 line-through'
+    return 'text-muted line-through'
   }
 
-  if (data.isCompleted) return 'text-neutral-500'
+  if (data.isCompleted) return 'text-muted'
 
   if (isPickedWinner) return 'bg-primary-50 font-semibold text-primary-800'
-  return 'text-neutral-700'
+  return 'text-ink'
 }
 
 function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: number }) {
   const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
 
-  let borderClass = 'border-neutral-300'
+  let borderClass = 'border-border-default'
   if (data.isCompleted && data.pickIsCorrect === true) {
     borderClass = 'border-success-400'
   } else if (data.isCompleted && data.pickIsCorrect === false) {
@@ -452,7 +452,7 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
     >
       {/* Home team row */}
       <div
-        className={`flex items-center justify-between px-2 border-b border-neutral-100 ${getCellRowClass(data, 'home')}`}
+        className={`flex items-center justify-between px-2 border-b border-border-subtle ${getCellRowClass(data, 'home')}`}
         style={{ height: CELL_H / 2 - 0.5, fontSize: 12, lineHeight: '16px' }}
       >
         <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
@@ -462,10 +462,10 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
           <span className="truncate">{data.homeCode || shortName(data.homeName)}</span>
         </span>
         {hasScore && (
-          <span className="font-bold tabular-nums flex-shrink-0">
+          <span className="t-num t-num-extrabold flex-shrink-0">
             {data.actualHomeScore}
             {data.actualHomePso !== null && (
-              <span className="text-[9px] text-neutral-400 ml-0.5">({data.actualHomePso})</span>
+              <span className="text-[9px] text-muted ml-0.5">({data.actualHomePso})</span>
             )}
           </span>
         )}
@@ -483,10 +483,10 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
           <span className="truncate">{data.awayCode || shortName(data.awayName)}</span>
         </span>
         {hasScore && (
-          <span className="font-bold tabular-nums flex-shrink-0">
+          <span className="t-num t-num-extrabold flex-shrink-0">
             {data.actualAwayScore}
             {data.actualAwayPso !== null && (
-              <span className="text-[9px] text-neutral-400 ml-0.5">({data.actualAwayPso})</span>
+              <span className="text-[9px] text-muted ml-0.5">({data.actualAwayPso})</span>
             )}
           </span>
         )}
@@ -501,7 +501,7 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
           {data.statusBadge.label}
         </span>
       ) : data.isLive && data.liveClock ? (
-        <span className="absolute right-0.5 top-0.5 text-[8px] font-bold text-danger-600 tabular-nums leading-none">
+        <span className="absolute right-0.5 top-0.5 t-num text-[8px] text-danger-600 leading-none">
           {data.liveClock}
         </span>
       ) : null}
@@ -518,15 +518,15 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
 function FinalMatchCard({ data, label }: { data: BracketCellData; label: string }) {
   const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
 
-  let borderClass = 'border-neutral-300'
+  let borderClass = 'border-border-default'
   if (data.isCompleted && data.pickIsCorrect === true) borderClass = 'border-success-400'
   else if (data.isCompleted && data.pickIsCorrect === false) borderClass = 'border-danger-300'
 
   return (
-    <div className={`border ${borderClass} rounded-xl bg-surface shadow-sm overflow-hidden`}>
-      <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between">
+    <div className={`border ${borderClass} rounded-card bg-surface shadow-sm overflow-hidden`}>
+      <div className="px-3 py-1.5 bg-snow border-b border-border-default flex items-center justify-between">
         <span className={`text-xs font-bold uppercase tracking-wider ${
-          label === 'Final' ? 'text-warning-600' : 'text-neutral-500'
+          label === 'Final' ? 'text-warning-600' : 'text-muted'
         }`}>
           {label}
         </span>
@@ -545,7 +545,7 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
           )
         )}
       </div>
-      <div className="divide-y divide-neutral-100">
+      <div className="divide-y divide-border-subtle">
         <div className={`flex items-center justify-between px-3 py-2.5 ${getCellRowClass(data, 'home')}`}>
           <span className="flex items-center gap-2 flex-1">
             {data.homeFlagUrl && (
@@ -554,10 +554,10 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
             <span className="text-sm font-medium">{data.homeName}</span>
           </span>
           {hasScore && (
-            <span className="text-sm font-bold tabular-nums flex-shrink-0">
+            <span className="text-sm t-num t-num-extrabold flex-shrink-0">
               {data.actualHomeScore}
               {data.actualHomePso !== null && (
-                <span className="text-[10px] text-neutral-400 ml-1">({data.actualHomePso})</span>
+                <span className="text-[10px] text-muted ml-1">({data.actualHomePso})</span>
               )}
             </span>
           )}
@@ -570,10 +570,10 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
             <span className="text-sm font-medium">{data.awayName}</span>
           </span>
           {hasScore && (
-            <span className="text-sm font-bold tabular-nums flex-shrink-0">
+            <span className="text-sm t-num t-num-extrabold flex-shrink-0">
               {data.actualAwayScore}
               {data.actualAwayPso !== null && (
-                <span className="text-[10px] text-neutral-400 ml-1">({data.actualAwayPso})</span>
+                <span className="text-[10px] text-muted ml-1">({data.actualAwayPso})</span>
               )}
             </span>
           )}
@@ -723,14 +723,14 @@ function KnockoutComparison({
   ) {
     return (
       <div>
-        <h3 className="text-sm font-bold text-neutral-600 mb-2 uppercase tracking-wide">{label}</h3>
+        <h3 className="text-sm font-bold text-muted mb-2 uppercase tracking-wide">{label}</h3>
         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
           <div className="relative" style={{ width: halfW, height: halfH, minWidth: halfW }}>
             {/* Round headers */}
             {roundHeaders.map((h, i) => (
               <div
                 key={i}
-                className="absolute text-center font-bold uppercase tracking-wider text-[11px] text-neutral-400"
+                className="absolute text-center font-bold uppercase tracking-wider text-[11px] text-muted"
                 style={{ left: h.x, top: 0, width: CELL_W }}
               >
                 {h.label}
@@ -740,13 +740,13 @@ function KnockoutComparison({
             {/* SVG connector lines */}
             <svg className="absolute top-0 left-0 pointer-events-none" width={halfW} height={halfH} fill="none">
               {getConnectorPaths(halfR32X + CELL_W, pos.r32Ys, halfR16X, pos.r16Ys).map((d, i) => (
-                <path key={`r32-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+                <path key={`r32-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
               {getConnectorPaths(halfR16X + CELL_W, pos.r16Ys, halfQfX, pos.qfYs).map((d, i) => (
-                <path key={`r16-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+                <path key={`r16-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
               {getConnectorPaths(halfQfX + CELL_W, pos.qfYs, halfSfX, [pos.sfY]).map((d, i) => (
-                <path key={`qf-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+                <path key={`qf-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
             </svg>
 
@@ -764,7 +764,7 @@ function KnockoutComparison({
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-neutral-900">Knockout Bracket</h2>
+        <h2 className="text-xl font-bold text-ink">Knockout Bracket</h2>
         {totalPickable > 0 && (
           <Badge variant={correctPicks === totalPickable ? 'green' : correctPicks > 0 ? 'blue' : 'gray'}>
             {correctPicks}/{totalPickable} correct
@@ -777,8 +777,8 @@ function KnockoutComparison({
         )}
       </div>
 
-      <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-6 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
-        Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-md align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-md align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
+      <div className="bg-primary-50 border border-primary-200 rounded-card px-4 py-2 mb-6 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
+        Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-chip align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-chip align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
       </div>
 
       {/* Split bracket — two halves stacked */}
@@ -789,7 +789,7 @@ function KnockoutComparison({
 
       {/* Final & 3rd Place */}
       <div className="mt-8">
-        <h3 className="text-sm font-bold text-neutral-600 mb-3 uppercase tracking-wide">Finals</h3>
+        <h3 className="text-sm font-bold text-muted mb-3 uppercase tracking-wide">Finals</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
           <FinalMatchCard data={buildCellData(104)} label="Final" />
           <FinalMatchCard data={buildCellData(103)} label="3rd Place" />
@@ -1038,8 +1038,8 @@ export function BracketResultsTab({
   // If no predictions submitted
   if (!isSubmitted && groupRankings.length === 0) {
     return (
-      <div className="bg-surface rounded-xl shadow p-8 text-center">
-        <p className="text-neutral-600">
+      <div className="bg-surface rounded-card shadow p-8 text-center">
+        <p className="text-muted">
           {selectedEntryId === currentEntryId
             ? 'You haven\'t submitted your bracket picks yet. Head to the Predictions tab to get started!'
             : 'This entry hasn\'t been submitted yet.'}
@@ -1053,11 +1053,11 @@ export function BracketResultsTab({
       {/* Entry selector */}
       {showEntrySelector && (
         <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-neutral-700">Viewing entry:</label>
+          <label className="text-sm font-medium text-ink">Viewing entry:</label>
           <select
             value={selectedEntryId}
             onChange={e => setSelectedEntryId(e.target.value)}
-            className="text-sm border border-neutral-300 rounded-xl px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="text-sm border border-border-default rounded-card px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             {userEntries.map(entry => (
               <option key={entry.entry_id} value={entry.entry_id}>
@@ -1073,7 +1073,7 @@ export function BracketResultsTab({
       {/* ================================ */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xl font-bold text-neutral-900">Group Rankings</h2>
+          <h2 className="text-xl font-bold text-ink">Group Rankings</h2>
           {groupScoreSummary && (
             <Badge variant={groupScoreSummary.correctPositions > 0 ? 'green' : 'gray'}>
               {groupScoreSummary.correctPositions}/{groupScoreSummary.totalPositions} correct

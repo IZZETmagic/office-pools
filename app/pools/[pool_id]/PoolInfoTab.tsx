@@ -58,8 +58,8 @@ function formatCreated(iso: string | null | undefined): string {
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between items-center py-1.5">
-      <span className="text-sm text-neutral-600 dark:text-neutral-400">{label}</span>
-      <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{children}</span>
+      <span className="text-sm text-muted">{label}</span>
+      <span className="text-sm font-bold text-ink">{children}</span>
     </div>
   )
 }
@@ -78,26 +78,26 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
       {/* Description */}
       {pool.description && (
         <Card>
-          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">About</h4>
-          <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{pool.description}</p>
+          <h4 className="t-card-title text-ink mb-3">About</h4>
+          <p className="text-sm text-ink whitespace-pre-wrap">{pool.description}</p>
         </Card>
       )}
 
       {/* Deadlines */}
       <Card>
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Deadlines</h4>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">When predictions lock</p>
+        <h4 className="t-card-title text-ink mb-1">Deadlines</h4>
+        <p className="text-xs text-muted mb-4">When predictions lock</p>
 
         {isProgressive && roundStates.length > 0 ? (
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+          <div className="divide-y divide-border-subtle">
             {roundStates.map((rs) => (
               <div key={rs.id} className="flex justify-between items-center py-2">
-                <span className="text-sm text-neutral-600 dark:text-neutral-400">{ROUND_LABELS[rs.round_key] ?? rs.round_key}</span>
+                <span className="text-sm text-muted">{ROUND_LABELS[rs.round_key] ?? rs.round_key}</span>
                 <div className="flex items-center gap-2">
                   {rs.deadline ? (
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{formatDeadline(rs.deadline)}</span>
+                    <span className="text-xs text-muted">{formatDeadline(rs.deadline)}</span>
                   ) : (
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500">No deadline</span>
+                    <span className="text-xs text-muted">No deadline</span>
                   )}
                   <Badge variant={
                     rs.state === 'open' ? 'green'
@@ -113,21 +113,21 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
           </div>
         ) : pool.prediction_deadline ? (
           <div className="flex justify-between items-center">
-            <span className="text-sm text-neutral-700 dark:text-neutral-300">{formatDeadline(pool.prediction_deadline)}</span>
+            <span className="text-sm text-ink">{formatDeadline(pool.prediction_deadline)}</span>
             <Badge variant={isPastDeadline ? 'gray' : 'green'}>
               {isPastDeadline ? 'Closed' : 'Open'}
             </Badge>
           </div>
         ) : (
-          <p className="text-sm text-neutral-400 dark:text-neutral-500">No deadline set</p>
+          <p className="text-sm text-muted">No deadline set</p>
         )}
       </Card>
 
       {/* Entries & Participants */}
       <Card>
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Entries & Participants</h4>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">Pool size and entry limits</p>
-        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        <h4 className="t-card-title text-ink mb-1">Entries & Participants</h4>
+        <p className="text-xs text-muted mb-4">Pool size and entry limits</p>
+        <div className="divide-y divide-border-subtle">
           <InfoRow label="Prediction mode">
             <Badge variant="blue">{MODE_LABELS[pool.prediction_mode] ?? pool.prediction_mode}</Badge>
           </InfoRow>
@@ -141,21 +141,21 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
       {/* Fees & Prize Pool */}
       {entryFee > 0 && (
         <Card>
-          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Fees & Prize Pool</h4>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">Entry costs and total pot</p>
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+          <h4 className="t-card-title text-ink mb-1">Fees & Prize Pool</h4>
+          <p className="text-xs text-muted mb-4">Entry costs and total pot</p>
+          <div className="divide-y divide-border-subtle">
             <InfoRow label="Entry fee">{formatFee(entryFee, currency)}</InfoRow>
             <InfoRow label="Total prize pool">{formatFee(entryFee * totalEntries, currency)}</InfoRow>
           </div>
 
           {/* Current user's fee status */}
           {userEntries.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-neutral-100 dark:border-neutral-800">
-              <h5 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Your Fee Status</h5>
+            <div className="mt-5 pt-4 border-t border-border-subtle">
+              <h5 className="t-card-title text-ink mb-3">Your Fee Status</h5>
               <div className="space-y-2">
                 {userEntries.map((entry) => (
                   <div key={entry.entry_id} className="flex justify-between items-center py-1">
-                    <span className="text-sm text-neutral-600 dark:text-neutral-400">{entry.entry_name}</span>
+                    <span className="text-sm text-muted">{entry.entry_name}</span>
                     <Badge variant={entry.fee_paid ? 'green' : 'yellow'}>
                       {entry.fee_paid ? 'Paid' : 'Unpaid'}
                     </Badge>
@@ -169,8 +169,8 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
 
       {/* Pool Status */}
       <Card>
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Pool Details</h4>
-        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        <h4 className="t-card-title text-ink mb-4">Pool Details</h4>
+        <div className="divide-y divide-border-subtle">
           <InfoRow label="Status">
             <Badge variant={getStatusVariantSolid(pool.status)}>
               {poolStatusLabel(pool.status)}

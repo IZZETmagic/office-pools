@@ -75,7 +75,7 @@ function countryCodeToEmoji(code: string): string {
 }
 
 function getLeftBorderColor(result: PointsResult | null, isUpcoming: boolean): string {
-  if (!result) return isUpcoming ? 'border-l-warning-400' : 'border-l-neutral-300 dark:border-l-neutral-600'
+  if (!result) return isUpcoming ? 'border-l-warning-400' : 'border-l-silver'
   switch (result.type) {
     case 'exact':
       return 'border-l-success-500'
@@ -185,7 +185,7 @@ export function MatchCard({
     >
       {/* ── Top Row: Stage label + Badge/Points ── */}
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+        <span className="text-xs text-muted">
           {getStageLabel(match.stage, match.group_letter)} · Match #{match.match_number}
         </span>
         <div>
@@ -193,16 +193,16 @@ export function MatchCard({
             <PointsBadge result={pointsResult} />
           ) : statusBadge ? (
             <span
-              className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${
+              className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill ${
                 statusBadge.tone === 'red'
-                  ? 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
-                  : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+                  ? 'bg-danger-600/12 text-danger-600'
+                  : 'bg-warning-500/12 text-warning-600'
               }`}
             >
               {statusBadge.label}
             </span>
           ) : isLive ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
@@ -210,11 +210,11 @@ export function MatchCard({
               {liveClock ?? 'LIVE'}
             </span>
           ) : isUpcoming ? (
-            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400">
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-warning-500/12 text-warning-600">
               Pending
             </span>
           ) : (isCompleted && !hasPrediction) ? (
-            <span className="text-[10px] italic text-neutral-400 dark:text-neutral-500">No prediction</span>
+            <span className="text-[10px] italic text-muted">No prediction</span>
           ) : null}
         </div>
       </div>
@@ -229,7 +229,7 @@ export function MatchCard({
             ) : homeCode ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
-            <span className="text-sm font-semibold text-neutral-800 dark:text-white truncate">
+            <span className="text-sm font-semibold text-ink truncate">
               {homeName}
             </span>
           </div>
@@ -238,12 +238,12 @@ export function MatchCard({
           <div className="text-center">
             {hasActualScores ? (
               <div>
-                <div className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-400 rounded-lg px-3 py-1">
-                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-800 tabular-nums">
+                <div className="inline-flex items-center gap-1 bg-mist rounded-chip px-3 py-1">
+                  <span className="t-num t-num-extrabold text-lg text-ink">
                     {match.home_score_ft}
                   </span>
-                  <span className="text-lg font-extrabold text-neutral-400 dark:text-neutral-800">-</span>
-                  <span className="text-lg font-extrabold text-neutral-900 dark:text-neutral-800 tabular-nums">
+                  <span className="t-num t-num-extrabold text-lg text-muted">-</span>
+                  <span className="t-num t-num-extrabold text-lg text-ink">
                     {match.away_score_ft}
                   </span>
                 </div>
@@ -254,13 +254,13 @@ export function MatchCard({
                 )}
               </div>
             ) : (
-              <span className="text-sm font-medium text-neutral-300 dark:text-neutral-600">vs</span>
+              <span className="text-sm font-medium text-silver">vs</span>
             )}
           </div>
 
           {/* Away team */}
           <div className="flex items-center justify-end gap-2 min-w-0">
-            <span className="text-sm font-semibold text-neutral-800 dark:text-white truncate">
+            <span className="text-sm font-semibold text-ink truncate">
               {awayName}
             </span>
             {awayFlagUrl ? (
@@ -274,25 +274,25 @@ export function MatchCard({
 
       {/* ── Bottom Row: Prediction + Date ── */}
       <div className="flex items-center justify-between px-4 py-2 border-t border-border-default">
-        <div className="text-xs text-neutral-400 dark:text-neutral-500 min-w-0">
+        <div className="text-xs text-muted min-w-0">
           {hasPrediction && showBracketTeams ? (
             <span>
               Your prediction:{' '}
-              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+              <span className="font-semibold text-muted">
                 {match.predicted_home_team_name || '?'}
               </span>
               {' '}
-              <span className="font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">
+              <span className="t-num text-muted">
                 {predictionDisplay}
               </span>
               {' '}
-              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+              <span className="font-semibold text-muted">
                 {match.predicted_away_team_name || '?'}
               </span>
               {hasPsoScores &&
                 match.prediction!.predicted_home_pso != null &&
                 match.prediction!.predicted_away_pso != null && (
-                  <span className="text-neutral-400 dark:text-neutral-500">
+                  <span className="text-muted">
                     {' '}(PSO: {match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})
                   </span>
                 )}
@@ -300,20 +300,20 @@ export function MatchCard({
           ) : !hasPrediction && showBracketTeams ? (
             <span>
               Your bracket:{' '}
-              <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+              <span className="font-semibold text-muted">
                 {match.predicted_home_team_name || '?'} vs {match.predicted_away_team_name || '?'}
               </span>
             </span>
           ) : hasPrediction ? (
             <span>
               Your prediction:{' '}
-              <span className="font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">
+              <span className="t-num text-muted">
                 {predictionDisplay}
               </span>
               {hasPsoScores &&
                 match.prediction!.predicted_home_pso != null &&
                 match.prediction!.predicted_away_pso != null && (
-                  <span className="text-neutral-400 dark:text-neutral-500">
+                  <span className="text-muted">
                     {' '}(PSO: {match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})
                   </span>
                 )}
@@ -322,7 +322,7 @@ export function MatchCard({
             <span className="italic">No prediction</span>
           ) : null}
         </div>
-        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap ml-2">
+        <span className="text-xs text-muted whitespace-nowrap ml-2">
           <LocalTime iso={match.match_date} format={formatDate} />
         </span>
       </div>

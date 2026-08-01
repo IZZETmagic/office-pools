@@ -2,13 +2,12 @@
 
 import { type PointsResult } from './points'
 import { formatNumber } from '@/lib/format'
+import { tierChipClass } from '@/lib/design/formDots'
 
-const badgeStyles: Record<PointsResult['type'], string> = {
-  exact: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400',
-  winner_gd: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
-  winner: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
-  miss: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400',
-}
+// The tier colours used to be a private copy here, and it had drifted the same
+// way the other nine had: `exact` on green and `winner_gd` on blue, both a step
+// off. The Results tab therefore coloured a result differently from the
+// leaderboard and the points breakdown showing the same match.
 
 const typeLabels: Record<PointsResult['type'], string> = {
   exact: 'EXACT',
@@ -31,26 +30,24 @@ export function PointsBadge({ result }: { result: PointsResult }) {
   return (
     <div className="flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${badgeStyles[result.type]}`}
+        className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill ${tierChipClass(result.type)}`}
       >
         {typeLabels[result.type]}
       </span>
       <span
-        className={`text-xs font-bold tabular-nums ${
-          ftPoints > 0
-            ? 'text-success-600 dark:text-success-400'
-            : 'text-neutral-400 dark:text-neutral-500'
+        className={`t-num t-num-extrabold text-xs ${
+          ftPoints > 0 ? 'text-success-600' : 'text-muted'
         }`}
       >
         +{formatNumber(ftPoints)}
       </span>
       {showMultiplier && (
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+        <span className="t-num text-[10px] text-muted">
           ({formatNumber(result.basePoints)}×{result.multiplier})
         </span>
       )}
       {result.pso && result.pso.psoPoints > 0 && (
-        <span className="text-[10px] font-medium text-accent-500">
+        <span className="text-[10px] font-medium text-gold">
           +{formatNumber(result.pso.psoPoints)} {psoTypeLabels[result.pso.psoType]}
         </span>
       )}

@@ -33,10 +33,10 @@ const STAGE_TABS: { key: StageTab; label: string }[] = [
 ]
 
 const STATUS_OPTIONS: { key: StatusFilter; label: string; activeColor: string }[] = [
-  { key: 'all', label: 'All', activeColor: 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900' },
+  { key: 'all', label: 'All', activeColor: 'bg-ink text-surface' },
   { key: 'completed', label: 'Completed', activeColor: 'bg-success-600 text-white' },
   { key: 'live', label: 'Live', activeColor: 'bg-danger-600 text-white' },
-  { key: 'upcoming', label: 'Upcoming', activeColor: 'bg-neutral-600 text-white dark:bg-neutral-300 dark:text-neutral-900' },
+  { key: 'upcoming', label: 'Upcoming', activeColor: 'bg-muted text-surface' },
 ]
 
 // =============================================
@@ -151,15 +151,15 @@ export function ResultsView({
   return (
     <div>
       {/* ── Points summary strip ── */}
-      <div className="mb-4 px-4 h-[60px] bg-surface rounded-xl shadow-sm border border-neutral-200 flex items-center gap-3 text-sm">
-        <span className="font-semibold text-neutral-700 dark:text-neutral-600">
+      <div className="mb-4 px-4 h-[60px] bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex items-center gap-3 text-sm">
+        <span className="font-semibold text-ink">
           {userEntries && userEntries.length > 1
             ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
             : 'Your Points'}
         </span>
-        <span className="text-lg font-extrabold text-primary-600">{totalPoints.toLocaleString()}<span className="text-xs font-medium text-neutral-500 ml-0.5">pts</span></span>
-        <span className="text-neutral-300 dark:text-neutral-600">·</span>
-        <div className="flex items-center gap-2 text-xs text-neutral-500 ml-auto">
+        <span className="t-num t-num-extrabold text-lg text-primary-600">{totalPoints.toLocaleString()}<span className="text-xs font-medium text-muted ml-0.5">pts</span></span>
+        <span className="text-silver">·</span>
+        <div className="flex items-center gap-2 text-xs text-muted ml-auto">
           <span><span className="text-success-600 font-medium">{statusCounts.completed}</span> ✓</span>
           {statusCounts.live > 0 && (
             <span><span className="text-danger-600 font-medium">{statusCounts.live}</span> live</span>
@@ -169,7 +169,7 @@ export function ResultsView({
       </div>
 
       {/* ── Stage tabs ── */}
-      <div className="mb-4 border-b border-neutral-200 pb-3">
+      <div className="mb-4 border-b border-border-subtle pb-3">
         <div className="flex gap-1 overflow-x-auto">
           {STAGE_TABS.map((tab) => (
             <button
@@ -178,10 +178,10 @@ export function ResultsView({
                 setStageTab(tab.key)
                 if (tab.key !== 'group') setGroupFilter('all')
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-pill transition-colors whitespace-nowrap ${
                 stageTab === tab.key
                   ? 'bg-primary-600 text-white'
-                  : 'text-neutral-600 hover:bg-neutral-100'
+                  : 'text-muted hover:bg-mist'
               }`}
             >
               {tab.label}
@@ -197,7 +197,7 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
                 groupFilter === 'all'
                   ? 'bg-primary-600 text-white'
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
+                  : 'bg-mist text-muted hover:bg-silver'
               }`}
             >
               All
@@ -211,7 +211,7 @@ export function ResultsView({
                 } ${
                   groupFilter === g
                     ? 'bg-primary-600 text-white'
-                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
+                    : 'bg-mist text-muted hover:bg-silver'
                 }`}
               >
                 {g}
@@ -232,7 +232,7 @@ export function ResultsView({
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
+                  : 'bg-mist text-muted hover:bg-silver'
               }`}
             >
               {opt.label}
@@ -254,7 +254,7 @@ export function ResultsView({
               className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
-                  : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-200 dark:text-neutral-600 dark:hover:bg-neutral-400'
+                  : 'bg-mist text-muted hover:bg-silver'
               }`}
             >
               {opt.label}
@@ -273,7 +273,7 @@ export function ResultsView({
             <select
               value={selectedEntryId || ''}
               onChange={(e) => onEntryChange(e.target.value)}
-              className="px-1.5 py-1.5 text-[10px] sm:px-3 sm:py-1 sm:text-sm font-medium border border-neutral-300 rounded-md sm:rounded-lg bg-surface text-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-1.5 py-1.5 text-[10px] sm:px-3 sm:py-1 sm:text-sm font-medium border border-border-default rounded-control bg-surface text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
             >
               {userEntries.map((entry) => (
                 <option key={entry.entry_id} value={entry.entry_id}>
@@ -301,7 +301,7 @@ export function ResultsView({
       {/* ── Match cards grid ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-neutral-500 text-lg">
+          <p className="text-muted text-lg">
             No matches found for this filter.
           </p>
         </div>

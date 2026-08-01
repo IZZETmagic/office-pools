@@ -163,27 +163,27 @@ function BracketCell({
 
   return (
     <div
-      className="absolute border border-neutral-300 rounded bg-surface shadow-sm overflow-hidden"
+      className="absolute bg-surface rounded-chip shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden"
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
     >
       {/* Home team row */}
       <div
-        className={`flex items-center justify-between px-1.5 border-b border-neutral-100 ${
+        className={`flex items-center justify-between px-1.5 text-[11px] leading-[14px] border-b border-border-subtle ${
           match.winnerSide === 'home'
-            ? 'bg-success-50 font-semibold text-success-800'
-            : 'text-neutral-700'
+            ? 'bg-success-600/12 font-semibold text-success-700'
+            : 'text-ink'
         }`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 11, lineHeight: '14px' }}
+        style={{ height: CELL_H / 2 - 0.5 }}
       >
         <span className="truncate flex-1 mr-0.5">
           {shortName(match.homeName)}
         </span>
         <span className="flex items-center gap-0.5 flex-shrink-0">
           {hasScore && (
-            <span className="font-bold tabular-nums">
+            <span className="t-num text-[11px]">
               {match.homeScore}
               {match.homePso !== null && (
-                <span className="text-[8px] text-neutral-400">({match.homePso})</span>
+                <span className="text-[8px] text-muted">({match.homePso})</span>
               )}
             </span>
           )}
@@ -192,22 +192,22 @@ function BracketCell({
 
       {/* Away team row */}
       <div
-        className={`flex items-center justify-between px-1.5 ${
+        className={`flex items-center justify-between px-1.5 text-[11px] leading-[14px] ${
           match.winnerSide === 'away'
-            ? 'bg-success-50 font-semibold text-success-800'
-            : 'text-neutral-700'
+            ? 'bg-success-600/12 font-semibold text-success-700'
+            : 'text-ink'
         }`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 11, lineHeight: '14px' }}
+        style={{ height: CELL_H / 2 - 0.5 }}
       >
         <span className="truncate flex-1 mr-0.5">
           {shortName(match.awayName)}
         </span>
         <span className="flex items-center gap-0.5 flex-shrink-0">
           {hasScore && (
-            <span className="font-bold tabular-nums">
+            <span className="t-num text-[11px]">
               {match.awayScore}
               {match.awayPso !== null && (
-                <span className="text-[8px] text-neutral-400">({match.awayPso})</span>
+                <span className="text-[8px] text-muted">({match.awayPso})</span>
               )}
             </span>
           )}
@@ -351,7 +351,7 @@ function KnockoutBracket({
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-neutral-900">Knockout Bracket</h2>
+        <h2 className="text-xl font-bold text-ink">Knockout Bracket</h2>
         {completedKnockout > 0 && (
           <Badge variant="green">
             {completedKnockout}/{totalKnockout} played
@@ -379,7 +379,7 @@ function KnockoutBracket({
               className={`absolute text-center font-bold uppercase tracking-wider ${
                 h.label === 'Final'
                   ? 'text-[10px] text-warning-600'
-                  : 'text-[10px] text-neutral-400'
+                  : 'text-[10px] text-muted'
               }`}
               style={{ left: h.x, top: 0, width: CELL_W }}
             >
@@ -396,37 +396,37 @@ function KnockoutBracket({
           >
             {/* Left R32 → R16 */}
             {getConnectorPaths(leftR32X + CELL_W, pos.r32Ys, leftR16X, pos.r16Ys).map((d, i) => (
-              <path key={`l32-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`l32-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Left R16 → QF */}
             {getConnectorPaths(leftR16X + CELL_W, pos.r16Ys, leftQfX, pos.qfYs).map((d, i) => (
-              <path key={`l16-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`l16-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Left QF → SF */}
             {getConnectorPaths(leftQfX + CELL_W, pos.qfYs, leftSfX, [pos.sfY]).map((d, i) => (
-              <path key={`lqf-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`lqf-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Right R32 → R16 */}
             {getReverseConnectorPaths(rightR32X, pos.r32Ys, rightR16X + CELL_W, pos.r16Ys).map((d, i) => (
-              <path key={`r32-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`r32-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Right R16 → QF */}
             {getReverseConnectorPaths(rightR16X, pos.r16Ys, rightQfX + CELL_W, pos.qfYs).map((d, i) => (
-              <path key={`r16-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`r16-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Right QF → SF */}
             {getReverseConnectorPaths(rightQfX, pos.qfYs, rightSfX + CELL_W, [pos.sfY]).map((d, i) => (
-              <path key={`rqf-${i}`} d={d} stroke="#d1d5db" strokeWidth={1.5} />
+              <path key={`rqf-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
             ))}
             {/* Left SF → Final */}
             <path
               d={`M ${leftSfX + CELL_W} ${pos.sfY + CELL_H / 2} H ${centerX}`}
-              stroke="#d1d5db" strokeWidth={1.5}
+              stroke="var(--border-default)" strokeWidth={1.5}
             />
             {/* Right SF → Final */}
             <path
               d={`M ${rightSfX} ${pos.sfY + CELL_H / 2} H ${centerX + CELL_W}`}
-              stroke="#d1d5db" strokeWidth={1.5}
+              stroke="var(--border-default)" strokeWidth={1.5}
             />
           </svg>
 
@@ -458,7 +458,7 @@ function KnockoutBracket({
             className="absolute text-center"
             style={{ left: centerX, top: pos.sfY + CELL_H + 8, width: CELL_W }}
           >
-            <div className="text-[8px] font-bold text-neutral-400 uppercase mb-0.5">3rd Place</div>
+            <div className="text-[8px] font-bold text-muted uppercase mb-0.5">3rd Place</div>
             <div className="relative" style={{ width: CELL_W, height: CELL_H }}>
               <BracketCell match={buildBracketMatch(103, matchMap)} x={0} y={0} />
             </div>
@@ -576,18 +576,18 @@ export function StandingsTab({ matches, teams, conductData }: StandingsTabProps)
       {/* ================================ */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xl font-bold text-neutral-900">Group Standings</h2>
+          <h2 className="text-xl font-bold text-ink">Group Standings</h2>
           <Badge variant="blue">Actual Results</Badge>
         </div>
 
         {!hasAnyCompletedGroupMatch ? (
           <Card padding="lg" className="text-center">
-            <p className="text-neutral-500">No group stage matches have been completed yet.</p>
-            <p className="text-xs text-neutral-400 mt-1">Standings will appear here once match results are entered.</p>
+            <p className="text-muted">No group stage matches have been completed yet.</p>
+            <p className="text-xs text-muted mt-1">Standings will appear here once match results are entered.</p>
           </Card>
         ) : (
           <>
-            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-2 mb-4 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
+            <div className="bg-primary-600/12 rounded-card px-4 py-2.5 mb-4 text-xs text-primary-700">
               Based on actual match results. FP (Fair Play) is the Team Conduct Score used as a FIFA tiebreaker.
             </div>
 
