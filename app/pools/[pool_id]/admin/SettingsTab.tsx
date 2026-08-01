@@ -703,7 +703,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
       {/* ── Status ── */}
-      <Card padding="sm">
+      <Card padding="sm" className="lg:min-h-32">
         <Caption icon="checkmark.circle.fill">Status</Caption>
         <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
         <p className="text-xs text-muted mt-2.5">
@@ -712,7 +712,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       </Card>
 
       {/* ── New Members ── */}
-      <Card padding="sm">
+      <Card padding="sm" className="lg:min-h-32">
         <Caption icon="person.badge.plus">New Members</Caption>
         <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
         <p className="text-xs text-muted mt-2.5">
@@ -722,7 +722,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
 
         {/* ── Visibility ── */}
-        <Card padding="sm">
+        <Card padding="sm" className="lg:min-h-32">
           <Caption icon="eye">Visibility</Caption>
           <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
           <p className="text-xs text-muted mt-2.5">
@@ -731,7 +731,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Max Members ── */}
-        <Card padding="sm">
+        <Card padding="sm" className="lg:min-h-32">
           <Caption icon="person.3.fill">Max Members</Caption>
           <SettingsRow
             label="Cap on total members"
@@ -745,7 +745,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Prediction Entries ── */}
-        <Card padding="sm">
+        <Card padding="sm" className="lg:min-h-32">
           <Caption icon="list.number">Prediction Entries</Caption>
           <p className="text-sm text-muted mb-4">
             Each entry is scored separately on the leaderboard.
@@ -768,7 +768,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Entry Fees ── */}
-        <Card padding="sm">
+        <Card padding="sm" className="lg:min-h-32">
           <Caption icon="dollarsign.circle.fill">Entry Fees</Caption>
           <p className="text-sm text-muted mb-4">
             Leave blank for a free pool.
