@@ -8,13 +8,20 @@ import { cn } from '@/lib/utils/cn'
  */
 type CardProps = {
   children: React.ReactNode
-  padding?: 'md' | 'lg'
+  /**
+   * `none` is for content that must reach the card's edge — a table whose rows
+   * highlight, for instance. With the default padding a highlighted row stops
+   * short of the border on both sides and reads as a floating band rather than
+   * a selected row.
+   */
+  padding?: 'none' | 'md' | 'lg'
   /** Hairline border instead of a shadow, matching Card's `bordered` prop in RN. */
   bordered?: boolean
   className?: string
 }
 
 const paddingClasses = {
+  none: '',
   md: 'p-6',
   lg: 'p-8',
 }

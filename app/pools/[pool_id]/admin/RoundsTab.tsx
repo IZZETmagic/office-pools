@@ -259,7 +259,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       </div>
 
       {/* Desktop table */}
-      <Card className="hidden sm:block">
+      <Card padding="none" className="hidden sm:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
