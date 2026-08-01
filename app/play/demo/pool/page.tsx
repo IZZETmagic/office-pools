@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import Link from 'next/link'
 import {
   POOL_INFO,
@@ -30,9 +31,7 @@ export default function PoolDemoPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex items-center gap-3 mb-1">
             <Link href="/play/demo" className="text-neutral-400 hover:text-neutral-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
+              <Icon name="chevron.left" size={20} />
             </Link>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2.5">

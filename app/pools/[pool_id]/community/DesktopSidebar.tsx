@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useRef, useEffect } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { Card } from '@/components/ui/Card'
 import type { MemberData, MatchData, MatchAccuracyData } from '../types'
 import type { MemberWithLevel, SystemEvent } from './types'
@@ -232,15 +233,7 @@ function OnlineMembersSection({
             className="flex items-center justify-between w-full mb-1.5 group"
           >
             <span className="text-[10px] font-medium text-neutral-400">Offline — {offlineMembers.length}</span>
-            <svg
-              className={`w-3 h-3 text-neutral-400 transition-transform duration-200 ${offlineExpanded ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            <Icon name="chevron.down" size={12} className={`text-muted transition-transform duration-200 ${offlineExpanded ? 'rotate-180' : ''}`} />
           </button>
           <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${offlineExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
             <div className="overflow-hidden">

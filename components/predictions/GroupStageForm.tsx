@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import {
   Match,
   Team,
@@ -101,14 +102,7 @@ export function GroupStageForm({ matches, teams, predictions, allGroupStandings,
                   ) : (
                     <Badge variant="gray">Not Started</Badge>
                   )}
-                  <svg
-                    className={`w-5 h-5 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <Icon name="chevron.down" size={20} className={`text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                 </div>
               </button>
 

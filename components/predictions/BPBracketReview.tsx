@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import type { TeamData, MatchData } from '@/app/pools/[pool_id]/types'
 import type { GroupStanding } from '@/lib/tournament'
 import { GROUP_LETTERS } from '@/lib/tournament'
@@ -85,14 +86,7 @@ function CollapsibleSection({
           onClick={onToggle}
           className="flex items-center gap-2 min-w-0"
         >
-          <svg
-            className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <Icon name="chevron.down" size={16} className={`text-muted transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
           <span className="text-sm font-semibold text-neutral-900">{title}</span>
           {badge}
         </button>
@@ -391,13 +385,9 @@ export function BPBracketReview({
                     {idx + 1}
                   </span>
                   {qualifies ? (
-                    <svg className="w-3.5 h-3.5 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Icon name="checkmark" size={14} className="text-success-500 shrink-0" />
                   ) : (
-                    <svg className="w-3.5 h-3.5 text-red-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <Icon name="xmark" size={14} className="text-red-300 shrink-0" />
                   )}
                   <TeamFlag team={team} size="sm" />
                   <span className={`text-xs truncate ${qualifies ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>

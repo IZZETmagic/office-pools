@@ -1,6 +1,7 @@
 'use client'
 
 import type { MemberData, PredictionData } from '@/app/pools/[pool_id]/types'
+import { Icon } from '@/components/ui/Icon'
 
 type SelectedEntry = { entryId: string; ownerName: string; entryName: string }
 
@@ -58,15 +59,7 @@ export function EveryoneElseSection({ members, currentUserId, allPredictions, on
               <div className="text-sm font-semibold text-neutral-900 truncate">{r.entryName}</div>
               <div className="text-xs text-neutral-500 truncate">{r.ownerName}</div>
             </div>
-            <svg
-              className="w-4 h-4 text-neutral-400 group-hover:text-primary-500 transition-colors shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
+            <Icon name="chevron.right" size={16} className="text-neutral-400 group-hover:text-primary-500 transition-colors shrink-0" />
           </button>
         ))}
       </div>

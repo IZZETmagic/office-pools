@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Fragment } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { LeaderboardPlayer } from './getLeaderboard'
@@ -587,11 +588,11 @@ export default function BrandedLandingClient({
             <div className="px-6 py-6 space-y-5">
               <div className="flex items-center justify-center gap-4 text-sm text-neutral-500">
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128H5.228A2 2 0 013 17.208V15a4.002 4.002 0 014.464-3.978A3 3 0 0112 13.5a3 3 0 014.536-2.478A4.002 4.002 0 0121 15v2.208a2 2 0 01-2.228 1.92M15 19.128H9" /></svg>
+                  <Icon name="person.3.fill" size={16} />
                   {poolConfig.memberCount} member{poolConfig.memberCount !== 1 ? 's' : ''}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
+                  <Icon name="tag" size={16} />
                   {poolConfig.mode}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${poolConfig.accentColor}20`, color: poolConfig.accentColor }}>

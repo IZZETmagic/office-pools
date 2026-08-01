@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { createPortal } from 'react-dom'
 import type {
   TeamData,
@@ -687,9 +688,7 @@ export default function BracketPickerFlow({
       {/* Submitted banner */}
       {isSubmitted && (
         <div className="flex items-center gap-3 p-4 rounded-xl border bg-success-50 border-success-200 text-success-800 mb-4">
-          <svg className="w-5 h-5 text-success-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Icon name="checkmark.circle.fill" size={20} className="text-success-600 shrink-0" />
           <p className="text-sm font-medium">Your bracket predictions have been submitted. Good luck!</p>
         </div>
       )}
@@ -697,9 +696,7 @@ export default function BracketPickerFlow({
       {/* Locked banner */}
       {isLocked && !isSubmitted && (
         <div className="flex items-center gap-3 p-4 rounded-xl border bg-neutral-50 border-neutral-200 text-neutral-800 mb-4">
-          <svg className="w-5 h-5 text-neutral-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
+          <Icon name="lock.fill" size={20} className="text-neutral-600 shrink-0" />
           <p className="text-sm font-medium">Your predictions have been locked by the pool admin.</p>
         </div>
       )}
@@ -711,9 +708,7 @@ export default function BracketPickerFlow({
             ? 'bg-danger-50 border-danger-200 text-danger-800'
             : 'bg-primary-50 border-primary-200 text-primary-800'
         }`}>
-          <svg className={`w-5 h-5 shrink-0 ${deadlineInfo.isPast ? 'text-danger-600' : 'text-primary-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Icon name="clock" size={20} className={`shrink-0 ${deadlineInfo.isPast ? 'text-danger-600' : 'text-primary-600'}`} />
           <p className="text-sm font-medium">{deadlineInfo.text}</p>
         </div>
       )}
@@ -789,9 +784,7 @@ export default function BracketPickerFlow({
         )}
         {saveStatus === 'saved' && (
           <span className="text-xs text-success-600 flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <Icon name="checkmark" size={14} />
             Saved
           </span>
         )}
@@ -1076,13 +1069,9 @@ export default function BracketPickerFlow({
                           {idx + 1}
                         </span>
                         {qualifies ? (
-                          <svg className="w-3.5 h-3.5 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <Icon name="checkmark" size={14} className="text-success-500 shrink-0" />
                         ) : (
-                          <svg className="w-3.5 h-3.5 text-red-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <Icon name="xmark" size={14} className="text-red-300 shrink-0" />
                         )}
                         {team.flag_url ? (
                           <img src={team.flag_url} alt={team.country_name} className="w-5 h-3.5 rounded-[2px] object-cover shrink-0" />

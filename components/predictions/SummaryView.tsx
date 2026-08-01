@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import {
   Match,
   Team,
@@ -231,14 +232,7 @@ function SectionHeader({
         onClick={onToggle}
         className="flex items-center gap-2"
       >
-        <svg
-          className={`w-4 h-4 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <Icon name="chevron.down" size={16} className={`text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         <h3 className="text-lg font-bold text-neutral-900">{title}</h3>
         <Badge variant="gray">{matchCount} matches</Badge>
       </button>

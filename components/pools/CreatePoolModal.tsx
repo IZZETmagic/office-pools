@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -285,9 +286,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
             className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
             aria-label="Close"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Icon name="xmark" size={20} />
           </button>
         </div>
 
@@ -326,9 +325,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                     }`}
                   >
                     {idx < currentStepIndex ? (
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                      <Icon name="checkmark" size={12} />
                     ) : (
                       idx + 1
                     )}
@@ -389,9 +386,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                             <div className="shrink-0 mt-0.5">
                               {selectedTournamentId === t.tournament_id ? (
                                 <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                  </svg>
+                                  <Icon name="checkmark" size={12} className="text-white" />
                                 </div>
                               ) : (
                                 <div className="w-5 h-5 rounded-full border-2 border-neutral-300" />
@@ -448,9 +443,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         label: 'Bracket Picker',
                         desc: 'Members rank groups and pick knockout winners only — no score predictions needed. Quick & simple (~10 min).',
                         icon: (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                          </svg>
+                          <Icon name="square.grid.2x2" size={20} />
                         ),
                       },
                     ]).map((opt) => (
@@ -474,9 +467,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   </div>
 
                   <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
+                    <Icon name="exclamationmark.triangle.fill" size={16} className="text-amber-600 shrink-0" />
                     <p className="text-xs text-amber-800">
                       This cannot be changed after your pool is created.
                     </p>
@@ -634,9 +625,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
                   {/* Scoring info note */}
                   <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl">
-                    <svg className="w-5 h-5 text-primary-800 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                    </svg>
+                    <Icon name="info.circle.fill" size={20} className="text-primary-800 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-primary-800">Scoring & Bonus Points</p>
                       <p className="text-xs text-primary-800 mt-0.5">

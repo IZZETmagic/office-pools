@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import type { SuperUserData } from './page'
 import { Badge } from '@/components/ui/Badge'
@@ -746,9 +747,7 @@ function DropdownMenu({
         }}
         className="p-1.5 sp-radius-sm transition-colors sp-hover-mist"
       >
-        <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
-        </svg>
+        <Icon name="ellipsis" size={16} className="sp-text-slate" />
       </button>
       {open && (
         <>
@@ -884,9 +883,7 @@ function UserDetailSheet({
         onClick={onBack}
         className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-        </svg>
+        <Icon name="chevron.left" size={16} />
         Users
       </button>
 
@@ -1629,9 +1626,7 @@ export function UsersTab({ users, setUsers, currentUserId, navigateToUserId, cle
             onClick={goBack}
             className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
+            <Icon name="chevron.left" size={16} />
             Users
           </button>
           <div className="text-center py-16">
@@ -1872,9 +1867,7 @@ export function UsersTab({ users, setUsers, currentUserId, navigateToUserId, cle
                       <span>Joined {formatDate(user.created_at)}</span>
                       <span>Login: {user.last_login ? formatDate(user.last_login) : 'Never'}</span>
                     </div>
-                    <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                    </svg>
+                    <Icon name="chevron.right" size={16} className="sp-text-slate" />
                   </div>
                 </div>
               </button>

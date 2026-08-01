@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
 import { useStandaloneMode } from '@/hooks/useStandaloneMode'
@@ -1254,9 +1255,7 @@ export function CommunityTab({
                     className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 active:scale-90 transition-all"
                     aria-label="Scroll to bottom"
                   >
-                    <svg className="w-5 h-5 text-neutral-600 dark:text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <Icon name="chevron.down" size={20} className="text-neutral-600 dark:text-neutral-300" />
                   </button>
                 </div>
               )}

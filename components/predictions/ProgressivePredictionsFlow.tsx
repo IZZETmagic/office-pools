@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -414,9 +415,7 @@ export default function ProgressivePredictionsFlow({
             >
               {ROUND_LABELS[key]}
               {sub?.has_submitted && !isSelected && (
-                <svg className="inline-block w-3 h-3 ml-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
+                <Icon name="checkmark" size={12} className="inline-block ml-1 -mt-0.5" />
               )}
             </button>
           )

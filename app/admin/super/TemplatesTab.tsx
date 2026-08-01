@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
@@ -479,9 +480,7 @@ export function TemplatesTab() {
               onClick={() => { setSelectedTemplate(null); setDryRunResult(null); setPreviewHtml(null); setPreviewSubject(null) }}
               className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900  transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
+              <Icon name="chevron.left" size={16} />
               Templates
             </button>
           </div>
@@ -628,9 +627,7 @@ export function TemplatesTab() {
                               onClick={() => toggleUser(id)}
                               className="text-primary-500 hover:text-primary-700 "
                             >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                              </svg>
+                              <Icon name="xmark" size={12} />
                             </button>
                           </span>
                         )
@@ -659,9 +656,7 @@ export function TemplatesTab() {
                               : 'sp-border-silver'
                           }`}>
                             {selectedUserIds.includes(u.user_id) && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                              </svg>
+                              <Icon name="checkmark" size={12} className="text-white" />
                             )}
                           </div>
                           <div className="min-w-0">
@@ -849,9 +844,7 @@ export function TemplatesTab() {
                                 onClick={() => toggleUser(id)}
                                 className="text-primary-500 hover:text-primary-700 "
                               >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                </svg>
+                                <Icon name="xmark" size={12} />
                               </button>
                             </span>
                           )
@@ -880,9 +873,7 @@ export function TemplatesTab() {
                                 : 'sp-border-silver'
                             }`}>
                               {selectedUserIds.includes(u.user_id) && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                </svg>
+                                <Icon name="checkmark" size={12} className="text-white" />
                               )}
                             </div>
                             <div className="min-w-0">
@@ -999,9 +990,7 @@ export function TemplatesTab() {
                   onClick={() => { setPreviewHtml(null); setPreviewSubject(null) }}
                   className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
+                  <Icon name="xmark" size={16} />
                 </button>
               </div>
               <iframe

@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useState, useEffect, useCallback } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
@@ -429,9 +430,7 @@ export function EmailHistoryTab() {
           onClick={goBack}
           className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900  transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
+          <Icon name="chevron.left" size={16} />
           {detailView.type === 'sent' ? 'Sent' : detailView.type === 'received' ? 'Received' : 'Broadcasts'}
         </button>
 
@@ -493,9 +492,7 @@ export function EmailHistoryTab() {
             <>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-primary-light">
-                  <svg className="w-5 h-5 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-                  </svg>
+                  <Icon name="envelope" size={20} className="sp-text-primary" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -504,9 +501,7 @@ export function EmailHistoryTab() {
                     </h2>
                     {email.attachments.length > 0 && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium sp-bg-mist text-neutral-600  shrink-0">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                        </svg>
+                        <Icon name="paperclip" size={12} />
                         {email.attachments.length}
                       </span>
                     )}
@@ -526,9 +521,7 @@ export function EmailHistoryTab() {
                     onClick={() => handleStartReply(email, emailDetail as ReceivedEmailDetail)}
                   >
                     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                      </svg>
+                      <Icon name="arrow.uturn.left" size={14} className="shrink-0" />
                       Reply
                     </span>
                   </Button>
@@ -540,9 +533,7 @@ export function EmailHistoryTab() {
                 <div className="bg-surface sp-radius-lg p-5 space-y-4" style={{ border: '0.5px solid var(--sp-primary, #2563EB)40', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)' }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                      </svg>
+                      <Icon name="arrow.uturn.left" size={16} className="sp-text-primary" />
                       <h4 className="font-medium text-sm sp-text-ink sp-heading">
                         Reply to {replyRecipientName ? `${replyRecipientName} (${replyTo.email})` : replyTo.email}
                       </h4>
@@ -551,9 +542,7 @@ export function EmailHistoryTab() {
                       onClick={handleCancelReply}
                       className="text-neutral-400 hover:text-neutral-600"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                      </svg>
+                      <Icon name="xmark" size={16} />
                     </button>
                   </div>
 
@@ -668,9 +657,7 @@ export function EmailHistoryTab() {
                                 >
                                   <td className="px-4 py-3 whitespace-nowrap">
                                     <div className="flex items-center gap-2.5">
-                                      <svg className="w-4 h-4 text-neutral-400 group-hover:text-primary-500 shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                                      </svg>
+                                      <Icon name="paperclip" size={16} className="text-neutral-400 group-hover:text-primary-500 shrink-0 transition-colors" />
                                       <span className="sp-text-ink group-hover:text-primary-600 transition-colors">
                                         {att.filename || 'Untitled attachment'}
                                       </span>
@@ -691,9 +678,7 @@ export function EmailHistoryTab() {
                                 <tr key={att.id} style={{ borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
                                   <td className="px-4 py-3 whitespace-nowrap">
                                     <div className="flex items-center gap-2.5">
-                                      <svg className="w-4 h-4 text-neutral-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                                      </svg>
+                                      <Icon name="paperclip" size={16} className="text-neutral-400 shrink-0" />
                                       <span className="sp-text-slate">
                                         {att.filename || 'Untitled attachment'}
                                       </span>
@@ -727,9 +712,7 @@ export function EmailHistoryTab() {
             <>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 sp-radius-sm flex items-center justify-center shrink-0 sp-bg-primary-light">
-                  <svg className="w-5 h-5 sp-text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 1 1 0-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38a.75.75 0 0 1-1.021-.274 18.634 18.634 0 0 1-2.414-7.22m3.57-7.36V4.52c0-.131.021-.26.06-.386a.75.75 0 0 1 1.147-.36l4.897 3.27a1.5 1.5 0 0 1 0 2.453l-4.897 3.27a.75.75 0 0 1-1.147-.36 1.714 1.714 0 0 1-.06-.386v-1.67" />
-                  </svg>
+                  <Icon name="link" size={20} className="sp-text-primary" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-extrabold sp-heading sp-text-ink">
@@ -923,9 +906,7 @@ export function EmailHistoryTab() {
                           <div className="text-sm font-medium sp-text-ink sp-body truncate">{email.to.join(', ')}</div>
                           <p className="text-xs sp-text-slate mt-1 line-clamp-1 sp-body">{email.subject}</p>
                           <div className="flex items-center justify-end mt-2">
-                            <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                            </svg>
+                            <Icon name="chevron.right" size={16} className="sp-text-slate" />
                           </div>
                         </div>
                       </button>
@@ -1005,9 +986,7 @@ export function EmailHistoryTab() {
                         <span className="text-xs font-medium sp-text-ink sp-body truncate">{email.from}</span>
                         {email.attachments.length > 0 && (
                           <span className="inline-flex items-center gap-0.5 shrink-0 sp-text-slate">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                            </svg>
+                            <Icon name="paperclip" size={14} />
                             <span className="text-[11px]">{email.attachments.length}</span>
                           </span>
                         )}
@@ -1019,9 +998,7 @@ export function EmailHistoryTab() {
                         <p className="text-sm sp-text-ink sp-body line-clamp-1">{email.subject}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-[11px] sp-text-slate sp-body">To: {email.to.join(', ')}</span>
-                          <svg className="w-4 h-4 sp-text-slate shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                          </svg>
+                          <Icon name="chevron.right" size={16} className="sp-text-slate shrink-0" />
                         </div>
                       </div>
                     </button>
@@ -1055,9 +1032,7 @@ export function EmailHistoryTab() {
                                 <span className="truncate">{email.subject}</span>
                                 {email.attachments.length > 0 && (
                                   <span className="inline-flex items-center gap-0.5 shrink-0 sp-text-slate">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-                                    </svg>
+                                    <Icon name="paperclip" size={14} />
                                     <span className="text-[11px]">{email.attachments.length}</span>
                                   </span>
                                 )}
@@ -1124,9 +1099,7 @@ export function EmailHistoryTab() {
                           )}
                         </div>
                         <div className="flex items-center justify-end mt-2">
-                          <svg className="w-4 h-4 sp-text-slate" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                          </svg>
+                          <Icon name="chevron.right" size={16} className="sp-text-slate" />
                         </div>
                       </div>
                     </button>
