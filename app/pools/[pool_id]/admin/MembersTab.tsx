@@ -489,47 +489,47 @@ export function MembersTab({
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">Pool Members</h2>
+        <h2 className="text-2xl font-bold text-ink">Pool Members</h2>
         <div className="flex flex-wrap items-center gap-1.5 mt-1">
-          <span className="text-sm text-neutral-500">Code:</span>
+          <span className="text-sm text-muted">Code:</span>
           <button
             onClick={copyPoolCode}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
             title="Copy pool code"
           >
             {pool.pool_code}
             {copied ? (
               <svg className="w-3.5 h-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
             ) : (
-              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+              <svg className="w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
             )}
           </button>
           <span className="text-neutral-300">|</span>
           <button
             onClick={copyInviteLink}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-800 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
             title="Copy invite link"
           >
             {linkCopied ? 'Copied!' : 'Copy Invite Link'}
             {linkCopied ? (
               <svg className="w-3.5 h-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
             ) : (
-              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.061a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
+              <svg className="w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.061a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
             )}
           </button>
           <button
             onClick={toggleQRCode}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-800 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
             title="Show QR code"
           >
             QR
-            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
+            <svg className="w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
           </button>
         </div>
         {showQR && qrDataUrl && (
-          <div className="mt-3 p-3 bg-white rounded-lg border border-neutral-200 inline-block">
+          <div className="mt-3 p-3 bg-white rounded-lg border border-border-default inline-block">
             <img src={qrDataUrl} alt={`QR code for joining ${pool.pool_name}`} width={200} height={200} />
-            <p className="text-xs text-neutral-400 text-center mt-1">Scan to join this pool</p>
+            <p className="text-xs text-muted text-center mt-1">Scan to join this pool</p>
           </div>
         )}
       </div>
@@ -558,7 +558,7 @@ export function MembersTab({
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-700 bg-surface"
+          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-ink bg-surface"
         >
           <option value="rank">Sort by Rank</option>
           <option value="points">Sort by Points</option>
@@ -574,18 +574,18 @@ export function MembersTab({
           return (
             <div
               key={member.member_id}
-              className={`rounded-xl border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-neutral-200'}`}
+              className={`rounded-xl border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-border-default'}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-neutral-500">#{getBestEntry(member)?.current_rank || '-'}</span>
-                    <span className="text-sm font-medium text-neutral-900 truncate">
+                    <span className="text-sm font-bold text-muted">#{getBestEntry(member)?.current_rank || '-'}</span>
+                    <span className="text-sm font-medium text-ink truncate">
                       {member.users.username}
                       {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-500 mt-0.5">{member.users.full_name}</p>
+                  <p className="text-xs text-muted mt-0.5">{member.users.full_name}</p>
                 </div>
                 <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}</span>
               </div>
@@ -602,7 +602,7 @@ export function MembersTab({
                         className={`text-xs px-2 py-0.5 rounded-full ${
                           submitted
                             ? 'bg-success-50 text-success-700'
-                            : 'bg-neutral-100 text-neutral-500'
+                            : 'bg-neutral-100 text-muted'
                         }`}
                       >
                         {entry.entry_name}
@@ -651,7 +651,7 @@ export function MembersTab({
                         break
                     }
                   }}
-                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
+                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-ink cursor-pointer"
                 >
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
@@ -669,55 +669,55 @@ export function MembersTab({
       </div>
 
       {/* Members - Desktop table view */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow overflow-hidden">
+      <Card className="hidden sm:block">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-default">
+                <th className="text-left py-3 px-4 font-semibold text-ink">
                   Rank
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-left py-3 px-4 font-semibold text-ink">
                   Member
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-right py-3 px-4 font-semibold text-ink">
                   Points
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-center py-3 px-4 font-semibold text-ink">
                   Predictions
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-center py-3 px-4 font-semibold text-ink">
                   Role
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-left py-3 px-4 font-semibold text-ink">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase">
+                <th className="text-right py-3 px-4 font-semibold text-ink">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200">
+            <tbody>
               {filteredMembers.map((member) => {
                 const isCurrentUser = member.user_id === currentUserId
 
                 return (
                   <tr
                     key={member.member_id}
-                    className={isCurrentUser ? 'bg-primary-50' : 'hover:bg-neutral-50'}
+                    className={`border-b border-border-default last:border-b-0 ${isCurrentUser ? 'bg-primary-600/12' : 'hover:bg-snow'}`}
                   >
                     <td className="px-4 py-3">
-                      <span className="text-sm font-bold text-neutral-900">
+                      <span className="text-sm font-bold text-ink">
                         #{getBestEntry(member)?.current_rank || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-neutral-900">
+                        <p className="text-sm font-medium text-ink">
                           {member.users.username}
                           {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
                         </p>
-                        <p className="text-xs text-neutral-600">
+                        <p className="text-xs text-muted">
                           {member.users.full_name}
                         </p>
                       </div>
@@ -731,7 +731,7 @@ export function MembersTab({
                       <div className="flex flex-col items-center gap-1">
                         {roundsLoaded && <StatusBadge status={memberStatus(member)} />}
                         {(member.entries || []).length > 1 && (
-                          <span className="text-xs text-neutral-500">{(member.entries || []).length} entries</span>
+                          <span className="text-xs text-muted">{(member.entries || []).length} entries</span>
                         )}
                       </div>
                     </td>
@@ -742,7 +742,7 @@ export function MembersTab({
                         {member.role === 'admin' ? 'Admin' : 'Player'}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600">
+                    <td className="px-4 py-3 text-sm text-muted">
                       {new Date(member.joined_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -786,7 +786,7 @@ export function MembersTab({
                                 break
                             }
                           }}
-                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-neutral-700 cursor-pointer"
+                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-ink cursor-pointer"
                         >
                           <option value="" disabled>
                             Actions
@@ -817,7 +817,7 @@ export function MembersTab({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       {/* View Predictions Modal */}
       {modal.type === 'view_predictions' && (
@@ -868,15 +868,15 @@ export function MembersTab({
       {modal.type === 'promote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
+            <h3 className="text-lg font-bold text-ink mb-3">
               Promote to Admin
             </h3>
-            <p className="text-sm text-neutral-600 mb-2">
+            <p className="text-sm text-muted mb-2">
               Are you sure you want to make{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               an admin?
             </p>
-            <p className="text-sm text-neutral-600 mb-4">
+            <p className="text-sm text-muted mb-4">
               Admins can edit pool settings, manage scoring rules, and manage
               members.
             </p>
@@ -905,10 +905,10 @@ export function MembersTab({
       {modal.type === 'demote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
           <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
+            <h3 className="text-lg font-bold text-ink mb-3">
               Demote to Player
             </h3>
-            <p className="text-sm text-neutral-600 mb-4">
+            <p className="text-sm text-muted mb-4">
               Are you sure you want to demote{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               to a regular player?
@@ -969,7 +969,7 @@ export function MembersTab({
             <h3 className="text-lg font-bold text-danger-600 mb-3">
               Remove Member
             </h3>
-            <p className="text-sm text-neutral-600 mb-2">
+            <p className="text-sm text-muted mb-2">
               Are you sure you want to remove{' '}
               <span className="font-bold">{modal.member.users.username}</span>{' '}
               from this pool?
@@ -980,7 +980,7 @@ export function MembersTab({
                 undone.
               </p>
             </Alert>
-            <label className="flex items-center gap-2 text-sm text-neutral-700 mb-4 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ink mb-4 cursor-pointer">
               <input
                 type="checkbox"
                 checked={removeConfirmed}
@@ -1220,11 +1220,11 @@ function ViewPredictionsModal({
       <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
-          <h3 className="text-xl font-bold text-neutral-900">
+          <h3 className="text-xl font-bold text-ink">
             {member.users.full_name || member.users.username}&apos;s Predictions
           </h3>
           {selectedEntry && (
-            <p className="text-sm text-neutral-600 mt-1">
+            <p className="text-sm text-muted mt-1">
               {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
               {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
             </p>
@@ -1239,7 +1239,7 @@ function ViewPredictionsModal({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
                   }`}
                 >
                   {entry.entry_name}
@@ -1252,7 +1252,7 @@ function ViewPredictionsModal({
         {/* Scrollable content */}
         <div className="overflow-y-auto flex-1 p-4 sm:px-6">
           {memberPreds.length === 0 ? (
-            <p className="text-neutral-600 text-sm py-4">
+            <p className="text-muted text-sm py-4">
               No predictions submitted.
             </p>
           ) : (
@@ -1270,7 +1270,7 @@ function ViewPredictionsModal({
 
                 return (
                   <div key={stage} className="mb-5">
-                    <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
                       {stageNames[stage] || stage}
                     </h4>
                     <div className="space-y-1">
@@ -1288,26 +1288,26 @@ function ViewPredictionsModal({
                         return (
                           <div
                             key={pred.prediction_id}
-                            className="bg-neutral-50 rounded-xl px-3 py-2"
+                            className="bg-snow rounded-xl px-3 py-2"
                           >
                             <div className="flex items-center gap-2">
                               {/* Match number */}
-                              <span className="text-xs font-mono text-neutral-400 shrink-0 w-7 text-right">
+                              <span className="text-xs font-mono text-muted shrink-0 w-7 text-right">
                                 #{match.match_number}
                               </span>
 
                               {/* Home team */}
-                              <span className="flex-1 text-right text-sm font-medium text-neutral-800 truncate">
+                              <span className="flex-1 text-right text-sm font-medium text-ink truncate">
                                 {homeName}
                               </span>
 
                               {/* Score */}
-                              <span className="font-mono font-bold text-neutral-900 text-sm shrink-0 px-1">
+                              <span className="font-mono font-bold text-ink text-sm shrink-0 px-1">
                                 {pred.predicted_home_score} - {pred.predicted_away_score}
                               </span>
 
                               {/* Away team */}
-                              <span className="flex-1 text-left text-sm font-medium text-neutral-800 truncate">
+                              <span className="flex-1 text-left text-sm font-medium text-ink truncate">
                                 {awayName}
                               </span>
                             </div>
@@ -1335,7 +1335,7 @@ function ViewPredictionsModal({
                   <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-0.5">
                     Predicted Champion
                   </p>
-                  <h4 className="text-xl font-bold text-neutral-900">
+                  <h4 className="text-xl font-bold text-ink">
                     {champion.country_name}
                   </h4>
                 </div>
@@ -1483,11 +1483,11 @@ function ViewBracketPickerPredictionsModal({
       <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
-          <h3 className="text-xl font-bold text-neutral-900">
+          <h3 className="text-xl font-bold text-ink">
             {member.users.full_name || member.users.username}&apos;s Bracket Picks
           </h3>
           {selectedEntry && (
-            <p className="text-sm text-neutral-600 mt-1">
+            <p className="text-sm text-muted mt-1">
               {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
               {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
             </p>
@@ -1501,7 +1501,7 @@ function ViewBracketPickerPredictionsModal({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
                   }`}
                 >
                   {entry.entry_name}
@@ -1515,10 +1515,10 @@ function ViewBracketPickerPredictionsModal({
         <div className="overflow-y-auto flex-1 p-4 sm:px-6">
           {loadingBp ? (
             <div className="text-center py-8">
-              <div className="text-neutral-400 text-sm">Loading bracket picks...</div>
+              <div className="text-muted text-sm">Loading bracket picks...</div>
             </div>
           ) : !bpData || bpData.groupRankings.length === 0 ? (
-            <p className="text-neutral-600 text-sm py-4">No bracket picks submitted.</p>
+            <p className="text-muted text-sm py-4">No bracket picks submitted.</p>
           ) : (
             <>
               {/* Champion highlight */}
@@ -1530,19 +1530,19 @@ function ViewBracketPickerPredictionsModal({
                     {bracket.champion.flag_url && (
                       <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-md object-cover" />
                     )}
-                    <span className="text-lg font-bold text-neutral-900">{bracket.champion.country_name}</span>
+                    <span className="text-lg font-bold text-ink">{bracket.champion.country_name}</span>
                   </div>
                   {(bracket.runnerUp || bracket.thirdPlace) && (
-                    <div className="flex justify-center gap-6 mt-2 text-xs text-neutral-600">
+                    <div className="flex justify-center gap-6 mt-2 text-xs text-muted">
                       {bracket.runnerUp && (
                         <span>
-                          <span className="text-neutral-400">2nd:</span>{' '}
+                          <span className="text-muted">2nd:</span>{' '}
                           <span className="font-semibold">{bracket.runnerUp.country_name}</span>
                         </span>
                       )}
                       {bracket.thirdPlace && (
                         <span>
-                          <span className="text-neutral-400">3rd:</span>{' '}
+                          <span className="text-muted">3rd:</span>{' '}
                           <span className="font-semibold">{bracket.thirdPlace.country_name}</span>
                         </span>
                       )}
@@ -1553,7 +1553,7 @@ function ViewBracketPickerPredictionsModal({
 
               {/* Group Rankings */}
               <div className="mb-5">
-                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Group Rankings</h4>
+                <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Group Rankings</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {GROUP_LETTERS.map((letter) => {
                     const groupRanks = bpData.groupRankings
@@ -1561,20 +1561,20 @@ function ViewBracketPickerPredictionsModal({
                       .sort((a, b) => a.predicted_position - b.predicted_position)
                     if (groupRanks.length === 0) return null
                     return (
-                      <div key={letter} className="bg-neutral-50 rounded-xl p-2.5">
-                        <div className="text-xs font-bold text-neutral-700 mb-1.5">Group {letter}</div>
+                      <div key={letter} className="bg-snow rounded-xl p-2.5">
+                        <div className="text-xs font-bold text-ink mb-1.5">Group {letter}</div>
                         <div className="space-y-1">
                           {groupRanks.map((rank, i) => {
                             const team = teamMap.get(rank.team_id)
                             return (
                               <div key={rank.team_id} className="flex items-center gap-1.5">
                                 <span className={`text-[10px] font-bold w-4 text-center ${
-                                  i === 0 ? 'text-success-600' : i === 1 ? 'text-primary-600' : 'text-neutral-400'
+                                  i === 0 ? 'text-success-600' : i === 1 ? 'text-primary-600' : 'text-muted'
                                 }`}>{i + 1}</span>
                                 {team?.flag_url && (
                                   <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
                                 )}
-                                <span className="text-xs text-neutral-800 truncate">{team?.country_name || 'Unknown'}</span>
+                                <span className="text-xs text-ink truncate">{team?.country_name || 'Unknown'}</span>
                               </div>
                             )
                           })}
@@ -1587,8 +1587,8 @@ function ViewBracketPickerPredictionsModal({
 
               {/* Third-Place Rankings */}
               <div className="mb-5">
-                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Third-Place Rankings</h4>
-                <div className="bg-neutral-50 rounded-xl p-3">
+                <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Third-Place Rankings</h4>
+                <div className="bg-snow rounded-xl p-3">
                   <div className="space-y-1">
                     {[...bpData.thirdPlaceRankings]
                       .sort((a, b) => a.rank - b.rank)
@@ -1597,18 +1597,18 @@ function ViewBracketPickerPredictionsModal({
                         const qualifies = i < 8
                         return (
                           <div key={ranking.team_id} className={`flex items-center gap-2 py-0.5 ${!qualifies ? 'opacity-40' : ''}`}>
-                            <span className={`text-[10px] font-bold w-5 text-center ${qualifies ? 'text-success-600' : 'text-neutral-400'}`}>
+                            <span className={`text-[10px] font-bold w-5 text-center ${qualifies ? 'text-success-600' : 'text-muted'}`}>
                               {i + 1}
                             </span>
                             {team?.flag_url && (
                               <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
                             )}
-                            <span className="text-xs text-neutral-800 flex-1 truncate">{team?.country_name || 'Unknown'}</span>
-                            <span className="text-xs text-neutral-400">Grp {ranking.group_letter}</span>
+                            <span className="text-xs text-ink flex-1 truncate">{team?.country_name || 'Unknown'}</span>
+                            <span className="text-xs text-muted">Grp {ranking.group_letter}</span>
                             {qualifies ? (
                               <span className="text-[10px] font-medium text-success-600 bg-success-50 px-1.5 py-0.5 rounded">Q</span>
                             ) : (
-                              <span className="text-[10px] font-medium text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">E</span>
+                              <span className="text-[10px] font-medium text-muted bg-neutral-100 px-1.5 py-0.5 rounded">E</span>
                             )}
                           </div>
                         )
@@ -1619,7 +1619,7 @@ function ViewBracketPickerPredictionsModal({
 
               {/* Knockout Bracket */}
               <div className="mb-3">
-                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Knockout Bracket</h4>
+                <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Knockout Bracket</h4>
                 {knockoutStageOrder.map((stage) => {
                   const stageMatches = matches
                     .filter(m => m.stage === stage)
@@ -1635,23 +1635,23 @@ function ViewBracketPickerPredictionsModal({
 
                   return (
                     <div key={stage} className="mb-3">
-                      <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wide mb-1">
+                      <div className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">
                         {stageNames[stage]}
                       </div>
                       <div className="space-y-1">
                         {stagePicks.map(({ match, pick, winnerTeam, resolved }) => (
-                          <div key={match.match_id} className="bg-neutral-50 rounded-xl px-3 py-2">
+                          <div key={match.match_id} className="bg-snow rounded-xl px-3 py-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-neutral-400 shrink-0 w-7 text-right">
+                              <span className="text-xs font-mono text-muted shrink-0 w-7 text-right">
                                 #{match.match_number}
                               </span>
                               <div className="flex-1 min-w-0">
                                 {resolved ? (
-                                  <span className="text-xs text-neutral-500">
+                                  <span className="text-xs text-muted">
                                     {resolved.home?.country_name || 'TBD'} vs {resolved.away?.country_name || 'TBD'}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-neutral-400">TBD vs TBD</span>
+                                  <span className="text-xs text-muted">TBD vs TBD</span>
                                 )}
                               </div>
                               {winnerTeam ? (
@@ -1665,7 +1665,7 @@ function ViewBracketPickerPredictionsModal({
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-xs text-neutral-400">No pick</span>
+                                <span className="text-xs text-muted">No pick</span>
                               )}
                             </div>
                           </div>
@@ -1730,10 +1730,10 @@ function UnlockPredictionsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
       <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-        <h3 className="text-lg font-bold text-neutral-900 mb-3">
+        <h3 className="text-lg font-bold text-ink mb-3">
           Unlock Predictions
         </h3>
-        <p className="text-sm text-neutral-600 mb-2">
+        <p className="text-sm text-muted mb-2">
           Unlock predictions for{' '}
           <span className="font-bold">{member.users.username}</span>?
         </p>
@@ -1741,11 +1741,11 @@ function UnlockPredictionsModal({
         {/* Entry selector when multiple submitted entries */}
         {hasMultipleSubmitted && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Select entry to unlock
             </label>
             <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-xl hover:bg-neutral-50">
+              <label className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-xl hover:bg-snow">
                 <input
                   type="radio"
                   name="unlock_entry"
@@ -1754,12 +1754,12 @@ function UnlockPredictionsModal({
                   className="text-primary-600"
                 />
                 <span className="font-medium">All entries</span>
-                <span className="text-xs text-neutral-500">({submittedEntries.length} submitted)</span>
+                <span className="text-xs text-muted">({submittedEntries.length} submitted)</span>
               </label>
               {submittedEntries.map((entry) => (
                 <label
                   key={entry.entry_id}
-                  className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer p-2 rounded-xl hover:bg-neutral-50"
+                  className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-xl hover:bg-snow"
                 >
                   <input
                     type="radio"
@@ -1769,7 +1769,7 @@ function UnlockPredictionsModal({
                     className="text-primary-600"
                   />
                   <span className="font-medium">{entry.entry_name}</span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-muted">
                     {entry.predictions_submitted_at
                       ? `submitted ${new Date(entry.predictions_submitted_at).toLocaleString()}`
                       : ''}
@@ -1786,7 +1786,7 @@ function UnlockPredictionsModal({
 
         {/* Show submitted entries info (only when single entry or no selector) */}
         {!hasMultipleSubmitted && submittedEntries.length > 0 && (
-          <div className="text-xs text-neutral-500 mb-4 space-y-0.5">
+          <div className="text-xs text-muted mb-4 space-y-0.5">
             {submittedEntries.map(e => (
               <p key={e.entry_id}>
                 {e.entry_name} submitted: {e.predictions_submitted_at ? new Date(e.predictions_submitted_at).toLocaleString() : 'N/A'}
@@ -1859,7 +1859,7 @@ function AdjustPointsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
       <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-        <h3 className="text-xl font-bold text-neutral-900 mb-4">
+        <h3 className="text-xl font-bold text-ink mb-4">
           Adjust Points - {member.users.username}
         </h3>
 
@@ -1868,7 +1868,7 @@ function AdjustPointsModal({
         {/* Entry selector when multiple entries */}
         {hasMultipleEntries && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Select entry
             </label>
             <div className="flex gap-1.5 overflow-x-auto">
@@ -1879,7 +1879,7 @@ function AdjustPointsModal({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
                   }`}
                 >
                   {entry.entry_name} ({getEntryTotalPoints(entry)} pts)
@@ -1890,7 +1890,7 @@ function AdjustPointsModal({
         )}
 
         <div className="mb-4">
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-muted">
             {selectedEntry.entry_name} current points:{' '}
             <span className="font-bold">
               {getEntryTotalPoints(selectedEntry)}
@@ -1899,13 +1899,13 @@ function AdjustPointsModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-neutral-700 mb-1">
+          <label className="block text-sm font-medium text-ink mb-1">
             Adjustment
           </label>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPointAdjustment((p: number) => p - 1)}
-              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
+              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-ink hover:bg-neutral-100"
             >
               -
             </button>
@@ -1915,11 +1915,11 @@ function AdjustPointsModal({
               onChange={(e) =>
                 setPointAdjustment(parseInt(e.target.value) || 0)
               }
-              className="w-24 h-10 text-center border border-neutral-300 rounded-xl font-bold text-lg text-neutral-900"
+              className="w-24 h-10 text-center border border-neutral-300 rounded-xl font-bold text-lg text-ink"
             />
             <button
               onClick={() => setPointAdjustment((p: number) => p + 1)}
-              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-neutral-700 hover:bg-neutral-100"
+              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-ink hover:bg-neutral-100"
             >
               +
             </button>
@@ -1927,7 +1927,7 @@ function AdjustPointsModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-neutral-700 mb-1">
+          <label className="block text-sm font-medium text-ink mb-1">
             Reason (required)
           </label>
           <textarea
@@ -1935,11 +1935,11 @@ function AdjustPointsModal({
             onChange={(e) => setAdjustReason(e.target.value)}
             placeholder="Explain the reason for this adjustment..."
             rows={3}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-sm text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-sm text-ink focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
 
-        <p className="text-sm text-neutral-600 mb-4">
+        <p className="text-sm text-muted mb-4">
           New total:{' '}
           <span className="font-bold text-primary-600">
             {getEntryTotalPoints(selectedEntry) + pointAdjustment}
@@ -2003,13 +2003,13 @@ function DeleteEntryModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
       <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-lg font-bold text-danger-600 mb-1">Delete Entry</h3>
-        <p className="text-sm text-neutral-600 mb-3">
+        <p className="text-sm text-muted mb-3">
           Pick an entry to delete from{' '}
           <span className="font-bold">{member.users.username}</span>.
         </p>
         {!targetIsAdmin && (
-          <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 mb-3">
-            <p className="text-xs text-neutral-600">
+          <div className="bg-snow border border-border-default rounded-xl p-3 mb-3">
+            <p className="text-xs text-muted">
               Players need at least one entry. To take {member.users.username}{' '}
               out of the pool entirely, use Remove from Pool.
             </p>
@@ -2019,7 +2019,7 @@ function DeleteEntryModal({
 
         <div className="space-y-2 mb-4">
           {entries.length === 0 && (
-            <p className="text-sm text-neutral-500">No entries to delete.</p>
+            <p className="text-sm text-muted">No entries to delete.</p>
           )}
           {entries.map((entry) => {
             const isLast = entries.length === 1
@@ -2028,20 +2028,20 @@ function DeleteEntryModal({
             return (
               <div
                 key={entry.entry_id}
-                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-neutral-200"
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border-default"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-900 truncate">
+                  <p className="text-sm font-semibold text-ink truncate">
                     {entry.entry_name}
                   </p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted">
                     {getEntryTotalPoints(entry)} pts ·{' '}
                     {entry.has_submitted_predictions ? 'Submitted' : 'Pending'}
                   </p>
                 </div>
                 {blocked ? (
                   <span
-                    className="text-xs text-neutral-500"
+                    className="text-xs text-muted"
                     title="Players must keep at least one entry"
                   >
                     Last entry
@@ -2051,7 +2051,7 @@ function DeleteEntryModal({
                     <button
                       onClick={() => setConfirmingEntryId(null)}
                       disabled={loading}
-                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition disabled:opacity-50"
+                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-neutral-100 text-ink hover:bg-neutral-200 transition disabled:opacity-50"
                     >
                       Cancel
                     </button>

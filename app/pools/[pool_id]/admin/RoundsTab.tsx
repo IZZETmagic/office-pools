@@ -139,8 +139,8 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-neutral-900">Round Management</h2>
-        <p className="text-sm text-neutral-500 mt-1">
+        <h2 className="text-lg font-bold text-ink">Round Management</h2>
+        <p className="text-sm text-muted mt-1">
           Control when each prediction round opens and closes. Notifications are sent when rounds open.
         </p>
       </div>
@@ -154,14 +154,14 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
           return (
             <Card key={round.round_key}>
               <div className="flex items-center justify-between mb-3">
-                <span className="font-medium text-neutral-900 dark:text-white">{roundName}</span>
+                <span className="font-medium text-ink dark:text-white">{roundName}</span>
                 {getStateBadge(round.state)}
               </div>
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted">Deadline</span>
-                  <span className={isPastDeadline && round.state === 'open' ? 'text-red-600 font-medium' : 'text-neutral-700 dark:text-neutral-500'}>
+                  <span className={isPastDeadline && round.state === 'open' ? 'text-danger-700 font-medium' : 'text-ink dark:text-muted'}>
                     {formatDeadline(round.deadline)}
                   </span>
                 </div>
@@ -180,7 +180,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                           }}
                         />
                       </div>
-                      <span className="text-neutral-700 dark:text-neutral-500">
+                      <span className="text-ink dark:text-muted">
                         {round.completed_match_count} / {round.match_count}
                       </span>
                     </div>
@@ -190,7 +190,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                 {round.admin_stats && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Submissions</span>
-                    <span className="text-neutral-700 dark:text-neutral-500">
+                    <span className="text-ink dark:text-muted">
                       {round.admin_stats.submitted_entries} / {round.admin_stats.total_entries}
                     </span>
                   </div>
@@ -250,7 +250,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
               {round.state === 'completed' && (
                 <div className="mt-3 pt-3 border-t border-border-default">
-                  <span className="text-xs text-neutral-400">Done</span>
+                  <span className="text-xs text-muted">Done</span>
                 </div>
               )}
             </Card>
@@ -264,12 +264,12 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border-default">
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">Round</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">State</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">Deadline</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">Matches</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">Submissions</th>
-                <th className="text-right py-3 px-4 font-semibold text-neutral-700">Actions</th>
+                <th className="text-left py-3 px-4 font-semibold text-ink">Round</th>
+                <th className="text-left py-3 px-4 font-semibold text-ink">State</th>
+                <th className="text-left py-3 px-4 font-semibold text-ink">Deadline</th>
+                <th className="text-left py-3 px-4 font-semibold text-ink">Matches</th>
+                <th className="text-left py-3 px-4 font-semibold text-ink">Submissions</th>
+                <th className="text-right py-3 px-4 font-semibold text-ink">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -279,19 +279,19 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
                 return (
                   <tr key={round.round_key} className="border-b border-border-default last:border-b-0">
-                    <td className="py-3 px-4 font-medium text-neutral-900">{roundName}</td>
+                    <td className="py-3 px-4 font-medium text-ink">{roundName}</td>
                     <td className="py-3 px-4">{getStateBadge(round.state)}</td>
                     <td className="py-3 px-4">
-                      <span className={isPastDeadline && round.state === 'open' ? 'text-red-600 font-medium' : 'text-neutral-600'}>
+                      <span className={isPastDeadline && round.state === 'open' ? 'text-danger-700 font-medium' : 'text-muted'}>
                         {formatDeadline(round.deadline)}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       {round.state === 'locked' ? (
-                        <span className="text-neutral-400">—</span>
+                        <span className="text-muted">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-neutral-700">
+                          <span className="text-ink">
                             {round.completed_match_count} / {round.match_count}
                           </span>
                           <div className="w-16 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
@@ -309,11 +309,11 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                     </td>
                     <td className="py-3 px-4">
                       {round.admin_stats ? (
-                        <span className="text-neutral-700">
+                        <span className="text-ink">
                           {round.admin_stats.submitted_entries} / {round.admin_stats.total_entries}
                         </span>
                       ) : (
-                        <span className="text-neutral-400">—</span>
+                        <span className="text-muted">—</span>
                       )}
                     </td>
                     <td className="py-3 px-4">
@@ -366,7 +366,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                         )}
 
                         {round.state === 'completed' && (
-                          <span className="text-xs text-neutral-400">Done</span>
+                          <span className="text-xs text-muted">Done</span>
                         )}
                       </div>
                     </td>
@@ -391,10 +391,10 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={() => setModal(null)} />
           <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-sm w-full p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-1">
+            <h3 className="text-lg font-bold text-ink mb-1">
               {modal.type === 'open' ? 'Open Round' : 'Extend Deadline'}
             </h3>
-            <p className="text-sm text-neutral-500 mb-4">
+            <p className="text-sm text-muted mb-4">
               {modal.type === 'open'
                 ? `Set a deadline for ${modal.roundName}. Members will be notified.`
                 : `Set a new deadline for ${modal.roundName}.`}
@@ -402,7 +402,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
             <div className="space-y-3 mb-5">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Date</label>
+                <label className="block text-sm font-medium text-ink mb-1">Date</label>
                 <input
                   type="date"
                   value={deadlineDate}
@@ -411,7 +411,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Time</label>
+                <label className="block text-sm font-medium text-ink mb-1">Time</label>
                 <input
                   type="time"
                   value={deadlineTime}
