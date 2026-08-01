@@ -1362,15 +1362,7 @@ export function MatchesTab({
                   onClick={() => setShowConductFields(!showConductFields)}
                   className="flex items-center gap-2 text-sm font-medium text-neutral-700 hover:text-neutral-900 transition"
                 >
-                  <svg
-                    className={`w-4 h-4 transition-transform ${showConductFields ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                  </svg>
+                  <Icon name="chevron.down" size={16} className={`transition-transform ${showConductFields ? 'rotate-180' : ''}`} />
                   Fair Play Cards (Optional)
                 </button>
 

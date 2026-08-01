@@ -456,9 +456,7 @@ export default function ProgressivePredictionsFlow({
       {currentRoundState?.state === 'locked' ? (
         <div className="text-center py-12">
           <div className="text-4xl mb-3">
-            <svg className="w-12 h-12 mx-auto text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
+            <Icon name="lock.fill" size={48} className="mx-auto text-neutral-300" />
           </div>
           <p className="text-neutral-500 text-sm">
             {roundName} predictions are not yet available.

@@ -423,9 +423,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         label: 'Full Tournament',
                         desc: 'Members predict all matches upfront before the tournament starts. They must predict which teams qualify for the knockout rounds based on their group stage predictions.',
                         icon: (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                          </svg>
+                          <Icon name="list.bullet" size={20} />
                         ),
                       },
                       {
@@ -433,9 +431,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         label: 'Progressive',
                         desc: 'Members predict round-by-round as teams advance. After each round completes, the next round opens with actual qualified teams and matchups.',
                         icon: (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.69z" />
-                          </svg>
+                          <Icon name="paperplane.fill" size={20} />
                         ),
                       },
                       {

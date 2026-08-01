@@ -161,9 +161,7 @@ function RoadTracker({
                       />
                     )}
                     {done ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
+                      <Icon name="checkmark" />
                     ) : (
                       <span className="relative rounded-full" style={{ width: 8, height: 8, backgroundColor: current ? accentColor : '#d4d4d4' }} />
                     )}

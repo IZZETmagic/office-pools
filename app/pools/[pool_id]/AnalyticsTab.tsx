@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
@@ -469,9 +470,7 @@ export function AnalyticsTab({
     return (
       <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default p-8 text-center">
         <div className="text-4xl mb-3">
-          <svg className="w-12 h-12 mx-auto text-neutral-300 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-          </svg>
+          <Icon name="chart.bar" size={48} className="mx-auto text-neutral-300 dark:text-muted" />
         </div>
         <h3 className="text-lg font-semibold text-ink mb-1">
           Analytics Coming Soon
