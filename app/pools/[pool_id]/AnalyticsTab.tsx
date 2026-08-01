@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
 import type { MatchConductData, GroupStanding, Team, PredictionMap } from '@/lib/tournament'
@@ -504,22 +505,22 @@ export function AnalyticsTab({
 
       {/* Entry not submitted warning */}
       {!isEntrySubmitted && !isBracketPicker && (
-        <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-control p-4">
-          <p className="text-sm text-warning-800 dark:text-warning-300">
+        <Alert variant="warning" className="mb-0">
+          <p>
             Submit your predictions to see your XP progression, accuracy breakdown, streaks, and crowd comparison.
             Pool-wide stats are shown below.
           </p>
-        </div>
+        </Alert>
       )}
 
       {/* Bracket picker: not submitted warning */}
       {isBracketPicker && !isEntrySubmitted && (
-        <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-control p-4">
-          <p className="text-sm text-warning-800 dark:text-warning-300">
+        <Alert variant="warning" className="mb-0">
+          <p>
             Submit your bracket to see your XP progression, group accuracy, knockout picks, and badge progress.
             Pool-wide stats are shown below.
           </p>
-        </div>
+        </Alert>
       )}
 
       {/* Section 0: XP Progress — Full Tournament & Progressive */}

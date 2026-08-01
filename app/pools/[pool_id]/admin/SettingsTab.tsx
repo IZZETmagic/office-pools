@@ -681,18 +681,18 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
               Are you sure you want to archive this pool?
             </p>
 
-            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
-              <p className="text-sm font-bold text-warning-800 mb-2">
+            <Alert variant="warning">
+              <p className="font-bold mb-2">
                 {pool.pool_name}
               </p>
-              <ul className="text-sm text-warning-800 space-y-1">
+              <ul className="space-y-1">
                 <li>&#8226; Nothing is deleted — every prediction and result is kept</li>
                 <li>&#8226; It moves to Archived in everyone&apos;s profile, read-only</li>
                 <li>&#8226; It stops counting toward trophies and stats until restored</li>
                 <li>&#8226; All {members.length} members will be told that you archived it</li>
                 <li>&#8226; You can restore it at any time</li>
               </ul>
-            </div>
+            </Alert>
 
             <div className="flex gap-3 justify-end">
               <Button

@@ -178,7 +178,7 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: 
               onClick={() => setMenuOpen(false)}
               className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition ${
                 isActive(link.href)
-                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-400'
+                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-800'
                   : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-500 dark:hover:text-neutral-100 dark:hover:bg-neutral-700'
               }`}
             >

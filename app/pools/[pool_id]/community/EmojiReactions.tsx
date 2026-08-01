@@ -32,7 +32,7 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
           onClick={() => onToggleReaction(r.emoji)}
           className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
             r.reacted_by_me
-              ? 'bg-primary-50 dark:bg-primary-900/15 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400'
+              ? 'bg-primary-50 dark:bg-primary-900/15 border-primary-300 dark:border-primary-700 text-primary-800'
               : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-border-default text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
           }`}
         >

@@ -1036,7 +1036,7 @@ export function TemplatesTab() {
               </Button>
             ) : (
               <div className="flex items-center gap-3">
-                <span className="text-xs text-warning-600 dark:text-warning-400 font-medium">
+                <span className="text-xs text-warning-800 font-medium">
                   Send {dryRunResult?.totalEmails ?? 0} transactional email{(dryRunResult?.totalEmails ?? 0) !== 1 ? 's' : ''}?
                 </span>
                 <Button

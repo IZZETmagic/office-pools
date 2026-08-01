@@ -208,7 +208,7 @@ function OnlineMembersSection({
         <>
           <div className="flex items-center gap-1.5 mb-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
-            <span className="text-[10px] font-medium text-success-600 dark:text-success-400">Online — {onlineMembers.length}</span>
+            <span className="text-[10px] font-medium text-success-900">Online — {onlineMembers.length}</span>
           </div>
           <div className="space-y-1 mb-3">
             {onlineMembers.map(m => (
@@ -353,7 +353,7 @@ function MatchdayPulseSection({
                 <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
                   {homeName} vs {awayName}
                 </span>
-                <span className="text-[10px] font-medium text-primary-600 dark:text-primary-400">
+                <span className="text-[10px] font-medium text-primary-800">
                   <LocalTime iso={match.match_date} format={matchDayLabel} />
                 </span>
               </div>
@@ -419,7 +419,7 @@ function LeaderboardSnapshotSection({
                   )}
                 </span>
                 <span className={`text-[11px] flex-1 truncate ${
-                  isCurrentUser ? 'font-semibold text-primary-700 dark:text-primary-400' : 'font-medium text-neutral-900 dark:text-neutral-100'
+                  isCurrentUser ? 'font-semibold text-primary-800' : 'font-medium text-neutral-900 dark:text-neutral-100'
                 }`}>
                   {entry.full_name}
                 </span>
@@ -428,7 +428,7 @@ function LeaderboardSnapshotSection({
                 </span>
                 {entry.delta !== 0 && (
                   <span className={`text-[9px] font-medium ${
-                    entry.delta > 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'
+                    entry.delta > 0 ? 'text-success-900' : 'text-danger-800'
                   }`}>
                     {entry.delta > 0 ? '▲' : '▼'}{Math.abs(entry.delta)}
                   </span>

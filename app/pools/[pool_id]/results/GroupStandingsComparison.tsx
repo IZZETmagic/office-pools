@@ -110,11 +110,11 @@ type ComputedGroupBonus = {
 }
 
 const GROUP_BONUS_CONFIG: Record<string, { bg: string; label: string }> = {
-  group_winner_and_runnerup: { bg: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400', label: 'WINNER & RU' },
-  both_qualify_swapped: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'SWAPPED' },
-  group_winner_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'WINNER' },
-  group_runnerup_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: 'RUNNER-UP' },
-  one_qualifies_wrong_position: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400', label: '1 QUALIFIER' },
+  group_winner_and_runnerup: { bg: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-900', label: 'WINNER & RU' },
+  both_qualify_swapped: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-800', label: 'SWAPPED' },
+  group_winner_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-800', label: 'WINNER' },
+  group_runnerup_only: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-800', label: 'RUNNER-UP' },
+  one_qualifies_wrong_position: { bg: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-800', label: '1 QUALIFIER' },
 }
 
 /** Whether all group matches are completed */
@@ -209,13 +209,13 @@ function GroupComparisonCard({
             <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${computedBonus.bg}`}>
               {computedBonus.label}
             </span>
-            <span className="text-xs font-bold tabular-nums text-success-600 dark:text-success-400">
+            <span className="text-xs font-bold tabular-nums text-success-900">
               +{computedBonus.points}
             </span>
           </div>
         ) : groupComplete ? (
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-800">
               MISS
             </span>
             <span className="text-xs font-bold tabular-nums text-neutral-400 dark:text-neutral-500">
@@ -246,13 +246,13 @@ function GroupComparisonCard({
 
                 if (exactPosition) {
                   // Exact position match — contributes to winner/runner-up bonus
-                  rowStyle = 'bg-success-50 text-success-800 ring-1 ring-success-200 dark:bg-success-900/20 dark:text-success-300 dark:ring-success-800'
+                  rowStyle = 'bg-success-600/12 text-success-900 ring-1 ring-success-600/25'
                 } else if (qualified) {
                   // Qualified but swapped position — contributes to swapped/partial bonus
-                  rowStyle = 'bg-primary-50 text-primary-800 ring-1 ring-primary-200 dark:bg-primary-900/20 dark:text-primary-300 dark:ring-primary-800'
+                  rowStyle = 'bg-primary-600/12 text-primary-800 ring-1 ring-primary-600/25'
                 } else {
                   // Didn't qualify at all — miss
-                  rowStyle = 'bg-danger-50 text-danger-700 ring-1 ring-danger-200 dark:bg-danger-900/20 dark:text-danger-300 dark:ring-danger-800'
+                  rowStyle = 'bg-danger-50 text-danger-800 ring-1 ring-danger-200 dark:bg-danger-900/20 dark:ring-danger-800'
                 }
               } else if (hasActualData && groupComplete && !isTopTwo) {
                 // Positions 3-4: muted style
@@ -358,10 +358,10 @@ function ThirdPlaceComparisonCard({
               if (hasActualData && isQualifier) {
                 if (actuallyQualified) {
                   // Green: predicted to qualify and they did
-                  rowStyle = 'bg-success-50 text-success-800 ring-1 ring-success-200 dark:bg-success-900/20 dark:text-success-300 dark:ring-success-800'
+                  rowStyle = 'bg-success-50 text-success-900 ring-1 ring-success-200 dark:bg-success-900/20 dark:ring-success-800'
                 } else {
                   // Red: predicted to qualify but they didn't
-                  rowStyle = 'bg-danger-50 text-danger-700 ring-1 ring-danger-200 dark:bg-danger-900/20 dark:text-danger-300 dark:ring-danger-800'
+                  rowStyle = 'bg-danger-600/12 text-danger-800 ring-1 ring-danger-600/25'
                 }
               }
 

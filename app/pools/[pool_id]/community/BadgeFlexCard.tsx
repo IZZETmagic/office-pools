@@ -19,10 +19,10 @@ const TIER_BORDER_COLORS: Record<string, string> = {
 
 const RARITY_COLORS: Record<string, string> = {
   Common: 'text-neutral-500 dark:text-neutral-800',
-  Uncommon: 'text-success-600 dark:text-success-400',
-  Rare: 'text-primary-600 dark:text-primary-400',
+  Uncommon: 'text-success-900',
+  Rare: 'text-primary-800',
   'Very Rare': 'text-accent-500 dark:text-accent-500',
-  Legendary: 'text-warning-500 dark:text-warning-400',
+  Legendary: 'text-warning-800',
 }
 
 export function BadgeFlexCard({

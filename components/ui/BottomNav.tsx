@@ -40,7 +40,7 @@ export function BottomNav() {
               href={item.href}
               className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${
                 active
-                  ? 'text-primary-600 dark:text-primary-400'
+                  ? 'text-primary-800'
                   : 'text-neutral-400 dark:text-neutral-500'
               }`}
             >

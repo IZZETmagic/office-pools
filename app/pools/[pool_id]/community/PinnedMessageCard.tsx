@@ -86,7 +86,7 @@ export function PinnedMessageCard({
       <div className="bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-xl px-3.5 py-3">
         {/* Top row: badge + admin actions */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary-800">
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
               <path d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
             </svg>
@@ -142,7 +142,7 @@ export function PinnedMessageCard({
           )}
 
           {sharedCallsCount > 0 && (
-            <span className="text-[10px] text-primary-500 dark:text-primary-400 font-medium">
+            <span className="text-[10px] text-primary-800 font-medium">
               {sharedCallsCount} call{sharedCallsCount !== 1 ? 's' : ''} shared
             </span>
           )}

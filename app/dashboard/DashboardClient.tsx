@@ -288,13 +288,13 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
     case 'deadline_passed':
       return <>Predictions locked for {poolLink}</>
     case 'rank_up':
-      return <>Moved up {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to <span className="font-semibold text-success-600 dark:text-success-400">#{activity.newRank}</span> in {poolLink}</>
+      return <>Moved up {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to <span className="font-semibold text-success-900">#{activity.newRank}</span> in {poolLink}</>
     case 'rank_down':
       return <>Dropped {activity.rankDelta} {activity.rankDelta === 1 ? 'place' : 'places'} to #{activity.newRank} in {poolLink}</>
     case 'mentioned':
       return <><span className="font-medium">@{activity.mentionedBy}</span> mentioned you in {poolLink}</>
     case 'points_adjusted':
-      return <>Points adjusted <span className={`font-semibold ${activity.adjustment > 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'}`}>{activity.adjustment > 0 ? '+' : ''}{activity.adjustment}</span> in {poolLink} &mdash; {activity.reason}</>
+      return <>Points adjusted <span className={`font-semibold ${activity.adjustment > 0 ? 'text-success-900' : 'text-danger-800'}`}>{activity.adjustment > 0 ? '+' : ''}{activity.adjustment}</span> in {poolLink} &mdash; {activity.reason}</>
   }
 }
 
@@ -345,11 +345,11 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
         )}
       </div>
       {needsPredictions ? (
-        <p className="text-[10px] font-semibold text-warning-600 dark:text-warning-400 mt-1">
+        <p className="text-[10px] font-semibold text-warning-800 mt-1">
           {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
         </p>
       ) : (
-        <p className="text-[10px] font-semibold text-success-700 dark:text-success-400 mt-1">All set</p>
+        <p className="text-[10px] font-semibold text-success-900 mt-1">All set</p>
       )}
 
       <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
@@ -462,7 +462,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
                   </span>
                 </div>
                 {(pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions && (
-                  <span className="ml-auto text-[11px] font-semibold text-warning-600 dark:text-warning-400 shrink-0">
+                  <span className="ml-auto text-[11px] font-semibold text-warning-800 shrink-0">
                     {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
                   </span>
                 )}
@@ -475,7 +475,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
             {/* Points */}
             <div className="flex-1 py-3 px-3">
               <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
-              <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+              <p className="text-xl font-bold text-primary-800 leading-none">
                 {formatNumber(pool.total_points ?? 0)}
               </p>
             </div>
@@ -502,7 +502,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
             {/* Level */}
             <div className="flex-[1.2] py-3 px-3">
               <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
-              <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+              <p className="text-xl font-bold text-primary-800 leading-none">
                 {level.level}
               </p>
               <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>

@@ -100,8 +100,8 @@ export function computeLevelFromXP(totalXP: number): { level: number; levelName:
  * Level 9+: amber (Oracle/Legend), Level 5-8: blue, Below 5: neutral
  */
 export function getLevelPillClasses(level: number): string {
-  if (level >= 9) return 'bg-warning-200 dark:bg-warning-900/30 text-warning-900 dark:text-warning-300'
-  if (level >= 5) return 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+  if (level >= 9) return 'bg-warning-200 dark:bg-warning-900/30 text-warning-800'
+  if (level >= 5) return 'bg-primary-100 dark:bg-primary-900/20 text-primary-800'
   return 'bg-neutral-100 dark:bg-neutral-800/15 text-neutral-500 dark:text-neutral-600'
 }
 

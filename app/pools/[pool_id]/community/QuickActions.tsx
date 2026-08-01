@@ -14,7 +14,7 @@ export function QuickActions({
       <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <button
           onClick={onSharePrediction}
-          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-primary-50 dark:bg-primary-900/15 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
+          className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap px-3 py-1.5 rounded-full bg-primary-50 dark:bg-primary-900/15 text-primary-800 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
         >
           🎯 Share Prediction
         </button>

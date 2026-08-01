@@ -69,7 +69,7 @@ export function EmojiPicker({ onSelect, onClose, anchor = 'above', side = 'right
             onClick={() => setActiveCategory(i)}
             className={`text-[10px] font-medium px-2 py-1 rounded-md whitespace-nowrap transition-colors ${
               i === activeCategory
-                ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-800'
                 : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
             }`}
           >

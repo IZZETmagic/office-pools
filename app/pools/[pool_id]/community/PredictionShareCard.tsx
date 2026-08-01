@@ -15,19 +15,19 @@ function OutcomeBadge({ outcome }: { outcome: 'exact' | 'correct' | 'miss' }) {
   switch (outcome) {
     case 'exact':
       return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400">
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-100 dark:bg-accent-900/20 text-accent-800">
           ★ EXACT
         </span>
       )
     case 'correct':
       return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400">
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-100 dark:bg-success-900/20 text-success-900">
           ✓ CORRECT
         </span>
       )
     case 'miss':
       return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-danger-100 dark:bg-danger-900/20 text-danger-700 dark:text-danger-400">
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-danger-100 dark:bg-danger-900/20 text-danger-800">
           ✗ MISS
         </span>
       )
@@ -36,9 +36,9 @@ function OutcomeBadge({ outcome }: { outcome: 'exact' | 'correct' | 'miss' }) {
 
 function getOutcomeColor(outcome: 'exact' | 'correct' | 'miss') {
   switch (outcome) {
-    case 'exact': return 'text-accent-600 dark:text-accent-400'
-    case 'correct': return 'text-success-600 dark:text-success-400'
-    case 'miss': return 'text-danger-600 dark:text-danger-400'
+    case 'exact': return 'text-accent-800'
+    case 'correct': return 'text-success-900'
+    case 'miss': return 'text-danger-800'
   }
 }
 
@@ -113,7 +113,7 @@ export function PredictionShareCard({
       {/* Exact match bragging footer */}
       {isExact && (
         <div className="bg-accent-50 dark:bg-accent-900/10 border-t border-accent-100 dark:border-accent-900/20 px-3.5 py-2">
-          <p className="text-xs text-accent-700 dark:text-accent-400 text-center">
+          <p className="text-xs text-accent-800 text-center">
             🎯 Nailed the exact score!
           </p>
         </div>

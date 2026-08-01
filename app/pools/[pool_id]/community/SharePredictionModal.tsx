@@ -39,9 +39,9 @@ function computeOutcome(
 }
 
 const OUTCOME_BADGES: Record<string, { label: string; classes: string }> = {
-  exact: { label: '★ EXACT', classes: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' },
-  correct: { label: '✓ CORRECT', classes: 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400' },
-  miss: { label: '✗ MISS', classes: 'bg-danger-100 dark:bg-danger-900/20 text-danger-700 dark:text-danger-400' },
+  exact: { label: '★ EXACT', classes: 'bg-accent-100 dark:bg-accent-900/20 text-accent-800' },
+  correct: { label: '✓ CORRECT', classes: 'bg-success-100 dark:bg-success-900/20 text-success-900' },
+  miss: { label: '✗ MISS', classes: 'bg-danger-100 dark:bg-danger-900/20 text-danger-800' },
 }
 
 export function SharePredictionModal({

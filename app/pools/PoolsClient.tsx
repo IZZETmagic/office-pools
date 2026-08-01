@@ -152,7 +152,7 @@ function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check'
   if (pool.has_submitted_predictions) return {
     label: 'Submitted',
     icon: 'check',
-    className: 'bg-success-100 dark:bg-success-900/30 text-success-500 dark:text-success-400 font-bold',
+    className: 'bg-success-100 dark:bg-success-900/30 text-success-900 font-bold',
     isButton: false,
   }
   return {
@@ -648,7 +648,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
-                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                    <p className="text-xl font-bold text-primary-800 leading-none">
                                       {formatNumber(pool.total_points ?? 0)}
                                     </p>
                                   </div>
@@ -675,7 +675,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Level */}
                                   <div className="flex-[1.2] py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
-                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                    <p className="text-xl font-bold text-primary-800 leading-none">
                                       {level.level}
                                     </p>
                                     <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
@@ -720,14 +720,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
                                   <button
                                     onClick={(e) => handleCopyInviteLink(e, pool.pool_id, pool.pool_code)}
-                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                    className="text-[11px] text-primary-800 font-semibold hover:underline"
                                   >
                                     {isLinkCopied ? 'Copied!' : 'Copy Link'}
                                   </button>
                                   <span className="text-neutral-300 dark:text-neutral-600">|</span>
                                   <button
                                     onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
-                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                    className="text-[11px] text-primary-800 font-semibold hover:underline"
                                   >
                                     {isCopied ? 'Copied!' : 'Copy Code'}
                                   </button>
@@ -803,7 +803,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
-                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                    <p className="text-xl font-bold text-primary-800 leading-none">
                                       {formatNumber(pool.total_points ?? 0)}
                                     </p>
                                   </div>
@@ -830,7 +830,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   {/* Level */}
                                   <div className="flex-[1.2] py-3 px-3">
                                     <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
-                                    <p className="text-xl font-bold text-primary-600 dark:text-primary-400 leading-none">
+                                    <p className="text-xl font-bold text-primary-800 leading-none">
                                       {level.level}
                                     </p>
                                     <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
@@ -877,14 +877,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
                                   <button
                                     onClick={(e) => handleCopyInviteLink(e, pool.pool_id, pool.pool_code)}
-                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                    className="text-[11px] text-primary-800 font-semibold hover:underline"
                                   >
                                     {isLinkCopied ? 'Copied!' : 'Copy Link'}
                                   </button>
                                   <span className="text-neutral-300 dark:text-neutral-600">|</span>
                                   <button
                                     onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
-                                    className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold hover:underline"
+                                    className="text-[11px] text-primary-800 font-semibold hover:underline"
                                   >
                                     {isCopied ? 'Copied!' : 'Copy Code'}
                                   </button>

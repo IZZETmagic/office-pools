@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -1199,10 +1200,10 @@ export function PoolDetail({
 
         {/* Super Admin viewing banner */}
         {isSuperAdminViewing && (
-          <div className="bg-warning-100 dark:bg-warning-900/30 border-b border-warning-300 dark:border-warning-700">
+          <div className="bg-warning-500/12 border-b border-warning-500/25">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
-              <Icon name="exclamationmark.triangle.fill" size={16} weight="semibold" className="text-warning-700 dark:text-warning-400 shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-warning-800 dark:text-warning-300">
+              <Icon name="exclamationmark.triangle.fill" size={16} weight="semibold" className="text-warning-800 shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-warning-800">
                 Viewing as Super Admin — You are not a member of this pool
               </span>
             </div>
@@ -1275,8 +1276,8 @@ export function PoolDetail({
                               onClick={() => { handleTabSwitch(tab.key); setMoreMenuOpen(false) }}
                               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                                 activeTab === tab.key
-                                  ? isAdminOverflow ? 'bg-warning-50 text-warning-700 font-medium dark:bg-warning-900/20 dark:text-warning-400' : 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/20 dark:text-primary-400'
-                                  : isAdminOverflow ? 'text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-900/20' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200'
+                                  ? isAdminOverflow ? 'bg-warning-500/12 text-warning-800 font-medium' : 'bg-primary-600/12 text-primary-800 font-medium'
+                                  : isAdminOverflow ? 'text-warning-800 hover:bg-warning-500/12' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200'
                               }`}
                             >
                               <span className="inline-flex items-center gap-1.5">
@@ -2001,11 +2002,9 @@ export function PoolDetail({
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to delete <span className="font-semibold text-neutral-900">{activeEntry.entry_name}</span>?
             </p>
-            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-5">
-              <p className="text-sm text-danger-800">
-                All predictions for this entry will be permanently deleted. This cannot be undone.
-              </p>
-            </div>
+            <Alert variant="error" className="mb-5">
+              All predictions for this entry will be permanently deleted. This cannot be undone.
+            </Alert>
             <div className="flex gap-3 justify-end">
               <Button
                 variant="gray"
@@ -2053,13 +2052,13 @@ export function PoolDetail({
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to leave <span className="font-semibold text-neutral-900">{pool.pool_name}</span>?
             </p>
-            <div className="bg-danger-50 border border-danger-200 rounded-xl p-3 mb-5">
-              <ul className="text-sm text-danger-800 space-y-1">
+            <Alert variant="error" className="mb-5">
+              <ul className="space-y-1">
                 <li>&#8226; Your predictions will be permanently deleted</li>
                 <li>&#8226; Your scores and ranking will be removed</li>
                 <li>&#8226; You will need a pool code to rejoin</li>
               </ul>
-            </div>
+            </Alert>
             <div className="flex gap-3 justify-end">
               <Button
                 variant="gray"

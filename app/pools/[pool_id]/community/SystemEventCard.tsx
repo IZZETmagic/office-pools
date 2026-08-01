@@ -16,7 +16,7 @@ export function SystemEventCard({ event }: SystemEventCardProps) {
     return (
       <>
         {parts[0]}
-        <span className="font-semibold text-warning-700 dark:text-warning-400">{event.highlighted_name}</span>
+        <span className="font-semibold text-warning-800">{event.highlighted_name}</span>
         {parts.slice(1).join(event.highlighted_name)}
       </>
     )

@@ -689,7 +689,7 @@ export function LeaderboardTab({
         name: getName(hottestEntry),
         detail: `${hottestLength}-match win streak`,
         bgClass: 'bg-warning-50 dark:bg-warning-500/10',
-        titleColorClass: 'text-warning-600 dark:text-warning-400',
+        titleColorClass: 'text-warning-800',
       })
     }
 
@@ -709,7 +709,7 @@ export function LeaderboardTab({
         name: getName(coldestEntry),
         detail: `${coldestLength} misses in last ${Math.min(5, coldestLength + 2)}`,
         bgClass: 'bg-primary-50 dark:bg-primary-500/10',
-        titleColorClass: 'text-primary-600 dark:text-primary-400',
+        titleColorClass: 'text-primary-800',
       })
     }
 
@@ -752,7 +752,7 @@ export function LeaderboardTab({
         name: getName(bestCrowdEntry),
         detail: `${Math.round(bestCrowdPct)}% consensus picks`,
         bgClass: 'bg-primary-50 dark:bg-primary-500/10',
-        titleColorClass: 'text-primary-600 dark:text-primary-400',
+        titleColorClass: 'text-primary-800',
       })
     }
 
@@ -772,7 +772,7 @@ export function LeaderboardTab({
         name: getName(bestExactEntry),
         detail: `${bestExactCount} exact scores (pool best)`,
         bgClass: 'bg-danger-50 dark:bg-danger-500/10',
-        titleColorClass: 'text-danger-600 dark:text-danger-400',
+        titleColorClass: 'text-danger-800',
       })
     }
 
@@ -797,7 +797,7 @@ export function LeaderboardTab({
         name: getName(climberEntry),
         detail: `Up ${climberDelta} places this matchday`,
         bgClass: 'bg-success-50 dark:bg-success-500/10',
-        titleColorClass: 'text-success-600 dark:text-success-400',
+        titleColorClass: 'text-success-900',
       })
     }
 
@@ -822,7 +822,7 @@ export function LeaderboardTab({
         name: getName(fallerEntry),
         detail: `Down ${Math.abs(fallerDelta)} places this matchday`,
         bgClass: 'bg-danger-50 dark:bg-danger-500/10',
-        titleColorClass: 'text-danger-600 dark:text-danger-400',
+        titleColorClass: 'text-danger-800',
       })
     }
 
@@ -1373,7 +1373,7 @@ export function LeaderboardTab({
                     {getDisplayName(entry)}
                   </span>
                   {isCurrentUser && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-800">
                       YOU
                     </span>
                   )}
@@ -1507,7 +1507,7 @@ export function LeaderboardTab({
                       {getDisplayName(entry)}
                     </span>
                     {isCurrentUser && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-800">
                         YOU
                       </span>
                     )}

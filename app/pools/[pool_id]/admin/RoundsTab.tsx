@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -378,12 +379,12 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       </Card>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-600">
+      <Alert variant="info" className="">
         <strong>How round management works:</strong> Open a round to allow predictions.
         Members will be notified by email. When the deadline passes, predictions auto-lock.
         After all matches in a round complete, mark it as completed to unlock scoring and
         optionally auto-open the next round.
-      </div>
+      </Alert>
 
       {/* Deadline modal */}
       {modal && (

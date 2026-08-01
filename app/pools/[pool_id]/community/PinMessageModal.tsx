@@ -128,7 +128,7 @@ export function PinMessageModal({
           </div>
 
           {error && (
-            <p className="text-xs text-danger-600 dark:text-danger-400">{error}</p>
+            <p className="text-xs text-danger-800">{error}</p>
           )}
 
           <div className="flex items-center gap-3 pt-1">

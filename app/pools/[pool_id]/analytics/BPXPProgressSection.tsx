@@ -32,7 +32,7 @@ const TIER_BORDER_COLORS: Record<string, string> = {
 }
 
 const TIER_BG_COLORS: Record<string, string> = {
-  Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400',
+  Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-800',
   Silver: 'bg-neutral-200 dark:bg-neutral-700 text-muted',
   Gold: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
   Platinum: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
@@ -40,10 +40,10 @@ const TIER_BG_COLORS: Record<string, string> = {
 
 const RARITY_COLORS: Record<string, string> = {
   Common: 'text-muted',
-  Uncommon: 'text-success-600 dark:text-success-400',
-  Rare: 'text-primary-600 dark:text-primary-400',
+  Uncommon: 'text-success-900',
+  Rare: 'text-primary-800',
   'Very Rare': 'text-accent-500 dark:text-accent-500',
-  Legendary: 'text-warning-500 dark:text-warning-400',
+  Legendary: 'text-warning-800',
 }
 
 // =============================================
@@ -162,7 +162,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
           {badge.name}
         </div>
         {earned ? (
-          <div className="text-[10px] font-bold text-success-600 dark:text-success-400">
+          <div className="text-[10px] font-bold text-success-900">
             +{badge.xpBonus} XP
           </div>
         ) : (
@@ -237,7 +237,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
               <svg className="w-4 h-4 text-success-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              <span className="text-sm font-semibold text-success-700 dark:text-success-300">Earned · +{badge.xpBonus} XP</span>
+              <span className="text-sm font-semibold text-success-900">Earned · +{badge.xpBonus} XP</span>
             </div>
           ) : (
             <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-mist border border-border-subtle">
@@ -747,7 +747,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
                   </div>
                   <span className={`text-xs font-medium tabular-nums flex-shrink-0 ${
                     isCurrent ? 'text-accent-700 dark:text-accent-500'
-                      : isReached ? 'text-success-600 dark:text-success-400'
+                      : isReached ? 'text-success-900'
                         : 'text-muted dark:text-muted'
                   }`}>
                     {level.xpRequired.toLocaleString()} XP
@@ -768,16 +768,16 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
 
             <div className="flex flex-wrap justify-center gap-2 mt-3">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
-                <span className="text-xs font-medium text-primary-600 dark:text-primary-400">Group XP</span>
-                <span className="text-xs font-bold text-primary-700 dark:text-primary-300">{(breakdown.totalGroupBaseXP + breakdown.totalGroupBonusXP).toLocaleString()}</span>
+                <span className="text-xs font-medium text-primary-800">Group XP</span>
+                <span className="text-xs font-bold text-primary-800">{(breakdown.totalGroupBaseXP + breakdown.totalGroupBonusXP).toLocaleString()}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
-                <span className="text-xs font-medium text-success-600 dark:text-success-400">Knockout XP</span>
-                <span className="text-xs font-bold text-success-700 dark:text-success-300">{(breakdown.totalKnockoutBaseXP + breakdown.totalKnockoutBonusXP).toLocaleString()}</span>
+                <span className="text-xs font-medium text-success-900">Knockout XP</span>
+                <span className="text-xs font-bold text-success-900">{(breakdown.totalKnockoutBaseXP + breakdown.totalKnockoutBonusXP).toLocaleString()}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
-                <span className="text-xs font-medium text-warning-600 dark:text-warning-400">Badge XP</span>
-                <span className="text-xs font-bold text-warning-700 dark:text-warning-300">{breakdown.totalBadgeXP.toLocaleString()}</span>
+                <span className="text-xs font-medium text-warning-800">Badge XP</span>
+                <span className="text-xs font-bold text-warning-800">{breakdown.totalBadgeXP.toLocaleString()}</span>
               </div>
             </div>
           </div>

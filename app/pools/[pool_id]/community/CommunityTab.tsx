@@ -1045,7 +1045,7 @@ export function CommunityTab({
       <div className="flex flex-col gap-2.5 w-full max-w-[260px]">
         <button
           onClick={handleShareBoldCall}
-          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/15 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/15 text-primary-800 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
         >
           🎯 Share Prediction
         </button>
@@ -1083,7 +1083,7 @@ export function CommunityTab({
           <button
             onClick={loadOlderMessages}
             disabled={loadingMore}
-            className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 disabled:opacity-50 transition-colors"
+            className="text-xs font-medium text-primary-800 hover:text-primary-700 disabled:opacity-50 transition-colors"
           >
             {loadingMore ? 'Loading...' : 'Load earlier messages'}
           </button>
