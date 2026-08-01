@@ -25,8 +25,95 @@ type SettingsTabProps = {
    field label above its control, a 14px semibold row title with an 11px slate
    subtitle beside it, and a half-pixel silver rule at 50%. */
 
-function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="t-caption text-muted">{children}</h3>
+/* SegmentedPicker: a mist track with the active option raised on a surface pill.
+   Not a bordered button group — RN's has no borders and the active state is
+   carried by elevation, which is what makes it read as a switch rather than a
+   toolbar. (mobile SettingsTab, SegmentedPicker) */
+function SegmentedPicker<T extends string | boolean>({
+  value, options, onChange,
+}: { value: T; options: Array<{ value: T; label: string }>; onChange: (v: T) => void }) {
+  return (
+    <div className="flex gap-[3px] p-[3px] rounded-control bg-mist">
+      {options.map((opt) => {
+        const active = opt.value === value
+        return (
+          <button
+            key={String(opt.value)}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            aria-pressed={active}
+            className={`flex-1 py-2 rounded-chip text-[13px] transition-colors ${
+              active ? 'bg-surface font-bold text-ink shadow-card' : 'font-medium text-muted'
+            }`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/* EntryCountPicker: 1-10 as one flush strip, the chosen number filled primary. */
+function EntryCountPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex rounded-control overflow-hidden">
+      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+        const active = n === value
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-pressed={active}
+            className={`flex-1 py-2.5 t-num text-[13px] transition-colors ${
+              active ? 'bg-primary-600 text-white' : 'bg-mist text-ink hover:bg-silver'
+            }`}
+          >
+            {n}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/* Stepper: 32px round buttons at ink@6%, the value between them. RN shows the
+   infinity glyph at 0 rather than the digit, because 0 means "no cap". */
+function Stepper({
+  value, min = 0, max = 500, onChange,
+}: { value: number; min?: number; max?: number; onChange: (v: number) => void }) {
+  const step = value < 20 ? 1 : 10
+  const btn = 'w-8 h-8 rounded-pill bg-ink/6 flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-30'
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <button type="button" aria-label="Decrease" disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - step))} className={btn}>
+        <Icon name="minus" size={14} weight="bold" className="text-ink" />
+      </button>
+      <span className="w-10 text-center t-num t-num-extrabold text-base text-ink">
+        {value === 0 ? '\u221E' : value}
+      </span>
+      <button type="button" aria-label="Increase" disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + step))} className={btn}>
+        <Icon name="plus" size={14} weight="bold" className="text-ink" />
+      </button>
+    </div>
+  )
+}
+
+/* QuickDeadlineButton: a primary@10% pill, 11px semibold. */
+function QuickDeadlineButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="px-2.5 py-1.5 rounded-pill bg-primary-600/10 text-[11px] font-semibold text-primary-800 transition-opacity hover:opacity-80">
+      {label}
+    </button>
+  )
+}
+
+function Caption({ children, tone }: { children: React.ReactNode; tone?: string }) {
+  return <h3 className={`t-caption ${tone ?? 'text-muted'}`}>{children}</h3>
 }
 
 function Divider() {
@@ -397,44 +484,22 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             </FieldRow>
 
             <FieldRow label="Pool Status">
-              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
-                {statusOptions.map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => setStatus(s.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
-                      status === s.value
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-ink hover:bg-snow'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedPicker
+                  value={status}
+                  options={statusOptions}
+                  onChange={setStatus}
+                />
               <p className="text-xs text-muted mt-1.5">
                 {statusOptions.find(s => s.value === status)?.desc}
               </p>
             </FieldRow>
 
             <FieldRow label="New Members">
-              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
-                {acceptingOptions.map((o) => (
-                  <button
-                    key={String(o.value)}
-                    type="button"
-                    onClick={() => setAcceptingMembers(o.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
-                      acceptingMembers === o.value
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-ink hover:bg-snow'
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedPicker
+                  value={acceptingMembers}
+                  options={acceptingOptions}
+                  onChange={setAcceptingMembers}
+                />
               <p className="text-xs text-muted mt-1.5">
                 {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
                 {' '}Independent of pool status — the pool stays visible to existing members either way.
@@ -517,24 +582,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setQuickDeadline('tournament_start')}
-              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
-            >
-              Tournament Start (Jun 11)
-            </button>
-            <button
-              onClick={() => setQuickDeadline('one_day_before')}
-              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
-            >
-              1 Day Before Start
-            </button>
-            <button
-              onClick={() => setQuickDeadline('one_week_before')}
-              className="text-xs px-3 py-1.5 rounded-chip bg-mist text-ink hover:bg-silver transition"
-            >
-              1 Week Before Start
-            </button>
+            <QuickDeadlineButton label="Tournament Start" onClick={() => setQuickDeadline('tournament_start')} />
+            <QuickDeadlineButton label="1 Day Before" onClick={() => setQuickDeadline('one_day_before')} />
+            <QuickDeadlineButton label="1 Week Before" onClick={() => setQuickDeadline('one_week_before')} />
           </div>
         </Card>
 
@@ -546,22 +596,11 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
           <div className="space-y-4">
             <FieldRow label="Pool Visibility">
-              <div className="inline-flex rounded-control overflow-hidden border border-border-default">
-                {visibilityOptions.map((opt) => (
-                  <button
-                    key={String(opt.value)}
-                    type="button"
-                    onClick={() => setIsPrivate(opt.value)}
-                    className={`px-4 py-2 text-sm font-medium transition border-r last:border-r-0 border-border-default cursor-pointer ${
-                      isPrivate === opt.value
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-surface text-ink hover:bg-snow'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedPicker
+                  value={isPrivate}
+                  options={visibilityOptions}
+                  onChange={setIsPrivate}
+                />
               <p className="text-xs text-muted mt-1.5">
                 {visibilityOptions.find(o => o.value === isPrivate)?.desc}
               </p>
@@ -571,16 +610,12 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
             <SettingsRow
               label="Cap on total members"
-              subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : 'Set to 0 for unlimited'}
+              subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : `${maxParticipants} max`}
             >
-              <div className="w-28 shrink-0">
-                <Input
-                  type="number"
-                  min="0"
-                  value={maxParticipants}
-                  onChange={(e) => setMaxParticipants(e.target.value)}
-                />
-              </div>
+              <Stepper
+                value={parseInt(maxParticipants) || 0}
+                onChange={(v) => setMaxParticipants(String(v))}
+              />
             </SettingsRow>
           </div>
         </Card>
@@ -596,22 +631,10 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
           <div className="space-y-4">
             <FieldRow label="Max Entries Per Member">
-              <div className="flex">
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setMaxEntries(String(n))}
-                    className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
-                      parseInt(maxEntries) === n
-                        ? 'bg-primary-500 text-white border-primary-500 z-10'
-                        : 'bg-surface text-ink border-border-default hover:bg-mist'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+              <EntryCountPicker
+                value={parseInt(maxEntries) || 1}
+                onChange={(v) => setMaxEntries(String(v))}
+              />
             </FieldRow>
 
             {parseInt(maxEntries) > 1 && (
@@ -673,7 +696,7 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
 
         {/* ── Danger Zone ── */}
         <Card className="border border-danger-200">
-          <Caption>
+          <Caption tone="text-danger-700">
             Danger Zone
           </Caption>
 
