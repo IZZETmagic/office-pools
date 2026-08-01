@@ -157,9 +157,9 @@ function FieldRow({
 }: { label: string; children: React.ReactNode; className?: string; helperText?: string }) {
   return (
     <div className={`flex flex-col gap-1 min-h-0 ${className ?? ''}`}>
-      <span className="text-xs font-medium text-muted">{label}</span>
+      <span className="t-detail text-muted">{label}</span>
       {children}
-      {helperText && <span className="text-[11px] text-muted">{helperText}</span>}
+      {helperText && <span className="t-detail text-muted">{helperText}</span>}
     </div>
   )
 }
@@ -170,8 +170,8 @@ function SettingsRow({
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className="text-sm font-semibold text-ink">{label}</span>
-        {subtitle && <span className="text-[11px] text-muted">{subtitle}</span>}
+        <span className="t-card-title text-ink">{label}</span>
+        {subtitle && <span className="t-detail text-muted">{subtitle}</span>}
       </div>
       {children}
     </div>
@@ -186,8 +186,8 @@ function DangerRow({
       className="w-full flex items-center gap-3 py-2 text-left transition-opacity hover:opacity-70">
       <Icon name={icon} size={16} weight="semibold" className={`shrink-0 ${tone}`} />
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className={`text-sm font-bold ${tone}`}>{title}</span>
-        <span className="text-[11px] text-muted">{subtitle}</span>
+        <span className={`t-card-title ${tone}`}>{title}</span>
+        <span className="t-detail text-muted">{subtitle}</span>
       </span>
       <Icon name="chevron.right" size={11} weight="semibold" className="shrink-0 text-muted" />
     </button>
@@ -533,7 +533,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   return (
     <div className="relative pb-20">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-ink">Pool Settings</h2>
+        <h2 className="t-page-title text-ink">Pool Settings</h2>
       </div>
 
       {error && (
@@ -629,7 +629,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
             </Caption>
             {pool.prediction_mode === 'progressive' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-detail font-bold bg-primary-600/12 text-primary-800">
                 Progressive
               </span>
             )}
@@ -643,7 +643,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
           {currentDeadline && (
             <div className="mb-4">
-              <p className="text-sm text-muted">
+              <p className="t-body text-muted">
                 Current Deadline:{' '}
                 <span className="font-medium">
                   {currentDeadline.toLocaleDateString('en-US', {
@@ -658,7 +658,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
                 </span>
               </p>
               {daysUntilDeadline !== null && timeUntilDeadline! > 0 && (
-                <p className="text-sm text-muted">
+                <p className="t-body text-muted">
                   Time until deadline: {daysUntilDeadline} days {hoursUntilDeadline} hours
                 </p>
               )}
@@ -672,7 +672,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
           <div className="flex gap-3 mb-4 flex-wrap">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">
+              <label className="block t-detail text-muted mb-1">
                 Date
               </label>
               <input
@@ -683,7 +683,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">
+              <label className="block t-detail text-muted mb-1">
                 Time
               </label>
               <input
@@ -703,35 +703,35 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
       {/* ── Status ── */}
-      <Card padding="sm" className="lg:min-h-32">
+      <Card padding="sm" className="lg:min-h-38">
         <Caption icon="checkmark.circle.fill">Status</Caption>
         <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
-        <p className="text-xs text-muted mt-2.5">
+        <p className="t-detail text-muted mt-2.5">
           {statusOptions.find(s => s.value === status)?.desc}
         </p>
       </Card>
 
       {/* ── New Members ── */}
-      <Card padding="sm" className="lg:min-h-32">
+      <Card padding="sm" className="lg:min-h-38">
         <Caption icon="person.badge.plus">New Members</Caption>
         <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
-        <p className="text-xs text-muted mt-2.5">
+        <p className="t-detail text-muted mt-2.5">
           {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
         </p>
       </Card>
 
 
         {/* ── Visibility ── */}
-        <Card padding="sm" className="lg:min-h-32">
+        <Card padding="sm" className="lg:min-h-38">
           <Caption icon="eye">Visibility</Caption>
           <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
-          <p className="text-xs text-muted mt-2.5">
+          <p className="t-detail text-muted mt-2.5">
             {visibilityOptions.find(o => o.value === isPrivate)?.desc}
           </p>
         </Card>
 
         {/* ── Max Members ── */}
-        <Card padding="sm" className="lg:min-h-32">
+        <Card padding="sm" className="lg:min-h-38">
           <Caption icon="person.3.fill">Max Members</Caption>
           <SettingsRow
             label="Cap on total members"
@@ -745,9 +745,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Prediction Entries ── */}
-        <Card padding="sm" className="lg:min-h-32">
+        <Card padding="sm" className="lg:min-h-38">
           <Caption icon="list.number">Prediction Entries</Caption>
-          <p className="text-sm text-muted mb-4">
+          <p className="t-body text-muted mb-4">
             Each entry is scored separately on the leaderboard.
           </p>
 
@@ -768,9 +768,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Entry Fees ── */}
-        <Card padding="sm" className="lg:min-h-32">
+        <Card padding="sm" className="lg:min-h-38">
           <Caption icon="dollarsign.circle.fill">Entry Fees</Caption>
-          <p className="text-sm text-muted mb-4">
+          <p className="t-body text-muted mb-4">
             Leave blank for a free pool.
           </p>
 
@@ -855,7 +855,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       {hasChanges && (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-default bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
           <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
-            <p className="text-sm text-muted">You have unsaved changes</p>
+            <p className="t-body text-muted">You have unsaved changes</p>
             <Button
               onClick={handleSaveAll}
               loading={saving}
@@ -878,7 +878,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           onClick={(e) => { if (e.target === e.currentTarget && !stopping) setShowStopConfirm(false) }}
         >
           <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-ink mb-3">Stop Participating</h3>
+            <h3 className="t-section-header text-ink mb-3">Stop Participating</h3>
 
             <Alert variant="warning">
               <p className="font-bold mb-2">{pool.pool_name}</p>
@@ -921,11 +921,11 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           }}
         >
           <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
-            <h3 className="text-lg font-bold text-ink mb-3">
+            <h3 className="t-section-header text-ink mb-3">
               Archive Pool
             </h3>
 
-            <p className="text-sm text-ink mb-3">
+            <p className="t-body text-ink mb-3">
               Are you sure you want to archive this pool?
             </p>
 
