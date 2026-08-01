@@ -494,7 +494,7 @@ export function MembersTab({
           <span className="text-sm text-muted">Code:</span>
           <button
             onClick={copyPoolCode}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
             title="Copy pool code"
           >
             {pool.pool_code}
@@ -504,10 +504,10 @@ export function MembersTab({
               <svg className="w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
             )}
           </button>
-          <span className="text-neutral-300">|</span>
+          <span className="text-silver">|</span>
           <button
             onClick={copyInviteLink}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
             title="Copy invite link"
           >
             {linkCopied ? 'Copied!' : 'Copy Invite Link'}
@@ -519,7 +519,7 @@ export function MembersTab({
           </button>
           <button
             onClick={toggleQRCode}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
             title="Show QR code"
           >
             QR
@@ -527,7 +527,7 @@ export function MembersTab({
           </button>
         </div>
         {showQR && qrDataUrl && (
-          <div className="mt-3 p-3 bg-white rounded-lg border border-border-default inline-block">
+          <div className="mt-3 p-3 bg-surface rounded-chip border border-border-default inline-block">
             <img src={qrDataUrl} alt={`QR code for joining ${pool.pool_name}`} width={200} height={200} />
             <p className="text-xs text-muted text-center mt-1">Scan to join this pool</p>
           </div>
@@ -558,7 +558,7 @@ export function MembersTab({
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-neutral-300 rounded-xl text-sm text-ink bg-surface"
+          className="px-3 py-2 border border-border-default rounded-control text-sm text-ink bg-surface"
         >
           <option value="rank">Sort by Rank</option>
           <option value="points">Sort by Points</option>
@@ -574,7 +574,7 @@ export function MembersTab({
           return (
             <div
               key={member.member_id}
-              className={`rounded-xl border p-3 ${isCurrentUser ? 'bg-primary-50 border-primary-200' : 'bg-surface border-border-default'}`}
+              className={`rounded-chip border p-3 ${isCurrentUser ? 'bg-primary-600/12 border-primary-600/25' : 'bg-surface border-border-default'}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -599,10 +599,10 @@ export function MembersTab({
                     return (
                       <span
                         key={entry.entry_id}
-                        className={`text-xs px-2 py-0.5 rounded-full ${
+                        className={`text-xs px-2 py-0.5 rounded-pill ${
                           submitted
-                            ? 'bg-success-50 text-success-700'
-                            : 'bg-neutral-100 text-muted'
+                            ? 'bg-success-600/12 text-success-900'
+                            : 'bg-mist text-muted'
                         }`}
                       >
                         {entry.entry_name}
@@ -611,7 +611,7 @@ export function MembersTab({
                   })}
                 </div>
               )}
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-100">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-subtle">
                 <div className="flex items-center gap-1.5">
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
@@ -651,7 +651,7 @@ export function MembersTab({
                         break
                     }
                   }}
-                  className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-ink cursor-pointer"
+                  className="text-xs px-2 py-1.5 border border-border-default rounded bg-surface text-ink cursor-pointer"
                 >
                   <option value="" disabled>Actions</option>
                   <option value="view_predictions">View Predictions</option>
@@ -786,7 +786,7 @@ export function MembersTab({
                                 break
                             }
                           }}
-                          className="text-xs px-2 py-1.5 border border-neutral-300 rounded bg-surface text-ink cursor-pointer"
+                          className="text-xs px-2 py-1.5 border border-border-default rounded bg-surface text-ink cursor-pointer"
                         >
                           <option value="" disabled>
                             Actions
@@ -867,7 +867,7 @@ export function MembersTab({
       {/* Promote Modal */}
       {modal.type === 'promote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-ink mb-3">
               Promote to Admin
             </h3>
@@ -904,7 +904,7 @@ export function MembersTab({
       {/* Demote Modal */}
       {modal.type === 'demote' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-ink mb-3">
               Demote to Player
             </h3>
@@ -965,7 +965,7 @@ export function MembersTab({
       {/* Remove Modal */}
       {modal.type === 'remove' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
             <h3 className="text-lg font-bold text-danger-600 mb-3">
               Remove Member
             </h3>
@@ -1003,7 +1003,7 @@ export function MembersTab({
               <button
                 onClick={() => handleRemove(modal.member)}
                 disabled={!removeConfirmed || loading}
-                className="px-4 py-2 text-sm rounded-xl font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm rounded-control font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Removing...' : 'Remove Member'}
               </button>
@@ -1217,9 +1217,9 @@ function ViewPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
-        <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
+        <div className="p-4 sm:p-6 pb-3 border-b border-border-subtle shrink-0">
           <h3 className="text-xl font-bold text-ink">
             {member.users.full_name || member.users.username}&apos;s Predictions
           </h3>
@@ -1236,10 +1236,10 @@ function ViewPredictionsModal({
                 <button
                   key={entry.entry_id}
                   onClick={() => setSelectedEntryId(entry.entry_id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                  className={`px-3 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
+                      : 'bg-mist text-muted hover:bg-silver'
                   }`}
                 >
                   {entry.entry_name}
@@ -1288,7 +1288,7 @@ function ViewPredictionsModal({
                         return (
                           <div
                             key={pred.prediction_id}
-                            className="bg-snow rounded-xl px-3 py-2"
+                            className="bg-snow rounded-chip px-3 py-2"
                           >
                             <div className="flex items-center gap-2">
                               {/* Match number */}
@@ -1330,7 +1330,7 @@ function ViewPredictionsModal({
                   Progressive members predict round-by-round, so a bracket-
                   resolved "champion" from partial predictions is misleading. */}
               {!isProgressive && champion && (
-                <div className="mt-2 text-center p-4 rounded-2xl bg-gradient-to-br from-primary-50 via-accent-50 to-accent-50 border border-accent-100">
+                <div className="mt-2 text-center p-4 rounded-card bg-gradient-to-br from-primary-600/12 via-accent-400/12 to-accent-400/12 border border-accent-400/25">
                   <div className="text-3xl mb-1">&#127942;</div>
                   <p className="text-xs font-semibold text-accent-500 uppercase tracking-wide mb-0.5">
                     Predicted Champion
@@ -1345,7 +1345,7 @@ function ViewPredictionsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:px-6 pt-3 border-t border-neutral-100 shrink-0">
+        <div className="p-4 sm:px-6 pt-3 border-t border-border-subtle shrink-0">
           <div className="flex justify-between">
             {memberPreds.length > 0 ? (
               <button
@@ -1480,9 +1480,9 @@ function ViewBracketPickerPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-lg w-full sm:mx-4 max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default">
         {/* Header */}
-        <div className="p-4 sm:p-6 pb-3 border-b border-neutral-100 shrink-0">
+        <div className="p-4 sm:p-6 pb-3 border-b border-border-subtle shrink-0">
           <h3 className="text-xl font-bold text-ink">
             {member.users.full_name || member.users.username}&apos;s Bracket Picks
           </h3>
@@ -1498,10 +1498,10 @@ function ViewBracketPickerPredictionsModal({
                 <button
                   key={entry.entry_id}
                   onClick={() => setSelectedEntryId(entry.entry_id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                  className={`px-3 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
+                      : 'bg-mist text-muted hover:bg-silver'
                   }`}
                 >
                   {entry.entry_name}
@@ -1523,12 +1523,12 @@ function ViewBracketPickerPredictionsModal({
             <>
               {/* Champion highlight */}
               {bracket?.champion && (
-                <div className="mb-5 text-center p-4 rounded-2xl bg-gradient-to-br from-warning-50 to-warning-100 border-2 border-warning-300">
+                <div className="mb-5 text-center p-4 rounded-card bg-gradient-to-br from-warning-500/12 to-warning-500/20 border-2 border-warning-500/30">
                   <div className="text-3xl mb-1">&#127942;</div>
                   <p className="text-xs font-semibold text-warning-600 uppercase tracking-wide mb-1">Predicted Champion</p>
                   <div className="flex items-center justify-center gap-2">
                     {bracket.champion.flag_url && (
-                      <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-md object-cover" />
+                      <img src={bracket.champion.flag_url} alt="" className="w-8 h-6 rounded-[2px] object-cover" />
                     )}
                     <span className="text-lg font-bold text-ink">{bracket.champion.country_name}</span>
                   </div>
@@ -1561,7 +1561,7 @@ function ViewBracketPickerPredictionsModal({
                       .sort((a, b) => a.predicted_position - b.predicted_position)
                     if (groupRanks.length === 0) return null
                     return (
-                      <div key={letter} className="bg-snow rounded-xl p-2.5">
+                      <div key={letter} className="bg-snow rounded-chip p-2.5">
                         <div className="text-xs font-bold text-ink mb-1.5">Group {letter}</div>
                         <div className="space-y-1">
                           {groupRanks.map((rank, i) => {
@@ -1572,7 +1572,7 @@ function ViewBracketPickerPredictionsModal({
                                   i === 0 ? 'text-success-600' : i === 1 ? 'text-primary-600' : 'text-muted'
                                 }`}>{i + 1}</span>
                                 {team?.flag_url && (
-                                  <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
+                                  <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-[2px] object-cover" />
                                 )}
                                 <span className="text-xs text-ink truncate">{team?.country_name || 'Unknown'}</span>
                               </div>
@@ -1588,7 +1588,7 @@ function ViewBracketPickerPredictionsModal({
               {/* Third-Place Rankings */}
               <div className="mb-5">
                 <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Third-Place Rankings</h4>
-                <div className="bg-snow rounded-xl p-3">
+                <div className="bg-snow rounded-chip p-3">
                   <div className="space-y-1">
                     {[...bpData.thirdPlaceRankings]
                       .sort((a, b) => a.rank - b.rank)
@@ -1601,14 +1601,14 @@ function ViewBracketPickerPredictionsModal({
                               {i + 1}
                             </span>
                             {team?.flag_url && (
-                              <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
+                              <img src={team.flag_url} alt="" className="w-5 h-3.5 rounded-[2px] object-cover" />
                             )}
                             <span className="text-xs text-ink flex-1 truncate">{team?.country_name || 'Unknown'}</span>
                             <span className="text-xs text-muted">Grp {ranking.group_letter}</span>
                             {qualifies ? (
-                              <span className="text-[10px] font-medium text-success-600 bg-success-50 px-1.5 py-0.5 rounded">Q</span>
+                              <span className="text-[10px] font-medium text-success-900 bg-success-600/12 px-1.5 py-0.5 rounded-chip">Q</span>
                             ) : (
-                              <span className="text-[10px] font-medium text-muted bg-neutral-100 px-1.5 py-0.5 rounded">E</span>
+                              <span className="text-[10px] font-medium text-muted bg-mist px-1.5 py-0.5 rounded-chip">E</span>
                             )}
                           </div>
                         )
@@ -1640,7 +1640,7 @@ function ViewBracketPickerPredictionsModal({
                       </div>
                       <div className="space-y-1">
                         {stagePicks.map(({ match, pick, winnerTeam, resolved }) => (
-                          <div key={match.match_id} className="bg-snow rounded-xl px-3 py-2">
+                          <div key={match.match_id} className="bg-snow rounded-chip px-3 py-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono text-muted shrink-0 w-7 text-right">
                                 #{match.match_number}
@@ -1657,7 +1657,7 @@ function ViewBracketPickerPredictionsModal({
                               {winnerTeam ? (
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {winnerTeam.flag_url && (
-                                    <img src={winnerTeam.flag_url} alt="" className="w-5 h-3.5 rounded-md object-cover" />
+                                    <img src={winnerTeam.flag_url} alt="" className="w-5 h-3.5 rounded-[2px] object-cover" />
                                   )}
                                   <span className="text-xs font-semibold text-success-700">{winnerTeam.country_name}</span>
                                   {pick?.predicted_penalty && (
@@ -1680,7 +1680,7 @@ function ViewBracketPickerPredictionsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:px-6 pt-3 border-t border-neutral-100 shrink-0">
+        <div className="p-4 sm:px-6 pt-3 border-t border-border-subtle shrink-0">
           <div className="flex justify-end">
             <Button variant="gray" onClick={onClose}>
               Close
@@ -1729,7 +1729,7 @@ function UnlockPredictionsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-lg font-bold text-ink mb-3">
           Unlock Predictions
         </h3>
@@ -1745,7 +1745,7 @@ function UnlockPredictionsModal({
               Select entry to unlock
             </label>
             <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-xl hover:bg-snow">
+              <label className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-chip hover:bg-snow">
                 <input
                   type="radio"
                   name="unlock_entry"
@@ -1759,7 +1759,7 @@ function UnlockPredictionsModal({
               {submittedEntries.map((entry) => (
                 <label
                   key={entry.entry_id}
-                  className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-xl hover:bg-snow"
+                  className="flex items-center gap-2 text-sm text-ink cursor-pointer p-2 rounded-chip hover:bg-snow"
                 >
                   <input
                     type="radio"
@@ -1858,7 +1858,7 @@ function AdjustPointsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-xl font-bold text-ink mb-4">
           Adjust Points - {member.users.username}
         </h3>
@@ -1876,10 +1876,10 @@ function AdjustPointsModal({
                 <button
                   key={entry.entry_id}
                   onClick={() => setSelectedEntryId(entry.entry_id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                  className={`px-3 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition ${
                     selectedEntryId === entry.entry_id
                       ? 'bg-primary-600 text-white'
-                      : 'bg-neutral-100 text-muted hover:bg-neutral-200'
+                      : 'bg-mist text-muted hover:bg-silver'
                   }`}
                 >
                   {entry.entry_name} ({getEntryTotalPoints(entry)} pts)
@@ -1905,7 +1905,7 @@ function AdjustPointsModal({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPointAdjustment((p: number) => p - 1)}
-              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-ink hover:bg-neutral-100"
+              className="w-10 h-10 rounded border border-border-default text-lg font-bold text-ink hover:bg-mist"
             >
               -
             </button>
@@ -1915,11 +1915,11 @@ function AdjustPointsModal({
               onChange={(e) =>
                 setPointAdjustment(parseInt(e.target.value) || 0)
               }
-              className="w-24 h-10 text-center border border-neutral-300 rounded-xl font-bold text-lg text-ink"
+              className="w-24 h-10 text-center border border-border-default rounded-control font-bold text-lg text-ink"
             />
             <button
               onClick={() => setPointAdjustment((p: number) => p + 1)}
-              className="w-10 h-10 rounded border border-neutral-300 text-lg font-bold text-ink hover:bg-neutral-100"
+              className="w-10 h-10 rounded border border-border-default text-lg font-bold text-ink hover:bg-mist"
             >
               +
             </button>
@@ -1935,7 +1935,7 @@ function AdjustPointsModal({
             onChange={(e) => setAdjustReason(e.target.value)}
             placeholder="Explain the reason for this adjustment..."
             rows={3}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-sm text-ink focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border-default rounded-control text-sm text-ink focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
 
@@ -2001,14 +2001,14 @@ function DeleteEntryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+      <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
         <h3 className="text-lg font-bold text-danger-600 mb-1">Delete Entry</h3>
         <p className="text-sm text-muted mb-3">
           Pick an entry to delete from{' '}
           <span className="font-bold">{member.users.username}</span>.
         </p>
         {!targetIsAdmin && (
-          <div className="bg-snow border border-border-default rounded-xl p-3 mb-3">
+          <div className="bg-snow border border-border-default rounded-chip p-3 mb-3">
             <p className="text-xs text-muted">
               Players need at least one entry. To take {member.users.username}{' '}
               out of the pool entirely, use Remove from Pool.
@@ -2028,7 +2028,7 @@ function DeleteEntryModal({
             return (
               <div
                 key={entry.entry_id}
-                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border-default"
+                className="flex items-center justify-between gap-3 p-3 rounded-chip border border-border-default"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink truncate">
@@ -2051,14 +2051,14 @@ function DeleteEntryModal({
                     <button
                       onClick={() => setConfirmingEntryId(null)}
                       disabled={loading}
-                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-neutral-100 text-ink hover:bg-neutral-200 transition disabled:opacity-50"
+                      className="px-2.5 py-1.5 text-xs rounded-control font-semibold bg-mist text-ink hover:bg-silver transition disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => onDelete(entry)}
                       disabled={loading}
-                      className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50"
+                      className="px-2.5 py-1.5 text-xs rounded-control font-semibold bg-danger-600 text-white hover:bg-danger-700 transition disabled:opacity-50"
                     >
                       {loading ? 'Deleting…' : 'Confirm'}
                     </button>
@@ -2067,7 +2067,7 @@ function DeleteEntryModal({
                   <button
                     onClick={() => setConfirmingEntryId(entry.entry_id)}
                     disabled={loading}
-                    className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-danger-50 text-danger-700 hover:bg-danger-100 transition disabled:opacity-50"
+                    className="px-2.5 py-1.5 text-xs rounded-control font-semibold bg-danger-600/12 text-danger-800 hover:bg-danger-600/20 transition disabled:opacity-50"
                   >
                     Delete
                   </button>
