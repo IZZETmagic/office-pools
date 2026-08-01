@@ -167,18 +167,26 @@ function SettingsRow({
 }
 
 function DangerRow({
-  icon, title, subtitle, tone, onClick,
-}: { icon: string; title: string; subtitle: string; tone: string; onClick: () => void }) {
+  icon, title, subtitle, tone, action, onClick,
+}: {
+  icon: string; title: string; subtitle: string
+  tone: string; action: string; onClick: () => void
+}) {
   return (
-    <button type="button" onClick={onClick}
-      className="w-full flex items-center gap-3 py-2 text-left transition-opacity hover:opacity-70">
+    // The row is a div, not a button: the action lives in a real Button on the
+    // right, and a button inside a button is invalid. RN uses a chevron because
+    // the whole row is the tap target on a phone; on web the explicit control
+    // is clearer and keeps the destructive action a deliberate click.
+    <div className="flex items-center gap-3 py-2">
       <Icon name={icon} size={16} weight="semibold" className={`shrink-0 ${tone}`} />
-      <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span className={`text-sm font-bold ${tone}`}>{title}</span>
         <span className="text-[11px] text-muted">{subtitle}</span>
-      </span>
-      <Icon name="chevron.right" size={11} weight="semibold" className="shrink-0 text-muted" />
-    </button>
+      </div>
+      <Button variant="warning" size="sm" className="shrink-0" onClick={onClick}>
+        {action}
+      </Button>
+    </div>
   )
 }
 
@@ -833,6 +841,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               title="Stop Participating"
               subtitle="Delete your entries; stay on as admin"
               tone="text-warning-800"
+              action="Stop"
               onClick={() => setShowStopConfirm(true)}
             />
           )}
@@ -842,6 +851,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             title="Archive Pool"
             subtitle="Files the pool away for everyone. Nothing is deleted, and you can restore it at any time from your profile."
             tone="text-warning-800"
+            action="Archive"
             onClick={() => setShowArchiveModal(true)}
           />
 
