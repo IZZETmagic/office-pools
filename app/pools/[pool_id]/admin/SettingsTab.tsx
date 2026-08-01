@@ -140,8 +140,15 @@ function ShareButton({
   )
 }
 
-function Caption({ children, tone }: { children: React.ReactNode; tone?: string }) {
-  return <h3 className={`t-caption ${tone ?? 'text-muted'}`}>{children}</h3>
+function Caption({
+  children, tone, icon,
+}: { children: React.ReactNode; tone?: string; icon?: string }) {
+  return (
+    <h3 className={`t-caption flex items-center gap-2 ${tone ?? 'text-muted'}`}>
+      {icon && <Icon name={icon} size={13} weight="semibold" className="shrink-0" />}
+      {children}
+    </h3>
+  )
 }
 
 
@@ -436,13 +443,13 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   // concept sharing a column with lifecycle. It now has its own toggle below
   // (migration 025); this control is lifecycle only.
   const statusOptions = [
-    { value: 'open' as const, label: 'Open', desc: 'Pool is running' },
-    { value: 'completed' as const, label: 'Completed', desc: 'Tournament finished' },
+    { value: 'open' as const, label: 'Open', desc: 'Scoring is live and members can play.' },
+    { value: 'completed' as const, label: 'Completed', desc: 'Locked — nothing new is scored.' },
   ]
 
   const acceptingOptions = [
-    { value: true as const, label: 'Accepting', desc: 'Anyone with the code can join' },
-    { value: false as const, label: 'Not accepting', desc: 'No new members can join' },
+    { value: true as const, label: 'Accepting', desc: 'Anyone with the code can join.' },
+    { value: false as const, label: 'Not accepting', desc: 'Nobody new can join, even with the code.' },
   ]
 
   /**
@@ -519,8 +526,8 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   }
 
   const visibilityOptions = [
-    { value: false as const, label: 'Public', desc: 'Anyone with code can join' },
-    { value: true as const, label: 'Private', desc: 'Requires pool code to join' },
+    { value: false as const, label: 'Public', desc: 'Listed in Discover, so people can find it without a code.' },
+    { value: true as const, label: 'Private', desc: 'Hidden from Discover. People need the code.' },
   ]
 
   return (
@@ -544,7 +551,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             admin can hold the screen up and let someone scan straight away; the
             code underneath is the spoken/typed fallback. Mirrors the RN card. */}
         <Card padding="sm" className="lg:col-span-2 flex flex-col gap-2.5">
-          <Caption>Share &amp; Invite</Caption>
+          <Caption icon="qrcode">Share &amp; Invite</Caption>
 
           {/* Stacked on a phone, side-by-side from lg. Stacked it is ~400px
               tall, which on a two-column desktop grid left a dead half-row
@@ -591,9 +598,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Pool Information ── */}
         <Card padding="sm">
-          <Caption>
-            Pool Information
-          </Caption>
+          <Caption icon="doc.text">Pool Information</Caption>
 
           <div className="space-y-4">
             <FieldRow label="Pool Name *">
@@ -620,7 +625,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         {/* ── Prediction Deadline ── */}
         <Card padding="sm">
           <div className="flex items-center gap-2 mb-4">
-            <Caption>
+            <Caption icon="calendar">
               {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
             </Caption>
             {pool.prediction_mode === 'progressive' && (
@@ -699,7 +704,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
       {/* ── Status ── */}
       <Card padding="sm">
-        <Caption>Status</Caption>
+        <Caption icon="checkmark.circle.fill">Status</Caption>
         <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
         <p className="text-xs text-muted mt-2.5">
           {statusOptions.find(s => s.value === status)?.desc}
@@ -708,18 +713,17 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
       {/* ── New Members ── */}
       <Card padding="sm">
-        <Caption>New Members</Caption>
+        <Caption icon="person.badge.plus">New Members</Caption>
         <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
         <p className="text-xs text-muted mt-2.5">
           {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
-          {' '}Independent of pool status — the pool stays visible to existing members either way.
         </p>
       </Card>
 
 
         {/* ── Visibility ── */}
         <Card padding="sm">
-          <Caption>Visibility</Caption>
+          <Caption icon="eye">Visibility</Caption>
           <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
           <p className="text-xs text-muted mt-2.5">
             {visibilityOptions.find(o => o.value === isPrivate)?.desc}
@@ -728,7 +732,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Max Members ── */}
         <Card padding="sm">
-          <Caption>Max Members</Caption>
+          <Caption icon="person.3.fill">Max Members</Caption>
           <SettingsRow
             label="Cap on total members"
             subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : `${maxParticipants} max`}
@@ -742,11 +746,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Prediction Entries ── */}
         <Card padding="sm">
-          <Caption>
-            Prediction Entries
-          </Caption>
+          <Caption icon="list.number">Prediction Entries</Caption>
           <p className="text-sm text-muted mb-4">
-            Allow members to submit multiple sets of predictions. Each entry is scored independently.
+            Each entry is scored separately on the leaderboard.
           </p>
 
           <div className="space-y-4">
@@ -767,11 +769,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Entry Fees ── */}
         <Card padding="sm">
-          <Caption>
-            Entry Fees
-          </Caption>
+          <Caption icon="dollarsign.circle.fill">Entry Fees</Caption>
           <p className="text-sm text-muted mb-4">
-            Set an entry fee that members pay for each entry. Leave blank for a free pool.
+            Leave blank for a free pool.
           </p>
 
           <div className="space-y-4">
@@ -816,7 +816,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Danger Zone ── */}
         <Card padding="sm" className="lg:col-span-2 border border-danger-200">
-          <Caption tone="text-danger-700">
+          <Caption icon="exclamationmark.triangle.fill" tone="text-danger-700">
             Danger Zone
           </Caption>
 
