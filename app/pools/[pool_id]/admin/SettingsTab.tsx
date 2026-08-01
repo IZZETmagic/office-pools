@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { Icon } from '@/components/ui/Icon'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -26,25 +27,32 @@ type SettingsTabProps = {
    field label above its control, a 14px semibold row title with an 11px slate
    subtitle beside it, and a half-pixel silver rule at 50%. */
 
-/* SegmentedPicker: a mist track with the active option raised on a surface pill.
-   Not a bordered button group — RN's has no borders and the active state is
-   carried by elevation, which is what makes it read as a switch rather than a
-   toolbar. (mobile SettingsTab, SegmentedPicker) */
+/* SegmentedPicker: the same control as the My Pools / Discover toggle — a mist
+   track with one surface pill that slides between the options, rather than each
+   option toggling its own background. useSlideIndicator measures the active
+   button and animates left/width; it keys off data-tab-key, so boolean values
+   are stringified for it. Shared with PoolsClient and DashboardClient. */
 function SegmentedPicker<T extends string | boolean>({
   value, options, onChange,
 }: { value: T; options: Array<{ value: T; label: string }>; onChange: (v: T) => void }) {
+  const { containerRef, indicatorStyle, ready } = useSlideIndicator(String(value))
   return (
-    <div className="flex gap-[3px] p-[3px] rounded-control bg-mist">
+    <div ref={containerRef} className="relative flex gap-1 bg-mist rounded-pill p-1">
+      <div
+        className={`absolute top-1 bottom-1 bg-surface rounded-pill shadow-sm pointer-events-none ${ready ? 'transition-all duration-300 ease-out' : ''}`}
+        style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+      />
       {options.map((opt) => {
         const active = opt.value === value
         return (
           <button
             key={String(opt.value)}
             type="button"
+            data-tab-key={String(opt.value)}
             onClick={() => onChange(opt.value)}
             aria-pressed={active}
-            className={`flex-1 py-2 rounded-chip text-[13px] transition-colors ${
-              active ? 'bg-surface font-bold text-ink shadow-card' : 'font-medium text-muted'
+            className={`relative z-10 flex-1 px-4 py-2 rounded-pill text-sm font-bold transition-colors ${
+              active ? 'text-ink' : 'text-muted hover:text-ink'
             }`}
           >
             {opt.label}
