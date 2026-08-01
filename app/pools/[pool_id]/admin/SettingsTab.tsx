@@ -183,7 +183,7 @@ function DangerRow({
         <span className={`text-sm font-bold ${tone}`}>{title}</span>
         <span className="text-[11px] text-muted">{subtitle}</span>
       </div>
-      <Button variant="warning" size="sm" className="shrink-0" onClick={onClick}>
+      <Button variant="warning" size="sm" className="shrink-0 w-32 whitespace-nowrap" onClick={onClick}>
         {action}
       </Button>
     </div>
@@ -841,7 +841,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               title="Stop Participating"
               subtitle="Delete your entries; stay on as admin"
               tone="text-warning-800"
-              action="Stop"
+              action="Stop Participating"
               onClick={() => setShowStopConfirm(true)}
             />
           )}
