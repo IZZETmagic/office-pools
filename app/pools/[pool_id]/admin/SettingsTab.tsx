@@ -144,9 +144,6 @@ function Caption({ children, tone }: { children: React.ReactNode; tone?: string 
   return <h3 className={`t-caption ${tone ?? 'text-muted'}`}>{children}</h3>
 }
 
-function Divider() {
-  return <div className="h-px bg-silver/50 my-1" />
-}
 
 function FieldRow({
   label, children, className, helperText,
@@ -546,13 +543,17 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         {/* Share & Invite. The QR is inline rather than behind a modal so an
             admin can hold the screen up and let someone scan straight away; the
             code underneath is the spoken/typed fallback. Mirrors the RN card. */}
-        <Card padding="sm" className="flex flex-col gap-2.5">
+        <Card padding="sm" className="lg:col-span-2 flex flex-col gap-2.5">
           <Caption>Share &amp; Invite</Caption>
 
-          <div className="flex flex-col items-center gap-3">
+          {/* Stacked on a phone, side-by-side from lg. Stacked it is ~400px
+              tall, which on a two-column desktop grid left a dead half-row
+              beside whatever card sat next to it; laid out wide it is short
+              enough that every row below pairs evenly. */}
+          <div className="flex flex-col lg:flex-row items-center lg:items-center gap-5 lg:gap-8">
             {/* Solid white plate regardless of theme — QR readers need a light
                 quiet zone, and a themed surface would break scanning in dark. */}
-            <div className="p-3 rounded-card bg-white shadow-card">
+            <div className="p-3 rounded-card bg-white shadow-card shrink-0">
               {qrDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={qrDataUrl} alt={`QR code to join with pool code ${pool.pool_code}`}
@@ -562,27 +563,29 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               )}
             </div>
 
-            <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[13px] font-medium text-muted">Pool Code</span>
-              <span className="t-num t-num-extrabold text-[22px] text-ink tracking-[0.125em]">
-                {pool.pool_code}
-              </span>
-            </div>
-          </div>
+            <div className="flex-1 min-w-0 w-full flex flex-col items-center lg:items-start gap-3">
+              <div className="flex flex-col items-center lg:items-start gap-0.5">
+                <span className="text-[13px] font-medium text-muted">Pool Code</span>
+                <span className="t-num t-num-extrabold text-[22px] text-ink tracking-[0.125em]">
+                  {pool.pool_code}
+                </span>
+              </div>
 
-          <div className="flex gap-2">
-            <ShareButton
-              label={copiedKey === 'code' ? 'Copied!' : 'Copy Code'}
-              icon={copiedKey === 'code' ? 'checkmark' : 'doc.on.doc'}
-              active={copiedKey === 'code'}
-              onClick={() => copyShare('code')}
-            />
-            <ShareButton
-              label={copiedKey === 'link' ? 'Copied!' : 'Copy Link'}
-              icon={copiedKey === 'link' ? 'checkmark' : 'link'}
-              active={copiedKey === 'link'}
-              onClick={() => copyShare('link')}
-            />
+              <div className="flex gap-2 w-full lg:max-w-sm">
+                <ShareButton
+                  label={copiedKey === 'code' ? 'Copied!' : 'Copy Code'}
+                  icon={copiedKey === 'code' ? 'checkmark' : 'doc.on.doc'}
+                  active={copiedKey === 'code'}
+                  onClick={() => copyShare('code')}
+                />
+                <ShareButton
+                  label={copiedKey === 'link' ? 'Copied!' : 'Copy Link'}
+                  icon={copiedKey === 'link' ? 'checkmark' : 'link'}
+                  active={copiedKey === 'link'}
+                  onClick={() => copyShare('link')}
+                />
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -611,31 +614,8 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
                 className="w-full px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent text-ink"
               />
             </FieldRow>
-
-            <FieldRow label="Pool Status">
-              <SegmentedPicker
-                  value={status}
-                  options={statusOptions}
-                  onChange={setStatus}
-                />
-              <p className="text-xs text-muted mt-1.5">
-                {statusOptions.find(s => s.value === status)?.desc}
-              </p>
-            </FieldRow>
-
-            <FieldRow label="New Members">
-              <SegmentedPicker
-                  value={acceptingMembers}
-                  options={acceptingOptions}
-                  onChange={setAcceptingMembers}
-                />
-              <p className="text-xs text-muted mt-1.5">
-                {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
-                {' '}Independent of pool status — the pool stays visible to existing members either way.
-              </p>
-            </FieldRow>
-          </div>
-        </Card>
+        </div>
+      </Card>
 
         {/* ── Prediction Deadline ── */}
         <Card padding="sm">
@@ -717,36 +697,47 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           </div>
         </Card>
 
-        {/* ── Access & Limits ── */}
+      {/* ── Status ── */}
+      <Card padding="sm">
+        <Caption>Status</Caption>
+        <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
+        <p className="text-xs text-muted mt-2.5">
+          {statusOptions.find(s => s.value === status)?.desc}
+        </p>
+      </Card>
+
+      {/* ── New Members ── */}
+      <Card padding="sm">
+        <Caption>New Members</Caption>
+        <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
+        <p className="text-xs text-muted mt-2.5">
+          {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
+          {' '}Independent of pool status — the pool stays visible to existing members either way.
+        </p>
+      </Card>
+
+
+        {/* ── Visibility ── */}
         <Card padding="sm">
-          <Caption>
-            Access & Limits
-          </Caption>
+          <Caption>Visibility</Caption>
+          <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
+          <p className="text-xs text-muted mt-2.5">
+            {visibilityOptions.find(o => o.value === isPrivate)?.desc}
+          </p>
+        </Card>
 
-          <div className="space-y-4">
-            <FieldRow label="Pool Visibility">
-              <SegmentedPicker
-                  value={isPrivate}
-                  options={visibilityOptions}
-                  onChange={setIsPrivate}
-                />
-              <p className="text-xs text-muted mt-1.5">
-                {visibilityOptions.find(o => o.value === isPrivate)?.desc}
-              </p>
-            </FieldRow>
-
-            <Divider />
-
-            <SettingsRow
-              label="Cap on total members"
-              subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : `${maxParticipants} max`}
-            >
-              <Stepper
-                value={parseInt(maxParticipants) || 0}
-                onChange={(v) => setMaxParticipants(String(v))}
-              />
-            </SettingsRow>
-          </div>
+        {/* ── Max Members ── */}
+        <Card padding="sm">
+          <Caption>Max Members</Caption>
+          <SettingsRow
+            label="Cap on total members"
+            subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : `${maxParticipants} max`}
+          >
+            <Stepper
+              value={parseInt(maxParticipants) || 0}
+              onChange={(v) => setMaxParticipants(String(v))}
+            />
+          </SettingsRow>
         </Card>
 
         {/* ── Prediction Entries ── */}
