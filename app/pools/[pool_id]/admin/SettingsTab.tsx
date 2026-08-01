@@ -156,7 +156,7 @@ function FieldRow({
   label, children, className, helperText,
 }: { label: string; children: React.ReactNode; className?: string; helperText?: string }) {
   return (
-    <div className={`flex flex-col gap-1 ${className ?? ''}`}>
+    <div className={`flex flex-col gap-1 min-h-0 ${className ?? ''}`}>
       <span className="text-xs font-medium text-muted">{label}</span>
       {children}
       {helperText && <span className="text-[11px] text-muted">{helperText}</span>}
@@ -597,10 +597,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Pool Information ── */}
-        <Card padding="sm">
+        <Card padding="sm" className="lg:self-stretch flex flex-col">
           <Caption icon="doc.text">Pool Information</Caption>
 
-          <div className="space-y-4">
+          <div className="flex-1 flex flex-col gap-4 mt-2.5">
             <FieldRow label="Pool Name *">
               <Input
                 type="text"
@@ -610,13 +610,13 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               />
             </FieldRow>
 
-            <FieldRow label="Description">
+            <FieldRow label="Description" className="flex-1">
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your pool..."
                 rows={3}
-                className="w-full px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent text-ink"
+                className="w-full flex-1 min-h-[4.5rem] resize-none px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent text-ink"
               />
             </FieldRow>
         </div>
