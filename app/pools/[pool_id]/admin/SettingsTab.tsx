@@ -400,14 +400,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
           </div>
 
           {pool.prediction_mode === 'progressive' && (
-            <div className="mb-4 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl dark:bg-blue-900/20 dark:border-blue-800">
-              <svg className="w-5 h-5 text-blue-800 dark:text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-              </svg>
-              <p className="text-xs text-blue-800 dark:text-blue-600 leading-5">
-                This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
-              </p>
-            </div>
+            <Alert variant="info">
+              This pool uses progressive predictions. Round-specific deadlines are managed in the <strong>Rounds</strong> tab. The deadline below applies to the initial group stage.
+            </Alert>
           )}
 
           {currentDeadline && (
@@ -561,14 +556,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             </FormField>
 
             {parseInt(maxEntries) > 1 && (
-              <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
-                <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                </svg>
-                <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
+              <Alert variant="info" className="text-xs">
                   Members will be able to create up to {maxEntries} entries (e.g. &quot;Serious&quot;, &quot;Fun&quot;). Each entry appears as its own row on the leaderboard.
-                </p>
-              </div>
+                </Alert>
             )}
           </div>
         </Card>
@@ -615,14 +605,9 @@ export function SettingsTab({ pool, setPool, members, onDirtyChange }: SettingsT
             </div>
 
             {entryFee && parseFloat(entryFee) > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl dark:bg-primary-900/20 dark:border-primary-800">
-                <svg className="w-5 h-5 text-primary-800 dark:text-primary-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
-                </svg>
-                <p className="text-xs text-primary-800 dark:text-primary-600 leading-5">
+              <Alert variant="info" className="text-xs">
                   Each entry will cost {new Intl.NumberFormat(undefined, { style: 'currency', currency: entryFeeCurrency }).format(parseFloat(entryFee))}. Track payments in the <strong>Fees</strong> tab.
-                </p>
-              </div>
+                </Alert>
             )}
           </div>
         </Card>

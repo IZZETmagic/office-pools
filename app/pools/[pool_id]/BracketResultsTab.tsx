@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState, useMemo } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { getLiveClock, getMatchStatusBadge, type MatchStatusBadge } from '@/lib/matchStatus'
 import {
   calculateGroupStandings,
@@ -777,9 +778,9 @@ function KnockoutComparison({
         )}
       </div>
 
-      <div className="bg-primary-50 border border-primary-200 rounded-card px-4 py-2 mb-6 text-xs text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-600">
+      <Alert variant="info" className="mb-6 text-xs">
         Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-chip align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-chip align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
-      </div>
+      </Alert>
 
       {/* Split bracket — two halves stacked */}
       <div className="space-y-8">
