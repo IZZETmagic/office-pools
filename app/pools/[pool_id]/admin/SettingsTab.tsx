@@ -545,12 +545,17 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {/* Three blocks, not one grid. The full-width cards (Share & Invite,
+          Danger Zone) sit directly in this column; the two-column regions are
+          their own grids so each can align independently. A single grid with
+          `items-start` could not do that — it switched off stretch for every
+          card at once, which is what left them at ragged content heights. */}
+      <div className="flex flex-col gap-4">
 
         {/* Share & Invite. The QR is inline rather than behind a modal so an
             admin can hold the screen up and let someone scan straight away; the
             code underneath is the spoken/typed fallback. Mirrors the RN card. */}
-        <Card padding="sm" className="lg:col-span-2 flex flex-col gap-2.5">
+        <Card padding="sm" className="flex flex-col gap-2.5">
           <Caption icon="qrcode">Share &amp; Invite</Caption>
 
           {/* Stacked on a phone, side-by-side from lg. Stacked it is ~400px
@@ -596,8 +601,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           </div>
         </Card>
 
+        {/* The two detail cards. Grid's default `stretch` makes the pair equal
+            to the taller of them, so neither carries a min-height. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
         {/* ── Pool Information ── */}
-        <Card padding="sm" className="lg:self-stretch flex flex-col">
+        <Card padding="sm" className="flex flex-col">
           <Caption icon="doc.text">Pool Information</Caption>
 
           <div className="flex-1 flex flex-col gap-4 mt-2.5">
@@ -702,8 +711,17 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           </div>
         </Card>
 
-      {/* ── Status ── */}
-      <Card padding="sm" className="lg:min-h-38">
+        </div>
+
+        {/* The six single-setting cards. `auto-rows-fr` equalises every row in
+            this grid, so all six match rather than only matching their
+            row-mate. The per-card min-height this replaces could only ever lift
+            the short cards up to a floor — the two tallest (Prediction Entries,
+            Entry Fees) stood above it and stayed uneven. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:auto-rows-fr">
+
+        {/* ── Status ── */}
+        <Card padding="sm">
         <Caption icon="checkmark.circle.fill">Status</Caption>
         <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
         <p className="t-detail text-muted mt-2.5">
@@ -712,7 +730,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       </Card>
 
       {/* ── New Members ── */}
-      <Card padding="sm" className="lg:min-h-38">
+      <Card padding="sm">
         <Caption icon="person.badge.plus">New Members</Caption>
         <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
         <p className="t-detail text-muted mt-2.5">
@@ -722,7 +740,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
 
         {/* ── Visibility ── */}
-        <Card padding="sm" className="lg:min-h-38">
+        <Card padding="sm">
           <Caption icon="eye">Visibility</Caption>
           <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
           <p className="t-detail text-muted mt-2.5">
@@ -731,7 +749,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Max Members ── */}
-        <Card padding="sm" className="lg:min-h-38">
+        <Card padding="sm">
           <Caption icon="person.3.fill">Max Members</Caption>
           <SettingsRow
             label="Cap on total members"
@@ -745,7 +763,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Prediction Entries ── */}
-        <Card padding="sm" className="lg:min-h-38">
+        <Card padding="sm">
           <Caption icon="list.number">Prediction Entries</Caption>
           <p className="t-body text-muted mb-4">
             Each entry is scored separately on the leaderboard.
@@ -768,7 +786,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Entry Fees ── */}
-        <Card padding="sm" className="lg:min-h-38">
+        <Card padding="sm">
           <Caption icon="dollarsign.circle.fill">Entry Fees</Caption>
           <p className="t-body text-muted mb-4">
             Leave blank for a free pool.
@@ -814,8 +832,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           </div>
         </Card>
 
+        </div>
+
         {/* ── Danger Zone ── */}
-        <Card padding="sm" className="lg:col-span-2 border border-danger-200">
+        <Card padding="sm" className="border border-danger-200">
           <Caption icon="exclamationmark.triangle.fill" tone="text-danger-700">
             Danger Zone
           </Caption>
