@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PoolData, MemberData, EntryData, PredictionData, MatchData, TeamData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick } from '../types'
 import { Card } from '@/components/ui/Card'
+import { Select } from '@/components/ui/Select'
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -172,6 +174,26 @@ export function MembersTab({
   // Get the true total points for an entry (client-side computed match + bonus, falling back to pool_entries)
   function getEntryTotalPoints(entry: EntryData): number {
     return computedEntryTotals.get(entry.entry_id) ?? entry.scored_total_points ?? 0
+  }
+
+  function memberActions(member: MemberData): ActionMenuItem[] {
+    const entries = member.entries || []
+    return [
+      { key: 'view_predictions', label: 'View Predictions',
+        onSelect: () => { setError(null); setModal({ type: 'view_predictions', member }) } },
+      { key: 'adjust_points', label: 'Adjust Points',
+        onSelect: () => { setError(null); setPointAdjustment(0); setAdjustReason(''); setModal({ type: 'adjust_points', member }) } },
+      { key: 'unlock_predictions', label: 'Unlock Predictions', disabled: !hasUnlockableEntries(member),
+        onSelect: () => { setError(null); setModal({ type: 'unlock_predictions', member }) } },
+      { key: 'promote', label: 'Promote to Admin', disabled: member.role !== 'player',
+        onSelect: () => { setError(null); setModal({ type: 'promote', member }) } },
+      { key: 'demote', label: 'Demote to Player', disabled: !(member.role === 'admin' && adminCount > 1),
+        onSelect: () => { setError(null); setModal({ type: 'demote', member }) } },
+      { key: 'delete_entry', label: 'Delete Entry…', destructive: true, disabled: entries.length === 0,
+        onSelect: () => { setError(null); setModal({ type: 'delete_entry', member }) } },
+      { key: 'remove', label: 'Remove from Pool', destructive: true, disabled: member.role !== 'player',
+        onSelect: () => { setError(null); setRemoveConfirmed(false); setModal({ type: 'remove', member }) } },
+    ]
   }
 
   // Helper: get best entry stats for a member (using true total including bonus)
@@ -555,16 +577,18 @@ export function MembersTab({
           onChange={(e) => setSearch(e.target.value)}
           className="w-full sm:max-w-xs"
         />
-        <select
+        <Select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-3 py-2 border border-border-default rounded-control text-sm text-ink bg-surface"
+          aria-label="Sort members"
         >
-          <option value="rank">Sort by Rank</option>
-          <option value="points">Sort by Points</option>
-          <option value="username">Sort by Username</option>
-          <option value="joined">Sort by Joined Date</option>
-        </select>
+          {/* Direction is in the label because it isn't guessable: points and
+              joined run descending, rank and username ascending. */}
+          <option value="rank">Rank — best first</option>
+          <option value="points">Points — high to low</option>
+          <option value="username">Username — A to Z</option>
+          <option value="joined">Joined — newest first</option>
+        </Select>
       </div>
 
       {/* Members - Mobile card view */}
@@ -618,50 +642,7 @@ export function MembersTab({
                   </Badge>
                   {roundsLoaded && <StatusBadge status={memberStatus(member)} />}
                 </div>
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    const action = e.target.value
-                    e.target.value = ''
-                    setError(null)
-                    switch (action) {
-                      case 'view_predictions':
-                        setModal({ type: 'view_predictions', member })
-                        break
-                      case 'adjust_points':
-                        setPointAdjustment(0)
-                        setAdjustReason('')
-                        setModal({ type: 'adjust_points', member })
-                        break
-                      case 'promote':
-                        setModal({ type: 'promote', member })
-                        break
-                      case 'demote':
-                        setModal({ type: 'demote', member })
-                        break
-                      case 'remove':
-                        setRemoveConfirmed(false)
-                        setModal({ type: 'remove', member })
-                        break
-                      case 'unlock_predictions':
-                        setModal({ type: 'unlock_predictions', member })
-                        break
-                      case 'delete_entry':
-                        setModal({ type: 'delete_entry', member })
-                        break
-                    }
-                  }}
-                  className="text-xs px-2 py-1.5 border border-border-default rounded bg-surface text-ink cursor-pointer"
-                >
-                  <option value="" disabled>Actions</option>
-                  <option value="view_predictions">View Predictions</option>
-                  <option value="adjust_points">Adjust Points</option>
-                  {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
-                  {(member.entries || []).length > 0 && <option value="delete_entry">Delete Entry</option>}
-                  {member.role === 'player' && <option value="promote">Promote</option>}
-                  {member.role === 'admin' && adminCount > 1 && <option value="demote">Demote</option>}
-                  {member.role === 'player' && <option value="remove">Remove</option>}
-                </select>
+                <ActionMenu items={memberActions(member)} />
               </div>
             </div>
           )
@@ -750,65 +731,7 @@ export function MembersTab({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="relative inline-block">
-                        <select
-                          defaultValue=""
-                          onChange={(e) => {
-                            const action = e.target.value
-                            e.target.value = ''
-                            setError(null)
-                                    switch (action) {
-                              case 'view_predictions':
-                                setModal({
-                                  type: 'view_predictions',
-                                  member,
-                                })
-                                break
-                              case 'adjust_points':
-                                setPointAdjustment(0)
-                                setAdjustReason('')
-                                setModal({ type: 'adjust_points', member })
-                                break
-                              case 'promote':
-                                setModal({ type: 'promote', member })
-                                break
-                              case 'demote':
-                                setModal({ type: 'demote', member })
-                                break
-                              case 'remove':
-                                setRemoveConfirmed(false)
-                                setModal({ type: 'remove', member })
-                                break
-                              case 'unlock_predictions':
-                                setModal({ type: 'unlock_predictions', member })
-                                break
-                              case 'delete_entry':
-                                setModal({ type: 'delete_entry', member })
-                                break
-                            }
-                          }}
-                          className="text-xs px-2 py-1.5 border border-border-default rounded bg-surface text-ink cursor-pointer"
-                        >
-                          <option value="" disabled>
-                            Actions
-                          </option>
-                          <option value="view_predictions">
-                            View Predictions
-                          </option>
-                          <option value="adjust_points">Adjust Points</option>
-                          {hasUnlockableEntries(member) && <option value="unlock_predictions">Unlock Predictions</option>}
-                          {(member.entries || []).length > 0 && (
-                            <option value="delete_entry">Delete Entry…</option>
-                          )}
-                          {member.role === 'player' && (
-                            <option value="promote">Promote to Admin</option>
-                          )}
-                          {member.role === 'admin' && adminCount > 1 && (
-                            <option value="demote">Demote to Player</option>
-                          )}
-                          {member.role === 'player' && (
-                            <option value="remove">Remove from Pool</option>
-                          )}
-                        </select>
+                        <ActionMenu items={memberActions(member)} />
                       </div>
                     </td>
                   </tr>
