@@ -541,7 +541,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Alert>
       )}
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* Share & Invite. The QR is inline rather than behind a modal so an
             admin can hold the screen up and let someone scan straight away; the
@@ -587,7 +587,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Pool Information ── */}
-        <Card>
+        <Card padding="sm">
           <Caption>
             Pool Information
           </Caption>
@@ -638,7 +638,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Prediction Deadline ── */}
-        <Card>
+        <Card padding="sm">
           <div className="flex items-center gap-2 mb-4">
             <Caption>
               {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
@@ -718,7 +718,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Access & Limits ── */}
-        <Card>
+        <Card padding="sm">
           <Caption>
             Access & Limits
           </Caption>
@@ -750,7 +750,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Prediction Entries ── */}
-        <Card>
+        <Card padding="sm">
           <Caption>
             Prediction Entries
           </Caption>
@@ -775,7 +775,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Entry Fees ── */}
-        <Card>
+        <Card padding="sm">
           <Caption>
             Entry Fees
           </Caption>
@@ -824,7 +824,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </Card>
 
         {/* ── Danger Zone ── */}
-        <Card className="border border-danger-200">
+        <Card padding="sm" className="lg:col-span-2 border border-danger-200">
           <Caption tone="text-danger-700">
             Danger Zone
           </Caption>
