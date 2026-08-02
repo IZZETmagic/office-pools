@@ -35,11 +35,12 @@ const STAGE_TABS: { key: StageTab; label: string }[] = [
   { key: 'finals', label: 'Finals' },
 ]
 
-const STATUS_OPTIONS: { key: StatusFilter; label: string; activeColor: string }[] = [
-  { key: 'all', label: 'All', activeColor: 'bg-ink text-surface' },
-  { key: 'completed', label: 'Completed', activeColor: 'bg-success-600 text-white' },
-  { key: 'live', label: 'Live', activeColor: 'bg-danger-600 text-white' },
-  { key: 'upcoming', label: 'Upcoming', activeColor: 'bg-muted text-surface' },
+// activeColor is gone with the pills — nothing reads it now.
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All Matches' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'live', label: 'Live' },
+  { key: 'upcoming', label: 'Upcoming' },
 ]
 
 // =============================================
@@ -224,49 +225,21 @@ export function ResultsView({
 
       {/* ── Status filter + Entry selector row ── */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Status pills (desktop) */}
-        <div className="hidden sm:flex gap-1">
+        {/* Status. One select rather than four pills — and one control rather
+            than the two near-identical chip rows this replaces, which differed
+            only in horizontal padding. The count rides in the label so it
+            survives the move. */}
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          aria-label="Filter by match status"
+        >
           {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setStatusFilter(opt.key)}
-              className={`px-3 py-1 t-detail font-bold rounded-pill transition-colors ${
-                statusFilter === opt.key
-                  ? opt.activeColor
-                  : 'bg-mist text-muted hover:bg-silver'
-              }`}
-            >
-              {opt.label}
-              {opt.key !== 'all' && (
-                <span className="ml-1 opacity-70">
-                  {statusCounts[opt.key]}
-                </span>
-              )}
-            </button>
+            <option key={opt.key} value={opt.key}>
+              {opt.key === 'all' ? opt.label : `${opt.label} (${statusCounts[opt.key]})`}
+            </option>
           ))}
-        </div>
-
-        {/* Status pills (mobile) */}
-        <div className="sm:hidden flex gap-1">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setStatusFilter(opt.key)}
-              className={`px-2.5 py-1 t-detail font-bold rounded-pill transition-colors ${
-                statusFilter === opt.key
-                  ? opt.activeColor
-                  : 'bg-mist text-muted hover:bg-silver'
-              }`}
-            >
-              {opt.label}
-              {opt.key !== 'all' && (
-                <span className="ml-0.5 opacity-70">
-                  {statusCounts[opt.key]}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        </Select>
 
         {/* Entry selector (right-aligned, only for multi-entry users) */}
         {userEntries && userEntries.length > 1 && onEntryChange && (
