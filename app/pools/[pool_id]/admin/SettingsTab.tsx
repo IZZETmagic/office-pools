@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 
 type SettingsTabProps = {
   pool: PoolData
@@ -547,6 +548,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     { value: true as const, label: 'Private', desc: 'Hidden from Discover. People need the code.' },
   ]
 
+  // Falls back to full_tournament, matching HowToPlayTab's own default, so a
+  // pool with an unset or unrecognised mode still renders a description rather
+  // than crashing on an undefined lookup.
+  const modeInfo =
+    POOL_MODE_INFO[pool.prediction_mode as PredictionMode] ?? POOL_MODE_INFO.full_tournament
+
   return (
     <div className="relative pb-20">
       {/* No page title. The tab strip above already names this section, and
@@ -567,6 +574,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           `items-start` could not do that — it switched off stretch for every
           card at once, which is what left them at ragged content heights. */}
       <div className="flex flex-col gap-4">
+
+        {/* Share & Invite beside Pool Mode. One grid on default stretch, so the
+            two match height without either carrying a fixed one. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Share & Invite. The QR is inline rather than behind a modal so an
             admin can hold the screen up and let someone scan straight away; the
@@ -616,6 +627,42 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             </div>
           </div>
         </Card>
+
+        {/* ── Pool Mode ──
+            Read-only. The mode is fixed when the pool is created because it
+            determines the shape of every prediction already stored, so this
+            card explains the mode rather than offering to change it. */}
+        <Card padding="sm" className="flex flex-col">
+          <Caption
+            trailing={
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full t-detail font-bold bg-primary-600/12 text-primary-800">
+                {modeInfo.label}
+              </span>
+            }
+          >
+            Pool Mode
+          </Caption>
+
+          <div className="flex-1 flex flex-col gap-3">
+            <p className="t-body text-ink">{modeInfo.summary}</p>
+
+            <ul className="flex flex-col gap-2">
+              {modeInfo.points.map((point) => (
+                <li key={point} className="flex items-start gap-2">
+                  <Icon
+                    name="checkmark.circle.fill"
+                    size={15}
+                    weight="semibold"
+                    className="shrink-0 mt-0.5 text-primary-700"
+                  />
+                  <span className="t-body text-ink">{point}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+
+        </div>
 
         {/* The two detail cards. Grid's default `stretch` makes the pair equal
             to the taller of them, so neither carries a min-height. */}
