@@ -4,6 +4,7 @@ import { useState, useRef, useMemo } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { ListRow } from '@/components/ui/ListRow'
 import { formatTimeAgo } from '@/lib/format'
 import type { EntryData, PredictionData } from '@/app/pools/[pool_id]/types'
 import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
@@ -150,9 +151,10 @@ export function EntriesListView({
           const isRenaming = renamingEntryId === entry.entry_id
 
           return (
-            <div
+            <ListRow
               key={entry.entry_id}
-              className="rounded-card bg-surface shadow-card p-3.5 cursor-pointer hover:bg-mist active:bg-silver transition-colors group"
+              interactive
+              className="group"
               onClick={() => !isRenaming && onEditEntry(entry)}
               role="button"
               tabIndex={0}
@@ -251,7 +253,7 @@ export function EntriesListView({
                 </div>
                 <span className="t-num text-sm text-ink shrink-0">{predictedCount}/{totalMatches}</span>
               </div>
-            </div>
+            </ListRow>
           )
         })}
 

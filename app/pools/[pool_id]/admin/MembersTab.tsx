@@ -7,6 +7,7 @@ import type { PoolData, MemberData, EntryData, PredictionData, MatchData, TeamDa
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/ActionMenu'
+import { ListRow } from '@/components/ui/ListRow'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -535,14 +536,7 @@ export function MembersTab({
           const isCurrentUser = member.user_id === currentUserId
           const best = getBestEntry(member)
           return (
-            <div
-              key={member.member_id}
-              className={`rounded-card p-3.5 border-[1.5px] ${
-                isCurrentUser
-                  ? 'bg-primary-600/8 border-primary-600/25'
-                  : 'bg-surface border-transparent shadow-card'
-              }`}
-            >
+            <ListRow key={member.member_id} selected={isCurrentUser}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -600,7 +594,7 @@ export function MembersTab({
                 </div>
                 <ActionMenu items={memberActions(member)} />
               </div>
-            </div>
+            </ListRow>
           )
         })}
       </div>

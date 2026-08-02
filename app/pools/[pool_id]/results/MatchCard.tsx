@@ -4,6 +4,7 @@ import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from '.
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
 import { LocalTime } from '@/components/LocalTime'
+import { ListRow } from '@/components/ui/ListRow'
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus'
 import type { MatchScoreData } from '../types'
 
@@ -85,13 +86,6 @@ function getLeftBorderColor(result: PointsResult | null, isUpcoming: boolean): s
     case 'miss':
       return 'border-l-danger-500'
   }
-}
-
-function getCardBorder(result: PointsResult | null): string {
-  if (result?.type === 'exact') {
-    return 'border-success-300 dark:border-success-700'
-  }
-  return 'border-border-default'
 }
 
 // =============================================
@@ -179,8 +173,10 @@ export function MatchCard({
   }
 
   return (
-    <div
-      className={`rounded-[14px] bg-surface border ${getCardBorder(pointsResult)} border-l-[3px] ${getLeftBorderColor(pointsResult, isUpcoming)} overflow-hidden animate-fade-up`}
+    <ListRow
+      padded={false}
+      accent={getLeftBorderColor(pointsResult, isUpcoming)}
+      className="overflow-hidden animate-fade-up"
       style={{ animationDelay: `${index * 0.03}s` }}
     >
       {/* ── Top Row: Stage label + Badge/Points ── */}
@@ -326,6 +322,6 @@ export function MatchCard({
           <LocalTime iso={match.match_date} format={formatDate} />
         </span>
       </div>
-    </div>
+    </ListRow>
   )
 }

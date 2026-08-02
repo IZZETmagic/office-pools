@@ -3,6 +3,7 @@
 import type { MemberData, PredictionData } from '@/app/pools/[pool_id]/types'
 import { Icon } from '@/components/ui/Icon'
 import { formatNumber } from '@/lib/format'
+import { ListRow } from '@/components/ui/ListRow'
 
 type SelectedEntry = { entryId: string; ownerName: string; entryName: string }
 
@@ -53,10 +54,12 @@ export function EveryoneElseSection({ members, currentUserId, allPredictions, on
       </h3>
       <div className="space-y-3">
         {rows.map((r) => (
-          <button
+          <ListRow
+            as="button"
             key={r.entryId}
+            interactive
             onClick={() => onSelect({ entryId: r.entryId, ownerName: r.ownerName, entryName: r.entryName })}
-            className="w-full flex items-center gap-3 rounded-card bg-surface shadow-card p-3.5 text-left hover:bg-mist active:bg-silver transition-colors group"
+            className="w-full flex items-center gap-3 text-left group"
           >
             <div className="w-9 h-9 rounded-pill bg-primary-600/12 text-primary-800 flex items-center justify-center t-detail font-bold shrink-0">
               {initials(r.ownerName)}
@@ -71,7 +74,7 @@ export function EveryoneElseSection({ members, currentUserId, allPredictions, on
               </span>
             )}
             <Icon name="chevron.right" size={16} className="text-muted group-hover:text-primary-600 transition-colors shrink-0" />
-          </button>
+          </ListRow>
         ))}
       </div>
     </div>
