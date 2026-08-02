@@ -103,7 +103,7 @@ export function ActionMenu({ items, label = 'Actions', className }: Props) {
       onClick={() => { setOpen(false); item.onSelect() }}
       className={`block w-full text-left px-3 py-2 text-sm rounded-chip transition-colors ${
         item.destructive
-          ? 'text-danger-800 hover:bg-danger-600/12'
+          ? 'text-danger-800 hover:bg-danger-600/20'
           : 'text-ink hover:bg-mist'
       }`}
     >
