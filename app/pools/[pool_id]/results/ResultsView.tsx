@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { MatchCard, type ResultMatch } from './MatchCard'
+import { MatchCard, MatchTableRow, type ResultMatch } from './MatchCard'
 import type { PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
@@ -306,22 +306,51 @@ export function ResultsView({
           </p>
         </div>
       ) : (
-        /* One list, not a grid of cards. At 104 matches a card each was
-           mostly repeated chrome; the container owns the surface, radius
-           and shadow, rows are separated by a hairline and keep their
-           accent edge. */
-        <div className="bg-surface rounded-card shadow-card overflow-hidden divide-y divide-border-subtle dark:shadow-none dark:border dark:border-border-default">
-          {filtered.map((match, i) => (
-            <MatchCard
-              key={match.match_id}
-              match={match}
-              poolSettings={poolSettings}
-              predictionMode={predictionMode}
-              index={i}
-              storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
-            />
-          ))}
-        </div>
+        <>
+          {/* Mobile: the stacked list. Six columns do not fit on a phone, and
+              the card carries the bracket-prediction line the table drops. */}
+          <div className="sm:hidden bg-surface rounded-card shadow-card overflow-hidden divide-y divide-border-subtle dark:shadow-none dark:border dark:border-border-default">
+            {filtered.map((match, i) => (
+              <MatchCard
+                key={match.match_id}
+                match={match}
+                poolSettings={poolSettings}
+                predictionMode={predictionMode}
+                index={i}
+                storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
+              />
+            ))}
+          </div>
+
+          {/* Desktop: a table. Same formatting as the members table — no header
+              fill, a rule under the head, rows separated by border. */}
+          <div className="hidden sm:block bg-surface rounded-card shadow-card overflow-hidden dark:shadow-none dark:border dark:border-border-default">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border-default">
+                  <tr>
+                    <th className="px-4 py-3 text-left t-body font-semibold text-ink whitespace-nowrap">Match</th>
+                    <th className="px-4 py-3 text-right t-body font-semibold text-ink">Home</th>
+                    <th className="px-2 py-3 text-center t-body font-semibold text-ink">Score</th>
+                    <th className="px-4 py-3 text-left t-body font-semibold text-ink">Away</th>
+                    <th className="px-4 py-3 text-center t-body font-semibold text-ink whitespace-nowrap">Your Pick</th>
+                    <th className="px-4 py-3 text-center t-body font-semibold text-ink">Result</th>
+                    <th className="px-4 py-3 text-right t-body font-semibold text-ink">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((match) => (
+                    <MatchTableRow
+                      key={match.match_id}
+                      match={match}
+                      storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

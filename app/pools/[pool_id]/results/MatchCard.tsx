@@ -87,6 +87,25 @@ function getLeftBorderColor(result: PointsResult | null, isUpcoming: boolean): s
   }
 }
 
+/**
+ * Points come from stored match_scores, never recomputed here — see the scoring
+ * architecture rule. Shared by the card and the table row so the two can never
+ * disagree about what a match was worth.
+ */
+function derivePointsResult(storedScore: MatchScoreData | null | undefined): PointsResult | null {
+  if (!storedScore) return null
+  return {
+    points: storedScore.total_points,
+    basePoints: storedScore.base_points,
+    multiplier: storedScore.multiplier,
+    label: storedScore.score_type,
+    type: storedScore.score_type,
+    pso: storedScore.pso_points > 0
+      ? { psoPoints: storedScore.pso_points, psoType: storedScore.score_type }
+      : undefined,
+  }
+}
+
 // =============================================
 // COMPONENT
 // =============================================
@@ -143,18 +162,7 @@ export function MatchCard({
       )
     : null // null = can't determine yet (upcoming / TBD teams)
 
-  // Read points from stored match_scores (single source of truth)
-  let pointsResult: PointsResult | null = null
-  if (storedScore) {
-    pointsResult = {
-      points: storedScore.total_points,
-      basePoints: storedScore.base_points,
-      multiplier: storedScore.multiplier,
-      label: storedScore.score_type,
-      type: storedScore.score_type,
-      pso: storedScore.pso_points > 0 ? { psoPoints: storedScore.pso_points, psoType: storedScore.score_type } : undefined,
-    }
-  }
+  const pointsResult = derivePointsResult(storedScore)
 
   const homeName =
     match.home_team?.country_name || match.home_team_placeholder || 'TBD'
@@ -320,5 +328,126 @@ export function MatchCard({
         </span>
       </div>
     </div>
+  )
+}
+
+// =============================================
+// TABLE ROW (desktop)
+// =============================================
+/**
+ * The same match as a table row. Shares every helper with MatchCard above —
+ * stage label, flags, points derivation — so the two presentations cannot drift
+ * on what they say, only on how much room they say it in.
+ *
+ * The card stays for mobile web, where six columns do not fit.
+ */
+export function MatchTableRow({
+  match,
+  storedScore,
+}: {
+  match: ResultMatch
+  storedScore?: MatchScoreData | null
+}) {
+  const isCompleted = match.status === 'completed'
+  const isLive = match.status === 'live'
+  const isUpcoming = !isCompleted && !isLive
+  const hasActualScores = match.home_score_ft !== null && match.away_score_ft !== null
+  const hasPsoScores = match.home_score_pso !== null && match.away_score_pso !== null
+  const hasPrediction = match.prediction !== null
+  const pointsResult = derivePointsResult(storedScore)
+  const statusBadge = getMatchStatusBadge({
+    status: match.status,
+    statusDetail: match.status_detail,
+    originalMatchDate: match.original_match_date,
+  })
+
+  const homeName = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
+  const awayName = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
+  const homeCode = match.home_team?.country_code ?? ''
+  const awayCode = match.away_team?.country_code ?? ''
+
+  return (
+    <tr className="border-b border-border-default last:border-b-0 hover:bg-snow transition-colors">
+      {/* The outcome accent survives the move to a table as a left edge on the
+          first cell — same colour vocabulary as the mobile card. */}
+      <td className={`px-4 py-3 border-l-[3px] ${getLeftBorderColor(pointsResult, isUpcoming)}`}>
+        <span className="t-body text-muted whitespace-nowrap">
+          {getStageLabel(match.stage, match.group_letter)} · #{match.match_number}
+        </span>
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-2 min-w-0">
+          <span className="t-body text-ink truncate text-right">{homeName}</span>
+          {homeCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>}
+        </div>
+      </td>
+
+      <td className="px-2 py-3 text-center whitespace-nowrap">
+        {hasActualScores ? (
+          <>
+            <span className="t-num t-num-extrabold text-base text-ink">
+              {match.home_score_ft} - {match.away_score_ft}
+            </span>
+            {hasPsoScores && (
+              <span className="t-detail font-bold text-accent-600 block">
+                PSO {match.home_score_pso}-{match.away_score_pso}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="t-body text-muted">vs</span>
+        )}
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {awayCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>}
+          <span className="t-body text-ink truncate">{awayName}</span>
+        </div>
+      </td>
+
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {hasPrediction ? (
+          <span className="t-num text-sm text-ink">
+            {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
+          </span>
+        ) : (
+          <span className="t-body text-muted">—</span>
+        )}
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex justify-center">
+          {pointsResult ? (
+            <PointsBadge result={pointsResult} />
+          ) : statusBadge ? (
+            <span
+              className={`t-caption px-2 py-0.5 rounded-pill ${
+                statusBadge.tone === 'red'
+                  ? 'bg-danger-600/12 text-danger-600'
+                  : 'bg-warning-500/12 text-warning-600'
+              }`}
+            >
+              {statusBadge.label}
+            </span>
+          ) : isLive ? (
+            <span className="inline-flex items-center gap-1 t-caption px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
+              </span>
+              {getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }) ?? 'LIVE'}
+            </span>
+          ) : null}
+        </div>
+      </td>
+
+      <td className="px-4 py-3 text-right">
+        <span className="t-body text-muted whitespace-nowrap">
+          <LocalTime iso={match.match_date} format={formatDate} />
+        </span>
+      </td>
+    </tr>
   )
 }
