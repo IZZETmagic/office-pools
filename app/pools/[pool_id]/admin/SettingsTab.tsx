@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 
 type SettingsTabProps = {
   pool: PoolData
@@ -818,11 +819,14 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
                   onChange={(e) => setEntryFee(e.target.value)}
                 />
               </FieldRow>
-              <FieldRow label="Currency" className="w-28">
-                <select
+              {/* No fixed width: Select sizes itself to its longest option, and
+                  the longest here ("CAD (C$)") does not fit the w-28 this used
+                  to carry. shrink-0 keeps it at that width while Fee Amount
+                  takes the rest. */}
+              <FieldRow label="Currency" className="shrink-0">
+                <Select
                   value={entryFeeCurrency}
                   onChange={(e) => setEntryFeeCurrency(e.target.value)}
-                  className="w-full h-10 px-3 border border-border-default rounded-control text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 "
                 >
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
@@ -834,7 +838,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
                   <option value="JPY">JPY (¥)</option>
                   <option value="CHF">CHF (Fr)</option>
                   <option value="BMD">BMD ($)</option>
-                </select>
+                </Select>
               </FieldRow>
             </div>
 
