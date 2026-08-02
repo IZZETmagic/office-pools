@@ -160,7 +160,7 @@ function MultiplierRow({ label, value }: { label: string; value: number }) {
   )
 }
 
-/** Numbered step, shared by How Points Work and the tie-breaker card. */
+/** Numbered step, used by the tie-breaker card. */
 function Step({ n, children }: { n: number | string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
@@ -235,8 +235,8 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
     ? { ...BP_DEFAULTS, ...settings }
     : BP_DEFAULTS
 
-  // Calculate a sample total for the "How Points Work" example
-  const groupMaxPerTeam = s.bp_group_correct_1st // best single-team score
+  // What a single team carried all the way from R32 would be worth. Used by
+  // the Knockout Stage example.
   const totalKnockoutExample = s.bp_r32_correct + s.bp_r16_correct + s.bp_qf_correct + s.bp_sf_correct + s.bp_final_correct
 
   return (
@@ -279,24 +279,6 @@ function BracketPickerScoringRules({ settings }: { settings: Record<string, any>
         <PointsRow label="Champion Correct" value={s.bp_champion_bonus} />
         <PointsRow label="All 8 Third-Place Qualifiers" value={s.bp_third_all_correct_bonus} />
         <PointsRow label="Penalty Shootout Correct" value={s.bp_penalty_correct} />
-      </RuleCard>
-
-      {/* How Points Work */}
-      <RuleCard title="How Points Work">
-        <div className="space-y-3 mt-3">
-          <Step n={1}>
-            <strong>Group Rankings:</strong> Predict the finishing order (1st to 4th) for all 12 groups. You earn points for each team in the correct position.
-          </Step>
-          <Step n={2}>
-            <strong>Third-Place Picks:</strong> Rank the 12 third-place teams to predict which 8 qualify and which 4 are eliminated.
-          </Step>
-          <Step n={3}>
-            <strong>Knockout Bracket:</strong> Pick the winner of every knockout match from the Round of 32 through the Final. Points increase for later rounds.
-          </Step>
-          <Step n={4}>
-            <strong>Bonus Points:</strong> Earn a bonus for correctly predicting the champion ({formatNumber(s.bp_champion_bonus)} pts), perfectly ranking all third-place qualifiers ({formatNumber(s.bp_third_all_correct_bonus)} pts), and predicting penalty shootout outcomes.
-          </Step>
-        </div>
       </RuleCard>
 
       <TieBreakerCard />
@@ -399,29 +381,6 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
           <SubCaption>Coming Soon</SubCaption>
           <PointsRow label="Best Player Correct" value={s.bonus_best_player_correct ?? 100} />
           <PointsRow label="Top Scorer Correct" value={s.bonus_top_scorer_correct ?? 100} />
-        </div>
-      </RuleCard>
-
-      {/* How Points Work */}
-      <RuleCard title="How Points Work">
-        <div className="space-y-3 mt-3">
-          <Step n={1}>
-            <strong>Match Predictions:</strong> Predict the full-time score of every match. The closer your prediction, the more points you earn.
-          </Step>
-          <Step n={2}>
-            <strong>Tiered Scoring:</strong> Only the highest tier applies per match &mdash; exact score, correct winner + goal difference, or correct result.
-          </Step>
-          <Step n={3}>
-            <strong>Knockout Multipliers:</strong> Later rounds are worth more. The Final has a &times;{s.final_multiplier} multiplier.
-          </Step>
-          {s.pso_enabled && (
-            <Step n={4}>
-              <strong>Penalty Shootouts:</strong> If a knockout match goes to penalties, you can earn additional bonus points for predicting the PSO score.
-            </Step>
-          )}
-          <Step n={s.pso_enabled ? 5 : 4}>
-            <strong>Bonus Points:</strong> Extra points are available for group standings, bracket accuracy, and tournament-level picks (champion, top scorer, etc.).
-          </Step>
         </div>
       </RuleCard>
 
