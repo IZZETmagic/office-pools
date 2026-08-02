@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
+import { formatNumber } from '@/lib/format'
 import {
   getKnockoutWinner,
   type GroupStanding,
@@ -561,7 +562,7 @@ export function MembersTab({
                   <p className="t-body text-muted mt-0.5">{member.users.full_name}</p>
                 </div>
                 <span className="t-num t-num-extrabold text-xl text-primary-600 shrink-0">
-                  {best ? getEntryTotalPoints(best) : 0}
+                  {formatNumber(best ? getEntryTotalPoints(best) : 0)}
                 </span>
               </div>
               {/* Entries badges for multi-entry members */}
@@ -660,7 +661,7 @@ export function MembersTab({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="t-num t-num-extrabold text-lg text-primary-600">
-                        {getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}
+                        {formatNumber(getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1103,7 +1104,7 @@ function ViewPredictionsModal({
           </h3>
           {selectedEntry && (
             <p className="text-sm text-muted mt-1">
-              {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
+              {selectedEntry.entry_name} &middot; {formatNumber(getEntryTotalPoints(selectedEntry))} pts
               {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
             </p>
           )}
@@ -1364,7 +1365,7 @@ function ViewBracketPickerPredictionsModal({
           </h3>
           {selectedEntry && (
             <p className="text-sm text-muted mt-1">
-              {selectedEntry.entry_name} &middot; {getEntryTotalPoints(selectedEntry)} pts
+              {selectedEntry.entry_name} &middot; {formatNumber(getEntryTotalPoints(selectedEntry))} pts
               {selectedEntry.has_submitted_predictions ? '' : ' (not submitted)'}
             </p>
           )}
@@ -1758,7 +1759,7 @@ function AdjustPointsModal({
                       : 'bg-mist text-muted hover:bg-silver'
                   }`}
                 >
-                  {entry.entry_name} ({getEntryTotalPoints(entry)} pts)
+                  {entry.entry_name} ({formatNumber(getEntryTotalPoints(entry))} pts)
                 </button>
               ))}
             </div>
@@ -1769,7 +1770,7 @@ function AdjustPointsModal({
           <p className="text-sm text-muted">
             {selectedEntry.entry_name} current points:{' '}
             <span className="font-bold">
-              {getEntryTotalPoints(selectedEntry)}
+              {formatNumber(getEntryTotalPoints(selectedEntry))}
             </span>
           </p>
         </div>
@@ -1818,7 +1819,7 @@ function AdjustPointsModal({
         <p className="text-sm text-muted mb-4">
           New total:{' '}
           <span className="font-bold text-primary-600">
-            {getEntryTotalPoints(selectedEntry) + pointAdjustment}
+            {formatNumber(getEntryTotalPoints(selectedEntry) + pointAdjustment)}
           </span>
         </p>
 
@@ -1911,7 +1912,7 @@ function DeleteEntryModal({
                     {entry.entry_name}
                   </p>
                   <p className="text-xs text-muted">
-                    {getEntryTotalPoints(entry)} pts ·{' '}
+                    {formatNumber(getEntryTotalPoints(entry))} pts ·{' '}
                     {entry.has_submitted_predictions ? 'Submitted' : 'Pending'}
                   </p>
                 </div>

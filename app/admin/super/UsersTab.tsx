@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
 import { poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
+import { formatNumber } from '@/lib/format'
 
 // =============================================
 // TYPES
@@ -964,7 +965,7 @@ function UserDetailSheet({
         {[
           { label: 'Pools', value: totalPools, sub: `${adminPools} as admin` },
           { label: 'Entries', value: totalEntries, sub: `${submittedEntries} submitted` },
-          { label: 'Total Points', value: totalPoints },
+          { label: 'Total Points', value: formatNumber(totalPoints) },
           { label: 'Best Rank', value: bestRank != null ? `#${bestRank}` : '-' },
           { label: 'Joined', value: formatDate(user.created_at) },
           { label: 'Last Login', value: user.last_login ? timeAgo(user.last_login) : 'Never' },
@@ -1269,7 +1270,7 @@ function UserDetailSheet({
                             )}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap font-bold sp-text-ink sp-body">
-                            {entry.total_points}
+                            {formatNumber(entry.total_points)}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap sp-body">
                             {entry.current_rank != null ? (

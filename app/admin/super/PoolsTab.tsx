@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
 import { SpTable, type SpColumn } from './SpTable'
 import { poolStatusLabel } from '@/components/ui/Badge'
+import { formatNumber } from '@/lib/format'
 
 // =============================================
 // TYPES
@@ -1373,7 +1374,7 @@ function PoolDetailSheet({
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap font-medium sp-text-ink sp-body">
-                          {totalPoints}
+                          {formatNumber(totalPoints)}
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap sp-body">
                           {bestRank != null ? (
@@ -1512,7 +1513,7 @@ function PoolDetailSheet({
                             )}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap font-bold sp-text-ink sp-body">
-                            {entry.total_points}
+                            {formatNumber(entry.total_points)}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap sp-body">
                             {entry.current_rank != null ? (
