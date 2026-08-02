@@ -797,13 +797,16 @@ export function DashboardClient({
                       <MobilePoolCard pool={pool} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
                     </div>
                   ))}
-                  {/* View All arrow card */}
+                  {/* View All. Matches MobilePoolCard beside it — same radius,
+                      same border, same hover. It was on rounded-xl with a
+                      neutral-200 edge, so it read as a slightly different shape
+                      sitting at the end of the strip. */}
                   <Link
                     href="/pools"
-                    className="shrink-0 w-16 self-stretch rounded-xl border border-neutral-200 dark:border-border-default bg-surface flex flex-col items-center justify-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-surface-secondary active:scale-[0.98] transition-all duration-200"
+                    className="shrink-0 w-16 self-stretch rounded-card border border-border-subtle bg-surface flex flex-col items-center justify-center gap-1.5 hover:shadow-md active:scale-[0.98] transition-all duration-200"
                   >
-                    <Icon name="chevron.right" size={18} weight="semibold" className="text-neutral-400" />
-                    <span className="text-[10px] font-medium text-neutral-400">All</span>
+                    <Icon name="chevron.right" size={18} weight="semibold" className="text-muted" />
+                    <span className="t-detail text-muted">All</span>
                   </Link>
                 </div>
               </div>
