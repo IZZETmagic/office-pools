@@ -66,9 +66,16 @@ function formatDate(d: Date): string {
   return `${month} ${day}, ${h}:${minute} ${period}`
 }
 
+/**
+  * ISO-3166 alpha-2 only. `teams.country_code` holds 3-letter FIFA codes
+  * (ALG, AUT, BIH), and taking their first two letters yields the wrong
+  * nation — Albania for Algeria, Burundi for Bosnia — so anything that is not
+  * exactly two characters returns empty and the caller falls back to flag_url.
+  */
 function countryCodeToEmoji(code: string): string {
   if (!code) return ''
   const upper = code.toUpperCase()
+  if (upper.length !== 2) return ''
   const offset = 0x1f1e6
   const a = 'A'.charCodeAt(0)
   return String.fromCodePoint(upper.charCodeAt(0) - a + offset, upper.charCodeAt(1) - a + offset)
@@ -227,7 +234,7 @@ export function MatchCard({
           <div className="flex items-center gap-2 min-w-0">
             {homeFlagUrl ? (
               <img src={homeFlagUrl} alt={homeName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
-            ) : homeCode ? (
+            ) : countryCodeToEmoji(homeCode) ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
             <span className="t-card-title text-ink truncate">
@@ -266,7 +273,7 @@ export function MatchCard({
             </span>
             {awayFlagUrl ? (
               <img src={awayFlagUrl} alt={awayName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
-            ) : awayCode ? (
+            ) : countryCodeToEmoji(awayCode) ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
             ) : null}
           </div>
@@ -367,6 +374,8 @@ export function MatchTableRow({
   const awayName = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
   const homeCode = match.home_team?.country_code ?? ''
   const awayCode = match.away_team?.country_code ?? ''
+  const homeFlagUrl = match.home_team?.flag_url ?? null
+  const awayFlagUrl = match.away_team?.flag_url ?? null
 
   // Knockout matches in a full-tournament pool are predicted from the bracket,
   // so who you had in the fixture matters as much as the score you gave it.
@@ -388,7 +397,14 @@ export function MatchTableRow({
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2 min-w-0">
           <span className="t-body text-ink truncate text-right">{homeName}</span>
-          {homeCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>}
+          {/* flag_url is authoritative — it carries the real ISO-2. The emoji
+              is only a fallback for teams that have no image. */}
+          {homeFlagUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={homeFlagUrl} alt="" className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+          ) : countryCodeToEmoji(homeCode) ? (
+            <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
+          ) : null}
         </div>
         {showBracketTeams && (
           <div className="t-detail text-muted text-right truncate">
@@ -427,7 +443,12 @@ export function MatchTableRow({
 
       <td className="px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
-          {awayCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>}
+          {awayFlagUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={awayFlagUrl} alt="" className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+          ) : countryCodeToEmoji(awayCode) ? (
+            <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
+          ) : null}
           <span className="t-body text-ink truncate">{awayName}</span>
         </div>
         {showBracketTeams && (
