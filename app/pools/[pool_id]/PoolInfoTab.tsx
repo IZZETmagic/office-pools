@@ -80,17 +80,6 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
           below it, so it should not be the last thing read. */}
       <DetailCard title="Pool Details">
         <div>
-          <InfoRow label="Pool type">
-            <Badge variant="blue">{modeInfo.label}</Badge>
-          </InfoRow>
-
-          {/* Reads as a row rather than a footnote: label on the left like the
-              rows around it, prose underneath where a value would not fit. */}
-          <div className="py-2.5">
-            <span className="t-body text-muted">Pool description</span>
-            <p className="t-body text-ink mt-1.5">{modeInfo.description}</p>
-          </div>
-
           <InfoRow label="Status">
             <Badge variant={getStatusVariantSolid(pool.status)}>
               {poolStatusLabel(pool.status)}
@@ -99,6 +88,19 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
           <InfoRow label="Created">
             {formatCreated(pool.created_at)}
           </InfoRow>
+
+          <InfoRow label="Pool type">
+            <Badge variant="blue">{modeInfo.label}</Badge>
+          </InfoRow>
+
+          {/* Last, and the only multi-line thing here: label on the left like
+              the rows above it, prose underneath where a value would not fit.
+              Keeping it at the foot means the scannable one-line rows stay
+              together rather than being split by a paragraph. */}
+          <div className="py-2.5">
+            <span className="t-body text-muted">Pool description</span>
+            <p className="t-body text-ink mt-1.5">{modeInfo.description}</p>
+          </div>
         </div>
       </DetailCard>
 
