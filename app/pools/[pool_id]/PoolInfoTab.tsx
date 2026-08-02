@@ -2,6 +2,7 @@
 
 import { DetailCard, DetailCaption, DetailRow } from '@/components/ui/DetailCard'
 import { Badge, poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
+import { Icon } from '@/components/ui/Icon'
 import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 import type { PoolData, MemberData, EntryData, PoolRoundState } from './types'
 
@@ -11,6 +12,18 @@ type PoolInfoTabProps = {
   userEntries: EntryData[]
   roundStates: PoolRoundState[]
   isPastDeadline: boolean
+  /**
+   * Opens the leave-pool confirmation. Omitted when leaving is not on the
+   * table at all — a super admin looking at someone else's pool — in which
+   * case the Danger Zone is not rendered.
+   */
+  onLeavePool?: () => void
+  /**
+   * Why leaving is blocked, if it is. Present means the row renders disabled
+   * with this as its subtitle rather than vanishing, so a sole admin is told
+   * what to do instead of being left guessing. Mirrors the RN row.
+   */
+  leaveDisabledReason?: string | null
 }
 
 const ROUND_LABELS: Record<string, string> = {
@@ -61,7 +74,9 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDeadline }: PoolInfoTabProps) {
+export function PoolInfoTab({
+  pool, members, userEntries, roundStates, isPastDeadline, onLeavePool, leaveDisabledReason,
+}: PoolInfoTabProps) {
   const allEntries = members.flatMap((m) => m.entries ?? [])
   const totalEntries = allEntries.length
   const totalMembers = members.length
@@ -186,7 +201,37 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
         </DetailCard>
       )}
 
-      {/* Pool Status */}
+      {/* Danger Zone last, as in the RN Pool Info screen. On web this lived
+          in the tab strip, where it sat among navigation and read as one more
+          tab rather than as a destructive action. */}
+      {onLeavePool && (
+        <DetailCard title="Danger Zone" className="border border-danger-200">
+          <button
+            type="button"
+            onClick={onLeavePool}
+            disabled={!!leaveDisabledReason}
+            className="w-full flex items-center gap-3 py-2.5 mt-1 text-left transition-opacity enabled:hover:opacity-70 disabled:opacity-55 disabled:cursor-not-allowed"
+          >
+            <Icon
+              name="rectangle.portrait.and.arrow.right"
+              size={16}
+              weight="semibold"
+              className={`shrink-0 ${leaveDisabledReason ? 'text-muted' : 'text-danger-700'}`}
+            />
+            <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+              <span className={`t-card-title ${leaveDisabledReason ? 'text-muted' : 'text-danger-700'}`}>
+                Leave Pool
+              </span>
+              <span className="t-body text-muted">
+                {leaveDisabledReason ?? 'Remove yourself from this pool entirely'}
+              </span>
+            </span>
+            {!leaveDisabledReason && (
+              <Icon name="chevron.right" size={14} weight="semibold" className="shrink-0 text-muted" />
+            )}
+          </button>
+        </DetailCard>
+      )}
     </div>
   )
 }

@@ -1249,20 +1249,6 @@ export function PoolDetail({
                 </>
               )}
 
-              {/* Leave Pool button (hidden for super admin non-members) */}
-              {!isSoleAdmin && !isSuperAdminViewing && (
-                <>
-                  <div className="flex items-center px-2">
-                    <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
-                  </div>
-                  <button
-                    onClick={() => setShowLeaveModal(true)}
-                    className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${hasBranding ? 'text-white/70 hover:bg-white/10' : 'text-danger-600 hover:bg-danger-600/10'}`}
-                  >
-                    Leave Pool
-                  </button>
-                </>
-              )}
             </div>
 
           </div>
@@ -1762,6 +1748,10 @@ export function PoolDetail({
                 userEntries={entries}
                 roundStates={roundStates}
                 isPastDeadline={isPastDeadline}
+                onLeavePool={isSuperAdminViewing ? undefined : () => setShowLeaveModal(true)}
+                leaveDisabledReason={
+                  isSoleAdmin ? 'Promote another admin or archive the pool to leave' : null
+                }
               />
             )}
 
