@@ -519,26 +519,50 @@ export function MembersTab({
       </div>
 
       {/* Members - Mobile card view */}
-      <div className="sm:hidden space-y-2">
+      {/* Members - Mobile card view.
+          The RN list-row chassis: surface, 24px radius, card shadow, 12px
+          apart. The current-user row uses the iOS values recorded in
+          mobile/PLATFORM_DIVERGENCES.md — primary@8% behind a 1.5px
+          primary@25% edge — rather than Android's, which that file notes as
+          the divergence. Both variants carry the border so the highlight does
+          not resize the row by 3px as it moves.
+
+          Rank and points are `t-num`: bold mono is the app's signature for a
+          numeral, and it also makes ranks column-align down the list. */}
+      <div className="sm:hidden space-y-3">
         {filteredMembers.map((member) => {
           const isCurrentUser = member.user_id === currentUserId
+          const best = getBestEntry(member)
           return (
             <div
               key={member.member_id}
-              className={`rounded-chip border p-3 ${isCurrentUser ? 'bg-primary-600/12 border-primary-600/25' : 'bg-surface border-border-default'}`}
+              className={`rounded-card p-3.5 border-[1.5px] ${
+                isCurrentUser
+                  ? 'bg-primary-600/8 border-primary-600/25'
+                  : 'bg-surface border-transparent shadow-card'
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-muted">#{getBestEntry(member)?.current_rank || '-'}</span>
-                    <span className="text-sm font-medium text-ink truncate">
+                    {/* ink, not muted — the desktop table's rank is ink, and
+                        the two views disagreed. */}
+                    <span className="t-num text-base text-ink shrink-0">#{best?.current_rank || '-'}</span>
+                    <span className="t-card-title text-ink truncate">
                       {member.users.username}
-                      {isCurrentUser && <span className="text-xs text-primary-500 ml-1">(you)</span>}
+                      {isCurrentUser && <span className="t-detail font-bold text-primary-800 ml-1">(you)</span>}
                     </span>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">{member.users.full_name}</p>
+                  {/* t-body, not t-detail. The scale jumps 10 → 14 with nothing
+                      between, and t-detail would have shrunk this line from the
+                      12px it was — the wrong direction on a card that already
+                      has room. Hierarchy comes from the 16px bold title above
+                      it instead. */}
+                  <p className="t-body text-muted mt-0.5">{member.users.full_name}</p>
                 </div>
-                <span className="text-lg font-bold text-primary-600 shrink-0">{getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}</span>
+                <span className="t-num t-num-extrabold text-xl text-primary-600 shrink-0">
+                  {best ? getEntryTotalPoints(best) : 0}
+                </span>
               </div>
               {/* Entries badges for multi-entry members */}
               {(member.entries || []).length > 1 && (
@@ -550,10 +574,10 @@ export function MembersTab({
                     return (
                       <span
                         key={entry.entry_id}
-                        className={`text-xs px-2 py-0.5 rounded-pill ${
+                        className={`t-detail font-bold px-2 py-0.5 rounded-pill whitespace-nowrap ${
                           submitted
                             ? 'bg-success-600/12 text-success-900'
-                            : 'bg-mist text-muted'
+                            : 'bg-mist text-ink'
                         }`}
                       >
                         {entry.entry_name}
@@ -562,7 +586,11 @@ export function MembersTab({
                   })}
                 </div>
               )}
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-subtle">
+              {/* ink@8%, not border-subtle. Subtle is mist, which is the same
+                  lightness as the primary tint behind the current-user row, so
+                  the divider vanished on exactly one row. A translucent ink
+                  darkens whatever is behind it and reads on both. */}
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-ink/8">
                 <div className="flex items-center gap-1.5">
                   <Badge variant={member.role === 'admin' ? 'blue' : 'gray'}>
                     {member.role === 'admin' ? 'Admin' : 'Player'}
