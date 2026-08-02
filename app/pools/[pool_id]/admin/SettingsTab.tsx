@@ -140,14 +140,26 @@ function ShareButton({
   )
 }
 
+/* Card header: `t-section-header` (Nunito 900/20) in title case over a rule.
+   This replaces an 11px uppercase micro-caption at `text-muted`, which read as
+   a field label sitting above the card rather than as the card's own title.
+
+   The rule lives on the wrapper, not on the <h3>, and badges go through
+   `trailing` rather than beside the component. A border on the heading itself
+   would stop at the end of the text, so the Prediction Deadline card — whose
+   header carries a "Progressive" pill — would have drawn a short rule under
+   the words instead of one spanning the card. */
 function Caption({
-  children, tone, icon,
-}: { children: React.ReactNode; tone?: string; icon?: string }) {
+  children, tone, icon, trailing,
+}: { children: React.ReactNode; tone?: string; icon?: string; trailing?: React.ReactNode }) {
   return (
-    <h3 className={`t-caption flex items-center gap-2 ${tone ?? 'text-muted'}`}>
-      {icon && <Icon name={icon} size={13} weight="semibold" className="shrink-0" />}
-      {children}
-    </h3>
+    <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
+      <h3 className={`t-section-header flex items-center gap-2 ${tone ?? 'text-ink'}`}>
+        {icon && <Icon name={icon} size={18} weight="bold" className="shrink-0" />}
+        {children}
+      </h3>
+      {trailing}
+    </div>
   )
 }
 
@@ -554,7 +566,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         {/* Share & Invite. The QR is inline rather than behind a modal so an
             admin can hold the screen up and let someone scan straight away; the
             code underneath is the spoken/typed fallback. Mirrors the RN card. */}
-        <Card padding="sm" className="flex flex-col gap-2.5">
+        <Card padding="sm" className="flex flex-col">
           <Caption icon="qrcode">Share &amp; Invite</Caption>
 
           {/* Stacked on a phone, side-by-side from lg. Stacked it is ~400px
@@ -608,7 +620,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         <Card padding="sm" className="flex flex-col">
           <Caption icon="doc.text">Pool Information</Caption>
 
-          <div className="flex-1 flex flex-col gap-4 mt-2.5">
+          <div className="flex-1 flex flex-col gap-4">
             <FieldRow label="Pool Name *">
               <Input
                 type="text"
@@ -632,16 +644,16 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Prediction Deadline ── */}
         <Card padding="sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Caption icon="calendar">
-              {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
-            </Caption>
-            {pool.prediction_mode === 'progressive' && (
+          <Caption
+            icon="calendar"
+            trailing={pool.prediction_mode === 'progressive' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-detail font-bold bg-primary-600/12 text-primary-800">
                 Progressive
               </span>
-            )}
-          </div>
+            ) : undefined}
+          >
+            {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
+          </Caption>
 
           {pool.prediction_mode === 'progressive' && (
             <Alert variant="info">
