@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { MatchCard, MatchTableRow, type ResultMatch } from './MatchCard'
+import { Select } from '@/components/ui/Select'
 import type { PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
@@ -22,13 +23,15 @@ type StageTab =
 
 type StatusFilter = 'all' | 'completed' | 'live' | 'upcoming'
 
+// Spelled out: R32 and QF read as jargon in a list, where there is room for
+// the real name.
 const STAGE_TABS: { key: StageTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'group', label: 'Group' },
-  { key: 'round_32', label: 'R32' },
-  { key: 'round_16', label: 'R16' },
-  { key: 'quarter_final', label: 'QF' },
-  { key: 'semi_final', label: 'SF' },
+  { key: 'all', label: 'All Rounds' },
+  { key: 'group', label: 'Group Stage' },
+  { key: 'round_32', label: 'Round of 32' },
+  { key: 'round_16', label: 'Round of 16' },
+  { key: 'quarter_final', label: 'Quarter Finals' },
+  { key: 'semi_final', label: 'Semi Finals' },
   { key: 'finals', label: 'Finals' },
 ]
 
@@ -168,26 +171,24 @@ export function ResultsView({
         </div>
       </div>
 
-      {/* ── Stage tabs ── */}
+      {/* ── Round selector ──
+          A select, not a chip strip. Seven pills wrapped on a phone and made
+          the head of this tab look like a pile of controls; one field states
+          the current round instead. */}
       <div className="mb-4 border-b border-border-subtle pb-3">
-        <div className="flex gap-1 overflow-x-auto">
+        <Select
+          value={stageTab}
+          onChange={(e) => {
+            const next = e.target.value as StageTab
+            setStageTab(next)
+            if (next !== 'group') setGroupFilter('all')
+          }}
+          aria-label="Filter by round"
+        >
           {STAGE_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                setStageTab(tab.key)
-                if (tab.key !== 'group') setGroupFilter('all')
-              }}
-              className={`px-3 py-1.5 t-body font-semibold rounded-pill transition-colors whitespace-nowrap ${
-                stageTab === tab.key
-                  ? 'bg-primary-600 text-white'
-                  : 'text-muted hover:bg-mist'
-              }`}
-            >
-              {tab.label}
-            </button>
+            <option key={tab.key} value={tab.key}>{tab.label}</option>
           ))}
-        </div>
+        </Select>
 
         {/* ── Group letter filter pills (only on Group Stage tab) ── */}
         {stageTab === 'group' && (
