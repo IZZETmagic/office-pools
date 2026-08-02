@@ -142,7 +142,7 @@ export function EntriesListView({
   return (
     <div style={{ animation: 'fadeUp 0.3s ease' }}>
       {/* Mobile card view */}
-      <div className="sm:hidden space-y-2">
+      <div className="sm:hidden space-y-3">
         {entries.map(entry => {
           const predictedCount = getPredictedCount(entry.entry_id)
           const status = getEntryStatus(entry, predictedCount, progressiveStatusMap?.get(entry.entry_id))
@@ -152,7 +152,7 @@ export function EntriesListView({
           return (
             <div
               key={entry.entry_id}
-              className="rounded-xl border border-neutral-200 bg-surface p-3 cursor-pointer hover:bg-primary-50 active:bg-primary-100 transition-colors group"
+              className="rounded-card bg-surface shadow-card p-3.5 cursor-pointer hover:bg-mist active:bg-silver transition-colors group"
               onClick={() => !isRenaming && onEditEntry(entry)}
               role="button"
               tabIndex={0}
@@ -171,19 +171,19 @@ export function EntriesListView({
                         if (e.key === 'Enter') handleRename(entry)
                         if (e.key === 'Escape') setRenamingEntryId(null)
                       }}
-                      className="px-2 py-1 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full min-w-0"
+                      className="px-3 py-1.5 rounded-control bg-mist border border-transparent t-body text-ink focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 w-full min-w-0"
                       maxLength={40}
                     />
                     <button
                       onClick={() => handleRename(entry)}
                       disabled={savingRename}
-                      className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 shrink-0"
+                      className="px-3 py-1.5 rounded-control t-detail font-bold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 shrink-0"
                     >
                       {savingRename ? '...' : 'Save'}
                     </button>
                     <button
                       onClick={() => setRenamingEntryId(null)}
-                      className="px-1 py-1 text-xs text-neutral-500 hover:text-neutral-700 shrink-0"
+                      className="px-2 py-1.5 rounded-control t-detail font-bold text-muted hover:text-ink shrink-0"
                     >
                       Cancel
                     </button>
@@ -191,13 +191,13 @@ export function EntriesListView({
                 ) : (
                   <>
                     <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-sm font-medium text-neutral-900 truncate">
+                      <span className="t-card-title text-ink truncate">
                         {entry.entry_name}
                       </span>
                       {canRename(entry) && (
                         <button
                           onClick={e => { e.stopPropagation(); startRename(entry) }}
-                          className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors shrink-0"
+                          className="p-1 text-muted hover:text-ink transition-colors shrink-0"
                           title="Rename entry"
                         >
                           <Icon name="pencil" size={14} />
@@ -206,7 +206,7 @@ export function EntriesListView({
                       {canDelete(entry) && (
                         <button
                           onClick={e => { e.stopPropagation(); onDeleteEntry(entry) }}
-                          className="p-1 text-neutral-400 hover:text-danger-600 transition-colors shrink-0"
+                          className="p-1 text-muted hover:text-danger-700 transition-colors shrink-0"
                           title="Delete entry"
                         >
                           <Icon name="trash" size={14} />
@@ -221,7 +221,7 @@ export function EntriesListView({
                         </Badge>
                       )}
                       {/* Chevron indicator */}
-                      <Icon name="chevron.right" size={16} className="text-neutral-400 group-hover:text-primary-500 transition-colors shrink-0" />
+                      <Icon name="chevron.right" size={16} className="text-muted group-hover:text-primary-600 transition-colors shrink-0" />
                     </div>
                   </>
                 )}
@@ -229,27 +229,27 @@ export function EntriesListView({
 
               {/* Timestamp */}
               {timestamp && (
-                <div className="text-xs text-neutral-500 mb-2" suppressHydrationWarning>
+                <div className="t-body text-muted mb-2" suppressHydrationWarning>
                   {getTimestampLabel(entry)} {formatTimeAgo(timestamp)}
                 </div>
               )}
 
               {/* Progress row: label + bar + count */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-500 shrink-0">Progress</span>
-                <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                <span className="t-body text-muted shrink-0">Progress</span>
+                <div className="flex-1 h-1.5 bg-mist rounded-pill overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
                       status.variant === 'green' || status.variant === 'blue'
-                        ? 'bg-success-500'
+                        ? 'bg-success-600'
                         : predictedCount > 0
                           ? 'bg-warning-500'
-                          : 'bg-neutral-200'
+                          : 'bg-silver'
                     }`}
                     style={{ width: `${totalMatches > 0 ? (predictedCount / totalMatches) * 100 : 0}%`, transformOrigin: 'left', animation: 'barGrow 0.8s ease both' }}
                   />
                 </div>
-                <span className="text-xs text-neutral-700 font-medium shrink-0">{predictedCount}/{totalMatches}</span>
+                <span className="t-num text-sm text-ink shrink-0">{predictedCount}/{totalMatches}</span>
               </div>
             </div>
           )
@@ -271,20 +271,20 @@ export function EntriesListView({
       </div>
 
       {/* Desktop table view */}
-      <div className="hidden sm:block bg-surface rounded-xl shadow overflow-hidden dark:shadow-none dark:border dark:border-border-default">
+      <div className="hidden sm:block bg-surface rounded-card shadow-card overflow-hidden dark:shadow-none dark:border dark:border-border-default">
         <table className="w-full">
-          <thead className="bg-neutral-50 border-b border-neutral-200">
+          <thead className="border-b border-border-default">
             <tr>
-              <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+              <th className="px-4 md:px-6 py-3 text-left t-body font-semibold text-ink">
                 Entry
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center t-body font-semibold text-ink">
                 Status
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-neutral-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center t-body font-semibold text-ink">
                 Progress
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left t-body font-semibold text-ink">
                 Last Updated
               </th>
               <th className="px-2 md:px-4 py-3 w-10">
@@ -292,7 +292,7 @@ export function EntriesListView({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200">
+          <tbody>
             {entries.map(entry => {
               const predictedCount = getPredictedCount(entry.entry_id)
               const status = getEntryStatus(entry, predictedCount, progressiveStatusMap?.get(entry.entry_id))
@@ -303,7 +303,7 @@ export function EntriesListView({
               return (
                 <tr
                   key={entry.entry_id}
-                  className="hover:bg-primary-50 active:bg-primary-100 transition-colors cursor-pointer group"
+                  className="border-b border-border-default last:border-b-0 hover:bg-snow transition-colors cursor-pointer group"
                   onClick={() => !isRenaming && onEditEntry(entry)}
                   role="button"
                   tabIndex={0}
@@ -322,30 +322,30 @@ export function EntriesListView({
                             if (e.key === 'Enter') handleRename(entry)
                             if (e.key === 'Escape') setRenamingEntryId(null)
                           }}
-                          className="px-2 py-1 border border-primary-300 rounded-lg text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+                          className="px-3 py-1.5 rounded-control bg-mist border border-transparent t-body text-ink focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 w-48"
                           maxLength={40}
                         />
                         <button
                           onClick={() => handleRename(entry)}
                           disabled={savingRename}
-                          className="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-control t-detail font-bold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
                         >
                           {savingRename ? '...' : 'Save'}
                         </button>
                         <button
                           onClick={() => setRenamingEntryId(null)}
-                          className="px-1 py-1 text-xs text-neutral-500 hover:text-neutral-700"
+                          className="px-2 py-1.5 rounded-control t-detail font-bold text-muted hover:text-ink"
                         >
                           Cancel
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <span className="text-sm font-medium text-neutral-900">{entry.entry_name}</span>
+                        <span className="t-body text-ink">{entry.entry_name}</span>
                         {canRename(entry) && (
                           <button
                             onClick={e => { e.stopPropagation(); startRename(entry) }}
-                            className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors"
+                            className="p-1 text-muted hover:text-ink transition-colors"
                             title="Rename entry"
                           >
                             <Icon name="pencil" size={14} />
@@ -354,7 +354,7 @@ export function EntriesListView({
                         {canDelete(entry) && (
                           <button
                             onClick={e => { e.stopPropagation(); onDeleteEntry(entry) }}
-                            className="p-1 text-neutral-400 hover:text-danger-600 transition-colors"
+                            className="p-1 text-muted hover:text-danger-700 transition-colors"
                             title="Delete entry"
                           >
                             <Icon name="trash" size={14} />
@@ -379,15 +379,15 @@ export function EntriesListView({
                   {/* Progress */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-sm text-neutral-700">{predictedCount}/{totalMatches}</span>
-                      <div className="w-20 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                      <span className="t-num text-sm text-ink">{predictedCount}/{totalMatches}</span>
+                      <div className="w-20 h-1.5 bg-mist rounded-pill overflow-hidden">
                         <div
                           className={`h-full rounded-full ${
                             status.variant === 'green' || status.variant === 'blue'
-                              ? 'bg-success-500'
+                              ? 'bg-success-600'
                               : predictedCount > 0
                                 ? 'bg-warning-500'
-                                : 'bg-neutral-200'
+                                : 'bg-silver'
                           }`}
                           style={{ width: `${progressPct}%`, transformOrigin: 'left', animation: 'barGrow 0.8s ease both' }}
                         />
@@ -398,17 +398,17 @@ export function EntriesListView({
                   {/* Last Updated */}
                   <td className="px-4 py-3">
                     {timestamp ? (
-                      <span className="text-sm text-neutral-500" suppressHydrationWarning>
+                      <span className="t-body text-muted" suppressHydrationWarning>
                         {getTimestampLabel(entry)} {formatTimeAgo(timestamp)}
                       </span>
                     ) : (
-                      <span className="text-sm text-neutral-400">—</span>
+                      <span className="t-body text-muted">—</span>
                     )}
                   </td>
 
                   {/* Chevron indicator */}
                   <td className="px-2 md:px-4 py-3">
-                    <Icon name="chevron.right" size={20} className="text-neutral-300 group-hover:text-primary-500 transition-colors" />
+                    <Icon name="chevron.right" size={20} className="text-muted group-hover:text-primary-600 transition-colors" />
                   </td>
                 </tr>
               )
@@ -418,7 +418,7 @@ export function EntriesListView({
 
         {/* Add Entry button (desktop, below table) */}
         {canAddEntry && (
-          <div className="px-4 md:px-6 py-3 border-t border-neutral-200 bg-neutral-50 flex justify-end">
+          <div className="px-4 md:px-6 py-3 border-t border-border-default bg-snow flex justify-end">
             <Button
               variant="outline"
               size="sm"
