@@ -395,7 +395,7 @@ export function MatchTableRow({
       </td>
 
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-2 min-w-0">
+        <div className="h-6 flex items-center justify-end gap-2 min-w-0">
           <span className="t-body text-ink truncate text-right">{homeName}</span>
           {/* flag_url is authoritative — it carries the real ISO-2. The emoji
               is only a fallback for teams that have no image. */}
@@ -407,7 +407,7 @@ export function MatchTableRow({
           ) : null}
         </div>
         {showBracketTeams && (
-          <div className="t-detail text-muted text-right truncate">
+          <div className="h-4 mt-1 t-detail text-muted text-right truncate leading-4">
             {match.predicted_home_team_name || '?'}
           </div>
         )}
@@ -415,11 +415,11 @@ export function MatchTableRow({
 
       <td className="px-2 py-3 text-center whitespace-nowrap">
         {hasActualScores ? (
-          <span className="t-num t-num-extrabold text-base text-ink block">
+          <span className="t-num t-num-extrabold text-base text-ink block h-6 leading-6">
             {match.home_score_ft} - {match.away_score_ft}
           </span>
         ) : (
-          <span className="t-body text-muted block">vs</span>
+          <span className="t-body text-muted block h-6 leading-6">vs</span>
         )}
         {hasPsoScores && (
           <span className="t-detail font-bold text-accent-600 block">
@@ -429,7 +429,7 @@ export function MatchTableRow({
         {/* The prediction sits directly under the actual score in the muted
             tone, so the column reads actual-over-predicted at a glance. */}
         {hasPrediction ? (
-          <span className="t-num t-num-medium text-xs text-muted block">
+          <span className="t-num t-num-medium text-xs text-muted block h-4 mt-1 leading-4">
             {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
             {match.prediction!.predicted_home_pso != null &&
               match.prediction!.predicted_away_pso != null && (
@@ -437,12 +437,12 @@ export function MatchTableRow({
               )}
           </span>
         ) : (
-          <span className="t-detail text-muted block">no pick</span>
+          <span className="t-detail text-muted block h-4 mt-1 leading-4">no pick</span>
         )}
       </td>
 
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="h-6 flex items-center gap-2 min-w-0">
           {awayFlagUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={awayFlagUrl} alt="" className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
@@ -452,7 +452,7 @@ export function MatchTableRow({
           <span className="t-body text-ink truncate">{awayName}</span>
         </div>
         {showBracketTeams && (
-          <div className="t-detail text-muted truncate">
+          <div className="h-4 mt-1 t-detail text-muted truncate leading-4">
             {match.predicted_away_team_name || '?'}
           </div>
         )}
