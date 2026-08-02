@@ -2,6 +2,7 @@
 
 import type { MemberData, PredictionData } from '@/app/pools/[pool_id]/types'
 import { Icon } from '@/components/ui/Icon'
+import { formatNumber } from '@/lib/format'
 
 type SelectedEntry = { entryId: string; ownerName: string; entryName: string }
 
@@ -40,26 +41,36 @@ export function EveryoneElseSection({ members, currentUserId, allPredictions, on
 
   if (rows.length === 0) return null
 
+  // The list is ordered by points, so show them — otherwise the order reads as
+  // arbitrary. Suppressed while every entry is still on zero (pre-scoring),
+  // where a column of 0s would be noise rather than information.
+  const showPoints = rows.some((r) => r.points > 0)
+
   return (
     <div className="mt-8">
-      <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+      <h3 className="t-caption text-muted mb-3">
         Everyone&apos;s predictions
       </h3>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {rows.map((r) => (
           <button
             key={r.entryId}
             onClick={() => onSelect({ entryId: r.entryId, ownerName: r.ownerName, entryName: r.entryName })}
-            className="w-full flex items-center gap-3 rounded-xl border border-neutral-200 bg-surface p-3 text-left hover:bg-primary-50 active:bg-primary-100 transition-colors group"
+            className="w-full flex items-center gap-3 rounded-card bg-surface shadow-card p-3.5 text-left hover:bg-mist active:bg-silver transition-colors group"
           >
-            <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="w-9 h-9 rounded-pill bg-primary-600/12 text-primary-800 flex items-center justify-center t-detail font-bold shrink-0">
               {initials(r.ownerName)}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-neutral-900 truncate">{r.entryName}</div>
-              <div className="text-xs text-neutral-500 truncate">{r.ownerName}</div>
+              <div className="t-card-title text-ink truncate">{r.entryName}</div>
+              <div className="t-body text-muted truncate">{r.ownerName}</div>
             </div>
-            <Icon name="chevron.right" size={16} className="text-neutral-400 group-hover:text-primary-500 transition-colors shrink-0" />
+            {showPoints && (
+              <span className="t-num t-num-extrabold text-base text-primary-600 shrink-0">
+                {formatNumber(r.points)}
+              </span>
+            )}
+            <Icon name="chevron.right" size={16} className="text-muted group-hover:text-primary-600 transition-colors shrink-0" />
           </button>
         ))}
       </div>
