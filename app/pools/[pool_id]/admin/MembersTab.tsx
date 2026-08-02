@@ -643,7 +643,7 @@ export function MembersTab({
                     className={`border-b border-border-default last:border-b-0 ${isCurrentUser ? 'bg-primary-600/12' : 'hover:bg-snow'}`}
                   >
                     <td className="px-4 py-3">
-                      <span className="text-sm font-bold text-ink">
+                      <span className="t-num text-sm text-ink">
                         #{getBestEntry(member)?.current_rank || '-'}
                       </span>
                     </td>
@@ -659,7 +659,7 @@ export function MembersTab({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-lg font-bold text-primary-600">
+                      <span className="t-num t-num-extrabold text-lg text-primary-600">
                         {getBestEntry(member) ? getEntryTotalPoints(getBestEntry(member)!) : 0}
                       </span>
                     </td>
@@ -1170,7 +1170,7 @@ function ViewPredictionsModal({
                           >
                             <div className="flex items-center gap-2">
                               {/* Match number */}
-                              <span className="text-xs font-mono text-muted shrink-0 w-7 text-right">
+                              <span className="t-num t-num-regular text-xs text-muted shrink-0 w-7 text-right">
                                 #{match.match_number}
                               </span>
 
@@ -1180,7 +1180,7 @@ function ViewPredictionsModal({
                               </span>
 
                               {/* Score */}
-                              <span className="font-mono font-bold text-ink text-sm shrink-0 px-1">
+                              <span className="t-num text-sm text-ink shrink-0 px-1">
                                 {pred.predicted_home_score} - {pred.predicted_away_score}
                               </span>
 
@@ -1518,7 +1518,7 @@ function ViewBracketPickerPredictionsModal({
                         {stagePicks.map(({ match, pick, winnerTeam, resolved }) => (
                           <div key={match.match_id} className="bg-snow rounded-chip px-3 py-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-muted shrink-0 w-7 text-right">
+                              <span className="t-num t-num-regular text-xs text-muted shrink-0 w-7 text-right">
                                 #{match.match_number}
                               </span>
                               <div className="flex-1 min-w-0">
