@@ -95,7 +95,7 @@ function getInitials(fullName: string | null, username: string): string {
 }
 
 function formatDeadline(deadline: string | null) {
-  if (!deadline) return { text: 'No deadline set', className: 'text-neutral-500' }
+  if (!deadline) return { text: 'No deadline set', className: 'text-muted' }
   const d = new Date(deadline)
   const now = new Date()
   const diffMs = d.getTime() - now.getTime()
@@ -120,7 +120,7 @@ function formatDeadline(deadline: string | null) {
       const h = hour % 12 || 12
       return `${month} ${day}, ${h}:${minute} ${period}`
     })(),
-    className: 'text-neutral-700',
+    className: 'text-ink',
   }
 }
 
@@ -133,9 +133,9 @@ function getStatusAccentColor(status: string): string {
       return 'bg-primary-500'
     case 'completed':
     case 'closed':
-      return 'bg-neutral-300 dark:bg-neutral-600'
+      return 'bg-silver'
     default:
-      return 'bg-neutral-200'
+      return 'bg-silver'
   }
 }
 
@@ -143,7 +143,7 @@ function getPoolAction(pool: PoolData): { label: string; icon: 'arrow' | 'check'
   if (pool.status === 'completed') return {
     label: 'Results',
     icon: 'arrow',
-    className: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300',
+    className: 'bg-silver text-ink',
     isButton: false,
   }
   // The 'closed' branch that used to sit here is unreachable now that
@@ -359,7 +359,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
           <div className="flex items-center gap-3 sm:gap-5">
-            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
+            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
@@ -390,15 +390,15 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
             </div>
           </div>
           <div className="hidden sm:grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
               <p className="text-2xl font-bold text-white">{stats.totalPools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Pools</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
               <p className="text-2xl font-bold text-white">{stats.activePools}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Active</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
               <p className="text-2xl font-bold text-white">{formatNumber(stats.totalPoints)}</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
@@ -419,8 +419,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               onClick={() => setActiveTab('my-pools')}
               className={`relative z-10 px-4 py-2 rounded-pill text-sm font-bold transition-colors ${
                 activeTab === 'my-pools'
-                  ? 'text-neutral-900'
-                  : 'text-neutral-600 hover:text-neutral-900'
+                  ? 'text-ink'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               My Pools
@@ -430,8 +430,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               onClick={() => setActiveTab('discover')}
               className={`relative z-10 px-4 py-2 rounded-pill text-sm font-bold transition-colors ${
                 activeTab === 'discover'
-                  ? 'text-neutral-900'
-                  : 'text-neutral-600 hover:text-neutral-900'
+                  ? 'text-ink'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               Discover
@@ -444,14 +444,14 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 setJoinInitialCode('')
                 setShowJoinModal(true)
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-700 bg-neutral-100 dark:bg-neutral-600/50 border border-neutral-200 dark:border-neutral-500/50 rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700/60 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted bg-mist/50 border border-border-default rounded-control hover:bg-silver transition-colors"
             >
               <Icon name="person.badge.plus" size={16} weight="semibold" />
               Join
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-control hover:bg-primary-700 transition-colors shadow-sm"
             >
               <Icon name="plus" size={16} weight="semibold" />
               Create
@@ -502,10 +502,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                 {pools.length === 0 ? (
                   <>
                     <div className="text-4xl mb-3">&#9917;</div>
-                    <p className="text-neutral-900 dark:text-white text-lg font-semibold mb-1">
+                    <p className="text-ink text-lg font-semibold mb-1">
                       You haven&apos;t joined any pools yet
                     </p>
-                    <p className="text-neutral-500 dark:text-neutral-700 text-sm mb-5">
+                    <p className="text-muted text-sm mb-5">
                       Compete with friends by predicting match results in the World Cup.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
@@ -522,8 +522,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   </>
                 ) : (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">No pools match your filters</p>
-                    <p className="text-neutral-500 dark:text-neutral-700 text-sm">
+                    <p className="text-muted text-lg mb-1">No pools match your filters</p>
+                    <p className="text-muted text-sm">
                       Try adjusting your search or{' '}
                       <button
                         onClick={() => {
@@ -540,7 +540,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               </Card>
             ) : (
               <>
-                <p className="text-sm text-neutral-500 mb-3">
+                <p className="text-sm text-muted mb-3">
                   {filteredPools.length} pool{filteredPools.length !== 1 ? 's' : ''}
                   {searchQuery || statusFilter !== 'all' ? ' found' : ''}
                 </p>
@@ -598,21 +598,21 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             <div className="flex items-center justify-between gap-3 mb-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
+                                  <h4 className="text-lg font-bold text-ink leading-snug min-w-0 truncate">
                                     {pool.pool_name}
                                   </h4>
                                   {(unreadCounts.get(pool.pool_id) ?? 0) > 0 && (
-                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-pill bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                                       {(unreadCounts.get(pool.pool_id) ?? 0) > 99 ? '99+' : unreadCounts.get(pool.pool_id)}
                                     </span>
                                   )}
                                 </div>
                                 {/* Badges + player count */}
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                  <span className="text-xs text-neutral-500 dark:text-neutral-700 ml-0.5">
+                                  <span className="text-xs text-muted ml-0.5">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                   </span>
                                 </div>
@@ -623,7 +623,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     e.preventDefault()
                                     router.push(`/pools/${pool.pool_id}?tab=predictions`)
                                   }}
-                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}
+                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-chip text-xs font-semibold ${poolAction.className}`}
                                 >
                                   {poolAction.label}
                                   {poolAction.icon === 'arrow' && (
@@ -631,7 +631,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   )}
                                 </button>
                               ) : (
-                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}>
+                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-chip text-xs font-semibold ${poolAction.className}`}>
                                   {poolAction.label}
                                   {poolAction.icon === 'arrow' && (
                                     <span className="ml-0.5">&rarr;</span>
@@ -644,52 +644,52 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {(() => {
                               const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
-                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mb-3 overflow-hidden">
+                                <div className="flex items-stretch rounded-control bg-snow/75 mb-3 overflow-hidden">
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Points</p>
                                     <p className="text-xl font-bold text-primary-800 leading-none">
                                       {formatNumber(pool.total_points ?? 0)}
                                     </p>
                                   </div>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   {/* Rank */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Rank</p>
                                     {pool.hasScoringStarted && pool.current_rank != null ? (
                                       <div className="flex items-baseline gap-1">
-                                        <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                        <p className="text-xl font-bold text-ink leading-none">
                                           #{pool.current_rank}
                                         </p>
-                                        <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                                        <p className="text-[11px] text-muted leading-none">
                                           of {pool.totalEntries}
                                         </p>
                                       </div>
                                     ) : (
-                                      <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                                      <p className="text-xl font-bold text-muted leading-none">
                                         —
                                       </p>
                                     )}
                                   </div>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   {/* Level */}
                                   <div className="flex-[1.2] py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
                                     <p className="text-xl font-bold text-primary-800 leading-none">
                                       {level.level}
                                     </p>
-                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
+                                    <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
                                   </div>
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide text-right">Form</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
                                     <div className="flex items-center justify-end gap-[5px] mt-1.5">
                                       {pool.form.length > 0
                                         ? pool.form.map((type, i) => (
-                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotClass(type)}`} />
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-pill ${getFormDotClass(type)}`} />
                                           ))
                                         : [0, 1, 2, 3, 4].map((i) => (
-                                            <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                                            <div key={i} className="w-[10px] h-[10px] rounded-pill bg-silver" />
                                           ))
                                       }
                                     </div>
@@ -700,7 +700,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row: status + deadline */}
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-neutral-500 dark:text-neutral-700">
+                              <span className="text-xs text-muted">
                                 {statusText}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -713,8 +713,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Invite nudge — admin pools with fewer than 10 members */}
                             {pool.role === 'admin' && pool.memberCount < 10 && (
-                              <div className="mt-2.5 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
+                              <div className="mt-2.5 bg-primary-50 dark:bg-primary-500/10 rounded-chip px-3 py-2 flex items-center justify-between">
+                                <span className="text-[11px] text-muted">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more
                                 </span>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -724,7 +724,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   >
                                     {isLinkCopied ? 'Copied!' : 'Copy Link'}
                                   </button>
-                                  <span className="text-neutral-300 dark:text-neutral-600">|</span>
+                                  <span className="text-muted dark:text-muted">|</span>
                                   <button
                                     onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
                                     className="text-[11px] text-primary-800 font-semibold hover:underline"
@@ -757,20 +757,20 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             <div className="flex items-center justify-between gap-3 mb-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                                  <h4 className="text-lg font-bold text-ink truncate">
                                     {pool.pool_name}
                                   </h4>
                                   {(unreadCounts.get(pool.pool_id) ?? 0) > 0 && (
-                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-pill bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                                       {(unreadCounts.get(pool.pool_id) ?? 0) > 99 ? '99+' : unreadCounts.get(pool.pool_id)}
                                     </span>
                                   )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
+                                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                  <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+                                  <span className="text-[11px] text-muted">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                   </span>
                                 </div>
@@ -782,13 +782,13 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     e.preventDefault()
                                     router.push(`/pools/${pool.pool_id}?tab=predictions`)
                                   }}
-                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}
+                                  className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-chip text-xs font-semibold ${poolAction.className}`}
                                 >
                                   {poolAction.label}
                                   {poolAction.icon === 'arrow' && <span className="ml-0.5">&rarr;</span>}
                                 </button>
                               ) : (
-                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${poolAction.className}`}>
+                                <span className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-chip text-xs font-semibold ${poolAction.className}`}>
                                   {poolAction.label}
                                   {poolAction.icon === 'arrow' && <span className="ml-0.5">&rarr;</span>}
                                 </span>
@@ -799,52 +799,52 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                             {(() => {
                               const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
-                                <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-3 overflow-hidden">
+                                <div className="flex items-stretch rounded-control bg-snow/75 mt-3 overflow-hidden">
                                   {/* Points */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Points</p>
                                     <p className="text-xl font-bold text-primary-800 leading-none">
                                       {formatNumber(pool.total_points ?? 0)}
                                     </p>
                                   </div>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   {/* Rank */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Rank</p>
                                     {pool.hasScoringStarted && pool.current_rank != null ? (
                                       <div className="flex items-baseline gap-1">
-                                        <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                        <p className="text-xl font-bold text-ink leading-none">
                                           #{pool.current_rank}
                                         </p>
-                                        <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                                        <p className="text-[11px] text-muted leading-none">
                                           of {pool.totalEntries}
                                         </p>
                                       </div>
                                     ) : (
-                                      <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                                      <p className="text-xl font-bold text-muted leading-none">
                                         —
                                       </p>
                                     )}
                                   </div>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   {/* Level */}
                                   <div className="flex-[1.2] py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
                                     <p className="text-xl font-bold text-primary-800 leading-none">
                                       {level.level}
                                     </p>
-                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
+                                    <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
                                   </div>
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide text-right">Form</p>
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
                                     <div className="flex items-center justify-end gap-[5px] mt-1.5">
                                       {pool.form.length > 0
                                         ? pool.form.map((type, i) => (
-                                            <div key={i} className={`w-[10px] h-[10px] rounded-full ${getFormDotClass(type)}`} />
+                                            <div key={i} className={`w-[10px] h-[10px] rounded-pill ${getFormDotClass(type)}`} />
                                           ))
                                         : [0, 1, 2, 3, 4].map((i) => (
-                                            <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                                            <div key={i} className="w-[10px] h-[10px] rounded-pill bg-silver" />
                                           ))
                                       }
                                     </div>
@@ -857,7 +857,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 stretched card puts its whitespace in the middle
                                 rather than dangling below the status line. */}
                             <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-                              <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+                              <span className="text-[11px] text-muted">
                                 {statusText}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -870,8 +870,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Invite nudge — admin pools with fewer than 10 members */}
                             {pool.role === 'admin' && pool.memberCount < 10 && (
-                              <div className="mt-3 bg-primary-50 dark:bg-primary-500/10 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span className="text-[11px] text-neutral-600 dark:text-neutral-700">
+                              <div className="mt-3 bg-primary-50 dark:bg-primary-500/10 rounded-chip px-3 py-2 flex items-center justify-between">
+                                <span className="text-[11px] text-muted">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''} &mdash; invite more to make it interesting
                                 </span>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -881,7 +881,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                   >
                                     {isLinkCopied ? 'Copied!' : 'Copy Link'}
                                   </button>
-                                  <span className="text-neutral-300 dark:text-neutral-600">|</span>
+                                  <span className="text-muted dark:text-muted">|</span>
                                   <button
                                     onClick={(e) => handleCopyCode(e, pool.pool_id, pool.pool_code)}
                                     className="text-[11px] text-primary-800 font-semibold hover:underline"
@@ -927,12 +927,12 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
             {discoverLoading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
-                <p className="text-neutral-500 text-sm mt-2">Searching pools...</p>
+                <div className="inline-block w-6 h-6 border-2 border-primary-300 border-t-primary-600 rounded-pill animate-spin" />
+                <p className="text-muted text-sm mt-2">Searching pools...</p>
               </div>
             ) : sortedDiscoverResults.length > 0 ? (
               <>
-                <p className="text-sm text-neutral-500 mb-3">
+                <p className="text-sm text-muted mb-3">
                   {sortedDiscoverResults.length} public pool{sortedDiscoverResults.length !== 1 ? 's' : ''} found
                 </p>
                 <div className={
@@ -955,33 +955,33 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           <div className="flex-1 px-4 py-3.5">
                             {/* Header: name + tags */}
                             <div className="mb-2">
-                              <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug min-w-0 truncate">
+                              <h4 className="text-lg font-bold text-ink leading-snug min-w-0 truncate">
                                 {pool.pool_name}
                               </h4>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                <span className="text-xs text-neutral-500 dark:text-neutral-700 ml-0.5">
+                                <span className="text-xs text-muted ml-0.5">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
 
                             {/* Stats section */}
-                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mb-3 overflow-hidden">
+                            <div className="flex items-stretch rounded-control bg-snow/75 mb-3 overflow-hidden">
                               {/* Members */}
                               <div className="shrink-0 py-3 px-3">
-                                <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
-                                <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Members</p>
+                                <p className="text-xl font-bold text-ink leading-none">
                                   {pool.memberCount}
                                 </p>
                               </div>
                               {pool.description && (
                                 <>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   <div className="flex-1 py-3 px-3 min-w-0">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">About</p>
-                                    <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed line-clamp-2">
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">About</p>
+                                    <p className="text-xs text-muted dark:text-muted leading-relaxed line-clamp-2">
                                       {pool.description}
                                     </p>
                                   </div>
@@ -991,7 +991,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Bottom row */}
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-neutral-500 dark:text-neutral-700">
+                              <span className="text-xs text-muted">
                                 Created {formatTimeAgo(pool.created_at)}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -1012,33 +1012,33 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           <div className="flex-1 min-w-0 p-4 flex flex-col">
                             {/* Header row */}
                             <div className="mb-2">
-                              <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                              <h4 className="text-lg font-bold text-ink truncate">
                                 {pool.pool_name}
                               </h4>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                                <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+                                <span className="text-[11px] text-muted">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
 
                             {/* Stats row */}
-                            <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-1 overflow-hidden">
+                            <div className="flex items-stretch rounded-control bg-snow/75 mt-1 overflow-hidden">
                               {/* Members */}
                               <div className="shrink-0 py-3 px-3">
-                                <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Members</p>
-                                <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                                <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Members</p>
+                                <p className="text-xl font-bold text-ink leading-none">
                                   {pool.memberCount}
                                 </p>
                               </div>
                               {pool.description && (
                                 <>
-                                  <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+                                  <div className="w-px my-5 bg-silver" />
                                   <div className="flex-1 py-3 px-3 min-w-0">
-                                    <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">About</p>
-                                    <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed line-clamp-2">
+                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">About</p>
+                                    <p className="text-xs text-muted dark:text-muted leading-relaxed line-clamp-2">
                                       {pool.description}
                                     </p>
                                   </div>
@@ -1050,7 +1050,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 stretched card puts its whitespace in the middle
                                 rather than dangling below the status line. */}
                             <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-                              <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+                              <span className="text-[11px] text-muted">
                                 Created {formatTimeAgo(pool.created_at)}
                               </span>
                               {deadline.text !== 'No deadline set' && (
@@ -1071,7 +1071,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
               <Card padding="lg" className="text-center max-w-md mx-auto">
                 {discoverQuery ? (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">
+                    <p className="text-muted text-lg mb-1">
                       No pools found for &ldquo;{discoverQuery}&rdquo;
                     </p>
                     <button
@@ -1083,8 +1083,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                   </>
                 ) : (
                   <>
-                    <p className="text-neutral-600 dark:text-neutral-700 text-lg mb-1">No public pools available</p>
-                    <p className="text-neutral-500 dark:text-neutral-700 text-sm">
+                    <p className="text-muted text-lg mb-1">No public pools available</p>
+                    <p className="text-muted text-sm">
                       There are no open public pools right now. Why not{' '}
                       <button
                         onClick={() => setShowCreateModal(true)}

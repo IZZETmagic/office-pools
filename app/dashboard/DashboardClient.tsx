@@ -125,7 +125,7 @@ function getInitials(fullName: string | null, username: string): string {
 }
 
 function formatDeadline(deadline: string | null) {
-  if (!deadline) return { text: 'No deadline set', className: 'text-neutral-500' }
+  if (!deadline) return { text: 'No deadline set', className: 'text-muted' }
 
   const deadlineDate = new Date(deadline)
   const now = new Date()
@@ -146,7 +146,7 @@ function formatDeadline(deadline: string | null) {
   } else if (daysUntil < 7) {
     return { text: `${formatted} (${daysUntil} days)`, className: 'text-warning-600 font-semibold' }
   } else {
-    return { text: `${formatted} (${daysUntil} days)`, className: 'text-neutral-600' }
+    return { text: `${formatted} (${daysUntil} days)`, className: 'text-muted' }
   }
 }
 
@@ -267,9 +267,9 @@ function activityIconColor(type: ActivityItem['type']): string {
     case 'submitted': return 'text-success-600 bg-success-50'
     case 'auto_submitted': return 'text-warning-600 bg-warning-50'
     case 'entry_created': return 'text-primary-500 bg-primary-50'
-    case 'deadline_passed': return 'text-neutral-500 bg-neutral-100'
+    case 'deadline_passed': return 'text-muted bg-mist'
     case 'rank_up': return 'text-success-600 bg-success-50'
-    case 'rank_down': return 'text-neutral-500 bg-neutral-100'
+    case 'rank_down': return 'text-muted bg-mist'
     case 'mentioned': return 'text-primary-600 bg-primary-50'
     case 'points_adjusted': return 'text-warning-600 bg-warning-50'
   }
@@ -337,9 +337,9 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
         style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
       >
       <div className="flex items-center gap-1.5">
-        <h4 className="text-sm font-bold text-neutral-900 dark:text-white line-clamp-2">{pool.pool_name}</h4>
+        <h4 className="text-sm font-bold text-ink line-clamp-2">{pool.pool_name}</h4>
         {unreadCount > 0 && (
-          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+          <span className="min-w-[18px] h-[18px] px-1 rounded-pill bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -354,13 +354,13 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
 
       <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
         <div>
-          <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Rank</p>
+          <p className="text-[10px] font-medium text-muted mb-0.5">Rank</p>
           {pool.hasScoringStarted && pool.current_rank != null ? (
             <>
               <p className="t-num text-lg text-ink leading-tight">
                 {pool.current_rank}
               </p>
-              <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">
+              <p className="text-[9px] text-muted leading-tight">
                 of {pool.totalEntries}
               </p>
             </>
@@ -371,19 +371,19 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
           )}
         </div>
         <div className="text-center">
-          <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Level</p>
+          <p className="text-[10px] font-medium text-muted mb-0.5">Level</p>
           <p className="t-num text-lg text-ink leading-tight">{level.level}</p>
-          <p className="text-[9px] text-neutral-400 dark:text-neutral-500 leading-tight">{level.name}</p>
+          <p className="text-[9px] text-muted leading-tight">{level.name}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-0.5">Points</p>
+          <p className="text-[10px] font-medium text-muted mb-0.5">Points</p>
           <p className="t-num text-lg text-primary-600 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
         </div>
       </div>
 
       {/* Form dots */}
-      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-        <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">Form</span>
+      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border-subtle">
+        <span className="text-[10px] font-medium text-muted">Form</span>
         <div className="flex items-center gap-[5px]">
           {pool.form.length > 0
             ? pool.form.map((type, i) => (
@@ -443,21 +443,21 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h4 className="text-lg font-bold text-neutral-900 dark:text-white truncate">
+                <h4 className="text-lg font-bold text-ink truncate">
                   {pool.pool_name}
                 </h4>
                 {unreadCount > 0 && (
-                  <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  <span className="min-w-[20px] h-[20px] px-1.5 rounded-pill bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-700">Admin</span>}
+                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+                  <span className="text-[11px] text-muted">
                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -471,52 +471,52 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
           </div>
 
           {/* KPI section */}
-          <div className="flex items-stretch rounded-xl bg-neutral-50 dark:bg-neutral-100/75 mt-3 overflow-hidden">
+          <div className="flex items-stretch rounded-control bg-snow/75 mt-3 overflow-hidden">
             {/* Points */}
             <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Points</p>
+              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Points</p>
               <p className="text-xl font-bold text-primary-800 leading-none">
                 {formatNumber(pool.total_points ?? 0)}
               </p>
             </div>
-            <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+            <div className="w-px my-5 bg-silver" />
             {/* Rank */}
             <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Rank</p>
+              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Rank</p>
               {pool.hasScoringStarted && pool.current_rank != null ? (
                 <div className="flex items-baseline gap-1">
-                  <p className="text-xl font-bold text-neutral-900 dark:text-white leading-none">
+                  <p className="text-xl font-bold text-ink leading-none">
                     #{pool.current_rank}
                   </p>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-700 leading-none">
+                  <p className="text-[11px] text-muted leading-none">
                     of {pool.totalEntries}
                   </p>
                 </div>
               ) : (
-                <p className="text-xl font-bold text-neutral-400 dark:text-neutral-500 leading-none">
+                <p className="text-xl font-bold text-muted leading-none">
                   —
                 </p>
               )}
             </div>
-            <div className="w-px my-5 bg-neutral-200 dark:bg-neutral-700" />
+            <div className="w-px my-5 bg-silver" />
             {/* Level */}
             <div className="flex-[1.2] py-3 px-3">
-              <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide">Level</p>
+              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
               <p className="text-xl font-bold text-primary-800 leading-none">
                 {level.level}
               </p>
-              <p className="text-[10px] text-neutral-500 dark:text-neutral-700 mt-0.5">{level.name}</p>
+              <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
             </div>
             {/* Form */}
             <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mb-1 tracking-wide text-right">Form</p>
+              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
               <div className="flex items-center justify-end gap-[5px] mt-1.5">
                 {pool.form.length > 0
                   ? pool.form.map((type, i) => (
                       <div key={i} className={`w-[10px] h-[10px] rounded-pill ${getFormDotClass(type)}`} />
                     ))
                   : [0, 1, 2, 3, 4].map((i) => (
-                      <div key={i} className="w-[10px] h-[10px] rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                      <div key={i} className="w-[10px] h-[10px] rounded-pill bg-silver" />
                     ))
                 }
               </div>
@@ -524,8 +524,8 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
           </div>
 
           {/* Bottom row */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-            <span className="text-[11px] text-neutral-500 dark:text-neutral-700">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
+            <span className="text-[11px] text-muted">
               {statusText}
             </span>
             {deadline.text !== 'No deadline set' && (
@@ -570,20 +570,20 @@ function ActivityList({
     return (
       <li key={globalIdx}>
         {showHeader && (
-          <p className={`text-[11px] font-semibold uppercase tracking-wider text-neutral-400 ${globalIdx > 0 ? 'mt-4 pt-3 border-t border-neutral-100 dark:border-border-default' : ''} mb-2`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-wider text-muted ${globalIdx > 0 ? 'mt-4 pt-3 border-t border-border-subtle' : ''} mb-2`}>
             {dayHeader}
           </p>
         )}
-        <div className={`flex items-start gap-3 ${!showHeader && globalIdx > 0 ? 'pt-3 border-t border-neutral-50 dark:border-border-default' : ''} ${idx < list.length - 1 || (startIdx === 0 && rest.length > 0) ? 'pb-3' : ''}`}>
-          <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
+        <div className={`flex items-start gap-3 ${!showHeader && globalIdx > 0 ? 'pt-3 border-t border-border-subtle' : ''} ${idx < list.length - 1 || (startIdx === 0 && rest.length > 0) ? 'pb-3' : ''}`}>
+          <span className={`shrink-0 w-7 h-7 rounded-pill flex items-center justify-center ${activityIconColor(activity.type)}`} aria-hidden="true">
             <ActivityIcon type={activity.type} />
           </span>
           <div className="min-w-0 pt-0.5">
-            <p className="text-sm text-neutral-900">
+            <p className="text-sm text-ink">
               {activityDescription(activity, poolLink)}
             </p>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-neutral-500">{timeAgo(activity.date)}</span>
+              <span className="text-xs text-muted">{timeAgo(activity.date)}</span>
               {activity.type === 'joined' && !activity.hasPredictions && (
                 <Badge variant="yellow" className="!rounded">Needs predictions</Badge>
               )}
@@ -619,7 +619,7 @@ function ActivityList({
           </div>
           <button
             onClick={onToggle}
-            className="w-full mt-3 pt-3 border-t border-neutral-100 dark:border-border-default text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+            className="w-full mt-3 pt-3 border-t border-border-subtle text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
           >
             {showAll ? 'Show less' : `Show ${rest.length} more`}
           </button>
@@ -681,7 +681,7 @@ export function DashboardClient({
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
           <div className="flex items-center gap-3 sm:gap-5">
-            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
+            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
               {getInitials(user.full_name, user.username)}
             </div>
             <div className="min-w-0">
@@ -714,17 +714,17 @@ export function DashboardClient({
           </div>
           {/* Desktop: glass stat cards */}
           <div className="hidden sm:grid grid-cols-3 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border border-white/10">
               <p className="text-2xl font-bold text-white">{bestStreak} 🔥</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Streak</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
               <p className="text-2xl font-bold text-white">
                 {bestRank === 1 && '🏆 '}{bestRank ? `#${bestRank}` : '--'}
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
               <p className="text-2xl font-bold text-white">{formatNumber(totalPoints)} ⚡</p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
@@ -738,19 +738,19 @@ export function DashboardClient({
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold text-neutral-900">My Pools <span className="text-sm text-neutral-400 font-normal">({pools.length})</span></h3>
+              <h3 className="text-xl font-bold text-ink">My Pools <span className="text-sm text-muted font-normal">({pools.length})</span></h3>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-700 bg-neutral-100 dark:bg-neutral-600/50 border border-neutral-200 dark:border-neutral-500/50 rounded-xl hover:bg-neutral-200 dark:hover:bg-neutral-700/60 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted bg-mist/50 border border-border-default rounded-control hover:bg-silver transition-colors"
               >
                 <Icon name="person.badge.plus" size={16} weight="semibold" />
                 Join
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-control hover:bg-primary-700 transition-colors shadow-sm"
               >
                 <Icon name="plus" size={16} weight="semibold" />
                 Create
@@ -760,11 +760,11 @@ export function DashboardClient({
 
           {pools.length === 0 ? (
             <Card padding="lg" className="text-center">
-              <p className="text-neutral-600 text-lg mb-2">You haven&apos;t joined any pools yet.</p>
-              <p className="text-neutral-500 mb-4">Use the buttons above to join or create a pool.</p>
+              <p className="text-muted text-lg mb-2">You haven&apos;t joined any pools yet.</p>
+              <p className="text-muted mb-4">Use the buttons above to join or create a pool.</p>
               <Link
                 href="/pools?tab=discover"
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 hover:border-primary-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-control hover:bg-primary-100 hover:border-primary-300 transition-colors"
               >
                 <Icon name="magnifyingglass" size={16} weight="semibold" />
                 Discover Pools
@@ -798,7 +798,7 @@ export function DashboardClient({
                     </div>
                   ))}
                   {/* View All. Matches MobilePoolCard beside it — same radius,
-                      same border, same hover. It was on rounded-xl with a
+                      same border, same hover. It was on rounded-control with a
                       neutral-200 edge, so it read as a slightly different shape
                       sitting at the end of the strip. */}
                   <Link
@@ -843,12 +843,12 @@ export function DashboardClient({
           <div className="md:hidden mb-8">
             {/* Header with live count */}
             <div className="flex items-center gap-2.5 mb-4">
-              <h3 className="text-xl font-bold text-neutral-900">Matches</h3>
+              <h3 className="text-xl font-bold text-ink">Matches</h3>
               {liveMatches.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-danger-700 bg-danger-100 px-2.5 py-1 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-danger-700 bg-danger-100 px-2.5 py-1 rounded-pill">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                    <span className="relative inline-flex rounded-pill h-2 w-2 bg-danger-500" />
                   </span>
                   {liveMatches.length} LIVE
                 </span>
@@ -856,18 +856,18 @@ export function DashboardClient({
             </div>
 
             {/* Tab toggle */}
-            <div ref={matchTabRef} className="relative bg-neutral-100 dark:bg-surface-tertiary rounded-xl p-1 flex mb-4">
+            <div ref={matchTabRef} className="relative bg-mist dark:bg-surface-tertiary rounded-control p-1 flex mb-4">
               <div
-                className={`absolute top-1 bottom-1 bg-surface rounded-lg shadow-sm pointer-events-none ${matchTabReady ? 'transition-all duration-300 ease-out' : ''}`}
+                className={`absolute top-1 bottom-1 bg-surface rounded-chip shadow-sm pointer-events-none ${matchTabReady ? 'transition-all duration-300 ease-out' : ''}`}
                 style={{ left: matchIndicator.left, width: matchIndicator.width }}
               />
               <button
                 data-tab-key="live"
                 onClick={() => switchMatchTab('live')}
-                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-chip transition-colors ${
                   matchTab === 'live'
-                    ? 'text-neutral-900'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                    ? 'text-ink'
+                    : 'text-muted hover:text-ink'
                 }`}
               >
                 Live Now
@@ -875,10 +875,10 @@ export function DashboardClient({
               <button
                 data-tab-key="upcoming"
                 onClick={() => switchMatchTab('upcoming')}
-                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                className={`relative z-10 flex-1 py-1.5 text-xs font-medium rounded-chip transition-colors ${
                   matchTab === 'upcoming'
-                    ? 'text-neutral-900'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                    ? 'text-ink'
+                    : 'text-muted hover:text-ink'
                 }`}
               >
                 Upcoming
@@ -894,7 +894,7 @@ export function DashboardClient({
             {matchTab === 'live' ? (
               liveMatches.length === 0 ? (
                 <Card>
-                  <p className="text-neutral-500 text-sm text-center py-2">No live matches right now.</p>
+                  <p className="text-muted text-sm text-center py-2">No live matches right now.</p>
                 </Card>
               ) : (
                 <div className="space-y-3">
@@ -907,16 +907,16 @@ export function DashboardClient({
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
                     const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
                     return (
-                      <div key={match.match_id} className="bg-surface rounded-2xl shadow dark:shadow-none dark:border dark:border-border-default border border-danger-200/60 dark:border-danger-800/50 px-4 py-2.5">
+                      <div key={match.match_id} className="bg-surface rounded-card shadow dark:shadow-none dark:border dark:border-border-default border border-danger-200/60 dark:border-danger-800/50 px-4 py-2.5">
                         <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] text-neutral-500">
+                          <p className="text-[10px] text-muted">
                             {formatStage(match.stage)} &middot; #{match.match_number}
                           </p>
                           <div className="flex items-center gap-1.5">
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-danger-600">
                               <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                                <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
                               </span>
                               LIVE
                             </span>
@@ -928,15 +928,15 @@ export function DashboardClient({
                         <div className="flex items-center justify-between">
                           <div className="flex-1 flex items-center justify-end gap-1.5 pr-2">
                             {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
-                            <p className="font-semibold text-neutral-900 text-xs">{homeTeam}</p>
+                            <p className="font-semibold text-ink text-xs">{homeTeam}</p>
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-1 bg-neutral-50 dark:bg-surface-tertiary rounded-lg border border-neutral-200 dark:border-border-default">
-                            <span className="text-lg font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
-                            <span className="text-neutral-400 text-sm">-</span>
-                            <span className="text-lg font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                          <div className="flex items-center gap-2 px-3 py-1 bg-snow dark:bg-surface-tertiary rounded-chip border border-border-default">
+                            <span className="text-lg font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
+                            <span className="text-muted text-sm">-</span>
+                            <span className="text-lg font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                           </div>
                           <div className="flex-1 flex items-center gap-1.5 pl-2">
-                            <p className="font-semibold text-neutral-900 text-xs">{awayTeam}</p>
+                            <p className="font-semibold text-ink text-xs">{awayTeam}</p>
                             {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
                           </div>
                         </div>
@@ -948,7 +948,7 @@ export function DashboardClient({
             ) : (
               upcomingMatches.length === 0 ? (
                 <Card>
-                  <p className="text-neutral-500 text-sm text-center py-2">
+                  <p className="text-muted text-sm text-center py-2">
                     {pools.length === 0 ? 'Join a pool to see upcoming matches.' : 'No upcoming matches scheduled.'}
                   </p>
                 </Card>
@@ -971,20 +971,20 @@ export function DashboardClient({
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center gap-1">
                               {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
-                              <span className="text-xs font-semibold tracking-wide text-neutral-900 tabular-nums">{homeCode}</span>
+                              <span className="text-xs font-semibold tracking-wide text-ink tabular-nums">{homeCode}</span>
                             </div>
-                            <span className="text-neutral-400 text-xs self-center">vs</span>
+                            <span className="text-muted text-xs self-center">vs</span>
                             <div className="flex flex-col items-center gap-1">
                               {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
-                              <span className="text-xs font-semibold tracking-wide text-neutral-900 tabular-nums">{awayCode}</span>
+                              <span className="text-xs font-semibold tracking-wide text-ink tabular-nums">{awayCode}</span>
                             </div>
                           </div>
                           <div className="text-right shrink-0 ml-3">
-                            <p className="text-xs font-medium text-neutral-600">
+                            <p className="text-xs font-medium text-muted">
                               {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                             </p>
                             {match.venue && (
-                              <p className="text-xs text-neutral-400 mt-0.5">{match.venue}</p>
+                              <p className="text-xs text-muted mt-0.5">{match.venue}</p>
                             )}
                           </div>
                         </Card>
@@ -992,19 +992,19 @@ export function DashboardClient({
                     })}
                     {tbdMatches.length > 0 && (
                       <Card>
-                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Awaiting Results</p>
-                        <ul className="divide-y divide-neutral-100 dark:divide-border-default">
+                        <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Awaiting Results</p>
+                        <ul className="divide-y divide-border-subtle">
                           {tbdMatches.map((match) => {
                             const homeLabel = match.home_team_placeholder ?? 'TBD'
                             const awayLabel = match.away_team_placeholder ?? 'TBD'
                             return (
                               <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
                                 <div className="flex items-center min-w-0">
-                                  <span className="text-xs text-neutral-400 w-8 shrink-0 tabular-nums">#{match.match_number}</span>
-                                  <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
-                                  <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
+                                  <span className="text-xs text-muted w-8 shrink-0 tabular-nums">#{match.match_number}</span>
+                                  <span className="text-xs text-muted w-8 shrink-0">{formatStageShort(match.stage)}</span>
+                                  <span className="text-sm text-muted truncate">{homeLabel} vs {awayLabel}</span>
                                 </div>
-                                <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                                <span className="text-xs text-muted shrink-0 ml-3">
                                   {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                                 </span>
                               </li>
@@ -1024,13 +1024,13 @@ export function DashboardClient({
 
         {/* ===== DESKTOP: Live Matches — only shown when there are live matches ===== */}
         {liveMatches.length > 0 && (
-          <div className="hidden md:block mb-8 bg-danger-50/40 dark:bg-danger-950/20 border border-danger-200/50 dark:border-danger-800/30 rounded-2xl p-4 sm:p-5">
+          <div className="hidden md:block mb-8 bg-danger-50/40 dark:bg-danger-950/20 border border-danger-200/50 dark:border-danger-800/30 rounded-card p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-danger-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                <span className="relative inline-flex rounded-pill h-3 w-3 bg-danger-500" />
               </span>
-              <h3 className="text-xl font-bold text-neutral-900">Live Matches</h3>
+              <h3 className="text-xl font-bold text-ink">Live Matches</h3>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
               {liveMatches.map((match) => {
@@ -1044,28 +1044,28 @@ export function DashboardClient({
                 return (
                   <Card key={match.match_id} className="border-danger-200 dark:border-danger-800/50 bg-surface">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-muted">
                         {formatStage(match.stage)} &middot; Match #{match.match_number}
                       </p>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-pill">
                         <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                          <span className="relative inline-flex rounded-pill h-2 w-2 bg-danger-500" />
                         </span>
                         LIVE
                       </span>
                     </div>
                     <div className="flex items-center justify-between overflow-hidden">
                       <div className="flex-1 min-w-0 flex items-center justify-end pr-3">
-                        <p className="font-semibold text-neutral-900 text-sm truncate">{homeTeam}</p>
+                        <p className="font-semibold text-ink text-sm truncate">{homeTeam}</p>
                       </div>
-                      <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-surface-tertiary rounded-xl shadow-sm border border-neutral-200 dark:border-border-default">
-                        <span className="text-2xl font-extrabold text-neutral-900">{match.home_score_ft ?? 0}</span>
-                        <span className="text-neutral-400 text-lg">-</span>
-                        <span className="text-2xl font-extrabold text-neutral-900">{match.away_score_ft ?? 0}</span>
+                      <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-snow dark:bg-surface-tertiary rounded-control shadow-sm border border-border-default">
+                        <span className="text-2xl font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
+                        <span className="text-muted text-lg">-</span>
+                        <span className="text-2xl font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                       </div>
                       <div className="flex-1 min-w-0 flex items-center pl-3">
-                        <p className="font-semibold text-neutral-900 text-sm truncate">{awayTeam}</p>
+                        <p className="font-semibold text-ink text-sm truncate">{awayTeam}</p>
                       </div>
                     </div>
                     {elapsed && (
@@ -1084,10 +1084,10 @@ export function DashboardClient({
         <div className="hidden md:grid lg:grid-cols-5 gap-6">
           {/* Upcoming matches - 3/5 width */}
           <div className="lg:col-span-3">
-            <h3 className="text-xl font-bold text-neutral-900 mb-4">Upcoming Matches</h3>
+            <h3 className="text-xl font-bold text-ink mb-4">Upcoming Matches</h3>
             {upcomingMatches.length === 0 ? (
               <Card>
-                <p className="text-neutral-600">
+                <p className="text-muted">
                   {pools.length === 0
                     ? 'Join a pool to see upcoming matches.'
                     : 'No upcoming matches scheduled.'}
@@ -1108,27 +1108,27 @@ export function DashboardClient({
                     return (
                       <Card key={match.match_id} className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold text-neutral-900 flex items-center gap-2">
+                          <p className="font-semibold text-ink flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5">
                               {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
                               {homeTeam}
                             </span>
-                            <span className="text-neutral-400 font-normal">vs</span>
+                            <span className="text-muted font-normal">vs</span>
                             <span className="inline-flex items-center gap-1.5">
                               {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
                               {awayTeam}
                             </span>
                           </p>
-                          <p className="text-xs text-neutral-500">
+                          <p className="text-xs text-muted">
                             {formatStage(match.stage)} &middot; Match #{match.match_number}
                           </p>
                         </div>
                         <div className="text-right shrink-0 ml-4">
-                          <p className="text-sm font-medium text-neutral-700">
+                          <p className="text-sm font-medium text-ink">
                             {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                           </p>
                           {match.venue && (
-                            <p className="text-xs text-neutral-400 mt-0.5">{match.venue}</p>
+                            <p className="text-xs text-muted mt-0.5">{match.venue}</p>
                           )}
                         </div>
                       </Card>
@@ -1136,19 +1136,19 @@ export function DashboardClient({
                   })}
                   {tbdMatches.length > 0 && (
                     <Card>
-                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Awaiting Results</p>
-                      <ul className="divide-y divide-neutral-100 dark:divide-border-default">
+                      <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Awaiting Results</p>
+                      <ul className="divide-y divide-border-subtle">
                         {tbdMatches.map((match) => {
                           const homeLabel = match.home_team_placeholder ?? 'TBD'
                           const awayLabel = match.away_team_placeholder ?? 'TBD'
                           return (
                             <li key={match.match_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
                               <div className="flex items-center min-w-0">
-                                <span className="text-xs text-neutral-400 w-8 shrink-0 tabular-nums">#{match.match_number}</span>
-                                <span className="text-xs text-neutral-400 w-8 shrink-0">{formatStageShort(match.stage)}</span>
-                                <span className="text-sm text-neutral-500 truncate">{homeLabel} vs {awayLabel}</span>
+                                <span className="text-xs text-muted w-8 shrink-0 tabular-nums">#{match.match_number}</span>
+                                <span className="text-xs text-muted w-8 shrink-0">{formatStageShort(match.stage)}</span>
+                                <span className="text-sm text-muted truncate">{homeLabel} vs {awayLabel}</span>
                               </div>
-                              <span className="text-xs text-neutral-400 shrink-0 ml-3">
+                              <span className="text-xs text-muted shrink-0 ml-3">
                                 {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                               </span>
                             </li>
@@ -1164,10 +1164,10 @@ export function DashboardClient({
 
           {/* Recent activity - 2/5 width */}
           <div className="lg:col-span-2">
-            <h3 className="text-xl font-bold text-neutral-900 mb-4">Recent Activity</h3>
+            <h3 className="text-xl font-bold text-ink mb-4">Recent Activity</h3>
             {activities.length === 0 ? (
               <Card>
-                <p className="text-neutral-600">No recent activity.</p>
+                <p className="text-muted">No recent activity.</p>
               </Card>
             ) : (
               <ActivityList
@@ -1181,10 +1181,10 @@ export function DashboardClient({
 
         {/* ===== MOBILE: Activity feed (separate from desktop grid) ===== */}
         <div className="md:hidden mt-6">
-          <h3 className="text-xl font-bold text-neutral-900 mb-4">Recent Activity</h3>
+          <h3 className="text-xl font-bold text-ink mb-4">Recent Activity</h3>
           {activities.length === 0 ? (
             <Card>
-              <p className="text-neutral-600">No recent activity.</p>
+              <p className="text-muted">No recent activity.</p>
             </Card>
           ) : (
             <ActivityList

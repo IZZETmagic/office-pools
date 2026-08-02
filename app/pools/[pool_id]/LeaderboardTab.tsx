@@ -1125,7 +1125,7 @@ export function LeaderboardTab({
   if (sorted.length === 0) {
     return (
       <div className="rounded-card p-8 text-center bg-surface border border-border-default">
-        <p className="text-neutral-500 dark:text-neutral-400">No members in this pool yet.</p>
+        <p className="text-muted">No members in this pool yet.</p>
       </div>
     )
   }
@@ -1161,15 +1161,15 @@ export function LeaderboardTab({
       {/* Matchday MVP Banner */}
       {matchdayMVP && (
         <div
-          className="bg-accent-50 dark:bg-accent-500/10 border border-accent-500/20 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2"
+          className="bg-accent-50 dark:bg-accent-500/10 border border-accent-500/20 rounded-control px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2"
           style={{ animation: 'fadeUp 0.3s ease 0.05s both' }}
         >
           <span className="text-base">⭐</span>
           <div className="flex-1 min-w-0">
             <span className="text-[11px] font-semibold text-accent-700 dark:text-accent-500">Matchday MVP</span>
-            <span className="text-[11px] text-neutral-500 dark:text-neutral-400"> — </span>
-            <span className="text-[11px] font-bold text-neutral-900 dark:text-white">{matchdayMVP.entryName}</span>
-            <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <span className="text-[11px] text-muted"> — </span>
+            <span className="text-[11px] font-bold text-ink">{matchdayMVP.entryName}</span>
+            <span className="text-[11px] text-muted">
               {' '}scored {matchdayMVP.matchPoints} pts on Match {matchdayMVP.matchNumber}
             </span>
           </div>
@@ -1215,7 +1215,7 @@ export function LeaderboardTab({
                     <div className="flex flex-col items-center mb-1 sm:mb-2">
                       <div className="relative mb-1 sm:mb-2">
                         <div
-                          className={`${isFirst ? 'w-14 h-14 sm:w-20 sm:h-20' : 'w-11 h-11 sm:w-16 sm:h-16'} rounded-full flex items-center justify-center border-2 ${getMedalRingClasses(actualRank)} bg-surface`}
+                          className={`${isFirst ? 'w-14 h-14 sm:w-20 sm:h-20' : 'w-11 h-11 sm:w-16 sm:h-16'} rounded-pill flex items-center justify-center border-2 ${getMedalRingClasses(actualRank)} bg-surface`}
                           style={isFirst ? { animation: 'crownFloat 2s ease-in-out infinite' } : undefined}
                         >
                           <span className={`${isFirst ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl'}`}>{getMedalEmoji(actualRank)}</span>
@@ -1234,13 +1234,13 @@ export function LeaderboardTab({
                         )}
                       </div>
 
-                      <div className="text-[11px] sm:text-sm font-bold text-center truncate w-full text-neutral-900 dark:text-white">
+                      <div className="text-[11px] sm:text-sm font-bold text-center truncate w-full text-ink">
                         {getDisplayName(entry)}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-neutral-400 dark:text-neutral-500 text-center truncate w-full">
+                      <div className="text-[10px] sm:text-xs text-muted text-center truncate w-full">
                         @{getUsername(entry)}
                       </div>
-                      <div className={`mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                      <div className={`mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
                         {stats?.levelName ?? 'Rookie'}
                       </div>
 
@@ -1249,7 +1249,7 @@ export function LeaderboardTab({
                           {stats.last5.map((type, di) => (
                             <div
                               key={di}
-                              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${getFormDotClass(type)}`}
+                              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-pill ${getFormDotClass(type)}`}
                               style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                             />
                           ))}
@@ -1266,10 +1266,10 @@ export function LeaderboardTab({
                       >
                         {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                      <div className="text-[10px] sm:text-xs text-muted mt-1">
                         {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                       </div>
-                      <div className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">
+                      <div className="text-[10px] sm:text-xs text-muted">
                         {isBracketPicker ? (() => {
                           const bpStats = bpStatsMap.get(entry.entry_id)
                           return bpStats && bpStats.total > 0
@@ -1293,10 +1293,10 @@ export function LeaderboardTab({
           style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}
         >
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-4 gap-y-1">
-            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
-            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
-            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">🎲 <span className="text-primary-700 font-medium">Contrarian King</span></span>
-            <span className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
+            <span className="text-[10px] sm:text-xs text-muted">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
+            <span className="text-[10px] sm:text-xs text-muted">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
+            <span className="text-[10px] sm:text-xs text-muted">🎲 <span className="text-primary-700 font-medium">Contrarian King</span></span>
+            <span className="text-[10px] sm:text-xs text-muted">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
           </div>
           {/* Driven by getFormDotClass so the key always matches the dots it explains.
               These were previously hand-written with their own colours, which is how a
@@ -1314,14 +1314,14 @@ export function LeaderboardTab({
 
       {/* Tap hint */}
       <p
-        className="text-center text-[11px] sm:text-xs text-neutral-400 dark:text-neutral-500"
+        className="text-center text-[11px] sm:text-xs text-muted"
         style={{ animation: 'fadeUp 0.3s ease 0.18s both' }}
       >
         <span className="sm:hidden">Tap</span><span className="hidden sm:inline">Click</span> a player to see their full breakdown
       </p>
 
       {/* Desktop table header */}
-      <div className={`hidden sm:grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 px-4 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider border-b border-border-default`}>
+      <div className={`hidden sm:grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 px-4 py-2 text-xs font-semibold text-muted uppercase tracking-wider border-b border-border-default`}>
         <div>Rank</div>
         <div>Player</div>
         {!isBracketPicker && <div className="text-center">Form</div>}
@@ -1369,7 +1369,7 @@ export function LeaderboardTab({
               {/* Player */}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                  <span className="text-sm font-bold text-ink truncate">
                     {getDisplayName(entry)}
                   </span>
                   {isCurrentUser && (
@@ -1379,8 +1379,8 @@ export function LeaderboardTab({
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-neutral-400 dark:text-neutral-500">@{getUsername(entry)}</span>
-                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                  <span className="text-xs text-muted">@{getUsername(entry)}</span>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
                     Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
                   </span>
                 </div>
@@ -1394,7 +1394,7 @@ export function LeaderboardTab({
                       {stats.last5.map((type, di) => (
                         <div
                           key={di}
-                          className={`w-2.5 h-2.5 rounded-full ${getFormDotClass(type)}`}
+                          className={`w-2.5 h-2.5 rounded-pill ${getFormDotClass(type)}`}
                           style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                         />
                       ))}
@@ -1408,7 +1408,7 @@ export function LeaderboardTab({
                       )}
                     </>
                   ) : (
-                    <span className="text-neutral-300 dark:text-neutral-600">—</span>
+                    <span className="text-muted dark:text-muted">—</span>
                   )}
                 </div>
               )}
@@ -1418,12 +1418,12 @@ export function LeaderboardTab({
                 {entryAwards.length > 0 ? entryAwards.map((award, ai) => (
                   <span
                     key={ai}
-                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getAwardBadgeClasses(award.type)}`}
+                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getAwardBadgeClasses(award.type)}`}
                   >
                     {award.emoji} {award.label}
                   </span>
                 )) : (
-                  <span className="text-neutral-300 dark:text-neutral-600">—</span>
+                  <span className="text-muted dark:text-muted">—</span>
                 )}
               </div>
 
@@ -1435,18 +1435,18 @@ export function LeaderboardTab({
                 >
                   {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                 </div>
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                <div className="text-[10px] text-muted">
                   {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                 </div>
                 {!isBracketPicker && stats && (
-                  <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                  <div className="text-[10px] text-muted">
                     {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                   </div>
                 )}
                 {isBracketPicker && (() => {
                   const bpStats = bpStatsMap.get(entry.entry_id)
                   return bpStats && bpStats.total > 0 ? (
-                    <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    <div className="text-[10px] text-muted">
                       {bpStats.correct}/{bpStats.total} correct · {bpStats.accuracy.toFixed(0)}%
                     </div>
                   ) : null
@@ -1471,7 +1471,7 @@ export function LeaderboardTab({
             <div
               key={entry.entry_id}
               onClick={() => setSelectedEntry(entry)}
-              className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+              className={`rounded-control border p-3 cursor-pointer transition-colors ${
                 isCurrentUser
                   ? 'bg-primary-50 dark:bg-primary-500/[0.08] border-l-2 border-l-primary-500 border-border-default'
                   : 'bg-surface border-border-default hover:bg-surface-secondary'
@@ -1503,7 +1503,7 @@ export function LeaderboardTab({
                 <div className="flex-1 min-w-0">
                   {/* Name row */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                    <span className="text-sm font-bold text-ink truncate">
                       {getDisplayName(entry)}
                     </span>
                     {isCurrentUser && (
@@ -1515,8 +1515,8 @@ export function LeaderboardTab({
 
                   {/* Username + Level pill */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">@{getUsername(entry)}</span>
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                    <span className="text-[11px] text-muted truncate">@{getUsername(entry)}</span>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
                       Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
                     </span>
                   </div>
@@ -1527,7 +1527,7 @@ export function LeaderboardTab({
                       {entryAwards.map((award, ai) => (
                         <span
                           key={ai}
-                          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getAwardBadgeClasses(award.type)}`}
+                          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getAwardBadgeClasses(award.type)}`}
                         >
                           {award.emoji} {award.label}
                         </span>
@@ -1538,12 +1538,12 @@ export function LeaderboardTab({
                   {/* Form dots */}
                   {!isBracketPicker && stats && stats.last5.length > 0 && (
                     <div className="flex items-center gap-1 mt-1.5">
-                      <span className="text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wide">Form</span>
+                      <span className="text-[9px] font-semibold text-muted uppercase tracking-wide">Form</span>
                       <div className="flex items-center gap-[3px]">
                         {stats.last5.map((type, di) => (
                           <div
                             key={di}
-                            className={`w-2 h-2 rounded-full ${getFormDotClass(type)}`}
+                            className={`w-2 h-2 rounded-pill ${getFormDotClass(type)}`}
                             style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                           />
                         ))}
@@ -1568,18 +1568,18 @@ export function LeaderboardTab({
                   >
                     {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                   </div>
-                  <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                  <div className="text-[10px] text-muted">
                     {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
                   </div>
                   {!isBracketPicker && stats && (
-                    <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+                    <div className="text-[10px] text-muted mt-0.5">
                       {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                     </div>
                   )}
                   {isBracketPicker && (() => {
                     const bpStats = bpStatsMap.get(entry.entry_id)
                     return bpStats && bpStats.total > 0 ? (
-                      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+                      <div className="text-[10px] text-muted mt-0.5">
                         {bpStats.correct}/{bpStats.total} correct · {bpStats.accuracy.toFixed(0)}%
                       </div>
                     ) : null
@@ -1589,12 +1589,12 @@ export function LeaderboardTab({
 
               {/* Current user insight line */}
               {isCurrentUser && userInsight && (
-                <div className="mt-2 pt-2 border-t border-border-default text-[10px] text-neutral-500 dark:text-neutral-400">
+                <div className="mt-2 pt-2 border-t border-border-default text-[10px] text-muted">
                   {userInsight.ptsBehind !== null && userInsight.personAboveName && (
                     <span>{userInsight.ptsBehind} pts behind {userInsight.personAboveName}</span>
                   )}
                   {userInsight.ptsBehind !== null && userInsight.ptsAhead !== null && (
-                    <span className="mx-1.5 text-neutral-300 dark:text-neutral-600">·</span>
+                    <span className="mx-1.5 text-muted dark:text-muted">·</span>
                   )}
                   {userInsight.ptsAhead !== null && userInsight.personBelowName && (
                     <span>{userInsight.personBelowName} is {userInsight.ptsAhead} pts behind you</span>
@@ -1610,7 +1610,7 @@ export function LeaderboardTab({
       {hasMore && (
         <button
           onClick={() => setVisibleCount(v => v + 20)}
-          className="w-full sm:max-w-xs sm:mx-auto py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-colors bg-surface-secondary text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+          className="w-full sm:max-w-xs sm:mx-auto py-2.5 sm:py-3 rounded-chip text-xs sm:text-sm font-semibold transition-colors bg-surface-secondary text-muted hover:bg-silver"
         >
           Show More
         </button>
@@ -1622,19 +1622,19 @@ export function LeaderboardTab({
           className="bg-surface rounded-card border border-border-default p-4"
           style={{ animation: 'fadeUp 0.3s ease 0.3s both' }}
         >
-          <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white mb-3">Pool Superlatives</h3>
+          <h3 className="text-sm sm:text-base font-bold text-ink mb-3">Pool Superlatives</h3>
           <div className="space-y-2 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3 sm:space-y-0">
             {poolSuperlatives.map((s) => (
               <div
                 key={s.type}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 ${s.bgClass}`}
+                className={`flex items-center gap-3 rounded-chip px-3 py-2.5 ${s.bgClass}`}
               >
                 <span className="text-lg flex-shrink-0">{s.emoji}</span>
                 <div className="min-w-0">
                   <div className={`text-[11px] sm:text-xs font-bold ${s.titleColorClass}`}>{s.title}</div>
-                  <div className="text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300">
+                  <div className="text-[11px] sm:text-xs text-ink">
                     {s.name}
-                    <span className="text-neutral-400 dark:text-neutral-500"> · {s.detail}</span>
+                    <span className="text-muted"> · {s.detail}</span>
                   </div>
                 </div>
               </div>
@@ -1645,16 +1645,16 @@ export function LeaderboardTab({
 
       {/* Matchday indicator */}
       <div
-        className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-[11px] sm:text-xs bg-surface-secondary border border-border-default"
+        className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 rounded-chip text-[11px] sm:text-xs bg-surface-secondary border border-border-default"
         style={{ animation: 'fadeUp 0.3s ease 0.35s both' }}
       >
-        <div className="text-neutral-400 dark:text-neutral-500">
+        <div className="text-muted">
           {matchdayInfo.lastMatchday ? `Last: Match ${matchdayInfo.lastMatchday}` : 'No matches played'}
-          <span className="mx-2 text-neutral-300 dark:text-neutral-600">·</span>
+          <span className="mx-2 text-muted dark:text-muted">·</span>
           {matchdayInfo.completedCount}/{matchdayInfo.totalCount} played
         </div>
         {matchdayInfo.nextDate && (
-          <div className="text-neutral-500 dark:text-neutral-400">
+          <div className="text-muted">
             Next: {new Date(matchdayInfo.nextDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </div>
         )}
