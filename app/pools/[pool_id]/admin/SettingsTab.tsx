@@ -150,12 +150,11 @@ function ShareButton({
    header carries a "Progressive" pill — would have drawn a short rule under
    the words instead of one spanning the card. */
 function Caption({
-  children, tone, icon, trailing,
-}: { children: React.ReactNode; tone?: string; icon?: string; trailing?: React.ReactNode }) {
+  children, tone, trailing,
+}: { children: React.ReactNode; tone?: string; trailing?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
-      <h3 className={`t-section-header flex items-center gap-2 ${tone ?? 'text-ink'}`}>
-        {icon && <Icon name={icon} size={18} weight="bold" className="shrink-0" />}
+      <h3 className={`t-section-header ${tone ?? 'text-ink'}`}>
         {children}
       </h3>
       {trailing}
@@ -567,7 +566,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             admin can hold the screen up and let someone scan straight away; the
             code underneath is the spoken/typed fallback. Mirrors the RN card. */}
         <Card padding="sm" className="flex flex-col">
-          <Caption icon="qrcode">Share &amp; Invite</Caption>
+          <Caption>Share &amp; Invite</Caption>
 
           {/* Stacked on a phone, side-by-side from lg. Stacked it is ~400px
               tall, which on a two-column desktop grid left a dead half-row
@@ -618,7 +617,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Pool Information ── */}
         <Card padding="sm" className="flex flex-col">
-          <Caption icon="doc.text">Pool Information</Caption>
+          <Caption>Pool Information</Caption>
 
           <div className="flex-1 flex flex-col gap-4">
             <FieldRow label="Pool Name *">
@@ -645,7 +644,6 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         {/* ── Prediction Deadline ── */}
         <Card padding="sm">
           <Caption
-            icon="calendar"
             trailing={pool.prediction_mode === 'progressive' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-detail font-bold bg-primary-600/12 text-primary-800">
                 Progressive
@@ -733,7 +731,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Status ── */}
         <Card padding="sm">
-        <Caption icon="checkmark.circle.fill">Status</Caption>
+        <Caption>Status</Caption>
         <SegmentedPicker value={status} options={statusOptions} onChange={setStatus} />
         <p className="t-detail text-muted mt-2.5">
           {statusOptions.find(s => s.value === status)?.desc}
@@ -742,7 +740,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
       {/* ── New Members ── */}
       <Card padding="sm">
-        <Caption icon="person.badge.plus">New Members</Caption>
+        <Caption>New Members</Caption>
         <SegmentedPicker value={acceptingMembers} options={acceptingOptions} onChange={setAcceptingMembers} />
         <p className="t-detail text-muted mt-2.5">
           {acceptingOptions.find(o => o.value === acceptingMembers)?.desc}
@@ -752,7 +750,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Visibility ── */}
         <Card padding="sm">
-          <Caption icon="eye">Visibility</Caption>
+          <Caption>Visibility</Caption>
           <SegmentedPicker value={isPrivate} options={visibilityOptions} onChange={setIsPrivate} />
           <p className="t-detail text-muted mt-2.5">
             {visibilityOptions.find(o => o.value === isPrivate)?.desc}
@@ -761,7 +759,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Max Members ── */}
         <Card padding="sm">
-          <Caption icon="person.3.fill">Max Members</Caption>
+          <Caption>Max Members</Caption>
           <SettingsRow
             label="Cap on total members"
             subtitle={!maxParticipants || maxParticipants === '0' ? 'No limit' : `${maxParticipants} max`}
@@ -775,7 +773,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Prediction Entries ── */}
         <Card padding="sm">
-          <Caption icon="list.number">Prediction Entries</Caption>
+          <Caption>Prediction Entries</Caption>
           <p className="t-body text-muted mb-4">
             Each entry is scored separately on the leaderboard.
           </p>
@@ -798,7 +796,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Entry Fees ── */}
         <Card padding="sm">
-          <Caption icon="dollarsign.circle.fill">Entry Fees</Caption>
+          <Caption>Entry Fees</Caption>
           <p className="t-body text-muted mb-4">
             Leave blank for a free pool.
           </p>
@@ -847,7 +845,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Danger Zone ── */}
         <Card padding="sm" className="border border-danger-200">
-          <Caption icon="exclamationmark.triangle.fill" tone="text-danger-700">
+          <Caption tone="text-danger-700">
             Danger Zone
           </Caption>
 
