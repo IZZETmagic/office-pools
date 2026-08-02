@@ -148,9 +148,9 @@ function ShareButton({
 
    The rule lives on the wrapper, not on the <h3>, and badges go through
    `trailing` rather than beside the component. A border on the heading itself
-   would stop at the end of the text, so the Prediction Deadline card — whose
-   header carries a "Progressive" pill — would have drawn a short rule under
-   the words instead of one spanning the card. */
+   would stop at the end of the text, so the Pool Mode card — whose header
+   carries a pill naming the mode — would have drawn a short rule under the
+   words instead of one spanning the card. */
 function Caption({
   children, tone, trailing,
 }: { children: React.ReactNode; tone?: string; trailing?: React.ReactNode }) {
@@ -696,13 +696,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
         {/* ── Prediction Deadline ── */}
         <Card padding="sm">
-          <Caption
-            trailing={pool.prediction_mode === 'progressive' ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-detail font-bold bg-primary-600/12 text-primary-800">
-                Progressive
-              </span>
-            ) : undefined}
-          >
+          {/* No mode pill here — the Pool Mode card above names the mode, and
+              the info banner below already says this pool is progressive. */}
+          <Caption>
             {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
           </Caption>
 
