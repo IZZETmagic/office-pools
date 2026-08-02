@@ -331,9 +331,8 @@ export function ResultsView({
                   <tr>
                     <th className="px-4 py-3 text-left t-body font-semibold text-ink whitespace-nowrap">Match</th>
                     <th className="px-4 py-3 text-right t-body font-semibold text-ink">Home</th>
-                    <th className="px-2 py-3 text-center t-body font-semibold text-ink">Score</th>
+                    <th className="px-2 py-3 text-center t-body font-semibold text-ink whitespace-nowrap">Score / Pick</th>
                     <th className="px-4 py-3 text-left t-body font-semibold text-ink">Away</th>
-                    <th className="px-4 py-3 text-center t-body font-semibold text-ink whitespace-nowrap">Your Pick</th>
                     <th className="px-4 py-3 text-center t-body font-semibold text-ink">Result</th>
                     <th className="px-4 py-3 text-right t-body font-semibold text-ink">Date</th>
                   </tr>
@@ -343,6 +342,7 @@ export function ResultsView({
                     <MatchTableRow
                       key={match.match_id}
                       match={match}
+                      predictionMode={predictionMode}
                       storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
                     />
                   ))}

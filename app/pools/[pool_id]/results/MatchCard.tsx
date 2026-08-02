@@ -343,9 +343,11 @@ export function MatchCard({
  */
 export function MatchTableRow({
   match,
+  predictionMode,
   storedScore,
 }: {
   match: ResultMatch
+  predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   storedScore?: MatchScoreData | null
 }) {
   const isCompleted = match.status === 'completed'
@@ -366,6 +368,13 @@ export function MatchTableRow({
   const homeCode = match.home_team?.country_code ?? ''
   const awayCode = match.away_team?.country_code ?? ''
 
+  // Knockout matches in a full-tournament pool are predicted from the bracket,
+  // so who you had in the fixture matters as much as the score you gave it.
+  const showBracketTeams =
+    predictionMode === 'full_tournament' &&
+    match.stage !== 'group' &&
+    (match.predicted_home_team_name != null || match.predicted_away_team_name != null)
+
   return (
     <tr className="border-b border-border-default last:border-b-0 hover:bg-snow transition-colors">
       {/* The outcome accent survives the move to a table as a left edge on the
@@ -381,22 +390,38 @@ export function MatchTableRow({
           <span className="t-body text-ink truncate text-right">{homeName}</span>
           {homeCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>}
         </div>
+        {showBracketTeams && (
+          <div className="t-detail text-muted text-right truncate">
+            {match.predicted_home_team_name || '?'}
+          </div>
+        )}
       </td>
 
       <td className="px-2 py-3 text-center whitespace-nowrap">
         {hasActualScores ? (
-          <>
-            <span className="t-num t-num-extrabold text-base text-ink">
-              {match.home_score_ft} - {match.away_score_ft}
-            </span>
-            {hasPsoScores && (
-              <span className="t-detail font-bold text-accent-600 block">
-                PSO {match.home_score_pso}-{match.away_score_pso}
-              </span>
-            )}
-          </>
+          <span className="t-num t-num-extrabold text-base text-ink block">
+            {match.home_score_ft} - {match.away_score_ft}
+          </span>
         ) : (
-          <span className="t-body text-muted">vs</span>
+          <span className="t-body text-muted block">vs</span>
+        )}
+        {hasPsoScores && (
+          <span className="t-detail font-bold text-accent-600 block">
+            PSO {match.home_score_pso}-{match.away_score_pso}
+          </span>
+        )}
+        {/* The prediction sits directly under the actual score in the muted
+            tone, so the column reads actual-over-predicted at a glance. */}
+        {hasPrediction ? (
+          <span className="t-num t-num-medium text-xs text-muted block">
+            {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
+            {match.prediction!.predicted_home_pso != null &&
+              match.prediction!.predicted_away_pso != null && (
+                <> ({match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})</>
+              )}
+          </span>
+        ) : (
+          <span className="t-detail text-muted block">no pick</span>
         )}
       </td>
 
@@ -405,15 +430,10 @@ export function MatchTableRow({
           {awayCode && <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>}
           <span className="t-body text-ink truncate">{awayName}</span>
         </div>
-      </td>
-
-      <td className="px-4 py-3 text-center whitespace-nowrap">
-        {hasPrediction ? (
-          <span className="t-num text-sm text-ink">
-            {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
-          </span>
-        ) : (
-          <span className="t-body text-muted">—</span>
+        {showBracketTeams && (
+          <div className="t-detail text-muted truncate">
+            {match.predicted_away_team_name || '?'}
+          </div>
         )}
       </td>
 
