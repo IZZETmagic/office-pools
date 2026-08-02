@@ -172,28 +172,63 @@ export function ResultsView({
         </div>
       </div>
 
-      {/* ── Round selector ──
-          A select, not a chip strip. Seven pills wrapped on a phone and made
-          the head of this tab look like a pile of controls; one field states
-          the current round instead. */}
-      <div className="mb-4 border-b border-border-subtle pb-3">
-        <Select
-          value={stageTab}
-          onChange={(e) => {
-            const next = e.target.value as StageTab
-            setStageTab(next)
-            if (next !== 'group') setGroupFilter('all')
-          }}
-          aria-label="Filter by round"
-        >
-          {STAGE_TABS.map((tab) => (
-            <option key={tab.key} value={tab.key}>{tab.label}</option>
-          ))}
-        </Select>
+      {/* ── Filters ──
+          Round and status side by side, with the entry selector pushed right.
+          These were a seven-pill strip and a four-pill strip in two stacked
+          blocks; three rows of controls stood between the header and the first
+          result. */}
+      <div className="mb-6 border-b border-border-subtle pb-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select
+            value={stageTab}
+            onChange={(e) => {
+              const next = e.target.value as StageTab
+              setStageTab(next)
+              if (next !== 'group') setGroupFilter('all')
+            }}
+            aria-label="Filter by round"
+          >
+            {STAGE_TABS.map((tab) => (
+              <option key={tab.key} value={tab.key}>{tab.label}</option>
+            ))}
+          </Select>
 
-        {/* ── Group letter filter pills (only on Group Stage tab) ── */}
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            aria-label="Filter by match status"
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.key === 'all' ? opt.label : `${opt.label} (${statusCounts[opt.key]})`}
+              </option>
+            ))}
+          </Select>
+
+          {/* Entry selector, right-aligned, only for multi-entry users. On the
+              shared Select now that it sits beside two others — it was a raw
+              <select> with its own border and padding. */}
+          {userEntries && userEntries.length > 1 && onEntryChange && (
+            <div className="ml-auto">
+              <Select
+                value={selectedEntryId || ''}
+                onChange={(e) => onEntryChange(e.target.value)}
+                aria-label="Choose entry"
+              >
+                {userEntries.map((entry) => (
+                  <option key={entry.entry_id} value={entry.entry_id}>
+                    {entry.entry_name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* Group letters qualify the round chosen above, so they stay beneath
+            the row rather than joining it. */}
         {stageTab === 'group' && (
-          <div className="flex gap-0.5 mt-2 overflow-x-auto">
+          <div className="flex gap-0.5 mt-3 overflow-x-auto">
             <button
               onClick={() => setGroupFilter('all')}
               className={`px-3 py-1 t-detail font-bold rounded-l-control rounded-r-chip transition-colors ${
@@ -209,7 +244,7 @@ export function ResultsView({
                 key={g}
                 onClick={() => setGroupFilter(g)}
                 className={`w-8 h-7 t-num text-xs transition-colors ${
-                  i === GROUP_LETTERS.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
+                  i === GROUP_LETTERS.length - 1 ? 'rounded-r-control rounded-l-chip' : 'rounded-chip'
                 } ${
                   groupFilter === g
                     ? 'bg-primary-600 text-white'
@@ -219,42 +254,6 @@ export function ResultsView({
                 {g}
               </button>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Status filter + Entry selector row ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Status. One select rather than four pills — and one control rather
-            than the two near-identical chip rows this replaces, which differed
-            only in horizontal padding. The count rides in the label so it
-            survives the move. */}
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          aria-label="Filter by match status"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.key === 'all' ? opt.label : `${opt.label} (${statusCounts[opt.key]})`}
-            </option>
-          ))}
-        </Select>
-
-        {/* Entry selector (right-aligned, only for multi-entry users) */}
-        {userEntries && userEntries.length > 1 && onEntryChange && (
-          <div className="ml-auto">
-            <select
-              value={selectedEntryId || ''}
-              onChange={(e) => onEntryChange(e.target.value)}
-              className="px-1.5 py-1.5 sm:px-3 sm:py-1 t-body border border-border-default rounded-control bg-surface text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
-            >
-              {userEntries.map((entry) => (
-                <option key={entry.entry_id} value={entry.entry_id}>
-                  {entry.entry_name}
-                </option>
-              ))}
-            </select>
           </div>
         )}
       </div>
