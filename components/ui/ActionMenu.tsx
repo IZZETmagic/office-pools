@@ -20,6 +20,15 @@ import { Icon } from './Icon'
  * that opens on the last row would be cut off. `fixed` escapes scroll clipping.
  * It does NOT escape a transformed ancestor, so if this is ever placed inside
  * one, the menu will anchor to that instead and this comment is the clue.
+ *
+ * Items are `block`, and that is load-bearing rather than decorative. A
+ * <button> is inline-block by default, and `w-full` on an inline-block inside
+ * this width-less fixed panel gives the percentage nothing definite to resolve
+ * against; the browser falls back toward the available space — viewport minus
+ * the `right` offset — so the menu rendered ~393px wide for labels needing
+ * ~130px. As a block child, `w-full` is treated as auto while the panel sizes
+ * itself, and the panel collapses onto its `min-w-44` floor. Setting
+ * `width: max-content` on the panel does NOT fix it; the cycle is in the child.
  */
 
 export type ActionMenuItem = {
@@ -92,7 +101,7 @@ export function ActionMenu({ items, label = 'Actions', className }: Props) {
       role="menuitem"
       type="button"
       onClick={() => { setOpen(false); item.onSelect() }}
-      className={`w-full text-left px-3 py-2 text-sm rounded-chip transition-colors ${
+      className={`block w-full text-left px-3 py-2 text-sm rounded-chip transition-colors ${
         item.destructive
           ? 'text-danger-800 hover:bg-danger-600/12'
           : 'text-ink hover:bg-mist'
