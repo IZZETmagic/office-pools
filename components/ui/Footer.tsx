@@ -22,7 +22,7 @@ export default function Footer() {
   if (HIDDEN_ROUTES.includes(pathname)) return null
 
   return (
-    <footer className="bg-neutral-900 text-neutral-300 dark:bg-surface dark:text-neutral-500 dark:border-t dark:border-border-default">
+    <footer className="bg-midnight text-white/70 dark:bg-surface dark:text-muted dark:border-t dark:border-border-default">
       {/* Mobile: minimal copyright only (links are in hamburger menu) */}
       <div className="sm:hidden py-4 text-center text-xs">
         &copy; 2026 SportPool. All rights reserved.
@@ -34,20 +34,20 @@ export default function Footer() {
           {/* The footer bar is a solid dark slab (inverted in dark mode), so the
               wordmark goes mono and inherits the bar's colour — the brand blue
               would not read against it. */}
-          <span className="flex items-center gap-1.5 text-white dark:text-neutral-900 shrink-0">
+          <span className="flex items-center gap-1.5 text-white dark:text-ink shrink-0">
             <Wordmark size={14} mono />
           </span>
           <nav className="flex items-center gap-4 text-xs">
             {!isLoggedIn && (
               <>
-                <a href="#features" className="hover:text-white dark:hover:text-neutral-900 transition">Features</a>
-                <Link href="/signup" className="hover:text-white dark:hover:text-neutral-900 transition">Get Started</Link>
+                <a href="#features" className="hover:text-white dark:hover:text-ink transition">Features</a>
+                <Link href="/signup" className="hover:text-white dark:hover:text-ink transition">Get Started</Link>
               </>
             )}
-            <Link href="/faq" className="hover:text-white dark:hover:text-neutral-900 transition">FAQ</Link>
-            <Link href="/contact" className="hover:text-white dark:hover:text-neutral-900 transition">Contact</Link>
-            <Link href="/privacy" className="hover:text-white dark:hover:text-neutral-900 transition">Privacy</Link>
-            <Link href="/terms" className="hover:text-white dark:hover:text-neutral-900 transition">Terms</Link>
+            <Link href="/faq" className="hover:text-white dark:hover:text-ink transition">FAQ</Link>
+            <Link href="/contact" className="hover:text-white dark:hover:text-ink transition">Contact</Link>
+            <Link href="/privacy" className="hover:text-white dark:hover:text-ink transition">Privacy</Link>
+            <Link href="/terms" className="hover:text-white dark:hover:text-ink transition">Terms</Link>
           </nav>
           <span className="text-xs shrink-0">&copy; 2026 SportPool</span>
         </div>

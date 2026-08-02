@@ -39,12 +39,12 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
   const onlineCount = onlineIds.size
 
   return (
-    <div className="md:hidden border-b border-neutral-200 dark:border-border-default bg-white dark:bg-surface">
+    <div className="md:hidden border-b border-border-default bg-surface">
       <div className="flex items-center gap-2 px-3 py-2.5 overflow-x-auto scrollbar-none">
         {/* Online count badge */}
         <div className="flex items-center gap-1 shrink-0">
           <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
-          <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 tabular-nums">
+          <span className="t-num t-num-medium text-[10px] text-muted">
             {onlineCount}
           </span>
         </div>
@@ -55,7 +55,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
           return (
             <div key={member.user_id} className="flex flex-col items-center shrink-0">
               <div className="relative">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                <div className="w-8 h-8 rounded-pill flex items-center justify-center t-detail font-bold bg-mist text-ink">
                   {getInitials(member.users.full_name, member.users.username)}
                 </div>
                 <div
@@ -73,17 +73,17 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
 
         {/* Divider between online and offline */}
         {offlineMembers.length > 0 && onlineMembers.length > 0 && (
-          <div className="w-px h-5 bg-neutral-200 dark:bg-border-default shrink-0" />
+          <div className="w-px h-5 bg-border-default shrink-0" />
         )}
 
         {/* Offline members */}
         {offlineMembers.map((member) => (
           <div key={member.user_id} className="flex flex-col items-center shrink-0">
             <div className="relative">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-300">
+              <div className="w-8 h-8 rounded-pill flex items-center justify-center t-detail font-bold bg-mist/50 text-muted">
                 {getInitials(member.users.full_name, member.users.username)}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white dark:ring-neutral-600 bg-neutral-300 dark:bg-neutral-600" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-surface bg-silver" />
             </div>
           </div>
         ))}
