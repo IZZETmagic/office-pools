@@ -868,7 +868,7 @@ function StatisticsTab({
                         }}
                       />
                     </div>
-                    <span className="text-sm font-semibold text-neutral-900 w-14 text-right shrink-0 font-mono tabular-nums">
+                    <span className="t-num text-sm text-neutral-900 w-14 text-right shrink-0">
                       {formatNumber(points)}
                     </span>
                   </div>
@@ -1409,12 +1409,12 @@ function PredictionHistoryTab({
                           )}
                         </td>
                         <td className="text-center py-3 px-3">
-                          <span className="inline-block bg-neutral-100 rounded-lg px-2.5 py-1 font-mono font-bold text-neutral-900">
+                          <span className="inline-block bg-neutral-100 rounded-lg px-2.5 py-1 t-num text-neutral-900">
                             {hasPredictedTeams ? `${predictedHome} ${pred.predicted_home_score}-${pred.predicted_away_score}` : `${pred.predicted_home_score}-${pred.predicted_away_score}`}
                           </span>
                         </td>
                         <td className="text-center py-3 px-3">
-                          <span className="inline-block bg-neutral-100 rounded-lg px-2.5 py-1 font-mono text-neutral-700">
+                          <span className="inline-block bg-neutral-100 rounded-lg px-2.5 py-1 t-num t-num-regular text-neutral-700">
                             {result}
                           </span>
                         </td>

@@ -264,7 +264,7 @@ function GroupComparisonCard({
                   key={team.team_id}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
                 >
-                  <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               )
@@ -288,7 +288,7 @@ function GroupComparisonCard({
                   key={team.team_id}
                   className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                 >
-                  <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               ))}
@@ -377,7 +377,7 @@ function ThirdPlaceComparisonCard({
                   <div
                     className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
                   >
-                    <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                    <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
                     <span className="truncate flex-1 font-medium">{team.country_name}</span>
                     <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
                   </div>
@@ -412,7 +412,7 @@ function ThirdPlaceComparisonCard({
                     <div
                       className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                     >
-                      <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                      <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
                       <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
                     </div>

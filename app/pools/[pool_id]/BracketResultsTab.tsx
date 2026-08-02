@@ -201,7 +201,7 @@ function GroupComparison({
                         : 'bg-snow text-ink'
                   }`}
                 >
-                  <span className="font-mono text-[10px] text-muted w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                   {isCorrect && <span className="text-success-600 text-xs flex-shrink-0">&#10003;</span>}
                   {isWrong && <span className="text-danger-500 text-xs flex-shrink-0">&#10007;</span>}
@@ -227,7 +227,7 @@ function GroupComparison({
                   key={team.team_id}
                   className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-silver text-ink"
                 >
-                  <span className="font-mono text-[10px] text-muted w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               ))}
@@ -327,7 +327,7 @@ function ThirdPlaceComparison({
                                   : 'bg-snow text-muted'
                     }`}
                   >
-                    <span className="font-mono text-[10px] text-muted w-4">{idx + 1}</span>
+                    <span className="t-num t-num-regular text-[10px] text-muted w-4">{idx + 1}</span>
                     <span className="truncate flex-1 font-medium">
                       {team?.country_name ?? 'Unknown'}
                     </span>
@@ -371,7 +371,7 @@ function ThirdPlaceComparison({
                           : 'bg-silver text-muted'
                       }`}
                     >
-                      <span className="font-mono text-[10px] text-muted w-4">{idx + 1}</span>
+                      <span className="t-num t-num-regular text-[10px] text-muted w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
                       <span className="text-[10px] text-muted">{team.group_letter}</span>
                     </div>

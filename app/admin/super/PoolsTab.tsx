@@ -399,7 +399,7 @@ function ActionModals({
         <div className="space-y-3">
           <div className="sp-bg-mist sp-radius-sm p-3">
             <div className="text-xs sp-text-slate sp-body">Current Code</div>
-            <div className="text-sm font-mono font-medium sp-text-ink sp-body">{actionModal.currentCode}</div>
+            <div className="t-num t-num-medium text-sm sp-text-ink">{actionModal.currentCode}</div>
           </div>
           <div>
             <label className="block text-sm font-medium sp-text-ink mb-1 sp-body">New Code</label>
@@ -408,7 +408,7 @@ function ActionModals({
               value={newPoolCode}
               onChange={(e) => setNewPoolCode(e.target.value.toUpperCase())}
               placeholder="e.g. WORLD26"
-              className="w-full px-3 py-2 border sp-border-silver sp-radius-sm text-sm sp-text-ink sp-bg-surface font-mono focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 border sp-border-silver sp-radius-sm text-sm sp-text-ink sp-bg-surface t-num t-num-regular focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -1102,7 +1102,7 @@ function PoolDetailSheet({
               {pool.pool_name}
             </h2>
             <Badge variant={getStatusVariant(pool.status)}>{poolStatusLabel(pool.status)}</Badge>
-            <span className="text-xs font-mono sp-text-slate">{pool.pool_code}</span>
+            <span className="t-num t-num-regular text-xs sp-text-slate">{pool.pool_code}</span>
           </div>
           {pool.description && (
             <p className="text-sm sp-text-slate mt-0.5 sp-body">{pool.description}</p>
@@ -1932,7 +1932,7 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
       key: 'code',
       header: 'Code',
       render: (pool) => (
-        <span className="font-mono" style={{ fontSize: 13 }}>{pool.pool_code}</span>
+        <span className="t-num t-num-regular" style={{ fontSize: 13 }}>{pool.pool_code}</span>
       ),
     },
     {
@@ -2066,7 +2066,7 @@ export function PoolsTab({ pools, setPools, onNavigateToUser, navigateToPoolId, 
                   <p className="text-xs sp-text-slate mb-2 line-clamp-1 sp-body">{pool.description}</p>
                 )}
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] sp-text-slate sp-body mb-2">
-                  <span>Code: <strong className="font-mono">{pool.pool_code}</strong></span>
+                  <span>Code: <strong className="t-num">{pool.pool_code}</strong></span>
                   <span>Members: <strong>{getMemberCount(pool)}</strong></span>
                   <span>Admin: <strong>{pool.admin_user?.username || 'Unknown'}</strong></span>
                 </div>

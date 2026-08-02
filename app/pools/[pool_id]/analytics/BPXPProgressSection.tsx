@@ -361,7 +361,7 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
     <div>
       <div className="flex items-center justify-between mb-[5px]">
         <span className="text-[11px] text-muted dark:text-[var(--neutral-400)]">{label}</span>
-        <span className="text-[10px] font-mono text-muted dark:text-[var(--neutral-500)]">
+        <span className="t-num t-num-regular text-[10px] text-muted dark:text-[var(--neutral-500)]">
           {you} vs {crowd}
         </span>
       </div>

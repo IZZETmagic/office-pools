@@ -739,10 +739,10 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                           <td className="px-4 py-3">
                             <Badge variant="blue">{ep.method}</Badge>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono sp-text-slate">
+                          <td className="px-4 py-3 text-right t-num t-num-regular sp-text-slate">
                             {ep.avg_response_ms}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono sp-text-slate">
+                          <td className="px-4 py-3 text-right t-num t-num-regular sp-text-slate">
                             {ep.max_response_ms}
                           </td>
                           <td className="px-4 py-3 text-right font-medium sp-text-ink">
@@ -803,7 +803,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                       <code className="text-xs font-mono sp-text-slate">
                         {t.table_name}
                       </code>
-                      <span className="font-mono font-medium sp-text-ink text-xs sp-body">
+                      <span className="t-num t-num-medium sp-text-ink text-xs">
                         {formatNumber(t.row_count)}
                       </span>
                     </div>
@@ -827,7 +827,7 @@ export function StatsTab({ matches, users, pools }: StatsTabProps) {
                               {t.table_name}
                             </code>
                           </td>
-                          <td className="px-4 py-2.5 text-right font-mono font-medium sp-text-ink">
+                          <td className="px-4 py-2.5 text-right t-num t-num-medium sp-text-ink">
                             {formatNumber(t.row_count)}
                           </td>
                         </tr>

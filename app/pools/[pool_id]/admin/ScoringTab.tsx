@@ -615,7 +615,7 @@ export function ScoringTab({
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             }}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 t-num text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
             title="Copy pool code"
           >
             {pool.pool_code}

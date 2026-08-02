@@ -186,7 +186,7 @@ export function MatchesTab({
               <div key={match.match_id} className="bg-surface border border-neutral-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-mono bg-neutral-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
+                    <span className="t-num t-num-regular text-xs bg-neutral-100 px-1.5 py-0.5 rounded">#{match.match_number}</span>
                     <Badge variant="blue">{getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}</Badge>
                   </div>
                   <Badge variant={getStatusBadgeVariant(match.status)}>{match.status}</Badge>
@@ -278,7 +278,7 @@ export function MatchesTab({
                   return (
                     <tr key={match.match_id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono bg-neutral-100 px-2 py-1 rounded">
+                        <span className="t-num t-num-regular text-xs bg-neutral-100 px-2 py-1 rounded">
                           #{match.match_number}
                         </span>
                       </td>
@@ -449,14 +449,14 @@ export function MatchesTab({
                           <span className="text-sm text-neutral-700">{name}{entryLabel}</span>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <span className="font-mono font-bold text-neutral-900">
+                              <span className="t-num text-neutral-900">
                                 {pred.predicted_home_score}-
                                 {pred.predicted_away_score}
                               </span>
                               {modal.match.home_score_pso !== null &&
                                 pred.predicted_home_pso != null &&
                                 pred.predicted_away_pso != null && (
-                                  <span className="text-xs text-accent-500 font-mono ml-1">
+                                  <span className="t-num t-num-regular text-xs text-accent-500 ml-1">
                                     (PSO: {pred.predicted_home_pso}-{pred.predicted_away_pso})
                                   </span>
                                 )}

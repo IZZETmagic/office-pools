@@ -1130,7 +1130,7 @@ function UserDetailSheet({
                           <div>
                             <span className="sp-text-ink font-medium sp-body">{pool?.pool_name || 'Unknown'}</span>
                             {pool?.pool_code && (
-                              <span className="ml-1.5 text-[11px] sp-text-slate font-mono">{pool.pool_code}</span>
+                              <span className="ml-1.5 t-num t-num-regular text-[11px] sp-text-slate">{pool.pool_code}</span>
                             )}
                           </div>
                         </td>

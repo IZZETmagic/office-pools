@@ -78,7 +78,7 @@ export function StandingsDropCard({
                 </span>
 
                 {/* Points */}
-                <span className="text-xs font-bold text-primary-600 dark:text-neutral-700 tabular-nums font-mono">
+                <span className="t-num text-xs text-primary-600 dark:text-neutral-700">
                   {entry.points.toLocaleString()}
                 </span>
               </div>

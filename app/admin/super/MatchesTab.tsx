@@ -829,7 +829,7 @@ export function MatchesTab({
       key: 'number',
       header: '#',
       render: (match) => (
-        <span className="text-xs font-mono font-semibold" style={{ color: 'var(--sp-slate)' }}>
+        <span className="t-num text-xs" style={{ color: 'var(--sp-slate)' }}>
           #{match.match_number}
         </span>
       ),
@@ -1123,7 +1123,7 @@ export function MatchesTab({
               <div key={match.match_id} className="sp-bg-surface sp-radius-lg overflow-hidden" style={{ border: cardBorder }}>
                 {/* Row 1: metadata bar */}
                 <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow)', borderBottom: thinBorder }}>
-                  <span className="text-xs font-mono font-semibold sp-text-slate">#{match.match_number}</span>
+                  <span className="t-num text-xs sp-text-slate">#{match.match_number}</span>
                   <span className="text-xs sp-text-slate">&middot;</span>
                   <span className="text-xs font-medium sp-text-ink sp-body">
                     {getStageName(match.stage)}{match.group_letter ? ` ${match.group_letter}` : ''}
@@ -1145,14 +1145,14 @@ export function MatchesTab({
                   </div>
                   <div className="flex-shrink-0 ml-3">
                     {match.is_completed ? (
-                      <span className="font-bold font-mono text-lg sp-text-ink">
+                      <span className="t-num text-lg sp-text-ink">
                         {match.home_score_ft} - {match.away_score_ft}
                         {match.home_score_pso !== null && (
                           <span className="text-[10px] font-normal font-sans sp-text-slate block text-right">PSO {match.home_score_pso}-{match.away_score_pso}</span>
                         )}
                       </span>
                     ) : match.status === 'live' && match.home_score_ft !== null ? (
-                      <span className="font-bold font-mono text-lg text-warning-700">
+                      <span className="t-num text-lg text-warning-700">
                         {match.home_score_ft} - {match.away_score_ft}
                       </span>
                     ) : (
