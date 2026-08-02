@@ -104,8 +104,8 @@ const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'predictions', label: 'Predictions' },
   { key: 'results', label: 'Results' },
   // { key: 'standings', label: 'Standings' }, // temporarily hidden — duplicate of info in Form
-  { key: 'pool_info', label: 'Pool Info' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
+  { key: 'pool_info', label: 'Pool Info' },
 ]
 
 const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
@@ -114,8 +114,8 @@ const USER_TABS_BRACKET_PICKER: { key: Tab; label: string }[] = [
   { key: 'analytics', label: 'Form' },
   { key: 'predictions', label: 'Predictions' },
   { key: 'my_bracket', label: 'My Bracket' },
-  { key: 'pool_info', label: 'Pool Info' },
   { key: 'scoring_rules', label: 'Scoring Rules' },
+  { key: 'pool_info', label: 'Pool Info' },
 ]
 
 const ADMIN_TABS: { key: Tab; label: string }[] = [
