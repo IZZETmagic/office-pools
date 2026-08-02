@@ -532,10 +532,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
   return (
     <div className="relative pb-20">
-      <div className="mb-6">
-        <h2 className="t-page-title text-ink">Pool Settings</h2>
-      </div>
-
+      {/* No page title. The tab strip above already names this section, and
+          Settings was the only one of the fifteen tabs that repeated its own
+          name in the body. */}
       {error && (
         <Alert variant="error" className="mb-4">
           {error}
