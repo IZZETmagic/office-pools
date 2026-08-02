@@ -80,10 +80,6 @@ export function MembersTab({
   const [removeConfirmed, setRemoveConfirmed] = useState(false)
 
   // Pool code copy state
-  const [copied, setCopied] = useState(false)
-  const [linkCopied, setLinkCopied] = useState(false)
-  const [showQR, setShowQR] = useState(false)
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   const adminCount = members.filter((m) => m.role === 'admin').length
   const isProgressive = pool.prediction_mode === 'progressive'
@@ -480,82 +476,8 @@ export function MembersTab({
     setModal({ type: 'none' })
   }
 
-  function copyPoolCode() {
-    navigator.clipboard.writeText(pool.pool_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function getInviteLink() {
-    return `${window.location.origin}/join/${pool.pool_code}`
-  }
-
-  function copyInviteLink() {
-    navigator.clipboard.writeText(getInviteLink())
-    setLinkCopied(true)
-    setTimeout(() => setLinkCopied(false), 2000)
-  }
-
-  async function toggleQRCode() {
-    if (showQR) {
-      setShowQR(false)
-      return
-    }
-    if (!qrDataUrl) {
-      const QRCode = (await import('qrcode')).default
-      const url = await QRCode.toDataURL(getInviteLink(), { width: 200, margin: 2 })
-      setQrDataUrl(url)
-    }
-    setShowQR(true)
-  }
-
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-ink">Pool Members</h2>
-        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-          <span className="text-sm text-muted">Code:</span>
-          <button
-            onClick={copyPoolCode}
-            className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
-            title="Copy pool code"
-          >
-            {pool.pool_code}
-            {copied ? (
-              <Icon name="checkmark" size={14} className="text-success-500" />
-            ) : (
-              <Icon name="doc.on.doc" size={14} className="text-muted" />
-            )}
-          </button>
-          <span className="text-silver">|</span>
-          <button
-            onClick={copyInviteLink}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
-            title="Copy invite link"
-          >
-            {linkCopied ? 'Copied!' : 'Copy Invite Link'}
-            {linkCopied ? (
-              <Icon name="checkmark" size={14} className="text-success-500" />
-            ) : (
-              <Icon name="link" size={14} className="text-muted" />
-            )}
-          </button>
-          <button
-            onClick={toggleQRCode}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink bg-mist hover:bg-silver px-2 py-0.5 rounded transition cursor-pointer"
-            title="Show QR code"
-          >
-            QR
-            <Icon name="clipboard" size={14} className="text-muted" />
-          </button>
-        </div>
-        {showQR && qrDataUrl && (
-          <div className="mt-3 p-3 bg-surface rounded-chip border border-border-default inline-block">
-            <img src={qrDataUrl} alt={`QR code for joining ${pool.pool_name}`} width={200} height={200} />
-            <p className="text-xs text-muted text-center mt-1">Scan to join this pool</p>
-          </div>
-        )}
-      </div>
 
       {error && (
         <Alert variant="error" className="mb-4">
