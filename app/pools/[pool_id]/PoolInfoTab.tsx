@@ -2,6 +2,7 @@
 
 import { DetailCard, DetailCaption, DetailRow } from '@/components/ui/DetailCard'
 import { Badge, poolStatusLabel, getStatusVariantSolid } from '@/components/ui/Badge'
+import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 import type { PoolData, MemberData, EntryData, PoolRoundState } from './types'
 
 type PoolInfoTabProps = {
@@ -20,12 +21,6 @@ const ROUND_LABELS: Record<string, string> = {
   semi_final: 'Semi Finals',
   third_place: 'Third Place',
   final: 'Final',
-}
-
-const MODE_LABELS: Record<string, string> = {
-  full_tournament: 'Full Tournament',
-  progressive: 'Progressive',
-  bracket_picker: 'Bracket Picker',
 }
 
 function formatFee(amount: number, currency: string): string {
@@ -73,9 +68,32 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
   const entryFee = pool.entry_fee ?? 0
   const currency = pool.entry_fee_currency || 'USD'
   const isProgressive = pool.prediction_mode === 'progressive'
+  // Same fallback as the Settings Pool Mode card: an unset or unrecognised
+  // mode still renders a description rather than blowing up on undefined.
+  const modeInfo =
+    POOL_MODE_INFO[pool.prediction_mode as PredictionMode] ?? POOL_MODE_INFO.full_tournament
 
   return (
     <div className="space-y-6">
+
+      {/* Pool Details first: what kind of pool this is frames everything
+          below it, so it should not be the last thing read. */}
+      <DetailCard title="Pool Details">
+        <div>
+          <InfoRow label="Pool type">
+            <Badge variant="blue">{modeInfo.label}</Badge>
+          </InfoRow>
+          <InfoRow label="Status">
+            <Badge variant={getStatusVariantSolid(pool.status)}>
+              {poolStatusLabel(pool.status)}
+            </Badge>
+          </InfoRow>
+          <InfoRow label="Created">
+            {formatCreated(pool.created_at)}
+          </InfoRow>
+        </div>
+        <p className="t-body text-muted mt-1">{modeInfo.summary}</p>
+      </DetailCard>
 
       {/* Description */}
       {pool.description && (
@@ -125,9 +143,6 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
       {/* Entries & Participants */}
       <DetailCard title="Entries & Participants">
         <div>
-          <InfoRow label="Prediction mode">
-            <Badge variant="blue">{MODE_LABELS[pool.prediction_mode] ?? pool.prediction_mode}</Badge>
-          </InfoRow>
           <InfoRow label="Entries per player">{pool.max_entries_per_user}</InfoRow>
           <InfoRow label="Max participants">{pool.max_participants ? pool.max_participants : 'Unlimited'}</InfoRow>
           <InfoRow label="Total members">{totalMembers}</InfoRow>
@@ -163,18 +178,6 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
       )}
 
       {/* Pool Status */}
-      <DetailCard title="Pool Details">
-        <div>
-          <InfoRow label="Status">
-            <Badge variant={getStatusVariantSolid(pool.status)}>
-              {poolStatusLabel(pool.status)}
-            </Badge>
-          </InfoRow>
-          <InfoRow label="Created">
-            {formatCreated(pool.created_at)}
-          </InfoRow>
-        </div>
-      </DetailCard>
     </div>
   )
 }
