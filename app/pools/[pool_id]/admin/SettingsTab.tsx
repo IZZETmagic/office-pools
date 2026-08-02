@@ -604,8 +604,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
             <div className="flex-1 min-w-0 w-full flex flex-col items-center lg:items-start gap-3">
               <div className="flex flex-col items-center lg:items-start gap-0.5">
-                <span className="t-body text-ink">Pool Code</span>
-                <span className="t-num t-num-extrabold text-[22px] text-ink tracking-[0.125em]">
+                {/* The code is the thing an admin reads aloud or holds up, so
+                    it gets the emphasis. There is room to grow both: the card's
+                    height is set by the 180px QR beside them, not by this
+                    column. */}
+                <span className="t-card-title text-ink">Pool Code</span>
+                <span className="t-num t-num-extrabold text-[32px] leading-none text-ink tracking-[0.125em]">
                   {pool.pool_code}
                 </span>
               </div>
