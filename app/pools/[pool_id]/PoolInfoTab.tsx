@@ -83,6 +83,14 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
           <InfoRow label="Pool type">
             <Badge variant="blue">{modeInfo.label}</Badge>
           </InfoRow>
+
+          {/* Reads as a row rather than a footnote: label on the left like the
+              rows around it, prose underneath where a value would not fit. */}
+          <div className="py-2.5">
+            <span className="t-body text-muted">Pool description</span>
+            <p className="t-body text-ink mt-1.5">{modeInfo.description}</p>
+          </div>
+
           <InfoRow label="Status">
             <Badge variant={getStatusVariantSolid(pool.status)}>
               {poolStatusLabel(pool.status)}
@@ -92,7 +100,6 @@ export function PoolInfoTab({ pool, members, userEntries, roundStates, isPastDea
             {formatCreated(pool.created_at)}
           </InfoRow>
         </div>
-        <p className="t-body text-muted mt-1">{modeInfo.summary}</p>
       </DetailCard>
 
       {/* Description */}
