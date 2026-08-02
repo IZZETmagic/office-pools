@@ -177,7 +177,7 @@ export function ResultsView({
           These were a seven-pill strip and a four-pill strip in two stacked
           blocks; three rows of controls stood between the header and the first
           result. */}
-      <div className="mb-6 border-b border-border-subtle pb-3">
+      <div className="mb-4">
         <div className="flex flex-wrap items-center gap-3">
           <Select
             value={stageTab}
