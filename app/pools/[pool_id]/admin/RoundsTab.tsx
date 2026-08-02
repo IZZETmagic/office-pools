@@ -138,12 +138,8 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-ink">Round Management</h2>
-        <p className="text-sm text-muted mt-1">
-          Control when each prediction round opens and closes. Notifications are sent when rounds open.
-        </p>
-      </div>
+      {/* No page title. The tab strip above already names this section, and its
+          subtitle has moved down into the info banner rather than being lost. */}
 
       {/* Mobile cards */}
       <div className="sm:hidden space-y-3">
@@ -379,11 +375,17 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       </Card>
 
       {/* Info */}
-      <Alert variant="info" className="">
-        <strong>How round management works:</strong> Open a round to allow predictions.
-        Members will be notified by email. When the deadline passes, predictions auto-lock.
-        After all matches in a round complete, mark it as completed to unlock scoring and
-        optionally auto-open the next round.
+      <Alert variant="info">
+        <p>
+          Control when each prediction round opens and closes. Notifications are sent when
+          rounds open.
+        </p>
+        <p className="mt-2">
+          <strong>How round management works:</strong> Open a round to allow predictions.
+          Members will be notified by email. When the deadline passes, predictions auto-lock.
+          After all matches in a round complete, mark it as completed to unlock scoring and
+          optionally auto-open the next round.
+        </p>
       </Alert>
 
       {/* Deadline modal */}
