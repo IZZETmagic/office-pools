@@ -491,8 +491,12 @@ export function MembersTab({
         </Alert>
       )}
 
-      {/* Search and Sort */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      {/* Search and Sort. Sort is pushed right by justifying the row, not by
+          an `ml-auto` on the Select — Select forwards className to the inner
+          <select>, while the flex item is the wrapper span around it, so a
+          margin utility passed to the component would land on the wrong node
+          and do nothing. */}
+      <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-4">
         <Input
           type="text"
           placeholder="Search by username..."
