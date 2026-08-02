@@ -152,19 +152,19 @@ export function ResultsView({
     <div>
       {/* ── Points summary strip ── */}
       <div className="mb-4 px-4 h-[60px] bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex items-center gap-3 text-sm">
-        <span className="font-semibold text-ink">
+        <span className="t-card-title text-ink">
           {userEntries && userEntries.length > 1
             ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
             : 'Your Points'}
         </span>
-        <span className="t-num t-num-extrabold text-lg text-primary-600">{totalPoints.toLocaleString()}<span className="text-xs font-medium text-muted ml-0.5">pts</span></span>
+        <span className="t-num t-num-extrabold text-lg text-primary-600">{totalPoints.toLocaleString()}<span className="t-detail text-muted ml-0.5">pts</span></span>
         <span className="text-silver">·</span>
-        <div className="flex items-center gap-2 text-xs text-muted ml-auto">
-          <span><span className="text-success-600 font-medium">{statusCounts.completed}</span> ✓</span>
+        <div className="flex items-center gap-2 t-body text-muted ml-auto">
+          <span><span className="t-num text-success-700">{statusCounts.completed}</span> ✓</span>
           {statusCounts.live > 0 && (
-            <span><span className="text-danger-600 font-medium">{statusCounts.live}</span> live</span>
+            <span><span className="t-num text-danger-700">{statusCounts.live}</span> live</span>
           )}
-          <span><span className="font-medium">{statusCounts.upcoming}</span> upcoming</span>
+          <span><span className="t-num text-ink">{statusCounts.upcoming}</span> upcoming</span>
         </div>
       </div>
 
@@ -178,7 +178,7 @@ export function ResultsView({
                 setStageTab(tab.key)
                 if (tab.key !== 'group') setGroupFilter('all')
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-pill transition-colors whitespace-nowrap ${
+              className={`px-3 py-1.5 t-body font-semibold rounded-pill transition-colors whitespace-nowrap ${
                 stageTab === tab.key
                   ? 'bg-primary-600 text-white'
                   : 'text-muted hover:bg-mist'
@@ -194,7 +194,7 @@ export function ResultsView({
           <div className="flex gap-0.5 mt-2 overflow-x-auto">
             <button
               onClick={() => setGroupFilter('all')}
-              className={`px-3 py-1 text-xs font-medium rounded-l-lg rounded-r-md transition-colors ${
+              className={`px-3 py-1 t-detail font-bold rounded-l-control rounded-r-chip transition-colors ${
                 groupFilter === 'all'
                   ? 'bg-primary-600 text-white'
                   : 'bg-mist text-muted hover:bg-silver'
@@ -206,7 +206,7 @@ export function ResultsView({
               <button
                 key={g}
                 onClick={() => setGroupFilter(g)}
-                className={`w-8 h-7 text-xs font-medium transition-colors ${
+                className={`w-8 h-7 t-num text-xs transition-colors ${
                   i === GROUP_LETTERS.length - 1 ? 'rounded-r-lg rounded-l-md' : 'rounded-md'
                 } ${
                   groupFilter === g
@@ -229,7 +229,7 @@ export function ResultsView({
             <button
               key={opt.key}
               onClick={() => setStatusFilter(opt.key)}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+              className={`px-3 py-1 t-detail font-bold rounded-pill transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
                   : 'bg-mist text-muted hover:bg-silver'
@@ -251,7 +251,7 @@ export function ResultsView({
             <button
               key={opt.key}
               onClick={() => setStatusFilter(opt.key)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+              className={`px-2.5 py-1 t-detail font-bold rounded-pill transition-colors ${
                 statusFilter === opt.key
                   ? opt.activeColor
                   : 'bg-mist text-muted hover:bg-silver'
@@ -273,7 +273,7 @@ export function ResultsView({
             <select
               value={selectedEntryId || ''}
               onChange={(e) => onEntryChange(e.target.value)}
-              className="px-1.5 py-1.5 text-[10px] sm:px-3 sm:py-1 sm:text-sm font-medium border border-border-default rounded-control bg-surface text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
+              className="px-1.5 py-1.5 sm:px-3 sm:py-1 t-body border border-border-default rounded-control bg-surface text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
             >
               {userEntries.map((entry) => (
                 <option key={entry.entry_id} value={entry.entry_id}>
@@ -301,7 +301,7 @@ export function ResultsView({
       {/* ── Match cards grid ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted text-lg">
+          <p className="t-section-header text-muted">
             No matches found for this filter.
           </p>
         </div>

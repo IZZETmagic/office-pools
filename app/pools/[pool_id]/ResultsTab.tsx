@@ -194,8 +194,8 @@ export function ResultsTab({
 
   if (resultMatches.length === 0) {
     return (
-      <div className="bg-surface rounded-xl shadow p-8 text-center">
-        <p className="text-neutral-600">No matches available for this tournament yet.</p>
+      <div className="bg-surface rounded-card shadow-card p-8 text-center">
+        <p className="t-body text-muted">No matches available for this tournament yet.</p>
       </div>
     )
   }

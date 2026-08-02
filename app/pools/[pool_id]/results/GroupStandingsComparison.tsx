@@ -203,7 +203,7 @@ function GroupComparisonCard({
     <Card padding="md">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Group {groupLetter}</h3>
+        <h3 className="t-card-title text-ink">Group {groupLetter}</h3>
         {computedBonus ? (
           <div className="flex items-center gap-1.5">
             <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${computedBonus.bg}`}>
@@ -218,7 +218,7 @@ function GroupComparisonCard({
             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-800">
               MISS
             </span>
-            <span className="text-xs font-bold tabular-nums text-neutral-400 dark:text-neutral-500">
+            <span className="t-num text-xs text-muted">
               +0
             </span>
           </div>
@@ -228,7 +228,7 @@ function GroupComparisonCard({
       <div className="grid grid-cols-2 gap-3">
         {/* Predicted column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -238,7 +238,7 @@ function GroupComparisonCard({
 
               // Only color top-2 picks when group is complete (these affect scoring)
               // Positions 3-4 don't earn bonus points so stay neutral
-              let rowStyle = 'bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+              let rowStyle = 'bg-mist text-ink'
 
               if (hasActualData && groupComplete && isTopTwo) {
                 const exactPosition = actualPos === idx
@@ -256,7 +256,7 @@ function GroupComparisonCard({
                 }
               } else if (hasActualData && groupComplete && !isTopTwo) {
                 // Positions 3-4: muted style
-                rowStyle = 'bg-neutral-50/50 text-neutral-400 dark:bg-neutral-800/50 dark:text-neutral-500'
+                rowStyle = 'bg-mist/50 text-muted'
               }
 
               return (
@@ -264,7 +264,7 @@ function GroupComparisonCard({
                   key={team.team_id}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
                 >
-                  <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               )
@@ -274,11 +274,11 @@ function GroupComparisonCard({
 
         {/* Actual column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
-            <div className="text-xs text-neutral-400 italic py-2">
+            <div className="t-body text-muted italic py-2">
               No results yet
             </div>
           ) : (
@@ -286,9 +286,9 @@ function GroupComparisonCard({
               {actualStandings.map((team, idx) => (
                 <div
                   key={team.team_id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-mist text-ink"
                 >
-                  <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-3">{idx + 1}</span>
+                  <span className="t-num t-num-regular text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
                 </div>
               ))}
@@ -328,11 +328,11 @@ function ThirdPlaceComparisonCard({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Third-Place Rankings</h3>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">Top 8 qualify</span>
+          <h3 className="t-card-title text-ink">Third-Place Rankings</h3>
+          <span className="text-[10px] text-muted">Top 8 qualify</span>
         </div>
         {hasActualData && (
-          <span className="text-xs font-medium text-neutral-400 tabular-nums">
+          <span className="t-num t-num-medium text-xs text-muted">
             {correctQualifiers}/8 correct
           </span>
         )}
@@ -341,7 +341,7 @@ function ThirdPlaceComparisonCard({
       <div className="grid grid-cols-2 gap-3">
         {/* Predicted column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -352,8 +352,8 @@ function ThirdPlaceComparisonCard({
               // Only top-8 picks matter (did you correctly predict they'd advance to R32?)
               // Positions 9-12 stay muted since they don't earn points
               let rowStyle = isQualifier
-                ? 'bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-                : 'bg-neutral-50/50 text-neutral-400 dark:bg-neutral-800/50 dark:text-neutral-500'
+                ? 'bg-mist text-ink'
+                : 'bg-mist/50 text-muted'
 
               if (hasActualData && isQualifier) {
                 if (actuallyQualified) {
@@ -369,17 +369,17 @@ function ThirdPlaceComparisonCard({
                 <Fragment key={team.team_id}>
                   {idx === 8 && (
                     <div className="flex items-center gap-2 py-0.5">
-                      <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
-                      <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
-                      <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                      <div className="flex-1 border-t border-dashed border-border-default" />
+                      <span className="t-detail font-bold text-muted uppercase tracking-wider">Eliminated</span>
+                      <div className="flex-1 border-t border-dashed border-border-default" />
                     </div>
                   )}
                   <div
                     className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${rowStyle}`}
                   >
-                    <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                    <span className="t-num t-num-regular text-[10px] text-muted w-4">{idx + 1}</span>
                     <span className="truncate flex-1 font-medium">{team.country_name}</span>
-                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
+                    <span className="text-[10px] text-muted">{team.group_letter}</span>
                   </div>
                 </Fragment>
               )
@@ -389,11 +389,11 @@ function ThirdPlaceComparisonCard({
 
         {/* Actual column */}
         <div>
-          <div className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
-            <div className="text-xs text-neutral-400 italic py-2">
+            <div className="t-body text-muted italic py-2">
               No results yet
             </div>
           ) : (
@@ -404,17 +404,17 @@ function ThirdPlaceComparisonCard({
                   <Fragment key={team.team_id}>
                     {idx === 8 && (
                       <div className="flex items-center gap-2 py-0.5">
-                        <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
-                        <span className="text-[9px] text-neutral-400 uppercase tracking-wider">Eliminated</span>
-                        <div className="flex-1 border-t border-dashed border-neutral-300 dark:border-neutral-600" />
+                        <div className="flex-1 border-t border-dashed border-border-default" />
+                        <span className="t-detail font-bold text-muted uppercase tracking-wider">Eliminated</span>
+                        <div className="flex-1 border-t border-dashed border-border-default" />
                       </div>
                     )}
                     <div
-                      className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-mist text-ink"
                     >
-                      <span className="t-num t-num-regular text-[10px] text-neutral-400 dark:text-neutral-500 w-4">{idx + 1}</span>
+                      <span className="t-num t-num-regular text-[10px] text-muted w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
-                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{team.group_letter}</span>
+                      <span className="text-[10px] text-muted">{team.group_letter}</span>
                     </div>
                   </Fragment>
                 )
@@ -547,7 +547,7 @@ export function GroupStandingsComparison({
 
       {/* Show groups with no results yet (only when viewing all groups) */}
       {groupFilter === 'all' && totalActiveGroups < GROUP_LETTERS.length && (
-        <p className="text-xs text-neutral-400 text-center">
+        <p className="t-body text-muted text-center">
           {GROUP_LETTERS.length - totalActiveGroups} groups have no match results yet
         </p>
       )}

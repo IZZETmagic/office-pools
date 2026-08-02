@@ -185,7 +185,7 @@ export function MatchCard({
     >
       {/* ── Top Row: Stage label + Badge/Points ── */}
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <span className="text-xs text-muted">
+        <span className="t-body text-muted">
           {getStageLabel(match.stage, match.group_letter)} · Match #{match.match_number}
         </span>
         <div>
@@ -193,7 +193,7 @@ export function MatchCard({
             <PointsBadge result={pointsResult} />
           ) : statusBadge ? (
             <span
-              className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill ${
+              className={`t-caption px-2 py-0.5 rounded-pill ${
                 statusBadge.tone === 'red'
                   ? 'bg-danger-600/12 text-danger-600'
                   : 'bg-warning-500/12 text-warning-600'
@@ -202,15 +202,15 @@ export function MatchCard({
               {statusBadge.label}
             </span>
           ) : isLive ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
+            <span className="inline-flex items-center gap-1 t-caption px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+                <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
               </span>
               {liveClock ?? 'LIVE'}
             </span>
           ) : isUpcoming ? (
-            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-warning-500/12 text-warning-600">
+            <span className="t-caption px-2 py-0.5 rounded-pill bg-warning-500/12 text-warning-600">
               Pending
             </span>
           ) : (isCompleted && !hasPrediction) ? (
@@ -229,7 +229,7 @@ export function MatchCard({
             ) : homeCode ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
-            <span className="text-sm font-semibold text-ink truncate">
+            <span className="t-card-title text-ink truncate">
               {homeName}
             </span>
           </div>
@@ -248,19 +248,19 @@ export function MatchCard({
                   </span>
                 </div>
                 {hasPsoScores && (
-                  <p className="text-[10px] font-semibold text-accent-500 mt-0.5">
+                  <p className="t-detail font-bold text-accent-600 mt-0.5">
                     PSO: {match.home_score_pso} - {match.away_score_pso}
                   </p>
                 )}
               </div>
             ) : (
-              <span className="text-sm font-medium text-silver">vs</span>
+              <span className="t-body text-muted">vs</span>
             )}
           </div>
 
           {/* Away team */}
           <div className="flex items-center justify-end gap-2 min-w-0">
-            <span className="text-sm font-semibold text-ink truncate">
+            <span className="t-card-title text-ink truncate">
               {awayName}
             </span>
             {awayFlagUrl ? (
@@ -274,11 +274,11 @@ export function MatchCard({
 
       {/* ── Bottom Row: Prediction + Date ── */}
       <div className="flex items-center justify-between px-4 py-2 border-t border-border-default">
-        <div className="text-xs text-muted min-w-0">
+        <div className="t-body text-muted min-w-0">
           {hasPrediction && showBracketTeams ? (
             <span>
               Your prediction:{' '}
-              <span className="font-semibold text-muted">
+              <span className="font-bold text-muted">
                 {match.predicted_home_team_name || '?'}
               </span>
               {' '}
@@ -286,7 +286,7 @@ export function MatchCard({
                 {predictionDisplay}
               </span>
               {' '}
-              <span className="font-semibold text-muted">
+              <span className="font-bold text-muted">
                 {match.predicted_away_team_name || '?'}
               </span>
               {hasPsoScores &&
@@ -300,7 +300,7 @@ export function MatchCard({
           ) : !hasPrediction && showBracketTeams ? (
             <span>
               Your bracket:{' '}
-              <span className="font-semibold text-muted">
+              <span className="font-bold text-muted">
                 {match.predicted_home_team_name || '?'} vs {match.predicted_away_team_name || '?'}
               </span>
             </span>
@@ -322,7 +322,7 @@ export function MatchCard({
             <span className="italic">No prediction</span>
           ) : null}
         </div>
-        <span className="text-xs text-muted whitespace-nowrap ml-2">
+        <span className="t-body text-muted whitespace-nowrap ml-2">
           <LocalTime iso={match.match_date} format={formatDate} />
         </span>
       </div>
