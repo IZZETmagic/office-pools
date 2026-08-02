@@ -4,7 +4,6 @@ import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from '.
 import { PointsBadge } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
 import { LocalTime } from '@/components/LocalTime'
-import { ListRow } from '@/components/ui/ListRow'
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus'
 import type { MatchScoreData } from '../types'
 
@@ -173,10 +172,8 @@ export function MatchCard({
   }
 
   return (
-    <ListRow
-      padded={false}
-      accent={getLeftBorderColor(pointsResult, isUpcoming)}
-      className="overflow-hidden animate-fade-up"
+    <div
+      className={`border-l-[3px] ${getLeftBorderColor(pointsResult, isUpcoming)} transition-colors hover:bg-snow animate-fade-up`}
       style={{ animationDelay: `${index * 0.03}s` }}
     >
       {/* ── Top Row: Stage label + Badge/Points ── */}
@@ -269,7 +266,7 @@ export function MatchCard({
       </div>
 
       {/* ── Bottom Row: Prediction + Date ── */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border-default">
+      <div className="flex items-center justify-between px-4 pb-3 pt-1">
         <div className="t-body text-muted min-w-0">
           {hasPrediction && showBracketTeams ? (
             <span>
@@ -322,6 +319,6 @@ export function MatchCard({
           <LocalTime iso={match.match_date} format={formatDate} />
         </span>
       </div>
-    </ListRow>
+    </div>
   )
 }

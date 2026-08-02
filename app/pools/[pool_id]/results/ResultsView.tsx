@@ -306,7 +306,11 @@ export function ResultsView({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        /* One list, not a grid of cards. At 104 matches a card each was
+           mostly repeated chrome; the container owns the surface, radius
+           and shadow, rows are separated by a hairline and keep their
+           accent edge. */
+        <div className="bg-surface rounded-card shadow-card overflow-hidden divide-y divide-border-subtle dark:shadow-none dark:border dark:border-border-default">
           {filtered.map((match, i) => (
             <MatchCard
               key={match.match_id}
