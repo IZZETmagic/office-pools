@@ -168,7 +168,12 @@ function FieldRow({
 }: { label: string; children: React.ReactNode; className?: string; helperText?: string }) {
   return (
     <div className={`flex flex-col gap-1 min-h-0 ${className ?? ''}`}>
-      <span className="t-detail text-muted">{label}</span>
+      {/* `t-body`, not `t-detail`. t-detail is 10px — the smallest token in the
+          system, for micro-detail — and it was being used for the label that
+          names the field, two points under the 12px this file's header records
+          as RN's own spec. Also ink rather than muted: slate measures 3.58:1 on
+          surface, which is under AA for text this size. */}
+      <span className="t-body text-ink">{label}</span>
       {children}
       {helperText && <span className="t-detail text-muted">{helperText}</span>}
     </div>
@@ -587,7 +592,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
             <div className="flex-1 min-w-0 w-full flex flex-col items-center lg:items-start gap-3">
               <div className="flex flex-col items-center lg:items-start gap-0.5">
-                <span className="text-[13px] font-medium text-muted">Pool Code</span>
+                <span className="t-body text-ink">Pool Code</span>
                 <span className="t-num t-num-extrabold text-[22px] text-ink tracking-[0.125em]">
                   {pool.pool_code}
                 </span>
@@ -690,7 +695,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
           <div className="flex gap-3 mb-4 flex-wrap">
             <div>
-              <label className="block t-detail text-muted mb-1">
+              <label className="block t-body text-ink mb-1">
                 Date
               </label>
               <input
@@ -701,7 +706,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               />
             </div>
             <div>
-              <label className="block t-detail text-muted mb-1">
+              <label className="block t-body text-ink mb-1">
                 Time
               </label>
               <input
