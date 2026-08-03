@@ -1,7 +1,7 @@
 'use client'
 
 import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
-import { PointsBadge } from './PointsBadge'
+import { PointsBadge, PointsChip, PointsValue } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
 import { LocalTime } from '@/components/LocalTime'
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus'
@@ -458,30 +458,36 @@ export function MatchTableRow({
         )}
       </td>
 
-      <td className="px-4 py-3">
-        <div className="flex justify-start">
-          {pointsResult ? (
-            <PointsBadge result={pointsResult} />
-          ) : statusBadge ? (
-            <span
-              className={`t-caption px-2 py-0.5 rounded-pill ${
-                statusBadge.tone === 'red'
-                  ? 'bg-danger-600/12 text-danger-600'
-                  : 'bg-warning-500/12 text-warning-600'
-              }`}
-            >
-              {statusBadge.label}
+      {/* Result is two columns, not one. The chip and the points each get a
+          cell so the table sizes them independently — that is what makes them
+          line up down the page. Doing it inside one cell needs the chip pinned
+          to a magic width, which the next longer label outgrows. */}
+      <td className="pl-4 py-3">
+        {pointsResult ? (
+          <PointsChip result={pointsResult} />
+        ) : statusBadge ? (
+          <span
+            className={`t-caption px-2 py-0.5 rounded-pill ${
+              statusBadge.tone === 'red'
+                ? 'bg-danger-600/12 text-danger-600'
+                : 'bg-warning-500/12 text-warning-600'
+            }`}
+          >
+            {statusBadge.label}
+          </span>
+        ) : isLive ? (
+          <span className="inline-flex items-center gap-1 t-caption px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
+              <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
             </span>
-          ) : isLive ? (
-            <span className="inline-flex items-center gap-1 t-caption px-2 py-0.5 rounded-pill bg-danger-600/12 text-danger-600">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
-                <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
-              </span>
-              {getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }) ?? 'LIVE'}
-            </span>
-          ) : null}
-        </div>
+            {getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }) ?? 'LIVE'}
+          </span>
+        ) : null}
+      </td>
+
+      <td className="pl-2 pr-4 py-3">
+        {pointsResult ? <PointsValue result={pointsResult} /> : null}
       </td>
 
       <td className="px-4 py-3 text-right">

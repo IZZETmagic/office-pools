@@ -302,7 +302,7 @@ export function ResultsView({
                     <th className="px-4 py-3 text-right t-body font-semibold text-ink">Home</th>
                     <th className="px-2 py-3 text-center t-body font-semibold text-ink whitespace-nowrap">Score / Pick</th>
                     <th className="px-4 py-3 text-left t-body font-semibold text-ink">Away</th>
-                    <th className="px-4 py-3 text-center t-body font-semibold text-ink">Result</th>
+                    <th colSpan={2} className="px-4 py-3 text-left t-body font-semibold text-ink">Result</th>
                     <th className="px-4 py-3 text-right t-body font-semibold text-ink">Date</th>
                   </tr>
                 </thead>
