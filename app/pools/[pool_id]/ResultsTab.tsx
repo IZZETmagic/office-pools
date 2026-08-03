@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ResultsView } from './results/ResultsView'
 import type { ResultMatch } from './results/MatchCard'
 import type { PoolSettings } from './results/points'
@@ -31,6 +31,8 @@ type ResultsTabProps = {
   matchScores: MatchScoreData[]
   currentEntryId: string
   userEntries: EntryData[]
+  /** Needed to fetch another entry's match scores when the selector changes. */
+  poolId: string
 }
 
 export function ResultsTab({
@@ -48,6 +50,7 @@ export function ResultsTab({
   matchScores,
   currentEntryId,
   userEntries,
+  poolId,
 }: ResultsTabProps) {
   const [selectedEntryId, setSelectedEntryId] = useState(currentEntryId)
   const showEntrySelector = userEntries.length > 1
@@ -92,11 +95,37 @@ export function ResultsTab({
 
   const activeEntryId = selectedEntryId || currentEntryId
 
+  /**
+   * Match scores for an entry other than the one PoolDetail loaded.
+   *
+   * `matchScores` holds the wide 22-column rows for PoolDetail's active entry
+   * ONLY — it is fetched per entry precisely because shipping every entry's
+   * rows doubled the pool payload. Predictions and bonus scores arrive
+   * pool-wide, so those just filter; match scores cannot. Without this, picking
+   * a second entry filtered the first entry's rows by an id they do not carry
+   * and came back empty: no points, and an empty Result column, on an entry
+   * that has 104 scored rows in the database.
+   */
+  const [otherEntryScores, setOtherEntryScores] = useState<MatchScoreData[]>([])
+  useEffect(() => {
+    // No eager clear on the early return: the memo below filters by
+    // activeEntryId, so rows left over from a previously viewed entry match
+    // nothing and the view is empty until the fetch lands. Clearing here would
+    // be a synchronous setState in an effect for no gain.
+    if (!selectedEntryId || selectedEntryId === currentEntryId) return
+    let cancelled = false
+    fetch(`/api/pools/${poolId}/entries/${selectedEntryId}/match-scores`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { scores: [] }))
+      .then(d => { if (!cancelled) setOtherEntryScores(d.scores ?? []) })
+      .catch(() => { if (!cancelled) setOtherEntryScores([]) })
+    return () => { cancelled = true }
+  }, [poolId, selectedEntryId, currentEntryId])
+
   // Filter match_scores and bonus_scores for the selected entry
-  const entryMatchScores = useMemo(() =>
-    matchScores.filter(ms => ms.entry_id === activeEntryId),
-    [matchScores, activeEntryId]
-  )
+  const entryMatchScores = useMemo(() => {
+    const source = selectedEntryId === currentEntryId ? matchScores : otherEntryScores
+    return source.filter(ms => ms.entry_id === activeEntryId)
+  }, [matchScores, otherEntryScores, selectedEntryId, currentEntryId, activeEntryId])
   const entryBonusScores = useMemo(() =>
     bonusScores.filter(bs => bs.entry_id === activeEntryId),
     [bonusScores, activeEntryId]

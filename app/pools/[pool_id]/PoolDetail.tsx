@@ -1716,6 +1716,7 @@ export function PoolDetail({
                 matchScores={activeEntryScores}
                 currentEntryId={activeEntry?.entry_id || ''}
                 userEntries={entries}
+                poolId={pool.pool_id}
               />
             )}
 
