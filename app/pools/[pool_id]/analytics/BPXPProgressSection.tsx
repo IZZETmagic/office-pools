@@ -10,6 +10,8 @@ import { BP_BADGE_DEFINITIONS } from './bracketPickerXpSystem'
 import type { BonusXPEvent } from './xpSystem'
 import type { TeamData } from '../types'
 import { formatNumber } from '@/lib/format'
+import { BadgeMedallion } from '@/components/BadgeMedallion'
+import { rarityColor, rarityTint } from '@/lib/design/badges'
 
 // =============================================
 // TYPES
@@ -25,29 +27,16 @@ type BPXPProgressSectionProps = {
 // STYLE CONSTANTS
 // =============================================
 
-const TIER_BORDER_COLORS: Record<string, string> = {
-  Bronze: 'border-l-warning-500',
-  // `muted` (slate), not `silver`: silver is a surface fill and in dark mode it
-  // sits within a few points of the card it is drawn on, so the Silver-tier
-  // stripe disappeared entirely. muted inverts and stays visible in both modes.
-  Silver: 'border-l-muted',
-  Gold: 'border-l-accent-500',
-  Platinum: 'border-l-accent-500',
-}
-
+// No `dark:` overrides here: the ramps already invert, so `bg-accent-100` is a
+// pale gold in light and a deep brown in dark on its own. The
+// `dark:bg-accent-900/20` these carried jumped back to the light end of the
+// ramp and inverted it a second time, which is why the Platinum pill rendered
+// as a cream slab on the dark sheet.
 const TIER_BG_COLORS: Record<string, string> = {
-  Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-800',
+  Bronze: 'bg-warning-100 text-warning-800',
   Silver: 'bg-mist text-muted',
-  Gold: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
-  Platinum: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
-}
-
-const RARITY_COLORS: Record<string, string> = {
-  Common: 'text-muted',
-  Uncommon: 'text-success-900',
-  Rare: 'text-primary-800',
-  'Very Rare': 'text-accent-500 dark:text-accent-500',
-  Legendary: 'text-warning-800',
+  Gold: 'bg-accent-100 text-accent-700',
+  Platinum: 'bg-accent-100 text-accent-700',
 }
 
 // =============================================
@@ -85,7 +74,7 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
                 {currentLevel.name}
               </h3>
               {isMaxLevel && (
-                <span className="flex-shrink-0 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-accent-100 dark:bg-accent-100 text-accent-700 dark:text-accent-500">
+                <span className="flex-shrink-0 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-chip bg-accent-100 text-accent-700">
                   MAX
                 </span>
               )}
@@ -144,40 +133,42 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
 // =============================================
 
 function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned: boolean; onSelect: () => void }) {
+  // Same BadgeCell shape the full-tournament tab already uses (and mobile's
+  // FormTab before it): a 64px medallion well, the name, the XP. This tab was
+  // the last one still drawing a bordered card per badge with a bare emoji
+  // inside it, which is why its grid read like a spreadsheet and its locked
+  // state turned into a mid-grey slab in dark mode.
+  const tint = rarityColor(badge.rarity)
+
   return (
     <div className="group relative hover:z-10">
-      <div
-        className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
-          earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[badge.tier]} border border-border-subtle shadow-card dark:shadow-none hover:shadow-card dark:hover:border-silver`
-            : 'bg-mist border border-border-subtle hover:bg-silver'
-        } ${badge.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
+      <button
+        type="button"
         onClick={onSelect}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+        className="w-full flex flex-col items-center gap-1 transition-opacity hover:opacity-70 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40 rounded-chip"
       >
-        <div className={`text-2xl sm:text-3xl mb-1.5 ${earned ? '' : 'grayscale opacity-50 dark:opacity-70'}`}>
-          {badge.emoji}
-        </div>
-        <div className={`text-xs font-semibold mb-0.5 ${earned ? 'text-ink' : 'text-muted dark:text-muted'}`}>
+        <span
+          className={`relative w-16 h-16 rounded-pill flex items-center justify-center ${badge.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
+          style={{ backgroundColor: earned ? rarityTint(badge.rarity) : 'var(--sp-mist)' }}
+        >
+          {earned ? (
+            <BadgeMedallion id={badge.id} emoji={badge.emoji} size={64} />
+          ) : (
+            <Icon name="lock.fill" size={20} weight="semibold" className="text-muted" />
+          )}
+        </span>
+
+        <span
+          className="text-[11px] font-medium text-center leading-tight truncate w-full"
+          style={{ color: earned ? 'var(--sp-ink)' : 'var(--sp-silver)' }}
+        >
           {badge.name}
-        </div>
-        {earned ? (
-          <div className="t-num t-num-extrabold text-[10px] text-success-700">
-            +{badge.xpBonus} XP
-          </div>
-        ) : (
-          <div className={`text-[10px] font-medium ${RARITY_COLORS[badge.rarity]}`}>
-            {badge.rarity}
-          </div>
-        )}
-        {!earned && (
-          <div className="absolute top-1.5 right-1.5">
-            <Icon name="lock.fill" size={14} className="text-muted dark:text-muted" />
-          </div>
-        )}
-      </div>
+        </span>
+
+        <span className="t-num text-[9px]" style={{ color: earned ? tint : 'var(--sp-silver)' }}>
+          +{formatNumber(badge.xpBonus)} XP
+        </span>
+      </button>
 
       <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-ink text-surface text-xs text-center shadow-card-elevated pointer-events-none">
         <div className="font-semibold mb-0.5">{badge.name}</div>
@@ -185,14 +176,13 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
         {earned ? (
           <div className="text-success-400 font-bold mt-1">✓ Earned · +{badge.xpBonus} XP</div>
         ) : (
-          <div className="text-muted mt-1">🔒 Locked</div>
+          <div className="text-surface/70 mt-1">🔒 Locked</div>
         )}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-ink" />
       </div>
     </div>
   )
 }
-
 function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; earned: boolean; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -213,17 +203,17 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
         </button>
 
         <div className="p-6 pt-8 text-center">
-          <div className={`text-5xl mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
-            {badge.emoji}
+          <div className={`mb-3 ${earned ? '' : 'grayscale opacity-40 dark:opacity-60'}`}>
+            <BadgeMedallion id={badge.id} emoji={badge.emoji} size={72} className="mx-auto" />
           </div>
           <h3 className="t-section-header text-ink mb-1.5">
             {badge.name}
           </h3>
           <div className="flex items-center justify-center gap-2 mb-4">
-            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_BG_COLORS[badge.tier]}`}>
+            <span className={`t-caption px-2 py-0.5 rounded-pill ${TIER_BG_COLORS[badge.tier]}`}>
               {badge.tier}
             </span>
-            <span className={`text-[10px] font-semibold ${RARITY_COLORS[badge.rarity]}`}>
+            <span className="t-caption" style={{ color: rarityColor(badge.rarity) }}>
               {badge.rarity}
             </span>
           </div>
