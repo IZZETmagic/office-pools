@@ -155,70 +155,63 @@ export function ResultsView({
 
   return (
     <div>
-      {/* ── Points summary strip ── */}
-      <div className="mb-4 px-4 py-3 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <span className="t-card-title text-ink truncate">
-            {userEntries && userEntries.length > 1
-              ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
-              : 'Your Points'}
-          </span>
-          <span className="t-num t-num-extrabold text-lg text-primary-600 whitespace-nowrap">
-            {formatNumber(totalPoints)}
-            <span className="t-detail text-muted ml-1">pts</span>
-          </span>
-        </div>
-
-        {/* Counts read as words. "completed" was a bare check glyph sitting
-            beside two written labels, which made the row look like a fragment
-            rather than a sentence. */}
-        <div className="flex items-baseline gap-3 t-body text-muted ml-auto whitespace-nowrap">
-          <span><span className="t-num text-success-700">{statusCounts.completed}</span> completed</span>
-          {statusCounts.live > 0 && (
-            <span><span className="t-num text-danger-700">{statusCounts.live}</span> live</span>
-          )}
-          <span><span className="t-num text-ink">{statusCounts.upcoming}</span> upcoming</span>
-        </div>
-      </div>
-
-      {/* ── Filters ──
-          Round and status side by side, with the entry selector pushed right.
-          These were a seven-pill strip and a four-pill strip in two stacked
-          blocks; three rows of controls stood between the header and the first
-          result. */}
+      {/* ── Header row ──
+          Points on the left, filters on the right, one line. The points were a
+          card of their own stacked above a separate filter block; inline they
+          take roughly a third of the height and the first result sits that
+          much nearer the top. */}
       <div className="mb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Select
-            value={stageTab}
-            onChange={(e) => {
-              const next = e.target.value as StageTab
-              setStageTab(next)
-              if (next !== 'group') setGroupFilter('all')
-            }}
-            aria-label="Filter by round"
-          >
-            {STAGE_TABS.map((tab) => (
-              <option key={tab.key} value={tab.key}>{tab.label}</option>
-            ))}
-          </Select>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="t-card-title text-ink truncate">
+              {userEntries && userEntries.length > 1
+                ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
+                : 'Your Points'}
+            </span>
+            <span className="t-num t-num-extrabold text-lg text-primary-600 whitespace-nowrap">
+              {formatNumber(totalPoints)}
+              <span className="t-detail text-muted ml-1">pts</span>
+            </span>
+          </div>
 
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            aria-label="Filter by match status"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.key} value={opt.key}>
-                {opt.key === 'all' ? opt.label : `${opt.label} (${statusCounts[opt.key]})`}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-baseline gap-3 t-body text-muted whitespace-nowrap">
+            <span><span className="t-num text-success-700">{statusCounts.completed}</span> completed</span>
+            {statusCounts.live > 0 && (
+              <span><span className="t-num text-danger-700">{statusCounts.live}</span> live</span>
+            )}
+            <span><span className="t-num text-ink">{statusCounts.upcoming}</span> upcoming</span>
+          </div>
 
-          {/* Entry selector, right-aligned, only for multi-entry users. On the
-              shared Select now that it sits beside two others — it was a raw
-              <select> with its own border and padding. */}
-          {userEntries && userEntries.length > 1 && onEntryChange && (
-            <div className="ml-auto">
+          {/* Filters, pushed right. ml-auto sits on the group, not on the last
+              select, so the three stay together when the row wraps. */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            <Select
+              value={stageTab}
+              onChange={(e) => {
+                const next = e.target.value as StageTab
+                setStageTab(next)
+                if (next !== 'group') setGroupFilter('all')
+              }}
+              aria-label="Filter by round"
+            >
+              {STAGE_TABS.map((tab) => (
+                <option key={tab.key} value={tab.key}>{tab.label}</option>
+              ))}
+            </Select>
+
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              aria-label="Filter by match status"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.key === 'all' ? opt.label : `${opt.label} (${statusCounts[opt.key]})`}
+                </option>
+              ))}
+            </Select>
+
+            {userEntries && userEntries.length > 1 && onEntryChange && (
               <Select
                 value={selectedEntryId || ''}
                 onChange={(e) => onEntryChange(e.target.value)}
@@ -230,8 +223,8 @@ export function ResultsView({
                   </option>
                 ))}
               </Select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Group letters qualify the round chosen above, so they stay beneath
