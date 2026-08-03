@@ -113,7 +113,9 @@ export function poolJoinability(pool: PoolStatusInput): PoolJoinability {
 // both flavours derive from the same tone rather than re-deriving from status.
 // ---------------------------------------------------------------------------
 
-type BadgeVariant = 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
+type BadgeVariant =
+  | 'blue' | 'green' | 'yellow' | 'red' | 'gray'
+  | 'outline' | 'outline-green' | 'outline-yellow' | 'outline-gray'
 
 /** For `<Badge variant={...}>` (components/ui/Badge.tsx). */
 export function toneToBadgeVariant(tone: PoolStatusTone): BadgeVariant {
@@ -125,17 +127,35 @@ export function toneToBadgeVariant(tone: PoolStatusTone): BadgeVariant {
   }
 }
 
-/** For the bare Tailwind pills on pool cards and detail headers. */
+/** Filled Badge variant for a tone, for status pills that are not outlines. */
+export function toneToBadgeVariantSolid(tone: PoolStatusTone): BadgeVariant {
+  switch (tone) {
+    case 'green': return 'green'
+    case 'amber': return 'yellow'
+    case 'blue': return 'blue'
+    case 'neutral': return 'gray'
+  }
+}
+
+/**
+ * For the bare Tailwind pills on pool cards.
+ *
+ * Uses the Badge recipe — the tone at 12% behind its -700 step — rather than a
+ * pale -100 fill with a dark: override. The old pairing put text on the -400
+ * step in dark mode, which is the weak end of an inverted ramp and measured
+ * around 2:1; and -100 fills go near-black in dark. One class per tone now
+ * covers both modes.
+ */
 export function toneToTagClass(tone: PoolStatusTone): string {
   switch (tone) {
     case 'green':
-      return 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400'
+      return 'bg-success-600/12 text-success-700'
     case 'amber':
-      return 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400'
+      return 'bg-warning-500/15 text-warning-700'
     case 'blue':
-      return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+      return 'bg-primary-600/12 text-primary-700'
     case 'neutral':
-      return 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+      return 'bg-mist text-muted'
   }
 }
 

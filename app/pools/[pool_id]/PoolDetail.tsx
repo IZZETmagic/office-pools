@@ -59,7 +59,8 @@ import type {
 } from './types'
 import type { MatchConductData } from '@/lib/tournament'
 import { formatTimeAgo } from '@/lib/format'
-import { poolStatusTag } from '@/lib/poolStatus'
+import { poolStatusDisplay, toneToBadgeVariantSolid } from '@/lib/poolStatus'
+import { Badge } from '@/components/ui/Badge'
 
 // =====================
 // TAB DEFINITIONS
@@ -1169,10 +1170,13 @@ export function PoolDetail({
             ]}
             badges={
               <>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${poolStatusTag(pool).className}`}>
-                  {poolStatusTag(pool).label}
-                </span>
-                {isAdmin && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400">Admin</span>}
+                {/* The Badge primitive, not hand-rolled pills. These were
+                    `rounded` at 4px with a 10px label, while every other badge
+                    in the app is a fully-rounded 11px pill. */}
+                <Badge variant={toneToBadgeVariantSolid(poolStatusDisplay(pool).tone)}>
+                  {poolStatusDisplay(pool).label}
+                </Badge>
+                {isAdmin && <Badge variant="outline-gray">Admin</Badge>}
               </>
             }
             isSuperAdmin={isSuperAdmin}
