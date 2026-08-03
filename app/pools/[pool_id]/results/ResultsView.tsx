@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/Select'
 import type { PoolSettings } from './points'
 import { GroupStandingsComparison } from './GroupStandingsComparison'
 import { GROUP_LETTERS } from '@/lib/tournament'
+import { formatNumber } from '@/lib/format'
 import type { MatchData, TeamData, EntryData, ExistingPrediction, BonusScoreData, MatchScoreData } from '../types'
 import type { MatchConductData } from '@/lib/tournament'
 
@@ -155,16 +156,24 @@ export function ResultsView({
   return (
     <div>
       {/* ── Points summary strip ── */}
-      <div className="mb-4 px-4 h-[60px] bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex items-center gap-3 text-sm">
-        <span className="t-card-title text-ink">
-          {userEntries && userEntries.length > 1
-            ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
-            : 'Your Points'}
-        </span>
-        <span className="t-num t-num-extrabold text-lg text-primary-600">{totalPoints.toLocaleString()}<span className="t-detail text-muted ml-0.5">pts</span></span>
-        <span className="text-silver">·</span>
-        <div className="flex items-center gap-2 t-body text-muted ml-auto">
-          <span><span className="t-num text-success-700">{statusCounts.completed}</span> ✓</span>
+      <div className="mb-4 px-4 py-3 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="t-card-title text-ink truncate">
+            {userEntries && userEntries.length > 1
+              ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
+              : 'Your Points'}
+          </span>
+          <span className="t-num t-num-extrabold text-lg text-primary-600 whitespace-nowrap">
+            {formatNumber(totalPoints)}
+            <span className="t-detail text-muted ml-1">pts</span>
+          </span>
+        </div>
+
+        {/* Counts read as words. "completed" was a bare check glyph sitting
+            beside two written labels, which made the row look like a fragment
+            rather than a sentence. */}
+        <div className="flex items-baseline gap-3 t-body text-muted ml-auto whitespace-nowrap">
+          <span><span className="t-num text-success-700">{statusCounts.completed}</span> completed</span>
           {statusCounts.live > 0 && (
             <span><span className="t-num text-danger-700">{statusCounts.live}</span> live</span>
           )}
