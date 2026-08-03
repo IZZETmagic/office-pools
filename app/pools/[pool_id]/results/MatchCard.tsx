@@ -459,7 +459,7 @@ export function MatchTableRow({
       </td>
 
       <td className="px-4 py-3">
-        <div className="flex justify-center">
+        <div className="flex justify-start">
           {pointsResult ? (
             <PointsBadge result={pointsResult} />
           ) : statusBadge ? (

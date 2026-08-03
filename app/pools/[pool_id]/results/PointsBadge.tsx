@@ -29,8 +29,11 @@ export function PointsBadge({ result }: { result: PointsResult }) {
 
   return (
     <div className="flex items-center gap-1.5">
+      {/* Fixed width: the four labels run 41-67px, so a chip sized to its text
+          left the points after it landing at four different x positions down the
+          Result column. 4.5rem clears the widest ("RESULT ✓") with headroom. */}
       <span
-        className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill ${tierChipClass(result.type)}`}
+        className={`inline-flex items-center justify-center gap-1 min-w-[4.5rem] text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill ${tierChipClass(result.type)}`}
       >
         {typeLabels[result.type]}
       </span>
