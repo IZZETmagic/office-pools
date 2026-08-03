@@ -9,6 +9,7 @@ import { LEVELS } from './xpSystem'
 import { BP_BADGE_DEFINITIONS } from './bracketPickerXpSystem'
 import type { BonusXPEvent } from './xpSystem'
 import type { TeamData } from '../types'
+import { formatNumber } from '@/lib/format'
 
 // =============================================
 // TYPES
@@ -26,14 +27,17 @@ type BPXPProgressSectionProps = {
 
 const TIER_BORDER_COLORS: Record<string, string> = {
   Bronze: 'border-l-warning-500',
-  Silver: 'border-l-neutral-400',
+  // `muted` (slate), not `silver`: silver is a surface fill and in dark mode it
+  // sits within a few points of the card it is drawn on, so the Silver-tier
+  // stripe disappeared entirely. muted inverts and stays visible in both modes.
+  Silver: 'border-l-muted',
   Gold: 'border-l-accent-500',
   Platinum: 'border-l-accent-500',
 }
 
 const TIER_BG_COLORS: Record<string, string> = {
   Bronze: 'bg-warning-100 dark:bg-warning-900/20 text-warning-800',
-  Silver: 'bg-neutral-200 dark:bg-neutral-700 text-muted',
+  Silver: 'bg-mist text-muted',
   Gold: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
   Platinum: 'bg-accent-100 dark:bg-accent-900/20 text-accent-700 dark:text-accent-500',
 }
@@ -72,12 +76,12 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
       <div className="p-5 sm:p-6">
         <div className="flex items-center gap-4 sm:gap-5 mb-5">
           <div className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center ${getLevelTierStyle(currentLevel.level)}`}>
-            <span className="text-2xl sm:text-3xl font-black">{currentLevel.level}</span>
+            <span className="t-num t-num-black text-2xl sm:text-3xl">{currentLevel.level}</span>
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-xl sm:text-2xl font-bold text-ink truncate">
+              <h3 className="t-section-header sm:text-2xl text-ink truncate">
                 {currentLevel.name}
               </h3>
               {isMaxLevel && (
@@ -96,25 +100,25 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
 
           <div className="flex-shrink-0 flex items-center gap-2">
             <div className="text-right hidden sm:block">
-              <div className="text-2xl font-black text-accent-500">{totalXP.toLocaleString()}</div>
-              <div className="text-xs font-medium uppercase tracking-wider text-muted">Total XP</div>
+              <div className="t-num t-num-black text-2xl text-accent-500">{formatNumber(totalXP)}</div>
+              <div className="t-caption text-muted">Total XP</div>
             </div>
-            <Icon name="chevron.right" size={20} className="text-neutral-300 dark:text-muted" />
+            <Icon name="chevron.right" size={20} className="text-muted" />
           </div>
         </div>
 
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-muted">
+            <span className="t-caption text-muted">
               Level {currentLevel.level}
             </span>
-            <span className="text-xs font-semibold text-muted">
+            <span className="t-caption text-muted">
               {isMaxLevel ? 'MAX LEVEL' : `Level ${nextLevel.level}`}
             </span>
           </div>
-          <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-mist rounded-pill h-3 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500 origin-left"
+              className="h-full rounded-pill bg-gradient-to-r from-primary-500 to-accent-500 origin-left"
               style={{
                 width: `${Math.round(levelProgress * 100)}%`,
                 animation: 'barGrow 0.8s ease 0.3s both',
@@ -122,11 +126,11 @@ function BPXPHeroCard({ breakdown, onOpenRoadmap }: { breakdown: BPXPBreakdown; 
             />
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-[10px] text-muted">
-              {currentLevel.xpRequired.toLocaleString()} XP
+            <span className="t-num t-num-medium text-[10px] text-muted">
+              {formatNumber(currentLevel.xpRequired)} XP
             </span>
-            <span className="text-[10px] text-muted">
-              {isMaxLevel ? '' : `${nextLevel.xpRequired.toLocaleString()} XP`}
+            <span className="t-num t-num-medium text-[10px] text-muted">
+              {isMaxLevel ? '' : `${formatNumber(nextLevel.xpRequired)} XP`}
             </span>
           </div>
         </div>
@@ -145,8 +149,8 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
       <div
         className={`relative rounded-control p-3 text-center transition-all cursor-pointer ${
           earned
-            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[badge.tier]} border border-border-subtle shadow-card dark:shadow-none hover:shadow-card dark:hover:border-neutral-600`
-            : 'bg-mist dark:bg-neutral-400/90 border border-border-subtle dark:border-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-300/90'
+            ? `bg-surface border-l-4 ${TIER_BORDER_COLORS[badge.tier]} border border-border-subtle shadow-card dark:shadow-none hover:shadow-card dark:hover:border-silver`
+            : 'bg-mist border border-border-subtle hover:bg-silver'
         } ${badge.tier === 'Platinum' && earned ? 'shimmer-effect' : ''}`}
         onClick={onSelect}
         role="button"
@@ -160,7 +164,7 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
           {badge.name}
         </div>
         {earned ? (
-          <div className="text-[10px] font-bold text-success-900">
+          <div className="t-num t-num-extrabold text-[10px] text-success-700">
             +{badge.xpBonus} XP
           </div>
         ) : (
@@ -175,15 +179,15 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
         )}
       </div>
 
-      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-neutral-900 dark:bg-neutral-700 text-white text-xs text-center shadow-card-elevated pointer-events-none">
+      <div className="hidden sm:group-hover:block absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-chip bg-ink text-surface text-xs text-center shadow-card-elevated pointer-events-none">
         <div className="font-semibold mb-0.5">{badge.name}</div>
-        <div className="text-neutral-300">{badge.condition}</div>
+        <div className="text-surface/70">{badge.condition}</div>
         {earned ? (
           <div className="text-success-400 font-bold mt-1">✓ Earned · +{badge.xpBonus} XP</div>
         ) : (
           <div className="text-muted mt-1">🔒 Locked</div>
         )}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-700" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-ink" />
       </div>
     </div>
   )
@@ -203,7 +207,7 @@ function BadgeDetailModal({ badge, earned, onClose }: { badge: BadgeDefinition; 
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors z-10"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:bg-mist transition-colors z-10"
         >
           <Icon name="xmark" size={20} />
         </button>
@@ -293,7 +297,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
               <span>🏅</span>
               <span>Bracket Badges</span>
             </h4>
-            <span className="text-xs font-medium text-muted">
+            <span className="t-num t-num-medium text-xs text-muted">
               {earnedBadges.length} / {BP_BADGE_DEFINITIONS.length} earned
             </span>
           </div>
@@ -319,7 +323,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
                 <button
                   key={idx}
                   className={`w-2 h-2 rounded-full transition-colors ${
-                    activePage === idx ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600'
+                    activePage === idx ? 'bg-accent-500' : 'bg-silver'
                   }`}
                   onClick={() => goToPage(idx)}
                   aria-label={`Badge page ${idx + 1}`}
@@ -359,28 +363,35 @@ function BattleBar({ label, you, crowd, animDelay }: { label: string; you: numbe
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-[5px]">
-        <span className="text-[11px] text-muted dark:text-[var(--neutral-400)]">{label}</span>
-        <span className="t-num t-num-regular text-[10px] text-muted dark:text-[var(--neutral-500)]">
-          {you} vs {crowd}
+      <div className="flex items-baseline justify-between mb-1.5 gap-2">
+        <span className="t-body text-muted truncate">{label}</span>
+        {/* Each number is tinted like the half of the bar it describes, so
+            "17 vs 13" cannot be read the wrong way round. */}
+        <span className="t-num t-num-medium text-[10px] shrink-0">
+          <span className="text-primary-600">{formatNumber(you)}</span>
+          <span className="text-muted"> vs </span>
+          <span className="text-muted">{formatNumber(crowd)}</span>
         </span>
       </div>
-      <div className="relative h-2 rounded bg-mist dark:bg-[var(--sp-midnight)]">
+      <div className="relative h-2 rounded-pill bg-mist overflow-hidden">
         <div
-          className="absolute top-0 left-0 h-full rounded-l"
+          className="absolute top-0 left-0 h-full rounded-l-pill"
           style={{
             width: `calc(${youPct}% - 1px)`,
             background: 'linear-gradient(to right, var(--primary-600), var(--primary-500))',
-            boxShadow: '0 0 8px color-mix(in srgb, var(--primary-600) 25%, transparent)',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'left',
           }}
         />
+        {/* The crowd half used to be primary at 67% over primary — against the
+            mist track the two halves composited to almost the same blue, so the
+            faceoff read as one solid bar and you could not tell which side was
+            yours. It is the neutral now: you are the colour, the pool is the
+            field. */}
         <div
-          className="absolute top-0 right-0 h-full rounded-r"
+          className="absolute top-0 right-0 h-full rounded-r-pill bg-muted"
           style={{
             width: `calc(${crowdPct}% - 1px)`,
-            background: 'linear-gradient(to right, color-mix(in srgb, var(--primary-600) 67%, transparent), var(--primary-600))',
             animation: `barGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${animDelay}s both`,
             transformOrigin: 'right',
           }}
@@ -417,49 +428,29 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
   const showContrarianBars = consensusCount + contrarianCount > 0
 
   return (
-    <div
-      className="relative overflow-hidden bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default"
-      style={{ animation: 'fadeUp 0.3s ease 0.25s both' }}
-    >
-      {/* Ambient corner glows */}
-      <div
-        className="absolute top-[-20px] right-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 25%, transparent), transparent 70%)' }}
-      />
-      <div
-        className="absolute top-[-20px] left-[-20px] w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary-600) 20%, transparent), transparent 70%)' }}
-      />
-
-      <div className="relative z-10 p-[18px]">
-        {/* Heading */}
-        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
-          You vs The Pool
-        </h4>
-
-        {/* VS Faceoff */}
+    <BPSectionCard title="You vs The Pool" animDelay={0.25}>
+      <div className="px-4 pb-4">
+        {/* VS Faceoff. "You" is the brand colour and the pool is the neutral —
+            the same pairing the bars below use, so the two halves of every bar
+            are readable without a legend. */}
         <div className="flex items-center justify-around mb-8">
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
-              You
-            </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--primary-600)' }}>
+            <div className="t-caption text-primary-600 mb-1">You</div>
+            <div className="t-num t-num-extrabold text-[32px] leading-none text-primary-600">
               {userOverallAccuracy}%
             </div>
           </div>
 
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-border-subtle dark:border-[var(--sp-midnight)]"
+            className="w-9 h-9 rounded-pill flex items-center justify-center flex-shrink-0 border border-border-subtle"
             style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 12%, transparent), color-mix(in srgb, var(--primary-600) 20%, transparent))' }}
           >
-            <span className="text-[11px] font-extrabold" style={{ color: 'var(--neutral-500)' }}>VS</span>
+            <span className="t-caption text-muted">VS</span>
           </div>
 
           <div className="text-center">
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] mb-1" style={{ color: 'var(--primary-600)' }}>
-              Pool Avg
-            </div>
-            <div className="text-[32px] font-extrabold leading-none" style={{ color: 'var(--neutral-400)' }}>
+            <div className="t-caption text-muted mb-1">Pool Avg</div>
+            <div className="t-num t-num-extrabold text-[32px] leading-none text-muted">
               {poolAvgOverallAccuracy}%
             </div>
           </div>
@@ -477,9 +468,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
         {/* Consensus/Contrarian Bars */}
         {showContrarianBars && (
           <>
-            <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-muted dark:text-[var(--neutral-500)] mb-3">
-              Bracket Boldness
-            </div>
+            <div className="t-caption text-muted mb-3">Bracket Boldness</div>
             <div className="space-y-5">
               <BattleBar label="Consensus Picks" you={consensusCount} crowd={poolAvgConsensus} animDelay={0.6} />
               <BattleBar label="Contrarian Picks" you={contrarianCount} crowd={poolAvgContrarian} animDelay={0.7} />
@@ -491,43 +480,29 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
         {/* Performance Callout */}
         <div className="mt-7">
           {isOutperforming ? (
-            <div
-              className="flex items-start gap-2 rounded-chip"
-              style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--success-600) 10%, transparent), transparent)',
-                border: '1px solid color-mix(in srgb, var(--success-600) 13%, transparent)',
-                padding: '10px 14px',
-              }}
-            >
-              <span className="text-[18px] leading-none flex-shrink-0">📈</span>
+            <div className="flex items-start gap-2 rounded-chip px-3.5 py-2.5 bg-success-600/8 border border-success-600/15">
+              <span className="text-lg leading-none flex-shrink-0">📈</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: 'var(--success-600)' }}>
+                <div className="t-body font-bold text-success-700">
                   Outperforming the pool by {accuracyDiff}%
                 </div>
                 {contrarianCount > 0 && contrarianAdv > 0 && (
-                  <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
+                  <div className="t-detail text-muted mt-px">
                     Your contrarian win rate is {contrarianAdv}% higher than average
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div
-              className="flex items-start gap-2 rounded-chip"
-              style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-600) 10%, transparent), transparent)',
-                border: '1px solid color-mix(in srgb, var(--primary-600) 13%, transparent)',
-                padding: '10px 14px',
-              }}
-            >
-              <span className="text-[18px] leading-none flex-shrink-0">🎯</span>
+            <div className="flex items-start gap-2 rounded-chip px-3.5 py-2.5 bg-primary-600/8 border border-primary-600/15">
+              <span className="text-lg leading-none flex-shrink-0">🎯</span>
               <div>
-                <div className="text-xs font-bold" style={{ color: 'var(--primary-600)' }}>
+                <div className="t-body font-bold text-primary-600">
                   {accuracyDiff === 0
                     ? 'Neck and neck with the pool'
                     : 'The pool has a slight edge — time to trust your gut?'}
                 </div>
-                <div className="text-[10px] mt-px" style={{ color: 'var(--neutral-500)' }}>
+                <div className="t-detail text-muted mt-px">
                   {accuracyDiff === 0
                     ? "You\u2019re matching the pool average perfectly"
                     : `Only ${Math.abs(accuracyDiff)}% behind — one bold call could flip it`}
@@ -537,7 +512,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
           )}
         </div>
       </div>
-    </div>
+    </BPSectionCard>
   )
 }
 
@@ -549,58 +524,43 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
   const { totalEntries, totalScoredPicks, mostPopularChampion, poolAvgOverallAccuracy } = comparison
   const teamLookup = new Map(teams.map(t => [t.team_id, t]))
 
-  return (
-    <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default">
-      <div className="p-[18px]">
-        <h4 className="text-[15px] font-bold text-ink dark:text-[var(--neutral-100)] mb-3">
-          Pool-Wide Stats
-        </h4>
+  const stats: { value: string; label: string }[] = [
+    { value: `${poolAvgOverallAccuracy}%`, label: 'Avg Pool Accuracy' },
+    { value: formatNumber(totalEntries), label: 'Competitors' },
+    // Picks Scored runs to five figures in a big pool, so it needs the
+    // separator every other total on the tab already gets.
+    { value: formatNumber(totalScoredPicks), label: 'Picks Scored' },
+  ]
 
-        {/* Summary Stats Row */}
-        <div className="flex items-center justify-around mb-[18px]">
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {poolAvgOverallAccuracy}%
+  return (
+    <BPSectionCard title="Pool-Wide Stats" animDelay={0.28}>
+      <div className="px-4 pb-4">
+        <div className="flex items-start justify-around mb-4 gap-2">
+          {stats.map(s => (
+            <div key={s.label} className="text-center min-w-0">
+              <div className="t-num t-num-extrabold text-2xl text-ink">{s.value}</div>
+              <div className="t-detail text-muted mt-0.5">{s.label}</div>
             </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Avg Pool Accuracy
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {totalEntries}
-            </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Competitors
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-extrabold text-ink dark:text-[var(--neutral-100)]">
-              {totalScoredPicks}
-            </div>
-            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--neutral-500)' }}>
-              Picks Scored
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Most Popular Champion */}
         {mostPopularChampion && (() => {
           const team = teamLookup.get(mostPopularChampion.team_id)
           return (
             <div className="border border-border-subtle rounded-chip p-3">
-              <div className="text-[10px] font-bold uppercase tracking-[0.8px] text-muted dark:text-[var(--neutral-500)] mb-2">
-                Pool&apos;s Favorite Champion
+              <div className="t-caption text-muted mb-2">
+                Pool&apos;s Favourite Champion
               </div>
               <div className="flex items-center gap-3">
                 {team?.flag_url && (
-                  <img src={team.flag_url} alt="" className="w-8 h-6 object-cover rounded-sm flex-shrink-0" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={team.flag_url} alt="" className="w-8 h-6 object-cover rounded-[2px] flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-ink truncate">
+                  <div className="t-card-title text-ink truncate">
                     {team?.country_name ?? 'Unknown'}
                   </div>
-                  <div className="text-[10px] text-muted">
+                  <div className="t-num t-num-medium text-[10px] text-muted">
                     {Math.round(mostPopularChampion.pct * 100)}% of brackets
                   </div>
                 </div>
@@ -610,7 +570,7 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
           )
         })()}
       </div>
-    </div>
+    </BPSectionCard>
   )
 }
 
@@ -634,7 +594,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
             <span>🎯</span>
             <span>Bonus Events</span>
           </h4>
-          <span className="text-xs font-bold text-accent-500">{totalBonusXP.toLocaleString()} XP</span>
+          <span className="t-num t-num-extrabold text-xs text-accent-500">{formatNumber(totalBonusXP)} XP</span>
         </div>
       </div>
       <div className="p-4 sm:p-5 space-y-2">
@@ -645,12 +605,12 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
           >
             <span className="text-xl flex-shrink-0">{event.emoji}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-ink">{event.label}</div>
+              <div className="t-body font-bold text-ink">{event.label}</div>
               {event.detail && (
-                <div className="text-[10px] text-muted truncate">{event.detail}</div>
+                <div className="t-detail text-muted truncate">{event.detail}</div>
               )}
             </div>
-            <span className="text-xs font-bold text-accent-500 flex-shrink-0">+{event.xp} XP</span>
+            <span className="t-num t-num-extrabold text-xs text-accent-500 flex-shrink-0">+{formatNumber(event.xp)} XP</span>
           </div>
         ))}
       </div>
@@ -683,7 +643,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-muted hover:bg-mist dark:hover:bg-mist transition-colors"
           >
             <Icon name="xmark" size={20} />
           </button>
@@ -709,7 +669,7 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                     isReached
                       ? 'bg-success-500 text-white'
-                      : 'bg-neutral-200 dark:bg-neutral-700 text-muted'
+                      : 'bg-mist text-muted'
                   }`}>
                     {isReached ? (
                       <Icon name="checkmark" size={16} />
@@ -731,12 +691,12 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
                       </div>
                     )}
                   </div>
-                  <span className={`text-xs font-medium tabular-nums flex-shrink-0 ${
+                  <span className={`t-num t-num-medium text-xs flex-shrink-0 ${
                     isCurrent ? 'text-accent-700 dark:text-accent-500'
                       : isReached ? 'text-success-900'
                         : 'text-muted dark:text-muted'
                   }`}>
-                    {level.xpRequired.toLocaleString()} XP
+                    {formatNumber(level.xpRequired)} XP
                   </span>
                 </div>
               )
@@ -744,10 +704,10 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
           </div>
 
           <div className="mt-4 pt-4 border-t border-border-subtle text-center">
-            <div className="text-2xl font-black text-accent-500">{breakdown.totalXP.toLocaleString()} XP</div>
+            <div className="t-num t-num-black text-2xl text-accent-500">{formatNumber(breakdown.totalXP)} XP</div>
             <div className="text-xs text-muted mt-0.5">
               {breakdown.nextLevel
-                ? `${breakdown.xpToNextLevel.toLocaleString()} XP to ${breakdown.nextLevel.name}`
+                ? `${formatNumber(breakdown.xpToNextLevel)} XP to ${breakdown.nextLevel.name}`
                 : 'Maximum level reached'
               }
             </div>
@@ -755,15 +715,15 @@ function BPLevelRoadmapModal({ breakdown, onClose }: { breakdown: BPXPBreakdown;
             <div className="flex flex-wrap justify-center gap-2 mt-3">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
                 <span className="text-xs font-medium text-primary-800">Group XP</span>
-                <span className="text-xs font-bold text-primary-800">{(breakdown.totalGroupBaseXP + breakdown.totalGroupBonusXP).toLocaleString()}</span>
+                <span className="t-num t-num-extrabold text-xs text-primary-800">{formatNumber(breakdown.totalGroupBaseXP + breakdown.totalGroupBonusXP)}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800">
                 <span className="text-xs font-medium text-success-900">Knockout XP</span>
-                <span className="text-xs font-bold text-success-900">{(breakdown.totalKnockoutBaseXP + breakdown.totalKnockoutBonusXP).toLocaleString()}</span>
+                <span className="t-num t-num-extrabold text-xs text-success-900">{formatNumber(breakdown.totalKnockoutBaseXP + breakdown.totalKnockoutBonusXP)}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-chip bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
                 <span className="text-xs font-medium text-warning-800">Badge XP</span>
-                <span className="text-xs font-bold text-warning-800">{breakdown.totalBadgeXP.toLocaleString()}</span>
+                <span className="t-num t-num-extrabold text-xs text-warning-800">{formatNumber(breakdown.totalBadgeXP)}</span>
               </div>
             </div>
           </div>
@@ -1020,7 +980,7 @@ export function BPXPProgressSection({ bpXpBreakdown, teams, bpPoolComparison }: 
 
       {/* You vs The Pool + Pool Stats (side by side on desktop) */}
       {bpPoolComparison && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <BPYouVsPoolSection comparison={bpPoolComparison} />
           <BPPoolWideStatsSection comparison={bpPoolComparison} teams={teams} />
         </div>
