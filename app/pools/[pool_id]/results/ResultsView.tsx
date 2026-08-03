@@ -162,7 +162,10 @@ export function ResultsView({
       <div className="mb-4">
         <div className="px-4 py-3 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-baseline gap-2 min-w-0">
-            <span className="t-card-title text-ink truncate">
+            {/* The label is desktop-only. On a phone the total speaks for
+                itself, and when there are multiple entries the name is already
+                showing in the entry selector a few pixels away. */}
+            <span className="hidden sm:inline t-card-title text-ink truncate">
               {userEntries && userEntries.length > 1
                 ? userEntries.find(e => e.entry_id === selectedEntryId)?.entry_name || 'Entry'
                 : 'Your Points'}
