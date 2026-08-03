@@ -156,12 +156,11 @@ export function ResultsView({
   return (
     <div>
       {/* ── Header row ──
-          Points on the left, filters on the right, one line. The points were a
-          card of their own stacked above a separate filter block; inline they
-          take roughly a third of the height and the first result sits that
-          much nearer the top. */}
+          One card holding both halves: points on the left, filters pushed
+          right. Previously these were two stacked blocks — a points card, then
+          a bare filter row — which is what made the top of the tab feel busy. */}
       <div className="mb-4">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="px-4 py-3 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-baseline gap-2 min-w-0">
             <span className="t-card-title text-ink truncate">
               {userEntries && userEntries.length > 1
