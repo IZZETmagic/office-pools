@@ -176,14 +176,6 @@ export function ResultsView({
             </span>
           </div>
 
-          <div className="flex items-baseline gap-3 t-body text-muted whitespace-nowrap">
-            <span><span className="t-num text-success-700">{statusCounts.completed}</span> completed</span>
-            {statusCounts.live > 0 && (
-              <span><span className="t-num text-danger-700">{statusCounts.live}</span> live</span>
-            )}
-            <span><span className="t-num text-ink">{statusCounts.upcoming}</span> upcoming</span>
-          </div>
-
           {/* Filters, pushed right. ml-auto sits on the group, not on the last
               select, so the three stay together when the row wraps. */}
           <div className="flex flex-wrap items-center gap-2 ml-auto">
