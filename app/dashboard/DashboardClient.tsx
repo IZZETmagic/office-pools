@@ -245,6 +245,24 @@ function formatDayHeader(dateStr: string): string {
 
 // SF-Symbol names for each activity kind, resolved by components/ui/Icon. Keyed on
 // the union so a new activity type fails the build rather than rendering nothing.
+/**
+ * Hero stat tints, taken verbatim from QuickStats in the RN app so the two
+ * surfaces use one palette.
+ *
+ * These are deliberate, not an oversight: RN draws its stat cards on `surface`,
+ * where all three clear 3.8:1, but this hero is a primary-600 → primary-700 →
+ * success-600 gradient, so measured against the tile each icon actually lands
+ * on they come out at 1.02 (flame, on blue), 1.55 (trophy) and 2.04 (bolt, on
+ * green). Ryan chose the shared palette over the contrast on 2026-08-04. If
+ * that trade stops being worth it, the fix is to put these tiles on `surface`
+ * like RN's — not to re-tint them.
+ */
+const STAT_TINT = {
+  streak: '#EF4444',
+  rank: '#D97706',
+  points: 'var(--primary-600)',
+} as const
+
 const ACTIVITY_ICON: Record<ActivityItem['type'], string> = {
   joined: 'person.badge.plus',
   submitted: 'checkmark.circle.fill',
@@ -696,36 +714,50 @@ export function DashboardClient({
           {/* Mobile: inline row with dividers */}
           <div className="flex items-center justify-around mt-3 sm:hidden">
             <div className="text-center">
-              <p className="text-lg font-bold text-white">{bestStreak} 🔥</p>
+              <p className="text-lg font-bold text-white inline-flex items-center gap-1.5">
+                {bestStreak}
+                <Icon name="flame.fill" size={16} tint={STAT_TINT.streak} weight="light" solid />
+              </p>
               <p className="text-[10px] text-primary-200 dark:text-white/50">Best Streak</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-white">
-                {bestRank === 1 && '🏆 '}{bestRank ? `#${bestRank}` : '--'}
+              <p className="text-lg font-bold text-white inline-flex items-center gap-1.5">
+                {bestRank ? `#${bestRank}` : '--'}
+                <Icon name="trophy.fill" size={16} tint={STAT_TINT.rank} weight="light" solid />
               </p>
               <p className="text-[10px] text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-white">{formatNumber(totalPoints)} ⚡</p>
+              <p className="text-lg font-bold text-white inline-flex items-center gap-1.5">
+                {formatNumber(totalPoints)}
+                <Icon name="bolt.fill" size={16} tint={STAT_TINT.points} weight="light" solid />
+              </p>
               <p className="text-[10px] text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
           {/* Desktop: glass stat cards */}
           <div className="hidden sm:grid grid-cols-3 gap-4 mt-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border border-white/10">
-              <p className="text-2xl font-bold text-white">{bestStreak} 🔥</p>
+              <p className="text-2xl font-bold text-white inline-flex items-center gap-2">
+                {bestStreak}
+                <Icon name="flame.fill" size={20} tint={STAT_TINT.streak} weight="light" solid />
+              </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Streak</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
-              <p className="text-2xl font-bold text-white">
-                {bestRank === 1 && '🏆 '}{bestRank ? `#${bestRank}` : '--'}
+              <p className="text-2xl font-bold text-white inline-flex items-center gap-2">
+                {bestRank ? `#${bestRank}` : '--'}
+                <Icon name="trophy.fill" size={20} tint={STAT_TINT.rank} weight="light" solid />
               </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Best Rank</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-3 text-center border-l-2 border-white/20 border border-white/10">
-              <p className="text-2xl font-bold text-white">{formatNumber(totalPoints)} ⚡</p>
+              <p className="text-2xl font-bold text-white inline-flex items-center gap-2">
+                {formatNumber(totalPoints)}
+                <Icon name="bolt.fill" size={20} tint={STAT_TINT.points} weight="light" solid />
+              </p>
               <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
             </div>
           </div>
