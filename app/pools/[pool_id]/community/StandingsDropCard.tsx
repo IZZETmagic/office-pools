@@ -37,17 +37,17 @@ export function StandingsDropCard({
       <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">📊</span>
-          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-700">
+          <span className="text-sm font-semibold text-ink">
             Current Standings
           </span>
         </div>
-        <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
+        <span className="text-[10px] font-medium text-muted uppercase tracking-wider">
           {meta.pool_name}
         </span>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-neutral-100 dark:border-border-default/50" />
+      <div className="border-t border-border-subtle/50" />
 
       {/* Leaderboard rows */}
       <div className="px-1 py-1">
@@ -57,34 +57,42 @@ export function StandingsDropCard({
           return (
             <div key={`${entry.user_id}-${idx}`}>
               <div
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg ${
-                  isFirst ? 'bg-accent-50/60 dark:bg-accent-400/30' : ''
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-chip ${
+                  // 15%, not 30%: this is the app's tint recipe (see rarityTint), and at 30%
+                  // the dark band came out a mid olive that the primary points could not
+                  // clear — 2.41:1. The old code worked around it by overriding the points
+                  // to a light neutral in dark only.
+                  isFirst ? 'bg-accent-50/60 dark:bg-accent-400/15' : ''
                 }`}
               >
                 {/* Rank */}
                 <span className="w-6 text-center text-sm shrink-0">
                   {RANK_MEDALS[entry.rank] ?? (
-                    <span className="text-xs text-neutral-400 dark:text-neutral-700 font-medium">{entry.rank}</span>
+                    <span className="text-xs text-muted font-medium">{entry.rank}</span>
                   )}
                 </span>
 
                 {/* Name */}
                 <span className={`text-xs flex-1 truncate ${
                   isCurrentUser
-                    ? 'font-semibold text-primary-700 dark:text-neutral-700'
-                    : 'font-medium text-neutral-900 dark:text-neutral-700'
+                    ? 'font-semibold text-primary-700'
+                    : 'font-medium text-ink'
                 }`}>
                   {entry.full_name}
                 </span>
 
                 {/* Points */}
-                <span className="t-num text-xs text-primary-600 dark:text-neutral-700">
+                {/* Points are primary everywhere else, but the leader's row already
+                    carries the accent band behind it, and primary-on-accent does not
+                    clear AA in either mode. On that one row they take ink, the same
+                    token the name beside them uses. */}
+                <span className={`t-num text-xs ${isFirst ? 'text-ink' : 'text-primary-600'}`}>
                   {entry.points.toLocaleString()}
                 </span>
               </div>
               {/* Row divider */}
               {idx < meta.entries.length - 1 && (
-                <div className="mx-3 border-t border-neutral-100 dark:border-border-default/30" />
+                <div className="mx-3 border-t border-border-subtle/30" />
               )}
             </div>
           )

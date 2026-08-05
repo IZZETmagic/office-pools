@@ -147,15 +147,15 @@ export function SharePredictionModal({
       aria-modal="true"
     >
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
+      <div className="relative bg-surface rounded-t-card sm:rounded-card shadow-xl sm:max-w-md w-full max-h-[85vh] flex flex-col dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 dark:border-border-default shrink-0">
-          <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border-subtle shrink-0">
+          <h2 className="text-lg font-bold text-ink">
             Share a Prediction
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-colors"
+            className="p-1.5 text-muted hover:text-muted hover:bg-mist rounded-control transition-colors"
           >
             <Icon name="xmark" size={20} />
           </button>
@@ -165,7 +165,7 @@ export function SharePredictionModal({
         <div className="overflow-y-auto px-4 sm:px-6 py-4 space-y-2 flex-1">
           {shareableMatches.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-sm text-neutral-500">No completed matches with predictions yet.</p>
+              <p className="text-sm text-muted">No completed matches with predictions yet.</p>
             </div>
           )}
 
@@ -179,14 +179,14 @@ export function SharePredictionModal({
               <button
                 key={match.match_id}
                 onClick={() => setSelectedMatch({ match, prediction, outcome })}
-                className={`w-full text-left rounded-xl border p-3 transition-all ${
+                className={`w-full text-left rounded-control border p-3 transition-all ${
                   isSelected
                     ? 'border-primary-400 dark:border-primary-600 bg-primary-50/50 dark:bg-primary-900/10 ring-1 ring-primary-400/30'
-                    : 'border-neutral-200 dark:border-border-default hover:border-neutral-300 dark:hover:border-neutral-600'
+                    : 'border-border-default hover:border-border-default'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
+                  <span className="text-[10px] font-medium text-muted uppercase tracking-wider">
                     Match {match.match_number} · {formatStageLabel(match.stage)}
                   </span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${badge.classes}`}>
@@ -199,18 +199,18 @@ export function SharePredictionModal({
                     {match.home_team?.flag_url && (
                       <img src={match.home_team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
                     )}
-                    <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{homeName}</span>
+                    <span className="text-xs font-medium text-ink">{homeName}</span>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-neutral-400">
+                    <div className="text-[10px] text-muted">
                       {prediction.predicted_home_score}-{prediction.predicted_away_score}
                     </div>
-                    <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                    <div className="text-sm font-bold text-ink">
                       {match.home_score_ft}-{match.away_score_ft}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{awayName}</span>
+                    <span className="text-xs font-medium text-ink">{awayName}</span>
                     {match.away_team?.flag_url && (
                       <img src={match.away_team.flag_url} alt="" className="w-5 h-3.5 rounded-sm object-cover" />
                     )}
@@ -222,19 +222,19 @@ export function SharePredictionModal({
         </div>
 
         {/* Footer */}
-        <div className={`border-t border-neutral-100 dark:border-border-default px-4 sm:px-6 pt-4 ${isStandalone ? 'pb-10' : 'pb-4'} shrink-0`}>
+        <div className={`border-t border-border-subtle px-4 sm:px-6 pt-4 ${isStandalone ? 'pb-10' : 'pb-4'} shrink-0`}>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 text-sm font-medium text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl px-4 py-2.5 transition-colors"
+              className="flex-1 text-sm font-medium text-muted bg-mist hover:bg-silver rounded-control px-4 py-2.5 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleShare}
               disabled={!selectedMatch || sharing}
-              className="flex-1 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none rounded-xl px-4 py-2.5 transition-all active:scale-[0.98]"
+              className="flex-1 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none rounded-control px-4 py-2.5 transition-all active:scale-[0.98]"
             >
               {sharing ? 'Sharing...' : 'Share Prediction'}
             </button>

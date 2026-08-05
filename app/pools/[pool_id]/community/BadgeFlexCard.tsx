@@ -1,6 +1,8 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, BadgeFlexMetadata, MemberWithLevel, ReactionCount } from './types'
 import { SharedCardWrapper } from './SharedCardWrapper'
+import { rarityColor } from '@/lib/design/badges'
+import { BadgeMedallion } from '@/components/BadgeMedallion'
 
 type BadgeFlexCardProps = {
   message: MessageWithReactions
@@ -12,17 +14,9 @@ type BadgeFlexCardProps = {
 
 const TIER_BORDER_COLORS: Record<string, string> = {
   Bronze: 'border-l-warning-500',
-  Silver: 'border-l-neutral-400',
+  Silver: 'border-l-muted',
   Gold: 'border-l-accent-500',
   Platinum: 'border-l-accent-500',
-}
-
-const RARITY_COLORS: Record<string, string> = {
-  Common: 'text-neutral-500 dark:text-neutral-800',
-  Uncommon: 'text-success-900',
-  Rare: 'text-primary-800',
-  'Very Rare': 'text-accent-500 dark:text-accent-500',
-  Legendary: 'text-warning-800',
 }
 
 export function BadgeFlexCard({
@@ -49,13 +43,13 @@ export function BadgeFlexCard({
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">
         <span className="text-sm">🏆</span>
-        <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-700">
+        <span className="text-sm font-semibold text-ink">
           Badge Flex
         </span>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-neutral-100 dark:border-border-default/50" />
+      <div className="border-t border-border-subtle/50" />
 
       {/* Badges grid — matching XP tab BadgeCard style */}
       <div className="px-3 py-3">
@@ -64,25 +58,25 @@ export function BadgeFlexCard({
             {badges.map((badge) => (
               <div
                 key={badge.id}
-                className={`relative w-[90px] rounded-lg px-1.5 py-1.5 text-center bg-surface border-l-[3px] ${TIER_BORDER_COLORS[badge.tier] || 'border-l-neutral-300'} border border-neutral-200 dark:border-neutral-400 shadow-sm dark:shadow-none ${badge.tier === 'Platinum' ? 'shimmer-effect' : ''}`}
+                className={`relative w-[90px] rounded-chip px-1.5 py-1.5 text-center bg-surface border-l-[3px] ${TIER_BORDER_COLORS[badge.tier] || 'border-l-silver'} border border-border-default shadow-card dark:shadow-none ${badge.tier === 'Platinum' ? 'shimmer-effect' : ''}`}
               >
                 {/* Emoji */}
-                <div className="text-lg mb-1">
-                  {badge.emoji}
+                <div className="mb-1">
+                  <BadgeMedallion id={badge.id} emoji={badge.emoji} size={28} className="mx-auto" />
                 </div>
                 {/* Name */}
-                <div className="text-[10px] font-semibold text-neutral-900 dark:text-white mb-0.5 leading-tight">
+                <div className="t-detail font-semibold text-ink mb-0.5 leading-tight">
                   {badge.name}
                 </div>
                 {/* Rarity */}
-                <div className={`text-[9px] font-medium ${RARITY_COLORS[badge.rarity] || 'text-neutral-500'}`}>
+                <div className="text-[9px] font-medium" style={{ color: rarityColor(badge.rarity) }}>
                   {badge.rarity}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-neutral-400 italic text-center">No badges earned yet — keep predicting!</p>
+          <p className="text-xs text-muted italic text-center">No badges earned yet — keep predicting!</p>
         )}
       </div>
     </SharedCardWrapper>

@@ -74,7 +74,7 @@ export function PredictionShareCard({
       <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-sm">⚽</span>
-          <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+          <span className="text-sm font-semibold text-ink truncate">
             {matchName}
           </span>
         </div>
@@ -82,26 +82,26 @@ export function PredictionShareCard({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-neutral-100 dark:border-border-default/50" />
+      <div className="border-t border-border-subtle/50" />
 
       {/* Two-column scores */}
       <div className="flex items-stretch">
         {/* My Pick */}
         <div className="flex-1 flex flex-col items-center py-3 px-2">
-          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider mb-1.5">
+          <span className="text-[10px] font-medium text-muted uppercase tracking-wider mb-1.5">
             My Pick
           </span>
-          <span className="text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
+          <span className="text-2xl font-bold tabular-nums text-ink">
             {meta.predicted_home} - {meta.predicted_away}
           </span>
         </div>
 
         {/* Vertical divider */}
-        <div className="w-px bg-neutral-100 dark:bg-border-default/50 my-2.5" />
+        <div className="w-px bg-mist dark:bg-border-default/50 my-2.5" />
 
         {/* Result */}
         <div className="flex-1 flex flex-col items-center py-3 px-2">
-          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider mb-1.5">
+          <span className="text-[10px] font-medium text-muted uppercase tracking-wider mb-1.5">
             Result
           </span>
           <span className={`text-2xl font-bold tabular-nums ${getOutcomeColor(meta.outcome)}`}>

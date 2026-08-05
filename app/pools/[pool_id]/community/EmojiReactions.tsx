@@ -30,10 +30,10 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
         <button
           key={r.emoji}
           onClick={() => onToggleReaction(r.emoji)}
-          className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-pill border transition-colors ${
             r.reacted_by_me
               ? 'bg-primary-50 dark:bg-primary-900/15 border-primary-300 dark:border-primary-700 text-primary-800'
-              : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-border-default text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
+              : 'bg-snow border-border-default text-muted hover:border-border-default'
           }`}
         >
           <span>{r.emoji}</span>
@@ -45,7 +45,7 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
       <div className="relative">
         <button
           onClick={() => setShowPicker(!showPicker)}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-neutral-200 dark:border-neutral-700 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:border-neutral-300 transition-colors text-xs"
+          className="inline-flex items-center justify-center w-7 h-7 rounded-pill border border-dashed border-border-default text-muted hover:text-ink hover:border-border-default transition-colors text-xs"
           title="Add reaction"
         >
           +

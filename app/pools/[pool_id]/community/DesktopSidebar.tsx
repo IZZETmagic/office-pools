@@ -64,25 +64,25 @@ function MemberRow({
   const dotClass =
     presence === 'here' ? 'bg-success-500'
     : presence === 'app' ? 'bg-warning-400'
-    : 'bg-neutral-300 dark:bg-neutral-600'
+    : 'bg-silver'
 
   return (
     <div
-      className={`flex items-center gap-2 rounded-lg px-1 -mx-1 ${presence === 'offline' ? 'opacity-45' : ''}`}
+      className={`flex items-center gap-2 rounded-chip px-1 -mx-1 ${presence === 'offline' ? 'opacity-45' : ''}`}
       style={animStyle}
     >
       <div className="relative shrink-0">
-        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+        <div className="w-7 h-7 rounded-pill flex items-center justify-center text-[9px] font-bold bg-mist text-muted">
           {getInitials(member.users.full_name, member.users.username)}
         </div>
         <div
-          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-surface ${dotClass}`}
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-pill ring-1 ring-surface ${dotClass}`}
           title={presence === 'here' ? 'In this pool' : presence === 'app' ? 'Online in the app' : undefined}
         />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium text-neutral-900 dark:text-neutral-100 truncate">{member.users.full_name || member.users.username}</p>
-        <p className="text-[9px] text-neutral-400 truncate">{level ? getRankTitle(level.level) : 'Rookie'}</p>
+        <p className="text-[11px] font-medium text-ink truncate">{member.users.full_name || member.users.username}</p>
+        <p className="text-[9px] text-muted truncate">{level ? getRankTitle(level.level) : 'Rookie'}</p>
       </div>
       {level && (
         <span className={`text-[8px] font-bold px-1.5 py-1 rounded leading-none ${getLevelPillClasses(level.level)}`}>
@@ -200,15 +200,15 @@ function OnlineMembersSection({
       `}</style>
 
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">Members</h4>
-        <span className="text-[10px] text-neutral-400">{members.length}</span>
+        <h4 className="text-xs font-bold text-ink">Members</h4>
+        <span className="text-[10px] text-muted">{members.length}</span>
       </div>
 
       {/* Online */}
       {onlineMembers.length > 0 && (
         <>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
+            <div className="w-1.5 h-1.5 rounded-pill bg-success-500" />
             <span className="text-[10px] font-medium text-success-900">Online — {onlineMembers.length}</span>
           </div>
           <div className="space-y-1 mb-3">
@@ -232,7 +232,7 @@ function OnlineMembersSection({
             onClick={() => setOfflineExpanded(prev => !prev)}
             className="flex items-center justify-between w-full mb-1.5 group"
           >
-            <span className="text-[10px] font-medium text-neutral-400">Offline — {offlineMembers.length}</span>
+            <span className="text-[10px] font-medium text-muted">Offline — {offlineMembers.length}</span>
             <Icon name="chevron.down" size={12} className={`text-muted transition-transform duration-200 ${offlineExpanded ? 'rotate-180' : ''}`} />
           </button>
           <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${offlineExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
@@ -291,7 +291,7 @@ function MatchdayPulseSection({
 
   return (
     <Card className="!p-3">
-      <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Matchday Pulse</h4>
+      <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Matchday Pulse</h4>
 
       {/* Recent results */}
       {completedMatches.map(match => {
@@ -307,22 +307,22 @@ function MatchdayPulseSection({
         return (
           <div key={match.match_id} className="mb-2 last:mb-0">
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+              <span className="text-[11px] font-medium text-ink">
                 {homeName} vs {awayName}
               </span>
-              <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
+              <span className="text-[11px] font-bold text-ink tabular-nums">
                 {match.home_score_ft}-{match.away_score_ft}
               </span>
             </div>
             {/* Accuracy bar */}
             <div className="flex items-center gap-1.5">
-              <div className="flex-1 h-1 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+              <div className="flex-1 h-1 rounded-pill bg-mist overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-success-500 transition-all"
+                  className="h-full rounded-pill bg-success-500 transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className="text-[9px] text-neutral-400 tabular-nums w-16 text-right">
+              <span className="text-[9px] text-muted tabular-nums w-16 text-right">
                 {correctCount}/{pickedCount} · {pct}%
               </span>
             </div>
@@ -331,19 +331,19 @@ function MatchdayPulseSection({
       })}
 
       {completedMatches.length === 0 && (
-        <p className="text-[10px] text-neutral-400 italic">No completed matches yet</p>
+        <p className="text-[10px] text-muted italic">No completed matches yet</p>
       )}
 
       {/* Upcoming */}
       {upcomingMatches.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-border-default/50">
+        <div className="mt-2 pt-2 border-t border-border-subtle/50">
           {upcomingMatches.map(match => {
             const homeName = match.home_team?.country_code ?? match.home_team_placeholder ?? '???'
             const awayName = match.away_team?.country_code ?? match.away_team_placeholder ?? '???'
 
             return (
               <div key={match.match_id} className="flex items-center justify-between py-1">
-                <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-[11px] font-medium text-ink">
                   {homeName} vs {awayName}
                 </span>
                 <span className="text-[10px] font-medium text-primary-800">
@@ -390,11 +390,11 @@ function LeaderboardSnapshotSection({
   return (
     <Card className="!p-3">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Leaderboard</h4>
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted">Leaderboard</h4>
       </div>
 
       {ranked.length === 0 ? (
-        <p className="text-[10px] text-neutral-400 italic">No rankings yet</p>
+        <p className="text-[10px] text-muted italic">No rankings yet</p>
       ) : (
         <div className="space-y-0.5">
           {ranked.map((entry) => {
@@ -402,21 +402,21 @@ function LeaderboardSnapshotSection({
             return (
               <div
                 key={`${entry.user_id}-${entry.rank}`}
-                className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg ${
+                className={`flex items-center gap-1.5 px-1.5 py-1 rounded-chip ${
                   isCurrentUser ? 'bg-primary-50 dark:bg-primary-900/15' : ''
                 }`}
               >
                 <span className="w-5 text-center shrink-0">
                   {RANK_MEDALS[entry.rank] ?? (
-                    <span className="text-[10px] text-neutral-400 font-medium">{entry.rank}</span>
+                    <span className="text-[10px] text-muted font-medium">{entry.rank}</span>
                   )}
                 </span>
                 <span className={`text-[11px] flex-1 truncate ${
-                  isCurrentUser ? 'font-semibold text-primary-800' : 'font-medium text-neutral-900 dark:text-neutral-100'
+                  isCurrentUser ? 'font-semibold text-primary-800' : 'font-medium text-ink'
                 }`}>
                   {entry.full_name}
                 </span>
-                <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100 tabular-nums" suppressHydrationWarning>
+                <span className="text-[11px] font-bold text-ink tabular-nums" suppressHydrationWarning>
                   {entry.points.toLocaleString()}
                 </span>
                 {entry.delta !== 0 && (
@@ -446,19 +446,19 @@ function RecentActivitySection({ events }: { events: SystemEvent[] }) {
 
   return (
     <Card className="!p-3">
-      <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Recent Activity</h4>
+      <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Recent Activity</h4>
 
       {activityEvents.length === 0 ? (
-        <p className="text-[10px] text-neutral-400 italic">No recent activity</p>
+        <p className="text-[10px] text-muted italic">No recent activity</p>
       ) : (
         <div className="space-y-1.5">
           {activityEvents.map((event) => (
             <div key={event.id} className="flex items-start gap-1.5">
               <span className="text-sm leading-none mt-0.5 shrink-0">{event.emoji}</span>
-              <p className="text-[10px] text-neutral-600 dark:text-neutral-400 flex-1 leading-relaxed">
+              <p className="text-[10px] text-muted flex-1 leading-relaxed">
                 {event.content}
               </p>
-              <span className="text-[9px] text-neutral-300 dark:text-neutral-600 shrink-0 mt-0.5" suppressHydrationWarning>
+              <span className="text-[9px] text-muted shrink-0 mt-0.5" suppressHydrationWarning>
                 {formatMessageTime(event.timestamp)}
               </span>
             </div>

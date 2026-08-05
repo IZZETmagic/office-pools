@@ -1037,28 +1037,28 @@ export function CommunityTab({
   const emptyState = (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
       <span className="text-5xl mb-4">💬</span>
-      <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
+      <h3 className="text-lg font-bold text-ink dark:text-white mb-1">
         Start the conversation
       </h3>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 max-w-[280px]">
+      <p className="text-sm text-muted mb-6 max-w-[280px]">
         Share a prediction, flex your badges, or just talk trash
       </p>
       <div className="flex flex-col gap-2.5 w-full max-w-[260px]">
         <button
           onClick={handleShareBoldCall}
-          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/15 text-primary-800 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-control bg-primary-50 dark:bg-primary-900/15 text-primary-800 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:scale-[0.97] transition-all"
         >
           🎯 Share Prediction
         </button>
         <button
           onClick={handleFlexBadges}
-          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-control bg-snow text-muted border border-border-default hover:bg-mist active:scale-[0.97] transition-all"
         >
           🏆 Flex Badges
         </button>
         <button
           onClick={handleDropStandings}
-          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-border-default hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.97] transition-all"
+          className="flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-control bg-snow text-muted border border-border-default hover:bg-mist active:scale-[0.97] transition-all"
         >
           📊 Drop Standings
         </button>
@@ -1094,7 +1094,7 @@ export function CommunityTab({
       {/* Loading state */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-pill animate-spin" />
         </div>
       )}
 
@@ -1245,17 +1245,17 @@ export function CommunityTab({
                   {showNewMessagesPill && (
                     <button
                       onClick={() => scrollToBottom()}
-                      className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary-600 text-white text-xs font-medium shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-95 transition-all"
+                      className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-pill bg-primary-600 text-white text-xs font-medium shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-95 transition-all"
                     >
                       ↓ {unseenCount > 0 ? `${unseenCount} new message${unseenCount !== 1 ? 's' : ''}` : 'New messages'}
                     </button>
                   )}
                   <button
                     onClick={() => scrollToBottom()}
-                    className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 active:scale-90 transition-all"
+                    className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-pill bg-white border border-border-default shadow-lg hover:bg-snow active:scale-90 transition-all"
                     aria-label="Scroll to bottom"
                   >
-                    <Icon name="chevron.down" size={20} className="text-neutral-600 dark:text-neutral-300" />
+                    <Icon name="chevron.down" size={20} className="text-muted" />
                   </button>
                 </div>
               )}
@@ -1286,8 +1286,8 @@ export function CommunityTab({
         }>
           <Card className={
             mobileChat
-              ? `!p-0 ${isStandalone && !keyboardOpen ? '!pb-6' : ''} !rounded-none border-t border-neutral-200 dark:border-border-default`
-              : '!p-0 !rounded-b-none md:!rounded-b-xl border-t border-neutral-200 dark:border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]'
+              ? `!p-0 ${isStandalone && !keyboardOpen ? '!pb-6' : ''} !rounded-none border-t border-border-default`
+              : '!p-0 !rounded-b-none md:!rounded-b-control border-t border-border-default shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] md:mr-[calc(260px+1rem)]'
           }>
             {inputBarContent}
           </Card>

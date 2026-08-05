@@ -98,7 +98,7 @@ export function PinMessageModal({
       {/* Form */}
       <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
           <div>
-            <label htmlFor="pin-title" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+            <label htmlFor="pin-title" className="block text-sm font-medium text-ink mb-1.5">
               Title
             </label>
             <input
@@ -108,12 +108,12 @@ export function PinMessageModal({
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
               placeholder="e.g. Share your boldest prediction!"
-              className="w-full text-sm bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
+              className="w-full text-sm bg-snow border border-border-default rounded-control px-3 py-2.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="pin-desc" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+            <label htmlFor="pin-desc" className="block text-sm font-medium text-ink mb-1.5">
               Description
             </label>
             <textarea
@@ -123,7 +123,7 @@ export function PinMessageModal({
               maxLength={1000}
               rows={3}
               placeholder="What should members share? e.g. Drop your most unexpected scoreline..."
-              className="w-full text-sm bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none"
+              className="w-full text-sm bg-snow border border-border-default rounded-control px-3 py-2.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none"
             />
           </div>
 
@@ -135,14 +135,14 @@ export function PinMessageModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 text-sm font-medium text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl px-4 py-2.5 transition-colors"
+              className="flex-1 text-sm font-medium text-muted bg-mist hover:bg-silver rounded-control px-4 py-2.5 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || !title.trim() || !description.trim()}
-              className="flex-1 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none rounded-xl px-4 py-2.5 transition-all active:scale-[0.98]"
+              className="flex-1 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none rounded-control px-4 py-2.5 transition-all active:scale-[0.98]"
             >
               {saving ? 'Saving...' : isEditing ? 'Update' : 'Pin Message'}
             </button>

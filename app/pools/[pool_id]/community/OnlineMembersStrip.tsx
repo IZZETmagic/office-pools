@@ -43,7 +43,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
       <div className="flex items-center gap-2 px-3 py-2.5 overflow-x-auto scrollbar-none">
         {/* Online count badge */}
         <div className="flex items-center gap-1 shrink-0">
-          <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
+          <div className="w-1.5 h-1.5 rounded-pill bg-success-500" />
           <span className="t-num t-num-medium text-[10px] text-muted">
             {onlineCount}
           </span>
@@ -59,7 +59,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
                   {getInitials(member.users.full_name, member.users.username)}
                 </div>
                 <div
-                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-white ${
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-pill ring-[1.5px] ring-white ${
                     isHere
                       ? 'dark:ring-success-500 bg-success-500'
                       : 'dark:ring-warning-400 bg-warning-400'
@@ -83,7 +83,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
               <div className="w-8 h-8 rounded-pill flex items-center justify-center t-detail font-bold bg-mist/50 text-muted">
                 {getInitials(member.users.full_name, member.users.username)}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-[1.5px] ring-surface bg-silver" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-pill ring-[1.5px] ring-surface bg-silver" />
             </div>
           </div>
         ))}

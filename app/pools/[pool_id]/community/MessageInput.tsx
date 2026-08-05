@@ -135,17 +135,17 @@ export function MessageInput({
     : null
 
   return (
-    <div className="relative border-t border-neutral-200 dark:border-border-default">
+    <div className="relative border-t border-border-default">
       {/* Reply-to bar */}
       {replyingTo && (
         <div className="flex items-center gap-2 px-3 sm:px-4 pt-2 pb-1">
-          <div className="w-0.5 h-5 rounded-full bg-primary-400 shrink-0" />
-          <p className="text-xs text-neutral-500 truncate flex-1">
-            Replying to <span className="font-medium text-neutral-700 dark:text-neutral-300">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
+          <div className="w-0.5 h-5 rounded-pill bg-primary-400 shrink-0" />
+          <p className="text-xs text-muted truncate flex-1">
+            Replying to <span className="font-medium text-ink">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
           </p>
           <button
             onClick={onClearReply}
-            className="p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+            className="p-0.5 text-muted hover:text-ink transition-colors"
             aria-label="Cancel reply"
           >
             <Icon name="xmark" size={14} />
@@ -173,16 +173,16 @@ export function MessageInput({
             placeholder="Message the pool..."
             maxLength={2000}
             rows={1}
-            className="flex-1 text-sm bg-neutral-50 dark:bg-neutral-800/15 border border-neutral-200 dark:border-border-default rounded-xl px-3 py-2.5 text-neutral-900 dark:text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none overflow-y-auto scrollbar-none"
+            className="flex-1 text-sm bg-snow/15 border border-border-default rounded-control px-3 py-2.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none overflow-y-auto scrollbar-none"
           />
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-sm shadow-primary-600/25"
+            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-control bg-primary-600 text-white hover:bg-primary-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-sm shadow-primary-600/25"
             aria-label="Send message"
           >
             {sending ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-pill animate-spin" />
             ) : (
               <Icon name="paperplane.fill" size={16} />
             )}

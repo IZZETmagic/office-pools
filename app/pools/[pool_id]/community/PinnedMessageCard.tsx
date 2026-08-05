@@ -84,7 +84,7 @@ export function PinnedMessageCard({
 
   return (
     <div className="sticky top-0 z-10 mx-1 mb-3">
-      <div className="bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-xl px-3.5 py-3">
+      <div className="bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-control px-3.5 py-3">
         {/* Top row: badge + admin actions */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary-800">
@@ -113,12 +113,12 @@ export function PinnedMessageCard({
         </div>
 
         {/* Title */}
-        <p className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+        <p className="text-sm font-bold text-ink leading-snug">
           {pinned.title}
         </p>
 
         {/* Description */}
-        <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed">
+        <p className="text-xs text-muted mt-1 leading-relaxed">
           {pinned.description}
         </p>
 
@@ -127,7 +127,7 @@ export function PinnedMessageCard({
           {pinned.cta_type === 'share_bold_call' && (
             <button
               onClick={onShareBoldCall}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 active:scale-[0.98] rounded-lg px-3 py-1.5 transition-all"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 active:scale-[0.98] rounded-chip px-3 py-1.5 transition-all"
             >
               <Icon name="ellipsis" size={14} />
               Share My Bold Call

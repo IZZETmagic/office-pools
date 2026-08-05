@@ -29,10 +29,10 @@ export function SharedCardWrapper({
     <div>
       {/* Attribution row */}
       <div className="flex items-center gap-2 mb-1.5">
-        <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold bg-neutral-100 dark:bg-neutral-800/15 text-neutral-600 dark:text-neutral-700">
+        <div className="shrink-0 w-6 h-6 rounded-pill flex items-center justify-center text-[8px] font-bold bg-mist/15 text-muted">
           {getInitials(author?.users.full_name, author?.users.username)}
         </div>
-        <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-700 truncate">
+        <span className="text-xs font-semibold text-ink truncate">
           {author?.users.full_name || author?.users.username || 'Unknown'}
         </span>
         {authorLevel && (
@@ -40,13 +40,13 @@ export function SharedCardWrapper({
             Lvl {authorLevel.level} · {getRankTitle(authorLevel.level)}
           </span>
         )}
-        <span className="text-[10px] text-neutral-400 ml-auto shrink-0" suppressHydrationWarning>
+        <span className="text-[10px] text-muted ml-auto shrink-0" suppressHydrationWarning>
           {formatMessageTime(createdAt)}
         </span>
       </div>
 
       {/* Card */}
-      <div className="rounded-xl border border-neutral-200 dark:border-border-default bg-white dark:bg-neutral-400/50 overflow-hidden">
+      <div className="rounded-control border border-border-default bg-surface overflow-hidden">
         {children}
       </div>
 

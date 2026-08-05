@@ -1,5 +1,6 @@
 import type { MemberData, MatchData, EntryData } from '../types'
 import type { SystemEvent, MemberWithLevel } from './types'
+import { levelPillClass } from '@/lib/design/levels'
 import { LEVELS, computeLevel } from '../analytics/xpSystem'
 import type { EarnedBadge } from '../analytics/xpSystem'
 
@@ -96,13 +97,13 @@ export function computeLevelFromXP(totalXP: number): { level: number; levelName:
 }
 
 /**
- * Get level tier color classes for the level badge pill.
- * Level 9+: amber (Oracle/Legend), Level 5-8: blue, Below 5: neutral
+ * Level pill treatment. Delegates to the canonical ladder in
+ * lib/design/levels.ts rather than keeping a third copy: the one that lived
+ * here had only three bands where the app has five, so L4 rendered neutral
+ * instead of sky and L10 got amber instead of the solid gold top band.
  */
 export function getLevelPillClasses(level: number): string {
-  if (level >= 9) return 'bg-warning-200 dark:bg-warning-900/30 text-warning-800'
-  if (level >= 5) return 'bg-primary-100 dark:bg-primary-900/20 text-primary-800'
-  return 'bg-neutral-100 dark:bg-neutral-800/15 text-neutral-500 dark:text-neutral-600'
+  return levelPillClass(level)
 }
 
 /**
@@ -112,8 +113,8 @@ export function getTierBorderClass(tier: string | undefined): string {
   switch (tier) {
     case 'Platinum': return 'ring-2 ring-accent-500'
     case 'Gold': return 'ring-2 ring-accent-500'
-    case 'Silver': return 'ring-2 ring-neutral-400'
-    case 'Bronze': return 'ring-2 ring-neutral-300 dark:ring-neutral-600'
+    case 'Silver': return 'ring-2 ring-muted'
+    case 'Bronze': return 'ring-2 ring-silver'
     default: return ''
   }
 }
