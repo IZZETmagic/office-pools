@@ -422,24 +422,34 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         value: 'full_tournament' as const,
                         label: 'Full Tournament',
                         desc: 'Members predict all matches upfront before the tournament starts. They must predict which teams qualify for the knockout rounds based on their group stage predictions.',
+                        // A ticked-off list: every match filled in before a ball
+                        // is kicked. A plain bullet list said "a list" and nothing
+                        // about predicting them.
                         icon: (
-                          <Icon name="list.bullet" size={20} />
+                          <Icon name="checklist" size={20} />
                         ),
                       },
                       {
                         value: 'progressive' as const,
                         label: 'Progressive',
                         desc: 'Members predict round-by-round as teams advance. After each round completes, the next round opens with actual qualified teams and matchups.',
+                        // Steps: one round opens, then the next. This was
+                        // paperplane.fill, which resolves to Hugeicons'
+                        // SendingOrder glyph — a mail/cloud blob that says
+                        // nothing about rounds.
                         icon: (
-                          <Icon name="paperplane.fill" size={20} />
+                          <Icon name="stairs" size={20} />
                         ),
                       },
                       {
                         value: 'bracket_picker' as const,
                         label: 'Bracket Picker',
                         desc: 'Members rank groups and pick knockout winners only — no score predictions needed. Quick & simple (~10 min).',
+                        // Two feeding into one — the knockout tree itself.
+                        // square.grid.2x2 resolves to Grid02, which reads as a
+                        // crop tool.
                         icon: (
-                          <Icon name="square.grid.2x2" size={20} />
+                          <Icon name="arrow.triangle.merge" size={20} />
                         ),
                       },
                     ]).map((opt) => (
