@@ -1189,26 +1189,6 @@ export function ScoringTab({
               )}
             </SectionCard>
 
-            {/* Coming Soon — Best Player & Top Scorer */}
-            <div className="mb-6 border border-neutral-200 rounded-xl px-4 py-3 bg-neutral-50">
-              <p className="text-sm font-semibold text-neutral-400">
-                Bonus: Best Player &amp; Top Scorer
-                <span className="ml-2 inline-block px-2 py-0.5 text-xs bg-neutral-200 text-neutral-500 rounded-full">
-                  Coming Soon
-                </span>
-              </p>
-              <div className="mt-2 space-y-2 opacity-40 pointer-events-none">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-neutral-500 w-52 shrink-0">Best Player correct:</span>
-                  <span className="text-sm font-bold text-neutral-400">100 points</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-neutral-500 w-52 shrink-0">Top Scorer correct:</span>
-                  <span className="text-sm font-bold text-neutral-400">100 points</span>
-                </div>
-              </div>
-            </div>
-
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mb-6">
               <Button variant="gray" onClick={resetDefaults}>
