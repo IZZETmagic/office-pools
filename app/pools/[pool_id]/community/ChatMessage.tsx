@@ -154,7 +154,11 @@ export function ChatMessage({
                 the final words. RN does the same with non-breaking spaces. */}
             <span className="inline-block w-14 align-baseline" aria-hidden />
             <span
-              className={`absolute right-2.5 bottom-1.5 text-[11px] font-medium leading-none whitespace-nowrap ${
+              // RN pins this at right:4 bottom:2 inside a text container that
+              // itself sits inside the bubble's 4px padding — 8px and 4px from
+              // the bubble's visual edge. At 10px/6px it drifted off the corner
+              // and read as a word sitting beside the text.
+              className={`absolute right-2 bottom-1 text-[11px] font-medium leading-none whitespace-nowrap ${
                 isOwn ? 'text-white/70' : 'text-muted'
               }`}
               suppressHydrationWarning
