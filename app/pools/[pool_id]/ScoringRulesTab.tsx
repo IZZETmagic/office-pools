@@ -274,7 +274,7 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
     ? { ...DEFAULTS, ...settings }
     : DEFAULTS
 
-  const finalExactExample = s.knockout_exact_score * s.final_multiplier
+  const finalExactExample = s.group_exact_score * s.final_multiplier
 
   return (
     <div>
@@ -288,14 +288,10 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
         </Alert>
       </DetailCard>
 
-      {/* Knockout Stage. Multipliers sit inside this card, as they do in the
-          app, because they are meaningless without the base points above. */}
+      {/* Knockout Stage. There is no separate knockout base: a knockout match
+          is the group-stage value above, scaled by its round. */}
       <DetailCard title="Knockout Stage">
-        <PointsRow label="Exact Score" value={s.knockout_exact_score} />
-        <PointsRow label="Correct Difference" value={s.knockout_correct_difference} />
-        <PointsRow label="Correct Result" value={s.knockout_correct_result} />
-
-        <div className="mt-1 pt-3 border-t border-border-subtle">
+        <div>
           <DetailCaption>Round Multipliers</DetailCaption>
           <MultiplierRow label="Round of 32" value={s.round_32_multiplier} />
           <MultiplierRow label="Round of 16" value={s.round_16_multiplier} />
@@ -306,7 +302,7 @@ export function ScoringRulesTab({ settings, predictionMode }: ScoringRulesTabPro
         </div>
 
         <Alert variant="info" className="mt-4">
-          <strong>Example:</strong> An exact score prediction in the Final earns {s.knockout_exact_score} &times; {s.final_multiplier} = <strong>{formatNumber(finalExactExample)} pts</strong>.
+          <strong>Example:</strong> An exact score in the Final earns {s.group_exact_score} &times; {s.final_multiplier} = <strong>{formatNumber(finalExactExample)} pts</strong> — the group-stage value, scaled by the round.
         </Alert>
       </DetailCard>
 

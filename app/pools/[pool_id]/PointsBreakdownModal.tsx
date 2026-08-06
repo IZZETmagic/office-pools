@@ -956,9 +956,11 @@ export function PointsBreakdownModal({
                       <span className="t-card-title text-ink">Knockout Stage (Base)</span>
                     </div>
                     <div>
-                      <PointsRow label="Exact Score" value={poolSettings.knockout_exact_score} />
-                      <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.knockout_correct_difference} />
-                      <PointsRow label="Correct Result Only" value={poolSettings.knockout_correct_result} />
+                      {/* Knockout scoring is the group base scaled by the round
+                          multiplier — there is no separate knockout base. */}
+                      <PointsRow label="Exact Score" value={poolSettings.group_exact_score} />
+                      <PointsRow label="Correct Winner + Goal Diff" value={poolSettings.group_correct_difference} />
+                      <PointsRow label="Correct Result Only" value={poolSettings.group_correct_result} />
                     </div>
                   </div>
 

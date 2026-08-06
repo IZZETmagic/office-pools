@@ -8,6 +8,7 @@
 // No DB, no network, pure functions only.
 
 import { describe, it, expect } from 'vitest'
+import { calculatePoints } from '@/app/pools/[pool_id]/results/points'
 import { scoreMatch, checkKnockoutTeamsMatch, getStageMultiplier } from '../core'
 import { DEFAULT_POOL_SETTINGS } from '@/app/pools/[pool_id]/results/points'
 import type { PoolSettings } from '../types'
@@ -73,13 +74,68 @@ describe('scoreMatch — group stage', () => {
   })
 })
 
+describe('scoreMatch — knockout scoring reads the group base', () => {
+  // The shared fixture has group and knockout on the same numbers, so every
+  // other test here passes whichever column the engine reads. These pull them
+  // apart: knockout_* is set to a value that would be obvious in the result if
+  // it were still being used.
+  const splitBases: PoolSettings = {
+    ...baseSettings,
+    group_exact_score: 10,
+    group_correct_difference: 6,
+    group_correct_result: 2,
+    knockout_exact_score: 999,
+    knockout_correct_difference: 888,
+    knockout_correct_result: 777,
+    round_16_multiplier: 3,
+    quarter_final_multiplier: 2,
+    semi_final_multiplier: 4,
+  }
+
+  it('scores an exact knockout call off the group base, not the knockout base', () => {
+    const r = scoreMatch(2, 1, 2, 1, 'round_16', splitBases, true)
+    expect(r.scoreType).toBe('exact')
+    expect(r.basePoints).toBe(10)
+    expect(r.totalPoints).toBe(30) // 10 x 3, not 999 x 3
+  })
+
+  it('scores winner + GD off the group base', () => {
+    const r = scoreMatch(2, 1, 3, 2, 'quarter_final', splitBases, true)
+    expect(r.scoreType).toBe('winner_gd')
+    expect(r.basePoints).toBe(6)
+    expect(r.totalPoints).toBe(12) // 6 x 2
+  })
+
+  it('scores winner-only off the group base', () => {
+    const r = scoreMatch(3, 0, 2, 1, 'semi_final', splitBases, true)
+    expect(r.scoreType).toBe('winner')
+    expect(r.basePoints).toBe(2)
+    expect(r.totalPoints).toBe(8) // 2 x 4
+  })
+
+  it('never reads a knockout_* column', () => {
+    // A settings object that throws if the engine touches the retired columns.
+    const trap = new Proxy({ ...splitBases }, {
+      get(target, key) {
+        if (typeof key === 'string' && key.startsWith('knockout_')) {
+          throw new Error(`engine read retired column ${key}`)
+        }
+        return target[key as keyof PoolSettings]
+      },
+    }) as PoolSettings
+    for (const stage of ['round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']) {
+      expect(() => scoreMatch(2, 1, 2, 1, stage, trap, true)).not.toThrow()
+    }
+  })
+})
+
 describe('scoreMatch — knockout stage multipliers', () => {
   it('applies round_16 multiplier to exact score', () => {
     const r = scoreMatch(2, 1, 2, 1, 'round_16', baseSettings, true)
     expect(r.scoreType).toBe('exact')
     expect(r.multiplier).toBe(baseSettings.round_16_multiplier)
     expect(r.totalPoints).toBe(
-      Math.floor(baseSettings.knockout_exact_score * baseSettings.round_16_multiplier)
+      Math.floor(baseSettings.group_exact_score * baseSettings.round_16_multiplier)
     )
   })
 
@@ -88,7 +144,7 @@ describe('scoreMatch — knockout stage multipliers', () => {
     expect(r.scoreType).toBe('winner_gd')
     expect(r.multiplier).toBe(baseSettings.quarter_final_multiplier)
     expect(r.totalPoints).toBe(
-      Math.floor(baseSettings.knockout_correct_difference * baseSettings.quarter_final_multiplier)
+      Math.floor(baseSettings.group_correct_difference * baseSettings.quarter_final_multiplier)
     )
   })
 
@@ -127,7 +183,7 @@ describe('scoreMatch — PSO bonus', () => {
     })
     // Exact FT (1-1) × round_16 multiplier, plus PSO exact bonus (NOT multiplied)
     const expected =
-      Math.floor(baseSettings.knockout_exact_score * baseSettings.round_16_multiplier) +
+      Math.floor(baseSettings.group_exact_score * baseSettings.round_16_multiplier) +
       baseSettings.pso_exact_score
     expect(r.totalPoints).toBe(expected)
     expect(r.psoPoints).toBe(baseSettings.pso_exact_score)
@@ -301,5 +357,55 @@ describe('getStageMultiplier', () => {
 
   it('returns 1 for unknown stage', () => {
     expect(getStageMultiplier('unknown_round', baseSettings)).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// There are two implementations of match scoring: lib/scoring/core.ts, which is
+// the engine of record, and calculatePoints in app/pools/[pool_id]/results/
+// points.ts, which feeds the admin match preview and the Form tab. They are
+// meant to be identical. Nothing enforced that until now — both were changed to
+// read one base in the same commit, and only a test keeps them together.
+// ---------------------------------------------------------------------------
+describe('core.ts and results/points.ts agree', () => {
+  const settings: PoolSettings = {
+    ...baseSettings,
+    group_exact_score: 100,
+    group_correct_difference: 75,
+    group_correct_result: 50,
+    knockout_exact_score: 999,      // must be ignored by both
+    knockout_correct_difference: 888,
+    knockout_correct_result: 777,
+    round_32_multiplier: 2,
+    round_16_multiplier: 4,
+    quarter_final_multiplier: 6,
+    semi_final_multiplier: 8,
+    third_place_multiplier: 3,
+    final_multiplier: 12,
+    pso_enabled: false,
+  }
+
+  const CASES: [number, number, number, number][] = [
+    [2, 1, 2, 1], // exact
+    [3, 2, 2, 1], // winner + GD
+    [3, 0, 2, 1], // winner only
+    [0, 2, 2, 1], // miss
+    [1, 1, 1, 1], // exact draw
+    [2, 2, 1, 1], // draw, wrong score
+  ]
+  const STAGES = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
+
+  it('produces the same points for every stage and outcome', () => {
+    for (const stage of STAGES) {
+      for (const [ph, pa, ah, aa] of CASES) {
+        const engine = scoreMatch(ph, pa, ah, aa, stage, settings, true)
+        const display = calculatePoints(ph, pa, ah, aa, stage, settings as never, true)
+        expect(
+          { stage, pred: `${ph}-${pa}`, actual: `${ah}-${aa}`, points: display.points, type: display.type },
+        ).toEqual(
+          { stage, pred: `${ph}-${pa}`, actual: `${ah}-${aa}`, points: engine.totalPoints, type: engine.scoreType },
+        )
+      }
+    }
   })
 })

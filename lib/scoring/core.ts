@@ -149,10 +149,16 @@ export function scoreMatch(
     }
   }
 
-  // Determine base point values for the stage
-  const exactBase = isGroupStage ? settings.group_exact_score : settings.knockout_exact_score
-  const gdBase = isGroupStage ? settings.group_correct_difference : settings.knockout_correct_difference
-  const winnerBase = isGroupStage ? settings.group_correct_result : settings.knockout_correct_result
+  // One base for every stage; the round multiplier is what makes a knockout
+  // match worth more. The knockout_* columns used to supply a second, parallel
+  // base here — which meant a knockout match was scaled twice, once by the
+  // ratio between the two bases and again by the multiplier. Migration 042
+  // folded that ratio into the multipliers so existing pools score the same,
+  // and the columns are no longer read. See the migration for the sixteen
+  // pools whose ratio differed per tier and could not be preserved exactly.
+  const exactBase = settings.group_exact_score
+  const gdBase = settings.group_correct_difference
+  const winnerBase = settings.group_correct_result
 
   // Calculate PSO bonus (separate from base points — NOT multiplied)
   let psoPoints = 0

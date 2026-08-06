@@ -246,16 +246,14 @@ export function calculatePoints(
     }
   }
 
-  // Determine base points for each tier
-  const exactBase = isGroupStage
-    ? settings.group_exact_score
-    : settings.knockout_exact_score
-  const gdBase = isGroupStage
-    ? settings.group_correct_difference
-    : settings.knockout_correct_difference
-  const winnerBase = isGroupStage
-    ? settings.group_correct_result
-    : settings.knockout_correct_result
+  // One base for every stage — the round multiplier below is what makes a
+  // knockout match worth more. Must stay in step with lib/scoring/core.ts,
+  // which is the engine of record; this copy feeds the admin match preview and
+  // the Form tab, and a difference here shows members a number the leaderboard
+  // does not agree with.
+  const exactBase = settings.group_exact_score
+  const gdBase = settings.group_correct_difference
+  const winnerBase = settings.group_correct_result
 
   // Multiplier (only for knockout, and round_32 defaults to 1x)
   const multiplier = isGroupStage ? 1 : getStageMultiplier(stage, settings)
