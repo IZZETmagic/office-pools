@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
 import { Icon } from '@/components/ui/Icon'
@@ -8,6 +8,67 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+
+/** The pill switch used in section headers. */
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <span
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onChange(!checked) }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onChange(!checked) }
+      }}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-pill transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40 ${
+        checked ? 'bg-primary-600' : 'bg-silver'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-pill bg-white shadow-card transition-transform ${
+          checked ? 'translate-x-4' : ''
+        }`}
+      />
+    </span>
+  )
+}
+
+/**
+ * Whether a scoring section is on, and how to turn it off.
+ *
+ * There is no enabled column for any of these — but the bonus engine already
+ * skips anything worth zero (`if (points > 0)` in all five functions in
+ * lib/bonusCalculation.ts, and the comment on the bracket-pairing bonus says
+ * progressive pools disable it exactly this way). So "off" is a value the
+ * engine already understands, and this needs no schema or engine change.
+ *
+ * Off stashes the current numbers so flicking the switch back restores what was
+ * there rather than the defaults. The stash is per-session; a section that
+ * loads already zeroed simply reads as off, which is what an admin who turned
+ * it off last week should see.
+ *
+ * `offValue` is 1 for multipliers — zero there would wipe out knockout scoring
+ * rather than disable a bonus.
+ */
+function useToggleGroup(
+  fields: [number, (n: number) => void][],
+  defaults: number[],
+  offValue = 0,
+) {
+  const stash = useRef<number[] | null>(null)
+  const enabled = fields.some(([v]) => v !== offValue)
+  const setEnabled = (on: boolean) => {
+    if (on) {
+      const restore = stash.current
+      fields.forEach(([, set], i) => set(restore?.[i] ?? defaults[i]))
+    } else {
+      stash.current = fields.map(([v]) => v)
+      fields.forEach(([, set]) => set(offValue))
+    }
+  }
+  return [enabled, setEnabled] as const
+}
 
 /**
  * One scoring section as its own card. Each section used to be a collapsible
@@ -19,24 +80,62 @@ import { useToast } from '@/components/ui/Toast'
  * body is open — collapsed, the card is just its title.
  */
 function SectionCard({
-  title, expanded, onToggle, children,
-}: { title: string; expanded: boolean; onToggle: () => void; children: React.ReactNode }) {
+  title, subtitle, expanded, onToggle, enabled, onEnabledChange, children,
+}: {
+  title: string
+  subtitle?: string
+  expanded: boolean
+  onToggle: () => void
+  /** Omit for a section that is always part of scoring. */
+  enabled?: boolean
+  onEnabledChange?: (v: boolean) => void
+  children: React.ReactNode
+}) {
+  const optional = enabled !== undefined && onEnabledChange !== undefined
+  const open = optional ? expanded && enabled : expanded
+
   return (
     <Card padding="sm" className="mb-4">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className={`w-full flex items-center gap-2 text-left ${expanded ? 'pb-3 mb-4 border-b border-border-subtle' : ''}`}
-      >
-        <h3 className="t-section-header text-ink">{title}</h3>
-        <Icon
-          name="chevron.down"
-          size={18}
-          className={`ml-auto shrink-0 text-muted transition-transform ${expanded ? '' : '-rotate-90'}`}
-        />
-      </button>
-      {children}
+      <div className={`flex items-center gap-3 ${open ? 'pb-3 mb-4 border-b border-border-subtle' : ''}`}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          disabled={optional && !enabled}
+          className="flex-1 min-w-0 flex flex-col text-left disabled:cursor-default"
+        >
+          <h3 className={`t-section-header ${optional && !enabled ? 'text-muted' : 'text-ink'}`}>{title}</h3>
+          {subtitle && <span className="t-body text-muted">{subtitle}</span>}
+        </button>
+
+        {optional && (
+          <Switch
+            checked={enabled}
+            label={`${enabled ? 'Disable' : 'Enable'} ${title}`}
+            onChange={(on) => {
+              onEnabledChange(on)
+              // Turning a section on opens it, since the point of turning it on
+              // is to set its numbers.
+              if (on && !expanded) onToggle()
+            }}
+          />
+        )}
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+          disabled={optional && !enabled}
+          className="shrink-0 disabled:opacity-30 disabled:cursor-default"
+        >
+          <Icon
+            name="chevron.down"
+            size={18}
+            className={`text-muted transition-transform ${open ? '' : '-rotate-90'}`}
+          />
+        </button>
+      </div>
+      {open && children}
     </Card>
   )
 }
@@ -276,12 +375,55 @@ export function ScoringTab({
   const [error, setError] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [expandGroup, setExpandGroup] = useState(true)
-  const [expandKnockout, setExpandKnockout] = useState(true)
   const [expandMultipliers, setExpandMultipliers] = useState(true)
   const [expandPso, setExpandPso] = useState(true)
   const [expandBonusGroup, setExpandBonusGroup] = useState(true)
   const [expandBonusQualification, setExpandBonusQualification] = useState(true)
   const [expandBonusKnockout, setExpandBonusKnockout] = useState(true)
+
+  // ── Optional-section switches ────────────────────────────────────────────
+  // Each maps to the fields it governs; "off" writes the value the scoring
+  // engine already treats as "do not award". Nothing is persisted until Save.
+  const [multipliersOn, setMultipliersOn] = useToggleGroup(
+    [[r32Mult, setR32Mult], [r16Mult, setR16Mult], [qfMult, setQfMult],
+     [sfMult, setSfMult], [tpMult, setTpMult], [finalMult, setFinalMult]],
+    [DEFAULTS.round_32_multiplier, DEFAULTS.round_16_multiplier, DEFAULTS.quarter_final_multiplier,
+     DEFAULTS.semi_final_multiplier, DEFAULTS.third_place_multiplier, DEFAULTS.final_multiplier],
+    1, // off = every stage scores at face value, not zero
+  )
+  const [groupStandingsOn, setGroupStandingsOn] = useToggleGroup(
+    [[bonusGroupWinnerAndRunnerup, setBonusGroupWinnerAndRunnerup],
+     [bonusGroupWinnerOnly, setBonusGroupWinnerOnly],
+     [bonusGroupRunnerupOnly, setBonusGroupRunnerupOnly],
+     [bonusBothQualifySwapped, setBonusBothQualifySwapped],
+     [bonusOneQualifiesWrongPos, setBonusOneQualifiesWrongPos]],
+    [DEFAULTS.bonus_group_winner_and_runnerup, DEFAULTS.bonus_group_winner_only,
+     DEFAULTS.bonus_group_runnerup_only, DEFAULTS.bonus_both_qualify_swapped,
+     DEFAULTS.bonus_one_qualifies_wrong_position],
+  )
+  const [qualificationOn, setQualificationOn] = useToggleGroup(
+    [[bonusAllQualified, setBonusAllQualified], [bonus75PctQualified, setBonus75PctQualified],
+     [bonus50PctQualified, setBonus50PctQualified]],
+    [DEFAULTS.bonus_all_16_qualified, DEFAULTS.bonus_12_15_qualified, DEFAULTS.bonus_8_11_qualified],
+  )
+  const [knockoutBonusOn, setKnockoutBonusOn] = useToggleGroup(
+    [[bonusBracketPairing, setBonusBracketPairing], [bonusMatchWinner, setBonusMatchWinner],
+     [bonusChampion, setBonusChampion], [bonusSecondPlace, setBonusSecondPlace],
+     [bonusThirdPlace, setBonusThirdPlace]],
+    [DEFAULTS.bonus_correct_bracket_pairing, DEFAULTS.bonus_match_winner_correct,
+     DEFAULTS.bonus_champion_correct, DEFAULTS.bonus_second_place_correct,
+     DEFAULTS.bonus_third_place_correct],
+  )
+  const [bpThirdOn, setBpThirdOn] = useToggleGroup(
+    [[bpThirdQualifier, setBpThirdQualifier], [bpThirdEliminated, setBpThirdEliminated],
+     [bpThirdAllBonus, setBpThirdAllBonus]],
+    [BP_DEFAULTS.bp_third_correct_qualifier, BP_DEFAULTS.bp_third_correct_eliminated,
+     BP_DEFAULTS.bp_third_all_correct_bonus],
+  )
+  const [bpBonusOn, setBpBonusOn] = useToggleGroup(
+    [[bpChampionBonus, setBpChampionBonus], [bpPenaltyCorrect, setBpPenaltyCorrect]],
+    [BP_DEFAULTS.bp_champion_bonus, BP_DEFAULTS.bp_penalty_correct],
+  )
 
   const completedMatchCount = matches.filter((m) => m.is_completed).length
   const memberCount = members.length
@@ -644,7 +786,6 @@ export function ScoringTab({
               expanded={expandBpGroup}
               onToggle={() => setExpandBpGroup(!expandBpGroup)}
             >
-              {expandBpGroup && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
                     Points awarded for correctly predicting a team's finishing position within their group.
@@ -682,46 +823,6 @@ export function ScoringTab({
                     step={1}
                   />
                 </div>
-              )}
-            </SectionCard>
-
-            {/* Third-Place Points */}
-            <SectionCard
-              title="Third-Place Points"
-              expanded={expandBpThird}
-              onToggle={() => setExpandBpThird(!expandBpThird)}
-            >
-              {expandBpThird && (
-                <div className="space-y-4 pl-4">
-                  <p className="text-xs text-neutral-600">
-                    Points for correctly predicting which 3rd-place teams qualify for the knockout stage and which are eliminated.
-                  </p>
-                  <SliderInput
-                    label="Correct Qualifier:"
-                    value={bpThirdQualifier}
-                    onChange={setBpThirdQualifier}
-                    min={0}
-                    max={20}
-                    step={1}
-                  />
-                  <SliderInput
-                    label="Correct Eliminated:"
-                    value={bpThirdEliminated}
-                    onChange={setBpThirdEliminated}
-                    min={0}
-                    max={20}
-                    step={1}
-                  />
-                  <SliderInput
-                    label="All 8 Correct Bonus:"
-                    value={bpThirdAllBonus}
-                    onChange={setBpThirdAllBonus}
-                    min={0}
-                    max={50}
-                    step={1}
-                  />
-                </div>
-              )}
             </SectionCard>
 
             {/* Knockout Points */}
@@ -730,7 +831,6 @@ export function ScoringTab({
               expanded={expandBpKnockout}
               onToggle={() => setExpandBpKnockout(!expandBpKnockout)}
             >
-              {expandBpKnockout && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
                     Points for correctly predicting the winner of each knockout match. Higher rounds are worth more.
@@ -784,16 +884,57 @@ export function ScoringTab({
                     step={1}
                   />
                 </div>
-              )}
+            </SectionCard>
+
+            {/* Third-Place Points */}
+            <SectionCard
+              title="Third-Place Picks"
+              subtitle="For calling which third places go through"
+              enabled={bpThirdOn}
+              onEnabledChange={setBpThirdOn}
+              expanded={expandBpThird}
+              onToggle={() => setExpandBpThird(!expandBpThird)}
+            >
+                <div className="space-y-4 pl-4">
+                  <p className="text-xs text-neutral-600">
+                    Points for correctly predicting which 3rd-place teams qualify for the knockout stage and which are eliminated.
+                  </p>
+                  <SliderInput
+                    label="Correct Qualifier:"
+                    value={bpThirdQualifier}
+                    onChange={setBpThirdQualifier}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="Correct Eliminated:"
+                    value={bpThirdEliminated}
+                    onChange={setBpThirdEliminated}
+                    min={0}
+                    max={20}
+                    step={1}
+                  />
+                  <SliderInput
+                    label="All 8 Correct Bonus:"
+                    value={bpThirdAllBonus}
+                    onChange={setBpThirdAllBonus}
+                    min={0}
+                    max={50}
+                    step={1}
+                  />
+                </div>
             </SectionCard>
 
             {/* Bonus Points */}
             <SectionCard
-              title="Bonus Points"
+              title="Bonuses"
+              subtitle="Champion and penalty calls"
+              enabled={bpBonusOn}
+              onEnabledChange={setBpBonusOn}
               expanded={expandBpBonus}
               onToggle={() => setExpandBpBonus(!expandBpBonus)}
             >
-              {expandBpBonus && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
                     label="Champion Bonus:"
@@ -812,7 +953,6 @@ export function ScoringTab({
                     step={1}
                   />
                 </div>
-              )}
             </SectionCard>
 
             {/* Action buttons */}
@@ -828,90 +968,44 @@ export function ScoringTab({
       ) : (
         <>
             {/* Group Stage */}
+            {/* Base Match Points — the two stages share the same three
+                concepts, so they are one card with a block each rather than two
+                cards a reader has to hold side by side. Always on: without it
+                nothing scores. */}
             <SectionCard
-              title="Group Stage Points"
+              title="Base Match Points"
+              subtitle="What a correct prediction is worth before any multiplier"
               expanded={expandGroup}
               onToggle={() => setExpandGroup(!expandGroup)}
             >
-              {expandGroup && (
-                <div className="space-y-4 pl-4">
-                  <SliderInput
-                    label="Exact Score Match:"
-                    value={groupExact}
-                    onChange={setGroupExact}
-                    min={5}
-                    max={100}
-                    step={5}
-                  />
-                  <SliderInput
-                    label="Correct Winner + Goal Difference:"
-                    value={groupDiff}
-                    onChange={setGroupDiff}
-                    min={5}
-                    max={100}
-                    step={5}
-                  />
-                  <SliderInput
-                    label="Correct Winner Only:"
-                    value={groupResult}
-                    onChange={setGroupResult}
-                    min={5}
-                    max={100}
-                    step={5}
-                  />
-                  {groupWarning && (
-                    <p className="text-sm text-warning-500">{groupWarning}</p>
-                  )}
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h4 className="t-caption text-muted">Group Stage</h4>
+                  <SliderInput label="Exact Score Match:" value={groupExact} onChange={setGroupExact} min={5} max={100} step={5} />
+                  <SliderInput label="Correct Winner + Goal Difference:" value={groupDiff} onChange={setGroupDiff} min={5} max={100} step={5} />
+                  <SliderInput label="Correct Winner Only:" value={groupResult} onChange={setGroupResult} min={5} max={100} step={5} />
+                  {groupWarning && <p className="text-sm text-warning-500">{groupWarning}</p>}
                 </div>
-              )}
-            </SectionCard>
 
-            {/* Knockout Stage */}
-            <SectionCard
-              title="Knockout Stage Points (Base Values)"
-              expanded={expandKnockout}
-              onToggle={() => setExpandKnockout(!expandKnockout)}
-            >
-              {expandKnockout && (
-                <div className="space-y-4 pl-4">
-                  <SliderInput
-                    label="Exact Score Match:"
-                    value={koExact}
-                    onChange={setKoExact}
-                    min={5}
-                    max={200}
-                    step={5}
-                  />
-                  <SliderInput
-                    label="Correct Winner + Goal Difference:"
-                    value={koDiff}
-                    onChange={setKoDiff}
-                    min={5}
-                    max={200}
-                    step={5}
-                  />
-                  <SliderInput
-                    label="Correct Winner Only:"
-                    value={koResult}
-                    onChange={setKoResult}
-                    min={5}
-                    max={200}
-                    step={5}
-                  />
-                  {koWarning && (
-                    <p className="text-sm text-warning-500">{koWarning}</p>
-                  )}
+                <div className="space-y-4 pt-6 border-t border-border-subtle">
+                  <h4 className="t-caption text-muted">Knockout Stage</h4>
+                  <SliderInput label="Exact Score Match:" value={koExact} onChange={setKoExact} min={5} max={200} step={5} />
+                  <SliderInput label="Correct Winner + Goal Difference:" value={koDiff} onChange={setKoDiff} min={5} max={200} step={5} />
+                  <SliderInput label="Correct Winner Only:" value={koResult} onChange={setKoResult} min={5} max={200} step={5} />
+                  {koWarning && <p className="text-sm text-warning-500">{koWarning}</p>}
                 </div>
-              )}
+              </div>
             </SectionCard>
 
             {/* Multipliers */}
             <SectionCard
-              title="Knockout Stage Multipliers"
+              title="Knockout Multipliers"
+              subtitle="Later rounds are worth more"
+              enabled={multipliersOn}
+              onEnabledChange={setMultipliersOn}
               expanded={expandMultipliers}
               onToggle={() => setExpandMultipliers(!expandMultipliers)}
             >
-              {expandMultipliers && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
                     label="Round of 32:"
@@ -975,35 +1069,22 @@ export function ScoringTab({
                     <p className="text-sm text-danger-500">{multiplierWarning}</p>
                   )}
                 </div>
-              )}
             </SectionCard>
 
             {/* Penalty Shootout Scoring */}
             <SectionCard
-              title="Penalty Shootout Scoring"
+              title="Penalty Shootout"
+              subtitle="Points for calling the shootout score"
+              enabled={psoEnabled}
+              onEnabledChange={setPsoEnabled}
               expanded={expandPso}
               onToggle={() => setExpandPso(!expandPso)}
             >
-              {expandPso && (
                 <div className="space-y-4 pl-4">
-                  <div className="flex items-center gap-3">
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={psoEnabled}
-                        onChange={(e) => setPsoEnabled(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                    <span className="text-sm text-neutral-700">
-                      Enable penalty shootout scoring
-                    </span>
-                  </div>
                   <p className="text-xs text-neutral-600">
                     When enabled, bonus points are awarded for predicting the penalty shootout score in knockout matches that go to penalties.
                   </p>
-                  <div className={psoEnabled ? '' : 'opacity-40 pointer-events-none'}>
+                  <div>
                     <SliderInput
                       label="Exact PSO Score:"
                       value={psoExact}
@@ -1037,16 +1118,17 @@ export function ScoringTab({
                     <p className="text-sm text-warning-500">{psoWarning}</p>
                   )}
                 </div>
-              )}
             </SectionCard>
 
             {/* Bonus: Group Standings */}
             <SectionCard
-              title="Bonus: Group Standings"
+              title="Group Standings"
+              subtitle="For calling who tops each group"
+              enabled={groupStandingsOn}
+              onEnabledChange={setGroupStandingsOn}
               expanded={expandBonusGroup}
               onToggle={() => setExpandBonusGroup(!expandBonusGroup)}
             >
-              {expandBonusGroup && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
                     Awarded per group when all group matches are completed. Compares predicted group standings (derived from match predictions) against actual results.
@@ -1092,16 +1174,17 @@ export function ScoringTab({
                     step={25}
                   />
                 </div>
-              )}
             </SectionCard>
 
             {/* Bonus: Overall Qualification */}
             <SectionCard
-              title="Bonus: Overall Qualification"
+              title="Overall Qualification"
+              subtitle="For calling the full set of qualifiers"
+              enabled={qualificationOn}
+              onEnabledChange={setQualificationOn}
               expanded={expandBonusQualification}
               onToggle={() => setExpandBonusQualification(!expandBonusQualification)}
             >
-              {expandBonusQualification && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
                     Awarded once when all 48 group matches are completed. Based on how many of the 32 qualifying teams were predicted correctly.
@@ -1131,16 +1214,17 @@ export function ScoringTab({
                     step={25}
                   />
                 </div>
-              )}
             </SectionCard>
 
             {/* Bonus: Knockout & Tournament */}
             <SectionCard
-              title="Bonus: Knockout &amp; Tournament"
+              title="Knockout &amp; Tournament"
+              subtitle="For bracket pairings, winners and the podium"
+              enabled={knockoutBonusOn}
+              onEnabledChange={setKnockoutBonusOn}
               expanded={expandBonusKnockout}
               onToggle={() => setExpandBonusKnockout(!expandBonusKnockout)}
             >
-              {expandBonusKnockout && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
                     Bracket pairing and match winner bonuses are awarded as knockout matches are played. Podium bonuses are awarded when the tournament champion, runner-up, and third place are confirmed.
@@ -1186,7 +1270,6 @@ export function ScoringTab({
                     step={25}
                   />
                 </div>
-              )}
             </SectionCard>
 
             {/* Action buttons */}
