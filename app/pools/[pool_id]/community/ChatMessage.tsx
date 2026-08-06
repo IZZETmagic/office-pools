@@ -44,7 +44,7 @@ export function DayHeader({ text }: { text: string }) {
 function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) {
   return (
     <div className={`flex items-stretch gap-2 rounded-[8px] px-2 py-1.5 mb-1 overflow-hidden ${
-      isOwn ? 'bg-white/15' : 'bg-ink/[0.06]'
+      isOwn ? 'bg-white/15' : 'bg-ink/5'
     }`}>
       <div className={`w-0.5 shrink-0 rounded-pill ${isOwn ? 'bg-white/60' : 'bg-primary-500'}`} />
       <div className="min-w-0">
@@ -129,7 +129,7 @@ export function ChatMessage({
           </div>
         )}
 
-        <div className={`min-w-0 max-w-[min(78%,26rem)] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        <div className={`min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
           {/* Sender name — once per run, received side only. RN shows the name
               alone; the level pill is web-only and kept because it is existing
               product content, sized down to sit with the smaller name. */}
@@ -145,7 +145,7 @@ export function ChatMessage({
           <div className={`relative px-3.5 py-2 text-base leading-[22px] font-medium break-words rounded-chip ${
             isOwn
               ? 'bg-primary-600 text-white'
-              : `bg-mist text-ink ${isLastInCluster ? 'rounded-bl-[4px]' : ''}`
+              : `bg-mist text-ink ${isLastInCluster ? 'rounded-bl-sm' : ''}`
           }`}>
             {replyPreview && <ReplyHeader reply={replyPreview} isOwn={isOwn} />}
             {renderMessageContent(message.content, members, isOwn)}
