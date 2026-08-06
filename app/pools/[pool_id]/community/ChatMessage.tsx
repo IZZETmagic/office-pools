@@ -87,7 +87,11 @@ export function ChatMessage({
   const isOwn = message.user_id === currentUserId
 
   return (
-    <div className={`relative ${isFirstInCluster ? '' : '-mt-2'}`}>
+    /* The feed's space-y-3 is the baseline for every other item type; messages
+       override it in both directions. A new speaker gets room to breathe, and a
+       continuation sits almost flush against the bubble above so the run reads
+       as one turn. */
+    <div className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
       <div className={`flex gap-2.5 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
         {/* Avatar sits beside the LAST bubble in the cluster. Earlier bubbles get
             a spacer of the same width so the whole run stays on one left edge. */}
