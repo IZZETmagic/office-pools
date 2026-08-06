@@ -1335,7 +1335,6 @@ export function ScoringTab({
                 Cancel
               </Button>
               <Button
-                variant="green"
                 onClick={handleSave}
                 loading={saving}
                 loadingText="Saving..."
