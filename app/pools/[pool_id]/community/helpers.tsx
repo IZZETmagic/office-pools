@@ -88,7 +88,15 @@ export function renderMessageContent(content: string, members: MemberData[], isO
       const member = members.find(m => m.users.username.toLowerCase() === username)
       if (member) {
         return (
-          <span key={i} className={`font-semibold ${isOwn ? 'text-accent-800' : 'text-primary-600 dark:text-primary-600'}`}>
+          // Own bubbles: white + bold, as the RN BanterSheet does. It was
+          // accent-800 — a dark gold on primary blue, which is why a mention
+          // in your own message was almost unreadable.
+          //
+          // Received bubbles keep primary rather than RN's accent: gold
+          // (#F5C518) on mist (#EEF1F8) measures 1.45:1, so copying that half
+          // would trade one invisible mention for another. primary-600 on mist
+          // is 3.79:1 and bold.
+          <span key={i} className={`font-bold ${isOwn ? 'text-white' : 'text-primary-600'}`}>
             {part}
           </span>
         )
