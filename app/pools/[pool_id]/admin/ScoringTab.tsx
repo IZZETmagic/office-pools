@@ -3,43 +3,43 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
+import { Icon } from '@/components/ui/Icon'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
-import { formatNumber } from '@/lib/format'
 
-/** The Settings tab's card header: title over a rule. Same shape so the two
- *  admin tabs read as one surface. */
-function Caption({ children }: { children: React.ReactNode }) {
+/**
+ * One scoring section as its own card. Each section used to be a collapsible
+ * block inside a single "Edit Scoring Rules" card, which made the whole tab one
+ * long undifferentiated form; on the Settings tab each concern gets its own
+ * card, and these are the same kind of thing.
+ *
+ * The caption doubles as the toggle, so the header rule only appears when the
+ * body is open — collapsed, the card is just its title.
+ */
+function SectionCard({
+  title, expanded, onToggle, children,
+}: { title: string; expanded: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
-      <h3 className="t-section-header text-ink">{children}</h3>
-    </div>
+    <Card padding="sm" className="mb-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className={`w-full flex items-center gap-2 text-left ${expanded ? 'pb-3 mb-4 border-b border-border-subtle' : ''}`}
+      >
+        <h3 className="t-section-header text-ink">{title}</h3>
+        <Icon
+          name="chevron.down"
+          size={18}
+          className={`ml-auto shrink-0 text-muted transition-transform ${expanded ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {children}
+    </Card>
   )
 }
-
-/** One label/value line in the scoring summary. */
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="t-body text-muted truncate">{label}</span>
-      <span className="t-num t-num-extrabold text-sm text-ink shrink-0">{value}</span>
-    </div>
-  )
-}
-
-/** A titled block of rows inside the summary card. */
-function SummaryGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <h4 className="t-caption text-muted mb-2">{title}</h4>
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  )
-}
-
-const pts = (n: number) => `${formatNumber(n)} pt${n === 1 ? '' : 's'}`
 
 type ScoringTabProps = {
   pool: PoolData
@@ -638,54 +638,12 @@ export function ScoringTab({
 
       {isBracketPicker ? (
         <>
-          {/* One card, not three: this is a read-out of the current setup, and
-              three separate cards made a summary look like three decisions. */}
-          <Card padding="sm" className="mb-6">
-            <Caption>Scoring Summary</Caption>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-              <SummaryGroup title="Group Positions">
-                <SummaryRow label="Correct 1st" value={pts(bpGroup1st)} />
-                <SummaryRow label="Correct 2nd" value={pts(bpGroup2nd)} />
-                <SummaryRow label="Correct 3rd" value={pts(bpGroup3rd)} />
-                <SummaryRow label="Correct 4th" value={pts(bpGroup4th)} />
-                <div className="pt-2 mt-1 border-t border-border-subtle space-y-1.5">
-                  <SummaryRow label="3rd-place qualifier" value={pts(bpThirdQualifier)} />
-                  <SummaryRow label="3rd-place eliminated" value={pts(bpThirdEliminated)} />
-                </div>
-              </SummaryGroup>
-
-              <SummaryGroup title="Knockout Rounds">
-                <SummaryRow label="Round of 32" value={pts(bpR32)} />
-                <SummaryRow label="Round of 16" value={pts(bpR16)} />
-                <SummaryRow label="Quarter Finals" value={pts(bpQf)} />
-                <SummaryRow label="Semi Finals" value={pts(bpSf)} />
-                <SummaryRow label="3rd Place Match" value={pts(bpThirdPlaceMatch)} />
-                <SummaryRow label="Final" value={pts(bpFinal)} />
-              </SummaryGroup>
-
-              <SummaryGroup title="Bonuses">
-                <SummaryRow label="Champion" value={pts(bpChampionBonus)} />
-                <SummaryRow label="All 8 third places" value={pts(bpThirdAllBonus)} />
-                <SummaryRow label="Penalty prediction" value={pts(bpPenaltyCorrect)} />
-              </SummaryGroup>
-            </div>
-          </Card>
-
-          {/* Bracket Picker Edit Form */}
-          <Card className="mb-6">
-            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-              Edit Scoring Rules
-            </h3>
-
             {/* Group Stage Points */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBpGroup(!expandBpGroup)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBpGroup ? '▼' : '▶'}</span>
-                Group Stage Points
-              </button>
+            <SectionCard
+              title="Group Stage Points"
+              expanded={expandBpGroup}
+              onToggle={() => setExpandBpGroup(!expandBpGroup)}
+            >
               {expandBpGroup && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -725,17 +683,14 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Third-Place Points */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBpThird(!expandBpThird)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBpThird ? '▼' : '▶'}</span>
-                Third-Place Points
-              </button>
+            <SectionCard
+              title="Third-Place Points"
+              expanded={expandBpThird}
+              onToggle={() => setExpandBpThird(!expandBpThird)}
+            >
               {expandBpThird && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -767,17 +722,14 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Knockout Points */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBpKnockout(!expandBpKnockout)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBpKnockout ? '▼' : '▶'}</span>
-                Knockout Points
-              </button>
+            <SectionCard
+              title="Knockout Points"
+              expanded={expandBpKnockout}
+              onToggle={() => setExpandBpKnockout(!expandBpKnockout)}
+            >
               {expandBpKnockout && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -833,17 +785,14 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Bonus Points */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBpBonus(!expandBpBonus)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBpBonus ? '▼' : '▶'}</span>
-                Bonus Points
-              </button>
+            <SectionCard
+              title="Bonus Points"
+              expanded={expandBpBonus}
+              onToggle={() => setExpandBpBonus(!expandBpBonus)}
+            >
               {expandBpBonus && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
@@ -864,10 +813,10 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mb-6">
               <Button variant="gray" onClick={resetDefaults}>
                 Reset to Defaults
               </Button>
@@ -875,64 +824,15 @@ export function ScoringTab({
                 Save Changes
               </Button>
             </div>
-          </Card>
         </>
       ) : (
         <>
-          {/* One card, not three: this is a read-out of the current setup, and
-              three separate cards made a summary look like three decisions. */}
-          <Card padding="sm" className="mb-6">
-            <Caption>Scoring Summary</Caption>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-              <SummaryGroup title="Group Stage">
-                <SummaryRow label="Exact score" value={pts(groupExact)} />
-                <SummaryRow label="Winner + goal difference" value={pts(groupDiff)} />
-                <SummaryRow label="Winner only" value={pts(groupResult)} />
-              </SummaryGroup>
-
-              <SummaryGroup title="Knockout Stage">
-                <SummaryRow label="Exact score" value={pts(koExact)} />
-                <SummaryRow label="Winner + goal difference" value={pts(koDiff)} />
-                <SummaryRow label="Winner only" value={pts(koResult)} />
-                <div className="pt-2 mt-1 border-t border-border-subtle space-y-1.5">
-                  <SummaryRow label="Round of 32" value={`${r32Mult}\u00d7`} />
-                  <SummaryRow label="Round of 16" value={`${r16Mult}\u00d7`} />
-                  <SummaryRow label="Quarter Final" value={`${qfMult}\u00d7`} />
-                  <SummaryRow label="Semi Final" value={`${sfMult}\u00d7`} />
-                  <SummaryRow label="Third Place" value={`${tpMult}\u00d7`} />
-                  <SummaryRow label="Final" value={`${finalMult}\u00d7`} />
-                </div>
-              </SummaryGroup>
-
-              <SummaryGroup title="Penalty Shootout">
-                {psoEnabled ? (
-                  <>
-                    <SummaryRow label="Exact PSO score" value={pts(psoExact)} />
-                    <SummaryRow label="Winner + goal difference" value={pts(psoDiff)} />
-                    <SummaryRow label="Winner only" value={pts(psoResult)} />
-                  </>
-                ) : (
-                  <p className="t-body text-muted">Not scored in this pool.</p>
-                )}
-              </SummaryGroup>
-            </div>
-          </Card>
-
-          {/* Edit Scoring Form */}
-          <Card className="mb-6">
-            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-              Edit Scoring Rules
-            </h3>
-
             {/* Group Stage */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandGroup(!expandGroup)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandGroup ? '▼' : '▶'}</span>
-                Group Stage Points
-              </button>
+            <SectionCard
+              title="Group Stage Points"
+              expanded={expandGroup}
+              onToggle={() => setExpandGroup(!expandGroup)}
+            >
               {expandGroup && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
@@ -964,17 +864,14 @@ export function ScoringTab({
                   )}
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Knockout Stage */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandKnockout(!expandKnockout)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandKnockout ? '▼' : '▶'}</span>
-                Knockout Stage Points (Base Values)
-              </button>
+            <SectionCard
+              title="Knockout Stage Points (Base Values)"
+              expanded={expandKnockout}
+              onToggle={() => setExpandKnockout(!expandKnockout)}
+            >
               {expandKnockout && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
@@ -1006,17 +903,14 @@ export function ScoringTab({
                   )}
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Multipliers */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandMultipliers(!expandMultipliers)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandMultipliers ? '▼' : '▶'}</span>
-                Knockout Stage Multipliers
-              </button>
+            <SectionCard
+              title="Knockout Stage Multipliers"
+              expanded={expandMultipliers}
+              onToggle={() => setExpandMultipliers(!expandMultipliers)}
+            >
               {expandMultipliers && (
                 <div className="space-y-4 pl-4">
                   <SliderInput
@@ -1082,17 +976,14 @@ export function ScoringTab({
                   )}
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Penalty Shootout Scoring */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandPso(!expandPso)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandPso ? '▼' : '▶'}</span>
-                Penalty Shootout Scoring
-              </button>
+            <SectionCard
+              title="Penalty Shootout Scoring"
+              expanded={expandPso}
+              onToggle={() => setExpandPso(!expandPso)}
+            >
               {expandPso && (
                 <div className="space-y-4 pl-4">
                   <div className="flex items-center gap-3">
@@ -1147,17 +1038,14 @@ export function ScoringTab({
                   )}
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Bonus: Group Standings */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBonusGroup(!expandBonusGroup)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBonusGroup ? '▼' : '▶'}</span>
-                Bonus: Group Standings
-              </button>
+            <SectionCard
+              title="Bonus: Group Standings"
+              expanded={expandBonusGroup}
+              onToggle={() => setExpandBonusGroup(!expandBonusGroup)}
+            >
               {expandBonusGroup && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -1205,17 +1093,14 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Bonus: Overall Qualification */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBonusQualification(!expandBonusQualification)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBonusQualification ? '▼' : '▶'}</span>
-                Bonus: Overall Qualification
-              </button>
+            <SectionCard
+              title="Bonus: Overall Qualification"
+              expanded={expandBonusQualification}
+              onToggle={() => setExpandBonusQualification(!expandBonusQualification)}
+            >
               {expandBonusQualification && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -1247,17 +1132,14 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Bonus: Knockout & Tournament */}
-            <div className="mb-6">
-              <button
-                onClick={() => setExpandBonusKnockout(!expandBonusKnockout)}
-                className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-3 hover:text-primary-600"
-              >
-                <span>{expandBonusKnockout ? '▼' : '▶'}</span>
-                Bonus: Knockout &amp; Tournament
-              </button>
+            <SectionCard
+              title="Bonus: Knockout &amp; Tournament"
+              expanded={expandBonusKnockout}
+              onToggle={() => setExpandBonusKnockout(!expandBonusKnockout)}
+            >
               {expandBonusKnockout && (
                 <div className="space-y-4 pl-4">
                   <p className="text-xs text-neutral-600">
@@ -1305,7 +1187,7 @@ export function ScoringTab({
                   />
                 </div>
               )}
-            </div>
+            </SectionCard>
 
             {/* Coming Soon — Best Player & Top Scorer */}
             <div className="mb-6 border border-neutral-200 rounded-xl px-4 py-3 bg-neutral-50">
@@ -1328,7 +1210,7 @@ export function ScoringTab({
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mb-6">
               <Button variant="gray" onClick={resetDefaults}>
                 Reset to Defaults
               </Button>
@@ -1336,7 +1218,6 @@ export function ScoringTab({
                 Save Changes
               </Button>
             </div>
-          </Card>
         </>
       )}
 
