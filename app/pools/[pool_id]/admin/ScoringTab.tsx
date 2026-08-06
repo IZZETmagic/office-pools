@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
 import { Icon } from '@/components/ui/Icon'
 import { Card } from '@/components/ui/Card'
+import { InfoPopover } from '@/components/ui/InfoPopover'
+import { fieldHelp } from '@/lib/scoring/fieldHelp'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
@@ -698,6 +700,7 @@ export function ScoringTab({
     max = 10,
     step = 1,
     suffix = 'points',
+    field,
   }: {
     label: string
     value: number
@@ -706,12 +709,16 @@ export function ScoringTab({
     max?: number
     step?: number
     suffix?: string
+    /** pool_settings column this edits; supplies the (i) explanation. */
+    field?: string
   }) {
+    const help = field ? fieldHelp(field) : null
+    const info = help ? <InfoPopover title={help.title} body={help.body} /> : null
     return (
       <div>
-        <label className="text-sm text-neutral-700 block mb-1.5 sm:hidden">{label}</label>
+        <label className="text-sm text-ink mb-1.5 sm:hidden flex items-center gap-1.5">{label}{info}</label>
         <div className="flex items-center gap-3 sm:gap-4">
-          <label className="text-sm text-neutral-700 w-52 shrink-0 hidden sm:block">{label}</label>
+          <span className="text-sm text-ink w-52 shrink-0 hidden sm:flex items-center gap-1.5">{label}{info}</span>
           <input
             type="range"
             min={min}
@@ -765,7 +772,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_group_correct_1st"/>
                   <SliderInput
                     label="Correct 2nd Place:"
                     value={bpGroup2nd}
@@ -773,7 +780,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_group_correct_2nd"/>
                   <SliderInput
                     label="Correct 3rd Place:"
                     value={bpGroup3rd}
@@ -781,7 +788,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_group_correct_3rd"/>
                   <SliderInput
                     label="Correct 4th Place:"
                     value={bpGroup4th}
@@ -789,7 +796,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_group_correct_4th"/>
                 </div>
             </SectionCard>
 
@@ -810,7 +817,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_r32_correct"/>
                   <SliderInput
                     label="Round of 16:"
                     value={bpR16}
@@ -818,7 +825,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_r16_correct"/>
                   <SliderInput
                     label="Quarter Finals:"
                     value={bpQf}
@@ -826,7 +833,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_qf_correct"/>
                   <SliderInput
                     label="Semi Finals:"
                     value={bpSf}
@@ -834,7 +841,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_sf_correct"/>
                   <SliderInput
                     label="3rd Place Match:"
                     value={bpThirdPlaceMatch}
@@ -842,7 +849,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_third_place_match_correct"/>
                   <SliderInput
                     label="Final:"
                     value={bpFinal}
@@ -850,7 +857,7 @@ export function ScoringTab({
                     min={0}
                     max={100}
                     step={1}
-                  />
+                   field="bp_final_correct"/>
                 </div>
             </SectionCard>
 
@@ -874,7 +881,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_third_correct_qualifier"/>
                   <SliderInput
                     label="Correct Eliminated:"
                     value={bpThirdEliminated}
@@ -882,7 +889,7 @@ export function ScoringTab({
                     min={0}
                     max={20}
                     step={1}
-                  />
+                   field="bp_third_correct_eliminated"/>
                   <SliderInput
                     label="All 8 Correct Bonus:"
                     value={bpThirdAllBonus}
@@ -890,7 +897,7 @@ export function ScoringTab({
                     min={0}
                     max={50}
                     step={1}
-                  />
+                   field="bp_third_all_correct_bonus"/>
                 </div>
             </SectionCard>
 
@@ -911,7 +918,7 @@ export function ScoringTab({
                     min={0}
                     max={200}
                     step={5}
-                  />
+                   field="bp_champion_bonus"/>
                   <SliderInput
                     label="Correct Penalty Prediction:"
                     value={bpPenaltyCorrect}
@@ -919,7 +926,7 @@ export function ScoringTab({
                     min={0}
                     max={10}
                     step={1}
-                  />
+                   field="bp_penalty_correct"/>
                 </div>
             </SectionCard>
 
@@ -965,17 +972,17 @@ export function ScoringTab({
               <div className="space-y-6">
                 <div className="space-y-4">
                   <h4 className="t-caption text-muted">Group Stage</h4>
-                  <SliderInput label="Exact Score Match:" value={groupExact} onChange={setGroupExact} min={5} max={100} step={5} />
-                  <SliderInput label="Correct Winner + Goal Difference:" value={groupDiff} onChange={setGroupDiff} min={5} max={100} step={5} />
-                  <SliderInput label="Correct Winner Only:" value={groupResult} onChange={setGroupResult} min={5} max={100} step={5} />
+                  <SliderInput label="Exact Score Match:" value={groupExact} onChange={setGroupExact} min={5} max={100} step={5}  field="group_exact_score"/>
+                  <SliderInput label="Correct Winner + Goal Difference:" value={groupDiff} onChange={setGroupDiff} min={5} max={100} step={5}  field="group_correct_difference"/>
+                  <SliderInput label="Correct Winner Only:" value={groupResult} onChange={setGroupResult} min={5} max={100} step={5}  field="group_correct_result"/>
                   {groupWarning && <p className="text-sm text-warning-500">{groupWarning}</p>}
                 </div>
 
                 <div className="space-y-4 pt-6 border-t border-border-subtle">
                   <h4 className="t-caption text-muted">Knockout Stage</h4>
-                  <SliderInput label="Exact Score Match:" value={koExact} onChange={setKoExact} min={5} max={200} step={5} />
-                  <SliderInput label="Correct Winner + Goal Difference:" value={koDiff} onChange={setKoDiff} min={5} max={200} step={5} />
-                  <SliderInput label="Correct Winner Only:" value={koResult} onChange={setKoResult} min={5} max={200} step={5} />
+                  <SliderInput label="Exact Score Match:" value={koExact} onChange={setKoExact} min={5} max={200} step={5}  field="knockout_exact_score"/>
+                  <SliderInput label="Correct Winner + Goal Difference:" value={koDiff} onChange={setKoDiff} min={5} max={200} step={5}  field="knockout_correct_difference"/>
+                  <SliderInput label="Correct Winner Only:" value={koResult} onChange={setKoResult} min={5} max={200} step={5}  field="knockout_correct_result"/>
                   {koWarning && <p className="text-sm text-warning-500">{koWarning}</p>}
                 </div>
               </div>
@@ -999,7 +1006,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="round_32_multiplier"/>
                   <SliderInput
                     label="Round of 16:"
                     value={r16Mult}
@@ -1008,7 +1015,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="round_16_multiplier"/>
                   <SliderInput
                     label="Quarter Final:"
                     value={qfMult}
@@ -1017,7 +1024,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="quarter_final_multiplier"/>
                   <SliderInput
                     label="Semi Final:"
                     value={sfMult}
@@ -1026,7 +1033,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="semi_final_multiplier"/>
                   <SliderInput
                     label="Third Place:"
                     value={tpMult}
@@ -1035,7 +1042,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="third_place_multiplier"/>
                   <SliderInput
                     label="Final:"
                     value={finalMult}
@@ -1044,7 +1051,7 @@ export function ScoringTab({
                     max={5}
                     step={0.5}
                     suffix="x"
-                  />
+                   field="final_multiplier"/>
                   <p className="text-xs text-neutral-600">
                     Example: {koExact} points (exact) x {finalMult} (final) ={' '}
                     {koExact * finalMult} points
@@ -1076,7 +1083,7 @@ export function ScoringTab({
                       min={5}
                       max={200}
                       step={5}
-                    />
+                     field="pso_exact_score"/>
                     <div className="mt-4">
                       <SliderInput
                         label="Correct Winner + GD:"
@@ -1085,7 +1092,7 @@ export function ScoringTab({
                         min={5}
                         max={200}
                         step={5}
-                      />
+                       field="pso_correct_difference"/>
                     </div>
                     <div className="mt-4">
                       <SliderInput
@@ -1095,7 +1102,7 @@ export function ScoringTab({
                         min={5}
                         max={200}
                         step={5}
-                      />
+                       field="pso_correct_result"/>
                     </div>
                   </div>
                   {psoWarning && (
@@ -1124,7 +1131,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_group_winner_and_runnerup"/>
                   <SliderInput
                     label="Winner only correct:"
                     value={bonusGroupWinnerOnly}
@@ -1132,7 +1139,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_group_winner_only"/>
                   <SliderInput
                     label="Both qualify, positions swapped:"
                     value={bonusBothQualifySwapped}
@@ -1140,7 +1147,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_both_qualify_swapped"/>
                   <SliderInput
                     label="Runner-up only correct:"
                     value={bonusGroupRunnerupOnly}
@@ -1148,7 +1155,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_group_runnerup_only"/>
                   <SliderInput
                     label="One qualifies, wrong position:"
                     value={bonusOneQualifiesWrongPos}
@@ -1156,7 +1163,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_one_qualifies_wrong_position"/>
                 </div>
             </SectionCard>
 
@@ -1180,7 +1187,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_all_16_qualified"/>
                   <SliderInput
                     label="75%+ qualified correct:"
                     value={bonus75PctQualified}
@@ -1188,7 +1195,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_12_15_qualified"/>
                   <SliderInput
                     label="50%+ qualified correct:"
                     value={bonus50PctQualified}
@@ -1196,7 +1203,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_8_11_qualified"/>
                 </div>
             </SectionCard>
 
@@ -1220,7 +1227,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_correct_bracket_pairing"/>
                   <SliderInput
                     label="Correct knockout match winner:"
                     value={bonusMatchWinner}
@@ -1228,7 +1235,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_match_winner_correct"/>
                   <SliderInput
                     label="Champion correct:"
                     value={bonusChampion}
@@ -1236,7 +1243,7 @@ export function ScoringTab({
                     min={0}
                     max={2000}
                     step={50}
-                  />
+                   field="bonus_champion_correct"/>
                   <SliderInput
                     label="Runner-up correct:"
                     value={bonusSecondPlace}
@@ -1244,7 +1251,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_second_place_correct"/>
                   <SliderInput
                     label="Third place correct:"
                     value={bonusThirdPlace}
@@ -1252,7 +1259,7 @@ export function ScoringTab({
                     min={0}
                     max={500}
                     step={25}
-                  />
+                   field="bonus_third_place_correct"/>
                 </div>
             </SectionCard>
 
