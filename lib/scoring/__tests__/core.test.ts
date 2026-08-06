@@ -399,7 +399,10 @@ describe('core.ts and results/points.ts agree', () => {
     for (const stage of STAGES) {
       for (const [ph, pa, ah, aa] of CASES) {
         const engine = scoreMatch(ph, pa, ah, aa, stage, settings, true)
-        const display = calculatePoints(ph, pa, ah, aa, stage, settings as never, true)
+        // calculatePoints takes (…, settings, pso?, knockoutTeamsMatch?) — the
+        // two arguments are in the opposite order to scoreMatch's, which is
+        // exactly the kind of thing this test exists to keep honest.
+        const display = calculatePoints(ph, pa, ah, aa, stage, settings as never, undefined, true)
         expect(
           { stage, pred: `${ph}-${pa}`, actual: `${ah}-${aa}`, points: display.points, type: display.type },
         ).toEqual(
