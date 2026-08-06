@@ -24,6 +24,13 @@
 -- are the only record of what a pool's scoring used to be, and the rollback at
 -- the bottom needs them.
 
+-- APPLIED to production 2026-08-05. Post-migration verification, comparing
+-- every pool/stage/tier against pool_settings_premigration_042:
+--   606 identical everywhere, 17 drifted — matching the pre-flight exactly.
+--   623/623 rows backed up, all six columns numeric(6,2), max value 106.67,
+--   no nulls, no non-positives. match_scores untouched (286,978 rows, last
+--   written 2026-07-20).
+
 begin;
 
 -- Five of the six multipliers are numeric(3,1) — max 99.9. The uniform pools
