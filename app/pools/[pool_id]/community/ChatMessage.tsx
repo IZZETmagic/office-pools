@@ -1,6 +1,6 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
-import { getInitials, formatMessageTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
+import { getInitials, formatClockTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
 
 // =====================
 // LEVEL PILL
@@ -57,12 +57,20 @@ function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) 
 // CHAT MESSAGE
 // =====================
 
+/**
+ * A run of consecutive messages from one person renders as a cluster: the name
+ * and level once at the top, one avatar beside the last bubble, and one
+ * timestamp on that same row. `isFirstInCluster`/`isLastInCluster` default to
+ * true so a message rendered on its own is unchanged.
+ */
 export function ChatMessage({
   message,
   members,
   memberLevels,
   currentUserId,
   replyPreview,
+  isFirstInCluster = true,
+  isLastInCluster = true,
 }: {
   message: MessageWithReactions
   members: MemberData[]
@@ -71,24 +79,31 @@ export function ChatMessage({
   replyPreview?: ReplyPreview | null
   reactions?: ReactionCount[]
   onToggleReaction?: (emoji: string) => void
+  isFirstInCluster?: boolean
+  isLastInCluster?: boolean
 }) {
   const author = members.find(m => m.user_id === message.user_id)
   const authorLevel = memberLevels.get(message.user_id)
   const isOwn = message.user_id === currentUserId
 
   return (
-    <div className="relative">
+    <div className={`relative ${isFirstInCluster ? '' : '-mt-2'}`}>
       <div className={`flex gap-2.5 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
-        {/* Avatar — hidden for own messages */}
+        {/* Avatar sits beside the LAST bubble in the cluster. Earlier bubbles get
+            a spacer of the same width so the whole run stays on one left edge. */}
         {!isOwn && (
-          <div className="shrink-0 w-[30px] h-[30px] rounded-pill flex items-center justify-center text-[10px] font-bold bg-primary-100 dark:bg-primary-600/15 text-primary-700 dark:text-primary-600">
-            {getInitials(author?.users.full_name, author?.users.username)}
-          </div>
+          isLastInCluster ? (
+            <div className="shrink-0 w-[30px] h-[30px] rounded-pill flex items-center justify-center text-[10px] font-bold bg-primary-100 dark:bg-primary-600/15 text-primary-700 dark:text-primary-600">
+              {getInitials(author?.users.full_name, author?.users.username)}
+            </div>
+          ) : (
+            <div className="shrink-0 w-[30px]" aria-hidden />
+          )
         )}
 
         <div className={`max-w-[78%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-          {/* Name + level — hidden for own messages */}
-          {!isOwn && (
+          {/* Name + level — once per cluster, and never for your own messages */}
+          {!isOwn && isFirstInCluster && (
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-xs font-semibold text-ink">
                 {author?.users.full_name || author?.users.username || 'Unknown'}
@@ -102,20 +117,26 @@ export function ChatMessage({
             <ReplyHeader reply={replyPreview} isOwn={isOwn} />
           )}
 
-          {/* Message bubble */}
+          {/* Message bubble. The clipped corner is the tail pointing at the
+              author, so it belongs on the last bubble of a cluster only —
+              repeating it on every bubble in a run reads as several separate
+              messages rather than one person still talking. */}
           <div className={`px-3 py-2 text-sm leading-relaxed ${
             isOwn
-              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-card rounded-tl-card rounded-tr-sm' : 'rounded-card rounded-br-sm'}`
-              : `bg-surface text-ink border border-border-default ${replyPreview ? 'rounded-b-card rounded-tr-card rounded-tl-sm' : 'rounded-card rounded-bl-sm'}`
+              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-card rounded-tl-card rounded-tr-sm' : `rounded-card ${isLastInCluster ? 'rounded-br-sm' : ''}`}`
+              : `bg-surface text-ink border border-border-default ${replyPreview ? 'rounded-b-card rounded-tr-card rounded-tl-sm' : `rounded-card ${isLastInCluster ? 'rounded-bl-sm' : ''}`}`
           }`}>
             {renderMessageContent(message.content, members, isOwn)}
           </div>
-
-          {/* Timestamp below bubble */}
-          <span className={`text-[10px] text-muted mt-0.5 ${isOwn ? 'text-right' : ''}`} suppressHydrationWarning>
-            {formatMessageTime(message.created_at)}
-          </span>
         </div>
+
+        {/* One timestamp per cluster, on the outer edge of the last bubble.
+            flex-row-reverse mirrors it to the left for your own messages. */}
+        {isLastInCluster && (
+          <span className="text-[10px] text-muted shrink-0 pb-0.5" suppressHydrationWarning>
+            {formatClockTime(message.created_at)}
+          </span>
+        )}
       </div>
     </div>
   )

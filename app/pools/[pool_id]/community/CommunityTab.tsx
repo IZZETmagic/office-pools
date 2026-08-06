@@ -1102,7 +1102,16 @@ export function CommunityTab({
       {!loading && !hasMessages && emptyState}
 
       {/* Feed items */}
-      {!loading && feedItems.map((item) => {
+      {!loading && feedItems.map((item, i) => {
+        /* A cluster is an unbroken run of plain-text messages from one person.
+           Anything else between them — another member, a day header, a system
+           event, the unread divider, or one of the rich share cards, which
+           render as their own card — ends the run. */
+        const sameAuthorText = (other: FeedItem | undefined, userId: string) =>
+          other?.type === 'message' &&
+          other.data.message_type === 'text' &&
+          other.data.user_id === userId
+
         if (item.type === 'new_divider') {
           return (
             <div key="new-divider" ref={newDividerRef} className="flex items-center gap-3 my-4">
@@ -1181,6 +1190,8 @@ export function CommunityTab({
               memberLevels={memberLevels}
               currentUserId={currentUserId}
               replyPreview={reply}
+              isFirstInCluster={!sameAuthorText(feedItems[i - 1], msg.user_id)}
+              isLastInCluster={!sameAuthorText(feedItems[i + 1], msg.user_id)}
             />
           )
         }

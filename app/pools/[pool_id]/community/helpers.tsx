@@ -35,6 +35,20 @@ export function formatMessageTime(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/**
+ * Clock time for a message, e.g. "3:42 pm".
+ *
+ * Separate from formatMessageTime, which stays relative ("2h ago") for the
+ * activity feed and the shared-card headers. In the message list the day is
+ * already carried by the day header above, so repeating it on every row said
+ * nothing — two messages three hours apart both read "Jul 19".
+ */
+export function formatClockTime(dateStr: string): string {
+  return new Date(dateStr)
+    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    .toLowerCase()
+}
+
 export function formatDayHeader(dateStr: string): string {
   const date = new Date(dateStr)
   const now = new Date()
