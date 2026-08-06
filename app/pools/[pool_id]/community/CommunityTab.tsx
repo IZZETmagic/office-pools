@@ -1245,7 +1245,12 @@ export function CommunityTab({
               className={
                 mobileChat
                   ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 px-4 relative'
-                  : 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain scrollbar-none space-y-3 px-1 pb-4'
+                  // max-w-3xl: the chat panel is flex-1 next to a 260px sidebar, so on a
+                  // wide monitor it runs past 1000px. Received and sent bubbles then sit
+                  // at opposite ends of a canyon with nothing in between, which is not
+                  // what the RN sheet looks like — that is a phone-width column. Capping
+                  // the conversation and centring it keeps the two sides in conversation.
+                  : 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain scrollbar-none space-y-3 px-1 pb-4 w-full max-w-3xl mx-auto'
               }
             >
               {feedContent}

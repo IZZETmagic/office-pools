@@ -35,20 +35,25 @@ export function DayHeader({ text }: { text: string }) {
 // REPLY PREVIEW HEADER
 // =====================
 
+/**
+ * The quoted message, rendered INSIDE the bubble above the reply — which is
+ * where RN puts it. It used to be a separate block sitting above the bubble
+ * with its own top corners, so a reply read as two detached slabs with a seam
+ * between them instead of one message quoting another.
+ */
 function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) {
   return (
-    <div className={`flex items-stretch gap-0 mb-0 ${isOwn ? 'justify-end' : ''}`}>
-      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-t-chip ${
-        isOwn
-          ? 'bg-primary-700/50'
-          : 'bg-mist/80'
-      }`}>
-        <div className="w-0.5 h-4 rounded-pill bg-primary-400 shrink-0" />
-        <p className={`text-[10px] truncate max-w-[200px] ${
-          isOwn ? 'text-primary-200' : 'text-muted'
-        }`}>
-          <span className="font-medium">↩ {reply.author_name}:</span> {reply.content}
-        </p>
+    <div className={`flex items-stretch gap-2 rounded-[8px] px-2 py-1.5 mb-1 overflow-hidden ${
+      isOwn ? 'bg-white/15' : 'bg-ink/[0.06]'
+    }`}>
+      <div className={`w-0.5 shrink-0 rounded-pill ${isOwn ? 'bg-white/60' : 'bg-primary-500'}`} />
+      <div className="min-w-0">
+        <div className={`text-[11px] font-semibold leading-tight ${isOwn ? 'text-white/80' : 'text-primary-700'}`}>
+          {reply.author_name}
+        </div>
+        <div className={`text-[11px] leading-tight truncate ${isOwn ? 'text-white/70' : 'text-muted'}`}>
+          {reply.content}
+        </div>
       </div>
     </div>
   )
@@ -124,7 +129,7 @@ export function ChatMessage({
           </div>
         )}
 
-        <div className={`max-w-[78%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        <div className={`min-w-0 max-w-[min(78%,26rem)] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
           {/* Sender name — once per run, received side only. RN shows the name
               alone; the level pill is web-only and kept because it is existing
               product content, sized down to sit with the smaller name. */}
@@ -137,20 +142,19 @@ export function ChatMessage({
             </div>
           )}
 
-          {replyPreview && <ReplyHeader reply={replyPreview} isOwn={isOwn} />}
-
-          <div className={`relative px-3.5 py-2 text-base leading-[22px] font-medium ${
+          <div className={`relative px-3.5 py-2 text-base leading-[22px] font-medium break-words rounded-chip ${
             isOwn
-              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-chip rounded-tl-chip rounded-tr-sm' : 'rounded-chip'}`
-              : `bg-mist text-ink ${replyPreview ? 'rounded-b-chip rounded-tr-chip rounded-tl-sm' : `rounded-chip ${isLastInCluster ? 'rounded-bl-[4px]' : ''}`}`
+              ? 'bg-primary-600 text-white'
+              : `bg-mist text-ink ${isLastInCluster ? 'rounded-bl-[4px]' : ''}`
           }`}>
+            {replyPreview && <ReplyHeader reply={replyPreview} isOwn={isOwn} />}
             {renderMessageContent(message.content, members, isOwn)}
             {/* Reserves inline room at the end of the last line for the
                 absolutely-positioned time below. Without it the time overlaps
                 the final words. RN does the same with non-breaking spaces. */}
             <span className="inline-block w-14 align-baseline" aria-hidden />
             <span
-              className={`absolute right-2.5 bottom-1.5 text-[11px] font-medium leading-none ${
+              className={`absolute right-2.5 bottom-1.5 text-[11px] font-medium leading-none whitespace-nowrap ${
                 isOwn ? 'text-white/70' : 'text-muted'
               }`}
               suppressHydrationWarning
