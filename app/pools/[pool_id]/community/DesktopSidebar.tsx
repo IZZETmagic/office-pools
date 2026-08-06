@@ -237,7 +237,7 @@ function OnlineMembersSection({
           </button>
           <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${offlineExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
             <div className="overflow-hidden">
-              <div className="space-y-1 pt-0.5 max-h-[280px] overflow-y-auto overflow-x-hidden scrollbar-none">
+              <div className="space-y-1 pt-0.5 max-h-[280px] overflow-y-auto overflow-x-hidden no-scrollbar">
                 {offlineMembers.map(m => (
                   <MemberRow
                     key={m.user_id}
@@ -485,7 +485,11 @@ export function DesktopSidebar({
 }: DesktopSidebarProps) {
   return (
     <div
-      className="fixed top-[9rem] w-[260px] flex flex-col gap-3 overflow-hidden max-h-[calc(100vh-12rem)] pb-4 pr-0.5"
+      // overflow-y-auto, not hidden: the four cards together run past
+      // max-h once the offline list is expanded or the pool has a long
+      // activity feed, and clipping made Recent Activity unreachable.
+      // overscroll-contain stops the page scrolling on when this hits its end.
+      className="fixed top-[9rem] w-[260px] flex flex-col gap-3 overflow-y-auto overscroll-contain max-h-[calc(100vh-12rem)] pb-4 pr-0.5"
       style={{ right: 'max(calc((100vw - 72rem) / 2 + 1.5rem), 1.5rem)' }}
     >
       <OnlineMembersSection

@@ -40,7 +40,7 @@ export function OnlineMembersStrip({ members, onlineUsers, currentUserId, poolId
 
   return (
     <div className="md:hidden border-b border-border-default bg-surface">
-      <div className="flex items-center gap-2 px-3 py-2.5 overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-2 px-3 py-2.5 overflow-x-auto no-scrollbar">
         {/* Online count badge */}
         <div className="flex items-center gap-1 shrink-0">
           <div className="w-1.5 h-1.5 rounded-pill bg-success-500" />

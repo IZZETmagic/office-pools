@@ -1250,7 +1250,7 @@ export function CommunityTab({
                   // at opposite ends of a canyon with nothing in between, which is not
                   // what the RN sheet looks like — that is a phone-width column. Capping
                   // the conversation and centring it keeps the two sides in conversation.
-                  : 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain scrollbar-none space-y-3 px-1 pb-4 w-full max-w-3xl mx-auto'
+                  : 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain no-scrollbar space-y-3 px-1 pb-4 w-full max-w-3xl mx-auto'
               }
             >
               {feedContent}
