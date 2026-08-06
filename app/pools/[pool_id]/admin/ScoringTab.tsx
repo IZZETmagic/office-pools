@@ -959,107 +959,75 @@ export function ScoringTab({
       ) : (
         <>
             {/* Group Stage */}
-            {/* Base Match Points — the two stages share the same three
-                concepts, so they are one card with a block each rather than two
-                cards a reader has to hold side by side. Always on: without it
-                nothing scores. */}
+            {/* Group Stage Points. Always on: without it nothing scores. */}
             <SectionCard
-              title="Base Match Points"
-              subtitle="What a correct prediction is worth before any multiplier"
+              title="Group Stage Points"
+              subtitle="What a correct group-stage prediction is worth"
               expanded={expandGroup}
               onToggle={() => setExpandGroup(!expandGroup)}
             >
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="t-caption text-muted">Group Stage</h4>
-                  <SliderInput label="Exact Score Match:" value={groupExact} onChange={setGroupExact} min={5} max={100} step={5}  field="group_exact_score"/>
-                  <SliderInput label="Correct Winner + Goal Difference:" value={groupDiff} onChange={setGroupDiff} min={5} max={100} step={5}  field="group_correct_difference"/>
-                  <SliderInput label="Correct Winner Only:" value={groupResult} onChange={setGroupResult} min={5} max={100} step={5}  field="group_correct_result"/>
-                  {groupWarning && <p className="text-sm text-warning-500">{groupWarning}</p>}
-                </div>
-
-                <div className="space-y-4 pt-6 border-t border-border-subtle">
-                  <h4 className="t-caption text-muted">Knockout Stage</h4>
-                  <SliderInput label="Exact Score Match:" value={koExact} onChange={setKoExact} min={5} max={200} step={5}  field="knockout_exact_score"/>
-                  <SliderInput label="Correct Winner + Goal Difference:" value={koDiff} onChange={setKoDiff} min={5} max={200} step={5}  field="knockout_correct_difference"/>
-                  <SliderInput label="Correct Winner Only:" value={koResult} onChange={setKoResult} min={5} max={200} step={5}  field="knockout_correct_result"/>
-                  {koWarning && <p className="text-sm text-warning-500">{koWarning}</p>}
-                </div>
+              <div className="space-y-4">
+                <SliderInput label="Exact Score Match:" value={groupExact} onChange={setGroupExact} min={5} max={100} step={5} field="group_exact_score" />
+                <SliderInput label="Correct Winner + Goal Difference:" value={groupDiff} onChange={setGroupDiff} min={5} max={100} step={5} field="group_correct_difference" />
+                <SliderInput label="Correct Winner Only:" value={groupResult} onChange={setGroupResult} min={5} max={100} step={5} field="group_correct_result" />
+                {groupWarning && <p className="text-sm text-warning-500">{groupWarning}</p>}
               </div>
             </SectionCard>
 
-            {/* Multipliers */}
+            {/* Knockout Scoring. The base values and the round multipliers are
+                one idea — what a knockout match is worth — and reading them in
+                separate cards meant holding a number from one to make sense of
+                the other. They are stored separately and the engine multiplies
+                them, so this is a presentation change only.
+
+                The switch sits on the multipliers block rather than the card:
+                the base values are not optional (knockout matches have to score
+                something), but flat scoring across every round is a legitimate
+                setup. Off writes 1x, not 0. */}
             <SectionCard
-              title="Knockout Multipliers"
-              subtitle="Later rounds are worth more"
-              enabled={multipliersOn}
-              onEnabledChange={setMultipliersOn}
+              title="Knockout Scoring"
+              subtitle="What a knockout prediction is worth, and how much each round is amplified"
               expanded={expandMultipliers}
               onToggle={() => setExpandMultipliers(!expandMultipliers)}
             >
-                <div className="space-y-4 pl-4">
-                  <SliderInput
-                    label="Round of 32:"
-                    value={r32Mult}
-                    onChange={setR32Mult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="round_32_multiplier"/>
-                  <SliderInput
-                    label="Round of 16:"
-                    value={r16Mult}
-                    onChange={setR16Mult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="round_16_multiplier"/>
-                  <SliderInput
-                    label="Quarter Final:"
-                    value={qfMult}
-                    onChange={setQfMult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="quarter_final_multiplier"/>
-                  <SliderInput
-                    label="Semi Final:"
-                    value={sfMult}
-                    onChange={setSfMult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="semi_final_multiplier"/>
-                  <SliderInput
-                    label="Third Place:"
-                    value={tpMult}
-                    onChange={setTpMult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="third_place_multiplier"/>
-                  <SliderInput
-                    label="Final:"
-                    value={finalMult}
-                    onChange={setFinalMult}
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    suffix="x"
-                   field="final_multiplier"/>
-                  <p className="text-xs text-neutral-600">
-                    Example: {koExact} points (exact) x {finalMult} (final) ={' '}
-                    {koExact * finalMult} points
-                  </p>
-                  {multiplierWarning && (
-                    <p className="text-sm text-danger-500">{multiplierWarning}</p>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h4 className="t-caption text-muted">Base Points</h4>
+                  <SliderInput label="Exact Score Match:" value={koExact} onChange={setKoExact} min={5} max={200} step={5} field="knockout_exact_score" />
+                  <SliderInput label="Correct Winner + Goal Difference:" value={koDiff} onChange={setKoDiff} min={5} max={200} step={5} field="knockout_correct_difference" />
+                  <SliderInput label="Correct Winner Only:" value={koResult} onChange={setKoResult} min={5} max={200} step={5} field="knockout_correct_result" />
+                  {koWarning && <p className="text-sm text-warning-500">{koWarning}</p>}
+                </div>
+
+                <div className="pt-6 border-t border-border-subtle">
+                  <div className="flex items-center gap-3 mb-4">
+                    <h4 className={`t-caption ${multipliersOn ? 'text-muted' : 'text-silver'}`}>Round Multipliers</h4>
+                    <Switch
+                      checked={multipliersOn}
+                      onChange={setMultipliersOn}
+                      label={`${multipliersOn ? 'Disable' : 'Enable'} round multipliers`}
+                    />
+                    {!multipliersOn && (
+                      <span className="t-detail text-muted">Every round scores at face value</span>
+                    )}
+                  </div>
+
+                  {multipliersOn && (
+                    <div className="space-y-4">
+                      <SliderInput label="Round of 32:" value={r32Mult} onChange={setR32Mult} min={0.5} max={5} step={0.5} suffix="x" field="round_32_multiplier" />
+                      <SliderInput label="Round of 16:" value={r16Mult} onChange={setR16Mult} min={0.5} max={5} step={0.5} suffix="x" field="round_16_multiplier" />
+                      <SliderInput label="Quarter Final:" value={qfMult} onChange={setQfMult} min={0.5} max={5} step={0.5} suffix="x" field="quarter_final_multiplier" />
+                      <SliderInput label="Semi Final:" value={sfMult} onChange={setSfMult} min={0.5} max={5} step={0.5} suffix="x" field="semi_final_multiplier" />
+                      <SliderInput label="Third Place:" value={tpMult} onChange={setTpMult} min={0.5} max={5} step={0.5} suffix="x" field="third_place_multiplier" />
+                      <SliderInput label="Final:" value={finalMult} onChange={setFinalMult} min={0.5} max={5} step={0.5} suffix="x" field="final_multiplier" />
+                      <p className="t-detail text-muted">
+                        A Final called exactly is worth {koExact} x {finalMult} = {koExact * finalMult} points.
+                      </p>
+                      {multiplierWarning && <p className="text-sm text-danger-500">{multiplierWarning}</p>}
+                    </div>
                   )}
                 </div>
+              </div>
             </SectionCard>
 
             {/* Penalty Shootout Scoring */}
