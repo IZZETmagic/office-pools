@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Card } from '@/components/ui/Card'
 import { InfoPopover } from '@/components/ui/InfoPopover'
 import { fieldHelp } from '@/lib/scoring/fieldHelp'
+import { formatNumber } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
@@ -556,6 +557,27 @@ export function ScoringTab({
     ([k, v]) => v !== ((settings as Record<string, unknown> | null)?.[k] ??
                        (baseline as Record<string, unknown>)[k]),
   )
+
+  /**
+   * What is actually about to change, for the confirmation dialog.
+   *
+   * A generic "this will update scoring" tells an admin nothing about the one
+   * thing worth pausing over: a value dropping to zero means those points stop
+   * being awarded, and on a recalculation they come off every entry that had
+   * them. Those are listed first and by name; everything else is a count.
+   */
+  const pendingChanges = Object.entries(formValues)
+    .map(([key, next]) => {
+      const prev = (settings as Record<string, unknown> | null)?.[key] ??
+                   (baseline as Record<string, unknown>)[key]
+      return { key, prev, next, help: fieldHelp(key) }
+    })
+    .filter(c => c.next !== c.prev)
+
+  const turnedOff = pendingChanges.filter(
+    c => typeof c.next === 'number' && c.next === 0 && typeof c.prev === 'number' && c.prev > 0,
+  )
+  const otherChanges = pendingChanges.length - turnedOff.length
 
   /** Still exactly as the pool was created. Reset has nothing to do here. */
   const isAtDefaults = Object.entries(formValues).every(
@@ -1230,33 +1252,80 @@ export function ScoringTab({
         </>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal. Says what is changing rather than that something
+          is: an admin who just switched a bonus off is told, by name, that
+          those points come off every entry. The old copy pointed at a
+          "Recalculate Bonus Points" button that no longer exists. */}
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-3">
-              Confirm Scoring Changes
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated sm:max-w-md w-full max-h-[85vh] overflow-y-auto p-5 sm:p-6 dark:shadow-none dark:border dark:border-border-default">
+            <h3 className="t-section-header text-ink mb-2">
+              Save scoring changes?
             </h3>
-            <p className="text-sm text-neutral-600 mb-4">
-              You are about to change the scoring system. This will:
+            <p className="t-body text-muted mb-5">
+              Every completed match will be scored again with these rules, and the
+              leaderboard will be rebuilt from the result.
             </p>
-            <ul className="text-sm text-neutral-600 space-y-1 mb-4 list-disc pl-5">
-              <li>Update scoring and bonus point values</li>
-              <li>Recalculate match points for ALL members</li>
-              <li>Update leaderboard rankings</li>
-            </ul>
-            <p className="text-xs text-neutral-500 mb-4">
-              Note: Use "Recalculate Bonus Points" separately to update bonus scores with new values.
+
+            {turnedOff.length > 0 && (
+              <div className="rounded-chip bg-warning-500/10 border border-warning-500/20 p-3 mb-5">
+                <p className="t-body font-bold text-warning-800 mb-1.5">
+                  {turnedOff.length === 1
+                    ? 'One award is being switched off'
+                    : `${turnedOff.length} awards are being switched off`}
+                </p>
+                <ul className="space-y-0.5 mb-2">
+                  {turnedOff.slice(0, 5).map(c => (
+                    <li key={c.key} className="t-body text-muted">
+                      {c.help?.title ?? c.key}
+                      <span className="t-num t-num-medium text-[11px] ml-1.5">
+                        {formatNumber(Number(c.prev))} &rarr; 0
+                      </span>
+                    </li>
+                  ))}
+                  {turnedOff.length > 5 && (
+                    <li className="t-body text-muted">and {turnedOff.length - 5} more</li>
+                  )}
+                </ul>
+                <p className="t-detail text-muted">
+                  Anyone who earned these keeps nothing from them once the recalculation runs.
+                </p>
+              </div>
+            )}
+
+            <dl className="grid grid-cols-3 gap-3 mb-5">
+              <div>
+                <dt className="t-caption text-muted mb-0.5">Values changed</dt>
+                <dd className="t-num t-num-extrabold text-lg text-ink">
+                  {formatNumber(pendingChanges.length)}
+                </dd>
+              </div>
+              <div>
+                <dt className="t-caption text-muted mb-0.5">Matches</dt>
+                <dd className="t-num t-num-extrabold text-lg text-ink">
+                  {formatNumber(completedMatchCount)}
+                </dd>
+              </div>
+              <div>
+                <dt className="t-caption text-muted mb-0.5">Members</dt>
+                <dd className="t-num t-num-extrabold text-lg text-ink">
+                  {formatNumber(memberCount)}
+                </dd>
+              </div>
+            </dl>
+
+            {otherChanges > 0 && turnedOff.length > 0 && (
+              <p className="t-detail text-muted mb-5">
+                {otherChanges === 1
+                  ? 'The other change adjusts a point value.'
+                  : `The other ${formatNumber(otherChanges)} changes adjust point values.`}
+              </p>
+            )}
+
+            <p className="t-body text-muted mb-5">
+              Points already recorded will be replaced, and there is no undo.
             </p>
-            <p className="text-sm text-neutral-600 mb-2">
-              Affected matches: {completedMatchCount} completed matches
-            </p>
-            <p className="text-sm text-neutral-600 mb-4">
-              Affected members: {memberCount} members
-            </p>
-            <p className="text-sm text-warning-500 font-medium mb-4">
-              This cannot be undone.
-            </p>
+
             <div className="flex gap-3 justify-end">
               <Button
                 variant="gray"
@@ -1271,7 +1340,7 @@ export function ScoringTab({
                 loading={saving}
                 loadingText="Saving..."
               >
-                Confirm &amp; Recalculate
+                Save and recalculate
               </Button>
             </div>
           </div>
