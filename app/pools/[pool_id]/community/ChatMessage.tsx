@@ -1,6 +1,7 @@
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
 import { getInitials, formatClockTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
+import { avatarGradient } from '@/lib/design/avatarGradient'
 
 // =====================
 // LEVEL PILL
@@ -8,7 +9,7 @@ import { getInitials, formatClockTime, renderMessageContent, getLevelPillClasses
 
 function LevelPill({ level }: { level: number }) {
   return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none whitespace-nowrap ${getLevelPillClasses(level)}`}>
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-chip leading-none whitespace-nowrap ${getLevelPillClasses(level)}`}>
       Lvl {level} · {getRankTitle(level)}
     </span>
   )
@@ -58,10 +59,25 @@ function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) 
 // =====================
 
 /**
- * A run of consecutive messages from one person renders as a cluster: the name
- * and level once at the top, one avatar beside the last bubble, and one
- * timestamp on that same row. `isFirstInCluster`/`isLastInCluster` default to
- * true so a message rendered on its own is unchanged.
+ * One message row, ported from BanterBubble in
+ * mobile/components/pool-detail/BanterSheet.tsx so the two chats read the same.
+ *
+ * The parts that carry the look, and what they were before:
+ *
+ *  - Received bubbles are a flat `mist` fill with no border. They used to be a
+ *    bordered `surface` card, which read as a list of cards rather than speech.
+ *  - 12px corners (RN radii.sm), with a 4px "tail" on the bottom-left of the
+ *    LAST received bubble in a run, pointing at the avatar. Own bubbles get no
+ *    tail — that is RN's rule, not an omission.
+ *  - The timestamp lives INSIDE the bubble, bottom-right, on every message
+ *    rather than once per run. A run of non-breaking space reserves inline room
+ *    at the end of the text so the time either shares the last line or drops to
+ *    its own, exactly as the RN version does.
+ *  - Avatars carry a per-user gradient chosen by a hash of the user id, so the
+ *    same person is the same colour here and in the app.
+ *
+ * isFirstInCluster/isLastInCluster default to true, so a message rendered on
+ * its own is a complete row.
  */
 export function ChatMessage({
   message,
@@ -85,62 +101,64 @@ export function ChatMessage({
   const author = members.find(m => m.user_id === message.user_id)
   const authorLevel = memberLevels.get(message.user_id)
   const isOwn = message.user_id === currentUserId
+  const name = author?.users.full_name || author?.users.username || 'Unknown'
 
   return (
     /* The feed's space-y-3 is the baseline for every other item type; messages
-       override it in both directions. A new speaker gets room to breathe, and a
-       continuation sits almost flush against the bubble above so the run reads
-       as one turn. */
+       override it in both directions. A new speaker gets room to breathe, a
+       continuation sits almost flush against the bubble above. */
     <div className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
-      <div className={`flex gap-2.5 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
-        {/* Avatar sits beside the LAST bubble in the cluster. Earlier bubbles get
-            a spacer of the same width so the whole run stays on one left edge. */}
+      <div className={`flex gap-1 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
+        {/* Avatar sits beside the LAST bubble of the run; earlier bubbles get an
+            empty slot the same size so the whole run keeps one left edge. */}
         {!isOwn && (
-          isLastInCluster ? (
-            <div className="shrink-0 w-[30px] h-[30px] rounded-pill flex items-center justify-center text-[10px] font-bold bg-primary-100 dark:bg-primary-600/15 text-primary-700 dark:text-primary-600">
-              {getInitials(author?.users.full_name, author?.users.username)}
-            </div>
-          ) : (
-            <div className="shrink-0 w-[30px]" aria-hidden />
-          )
+          <div className="shrink-0 w-9 h-9" aria-hidden={!isLastInCluster}>
+            {isLastInCluster && (
+              <div
+                className="w-9 h-9 rounded-pill flex items-center justify-center text-[13px] font-bold text-white"
+                style={{ backgroundImage: avatarGradient(message.user_id) }}
+              >
+                {getInitials(author?.users.full_name, author?.users.username)}
+              </div>
+            )}
+          </div>
         )}
 
         <div className={`max-w-[78%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-          {/* Name + level — once per cluster, and never for your own messages */}
+          {/* Sender name — once per run, received side only. RN shows the name
+              alone; the level pill is web-only and kept because it is existing
+              product content, sized down to sit with the smaller name. */}
           {!isOwn && isFirstInCluster && (
             <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-xs font-semibold text-ink">
-                {author?.users.full_name || author?.users.username || 'Unknown'}
+              <span className="text-[11px] font-semibold tracking-[0.3px] text-muted">
+                {name}
               </span>
               {authorLevel && <LevelPill level={authorLevel.level} />}
             </div>
           )}
 
-          {/* Reply preview — connects to bubble */}
-          {replyPreview && (
-            <ReplyHeader reply={replyPreview} isOwn={isOwn} />
-          )}
+          {replyPreview && <ReplyHeader reply={replyPreview} isOwn={isOwn} />}
 
-          {/* Message bubble. The clipped corner is the tail pointing at the
-              author, so it belongs on the last bubble of a cluster only —
-              repeating it on every bubble in a run reads as several separate
-              messages rather than one person still talking. */}
-          <div className={`px-3 py-2 text-sm leading-relaxed ${
+          <div className={`relative px-3.5 py-2 text-base leading-[22px] font-medium ${
             isOwn
-              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-card rounded-tl-card rounded-tr-sm' : `rounded-card ${isLastInCluster ? 'rounded-br-sm' : ''}`}`
-              : `bg-surface text-ink border border-border-default ${replyPreview ? 'rounded-b-card rounded-tr-card rounded-tl-sm' : `rounded-card ${isLastInCluster ? 'rounded-bl-sm' : ''}`}`
+              ? `bg-primary-600 text-white ${replyPreview ? 'rounded-b-chip rounded-tl-chip rounded-tr-sm' : 'rounded-chip'}`
+              : `bg-mist text-ink ${replyPreview ? 'rounded-b-chip rounded-tr-chip rounded-tl-sm' : `rounded-chip ${isLastInCluster ? 'rounded-bl-[4px]' : ''}`}`
           }`}>
             {renderMessageContent(message.content, members, isOwn)}
+            {/* Reserves inline room at the end of the last line for the
+                absolutely-positioned time below. Without it the time overlaps
+                the final words. RN does the same with non-breaking spaces. */}
+            <span className="inline-block w-14 align-baseline" aria-hidden />
+            <span
+              className={`absolute right-2.5 bottom-1.5 text-[11px] font-medium leading-none ${
+                isOwn ? 'text-white/70' : 'text-muted'
+              }`}
+              suppressHydrationWarning
+            >
+              {formatClockTime(message.created_at)}
+            </span>
           </div>
         </div>
-
-        {/* One timestamp per cluster, on the outer edge of the last bubble.
-            flex-row-reverse mirrors it to the left for your own messages. */}
-        {isLastInCluster && (
-          <span className="text-[10px] text-muted shrink-0 pb-0.5" suppressHydrationWarning>
-            {formatClockTime(message.created_at)}
-          </span>
-        )}
       </div>
     </div>
   )

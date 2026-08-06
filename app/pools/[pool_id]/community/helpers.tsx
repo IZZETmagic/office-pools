@@ -9,15 +9,16 @@ import type { EarnedBadge } from '../analytics/xpSystem'
 // =====================
 
 export function getInitials(fullName: string | null | undefined, username: string | undefined): string {
-  if (fullName) {
-    return fullName
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-  return (username ?? '??').slice(0, 2).toUpperCase()
+  // Mirrors getInitials in mobile/components/pool-detail/BanterSheet.tsx: first
+  // and last initial for a multi-word name, but the FIRST TWO LETTERS of a
+  // single-word one. The web copy took only the first letter, so a one-word
+  // display name like "OdieBug" showed "O" in a 36px circle where the app
+  // shows "OD".
+  const source = fullName?.trim() || username?.trim()
+  if (!source) return '??'
+  const parts = source.split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 export function formatMessageTime(dateStr: string): string {
@@ -44,9 +45,9 @@ export function formatMessageTime(dateStr: string): string {
  * nothing — two messages three hours apart both read "Jul 19".
  */
 export function formatClockTime(dateStr: string): string {
-  return new Date(dateStr)
-    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    .toLowerCase()
+  // Pinned to en-US, not the browser locale: RN renders "11:04 PM" and several
+  // locales — including the one this machine defaults to — spell it "11:04 p.m."
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 export function formatDayHeader(dateStr: string): string {
