@@ -1,13 +1,45 @@
 'use client'
 
 import { useState } from 'react'
-import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import type { PoolData, SettingsData, MatchData, MemberData } from '../types'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
+import { formatNumber } from '@/lib/format'
+
+/** The Settings tab's card header: title over a rule. Same shape so the two
+ *  admin tabs read as one surface. */
+function Caption({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
+      <h3 className="t-section-header text-ink">{children}</h3>
+    </div>
+  )
+}
+
+/** One label/value line in the scoring summary. */
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="t-body text-muted truncate">{label}</span>
+      <span className="t-num t-num-extrabold text-sm text-ink shrink-0">{value}</span>
+    </div>
+  )
+}
+
+/** A titled block of rows inside the summary card. */
+function SummaryGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <h4 className="t-caption text-muted mb-2">{title}</h4>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  )
+}
+
+const pts = (n: number) => `${formatNumber(n)} pt${n === 1 ? '' : 's'}`
 
 type ScoringTabProps = {
   pool: PoolData
@@ -84,7 +116,6 @@ export function ScoringTab({
   const supabase = createClient()
   const { showToast } = useToast()
 
-  const [copied, setCopied] = useState(false)
 
   // Form state
   const [groupExact, setGroupExact] = useState(
@@ -603,113 +634,42 @@ export function ScoringTab({
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-neutral-900">
-          Scoring Configuration
-        </h2>
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-sm text-neutral-500">Code:</span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(pool.pool_code)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
-            className="inline-flex items-center gap-1.5 t-num text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded transition cursor-pointer"
-            title="Copy pool code"
-          >
-            {pool.pool_code}
-            {copied ? (
-              <Icon name="checkmark" size={14} className="text-success-500" />
-            ) : (
-              <Icon name="doc.on.doc" size={14} className="text-neutral-400" />
-            )}
-          </button>
-        </div>
-      </div>
-
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       {isBracketPicker ? (
         <>
-          {/* Bracket Picker current scoring display */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Group Stage Points
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Correct 1st Place</span>
-                  <span className="font-bold text-neutral-900">{bpGroup1st} point{bpGroup1st !== 1 ? 's' : ''}</span>
+          {/* One card, not three: this is a read-out of the current setup, and
+              three separate cards made a summary look like three decisions. */}
+          <Card padding="sm" className="mb-6">
+            <Caption>Scoring Summary</Caption>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+              <SummaryGroup title="Group Positions">
+                <SummaryRow label="Correct 1st" value={pts(bpGroup1st)} />
+                <SummaryRow label="Correct 2nd" value={pts(bpGroup2nd)} />
+                <SummaryRow label="Correct 3rd" value={pts(bpGroup3rd)} />
+                <SummaryRow label="Correct 4th" value={pts(bpGroup4th)} />
+                <div className="pt-2 mt-1 border-t border-border-subtle space-y-1.5">
+                  <SummaryRow label="3rd-place qualifier" value={pts(bpThirdQualifier)} />
+                  <SummaryRow label="3rd-place eliminated" value={pts(bpThirdEliminated)} />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Correct 2nd Place</span>
-                  <span className="font-bold text-neutral-900">{bpGroup2nd} point{bpGroup2nd !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Correct 3rd Place</span>
-                  <span className="font-bold text-neutral-900">{bpGroup3rd} point{bpGroup3rd !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Correct 4th Place</span>
-                  <span className="font-bold text-neutral-900">{bpGroup4th} point{bpGroup4th !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            </Card>
+              </SummaryGroup>
 
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Knockout Points
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Round of 32</span>
-                  <span className="font-bold text-neutral-900">{bpR32} point{bpR32 !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Round of 16</span>
-                  <span className="font-bold text-neutral-900">{bpR16} point{bpR16 !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Quarter Finals</span>
-                  <span className="font-bold text-neutral-900">{bpQf} point{bpQf !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Semi Finals</span>
-                  <span className="font-bold text-neutral-900">{bpSf} point{bpSf !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">3rd Place Match</span>
-                  <span className="font-bold text-neutral-900">{bpThirdPlaceMatch} point{bpThirdPlaceMatch !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Final</span>
-                  <span className="font-bold text-neutral-900">{bpFinal} point{bpFinal !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            </Card>
+              <SummaryGroup title="Knockout Rounds">
+                <SummaryRow label="Round of 32" value={pts(bpR32)} />
+                <SummaryRow label="Round of 16" value={pts(bpR16)} />
+                <SummaryRow label="Quarter Finals" value={pts(bpQf)} />
+                <SummaryRow label="Semi Finals" value={pts(bpSf)} />
+                <SummaryRow label="3rd Place Match" value={pts(bpThirdPlaceMatch)} />
+                <SummaryRow label="Final" value={pts(bpFinal)} />
+              </SummaryGroup>
 
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Bonus Points
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Champion Bonus</span>
-                  <span className="font-bold text-neutral-900">{bpChampionBonus} point{bpChampionBonus !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">All 8 3rd-Place Correct</span>
-                  <span className="font-bold text-neutral-900">{bpThirdAllBonus} point{bpThirdAllBonus !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Penalty Prediction</span>
-                  <span className="font-bold text-neutral-900">{bpPenaltyCorrect} point{bpPenaltyCorrect !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            </Card>
-          </div>
+              <SummaryGroup title="Bonuses">
+                <SummaryRow label="Champion" value={pts(bpChampionBonus)} />
+                <SummaryRow label="All 8 third places" value={pts(bpThirdAllBonus)} />
+                <SummaryRow label="Penalty prediction" value={pts(bpPenaltyCorrect)} />
+              </SummaryGroup>
+            </div>
+          </Card>
 
           {/* Bracket Picker Edit Form */}
           <Card className="mb-6">
@@ -919,98 +879,44 @@ export function ScoringTab({
         </>
       ) : (
         <>
-          {/* Current scoring display */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Group Stage Scoring
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">🎯 Exact Score</span>
-                  <span className="font-bold text-neutral-900">{groupExact} points</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">✓ Correct Winner + GD</span>
-                  <span className="font-bold text-neutral-900">{groupDiff} points</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">✓ Correct Winner Only</span>
-                  <span className="font-bold text-neutral-900">{groupResult} point{groupResult !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            </Card>
+          {/* One card, not three: this is a read-out of the current setup, and
+              three separate cards made a summary look like three decisions. */}
+          <Card padding="sm" className="mb-6">
+            <Caption>Scoring Summary</Caption>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+              <SummaryGroup title="Group Stage">
+                <SummaryRow label="Exact score" value={pts(groupExact)} />
+                <SummaryRow label="Winner + goal difference" value={pts(groupDiff)} />
+                <SummaryRow label="Winner only" value={pts(groupResult)} />
+              </SummaryGroup>
 
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Knockout Stage Scoring
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">🎯 Exact Score</span>
-                  <span className="font-bold text-neutral-900">{koExact} points</span>
+              <SummaryGroup title="Knockout Stage">
+                <SummaryRow label="Exact score" value={pts(koExact)} />
+                <SummaryRow label="Winner + goal difference" value={pts(koDiff)} />
+                <SummaryRow label="Winner only" value={pts(koResult)} />
+                <div className="pt-2 mt-1 border-t border-border-subtle space-y-1.5">
+                  <SummaryRow label="Round of 32" value={`${r32Mult}\u00d7`} />
+                  <SummaryRow label="Round of 16" value={`${r16Mult}\u00d7`} />
+                  <SummaryRow label="Quarter Final" value={`${qfMult}\u00d7`} />
+                  <SummaryRow label="Semi Final" value={`${sfMult}\u00d7`} />
+                  <SummaryRow label="Third Place" value={`${tpMult}\u00d7`} />
+                  <SummaryRow label="Final" value={`${finalMult}\u00d7`} />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">✓ Correct Winner + GD</span>
-                  <span className="font-bold text-neutral-900">{koDiff} points</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">✓ Correct Winner Only</span>
-                  <span className="font-bold text-neutral-900">{koResult} point{koResult !== 1 ? 's' : ''}</span>
-                </div>
-                <hr className="my-2" />
-                <p className="text-xs text-neutral-600 font-medium mb-1">Stage Multipliers:</p>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Round of 32</span>
-                  <span className="font-bold text-neutral-900">{r32Mult}x</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Round of 16</span>
-                  <span className="font-bold text-neutral-900">{r16Mult}x</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Quarter Final</span>
-                  <span className="font-bold text-neutral-900">{qfMult}x</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Semi Final</span>
-                  <span className="font-bold text-neutral-900">{sfMult}x</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Third Place</span>
-                  <span className="font-bold text-neutral-900">{tpMult}x</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Final</span>
-                  <span className="font-bold text-neutral-900">{finalMult}x</span>
-                </div>
-              </div>
-            </Card>
+              </SummaryGroup>
 
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-3">
-                Penalty Shootout
-              </h3>
-              {psoEnabled ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">🎯 Exact PSO Score</span>
-                    <span className="font-bold text-neutral-900">{psoExact} points</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">✓ Correct Winner + GD</span>
-                    <span className="font-bold text-neutral-900">{psoDiff} points</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">✓ Correct Winner Only</span>
-                    <span className="font-bold text-neutral-900">{psoResult} point{psoResult !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-neutral-500 italic">Disabled</p>
-              )}
-            </Card>
-          </div>
+              <SummaryGroup title="Penalty Shootout">
+                {psoEnabled ? (
+                  <>
+                    <SummaryRow label="Exact PSO score" value={pts(psoExact)} />
+                    <SummaryRow label="Winner + goal difference" value={pts(psoDiff)} />
+                    <SummaryRow label="Winner only" value={pts(psoResult)} />
+                  </>
+                ) : (
+                  <p className="t-body text-muted">Not scored in this pool.</p>
+                )}
+              </SummaryGroup>
+            </div>
+          </Card>
 
           {/* Edit Scoring Form */}
           <Card className="mb-6">
