@@ -370,8 +370,6 @@ export function ScoringTab({
 
   // UI state
   const [saving, setSaving] = useState(false)
-  const [recalculating, setRecalculating] = useState(false)
-  const [recalculatingBonus, setRecalculatingBonus] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [expandGroup, setExpandGroup] = useState(true)
@@ -497,6 +495,75 @@ export function ScoringTab({
     }
   }
 
+  /**
+   * The scoring fields as they stand in the form. One source for three things:
+   * what Save writes, whether anything has changed, and whether the pool is
+   * still on the defaults. Built without `updated_at` so it can be compared.
+   */
+  const formValues: Record<string, number | boolean> = isBracketPicker
+    ? {
+        bp_group_correct_1st: bpGroup1st,
+        bp_group_correct_2nd: bpGroup2nd,
+        bp_group_correct_3rd: bpGroup3rd,
+        bp_group_correct_4th: bpGroup4th,
+        bp_third_correct_qualifier: bpThirdQualifier,
+        bp_third_correct_eliminated: bpThirdEliminated,
+        bp_third_all_correct_bonus: bpThirdAllBonus,
+        bp_r32_correct: bpR32,
+        bp_r16_correct: bpR16,
+        bp_qf_correct: bpQf,
+        bp_sf_correct: bpSf,
+        bp_third_place_match_correct: bpThirdPlaceMatch,
+        bp_final_correct: bpFinal,
+        bp_champion_bonus: bpChampionBonus,
+        bp_penalty_correct: bpPenaltyCorrect,
+      }
+    : {
+        group_exact_score: groupExact,
+        group_correct_difference: groupDiff,
+        group_correct_result: groupResult,
+        knockout_exact_score: koExact,
+        knockout_correct_difference: koDiff,
+        knockout_correct_result: koResult,
+        round_32_multiplier: r32Mult,
+        round_16_multiplier: r16Mult,
+        quarter_final_multiplier: qfMult,
+        semi_final_multiplier: sfMult,
+        third_place_multiplier: tpMult,
+        final_multiplier: finalMult,
+        pso_enabled: psoEnabled,
+        pso_exact_score: psoExact,
+        pso_correct_difference: psoDiff,
+        pso_correct_result: psoResult,
+        bonus_group_winner_and_runnerup: bonusGroupWinnerAndRunnerup,
+        bonus_group_winner_only: bonusGroupWinnerOnly,
+        bonus_group_runnerup_only: bonusGroupRunnerupOnly,
+        bonus_both_qualify_swapped: bonusBothQualifySwapped,
+        bonus_one_qualifies_wrong_position: bonusOneQualifiesWrongPos,
+        bonus_all_16_qualified: bonusAllQualified,
+        bonus_12_15_qualified: bonus75PctQualified,
+        bonus_8_11_qualified: bonus50PctQualified,
+        bonus_correct_bracket_pairing: bonusBracketPairing,
+        bonus_match_winner_correct: bonusMatchWinner,
+        bonus_champion_correct: bonusChampion,
+        bonus_second_place_correct: bonusSecondPlace,
+        bonus_third_place_correct: bonusThirdPlace,
+      }
+
+  const baseline = isBracketPicker ? BP_DEFAULTS : DEFAULTS
+
+  /** Unsaved edits. Compared against what is stored, falling back to the
+   *  defaults for a pool whose settings row has not been written yet. */
+  const hasChanges = Object.entries(formValues).some(
+    ([k, v]) => v !== ((settings as Record<string, unknown> | null)?.[k] ??
+                       (baseline as Record<string, unknown>)[k]),
+  )
+
+  /** Still exactly as the pool was created. Reset has nothing to do here. */
+  const isAtDefaults = Object.entries(formValues).every(
+    ([k, v]) => v === (baseline as Record<string, unknown>)[k],
+  )
+
   async function handleSave() {
     setSaving(true)
     setError(null)
@@ -621,105 +688,6 @@ export function ScoringTab({
     showToast('Scoring updated. Points recalculated for all members.', 'success')
     setSaving(false)
     setShowConfirm(false)
-  }
-
-  async function handleManualRecalculate() {
-    setRecalculating(true)
-    setError(null)
-
-    if (isBracketPicker) {
-      // For bracket picker pools, call the BP calculate endpoint
-      try {
-        const res = await fetch(`/api/pools/${pool.pool_id}/bracket-picks/calculate`, { method: 'POST' })
-        if (!res.ok) {
-          let errMsg = res.statusText
-          try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
-          setError('Recalculation failed: ' + errMsg)
-          setRecalculating(false)
-          return
-        }
-        const data = await res.json()
-        showToast(
-          `Bracket picker points recalculated: ${data.entriesProcessed} entries, ${data.totalBonusEntries} score items (${data.totalBonusPoints} total pts).`,
-          'success'
-        )
-      } catch (err: any) {
-        setError('Recalculation failed: ' + (err.message || 'Network error'))
-        setRecalculating(false)
-        return
-      }
-    } else {
-      const { error: rpcError } = await supabase.rpc(
-        'recalculate_all_pool_points',
-        { pool_id_param: pool.pool_id }
-      )
-
-      if (rpcError) {
-        setError('Recalculation failed: ' + rpcError.message)
-        setRecalculating(false)
-        return
-      }
-      showToast('Points recalculated successfully.', 'success')
-    }
-
-    // Refresh members
-    const { data: refreshedMembers } = await supabase
-      .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email)')
-      .eq('pool_id', pool.pool_id)
-      .order('current_rank', { ascending: true, nullsFirst: false })
-
-    if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
-
-    setRecalculating(false)
-  }
-
-  async function handleRecalculateBonus() {
-    setRecalculatingBonus(true)
-    setError(null)
-
-    const endpoint = isBracketPicker
-      ? `/api/pools/${pool.pool_id}/bracket-picks/calculate`
-      : `/api/pools/${pool.pool_id}/bonus/calculate`
-
-    try {
-      const res = await fetch(endpoint, { method: 'POST' })
-
-      if (!res.ok) {
-        let errMsg = res.statusText
-        try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
-        setError('Bonus recalculation failed: ' + errMsg)
-        setRecalculatingBonus(false)
-        return
-      }
-
-      const data = await res.json()
-
-      // Refresh members
-      const { data: refreshedMembers } = await supabase
-        .from('pool_members')
-        .select('*, users!inner(user_id, username, full_name, email)')
-        .eq('pool_id', pool.pool_id)
-        .order('current_rank', { ascending: true, nullsFirst: false })
-
-      if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
-
-      if (isBracketPicker) {
-        showToast(
-          `Bracket picker points recalculated: ${data.entriesProcessed} entries, ${data.totalBonusEntries} score items (${data.totalBonusPoints} total pts).`,
-          'success'
-        )
-      } else {
-        showToast(
-          `Bonus points recalculated: ${data.membersProcessed ?? data.entriesProcessed} members, ${data.totalBonusEntries} bonuses (${data.totalBonusPoints} total bonus points).`,
-          'success'
-        )
-      }
-    } catch (err: any) {
-      setError('Bonus recalculation failed: ' + (err.message || 'Network error'))
-    }
-
-    setRecalculatingBonus(false)
   }
 
   function SliderInput({
@@ -955,15 +923,31 @@ export function ScoringTab({
                 </div>
             </SectionCard>
 
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mb-6">
-              <Button variant="gray" onClick={resetDefaults}>
-                Reset to Defaults
-              </Button>
-              <Button variant="green" onClick={() => setShowConfirm(true)}>
-                Save Changes
-              </Button>
-            </div>
+            {/* Reset lives in a danger zone and only appears when there is
+                something to undo — on a pool still using the defaults the
+                button does nothing but invite a misclick. Save moved to the
+                sticky bar, as on the Settings tab. */}
+            {!isAtDefaults && (
+              <Card padding="sm" className="border border-danger-200 mb-6">
+                <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
+                  <h3 className="t-section-header text-danger-700">Danger Zone</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetDefaults}
+                  className="w-full flex items-center gap-3 py-2 text-left transition-opacity hover:opacity-70"
+                >
+                  <Icon name="arrow.uturn.left" size={16} weight="semibold" className="shrink-0 text-danger-600" />
+                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="t-card-title text-danger-600">Reset to Defaults</span>
+                    <span className="t-detail text-muted">
+                      Put every scoring value back to how the pool was created. Takes effect when you save.
+                    </span>
+                  </span>
+                  <Icon name="chevron.right" size={11} weight="semibold" className="shrink-0 text-muted" />
+                </button>
+              </Card>
+            )}
         </>
       ) : (
         <>
@@ -1272,59 +1256,33 @@ export function ScoringTab({
                 </div>
             </SectionCard>
 
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mb-6">
-              <Button variant="gray" onClick={resetDefaults}>
-                Reset to Defaults
-              </Button>
-              <Button variant="green" onClick={() => setShowConfirm(true)}>
-                Save Changes
-              </Button>
-            </div>
+            {/* Reset lives in a danger zone and only appears when there is
+                something to undo — on a pool still using the defaults the
+                button does nothing but invite a misclick. Save moved to the
+                sticky bar, as on the Settings tab. */}
+            {!isAtDefaults && (
+              <Card padding="sm" className="border border-danger-200 mb-6">
+                <div className="flex items-center gap-2 pb-3 mb-4 border-b border-border-subtle">
+                  <h3 className="t-section-header text-danger-700">Danger Zone</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetDefaults}
+                  className="w-full flex items-center gap-3 py-2 text-left transition-opacity hover:opacity-70"
+                >
+                  <Icon name="arrow.uturn.left" size={16} weight="semibold" className="shrink-0 text-danger-600" />
+                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="t-card-title text-danger-600">Reset to Defaults</span>
+                    <span className="t-detail text-muted">
+                      Put every scoring value back to how the pool was created. Takes effect when you save.
+                    </span>
+                  </span>
+                  <Icon name="chevron.right" size={11} weight="semibold" className="shrink-0 text-muted" />
+                </button>
+              </Card>
+            )}
         </>
       )}
-
-      {/* Manual Recalculation */}
-      <Card>
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-          Manual Recalculation
-        </h3>
-        <p className="text-sm text-neutral-600 mb-4">
-          If points seem incorrect, you can manually recalculate all points
-          using current rules.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {isBracketPicker ? (
-            <Button
-              variant="outline"
-              onClick={handleManualRecalculate}
-              loading={recalculating}
-              loadingText="Recalculating..."
-            >
-              Recalculate Bracket Picker Points
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleManualRecalculate}
-                loading={recalculating}
-                loadingText="Recalculating..."
-              >
-                Recalculate Match Points
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRecalculateBonus}
-                loading={recalculatingBonus}
-                loadingText="Recalculating Bonus..."
-              >
-                Recalculate Bonus Points
-              </Button>
-            </>
-          )}
-        </div>
-      </Card>
 
       {/* Confirmation Modal */}
       {showConfirm && (
@@ -1370,6 +1328,21 @@ export function ScoringTab({
                 Confirm &amp; Recalculate
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sticky save bar ──
+          Mirrors the Settings tab: nothing to press until something changes,
+          and the same wording. Save still routes through the existing confirm
+          dialog, which is what warns about the recalculation. */}
+      {hasChanges && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-default bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+          <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
+            <p className="t-body text-muted">You have unsaved changes</p>
+            <Button onClick={() => setShowConfirm(true)} loading={saving} loadingText="Saving...">
+              Save Changes
+            </Button>
           </div>
         </div>
       )}
