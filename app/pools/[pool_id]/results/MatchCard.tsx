@@ -116,18 +116,39 @@ function derivePointsResult(storedScore: MatchScoreData | null | undefined): Poi
 // =============================================
 // COMPONENT
 // =============================================
+/**
+ * A bracket-picker member's read on one knockout match.
+ *
+ * These pools store nothing this card normally reads: no scoreline (they pick a
+ * winner, not a result) and no match_scores row at all — verified against
+ * production, 998 entries, zero of either. Their points arrive as a bp_knockout
+ * bonus carrying related_match_id, which is what makes a per-match row possible.
+ * Passing this switches the card onto that reading; every other mode is
+ * untouched because nothing else supplies it.
+ */
+export type BracketPick = {
+  teamName: string | null
+  flagUrl: string | null
+  /** null while the match is still to be played. */
+  isCorrect: boolean | null
+  /** From the bp_knockout bonus for this match; null when it earned nothing. */
+  points: number | null
+}
+
 export function MatchCard({
   match,
   poolSettings,
   predictionMode,
   index = 0,
   storedScore,
+  bracketPick,
 }: {
   match: ResultMatch
   poolSettings: PoolSettings
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   index?: number
   storedScore?: MatchScoreData | null
+  bracketPick?: BracketPick | null
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
@@ -154,7 +175,8 @@ export function MatchCard({
 
   // Knockout bracket prediction display (full_tournament only)
   const isKnockout = match.stage !== 'group'
-  const showBracketTeams = predictionMode === 'full_tournament' && isKnockout &&
+  const showBracketTeams =
+    (predictionMode === 'full_tournament' || predictionMode === 'bracket_picker') && isKnockout &&
     (match.predicted_home_team_name != null || match.predicted_away_team_name != null)
 
   // Check if predicted teams match actual teams (only when both are known)
@@ -169,7 +191,20 @@ export function MatchCard({
       )
     : null // null = can't determine yet (upcoming / TBD teams)
 
-  const pointsResult = derivePointsResult(storedScore)
+  // A bracket pick is a single call — right or wrong, worth whatever the round
+  // pays — so there is no base/multiplier split to show. Points still come from
+  // stored data (the bp_knockout bonus), never recomputed here.
+  const pointsResult: PointsResult | null = bracketPick
+    ? bracketPick.points !== null
+      ? {
+          points: bracketPick.points,
+          basePoints: bracketPick.points,
+          multiplier: 1,
+          label: bracketPick.isCorrect ? 'winner' : 'miss',
+          type: bracketPick.isCorrect ? 'winner' : 'miss',
+        }
+      : null
+    : derivePointsResult(storedScore)
 
   const homeName =
     match.home_team?.country_name || match.home_team_placeholder || 'TBD'
@@ -221,7 +256,7 @@ export function MatchCard({
             <span className="t-caption px-2 py-0.5 rounded-pill bg-warning-500/12 text-warning-600">
               Pending
             </span>
-          ) : (isCompleted && !hasPrediction) ? (
+          ) : (isCompleted && !hasPrediction && !bracketPick) ? (
             <span className="text-[10px] italic text-muted">No prediction</span>
           ) : null}
         </div>
@@ -283,7 +318,30 @@ export function MatchCard({
       {/* ── Bottom Row: Prediction + Date ── */}
       <div className="flex items-center justify-between px-4 pb-3 pt-1">
         <div className="t-body text-muted min-w-0">
-          {hasPrediction && showBracketTeams ? (
+          {/* Bracket-picker reading first: these members picked a team, not a
+              score, so none of the branches below have anything to render. The
+              tie they expected here comes after the pick, because when their
+              bracket diverged the pick alone reads as though it came from
+              nowhere. */}
+          {bracketPick ? (
+            <span className="inline-flex items-center gap-1.5 flex-wrap">
+              <span>Your pick:</span>
+              {bracketPick.flagUrl && (
+                <img src={bracketPick.flagUrl} alt="" className="w-4 h-3 rounded-[1px] object-cover shrink-0" />
+              )}
+              <span className="font-bold text-ink">{bracketPick.teamName || '—'}</span>
+              {bracketPick.isCorrect !== null && (
+                <span className={bracketPick.isCorrect ? 'text-success-600' : 'text-danger-600'}>
+                  {bracketPick.isCorrect ? '✓' : '✗'}
+                </span>
+              )}
+              {showBracketTeams && (
+                <span className="text-muted">
+                  · you had {match.predicted_home_team_name || '?'} v {match.predicted_away_team_name || '?'}
+                </span>
+              )}
+            </span>
+          ) : hasPrediction && showBracketTeams ? (
             <span>
               Your prediction:{' '}
               <span className="font-bold text-muted">

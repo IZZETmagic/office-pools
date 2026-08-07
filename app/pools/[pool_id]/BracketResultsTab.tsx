@@ -1,8 +1,6 @@
 'use client'
 
-import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
-import { Alert } from '@/components/ui/Alert'
-import { getLiveClock, getMatchStatusBadge, type MatchStatusBadge } from '@/lib/matchStatus'
+import { Fragment, useState, useMemo } from 'react'
 import {
   calculateGroupStandings,
   rankThirdPlaceTeams,
@@ -23,16 +21,9 @@ import {
 import { calculateBracketPickerPoints, type MatchWithResult } from '@/lib/bracketPickerScoring'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import {
-  LEFT_R32,
-  RIGHT_R32,
-  LEFT_R16,
-  RIGHT_R16,
-  LEFT_QF,
-  RIGHT_QF,
-  LEFT_SF,
-  RIGHT_SF,
-} from '@/lib/bracketConstants'
+import { Select } from '@/components/ui/Select'
+import { MatchCard, type ResultMatch, type BracketPick } from './results/MatchCard'
+import { type PoolSettings } from './results/points'
 import type {
   MatchData,
   TeamData,
@@ -41,6 +32,7 @@ import type {
   BPThirdPlaceRanking,
   BPKnockoutPick,
   EntryData,
+  BonusScoreData,
 } from './types'
 
 // =============================================
@@ -64,127 +56,11 @@ type BracketResultsTabProps = {
   allBPThirdPlaceRankings: BPThirdPlaceRanking[]
   allBPKnockoutPicks: BPKnockoutPick[]
   bpProvisionalScoring?: boolean
+  /** Every bonus row for this pool; bp_knockout ones carry the per-match points. */
+  bonusScores: BonusScoreData[]
 }
 
-// =============================================
-// BRACKET LAYOUT
-// =============================================
-// A half-bracket is four columns — R32 → R16 → QF → SF — so its width is four
-// cells plus the three gaps between them. These sizes used to be fixed, which
-// made the bracket 712px wide no matter how much room the page had; on a
-// desktop it finished barely past halfway and the right third sat empty.
-//
-// makeLayout() stretches the cells and gaps to fill whatever width it is given.
-// Both are floored at the baseline below, so this only ever makes the bracket
-// bigger — a narrow screen still gets the original 712px and scrolls it, which
-// is what the overflow-x-auto wrapper is for.
 
-const BASE_CELL_W = 160
-/**
- * Two team rows to a cell — this is the pair, so it always stays even.
- *
- * A row carries a 12px team name and, where the user had somebody else in that
- * slot, a 10px line underneath naming them. That is 29px of text, so 32 clipped
- * the second line at the narrow end.
- */
-const BASE_ROW_H = 38
-const BASE_CELL_H = BASE_ROW_H * 2
-const BASE_PAIR_GAP = 8
-const BASE_COL_GAP = 24
-const HEADER_H = 24
-
-/** Width the bracket has always been, and the narrowest it is allowed to get. */
-export const BASE_W = 4 * BASE_CELL_W + 3 * BASE_COL_GAP
-
-export type BracketLayout = {
-  cellW: number
-  cellH: number
-  pairGap: number
-  colGap: number
-  roundW: number
-  width: number
-  height: number
-}
-
-export function makeLayout(available: number): BracketLayout {
-  // Cells take the bulk of the width; whatever is left becomes the gaps, which
-  // is where the connector elbows are drawn — they need the room as much as the
-  // cells do. Flooring both at the baseline is what keeps this from ever
-  // shrinking the bracket below what it is today.
-  const cellW = Math.max(BASE_CELL_W, Math.floor((available * 0.8) / 4))
-  const colGap = Math.max(BASE_COL_GAP, Math.floor((available - 4 * cellW) / 3))
-
-  // Height tracks width one-for-one, so a cell keeps its proportions as the
-  // bracket stretches. This was damped to 60% at first, which pinned the boxes
-  // at 69px on a desktop and left the two team rows looking squashed inside a
-  // 220px-wide box. Rounded to an even number so the pair splits cleanly and
-  // the divider between them lands on a whole pixel.
-  const grow = cellW / BASE_CELL_W
-  const cellH = Math.round((BASE_CELL_H * grow) / 2) * 2
-  const pairGap = Math.round(BASE_PAIR_GAP * grow)
-
-  return {
-    cellW,
-    cellH,
-    pairGap,
-    colGap,
-    roundW: cellW + colGap,
-    width: 4 * cellW + 3 * colGap,
-    height: HEADER_H + 8 * cellH + 7 * pairGap,
-  }
-}
-
-// =============================================
-// HELPERS
-// =============================================
-
-function shortName(name: string): string {
-  if (name.startsWith('Winner Match ')) return 'W' + name.slice(12)
-  if (name.startsWith('Loser Match ')) return 'L' + name.slice(11)
-  if (/^\d(st|nd|rd|th) Group [A-L]$/.test(name)) return name.replace(' Group ', ' ')
-  return name
-}
-
-function getMatchPositions(L: BracketLayout) {
-  const r32Ys: number[] = []
-  for (let i = 0; i < 8; i++) {
-    r32Ys.push(HEADER_H + i * (L.cellH + L.pairGap))
-  }
-  const r16Ys: number[] = []
-  for (let i = 0; i < 4; i++) {
-    r16Ys.push((r32Ys[i * 2] + r32Ys[i * 2 + 1]) / 2)
-  }
-  const qfYs: number[] = []
-  for (let i = 0; i < 2; i++) {
-    qfYs.push((r16Ys[i * 2] + r16Ys[i * 2 + 1]) / 2)
-  }
-  const sfY = (qfYs[0] + qfYs[1]) / 2
-  return { r32Ys, r16Ys, qfYs, sfY }
-}
-
-/** Connector lines for left-to-right bracket flow */
-function getConnectorPaths(
-  sourceXRight: number,
-  sourceYs: number[],
-  targetXLeft: number,
-  targetYs: number[],
-  L: BracketLayout,
-): string[] {
-  const paths: string[] = []
-  for (let i = 0; i < targetYs.length; i++) {
-    const topSourceY = sourceYs[i * 2] + L.cellH / 2
-    const botSourceY = sourceYs[i * 2 + 1] + L.cellH / 2
-    const targetY = targetYs[i] + L.cellH / 2
-    const midX = (sourceXRight + targetXLeft) / 2
-    paths.push(`M ${sourceXRight} ${topSourceY} H ${midX} V ${targetY} H ${targetXLeft}`)
-    paths.push(`M ${sourceXRight} ${botSourceY} H ${midX} V ${targetY}`)
-  }
-  return paths
-}
-
-// getReverseConnectorPaths lived here — the mirrored right-to-left variant for a
-// bracket drawn inwards from both edges. Both halves render left-to-right, so it
-// had no callers; removed rather than carried through the layout change.
 
 // =============================================
 // GROUP COMPARISON COMPONENT
@@ -429,294 +305,46 @@ function ThirdPlaceComparison({
 }
 
 // =============================================
-// KNOCKOUT BRACKET COMPONENTS
 // =============================================
-
-type BracketCellData = {
-  matchNumber: number
-  homeName: string
-  awayName: string
-  homeCode: string | null
-  awayCode: string | null
-  homeFlagUrl: string | null
-  awayFlagUrl: string | null
-  // Actual result
-  actualHomeScore: number | null
-  actualAwayScore: number | null
-  actualHomePso: number | null
-  actualAwayPso: number | null
-  isCompleted: boolean
-  isLive: boolean
-  actualWinnerSide: 'home' | 'away' | null
-  // User's pick
-  predictedWinnerSide: 'home' | 'away' | null
-  pickIsCorrect: boolean | null // null = match not completed
-  liveClock: string | null // "45'" / HT / ET / PENS while live
-  statusBadge: MatchStatusBadge | null // Delayed / Postponed / etc.
-  // Who the user had in these two slots — set ONLY when that is someone other
-  // than who actually turned up, since otherwise the row above already says it.
-  predictedHome: PredictedTeam | null
-  predictedAway: PredictedTeam | null
-}
-
-/** A team the user put in a slot that someone else ended up filling. */
-type PredictedTeam = {
-  name: string
-  code: string
-  flagUrl: string | null
-}
-
-/** Shared row styling for bracket cells and final match cards */
-function getCellRowClass(data: BracketCellData, side: 'home' | 'away') {
-  const isPickedWinner = data.predictedWinnerSide === side
-  const isActualWinner = data.actualWinnerSide === side
-  const matchDecided = data.actualWinnerSide !== null
-
-  if (data.isCompleted && matchDecided) {
-    // Winner you picked correctly
-    if (isActualWinner && isPickedWinner) return 'bg-success-50 font-semibold text-success-800'
-    // Winner you didn't pick
-    if (isActualWinner && !isPickedWinner) return 'font-semibold text-ink'
-    // Loser you incorrectly picked as winner
-    if (!isActualWinner && isPickedWinner) return 'text-danger-500 line-through'
-    // Loser (not picked) — still strike through as eliminated
-    return 'text-muted line-through'
-  }
-
-  if (data.isCompleted) return 'text-muted'
-
-  if (isPickedWinner) return 'bg-primary-50 font-semibold text-primary-800'
-  return 'text-ink'
-}
-
-/**
- * One team inside a bracket cell: who actually turned up, and — when the user
- * had somebody else there — a second line naming who they had.
- *
- * The comparison is meaningful because both answer the same question: who fills
- * this slot. A knockout slot is "winner of match 57", so the user's team and the
- * real one are two answers to that, not two unrelated teams stacked together.
- */
-function CellTeamRow({
-  code,
-  name,
-  flagUrl,
-  predicted,
-  score,
-  pso,
-  showScore,
-  rowClass,
-  height,
-  divider,
-}: {
-  code: string | null
-  name: string
-  flagUrl: string | null
-  predicted: PredictedTeam | null
-  score: number | null
-  pso: number | null
-  showScore: boolean
-  rowClass: string
-  height: number
-  divider: boolean
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between px-2 text-xs ${divider ? 'border-b border-border-subtle' : ''} ${rowClass}`}
-      style={{ height }}
-    >
-      <span className="flex flex-col min-w-0 flex-1 mr-1">
-        <span className="flex items-center gap-1.5 truncate">
-          {flagUrl && (
-            <img src={flagUrl} alt="" className="w-4 h-3 rounded-[1px] object-cover shrink-0" />
-          )}
-          <span className="truncate">{code || shortName(name)}</span>
-        </span>
-        {predicted && (
-          <span className="flex items-center gap-1 truncate t-detail text-muted">
-            <span className="shrink-0">you had</span>
-            {predicted.flagUrl && (
-              <img src={predicted.flagUrl} alt="" className="w-3 h-2 rounded-[1px] object-cover shrink-0" />
-            )}
-            <span className="truncate">{predicted.code || predicted.name}</span>
-          </span>
-        )}
-      </span>
-      {showScore && (
-        <span className="t-num t-num-extrabold flex-shrink-0">
-          {score}
-          {pso !== null && <span className="text-[9px] text-muted ml-0.5">({pso})</span>}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function BracketCell({ data, x, y, L }: { data: BracketCellData; x: number; y: number; L: BracketLayout }) {
-  const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
-
-  let borderClass = 'border-border-default'
-  if (data.isCompleted && data.pickIsCorrect === true) {
-    borderClass = 'border-success-400'
-  } else if (data.isCompleted && data.pickIsCorrect === false) {
-    borderClass = 'border-danger-300'
-  }
-
-  return (
-    <div
-      // radii.md, matching KnockoutMatchCard in the RN bracket wizard — same
-      // thing: a surface box with a thin border, overflow clipped, holding two
-      // rows. Not rounded-inset; that step is for a corner nested inside an
-      // already-rounded surface, and this one sits on the page background.
-      className={`absolute border ${borderClass} rounded-control bg-surface shadow-sm overflow-hidden`}
-      style={{ left: x, top: y, width: L.cellW, height: L.cellH }}
-    >
-      <CellTeamRow
-        code={data.homeCode}
-        name={data.homeName}
-        flagUrl={data.homeFlagUrl}
-        predicted={data.predictedHome}
-        score={data.actualHomeScore}
-        pso={data.actualHomePso}
-        showScore={hasScore}
-        rowClass={getCellRowClass(data, 'home')}
-        height={L.cellH / 2 - 0.5}
-        divider
-      />
-      <CellTeamRow
-        code={data.awayCode}
-        name={data.awayName}
-        flagUrl={data.awayFlagUrl}
-        predicted={data.predictedAway}
-        score={data.actualAwayScore}
-        pso={data.actualAwayPso}
-        showScore={hasScore}
-        rowClass={getCellRowClass(data, 'away')}
-        height={L.cellH / 2 - 0.5}
-        divider={false}
-      />
-
-      {/* Left edge indicator strip — no overlap with scores */}
-      {data.isLive && (
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-danger-500 animate-pulse" />
-      )}
-      {data.statusBadge ? (
-        <span className={`absolute right-0.5 top-0.5 text-[8px] font-bold leading-none ${data.statusBadge.tone === 'red' ? 'text-danger-600' : 'text-warning-600'}`}>
-          {data.statusBadge.label}
-        </span>
-      ) : data.isLive && data.liveClock ? (
-        <span className="absolute right-0.5 top-0.5 t-num text-[8px] text-danger-600 leading-none">
-          {data.liveClock}
-        </span>
-      ) : null}
-      {!data.isLive && data.isCompleted && data.pickIsCorrect !== null && (
-        <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${
-          data.pickIsCorrect ? 'bg-success-500' : 'bg-danger-500'
-        }`} />
-      )}
-    </div>
-  )
-}
-
-/** Larger match card used for the Final and 3rd-place match */
-function FinalMatchCard({ data, label }: { data: BracketCellData; label: string }) {
-  const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
-
-  let borderClass = 'border-border-default'
-  if (data.isCompleted && data.pickIsCorrect === true) borderClass = 'border-success-400'
-  else if (data.isCompleted && data.pickIsCorrect === false) borderClass = 'border-danger-300'
-
-  return (
-    <div className={`border ${borderClass} rounded-card bg-surface shadow-sm overflow-hidden`}>
-      <div className="px-3 py-1.5 bg-snow border-b border-border-default flex items-center justify-between">
-        <span className={`text-xs font-bold uppercase tracking-wider ${
-          label === 'Final' ? 'text-warning-600' : 'text-muted'
-        }`}>
-          {label}
-        </span>
-        {data.statusBadge ? (
-          <span className={`text-xs font-bold ${data.statusBadge.tone === 'red' ? 'text-danger-600' : 'text-warning-600'}`}>
-            {data.statusBadge.label}
-          </span>
-        ) : data.isLive ? (
-          <span className="text-xs font-bold text-danger-600 animate-pulse">{data.liveClock ?? 'LIVE'}</span>
-        ) : null}
-        {!data.isLive && data.isCompleted && data.pickIsCorrect !== null && (
-          data.pickIsCorrect ? (
-            <span className="text-xs font-bold text-success-600">&#10003; Correct</span>
-          ) : (
-            <span className="text-xs font-bold text-danger-600">&#10007; Wrong</span>
-          )
-        )}
-      </div>
-      <div className="divide-y divide-border-subtle">
-        <div className={`flex items-center justify-between px-3 py-2.5 ${getCellRowClass(data, 'home')}`}>
-          <span className="flex flex-col min-w-0 flex-1">
-            <span className="flex items-center gap-2 min-w-0">
-              {data.homeFlagUrl && (
-                <img src={data.homeFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
-              )}
-              <span className="text-sm font-medium truncate">{data.homeName}</span>
-            </span>
-            {data.predictedHome && (
-              <span className="flex items-center gap-1.5 min-w-0 t-detail text-muted mt-0.5">
-                <span className="shrink-0">you had</span>
-                {data.predictedHome.flagUrl && (
-                  <img src={data.predictedHome.flagUrl} alt="" className="w-3.5 h-2.5 rounded-[1px] object-cover shrink-0" />
-                )}
-                <span className="truncate">{data.predictedHome.name}</span>
-              </span>
-            )}
-          </span>
-          {hasScore && (
-            <span className="text-sm t-num t-num-extrabold flex-shrink-0">
-              {data.actualHomeScore}
-              {data.actualHomePso !== null && (
-                <span className="t-detail text-muted ml-1">({data.actualHomePso})</span>
-              )}
-            </span>
-          )}
-        </div>
-        <div className={`flex items-center justify-between px-3 py-2.5 ${getCellRowClass(data, 'away')}`}>
-          <span className="flex flex-col min-w-0 flex-1">
-            <span className="flex items-center gap-2 min-w-0">
-              {data.awayFlagUrl && (
-                <img src={data.awayFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
-              )}
-              <span className="text-sm font-medium truncate">{data.awayName}</span>
-            </span>
-            {data.predictedAway && (
-              <span className="flex items-center gap-1.5 min-w-0 t-detail text-muted mt-0.5">
-                <span className="shrink-0">you had</span>
-                {data.predictedAway.flagUrl && (
-                  <img src={data.predictedAway.flagUrl} alt="" className="w-3.5 h-2.5 rounded-[1px] object-cover shrink-0" />
-                )}
-                <span className="truncate">{data.predictedAway.name}</span>
-              </span>
-            )}
-          </span>
-          {hasScore && (
-            <span className="text-sm t-num t-num-extrabold flex-shrink-0">
-              {data.actualAwayScore}
-              {data.actualAwayPso !== null && (
-                <span className="t-detail text-muted ml-1">({data.actualAwayPso})</span>
-              )}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
+// KNOCKOUT RESULTS
 // =============================================
-// KNOCKOUT BRACKET WITH PICKS OVERLAY
-// =============================================
+// A filtered match list, the same shape the progressive and full-tournament
+// pools get on their Results tab. It replaced a drawn bracket grid: the grid
+// looked the part but could only ever show the real tournament, so a member
+// whose bracket had diverged spent most of it reading about teams they never
+// picked.
+//
+// The rows are MatchCards in bracket_picker mode. That mode exists because
+// these pools store none of what the card normally reads — no scoreline, and no
+// match_scores row at all (998 entries, zero of either). What they do have is a
+// winner pick per match and a bp_knockout bonus carrying related_match_id,
+// which is where the points below come from.
+
+type StageKey = 'all' | 'round_32' | 'round_16' | 'quarter_final' | 'semi_final' | 'finals'
+type StatusKey = 'all' | 'completed' | 'live' | 'upcoming'
+
+const STAGE_OPTIONS: { key: StageKey; label: string }[] = [
+  { key: 'all', label: 'All Rounds' },
+  { key: 'round_32', label: 'Round of 32' },
+  { key: 'round_16', label: 'Round of 16' },
+  { key: 'quarter_final', label: 'Quarter-Finals' },
+  { key: 'semi_final', label: 'Semi-Finals' },
+  { key: 'finals', label: 'Finals' },
+]
+
+const STATUS_OPTIONS: { key: StatusKey; label: string }[] = [
+  { key: 'all', label: 'All Matches' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'live', label: 'Live' },
+  { key: 'upcoming', label: 'Upcoming' },
+]
 
 function KnockoutComparison({
   matchMap,
   knockoutPicks,
   predictedKnockoutTeams,
+  bonusScores,
+  settings,
   completedKnockout,
   totalKnockout,
   correctPicks,
@@ -727,207 +355,130 @@ function KnockoutComparison({
   knockoutPicks: BPKnockoutPick[]
   /** The user's own bracket, keyed by match number — same slots as the real match. */
   predictedKnockoutTeams: Map<number, { home: GroupStanding | null; away: GroupStanding | null }>
+  /** Every bonus for this entry; the bp_knockout ones carry the per-match points. */
+  bonusScores: BonusScoreData[]
+  settings: SettingsData
   completedKnockout: number
   totalKnockout: number
   correctPicks: number
   totalPickable: number
   teams: TeamData[]
 }) {
-  // How much width the page is actually giving us. Measured rather than assumed:
-  // the tab sits in a max-w-6xl column, but that is only the ceiling — the real
-  // number depends on the viewport and the container's own padding. Starts at
-  // the baseline so the server renders the same 712px the client first paints,
-  // then the observer widens it.
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [availableW, setAvailableW] = useState(BASE_W)
+  const [stage, setStage] = useState<StageKey>('all')
+  const [status, setStatus] = useState<StatusKey>('all')
 
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setAvailableW(entry.contentRect.width)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  const L = useMemo(() => makeLayout(availableW), [availableW])
-  const pos = useMemo(() => getMatchPositions(L), [L])
-
-  // Build team lookup: team_id → TeamData
   const teamById = useMemo(() => new Map(teams.map(t => [t.team_id, t])), [teams])
+  const picksById = useMemo(
+    () => new Map(knockoutPicks.map(p => [p.match_id, p.winner_team_id])),
+    [knockoutPicks],
+  )
 
-  // Build picks map: match_id → winner_team_id
-  const picksById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const p of knockoutPicks) {
-      m.set(p.match_id, p.winner_team_id)
+  // Points per match. Summed rather than assigned because a match can carry more
+  // than one bp_knockout row, and a silent overwrite would under-report.
+  const pointsByMatch = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const b of bonusScores) {
+      if (b.bonus_category === 'bp_knockout' && b.related_match_id) {
+        m.set(b.related_match_id, (m.get(b.related_match_id) ?? 0) + b.points_earned)
+      }
     }
     return m
-  }, [knockoutPicks])
+  }, [bonusScores])
 
-  function buildCellData(matchNumber: number): BracketCellData {
-    const match = matchMap.get(matchNumber)
-    if (!match) {
-      return {
-        matchNumber,
-        homeName: 'TBD',
-        awayName: 'TBD',
-        homeCode: null,
-        awayCode: null,
-        homeFlagUrl: null,
-        awayFlagUrl: null,
-        actualHomeScore: null,
-        actualAwayScore: null,
-        actualHomePso: null,
-        actualAwayPso: null,
-        isCompleted: false,
-        isLive: false,
-        liveClock: null,
-        statusBadge: null,
-        actualWinnerSide: null,
-        predictedWinnerSide: null,
-        pickIsCorrect: null,
-        predictedHome: null,
-        predictedAway: null,
+  const rows = useMemo(() => {
+    const knockout = [...matchMap.values()]
+      .filter(m => m.stage !== 'group')
+      .sort((a, b) => a.match_number - b.match_number)
+
+    return knockout.map(m => {
+      const slots = predictedKnockoutTeams.get(m.match_number)
+      const pickId = picksById.get(m.match_id) ?? null
+      const pickTeam = pickId ? teamById.get(pickId) : null
+
+      const match: ResultMatch = {
+        match_id: m.match_id,
+        match_number: m.match_number,
+        stage: m.stage,
+        group_letter: m.group_letter,
+        match_date: m.match_date,
+        venue: m.venue,
+        status: m.status,
+        status_detail: m.status_detail,
+        original_match_date: m.original_match_date,
+        live_minute: m.live_minute,
+        live_period: m.live_period,
+        home_score_ft: m.home_score_ft,
+        away_score_ft: m.away_score_ft,
+        home_score_pso: m.home_score_pso,
+        away_score_pso: m.away_score_pso,
+        home_team_placeholder: m.home_team_placeholder,
+        away_team_placeholder: m.away_team_placeholder,
+        home_team_id: m.home_team_id,
+        away_team_id: m.away_team_id,
+        home_team: m.home_team
+          ? {
+              country_name: m.home_team.country_name,
+              country_code: teamById.get(m.home_team_id ?? '')?.country_code ?? '',
+              flag_url: teamById.get(m.home_team_id ?? '')?.flag_url ?? null,
+            }
+          : null,
+        away_team: m.away_team
+          ? {
+              country_name: m.away_team.country_name,
+              country_code: teamById.get(m.away_team_id ?? '')?.country_code ?? '',
+              flag_url: teamById.get(m.away_team_id ?? '')?.flag_url ?? null,
+            }
+          : null,
+        // No scoreline exists in this mode — the pick is carried on bracketPick.
+        prediction: null,
+        predicted_home_team_name: slots?.home?.country_name ?? null,
+        predicted_away_team_name: slots?.away?.country_name ?? null,
+        predicted_home_team_id: slots?.home?.team_id ?? null,
+        predicted_away_team_id: slots?.away?.team_id ?? null,
       }
-    }
 
-    const homeName = match.home_team?.country_name || match.home_team_placeholder || 'TBD'
-    const awayName = match.away_team?.country_name || match.away_team_placeholder || 'TBD'
-
-    const homeTeam = match.home_team_id ? teamById.get(match.home_team_id) : null
-    const awayTeam = match.away_team_id ? teamById.get(match.away_team_id) : null
-
-    // Who the user had in these two slots. Only kept when it is somebody other
-    // than who actually turned up — if it matches, the row above already says it.
-    const slots = predictedKnockoutTeams.get(matchNumber)
-    const otherThan = (
-      standing: GroupStanding | null | undefined,
-      actualTeamId: string | null,
-    ): PredictedTeam | null =>
-      standing && standing.team_id !== actualTeamId
-        ? { name: standing.country_name, code: standing.country_code, flagUrl: standing.flag_url ?? null }
+      const bracketPick: BracketPick | null = pickId
+        ? {
+            teamName: pickTeam?.country_name ?? null,
+            flagUrl: pickTeam?.flag_url ?? null,
+            // Undecided until the match is done AND has a winner — a pick on an
+            // unplayed tie is not wrong, it is unresolved.
+            isCorrect:
+              m.is_completed && m.winner_team_id ? m.winner_team_id === pickId : null,
+            // A completed match with no bonus row earned nothing; an unplayed one
+            // has no answer yet, and 0 would read as a miss.
+            points: pointsByMatch.get(m.match_id) ?? (m.is_completed ? 0 : null),
+          }
         : null
-    const predictedHome = otherThan(slots?.home, match.home_team_id)
-    const predictedAway = otherThan(slots?.away, match.away_team_id)
 
-    // Actual winner
-    let actualWinnerSide: 'home' | 'away' | null = null
-    if (match.is_completed && match.home_score_ft !== null && match.away_score_ft !== null) {
-      if (match.home_score_ft > match.away_score_ft) {
-        actualWinnerSide = 'home'
-      } else if (match.away_score_ft > match.home_score_ft) {
-        actualWinnerSide = 'away'
-      } else if (match.home_score_pso !== null && match.away_score_pso !== null) {
-        actualWinnerSide = match.home_score_pso > match.away_score_pso ? 'home' : 'away'
-      } else if (match.winner_team_id) {
-        actualWinnerSide = match.winner_team_id === match.home_team_id ? 'home' : 'away'
+      return { match, bracketPick }
+    })
+  }, [matchMap, predictedKnockoutTeams, picksById, teamById, pointsByMatch])
+
+  const filtered = useMemo(() => {
+    return rows.filter(({ match }) => {
+      if (stage === 'finals') {
+        if (match.stage !== 'third_place' && match.stage !== 'final') return false
+      } else if (stage !== 'all' && match.stage !== stage) {
+        return false
       }
-    }
+      if (status === 'upcoming') {
+        return match.status !== 'completed' && match.status !== 'live'
+      }
+      if (status !== 'all' && match.status !== status) return false
+      return true
+    })
+  }, [rows, stage, status])
 
-    // User's pick
-    const pickedWinnerId = picksById.get(match.match_id)
-    let predictedWinnerSide: 'home' | 'away' | null = null
-    if (pickedWinnerId) {
-      if (pickedWinnerId === match.home_team_id) predictedWinnerSide = 'home'
-      else if (pickedWinnerId === match.away_team_id) predictedWinnerSide = 'away'
-    }
-
-    // Compare
-    let pickIsCorrect: boolean | null = null
-    if (match.is_completed && match.winner_team_id && pickedWinnerId) {
-      pickIsCorrect = match.winner_team_id === pickedWinnerId
-    }
-
-    return {
-      matchNumber,
-      homeName,
-      awayName,
-      homeCode: homeTeam?.country_code || null,
-      awayCode: awayTeam?.country_code || null,
-      homeFlagUrl: homeTeam?.flag_url || null,
-      awayFlagUrl: awayTeam?.flag_url || null,
-      actualHomeScore: match.home_score_ft,
-      actualAwayScore: match.away_score_ft,
-      actualHomePso: match.home_score_pso,
-      actualAwayPso: match.away_score_pso,
-      isCompleted: match.is_completed,
-      isLive: match.status === 'live',
-      liveClock: getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }),
-      statusBadge: getMatchStatusBadge({ status: match.status, statusDetail: match.status_detail, originalMatchDate: match.original_match_date }),
-      actualWinnerSide,
-      predictedWinnerSide,
-      pickIsCorrect,
-      predictedHome,
-      predictedAway,
-    }
-  }
-
-  // Half-bracket layout: 4 columns (R32 → R16 → QF → SF)
-  const halfR32X = 0
-  const halfR16X = halfR32X + L.roundW
-  const halfQfX = halfR16X + L.roundW
-  const halfSfX = halfQfX + L.roundW
-
-  const roundHeaders = [
-    { x: halfR32X, label: 'R32' },
-    { x: halfR16X, label: 'R16' },
-    { x: halfQfX, label: 'QF' },
-    { x: halfSfX, label: 'SF' },
-  ]
-
-  function renderBracketHalf(
-    label: string,
-    r32: number[],
-    r16: number[],
-    qf: number[],
-    sf: number,
-  ) {
-    return (
-      <div>
-        <h3 className="text-sm font-bold text-muted mb-2 uppercase tracking-wide">{label}</h3>
-        <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="relative" style={{ width: L.width, height: L.height, minWidth: L.width }}>
-            {/* Round headers */}
-            {roundHeaders.map((h, i) => (
-              <div
-                key={i}
-                className="absolute text-center t-caption text-muted"
-                style={{ left: h.x, top: 0, width: L.cellW }}
-              >
-                {h.label}
-              </div>
-            ))}
-
-            {/* SVG connector lines */}
-            <svg className="absolute top-0 left-0 pointer-events-none" width={L.width} height={L.height} fill="none">
-              {getConnectorPaths(halfR32X + L.cellW, pos.r32Ys, halfR16X, pos.r16Ys, L).map((d, i) => (
-                <path key={`r32-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
-              ))}
-              {getConnectorPaths(halfR16X + L.cellW, pos.r16Ys, halfQfX, pos.qfYs, L).map((d, i) => (
-                <path key={`r16-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
-              ))}
-              {getConnectorPaths(halfQfX + L.cellW, pos.qfYs, halfSfX, [pos.sfY], L).map((d, i) => (
-                <path key={`qf-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
-              ))}
-            </svg>
-
-            {/* Match cells */}
-            {r32.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR32X} y={pos.r32Ys[i]} L={L} />)}
-            {r16.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR16X} y={pos.r16Ys[i]} L={L} />)}
-            {qf.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfQfX} y={pos.qfYs[i]} L={L} />)}
-            <BracketCell data={buildCellData(sf)} x={halfSfX} y={pos.sfY} L={L} />
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const totalPoints = useMemo(
+    () => rows.reduce((sum, r) => sum + (r.bracketPick?.points ?? 0), 0),
+    [rows],
+  )
 
   return (
-    <div ref={wrapRef}>
+    <div>
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-ink">Knockout Bracket</h2>
+        <h2 className="text-xl font-bold text-ink">Knockout Results</h2>
         {totalPickable > 0 && (
           <Badge variant={correctPicks === totalPickable ? 'green' : correctPicks > 0 ? 'blue' : 'gray'}>
             {correctPicks}/{totalPickable} correct
@@ -940,24 +491,58 @@ function KnockoutComparison({
         )}
       </div>
 
-      <Alert variant="info" className="mb-6 text-xs">
-        Your picks are highlighted. <span className="inline-block w-1 h-3 bg-success-500 rounded-chip align-middle mr-0.5"></span><span className="text-success-700 font-medium">Green</span> = correct, <span className="inline-block w-1 h-3 bg-danger-500 rounded-chip align-middle mr-0.5"></span><span className="text-danger-600 font-medium">Red</span> = incorrect, <span className="text-primary-700 font-medium">blue highlight</span> = your pick (pending).
-      </Alert>
+      {/* Header row — points left, filters right — matching the Results tab the
+          other two modes get, which is the point of this view. */}
+      <div className="mb-4 px-4 py-3 bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="hidden sm:inline t-card-title text-ink truncate">Knockout Points</span>
+          <span className="t-num t-num-extrabold text-lg text-primary-600 whitespace-nowrap">
+            {totalPoints}
+            <span className="t-detail text-muted ml-1">pts</span>
+          </span>
+        </div>
 
-      {/* Split bracket — two halves stacked */}
-      <div className="space-y-8">
-        {renderBracketHalf('Upper Bracket', LEFT_R32, LEFT_R16, LEFT_QF, LEFT_SF[0])}
-        {renderBracketHalf('Lower Bracket', RIGHT_R32, RIGHT_R16, RIGHT_QF, RIGHT_SF[0])}
-      </div>
-
-      {/* Final & 3rd Place */}
-      <div className="mt-8">
-        <h3 className="text-sm font-bold text-muted mb-3 uppercase tracking-wide">Finals</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-          <FinalMatchCard data={buildCellData(104)} label="Final" />
-          <FinalMatchCard data={buildCellData(103)} label="3rd Place" />
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          <Select
+            value={stage}
+            onChange={e => setStage(e.target.value as StageKey)}
+            aria-label="Filter by round"
+          >
+            {STAGE_OPTIONS.map(o => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </Select>
+          <Select
+            value={status}
+            onChange={e => setStatus(e.target.value as StatusKey)}
+            aria-label="Filter by match status"
+          >
+            {STATUS_OPTIONS.map(o => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </Select>
         </div>
       </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-surface rounded-card shadow-card p-8 text-center">
+          <p className="t-body text-muted">No matches match these filters.</p>
+        </div>
+      ) : (
+        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden divide-y divide-border-subtle">
+          {filtered.map(({ match, bracketPick }, i) => (
+            <MatchCard
+              key={match.match_id}
+              match={match}
+              // Unused by the card, but part of its contract.
+              poolSettings={settings as unknown as PoolSettings}
+              predictionMode="bracket_picker"
+              index={i}
+              bracketPick={bracketPick}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -980,6 +565,7 @@ export function BracketResultsTab({
   allBPThirdPlaceRankings,
   allBPKnockoutPicks,
   bpProvisionalScoring = false,
+  bonusScores,
 }: BracketResultsTabProps) {
   const [selectedEntryId, setSelectedEntryId] = useState(currentEntryId)
   const showEntrySelector = userEntries.length > 1
@@ -994,6 +580,11 @@ export function BracketResultsTab({
     if (selectedEntryId === currentEntryId) return initialThirdPlaceRankings
     return allBPThirdPlaceRankings.filter(r => r.entry_id === selectedEntryId)
   }, [selectedEntryId, currentEntryId, initialThirdPlaceRankings, allBPThirdPlaceRankings])
+
+  const entryBonusScores = useMemo(
+    () => bonusScores.filter(b => b.entry_id === selectedEntryId),
+    [bonusScores, selectedEntryId],
+  )
 
   const knockoutPicks = useMemo(() => {
     if (selectedEntryId === currentEntryId) return initialKnockoutPicks
@@ -1304,6 +895,8 @@ export function BracketResultsTab({
         matchMap={matchMap}
         knockoutPicks={knockoutPicks}
         predictedKnockoutTeams={predictedKnockoutTeams}
+        bonusScores={entryBonusScores}
+        settings={settings}
         completedKnockout={completedKnockout}
         totalKnockout={totalKnockout}
         correctPicks={correctPicks}

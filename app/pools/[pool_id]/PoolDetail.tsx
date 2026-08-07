@@ -1735,6 +1735,7 @@ export function PoolDetail({
                 allBPThirdPlaceRankings={allBPThirdPlaceRankings}
                 allBPKnockoutPicks={allBPKnockoutPicks}
                 bpProvisionalScoring={bpProvisionalScoring}
+                bonusScores={bonusScores}
               />
             )}
 
