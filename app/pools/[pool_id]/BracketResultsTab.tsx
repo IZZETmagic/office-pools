@@ -80,8 +80,14 @@ type BracketResultsTabProps = {
 // is what the overflow-x-auto wrapper is for.
 
 const BASE_CELL_W = 160
-/** Two team rows to a cell — this is the pair, so it always stays even. */
-const BASE_ROW_H = 32
+/**
+ * Two team rows to a cell — this is the pair, so it always stays even.
+ *
+ * A row carries a 12px team name and, where the user had somebody else in that
+ * slot, a 10px line underneath naming them. That is 29px of text, so 32 clipped
+ * the second line at the narrow end.
+ */
+const BASE_ROW_H = 38
 const BASE_CELL_H = BASE_ROW_H * 2
 const BASE_PAIR_GAP = 8
 const BASE_COL_GAP = 24
@@ -447,6 +453,17 @@ type BracketCellData = {
   pickIsCorrect: boolean | null // null = match not completed
   liveClock: string | null // "45'" / HT / ET / PENS while live
   statusBadge: MatchStatusBadge | null // Delayed / Postponed / etc.
+  // Who the user had in these two slots — set ONLY when that is someone other
+  // than who actually turned up, since otherwise the row above already says it.
+  predictedHome: PredictedTeam | null
+  predictedAway: PredictedTeam | null
+}
+
+/** A team the user put in a slot that someone else ended up filling. */
+type PredictedTeam = {
+  name: string
+  code: string
+  flagUrl: string | null
 }
 
 /** Shared row styling for bracket cells and final match cards */
@@ -472,6 +489,69 @@ function getCellRowClass(data: BracketCellData, side: 'home' | 'away') {
   return 'text-ink'
 }
 
+/**
+ * One team inside a bracket cell: who actually turned up, and — when the user
+ * had somebody else there — a second line naming who they had.
+ *
+ * The comparison is meaningful because both answer the same question: who fills
+ * this slot. A knockout slot is "winner of match 57", so the user's team and the
+ * real one are two answers to that, not two unrelated teams stacked together.
+ */
+function CellTeamRow({
+  code,
+  name,
+  flagUrl,
+  predicted,
+  score,
+  pso,
+  showScore,
+  rowClass,
+  height,
+  divider,
+}: {
+  code: string | null
+  name: string
+  flagUrl: string | null
+  predicted: PredictedTeam | null
+  score: number | null
+  pso: number | null
+  showScore: boolean
+  rowClass: string
+  height: number
+  divider: boolean
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between px-2 text-xs ${divider ? 'border-b border-border-subtle' : ''} ${rowClass}`}
+      style={{ height }}
+    >
+      <span className="flex flex-col min-w-0 flex-1 mr-1">
+        <span className="flex items-center gap-1.5 truncate">
+          {flagUrl && (
+            <img src={flagUrl} alt="" className="w-4 h-3 rounded-[1px] object-cover shrink-0" />
+          )}
+          <span className="truncate">{code || shortName(name)}</span>
+        </span>
+        {predicted && (
+          <span className="flex items-center gap-1 truncate t-detail text-muted">
+            <span className="shrink-0">you had</span>
+            {predicted.flagUrl && (
+              <img src={predicted.flagUrl} alt="" className="w-3 h-2 rounded-[1px] object-cover shrink-0" />
+            )}
+            <span className="truncate">{predicted.code || predicted.name}</span>
+          </span>
+        )}
+      </span>
+      {showScore && (
+        <span className="t-num t-num-extrabold flex-shrink-0">
+          {score}
+          {pso !== null && <span className="text-[9px] text-muted ml-0.5">({pso})</span>}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function BracketCell({ data, x, y, L }: { data: BracketCellData; x: number; y: number; L: BracketLayout }) {
   const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
 
@@ -491,47 +571,30 @@ function BracketCell({ data, x, y, L }: { data: BracketCellData; x: number; y: n
       className={`absolute border ${borderClass} rounded-control bg-surface shadow-sm overflow-hidden`}
       style={{ left: x, top: y, width: L.cellW, height: L.cellH }}
     >
-      {/* Home team row */}
-      <div
-        className={`flex items-center justify-between px-2 text-xs border-b border-border-subtle ${getCellRowClass(data, 'home')}`}
-        style={{ height: L.cellH / 2 - 0.5 }}
-      >
-        <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
-          {data.homeFlagUrl && (
-            <img src={data.homeFlagUrl} alt="" className="w-4 h-3 rounded-[1px] object-cover shrink-0" />
-          )}
-          <span className="truncate">{data.homeCode || shortName(data.homeName)}</span>
-        </span>
-        {hasScore && (
-          <span className="t-num t-num-extrabold flex-shrink-0">
-            {data.actualHomeScore}
-            {data.actualHomePso !== null && (
-              <span className="text-[9px] text-muted ml-0.5">({data.actualHomePso})</span>
-            )}
-          </span>
-        )}
-      </div>
-
-      {/* Away team row */}
-      <div
-        className={`flex items-center justify-between px-2 text-xs ${getCellRowClass(data, 'away')}`}
-        style={{ height: L.cellH / 2 - 0.5 }}
-      >
-        <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
-          {data.awayFlagUrl && (
-            <img src={data.awayFlagUrl} alt="" className="w-4 h-3 rounded-[1px] object-cover shrink-0" />
-          )}
-          <span className="truncate">{data.awayCode || shortName(data.awayName)}</span>
-        </span>
-        {hasScore && (
-          <span className="t-num t-num-extrabold flex-shrink-0">
-            {data.actualAwayScore}
-            {data.actualAwayPso !== null && (
-              <span className="text-[9px] text-muted ml-0.5">({data.actualAwayPso})</span>
-            )}
-          </span>
-        )}
-      </div>
+      <CellTeamRow
+        code={data.homeCode}
+        name={data.homeName}
+        flagUrl={data.homeFlagUrl}
+        predicted={data.predictedHome}
+        score={data.actualHomeScore}
+        pso={data.actualHomePso}
+        showScore={hasScore}
+        rowClass={getCellRowClass(data, 'home')}
+        height={L.cellH / 2 - 0.5}
+        divider
+      />
+      <CellTeamRow
+        code={data.awayCode}
+        name={data.awayName}
+        flagUrl={data.awayFlagUrl}
+        predicted={data.predictedAway}
+        score={data.actualAwayScore}
+        pso={data.actualAwayPso}
+        showScore={hasScore}
+        rowClass={getCellRowClass(data, 'away')}
+        height={L.cellH / 2 - 0.5}
+        divider={false}
+      />
 
       {/* Left edge indicator strip — no overlap with scores */}
       {data.isLive && (
@@ -588,11 +651,22 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
       </div>
       <div className="divide-y divide-border-subtle">
         <div className={`flex items-center justify-between px-3 py-2.5 ${getCellRowClass(data, 'home')}`}>
-          <span className="flex items-center gap-2 flex-1">
-            {data.homeFlagUrl && (
-              <img src={data.homeFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
+          <span className="flex flex-col min-w-0 flex-1">
+            <span className="flex items-center gap-2 min-w-0">
+              {data.homeFlagUrl && (
+                <img src={data.homeFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
+              )}
+              <span className="text-sm font-medium truncate">{data.homeName}</span>
+            </span>
+            {data.predictedHome && (
+              <span className="flex items-center gap-1.5 min-w-0 t-detail text-muted mt-0.5">
+                <span className="shrink-0">you had</span>
+                {data.predictedHome.flagUrl && (
+                  <img src={data.predictedHome.flagUrl} alt="" className="w-3.5 h-2.5 rounded-[1px] object-cover shrink-0" />
+                )}
+                <span className="truncate">{data.predictedHome.name}</span>
+              </span>
             )}
-            <span className="text-sm font-medium">{data.homeName}</span>
           </span>
           {hasScore && (
             <span className="text-sm t-num t-num-extrabold flex-shrink-0">
@@ -604,11 +678,22 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
           )}
         </div>
         <div className={`flex items-center justify-between px-3 py-2.5 ${getCellRowClass(data, 'away')}`}>
-          <span className="flex items-center gap-2 flex-1">
-            {data.awayFlagUrl && (
-              <img src={data.awayFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
+          <span className="flex flex-col min-w-0 flex-1">
+            <span className="flex items-center gap-2 min-w-0">
+              {data.awayFlagUrl && (
+                <img src={data.awayFlagUrl} alt="" className="w-5 h-3.5 rounded-[1px] object-cover shrink-0" />
+              )}
+              <span className="text-sm font-medium truncate">{data.awayName}</span>
+            </span>
+            {data.predictedAway && (
+              <span className="flex items-center gap-1.5 min-w-0 t-detail text-muted mt-0.5">
+                <span className="shrink-0">you had</span>
+                {data.predictedAway.flagUrl && (
+                  <img src={data.predictedAway.flagUrl} alt="" className="w-3.5 h-2.5 rounded-[1px] object-cover shrink-0" />
+                )}
+                <span className="truncate">{data.predictedAway.name}</span>
+              </span>
             )}
-            <span className="text-sm font-medium">{data.awayName}</span>
           </span>
           {hasScore && (
             <span className="text-sm t-num t-num-extrabold flex-shrink-0">
@@ -631,6 +716,7 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
 function KnockoutComparison({
   matchMap,
   knockoutPicks,
+  predictedKnockoutTeams,
   completedKnockout,
   totalKnockout,
   correctPicks,
@@ -639,6 +725,8 @@ function KnockoutComparison({
 }: {
   matchMap: Map<number, MatchData>
   knockoutPicks: BPKnockoutPick[]
+  /** The user's own bracket, keyed by match number — same slots as the real match. */
+  predictedKnockoutTeams: Map<number, { home: GroupStanding | null; away: GroupStanding | null }>
   completedKnockout: number
   totalKnockout: number
   correctPicks: number
@@ -700,6 +788,8 @@ function KnockoutComparison({
         actualWinnerSide: null,
         predictedWinnerSide: null,
         pickIsCorrect: null,
+        predictedHome: null,
+        predictedAway: null,
       }
     }
 
@@ -708,6 +798,19 @@ function KnockoutComparison({
 
     const homeTeam = match.home_team_id ? teamById.get(match.home_team_id) : null
     const awayTeam = match.away_team_id ? teamById.get(match.away_team_id) : null
+
+    // Who the user had in these two slots. Only kept when it is somebody other
+    // than who actually turned up — if it matches, the row above already says it.
+    const slots = predictedKnockoutTeams.get(matchNumber)
+    const otherThan = (
+      standing: GroupStanding | null | undefined,
+      actualTeamId: string | null,
+    ): PredictedTeam | null =>
+      standing && standing.team_id !== actualTeamId
+        ? { name: standing.country_name, code: standing.country_code, flagUrl: standing.flag_url ?? null }
+        : null
+    const predictedHome = otherThan(slots?.home, match.home_team_id)
+    const predictedAway = otherThan(slots?.away, match.away_team_id)
 
     // Actual winner
     let actualWinnerSide: 'home' | 'away' | null = null
@@ -756,6 +859,8 @@ function KnockoutComparison({
       actualWinnerSide,
       predictedWinnerSide,
       pickIsCorrect,
+      predictedHome,
+      predictedAway,
     }
   }
 
@@ -969,6 +1074,24 @@ export function BracketResultsTab({
     return buildGroupStandingsFromRankings(groupRankings, tournamentTeams)
   }, [groupRankings, tournamentTeams])
 
+  // ---- The user's own knockout bracket ----
+  // Which teams THEY had in each knockout slot, resolved from their group
+  // rankings plus their knockout picks. The grid below draws the real
+  // tournament, so a pick for a team that never turned up had nowhere to
+  // appear and simply vanished — 36% of every knockout pick ever made, and
+  // 62% of Final picks. Keyed by match number, same slots as the real match.
+  const predictedKnockoutTeams = useMemo(() => {
+    const empty = new Map<number, { home: GroupStanding | null; away: GroupStanding | null }>()
+    if (groupRankings.length === 0) return empty
+    return resolveFullBracketFromPicks({
+      groupRankings,
+      thirdPlaceRankings,
+      knockoutPicks,
+      teams: tournamentTeams,
+      matches: tournamentMatches,
+    }).knockoutTeamMap
+  }, [groupRankings, thirdPlaceRankings, knockoutPicks, tournamentTeams, tournamentMatches])
+
   // ---- Knockout stats ----
   const { completedKnockout, totalKnockout, correctPicks, totalPickable } = useMemo(() => {
     const knockoutMatches = matches.filter(m => m.stage !== 'group')
@@ -1180,6 +1303,7 @@ export function BracketResultsTab({
       <KnockoutComparison
         matchMap={matchMap}
         knockoutPicks={knockoutPicks}
+        predictedKnockoutTeams={predictedKnockoutTeams}
         completedKnockout={completedKnockout}
         totalKnockout={totalKnockout}
         correctPicks={correctPicks}
