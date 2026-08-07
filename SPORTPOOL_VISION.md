@@ -180,9 +180,16 @@ currently unmeasured on every dashboard** (risk R7), which makes our biggest lev
 
 ### 6.3 The formats are the range
 
-Decision 3. That a league crew can play Score Predictor, Last Man Standing or Final Table **is** the
-product's range. Hiding it makes SportPool look like a one-trick pick'em app. A format is a named
-preset that carries its own scoring — *the admin chooses a game, never assembles one.*
+Decision 3. That a league crew can play Pick'em, Showdown or Last Man Standing **is** the product's
+range. Hiding it makes SportPool look like a one-trick pick'em app. A format is a named preset that
+carries its own scoring — *the admin chooses a game, never assembles one.*
+
+**Names corrected 2026-07-30** (Decision 9 — the EPL format grid). This line previously read *"Score
+Predictor, Last Man Standing or Final Table"*. The settled shape is **three modes** — Last Man
+Standing, Pick'em, Showdown — with a **Results or Scores** depth choice on the latter two, and **Final
+Table** as an optional season-long add-on any mode can carry rather than a mode of its own. Depth
+exists to serve §1: a ten-month season asked in exact scorelines is 760 numeric decisions, which is
+homework, and homework does not *bring* anyone anywhere.
 
 Multi-sport follows from §6.1: it is a **retention** strategy wearing an expansion strategy's clothes.
 
@@ -346,7 +353,11 @@ product failure.
 
 ## 10. Still open
 
-- **§9.1 — free-tier banter.** Needs Ryan's call; blocks monetisation design.
+> **Both live decisions were deferred by Ryan on 2026-07-29** — not rejected. Each carries a trigger
+> below so the deferral doesn't quietly become a default.
+
+- **§9.1 — free-tier banter.** Needs Ryan's call; blocks monetisation design. **Trigger:** whenever
+  monetisation is next picked up — this is the first question in that work, not a detail inside it.
 - **How live is "live"?** The 60-second sync is the floor today. Three sub-questions: does our data
   provider offer push/webhooks; is sub-60s worth what it costs the DB; and — the sharp one — the
   time-boxed resumable sweep. **Verified against production 2026-07-26: `sweep_time_box_enabled` has
@@ -354,7 +365,9 @@ product failure.
   through to `false` — meaning **the outage protection built after the June meltdown has never run in
   production, and it is off by omission rather than by decision.** It matters both ways under §3: it
   prevents the pile-up that makes the leaderboard hours late, but it does so precisely by *allowing a
-  pool to lag a run* during a heavy completion. That trade now needs an explicit call.
+  pool to lag a run* during a heavy completion. That trade now needs an explicit call. **Trigger: EPL
+  kickoff, mid-August 2026** — it is moot while nothing is being scored, and load-bearing the moment a
+  38-matchweek season starts producing weekly completion sweeps across every pool.
 - **The monetisation plan needs re-costing** against "every user monetisable" (§6.5) rather than
   admin-only. RM-04 stands until it does.
 - **Admin retention is unmeasured** (R7). The clean baseline is the WC→EPL transition, which is

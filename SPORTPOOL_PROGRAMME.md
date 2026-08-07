@@ -864,6 +864,20 @@ registers are not decoration.
 - **Effort:** the code and the release are done. What's left is a ruling on **R19** (minutes) plus the header fix (minutes), and a check on whether the 697 level-ups pushed.
 - **Done when:** ~~parity comes back clean~~ ✅ (331/331, 2026-07-29), `/pools` and `/dashboard` show a level with one definition behind it ✅, **`entry_xp_state` has exactly one writer by decision *and* in `pg_cron`**, and it is confirmed that no user received a level-up push for a formula change.
 
+### Group-standings bonuses show a raw enum to every member `Bug` `Scoring` `Mobile`
+> Found 2026-07-31 during the web redesign of the points-breakdown modal. Web has a display-side
+> stopgap (`e906fc4`); **the data and the app are still wrong**. Not destructive and points are
+> correct — this is wording only — but it is on every pool.
+- **Is:** the shadow engine writes the bonus `description` as the bonus-type identifier. `lib/migrations/028_shadow_podium_use_view.sql:102` builds it as `('Group '||gp.group_letter||': '||x.bt)`, where `x.bt` is the enum, so a member's breakdown reads **"Group A: group_winner_only"**.
+- **Evidence (prod, 2026-07-31):** **33,774 of 33,774** `shadow_bonus_scores` group-standings rows are the raw shape; **0 of 139,677** legacy `bonus_scores` rows are. Every *other* shadow category still writes prose (`bp_group` → "Group A 1st position: Correctly predicted Mexico"; `tournament` → "Champion correct"). **`group_standings` is the only category that regressed.**
+- **Why it surfaced now:** it was latent until the read cutover pointed all 623 pools at the shadow table (*Shadow read-path cutover*, shipped 2026-07-28/29). The old table's sentences also carried the **team name** — "Group A: Correct winner (Mexico)" — which the shadow column drops entirely.
+- **Precedent:** the same class of defect was already fixed once for bracket-picker in `lib/migrations/036_shadow_bp_descriptions.sql`. That pass did not cover `group_standings`.
+- **Not just web.** The RN app reads the same column and renders the same raw text, so the stopgap in `lib/bonusDescription.ts` fixes one surface of two. The team name cannot be recovered at display time on either.
+- **Decision 2026-07-31 (Ryan):** log it, don't touch prod yet. A fix is a migration correcting 028's expression plus a backfill of the 33,774 rows.
+- **Touches:** `lib/migrations/028_shadow_podium_use_view.sql`, a new migration + backfill, `lib/bonusDescription.ts` (delete the stopgap once the data is right), `mobile/app/pool/[id]/breakdown.tsx` (no change needed if fixed at source).
+- **Effort:** ~half a day — the wording exists verbatim in `lib/bonusCalculation.ts:160–184`; the work is re-deriving the team names in SQL and backfilling.
+- **Done when:** `shadow_bonus_scores.description` is prose for every category, the app and web read it unformatted, and `lib/bonusDescription.ts` is deleted rather than left as a permanent shim.
+
 > Beyond that and the **recurring knockout ops** below, the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
 
 ### ✅ Completed (verified against code, 2026-07-12)
@@ -1463,11 +1477,14 @@ Crew membership is consent to the **group**, not to every **competition**.
 
 ### Decision 3 — The format screen stays, as a one-tap confirmation
 
-- Recommended format **pre-selected**; primary button names it (*"Continue with Score Predictor"*).
+- Recommended format **pre-selected**; primary button names it (*"Continue with Pick'em"*).
   **Skipped entirely** when only one format exists, and by Run it back. Shows crew history.
 - *Why keep it:* **the formats are the product.** For a multi-sport app, the fact a league crew can
-  play Score Predictor, Last Man Standing or Final Table *is* the range. Hiding it makes SportPool
-  look like a one-trick pick'em app.
+  play Pick'em, Showdown or Last Man Standing *is* the range. Hiding it makes SportPool look like a
+  one-trick pick'em app. ⚠ **Names corrected 2026-07-30** — this line previously read *"Score
+  Predictor, Last Man Standing or Final Table"*, which predates **Decision 9**: Final Table is an
+  add-on rather than a mode, Showdown is the third mode, and there is now a Results/Scores depth axis
+  the old list had no room for.
 - **A format is a named preset that carries its own scoring.** The admin chooses a game, never
   assembles one.
 - **Crew selection lives on the name screen:** *Name · Crew · Who can join · Create*. "No crew" is
@@ -1564,6 +1581,86 @@ five, for genuinely new mechanics:
 
 Standing check: assume a 15-year-old is in a family pool.
 
+### Decision 9 — The EPL format grid: three modes, two depths, one add-on
+
+> **Settled 2026-07-30 with Ryan, in session.** This closes *"the competition-shape × pool-format
+> grid"*, which sat under *Not yet discussed* until now, and supersedes the format names used as
+> examples in Decision 3 and `SPORTPOOL_VISION.md` §6.3.
+
+**Two axes, not a nested menu.** Depth is a property of a mode, not a submenu inside it:
+
+| | **Results** (home / draw / away) | **Scores** (exact goals) |
+|---|---|---|
+| **Pick'em** — running season table | ✅ | ✅ |
+| **Showdown** — weekly H2H duels | ✅ | ✅ |
+| **Last Man Standing** | — its own pick shape; no depth axis | — |
+
+- **Showdown is a layer, not a peer.** It consumes whichever weekly accuracy number the depth
+  produces (line 1059: *"beat their accuracy"*), so it works over either without knowing which.
+- **Results is the pre-selected recommendation for a league season.** 10 fixtures × 38 matchweeks =
+  380 fixtures; Scores means **760 numeric decisions** over ten months, Results means 380 taps. A
+  month of World Cup scorelines is a burst; ten months of them is homework — and §1 says *bring*
+  people together, while the vision explicitly rules out fantasy-depth. Scores is the opt-up.
+- ⚠ **They are named Results and Scores, never Basic/Advanced.** Decision 6 reserves *"advanced"* for
+  **a different game, not different numbers**, so "Advanced Pick'em" for *same game, more digits*
+  collides with settled vocabulary. Separately, "Basic" is a status word: it pushes people onto a
+  depth they'll abandon in October rather than look like the basic one.
+- **One depth per pool, locked at creation** — same DB-trigger treatment as Decision 6's
+  scoring-locks-at-kickoff, because mobile writes predictions directly and the UI is not a gate.
+  Mixed depths inside one pool would make weekly scores incomparable and break Showdown.
+- ⚠ **Results needs a real `predicted_outcome` column — do NOT encode it as a sentinel scoreline.**
+  Predictions store two integers (`predicted_home_score` / `predicted_away_score`). Encoding H/D/A as
+  1-0 / 0-0 / 0-1 would score as a genuine **exact** and would show every member a fabricated
+  *"predicted 1-0"* they never picked in the breakdown views (`039_pool_match_prediction_breakdown`).
+  That is the silent-wrongness class the vision names as not shippable. Per the `entry_xp_state`
+  lesson, **the migration ships before any code names the column.**
+- **The scoring half of Results is nearly free.** `getWinner()` already exists
+  ([core.ts:15](lib/scoring/core.ts)), the engine already resolves winner-vs-winner before paying out,
+  and `038_pool_match_prediction_accuracy` already derives home/draw/away in SQL. Results is the
+  existing ladder with the top two rungs removed — **a mode flag on the league engine, not a second
+  engine.** That distinction is what keeps it affordable against *EPL mid-August is not reachable on
+  current foundations*.
+- **Last Man Standing runs as repeating rounds, not one elimination.** At 7.6 members and a realistic
+  ~65–70% weekly survival rate, a single round is down to one player in five or six matchweeks of
+  **thirty-eight**. A pool dead in September fails the purpose clause outright. Round closes when all
+  are out, a new one opens next matchweek, season score = rounds won.
+- **LMS locks at matchweek level, not per match.** `trg_enforce_prediction_before_kickoff` locks at
+  each match's kickoff; an LMS pick must lock at the matchweek's **first** fixture or a Sunday picker
+  sees Saturday's results.
+- **Final Table is an add-on, not a mode.** Predict **champion, top four, relegation** — the things
+  people argue about, not twenty positions nobody has an opinion about. Made once before the first
+  lock, worth a **small slice** of the season total, admin toggle (on by default). *Why not a mode:*
+  "done for the season in August" leaves nothing to say to each other on a Tuesday in November, and
+  §3 is the whole product. **Shown live against the real table all season**, which is what earns it
+  its place — a self-refreshing argument from week three onward. The actual table is **derived from
+  completed matches**, the same trick [lib/podium.ts](lib/podium.ts) uses for the actual podium — no
+  standings feed, no new ingestion.
+- **Tiebreaks reuse the canonical World Cup cascade verbatim.** Verified 2026-07-30 that **both
+  engines already agree** — [recalculate.ts:542](lib/scoring/recalculate.ts) and
+  [035_shadow_wire_bracket_picker.sql:126](lib/migrations/035_shadow_wire_bracket_picker.sql) are
+  identical (worth stating, since the parity alarm compares **totals only** and cannot see rank
+  drift): `total_points DESC, exact_count DESC, correct_count DESC, bonus_points DESC,
+  predictions_submitted_at ASC NULLS LAST`.
+  - ✅ **Final Table scores into `bonus_points`, so it becomes rung 4 for free.** A league pool has no
+    bonus path today — WC bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`) — so the slot
+    is empty and Final Table fits it exactly. **No new tiebreak code.**
+  - **`exact_count` goes inert in Results depth** (no scorelines ⇒ nobody scores `exact`), so a
+    Results pool effectively runs a four-rung cascade. Harmless, but don't be surprised by it.
+- ❌ **Rejected: the banker** (nominate one fixture to count double). Killed on the **disclosure
+  gate** — it is pools jargon that has to be taught before a first pick, which taxes exactly the
+  people Results exists to include. The tie pressure it was solving was **overstated**: over 38
+  matchweeks at 3/1/0, even a third of duels drawing still separates the table cleanly, and a draw is
+  a legitimate football result. Drawn duels stay drawn. *If* it proves flat in practice, the
+  zero-explanation lever is a **Match of the Week worth double, chosen by us** — no jargon, no extra
+  input, and one shared game the whole pool watches. **Not for launch.**
+- **Consequence for *EPL mid-August is not reachable on current foundations*:** LMS at launch means
+  **three engines** for mid-August (league Pick'em with a depth flag, Showdown as a layer, LMS
+  standalone). This does not change that LMS is the right third mode; it sharpens the scope-or-date
+  call that item already demands.
+- **Turning on ≥2 formats turns on the format screen**, which Decision 3 skips when only one exists.
+  Keep it **flat**: three mode cards, each carrying a `Results | Scores` segmented control with
+  Results pre-selected — one screen, one tap to accept the recommendation.
+
 ---
 
 ### Still open
@@ -1578,10 +1675,20 @@ Standing check: assume a 15-year-old is in a family pool.
 - **Discover ranking weights** — signals agreed, formula not.
 - **Migration path** from today's `pools` table to Crew + Season without disturbing 622 live pools.
   Biggest unknown in the project.
+- **What `predictions_submitted_at` means in a 38-week season** (Decision 9, rung 5). In the World Cup
+  one bracket was submitted once, so *"earliest"* meant *committed earliest*. Across 38 matchweeks it
+  can only mean *joined and picked first*. Still deterministic and fair — but it is a different claim
+  and should be named as one.
+- **The size of the Final Table slice** — "small" is agreed, the number is not. Big enough that
+  getting it right matters, small enough that August cannot outrun a season played well.
+- **The season tiebreak when Final Table is toggled off** — rung 4 (`bonus_points`) is then empty in a
+  league pool. Most correct results across the season is the obvious fallback and needs no new data.
 
 ### Not yet discussed
 
-- The competition-shape × pool-format grid, and which format engines to build in what order.
+- **Which format engines to build in what order** — the grid itself is now settled (**Decision 9**);
+  the build order is not, and it is entangled with the scope-or-date call under *EPL mid-August is not
+  reachable on current foundations*.
 - Showdown mechanics beyond "no playoff cut, matched pairing".
 - Monetisation (tracked separately under 💎).
 
