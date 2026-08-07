@@ -243,7 +243,7 @@ export function ChatMessage({
             <div className="relative">
               <EmojiPicker
                 anchor="above"
-                side={isOwn ? 'right' : 'left'}
+                side={isOwn ? 'left' : 'right'}
                 onSelect={emoji => { onToggleReaction(emoji); setPickerOpen(false) }}
                 onClose={() => setPickerOpen(false)}
               />
@@ -259,7 +259,7 @@ export function ChatMessage({
               <EmojiReactions
                 reactions={reactions}
                 onToggleReaction={onToggleReaction}
-                pickerSide={isOwn ? 'right' : 'left'}
+                pickerSide={isOwn ? 'left' : 'right'}
               />
               {/* Tapping a pill toggles in every chat app, so "who reacted" gets
                   its own control rather than stealing that tap. RN opens the
@@ -294,7 +294,13 @@ export function ChatMessage({
             exist and the long-press menu takes over. */}
         {(onReply || onToggleReaction) && (
           <div
-            className={`shrink-0 self-center transition-opacity ${
+            /* Absolute, not a flex child. As a third child of a row whose
+               message column is already max-w-[85%], it added its own width and
+               pushed the row past the pane — on both sides, because the row
+               reverses for your own messages. Pinned to the row's edge instead:
+               it costs no layout width, and left-0/right-0 is the pane's inside
+               edge by definition. */
+            className={`absolute top-1 z-10 ${isOwn ? 'left-0' : 'right-0'} transition-opacity ${
               menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
             }`}
           >
