@@ -55,13 +55,13 @@
 -- enter_match_result; see 043b. A body sweep, not pg_depend, is the check that
 -- matters when dropping plpgsql functions.
 --
--- Left in place deliberately: compare_match_scores_v1_v2(). It is equally dead —
+-- Left in place by THIS migration: compare_match_scores_v1_v2(). Equally dead —
 -- it reads match_scores.points_earned and joins match_scores_v2, and NEITHER
--- exists — but unlike the above it still has a caller,
--- app/api/admin/scoring-v2/route.ts:145. That call discards its error
+-- exists — but unlike the above it still had a caller,
+-- app/api/admin/scoring-v2/route.ts. That call discarded its error
 -- (`const { data } = await adminClient.rpc(...)`), so the route's comparison
--- report has been silently empty rather than failing. Fix the route and the
--- function together; dropping the function alone changes nothing.
+-- report was silently empty rather than failing. The caller has since been
+-- removed and the function dropped in 043c.
 
 -- No explicit begin/commit: the migration runner wraps this file in a single
 -- transaction, so the backup below and the drops at the bottom are atomic

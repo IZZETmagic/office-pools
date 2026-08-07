@@ -3,158 +3,103 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { recalculatePool } from '@/lib/scoring'
 
-// Allow up to 120s for processing all pools
+// Allow up to 120s for processing
 export const maxDuration = 120
 
 // =============================================================
 // POST /api/admin/scoring-v2
-// One-time recalculation: runs the v2 scoring engine against
-// all pools with submitted entries, populates match_scores
-// and v2_* columns, then returns a comparison report.
+// Re-runs the scoring engine over named pools and reports what each
+// one wrote. Super admin only.
 //
-// Super admin only. No side effects on existing scores.
+// This WRITES. recalculatePool replaces match_scores and bonus_scores
+// for every entry in the pool and rewrites its totals. The handler used
+// to be documented as "no side effects on existing scores", which was
+// never true of it.
+//
+// pool_ids is required. It used to default to every pool — all 623 of
+// them, sequentially, against this 120s limit. A full sweep takes closer
+// to 300s, so that request could only ever die partway and leave scoring
+// half-rewritten with nothing recording where it stopped. For a full
+// pass use scripts/recalculate-all-pools.ts, which has no timeout and
+// reports per-pool progress.
+//
+// For a single pool prefer POST /api/pools/:pool_id/recalculate, which is
+// what the Scoring Config save button uses.
 // =============================================================
 export async function POST(request: NextRequest) {
   const auth = await requireSuperAdmin()
   if (auth.error) return auth.error
-  const { supabase } = auth.data
+
+  const body = await request.json().catch(() => ({})) as { pool_ids?: unknown }
+  const poolIds = Array.isArray(body.pool_ids)
+    ? body.pool_ids.filter((id): id is string => typeof id === 'string')
+    : []
+
+  if (poolIds.length === 0) {
+    return NextResponse.json(
+      {
+        error: 'pool_ids is required.',
+        detail:
+          'This endpoint no longer recalculates every pool: a full sweep exceeds the 120s function limit and would leave scoring partially rewritten. Use scripts/recalculate-all-pools.ts for a full pass.',
+      },
+      { status: 400 }
+    )
+  }
 
   const adminClient = createAdminClient()
 
-  // 2. Find all pools with submitted entries
-  const { data: pools } = await adminClient
+  // Capture the error rather than destructuring `data` alone — a discarded
+  // PostgREST error here would look like "no pools matched".
+  const { data: pools, error: poolsError } = await adminClient
     .from('pools')
     .select('pool_id, pool_name, prediction_mode')
+    .in('pool_id', poolIds)
 
-  if (!pools) {
-    return NextResponse.json({ error: 'Failed to fetch pools' }, { status: 500 })
+  if (poolsError) {
+    return NextResponse.json({ error: poolsError.message }, { status: 500 })
   }
 
-  // 3. Recalculate each pool
-  const results = []
+  const found = pools ?? []
+  const notFound = poolIds.filter(id => !found.some(p => p.pool_id === id))
 
-  for (const pool of pools) {
+  const results = []
+  for (const pool of found) {
     const start = Date.now()
     const result = await recalculatePool({ poolId: pool.pool_id })
-    const elapsed = Date.now() - start
-
     results.push({
       pool_id: pool.pool_id,
       pool_name: pool.pool_name,
       prediction_mode: pool.prediction_mode,
       ...result,
-      elapsed_ms: elapsed,
+      elapsed_ms: Date.now() - start,
     })
   }
 
-  // 4. Build comparison report: v2 totals vs existing totals
-  const { data: comparison } = await adminClient
-    .from('pool_entries')
-    .select(`
-      entry_id,
-      entry_name,
-      total_points,
-      match_points,
-      bonus_points,
-      scored_total_points,
-      point_adjustment,
-      member_id,
-      pool_members!inner(pool_id, pools!inner(pool_name, prediction_mode))
-    `)
-    .not('scored_total_points', 'is', null)
-    .order('entry_name')
-
-  // Compute discrepancies
-  const discrepancies = (comparison || [])
-    .filter((e: any) => e.total_points !== e.scored_total_points)
-    .map((e: any) => ({
-      entry_id: e.entry_id,
-      entry_name: e.entry_name,
-      pool_name: e.pool_members?.pools?.pool_name,
-      prediction_mode: e.pool_members?.pools?.prediction_mode,
-      old_total: e.total_points,
-      v2_match: e.match_points,
-      v2_bonus: e.bonus_points,
-      v2_total: e.scored_total_points,
-      difference: e.scored_total_points - e.total_points,
-    }))
-
-  const matches = (comparison || [])
-    .filter((e: any) => e.total_points === e.scored_total_points)
-    .length
-
   return NextResponse.json({
-    recalculation_results: results,
-    comparison: {
-      total_entries_compared: comparison?.length || 0,
-      entries_matching: matches,
-      entries_with_discrepancies: discrepancies.length,
-      discrepancies,
-    },
+    requested: poolIds.length,
+    recalculated: results.filter(r => r.success).length,
+    failed: results.filter(r => !r.success).length,
+    not_found: notFound,
+    results,
   })
 }
 
 // =============================================================
-// GET /api/admin/scoring-v2
-// Returns the current comparison state without recalculating.
+// There is no GET here any more.
+//
+// It returned a v1-vs-v2 comparison built for the March 2026 cutover, and
+// both sides of that comparison are gone:
+//
+//   - It compared pool_entries.total_points against scored_total_points.
+//     total_points is dead v1 storage, fixed at 0 for all 4,979 entries, so
+//     the "discrepancies" list was every scored entry in the product —
+//     4,234 of them — each reported as differing from zero.
+//   - It called compare_match_scores_v1_v2(), which read
+//     match_scores.points_earned and joined match_scores_v2. Neither the
+//     column nor the table exists. The call was wrapped in a try/catch that
+//     discarded the error, so the field came back null and the endpoint
+//     looked healthy.
+//
+// The function was dropped in migration 043c. scored_total_points is the
+// canonical total and is read directly everywhere it is needed.
 // =============================================================
-export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin()
-  if (auth.error) return auth.error
-
-  const adminClient = createAdminClient()
-
-  // Comparison: v2 totals vs existing totals
-  const { data: comparison } = await adminClient
-    .from('pool_entries')
-    .select(`
-      entry_id,
-      entry_name,
-      total_points,
-      match_points,
-      bonus_points,
-      scored_total_points,
-      point_adjustment,
-      member_id,
-      pool_members!inner(pool_id, pools!inner(pool_name, prediction_mode))
-    `)
-    .not('scored_total_points', 'is', null)
-    .order('entry_name')
-
-  const discrepancies = (comparison || [])
-    .filter((e: any) => e.total_points !== e.scored_total_points)
-    .map((e: any) => ({
-      entry_id: e.entry_id,
-      entry_name: e.entry_name,
-      pool_name: e.pool_members?.pools?.pool_name,
-      prediction_mode: e.pool_members?.pools?.prediction_mode,
-      old_total: e.total_points,
-      v2_match: e.match_points,
-      v2_bonus: e.bonus_points,
-      v2_total: e.scored_total_points,
-      difference: e.scored_total_points - e.total_points,
-    }))
-
-  const matches = (comparison || [])
-    .filter((e: any) => e.total_points === e.scored_total_points)
-    .length
-
-  // Per-match comparison with existing match_scores table
-  let matchComparison: any = null
-  try {
-    const { data } = await adminClient.rpc('compare_match_scores_v1_v2')
-    matchComparison = data
-  } catch {
-    // RPC may not exist yet — that's OK
-  }
-
-  return NextResponse.json({
-    comparison: {
-      total_entries_compared: comparison?.length || 0,
-      entries_matching: matches,
-      entries_with_discrepancies: discrepancies.length,
-      discrepancies,
-    },
-    match_level_comparison: matchComparison,
-  })
-}
