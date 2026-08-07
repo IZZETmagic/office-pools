@@ -480,7 +480,11 @@ function BracketCell({ data, x, y, L }: { data: BracketCellData; x: number; y: n
 
   return (
     <div
-      className={`absolute border ${borderClass} rounded-inset bg-surface shadow-sm overflow-hidden`}
+      // radii.md, matching KnockoutMatchCard in the RN bracket wizard — same
+      // thing: a surface box with a thin border, overflow clipped, holding two
+      // rows. Not rounded-inset; that step is for a corner nested inside an
+      // already-rounded surface, and this one sits on the page background.
+      className={`absolute border ${borderClass} rounded-control bg-surface shadow-sm overflow-hidden`}
       style={{ left: x, top: y, width: L.cellW, height: L.cellH }}
     >
       {/* Home team row */}
