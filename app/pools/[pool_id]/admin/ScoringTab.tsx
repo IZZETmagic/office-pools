@@ -747,35 +747,41 @@ export function ScoringTab({
     const help = field ? fieldHelp(field) : null
     const info = help ? <InfoPopover title={help.title} body={help.body} /> : null
     return (
-      <div>
-        <label className="text-sm text-ink mb-1.5 sm:hidden flex items-center gap-1.5">{label}{info}</label>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <span className="text-sm text-ink w-52 shrink-0 hidden sm:flex items-center gap-1.5">{label}{info}</span>
+      /* One row at every width. The slider is desktop-only — on a phone it is a
+         fiddly target for a value that gets typed anyway, and dropping it frees
+         the row so the label and the number box can share it. That is why there
+         is a single label here rather than the stacked-on-mobile / inline-on-
+         desktop pair this used to carry. */
+      <div className="flex items-center gap-3 sm:gap-4">
+        <span className="text-sm text-ink flex-1 min-w-0 sm:flex-none sm:w-52 sm:shrink-0 flex items-center gap-1.5">
+          {label}{info}
+        </span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          aria-label={label}
+          className="hidden sm:block flex-1 h-2 bg-neutral-200 rounded-xl appearance-none cursor-pointer accent-primary-600 min-w-0"
+        />
+        <div className="flex items-center gap-1.5 shrink-0">
           <input
-            type="range"
+            type="number"
             min={min}
             max={max}
             step={step}
+            inputMode="decimal"
             value={value}
-            onChange={(e) => onChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-neutral-200 rounded-xl appearance-none cursor-pointer accent-primary-600 min-w-0"
+            onChange={(e) => {
+              const v = parseFloat(e.target.value)
+              if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)))
+            }}
+            aria-label={label}
+            className="w-14 sm:w-16 h-8 text-center text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
           />
-          <div className="flex items-center gap-1.5 shrink-0">
-            <input
-              type="number"
-              min={min}
-              max={max}
-              step={step}
-              inputMode="decimal"
-              value={value}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)))
-              }}
-              className="w-14 sm:w-16 h-8 text-center text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-neutral-900"
-            />
-            <span className="text-xs text-neutral-600 w-10">{suffix}</span>
-          </div>
+          <span className="text-xs text-neutral-600 w-10">{suffix}</span>
         </div>
       </div>
     )
