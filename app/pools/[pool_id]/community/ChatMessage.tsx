@@ -193,7 +193,12 @@ export function ChatMessage({
         )}
 
         <div className={`relative min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
-          onToggleReaction && reactions.length > 0 ? 'mb-3' : ''
+          /* The overhang has to clear TWO things, which mb-3 did not:
+             the pills hang 12px below the column, and the next message in a
+             cluster pulls itself up by 10px (-mt-2.5). 12 + 10 = 22, so at
+             mb-3 the pills landed 10px into the following bubble — which is
+             exactly what they did. 24px leaves 2px of daylight. */
+          onToggleReaction && reactions.length > 0 ? 'mb-6' : ''
         }`}>
           {/* Sender name — once per run, received side only. RN shows the name
               alone; the level pill is web-only and kept because it is existing
