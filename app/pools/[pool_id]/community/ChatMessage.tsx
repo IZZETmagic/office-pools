@@ -255,7 +255,16 @@ export function ChatMessage({
               excluded before ("no reactions per spec"), which is what the
               programme's discoverability item asked to undo. */}
           {onToggleReaction && reactions.length > 0 && (
-            <div className="mt-1 flex items-center gap-1">
+            /* -6px lifts the row onto the bubble's bottom edge (iMessage /
+               WhatsApp) instead of floating it in a gap below, and the 10px
+               inset hugs the bubble's near corner — left for received, right
+               for own. Straight from ReactionPills in the RN sheet. The whole
+               row sits above the bubble so the ring is not clipped. */
+            <div
+              className={`relative z-10 -mt-1.5 flex items-center gap-1 ${
+                isOwn ? 'justify-end pr-2.5' : 'justify-start pl-2.5'
+              }`}
+            >
               <EmojiReactions
                 reactions={reactions}
                 onToggleReaction={onToggleReaction}

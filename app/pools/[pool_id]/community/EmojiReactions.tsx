@@ -30,10 +30,14 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
         <button
           key={r.emoji}
           onClick={() => onToggleReaction(r.emoji)}
-          className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-pill border transition-colors ${
+          /* RN's pill: px 8 / py 3, a mist fill, and a 2px ring the colour of
+             the chat background so it reads as cut out and pops off the bubble
+             it overlaps. The ring is the load-bearing part — without it an
+             overlapping pill just muddies the bubble's bottom edge. */
+          className={`inline-flex items-center gap-1 text-xs px-2 py-[3px] rounded-pill border-2 border-snow transition-colors ${
             r.reacted_by_me
-              ? 'bg-primary-50 dark:bg-primary-900/15 border-primary-300 dark:border-primary-700 text-primary-800'
-              : 'bg-snow border-border-default text-muted hover:border-border-default'
+              ? 'bg-primary-600/[0.14] text-primary-800'
+              : 'bg-mist text-muted'
           }`}
         >
           <span>{r.emoji}</span>
