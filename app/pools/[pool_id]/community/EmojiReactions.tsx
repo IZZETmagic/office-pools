@@ -7,12 +7,14 @@ import { EmojiPicker } from './EmojiPicker'
 type EmojiReactionsProps = {
   reactions: ReactionCount[]
   onToggleReaction: (emoji: string) => void
+  /** Chat bubbles add reactions from the hover bar, so the inline + is noise there. */
+  showAddButton?: boolean
   pickerSide?: 'left' | 'right'
 }
 
 const QUICK_EMOJIS = ['🔥', '😱', '🎯', '😂', '💀']
 
-export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'right' }: EmojiReactionsProps) {
+export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'right', showAddButton = true }: EmojiReactionsProps) {
   const [showPicker, setShowPicker] = useState(false)
 
   const handleSelect = useCallback((emoji: string) => {
@@ -34,7 +36,7 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
              the chat background so it reads as cut out and pops off the bubble
              it overlaps. The ring is the load-bearing part — without it an
              overlapping pill just muddies the bubble's bottom edge. */
-          className={`inline-flex items-center gap-1 text-xs px-2 py-[3px] rounded-pill border-2 border-snow transition-colors ${
+          className={`inline-flex items-center gap-1 text-xs px-2 py-[3px] rounded-pill border-2 border-snow transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40 ${
             r.reacted_by_me
               ? 'bg-primary-600/[0.14] text-primary-800'
               : 'bg-mist text-muted'
@@ -46,7 +48,7 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
       ))}
 
       {/* Add reaction button */}
-      <div className="relative">
+      {showAddButton && <div className="relative">
         <button
           onClick={() => setShowPicker(!showPicker)}
           className="inline-flex items-center justify-center w-7 h-7 rounded-pill border border-dashed border-border-default text-muted hover:text-ink hover:border-border-default transition-colors text-xs"
@@ -62,7 +64,7 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
             side={pickerSide}
           />
         )}
-      </div>
+      </div>}
     </div>
   )
 }

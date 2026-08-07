@@ -192,7 +192,9 @@ export function ChatMessage({
           </div>
         )}
 
-        <div className={`min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        <div className={`relative min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
+          onToggleReaction && reactions.length > 0 ? 'mb-3' : ''
+        }`}>
           {/* Sender name — once per run, received side only. RN shows the name
               alone; the level pill is web-only and kept because it is existing
               product content, sized down to sit with the smaller name. */}
@@ -255,35 +257,25 @@ export function ChatMessage({
               excluded before ("no reactions per spec"), which is what the
               programme's discoverability item asked to undo. */}
           {onToggleReaction && reactions.length > 0 && (
-            /* -6px lifts the row onto the bubble's bottom edge (iMessage /
-               WhatsApp) instead of floating it in a gap below, and the 10px
-               inset hugs the bubble's near corner — left for received, right
-               for own. Straight from ReactionPills in the RN sheet. The whole
-               row sits above the bubble so the ring is not clipped. */
+            /* Absolute so it adds no height. As a normal child it made the
+               column taller, and the row is items-end — so the avatar aligned
+               to the bottom of column-plus-reactions and drifted away from the
+               bubble. -12px hangs it over the bubble's bottom edge, hugging the
+               near corner: left for received, right for own, per ReactionPills.
+               z-10 keeps the cut-out ring above the bubble. */
             <div
-              className={`relative z-10 -mt-1.5 flex items-center gap-1 ${
-                isOwn ? 'justify-end pr-2.5' : 'justify-start pl-2.5'
+              className={`absolute -bottom-3 z-10 flex items-center gap-1 ${
+                isOwn ? 'right-2.5' : 'left-2.5'
               }`}
             >
               <EmojiReactions
                 reactions={reactions}
                 onToggleReaction={onToggleReaction}
                 pickerSide={isOwn ? 'left' : 'right'}
+                /* The hover bar is the way in on a bubble; a dashed + beside
+                   the pills was a second, uglier one. */
+                showAddButton={false}
               />
-              {/* Tapping a pill toggles in every chat app, so "who reacted" gets
-                  its own control rather than stealing that tap. RN opens the
-                  same sheet from the pill because it has a long-press to spare;
-                  the web does not, and a toggle that sometimes opened a sheet
-                  would be worse than an extra button. */}
-              <button
-                type="button"
-                onClick={() => setReactorsOpen(true)}
-                aria-label="See who reacted"
-                title="Who reacted"
-                className="shrink-0 px-1.5 py-0.5 rounded-pill t-detail text-muted hover:text-ink hover:bg-snow transition-colors"
-              >
-                {reactions.reduce((n, r) => n + r.count, 0)}
-              </button>
             </div>
           )}
 
@@ -323,6 +315,17 @@ export function ChatMessage({
                   className="p-1 rounded-pill text-muted hover:text-primary-600 hover:bg-snow transition-colors"
                 >
                   <Icon name="arrow.uturn.left" size={14} weight="semibold" />
+                </button>
+              )}
+              {onToggleReaction && reactions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); setReactorsOpen(true) }}
+                  aria-label="See who reacted"
+                  title="Who reacted"
+                  className="px-1.5 py-1 rounded-pill t-detail text-muted hover:text-ink hover:bg-snow transition-colors"
+                >
+                  {reactions.reduce((n, r) => n + r.count, 0)}
                 </button>
               )}
               {onToggleReaction && (
