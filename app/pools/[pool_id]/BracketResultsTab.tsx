@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useMemo } from 'react'
+import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { getLiveClock, getMatchStatusBadge, type MatchStatusBadge } from '@/lib/matchStatus'
 import {
@@ -67,16 +67,62 @@ type BracketResultsTabProps = {
 }
 
 // =============================================
-// BRACKET LAYOUT CONSTANTS (matching StandingsTab)
+// BRACKET LAYOUT
 // =============================================
+// A half-bracket is four columns — R32 → R16 → QF → SF — so its width is four
+// cells plus the three gaps between them. These sizes used to be fixed, which
+// made the bracket 712px wide no matter how much room the page had; on a
+// desktop it finished barely past halfway and the right third sat empty.
+//
+// makeLayout() stretches the cells and gaps to fill whatever width it is given.
+// Both are floored at the baseline below, so this only ever makes the bracket
+// bigger — a narrow screen still gets the original 712px and scrolls it, which
+// is what the overflow-x-auto wrapper is for.
 
-const CELL_W = 160
-const CELL_H = 56
-const PAIR_GAP = 8
-const COL_GAP = 24
-const ROUND_W = CELL_W + COL_GAP
+const BASE_CELL_W = 160
+const BASE_CELL_H = 56
+const BASE_PAIR_GAP = 8
+const BASE_COL_GAP = 24
 const HEADER_H = 24
-const R32_TOTAL_H = 8 * CELL_H + 7 * PAIR_GAP
+
+/** Width the bracket has always been, and the narrowest it is allowed to get. */
+export const BASE_W = 4 * BASE_CELL_W + 3 * BASE_COL_GAP
+
+export type BracketLayout = {
+  cellW: number
+  cellH: number
+  pairGap: number
+  colGap: number
+  roundW: number
+  width: number
+  height: number
+}
+
+export function makeLayout(available: number): BracketLayout {
+  // Cells take the bulk of the width; whatever is left becomes the gaps, which
+  // is where the connector elbows are drawn — they need the room as much as the
+  // cells do. Flooring both at the baseline is what keeps this from ever
+  // shrinking the bracket below what it is today.
+  const cellW = Math.max(BASE_CELL_W, Math.floor((available * 0.8) / 4))
+  const colGap = Math.max(BASE_COL_GAP, Math.floor((available - 4 * cellW) / 3))
+
+  // Height grows at 60% of the horizontal rate. A cell holds two 12px rows, so
+  // matching the stretch exactly would just add empty space inside each box and
+  // push the eight R32 ties well past a screen height.
+  const grow = cellW / BASE_CELL_W
+  const cellH = Math.round(BASE_CELL_H * (1 + (grow - 1) * 0.6))
+  const pairGap = Math.round(BASE_PAIR_GAP * grow)
+
+  return {
+    cellW,
+    cellH,
+    pairGap,
+    colGap,
+    roundW: cellW + colGap,
+    width: 4 * cellW + 3 * colGap,
+    height: HEADER_H + 8 * cellH + 7 * pairGap,
+  }
+}
 
 // =============================================
 // HELPERS
@@ -89,10 +135,10 @@ function shortName(name: string): string {
   return name
 }
 
-function getMatchPositions() {
+function getMatchPositions(L: BracketLayout) {
   const r32Ys: number[] = []
   for (let i = 0; i < 8; i++) {
-    r32Ys.push(HEADER_H + i * (CELL_H + PAIR_GAP))
+    r32Ys.push(HEADER_H + i * (L.cellH + L.pairGap))
   }
   const r16Ys: number[] = []
   for (let i = 0; i < 4; i++) {
@@ -112,12 +158,13 @@ function getConnectorPaths(
   sourceYs: number[],
   targetXLeft: number,
   targetYs: number[],
+  L: BracketLayout,
 ): string[] {
   const paths: string[] = []
   for (let i = 0; i < targetYs.length; i++) {
-    const topSourceY = sourceYs[i * 2] + CELL_H / 2
-    const botSourceY = sourceYs[i * 2 + 1] + CELL_H / 2
-    const targetY = targetYs[i] + CELL_H / 2
+    const topSourceY = sourceYs[i * 2] + L.cellH / 2
+    const botSourceY = sourceYs[i * 2 + 1] + L.cellH / 2
+    const targetY = targetYs[i] + L.cellH / 2
     const midX = (sourceXRight + targetXLeft) / 2
     paths.push(`M ${sourceXRight} ${topSourceY} H ${midX} V ${targetY} H ${targetXLeft}`)
     paths.push(`M ${sourceXRight} ${botSourceY} H ${midX} V ${targetY}`)
@@ -125,24 +172,9 @@ function getConnectorPaths(
   return paths
 }
 
-/** Connector lines for right-to-left bracket flow */
-function getReverseConnectorPaths(
-  sourceXLeft: number,
-  sourceYs: number[],
-  targetXRight: number,
-  targetYs: number[],
-): string[] {
-  const paths: string[] = []
-  for (let i = 0; i < targetYs.length; i++) {
-    const topSourceY = sourceYs[i * 2] + CELL_H / 2
-    const botSourceY = sourceYs[i * 2 + 1] + CELL_H / 2
-    const targetY = targetYs[i] + CELL_H / 2
-    const midX = (sourceXLeft + targetXRight) / 2
-    paths.push(`M ${sourceXLeft} ${topSourceY} H ${midX} V ${targetY} H ${targetXRight}`)
-    paths.push(`M ${sourceXLeft} ${botSourceY} H ${midX} V ${targetY}`)
-  }
-  return paths
-}
+// getReverseConnectorPaths lived here — the mirrored right-to-left variant for a
+// bracket drawn inwards from both edges. Both halves render left-to-right, so it
+// had no callers; removed rather than carried through the layout change.
 
 // =============================================
 // GROUP COMPARISON COMPONENT
@@ -436,7 +468,7 @@ function getCellRowClass(data: BracketCellData, side: 'home' | 'away') {
   return 'text-ink'
 }
 
-function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: number }) {
+function BracketCell({ data, x, y, L }: { data: BracketCellData; x: number; y: number; L: BracketLayout }) {
   const hasScore = data.actualHomeScore !== null && data.actualAwayScore !== null
 
   let borderClass = 'border-border-default'
@@ -449,12 +481,12 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
   return (
     <div
       className={`absolute border ${borderClass} rounded-inset bg-surface shadow-sm overflow-hidden`}
-      style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
+      style={{ left: x, top: y, width: L.cellW, height: L.cellH }}
     >
       {/* Home team row */}
       <div
         className={`flex items-center justify-between px-2 text-xs border-b border-border-subtle ${getCellRowClass(data, 'home')}`}
-        style={{ height: CELL_H / 2 - 0.5 }}
+        style={{ height: L.cellH / 2 - 0.5 }}
       >
         <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
           {data.homeFlagUrl && (
@@ -475,7 +507,7 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
       {/* Away team row */}
       <div
         className={`flex items-center justify-between px-2 text-xs ${getCellRowClass(data, 'away')}`}
-        style={{ height: CELL_H / 2 - 0.5 }}
+        style={{ height: L.cellH / 2 - 0.5 }}
       >
         <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
           {data.awayFlagUrl && (
@@ -605,7 +637,26 @@ function KnockoutComparison({
   totalPickable: number
   teams: TeamData[]
 }) {
-  const pos = getMatchPositions()
+  // How much width the page is actually giving us. Measured rather than assumed:
+  // the tab sits in a max-w-6xl column, but that is only the ceiling — the real
+  // number depends on the viewport and the container's own padding. Starts at
+  // the baseline so the server renders the same 712px the client first paints,
+  // then the observer widens it.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [availableW, setAvailableW] = useState(BASE_W)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setAvailableW(entry.contentRect.width)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const L = useMemo(() => makeLayout(availableW), [availableW])
+  const pos = useMemo(() => getMatchPositions(L), [L])
 
   // Build team lookup: team_id → TeamData
   const teamById = useMemo(() => new Map(teams.map(t => [t.team_id, t])), [teams])
@@ -702,11 +753,9 @@ function KnockoutComparison({
 
   // Half-bracket layout: 4 columns (R32 → R16 → QF → SF)
   const halfR32X = 0
-  const halfR16X = halfR32X + ROUND_W
-  const halfQfX = halfR16X + ROUND_W
-  const halfSfX = halfQfX + ROUND_W
-  const halfW = halfSfX + CELL_W
-  const halfH = HEADER_H + R32_TOTAL_H
+  const halfR16X = halfR32X + L.roundW
+  const halfQfX = halfR16X + L.roundW
+  const halfSfX = halfQfX + L.roundW
 
   const roundHeaders = [
     { x: halfR32X, label: 'R32' },
@@ -726,36 +775,36 @@ function KnockoutComparison({
       <div>
         <h3 className="text-sm font-bold text-muted mb-2 uppercase tracking-wide">{label}</h3>
         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="relative" style={{ width: halfW, height: halfH, minWidth: halfW }}>
+          <div className="relative" style={{ width: L.width, height: L.height, minWidth: L.width }}>
             {/* Round headers */}
             {roundHeaders.map((h, i) => (
               <div
                 key={i}
                 className="absolute text-center t-caption text-muted"
-                style={{ left: h.x, top: 0, width: CELL_W }}
+                style={{ left: h.x, top: 0, width: L.cellW }}
               >
                 {h.label}
               </div>
             ))}
 
             {/* SVG connector lines */}
-            <svg className="absolute top-0 left-0 pointer-events-none" width={halfW} height={halfH} fill="none">
-              {getConnectorPaths(halfR32X + CELL_W, pos.r32Ys, halfR16X, pos.r16Ys).map((d, i) => (
+            <svg className="absolute top-0 left-0 pointer-events-none" width={L.width} height={L.height} fill="none">
+              {getConnectorPaths(halfR32X + L.cellW, pos.r32Ys, halfR16X, pos.r16Ys, L).map((d, i) => (
                 <path key={`r32-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
-              {getConnectorPaths(halfR16X + CELL_W, pos.r16Ys, halfQfX, pos.qfYs).map((d, i) => (
+              {getConnectorPaths(halfR16X + L.cellW, pos.r16Ys, halfQfX, pos.qfYs, L).map((d, i) => (
                 <path key={`r16-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
-              {getConnectorPaths(halfQfX + CELL_W, pos.qfYs, halfSfX, [pos.sfY]).map((d, i) => (
+              {getConnectorPaths(halfQfX + L.cellW, pos.qfYs, halfSfX, [pos.sfY], L).map((d, i) => (
                 <path key={`qf-${i}`} d={d} stroke="var(--border-default)" strokeWidth={1.5} />
               ))}
             </svg>
 
             {/* Match cells */}
-            {r32.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR32X} y={pos.r32Ys[i]} />)}
-            {r16.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR16X} y={pos.r16Ys[i]} />)}
-            {qf.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfQfX} y={pos.qfYs[i]} />)}
-            <BracketCell data={buildCellData(sf)} x={halfSfX} y={pos.sfY} />
+            {r32.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR32X} y={pos.r32Ys[i]} L={L} />)}
+            {r16.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfR16X} y={pos.r16Ys[i]} L={L} />)}
+            {qf.map((num, i) => <BracketCell key={num} data={buildCellData(num)} x={halfQfX} y={pos.qfYs[i]} L={L} />)}
+            <BracketCell data={buildCellData(sf)} x={halfSfX} y={pos.sfY} L={L} />
           </div>
         </div>
       </div>
@@ -763,7 +812,7 @@ function KnockoutComparison({
   }
 
   return (
-    <div>
+    <div ref={wrapRef}>
       <div className="flex items-center gap-3 mb-4">
         <h2 className="text-xl font-bold text-ink">Knockout Bracket</h2>
         {totalPickable > 0 && (
