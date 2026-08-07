@@ -22,7 +22,7 @@ import { calculateBracketPickerPoints, type MatchWithResult } from '@/lib/bracke
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Select } from '@/components/ui/Select'
-import { MatchCard, type ResultMatch, type BracketPick } from './results/MatchCard'
+import { MatchCard, MatchTableRow, type ResultMatch, type BracketPick } from './results/MatchCard'
 import { type PoolSettings } from './results/points'
 import type {
   MatchData,
@@ -524,24 +524,59 @@ function KnockoutComparison({
         </div>
       </div>
 
+      {/* Same two-up as the Results tab, and for the same reason: six columns do
+          not fit on a phone, so below sm it is the stacked card list and from sm
+          up it is the table. Markup deliberately mirrors ResultsView so the two
+          modes cannot drift apart visually. */}
       {filtered.length === 0 ? (
-        <div className="bg-surface rounded-card shadow-card p-8 text-center">
-          <p className="t-body text-muted">No matches match these filters.</p>
+        <div className="text-center py-12">
+          <p className="t-section-header text-muted">
+            No matches found for this filter.
+          </p>
         </div>
       ) : (
-        <div className="bg-surface rounded-card shadow-card dark:shadow-none dark:border dark:border-border-default overflow-hidden divide-y divide-border-subtle">
-          {filtered.map(({ match, bracketPick }, i) => (
-            <MatchCard
-              key={match.match_id}
-              match={match}
-              // Unused by the card, but part of its contract.
-              poolSettings={settings as unknown as PoolSettings}
-              predictionMode="bracket_picker"
-              index={i}
-              bracketPick={bracketPick}
-            />
-          ))}
-        </div>
+        <>
+          <div className="sm:hidden bg-surface rounded-card shadow-card overflow-hidden divide-y divide-border-subtle dark:shadow-none dark:border dark:border-border-default">
+            {filtered.map(({ match, bracketPick }, i) => (
+              <MatchCard
+                key={match.match_id}
+                match={match}
+                // Unused by the card, but part of its contract.
+                poolSettings={settings as unknown as PoolSettings}
+                predictionMode="bracket_picker"
+                index={i}
+                bracketPick={bracketPick}
+              />
+            ))}
+          </div>
+
+          <div className="hidden sm:block bg-surface rounded-card shadow-card overflow-hidden dark:shadow-none dark:border dark:border-border-default">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border-default">
+                  <tr>
+                    <th className="px-4 py-3 text-left t-body font-semibold text-ink whitespace-nowrap">Match</th>
+                    <th className="px-4 py-3 text-right t-body font-semibold text-ink">Home</th>
+                    <th className="px-2 py-3 text-center t-body font-semibold text-ink whitespace-nowrap">Score / Pick</th>
+                    <th className="px-4 py-3 text-left t-body font-semibold text-ink">Away</th>
+                    <th colSpan={2} className="px-4 py-3 text-left t-body font-semibold text-ink">Result</th>
+                    <th className="px-4 py-3 text-right t-body font-semibold text-ink">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(({ match, bracketPick }) => (
+                    <MatchTableRow
+                      key={match.match_id}
+                      match={match}
+                      predictionMode="bracket_picker"
+                      bracketPick={bracketPick}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

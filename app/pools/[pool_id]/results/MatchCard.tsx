@@ -410,10 +410,12 @@ export function MatchTableRow({
   match,
   predictionMode,
   storedScore,
+  bracketPick,
 }: {
   match: ResultMatch
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   storedScore?: MatchScoreData | null
+  bracketPick?: BracketPick | null
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
@@ -421,7 +423,17 @@ export function MatchTableRow({
   const hasActualScores = match.home_score_ft !== null && match.away_score_ft !== null
   const hasPsoScores = match.home_score_pso !== null && match.away_score_pso !== null
   const hasPrediction = match.prediction !== null
-  const pointsResult = derivePointsResult(storedScore)
+  const pointsResult: PointsResult | null = bracketPick
+    ? bracketPick.points !== null
+      ? {
+          points: bracketPick.points,
+          basePoints: bracketPick.points,
+          multiplier: 1,
+          label: bracketPick.isCorrect ? 'winner' : 'miss',
+          type: bracketPick.isCorrect ? 'winner' : 'miss',
+        }
+      : null
+    : derivePointsResult(storedScore)
   const statusBadge = getMatchStatusBadge({
     status: match.status,
     statusDetail: match.status_detail,
@@ -438,7 +450,7 @@ export function MatchTableRow({
   // Knockout matches in a full-tournament pool are predicted from the bracket,
   // so who you had in the fixture matters as much as the score you gave it.
   const showBracketTeams =
-    predictionMode === 'full_tournament' &&
+    (predictionMode === 'full_tournament' || predictionMode === 'bracket_picker') &&
     match.stage !== 'group' &&
     (match.predicted_home_team_name != null || match.predicted_away_team_name != null)
 
@@ -486,7 +498,16 @@ export function MatchTableRow({
         )}
         {/* The prediction sits directly under the actual score in the muted
             tone, so the column reads actual-over-predicted at a glance. */}
-        {hasPrediction ? (
+        {bracketPick ? (
+          <span className="text-xs text-muted block h-4 mt-1 leading-4 truncate">
+            <span className="font-bold text-ink">{bracketPick.teamName || '—'}</span>
+            {bracketPick.isCorrect !== null && (
+              <span className={bracketPick.isCorrect ? 'text-success-600' : 'text-danger-600'}>
+                {' '}{bracketPick.isCorrect ? '\u2713' : '\u2717'}
+              </span>
+            )}
+          </span>
+        ) : hasPrediction ? (
           <span className="t-num t-num-medium text-xs text-muted block h-4 mt-1 leading-4">
             {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
             {match.prediction!.predicted_home_pso != null &&
