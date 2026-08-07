@@ -127,6 +127,7 @@ function derivePointsResult(storedScore: MatchScoreData | null | undefined): Poi
  * untouched because nothing else supplies it.
  */
 export type BracketPick = {
+  teamId: string | null
   teamName: string | null
   flagUrl: string | null
   /** null while the match is still to be played. */
@@ -454,6 +455,34 @@ export function MatchTableRow({
     match.stage !== 'group' &&
     (match.predicted_home_team_name != null || match.predicted_away_team_name != null)
 
+  // The bracket-picker mark sits against whichever team was backed, on the
+  // outer edge of the row — Home is right-aligned so it leads, Away trails.
+  // It used to be a name-plus-tick under the score, which put a third team name
+  // in the middle of a row that already names two.
+  const pickedSide: 'home' | 'away' | null =
+    bracketPick?.teamId == null
+      ? null
+      : bracketPick.teamId === match.home_team_id
+        ? 'home'
+        : bracketPick.teamId === match.away_team_id
+          ? 'away'
+          : null // they backed someone who never reached this tie
+
+  const pickMark = pickedSide && (
+    <span
+      title="Your pick"
+      className={`shrink-0 text-sm font-bold leading-none ${
+        bracketPick!.isCorrect === false
+          ? 'text-danger-600'
+          : bracketPick!.isCorrect
+            ? 'text-success-600'
+            : 'text-muted'
+      }`}
+    >
+      {bracketPick!.isCorrect === false ? '\u2717' : '\u2713'}
+    </span>
+  )
+
   return (
     <tr className="border-b border-border-default last:border-b-0 hover:bg-snow transition-colors">
       {/* The outcome accent survives the move to a table as a left edge on the
@@ -466,6 +495,7 @@ export function MatchTableRow({
 
       <td className="px-4 py-3">
         <div className="h-6 flex items-center justify-end gap-2 min-w-0">
+          {pickedSide === 'home' && pickMark}
           <span className="t-body text-ink truncate text-right">{homeName}</span>
           {/* flag_url is authoritative — it carries the real ISO-2. The emoji
               is only a fallback for teams that have no image. */}
@@ -498,16 +528,7 @@ export function MatchTableRow({
         )}
         {/* The prediction sits directly under the actual score in the muted
             tone, so the column reads actual-over-predicted at a glance. */}
-        {bracketPick ? (
-          <span className="text-xs text-muted block h-4 mt-1 leading-4 truncate">
-            <span className="font-bold text-ink">{bracketPick.teamName || '—'}</span>
-            {bracketPick.isCorrect !== null && (
-              <span className={bracketPick.isCorrect ? 'text-success-600' : 'text-danger-600'}>
-                {' '}{bracketPick.isCorrect ? '\u2713' : '\u2717'}
-              </span>
-            )}
-          </span>
-        ) : hasPrediction ? (
+        {hasPrediction ? (
           <span className="t-num t-num-medium text-xs text-muted block h-4 mt-1 leading-4">
             {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
             {match.prediction!.predicted_home_pso != null &&
@@ -529,6 +550,7 @@ export function MatchTableRow({
             <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
           ) : null}
           <span className="t-body text-ink truncate">{awayName}</span>
+          {pickedSide === 'away' && pickMark}
         </div>
         {showBracketTeams && (
           <div className="h-4 mt-1 t-detail text-muted truncate leading-4">

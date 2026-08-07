@@ -439,6 +439,7 @@ function KnockoutComparison({
 
       const bracketPick: BracketPick | null = pickId
         ? {
+            teamId: pickId,
             teamName: pickTeam?.country_name ?? null,
             flagUrl: pickTeam?.flag_url ?? null,
             // Undecided until the match is done AND has a winner — a pick on an
