@@ -181,7 +181,7 @@ function GroupComparison({
       <div className="grid grid-cols-2 gap-3">
         {/* Predicted column */}
         <div>
-          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -193,7 +193,7 @@ function GroupComparison({
               return (
                 <div
                   key={team.team_id}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-inset text-xs ${
                     isCorrect
                       ? 'bg-success-50 text-success-800 ring-1 ring-success-200'
                       : isWrong
@@ -213,7 +213,7 @@ function GroupComparison({
 
         {/* Actual column */}
         <div>
-          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
@@ -225,7 +225,7 @@ function GroupComparison({
               {actualStandings.map((team, idx) => (
                 <div
                   key={team.team_id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-silver text-ink"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-inset text-xs bg-silver text-ink"
                 >
                   <span className="t-num t-num-regular text-[10px] text-muted w-3">{idx + 1}</span>
                   <span className="truncate flex-1 font-medium">{team.country_name}</span>
@@ -281,7 +281,7 @@ function ThirdPlaceComparison({
       <div className="grid grid-cols-2 gap-4">
         {/* Predicted */}
         <div>
-          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Your Picks
           </div>
           <div className="space-y-1">
@@ -311,7 +311,7 @@ function ThirdPlaceComparison({
                     </div>
                   )}
                   <div
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-inset text-xs ${
                       isCorrectQualifier
                         ? 'bg-success-50 text-success-800 ring-1 ring-success-200'
                         : isCorrectlyEliminated
@@ -331,7 +331,7 @@ function ThirdPlaceComparison({
                     <span className="truncate flex-1 font-medium">
                       {team?.country_name ?? 'Unknown'}
                     </span>
-                    <span className="text-[10px] text-muted">{pick.group_letter}</span>
+                    <span className="t-detail text-muted">{pick.group_letter}</span>
                     {(isCorrectQualifier || isCorrectlyEliminated) && <span className="text-success-600 text-xs flex-shrink-0">&#10003;</span>}
                     {(isMissedQualifier || isWrongTeam) && <span className="text-danger-500 text-xs flex-shrink-0">&#10007;</span>}
                     {isWronglyEliminated && <span className="text-warning-600 text-xs flex-shrink-0">!</span>}
@@ -344,7 +344,7 @@ function ThirdPlaceComparison({
 
         {/* Actual */}
         <div>
-          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <div className="t-caption text-muted mb-1.5">
             Actual
           </div>
           {!hasActualData ? (
@@ -365,7 +365,7 @@ function ThirdPlaceComparison({
                       </div>
                     )}
                     <div
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-inset text-xs ${
                         isQualifier
                           ? 'bg-primary-100 text-primary-700'
                           : 'bg-silver text-muted'
@@ -373,7 +373,7 @@ function ThirdPlaceComparison({
                     >
                       <span className="t-num t-num-regular text-[10px] text-muted w-4">{idx + 1}</span>
                       <span className="truncate flex-1 font-medium">{team.country_name}</span>
-                      <span className="text-[10px] text-muted">{team.group_letter}</span>
+                      <span className="t-detail text-muted">{team.group_letter}</span>
                     </div>
                   </Fragment>
                 )
@@ -448,13 +448,13 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
 
   return (
     <div
-      className={`absolute border ${borderClass} rounded bg-surface shadow-sm overflow-hidden`}
+      className={`absolute border ${borderClass} rounded-inset bg-surface shadow-sm overflow-hidden`}
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
     >
       {/* Home team row */}
       <div
-        className={`flex items-center justify-between px-2 border-b border-border-subtle ${getCellRowClass(data, 'home')}`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 12, lineHeight: '16px' }}
+        className={`flex items-center justify-between px-2 text-xs border-b border-border-subtle ${getCellRowClass(data, 'home')}`}
+        style={{ height: CELL_H / 2 - 0.5 }}
       >
         <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
           {data.homeFlagUrl && (
@@ -474,8 +474,8 @@ function BracketCell({ data, x, y }: { data: BracketCellData; x: number; y: numb
 
       {/* Away team row */}
       <div
-        className={`flex items-center justify-between px-2 ${getCellRowClass(data, 'away')}`}
-        style={{ height: CELL_H / 2 - 0.5, fontSize: 12, lineHeight: '16px' }}
+        className={`flex items-center justify-between px-2 text-xs ${getCellRowClass(data, 'away')}`}
+        style={{ height: CELL_H / 2 - 0.5 }}
       >
         <span className="flex items-center gap-1.5 truncate flex-1 mr-1">
           {data.awayFlagUrl && (
@@ -558,7 +558,7 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
             <span className="text-sm t-num t-num-extrabold flex-shrink-0">
               {data.actualHomeScore}
               {data.actualHomePso !== null && (
-                <span className="text-[10px] text-muted ml-1">({data.actualHomePso})</span>
+                <span className="t-detail text-muted ml-1">({data.actualHomePso})</span>
               )}
             </span>
           )}
@@ -574,7 +574,7 @@ function FinalMatchCard({ data, label }: { data: BracketCellData; label: string 
             <span className="text-sm t-num t-num-extrabold flex-shrink-0">
               {data.actualAwayScore}
               {data.actualAwayPso !== null && (
-                <span className="text-[10px] text-muted ml-1">({data.actualAwayPso})</span>
+                <span className="t-detail text-muted ml-1">({data.actualAwayPso})</span>
               )}
             </span>
           )}
@@ -731,7 +731,7 @@ function KnockoutComparison({
             {roundHeaders.map((h, i) => (
               <div
                 key={i}
-                className="absolute text-center font-bold uppercase tracking-wider text-[11px] text-muted"
+                className="absolute text-center t-caption text-muted"
                 style={{ left: h.x, top: 0, width: CELL_W }}
               >
                 {h.label}

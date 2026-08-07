@@ -105,6 +105,10 @@ describe('app/globals.css carries the same values', () => {
     expect(globalsCss).toContain(`--radius-card:    ${radii.lg}px;`)
     expect(globalsCss).toContain(`--radius-control: ${radii.md}px;`)
     expect(globalsCss).toContain(`--radius-chip:    ${radii.sm}px;`)
+    // radii.xs was missing from the CSS until 2026-08-07, so anything needing a
+    // 6px corner reached for a bare `rounded` (Tailwind's 4px) and sat off the
+    // scale. Asserted here so the whole ladder has to stay mirrored, not most of it.
+    expect(globalsCss).toContain(`--radius-inset:    ${radii.xs}px;`)
     expect(globalsCss).toContain(`--radius-sheet:   ${radii.xl}px;`)
   })
 

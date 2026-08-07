@@ -582,6 +582,7 @@ html.dark {
   --radius-card:    24px; /* radii.lg  — cards, list rows, dialogs */
   --radius-control: 18px; /* radii.md  — buttons, inputs, banners */
   --radius-chip:    12px; /* radii.sm */
+  --radius-inset:    6px; /* radii.xs  — nested inside an already-rounded surface */
   --radius-sheet:   32px; /* radii.xl  — bottom-sheet top corners */
   --radius-pill:   999px; /* radii.pill */
 

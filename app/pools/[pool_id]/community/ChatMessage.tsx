@@ -43,7 +43,7 @@ export function DayHeader({ text }: { text: string }) {
  */
 function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) {
   return (
-    <div className={`flex items-stretch gap-2 rounded-[8px] px-2 py-1.5 mb-1 overflow-hidden ${
+    <div className={`flex items-stretch gap-2 rounded-inset px-2 py-1.5 mb-1 overflow-hidden ${
       isOwn ? 'bg-white/15' : 'bg-ink/5'
     }`}>
       <div className={`w-0.5 shrink-0 rounded-pill ${isOwn ? 'bg-white/60' : 'bg-primary-500'}`} />
