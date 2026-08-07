@@ -673,14 +673,28 @@ export function ScoringTab({
         return
       }
     } else {
-      // For other modes, call the match points RPC
-      const { error: rpcError } = await supabase.rpc(
-        'recalculate_all_pool_points',
-        { pool_id_param: pool.pool_id }
-      )
-
-      if (rpcError) {
-        setError('Settings saved but recalculation failed: ' + rpcError.message)
+      // For other modes, run the scoring engine through the same endpoint the
+      // rest of the app uses.
+      //
+      // This used to call the `recalculate_all_pool_points` RPC. That function
+      // is a fossil — it writes match_scores columns (prediction_id,
+      // points_earned, is_exact_score, …) that the table has not had since the
+      // shadow-engine widening, so every call failed with
+      //   column "prediction_id" of relation "match_scores" does not exist
+      // and a save left the pool on new rules with old points. The engine of
+      // record is lib/scoring; nothing else in the codebase called the RPC.
+      try {
+        const res = await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+        if (!res.ok) {
+          let errMsg = res.statusText
+          try { const data = await res.json(); errMsg = data.error || errMsg } catch {}
+          setError('Settings saved but recalculation failed: ' + errMsg)
+          setSaving(false)
+          setShowConfirm(false)
+          return
+        }
+      } catch (err: unknown) {
+        setError('Settings saved but recalculation failed: ' + (err instanceof Error ? err.message : 'Network error'))
         setSaving(false)
         setShowConfirm(false)
         return
