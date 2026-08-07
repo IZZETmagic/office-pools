@@ -601,6 +601,7 @@ export function CommunityTab({
         emoji,
         count,
         reacted_by_me: users.has(currentUserId),
+        user_ids: [...users],
       }))
       return { ...msg, reactions: reactionCounts }
     }))
@@ -691,14 +692,28 @@ export function CommunityTab({
       let newReactions: ReactionCount[]
       if (hasReacted) {
         newReactions = m.reactions
-          .map(r => r.emoji === emoji ? { ...r, count: r.count - 1, reacted_by_me: false } : r)
+          .map(r => r.emoji === emoji
+            ? {
+                ...r,
+                count: r.count - 1,
+                reacted_by_me: false,
+                user_ids: r.user_ids.filter(id => id !== currentUserId),
+              }
+            : r)
           .filter(r => r.count > 0)
       } else {
         const found = m.reactions.find(r => r.emoji === emoji)
         if (found) {
-          newReactions = m.reactions.map(r => r.emoji === emoji ? { ...r, count: r.count + 1, reacted_by_me: true } : r)
+          newReactions = m.reactions.map(r => r.emoji === emoji
+            ? {
+                ...r,
+                count: r.count + 1,
+                reacted_by_me: true,
+                user_ids: [...r.user_ids, currentUserId],
+              }
+            : r)
         } else {
-          newReactions = [...m.reactions, { emoji, count: 1, reacted_by_me: true }]
+          newReactions = [...m.reactions, { emoji, count: 1, reacted_by_me: true, user_ids: [currentUserId] }]
         }
       }
       return { ...m, reactions: newReactions }

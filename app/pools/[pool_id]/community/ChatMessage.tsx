@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { EmojiPicker } from './EmojiPicker'
 import { EmojiReactions } from './EmojiReactions'
+import { ReactorsModal } from './ReactorsModal'
 import { Icon } from '@/components/ui/Icon'
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
@@ -122,12 +124,21 @@ export function ChatMessage({
   // right-click as accelerators for people who reach for them. Two more hidden
   // gestures would have repeated the cause.
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [reactorsOpen, setReactorsOpen] = useState(false)
   const pressTimer = useRef<number | null>(null)
   const rowRef = useRef<HTMLDivElement>(null)
 
   // 350ms matches delayLongPress in the RN sheet, so the two feel the same.
   const startPress = () => {
-    pressTimer.current = window.setTimeout(() => setMenuOpen(true), 350)
+    // RN dismisses the keyboard first: with it up, the measured bubble can sit
+    // behind it and the picker ends up anchored over empty space. blur() is the
+    // web equivalent — it closes the on-screen keyboard and lets the feed
+    // re-lay out before the picker is placed.
+    pressTimer.current = window.setTimeout(() => {
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      setPickerOpen(true)
+    }, 350)
   }
   const cancelPress = () => {
     if (pressTimer.current !== null) {
@@ -137,12 +148,12 @@ export function ChatMessage({
   }
 
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen && !pickerOpen) return
     const onDown = (e: MouseEvent) => {
-      if (!rowRef.current?.contains(e.target as Node)) setMenuOpen(false)
+      if (!rowRef.current?.contains(e.target as Node)) { setMenuOpen(false); setPickerOpen(false) }
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
-    const onScroll = () => setMenuOpen(false)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); setPickerOpen(false) } }
+    const onScroll = () => { setMenuOpen(false); setPickerOpen(false) }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     // capture: the feed is the scroller, and scroll does not bubble.
@@ -152,7 +163,7 @@ export function ChatMessage({
       document.removeEventListener('keydown', onKey)
       window.removeEventListener('scroll', onScroll, true)
     }
-  }, [menuOpen])
+  }, [menuOpen, pickerOpen])
 
   useEffect(() => cancelPress, [])
   const author = members.find(m => m.user_id === message.user_id)
@@ -195,7 +206,7 @@ export function ChatMessage({
           )}
 
           <div
-            onContextMenu={e => { if (onReply || onToggleReaction) { e.preventDefault(); setMenuOpen(true) } }}
+            onContextMenu={e => { if (onToggleReaction) { e.preventDefault(); setPickerOpen(true) } }}
             onTouchStart={startPress}
             onTouchEnd={cancelPress}
             onTouchMove={cancelPress}
@@ -225,18 +236,55 @@ export function ChatMessage({
             </span>
           </div>
 
+          {/* Anchored over the bubble, like ReactionPicker in the RN sheet —
+              opened by long-press, right-click, or the bar's react button.
+              Sides with the bubble so it opens inward, never off-screen. */}
+          {pickerOpen && onToggleReaction && (
+            <div className="relative">
+              <EmojiPicker
+                anchor="above"
+                side={isOwn ? 'right' : 'left'}
+                onSelect={emoji => { onToggleReaction(emoji); setPickerOpen(false) }}
+                onClose={() => setPickerOpen(false)}
+              />
+            </div>
+          )}
+
           {/* Reactions sit under the bubble, using the same component the share
               cards use so a text message and a card react identically. Text was
               excluded before ("no reactions per spec"), which is what the
               programme's discoverability item asked to undo. */}
           {onToggleReaction && reactions.length > 0 && (
-            <div className="mt-1">
+            <div className="mt-1 flex items-center gap-1">
               <EmojiReactions
                 reactions={reactions}
                 onToggleReaction={onToggleReaction}
                 pickerSide={isOwn ? 'right' : 'left'}
               />
+              {/* Tapping a pill toggles in every chat app, so "who reacted" gets
+                  its own control rather than stealing that tap. RN opens the
+                  same sheet from the pill because it has a long-press to spare;
+                  the web does not, and a toggle that sometimes opened a sheet
+                  would be worse than an extra button. */}
+              <button
+                type="button"
+                onClick={() => setReactorsOpen(true)}
+                aria-label="See who reacted"
+                title="Who reacted"
+                className="shrink-0 px-1.5 py-0.5 rounded-pill t-detail text-muted hover:text-ink hover:bg-snow transition-colors"
+              >
+                {reactions.reduce((n, r) => n + r.count, 0)}
+              </button>
             </div>
+          )}
+
+          {reactorsOpen && (
+            <ReactorsModal
+              reactions={reactions}
+              members={members}
+              currentUserId={currentUserId}
+              onClose={() => setReactorsOpen(false)}
+            />
           )}
         </div>
 
@@ -265,12 +313,13 @@ export function ChatMessage({
               {onToggleReaction && (
                 <button
                   type="button"
-                  onClick={() => { setMenuOpen(false); onToggleReaction('\u{1F44D}') }}
-                  aria-label="React with a thumbs up"
+                  onClick={() => { setMenuOpen(false); setPickerOpen(o => !o) }}
+                  aria-label="Add a reaction"
+                  aria-expanded={pickerOpen}
                   title="React"
                   className="p-1 rounded-pill text-muted hover:bg-snow transition-colors text-sm leading-none"
                 >
-                  {'\u{1F44D}'}
+                  {'\u{1F642}'}
                 </button>
               )}
             </div>

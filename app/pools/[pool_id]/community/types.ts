@@ -24,6 +24,12 @@ export type ReactionCount = {
   emoji: string
   count: number
   reacted_by_me: boolean
+  /**
+   * Who reacted. The loader already grouped these into a Set and then dropped
+   * it on the floor; keeping it is what lets a pill say who is behind it,
+   * matching the RN sheet's reactor list.
+   */
+  user_ids: string[]
 }
 
 export type MessageWithReactions = Message & {
