@@ -1177,7 +1177,9 @@ export function CommunityTab({
             )
           }
 
-          // Text message — no reactions per spec
+          // Text messages used to be excluded from reactions. The programme's
+          // banter-engagement item asked for the opposite: reacting is the
+          // cheapest way in for the ~93% of members who never type.
           const reply = msg.reply_to_message_id
             ? replyPreviews.get(msg.reply_to_message_id) ?? null
             : null
@@ -1190,6 +1192,9 @@ export function CommunityTab({
               memberLevels={memberLevels}
               currentUserId={currentUserId}
               replyPreview={reply}
+              reactions={msg.reactions}
+              onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+              onReply={() => setReplyingTo(msg)}
               isFirstInCluster={!sameAuthorText(feedItems[i - 1], msg.user_id)}
               isLastInCluster={!sameAuthorText(feedItems[i + 1], msg.user_id)}
             />

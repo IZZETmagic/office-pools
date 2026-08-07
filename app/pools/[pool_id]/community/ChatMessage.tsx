@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
+
+import { EmojiReactions } from './EmojiReactions'
+import { Icon } from '@/components/ui/Icon'
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
 import { getInitials, formatClockTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
@@ -90,6 +94,9 @@ export function ChatMessage({
   memberLevels,
   currentUserId,
   replyPreview,
+  reactions = [],
+  onToggleReaction,
+  onReply,
   isFirstInCluster = true,
   isLastInCluster = true,
 }: {
@@ -100,9 +107,54 @@ export function ChatMessage({
   replyPreview?: ReplyPreview | null
   reactions?: ReactionCount[]
   onToggleReaction?: (emoji: string) => void
+  /** Opens the composer's reply banner against this message. */
+  onReply?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
 }) {
+  // Reply and react were plumbed end to end — the composer takes a replyToId,
+  // the row renders a quoted preview — but nothing on a bubble ever started
+  // either. The programme measured the result: replies under 1%, and
+  // reactions-on-text from about seven people in total, diagnosed as the
+  // control being impossible to find.
+  //
+  // So the bar is VISIBLE on hover rather than gesture-only, with long-press and
+  // right-click as accelerators for people who reach for them. Two more hidden
+  // gestures would have repeated the cause.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const pressTimer = useRef<number | null>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  // 350ms matches delayLongPress in the RN sheet, so the two feel the same.
+  const startPress = () => {
+    pressTimer.current = window.setTimeout(() => setMenuOpen(true), 350)
+  }
+  const cancelPress = () => {
+    if (pressTimer.current !== null) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (!rowRef.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    const onScroll = () => setMenuOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    // capture: the feed is the scroller, and scroll does not bubble.
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [menuOpen])
+
+  useEffect(() => cancelPress, [])
   const author = members.find(m => m.user_id === message.user_id)
   const authorLevel = memberLevels.get(message.user_id)
   const isOwn = message.user_id === currentUserId
@@ -112,7 +164,7 @@ export function ChatMessage({
     /* The feed's space-y-3 is the baseline for every other item type; messages
        override it in both directions. A new speaker gets room to breathe, a
        continuation sits almost flush against the bubble above. */
-    <div className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
+    <div ref={rowRef} className={`group relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
       <div className={`flex gap-1 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
         {/* Avatar sits beside the LAST bubble of the run; earlier bubbles get an
             empty slot the same size so the whole run keeps one left edge. */}
@@ -142,7 +194,13 @@ export function ChatMessage({
             </div>
           )}
 
-          <div className={`relative px-3.5 py-2 text-base leading-[22px] font-medium break-words rounded-chip ${
+          <div
+            onContextMenu={e => { if (onReply || onToggleReaction) { e.preventDefault(); setMenuOpen(true) } }}
+            onTouchStart={startPress}
+            onTouchEnd={cancelPress}
+            onTouchMove={cancelPress}
+            onTouchCancel={cancelPress}
+            className={`relative px-3.5 py-2 text-base leading-[22px] font-medium break-words rounded-chip ${
             isOwn
               ? 'bg-primary-600 text-white'
               : `bg-mist text-ink ${isLastInCluster ? 'rounded-bl-sm' : ''}`
@@ -166,7 +224,58 @@ export function ChatMessage({
               {formatClockTime(message.created_at)}
             </span>
           </div>
+
+          {/* Reactions sit under the bubble, using the same component the share
+              cards use so a text message and a card react identically. Text was
+              excluded before ("no reactions per spec"), which is what the
+              programme's discoverability item asked to undo. */}
+          {onToggleReaction && reactions.length > 0 && (
+            <div className="mt-1">
+              <EmojiReactions
+                reactions={reactions}
+                onToggleReaction={onToggleReaction}
+                pickerSide={isOwn ? 'right' : 'left'}
+              />
+            </div>
+          )}
         </div>
+
+        {/* The action bar. Visible on hover on a pointer device, and forced open
+            by long-press or right-click. Sits on the bubble's OUTER edge so it
+            never covers the text, and `hidden` on touch where hover does not
+            exist and the long-press menu takes over. */}
+        {(onReply || onToggleReaction) && (
+          <div
+            className={`shrink-0 self-center transition-opacity ${
+              menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+            }`}
+          >
+            <div className="flex items-center gap-0.5 rounded-pill bg-surface border border-border-default shadow-card px-1 py-0.5">
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); onReply() }}
+                  aria-label="Reply to this message"
+                  title="Reply"
+                  className="p-1 rounded-pill text-muted hover:text-primary-600 hover:bg-snow transition-colors"
+                >
+                  <Icon name="arrow.uturn.left" size={14} weight="semibold" />
+                </button>
+              )}
+              {onToggleReaction && (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); onToggleReaction('\u{1F44D}') }}
+                  aria-label="React with a thumbs up"
+                  title="React"
+                  className="p-1 rounded-pill text-muted hover:bg-snow transition-colors text-sm leading-none"
+                >
+                  {'\u{1F44D}'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
