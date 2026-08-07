@@ -39,20 +39,28 @@ describe('makeLayout', () => {
     }
   })
 
-  it('reproduces the old fixed layout exactly at its own width', () => {
+  it('keeps the original width and column rhythm at the baseline', () => {
     const L = makeLayout(BASE_W)
-    expect(L).toMatchObject({ cellW: 160, cellH: 56, pairGap: 8, colGap: 24, width: 712 })
+    expect(L).toMatchObject({ cellW: 160, pairGap: 8, colGap: 24, width: 712 })
   })
 
-  it('grows height more slowly than width', () => {
+  it('keeps a cell proportional as the bracket stretches', () => {
     const base = makeLayout(BASE_W)
     const wide = makeLayout(1104)
     const widthRatio = wide.cellW / base.cellW
     const heightRatio = wide.cellH / base.cellH
     expect(widthRatio).toBeGreaterThan(1)
-    expect(heightRatio).toBeGreaterThan(1)
-    // Matching the horizontal stretch would just pad the inside of each cell.
-    expect(heightRatio).toBeLessThan(widthRatio)
+    // Height tracks width rather than lagging it, so a wide cell does not end up
+    // a letterbox. Rounding to an even number costs at most a pixel either way.
+    expect(Math.abs(heightRatio - widthRatio)).toBeLessThan(0.02)
+  })
+
+  it('splits every cell into two whole-pixel team rows', () => {
+    // The divider between the two teams is drawn at cellH / 2 - 0.5. An odd
+    // height puts it on a half pixel and the border renders soft.
+    for (const w of [375, 712, 800, 900, 1104, 1152, 1400]) {
+      expect(makeLayout(w).cellH % 2).toBe(0)
+    }
   })
 
   it('grows monotonically — a wider page never yields a smaller bracket', () => {

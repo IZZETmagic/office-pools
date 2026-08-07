@@ -80,7 +80,9 @@ type BracketResultsTabProps = {
 // is what the overflow-x-auto wrapper is for.
 
 const BASE_CELL_W = 160
-const BASE_CELL_H = 56
+/** Two team rows to a cell — this is the pair, so it always stays even. */
+const BASE_ROW_H = 32
+const BASE_CELL_H = BASE_ROW_H * 2
 const BASE_PAIR_GAP = 8
 const BASE_COL_GAP = 24
 const HEADER_H = 24
@@ -106,11 +108,13 @@ export function makeLayout(available: number): BracketLayout {
   const cellW = Math.max(BASE_CELL_W, Math.floor((available * 0.8) / 4))
   const colGap = Math.max(BASE_COL_GAP, Math.floor((available - 4 * cellW) / 3))
 
-  // Height grows at 60% of the horizontal rate. A cell holds two 12px rows, so
-  // matching the stretch exactly would just add empty space inside each box and
-  // push the eight R32 ties well past a screen height.
+  // Height tracks width one-for-one, so a cell keeps its proportions as the
+  // bracket stretches. This was damped to 60% at first, which pinned the boxes
+  // at 69px on a desktop and left the two team rows looking squashed inside a
+  // 220px-wide box. Rounded to an even number so the pair splits cleanly and
+  // the divider between them lands on a whole pixel.
   const grow = cellW / BASE_CELL_W
-  const cellH = Math.round(BASE_CELL_H * (1 + (grow - 1) * 0.6))
+  const cellH = Math.round((BASE_CELL_H * grow) / 2) * 2
   const pairGap = Math.round(BASE_PAIR_GAP * grow)
 
   return {
