@@ -1227,11 +1227,6 @@ export function CommunityTab({
   const inputBarContent = (
     <>
       <TypingIndicator typingUsers={typingUsers} />
-      <QuickActions
-        onSharePrediction={handleShareBoldCall}
-        onFlexBadges={handleFlexBadges}
-        onDropStandings={handleDropStandings}
-      />
       <MessageInput
         poolId={poolId}
         currentUserId={currentUserId}
@@ -1239,6 +1234,15 @@ export function CommunityTab({
         memberLevels={memberLevels}
         replyingTo={replyingTo}
         onClearReply={() => setReplyingTo(null)}
+        /* Quick actions sit in the composer row rather than a band above it,
+           so the + is a peer of the send button on the other end. */
+        leftAction={
+          <QuickActions
+            onSharePrediction={handleShareBoldCall}
+            onFlexBadges={handleFlexBadges}
+            onDropStandings={handleDropStandings}
+          />
+        }
         onSend={handleSendMessage}
         onTyping={handleTyping}
       />

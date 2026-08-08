@@ -56,14 +56,17 @@ export function QuickActions({
   }
 
   return (
-    <div ref={wrapRef} className="relative border-t border-border-subtle/50 px-3 sm:px-4 py-2">
+    /* Inline in the composer row now, so no border or padding of its own —
+       it used to be a full-width band above the input and the + sat alone in
+       it, costing a whole row of chat for one 32px button. */
+    <div ref={wrapRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Quick actions"
-        className={`inline-flex items-center justify-center w-8 h-8 rounded-pill transition-colors ${
+        className={`inline-flex items-center justify-center w-9 h-9 rounded-control transition-colors ${
           open ? 'bg-primary-600 text-white' : 'bg-mist text-muted hover:text-ink'
         }`}
       >
@@ -76,7 +79,7 @@ export function QuickActions({
           /* RN anchors this to the + button's own 32px box plus a 4px gap, in
              pixels so it cannot drift when the composer row grows. bottom-full
              plus mb-1 is the same measurement expressed in the layout. */
-          className="absolute bottom-full left-3 sm:left-4 mb-1 z-30 min-w-[240px] rounded-control bg-surface border border-silver/60 shadow-card overflow-hidden animate-fade-up"
+          className="absolute bottom-full left-0 mb-1 z-30 min-w-[240px] rounded-control bg-surface border border-silver/60 shadow-card overflow-hidden animate-fade-up"
         >
           {QUICK_ACTIONS.map((a, i) => (
             <button

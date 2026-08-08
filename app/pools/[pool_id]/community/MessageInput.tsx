@@ -12,6 +12,8 @@ type MessageInputProps = {
   memberLevels: Map<string, MemberWithLevel>
   replyingTo: MessageWithReactions | null
   onClearReply: () => void
+  /** Rendered at the left of the composer row — the pool's quick actions. */
+  leftAction?: React.ReactNode
   onSend: (content: string, mentions: string[], replyToId: string | null) => Promise<void>
   onTyping: () => void
 }
@@ -23,6 +25,7 @@ export function MessageInput({
   memberLevels,
   replyingTo,
   onClearReply,
+  leftAction,
   onSend,
   onTyping,
 }: MessageInputProps) {
@@ -165,6 +168,7 @@ export function MessageInput({
         )}
 
         <form onSubmit={handleSend} className="flex items-end gap-2">
+          {leftAction}
           <textarea
             ref={inputRef}
             value={newMessage}
