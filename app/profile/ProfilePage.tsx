@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -205,9 +205,28 @@ export default function ProfilePage({
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const tabParam = searchParams.get('tab') as Tab | null
-    const validTabs: Tab[] = ['statistics', 'achievements', 'predictions', 'account']
+    // Kept in step with TAB_CONFIG. 'archived' was missing, so ?tab=archived
+    // silently fell back to Statistics — the tab was reachable by clicking but
+    // not by link, which is the half that gets shared.
+    const validTabs: Tab[] = TAB_CONFIG.map(t => t.key)
     return tabParam && validTabs.includes(tabParam) ? tabParam : 'statistics'
   })
+
+  // A scrolling strip can leave the selected tab off-screen — Account is last
+  // and sits past the edge at 375px — so deep-linking to ?tab=account or
+  // switching on a narrow screen would land you on a tab you cannot see.
+  // Nudges it into view horizontally without touching vertical scroll.
+  const tabStripRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const strip = tabStripRef.current
+    if (!strip || strip.scrollWidth <= strip.clientWidth) return
+    const el = strip.querySelector<HTMLElement>(`[data-tab="${activeTab}"]`)
+    if (!el) return
+    strip.scrollTo({
+      left: el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2,
+      behavior: 'smooth',
+    })
+  }, [activeTab])
   const router = useRouter()
   const supabase = createClient()
 
@@ -286,12 +305,23 @@ export default function ProfilePage({
           {/* Left sidebar - tab navigation */}
           <div className="w-full md:w-56 shrink-0">
             <Card padding="md" className="!p-2">
-              <div className="flex flex-row md:flex-col gap-1">
+              {/* Scrolls on mobile instead of cramming. The five tabs need 434px
+                  of content and the strip is 327px at 375px wide; flex-1 cannot
+                  shrink a tab below its own content (min-width: auto), so the
+                  row simply overflowed the card — which is what looked
+                  misaligned. flex-none lets each take its natural width and the
+                  container carries the overflow. Unchanged from md up, where the
+                  strip is a vertical sidebar with room to spare. */}
+              <div
+                ref={tabStripRef}
+                className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible no-scrollbar"
+              >
                 {TAB_CONFIG.map(tab => (
                   <button
                     key={tab.key}
+                    data-tab={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 md:flex-none md:w-full text-left px-2 sm:px-4 py-2.5 sm:py-3 rounded-control text-xs sm:text-sm font-medium transition-colors flex items-center justify-center md:justify-start gap-1.5 sm:gap-2.5 ${
+                    className={`flex-none md:w-full whitespace-nowrap text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-control text-xs sm:text-sm font-medium transition-colors flex items-center justify-center md:justify-start gap-1.5 sm:gap-2.5 ${
                       activeTab === tab.key
                         ? 'bg-primary-600 text-white shadow-sm'
                         : 'text-ink hover:bg-mist'
