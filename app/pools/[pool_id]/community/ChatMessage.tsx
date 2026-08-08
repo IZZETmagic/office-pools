@@ -65,6 +65,9 @@ function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) 
   )
 }
 
+/** The quick row the action menu offers before falling through to the full picker. */
+const QUICK_EMOJI = ['\u{1F44D}', '\u{1F602}', '\u{1F525}', '\u{1F62E}', '\u{1F622}', '\u{1F44F}']
+
 // =====================
 // CHAT MESSAGE
 // =====================
@@ -137,7 +140,7 @@ export function ChatMessage({
     // re-lay out before the picker is placed.
     pressTimer.current = window.setTimeout(() => {
       ;(document.activeElement as HTMLElement | null)?.blur()
-      setPickerOpen(true)
+      setMenuOpen(true)
     }, 350)
   }
   const cancelPress = () => {
@@ -213,7 +216,7 @@ export function ChatMessage({
           )}
 
           <div
-            onContextMenu={e => { if (onToggleReaction) { e.preventDefault(); setPickerOpen(true) } }}
+            onContextMenu={e => { if (onReply || onToggleReaction) { e.preventDefault(); setMenuOpen(true) } }}
             onTouchStart={startPress}
             onTouchEnd={cancelPress}
             onTouchMove={cancelPress}
@@ -242,6 +245,58 @@ export function ChatMessage({
               {formatClockTime(message.created_at)}
             </span>
           </div>
+
+          {/* Right-click and long-press land here, so the menu has to offer BOTH
+              things a message affords. It used to jump straight to the emoji
+              picker, which meant the gesture could react but never reply.
+              Quick emoji on top, reply underneath, "More" into the full picker —
+              the same order the RN sheet presents them. */}
+          {menuOpen && (onReply || onToggleReaction) && (
+            <div
+              role="menu"
+              className={`absolute bottom-full mb-1 z-30 rounded-control bg-surface border border-border-default shadow-card-elevated overflow-hidden ${
+                isOwn ? 'right-0' : 'left-0'
+              }`}
+            >
+              {onToggleReaction && (
+                <div className="flex items-center gap-0.5 px-1.5 py-1.5 border-b border-border-subtle">
+                  {QUICK_EMOJI.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { onToggleReaction(emoji); setMenuOpen(false) }}
+                      className="w-8 h-8 rounded-pill text-lg leading-none hover:bg-snow transition-colors"
+                      aria-label={`React with ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setMenuOpen(false); setPickerOpen(true) }}
+                    className="w-8 h-8 rounded-pill t-detail text-muted hover:bg-snow transition-colors"
+                    aria-label="More reactions"
+                    title="More"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+              {onReply && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); onReply() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 t-body text-ink hover:bg-snow transition-colors whitespace-nowrap"
+                >
+                  <Icon name="arrow.uturn.left" size={14} weight="semibold" />
+                  Reply
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Anchored over the bubble, like ReactionPicker in the RN sheet —
               opened by long-press, right-click, or the bar's react button.
