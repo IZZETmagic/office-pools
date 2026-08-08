@@ -138,7 +138,11 @@ export function MessageInput({
     : null
 
   return (
-    <div className="relative border-t border-border-default">
+    /* No border of its own. The composer container already draws one
+       (CommunityTab's input-bar wrapper); this was the second of two, with the
+       old quick-actions band sitting between them so the pair read as
+       deliberate. With the band gone they stacked into a double rule. */
+    <div className="relative">
       {/* Reply-to bar */}
       {replyingTo && (
         <div className="flex items-center gap-2 px-3 sm:px-4 pt-2 pb-1">
