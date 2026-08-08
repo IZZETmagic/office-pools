@@ -1074,6 +1074,21 @@ export function PoolDetail({
     }
     return 'bg-mist text-muted hover:text-ink'
   }
+  /**
+   * The branded header used to hard-code Dashboard / Pools / Profile in two
+   * places, a copy of AppHeader's list frozen at the time it was written. It
+   * missed the Admin link a super admin gets everywhere else, so branding a pool
+   * quietly removed a capability from the people who need it most.
+   *
+   * Same shape as AppHeader's navLinks, derived once here.
+   */
+  const brandedNavLinks = [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/pools', label: 'Pools' },
+    { href: '/profile', label: 'Profile' },
+    ...(isSuperAdmin ? [{ href: '/admin/super', label: 'Admin' }] : []),
+  ]
+
   const brandLogo = pool.brand_logo_url ? (
     <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-8 h-8 rounded-md object-cover shrink-0" />
   ) : (
@@ -1104,11 +1119,7 @@ export function PoolDetail({
             </div>
             {/* Desktop nav links */}
             <div className="hidden sm:flex items-center gap-4 shrink-0">
-              {[
-                { href: '/dashboard', label: 'Dashboard' },
-                { href: '/pools', label: 'Pools' },
-                { href: '/profile', label: 'Profile' },
-              ].map((link) => (
+              {brandedNavLinks.map((link) => (
                 <Link key={link.href} href={link.href} className="text-sm font-medium text-white/50 hover:text-white/80 transition">
                   {link.label}
                 </Link>
@@ -1134,16 +1145,31 @@ export function PoolDetail({
 
               {brandedNavOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 rounded-xl shadow-lg border border-white/10 py-1 z-50 overflow-hidden" style={{ backgroundColor: pool.brand_color! }}>
-                  {[
-                    { href: '/dashboard', label: 'Dashboard' },
-                    { href: '/pools', label: 'Pools' },
-                    { href: '/profile', label: 'Profile' },
-                  ].map((link) => (
+                  {brandedNavLinks.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
                       className="block px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                       onClick={() => setBrandedNavOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                  <div className="my-1 border-t border-white/10" />
+                  {/* AppHeader carries these in its menu; the branded copy did not,
+                      so a branded pool was the one place with no route to help or
+                      the legal pages. */}
+                  {[
+                    { href: '/faq', label: 'FAQ' },
+                    { href: '/contact', label: 'Contact' },
+                    { href: '/privacy', label: 'Privacy' },
+                    { href: '/terms', label: 'Terms' },
+                  ].map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setBrandedNavOpen(false)}
+                      className="block px-4 py-2 text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
                     >
                       {link.label}
                     </Link>
