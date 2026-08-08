@@ -186,13 +186,22 @@ export function MessageInput({
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-control bg-primary-600 text-white hover:bg-primary-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-sm shadow-primary-600/25"
+            /* RN's send: a 32px circle, primary when there is something to
+               send and silver@60% when there is not — the button holds its
+               place rather than fading, so the toolbar's right edge never
+               reflows. Ours was a 36px rounded-control at 40% opacity with a
+               paper plane; RN uses an up-arrow. */
+            className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-pill text-white active:scale-95 disabled:pointer-events-none transition-all ${
+              !newMessage.trim() || sending
+                ? 'bg-silver/60'
+                : 'bg-primary-600 hover:bg-primary-700 shadow-sm shadow-primary-600/25'
+            }`}
             aria-label="Send message"
           >
             {sending ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-pill animate-spin" />
             ) : (
-              <Icon name="paperplane.fill" size={16} />
+              <Icon name="arrow.up" size={18} weight="bold" />
             )}
           </button>
         </form>
