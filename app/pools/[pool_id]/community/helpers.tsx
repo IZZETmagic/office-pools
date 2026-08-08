@@ -205,7 +205,10 @@ export function generateSystemEvents(
             id: `rank-up-${entry.entry_id}`,
             event_type: 'rank_movement',
             emoji: '📊',
-            content: `🔺 Leaderboard updated — ${name} moves to #${entry.current_rank} (+${delta} positions)`,
+            // No inline arrow: the card renders one, tinted, from event_type.
+            // This was 🔺 — a RED triangle on a row only ever emitted when
+            // delta > 0, so every promotion in the feed was coloured like a loss.
+            content: `Leaderboard updated — ${name} moves to #${entry.current_rank} (+${delta} positions)`,
             highlighted_name: name,
             timestamp: entry.last_rank_update,
           })

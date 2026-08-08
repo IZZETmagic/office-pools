@@ -21,8 +21,10 @@ type SystemEventCardProps = {
 const EVENT_ICON: Record<SystemEvent['event_type'], { name: string; tint: string }> = {
   // 🏟️ — a pitch, for "Match 104 results are in"
   match_result: { name: 'sportscourt.fill', tint: 'text-primary-600' },
-  // 📊 — the leaderboard moved
-  rank_movement: { name: 'chart.bar.fill', tint: 'text-primary-600' },
+  // Only ever emitted for a climb (helpers.tsx pushes when delta > 0), so an
+  // up-arrow in success green is always the truth. Was a bar chart beside an
+  // inline red triangle: two glyphs, one of them saying the opposite.
+  rank_movement: { name: 'arrow.up', tint: 'text-success-600' },
   // 🔥 — a streak is running
   streak_alert: { name: 'flame.fill', tint: 'text-danger-500' },
   // 🏆 — a badge was unlocked
