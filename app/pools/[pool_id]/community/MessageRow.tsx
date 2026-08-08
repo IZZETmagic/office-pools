@@ -44,6 +44,7 @@ export function MessageRow({
   onReply,
   isFirstInCluster = true,
   isLastInCluster = true,
+  wide = false,
   children,
 }: {
   userId: string
@@ -56,6 +57,13 @@ export function MessageRow({
   onReply?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
+  /**
+   * Rich cards run wider than speech. max-w-md is a comfortable measure for a
+   * sentence, but a five-row standings table has a rank, a full name and a
+   * score to fit on one line, and at 448px the names were pushed against the
+   * points. Cards get lg; bubbles stay at md.
+   */
+  wide?: boolean
   children: React.ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -121,7 +129,7 @@ export function MessageRow({
           </div>
         )}
 
-        <div className={`relative min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
+        <div className={`relative min-w-0 max-w-[85%] ${wide ? 'sm:max-w-lg' : 'sm:max-w-md'} flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
           onToggleReaction && reactions.length > 0 ? 'mb-8' : ''
         }`}>
           {!isOwn && isFirstInCluster && (

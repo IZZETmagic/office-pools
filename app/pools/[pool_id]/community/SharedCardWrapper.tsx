@@ -53,6 +53,7 @@ export function SharedCardWrapper({
       reactions={reactions}
       onToggleReaction={onToggleReaction}
       onReply={onReply}
+      wide
     >
       {/* The card keeps its own surface and border — it is a card inside a
           message, not a bubble. rounded-chip matches the bubble's corner so the
