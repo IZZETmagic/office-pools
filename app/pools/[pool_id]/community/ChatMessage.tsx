@@ -280,6 +280,7 @@ export function ChatMessage({
                 /* The hover bar is the way in on a bubble; a dashed + beside
                    the pills was a second, uglier one. */
                 showAddButton={false}
+                onPillClick={() => setReactorsOpen(true)}
               />
             </div>
           )}

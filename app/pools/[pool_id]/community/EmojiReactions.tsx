@@ -9,12 +9,19 @@ type EmojiReactionsProps = {
   onToggleReaction: (emoji: string) => void
   /** Chat bubbles add reactions from the hover bar, so the inline + is noise there. */
   showAddButton?: boolean
+  /**
+   * When given, tapping a pill calls this instead of toggling — which is what
+   * RN does: the pill opens the who-reacted sheet, and adding or removing your
+   * own reaction moves to the picker. Share cards leave it unset and keep the
+   * toggle-on-tap they have always had.
+   */
+  onPillClick?: () => void
   pickerSide?: 'left' | 'right'
 }
 
 const QUICK_EMOJIS = ['🔥', '😱', '🎯', '😂', '💀']
 
-export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'right', showAddButton = true }: EmojiReactionsProps) {
+export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'right', showAddButton = true, onPillClick }: EmojiReactionsProps) {
   const [showPicker, setShowPicker] = useState(false)
 
   const handleSelect = useCallback((emoji: string) => {
@@ -31,7 +38,8 @@ export function EmojiReactions({ reactions, onToggleReaction, pickerSide = 'righ
       {reactions.map((r) => (
         <button
           key={r.emoji}
-          onClick={() => onToggleReaction(r.emoji)}
+          onClick={() => (onPillClick ? onPillClick() : onToggleReaction(r.emoji))}
+          aria-label={onPillClick ? `${r.count} reacted with ${r.emoji}. See who.` : `React with ${r.emoji}`}
           /* RN's pill: px 8 / py 3, a mist fill, and a 2px ring the colour of
              the chat background so it reads as cut out and pops off the bubble
              it overlaps. The ring is the load-bearing part — without it an
