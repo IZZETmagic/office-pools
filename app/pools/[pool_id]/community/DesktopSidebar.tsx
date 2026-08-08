@@ -1,5 +1,7 @@
 'use client'
 
+import { EVENT_ICON } from './SystemEventCard'
+
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { Card } from '@/components/ui/Card'
@@ -454,7 +456,13 @@ function RecentActivitySection({ events }: { events: SystemEvent[] }) {
         <div className="space-y-1.5">
           {activityEvents.map((event) => (
             <div key={event.id} className="flex items-start gap-1.5">
-              <span className="text-sm leading-none mt-0.5 shrink-0">{event.emoji}</span>
+              {/* Same map the feed card uses, so an event type cannot be a
+                  trophy in one place and something else in the other. Emoji
+                  took no tint and rendered at the OS's whim; these follow the
+                  event's own colour — green for a climb, gold for a badge. */}
+              <span className={`shrink-0 mt-0.5 ${EVENT_ICON[event.event_type].tint}`}>
+                <Icon name={EVENT_ICON[event.event_type].name} size={14} weight="semibold" />
+              </span>
               <p className="text-[10px] text-muted flex-1 leading-relaxed">
                 {event.content}
               </p>

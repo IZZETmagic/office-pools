@@ -285,7 +285,10 @@ export function generateSystemEvents(
         id: `badge-${userId}-${badge.id}`,
         event_type: 'badge_unlock',
         emoji: '🏆',
-        content: `${name} just unlocked the ${badge.emoji} ${badge.name} badge!`,
+        // No inline badge emoji: the row leads with a trophy icon and names the
+        // badge immediately after, so the glyph sat between two things already
+        // saying it — "🏆 … unlocked the 🎯 Sharpshooter badge".
+        content: `${name} just unlocked the ${badge.name} badge!`,
         highlighted_name: name,
         timestamp: badgeTimestamp,
       })
