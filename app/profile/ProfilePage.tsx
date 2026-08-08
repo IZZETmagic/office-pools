@@ -679,13 +679,18 @@ function AchievementsSection({ userId }: { userId: string }) {
               <span
                 /* The number of times a badge was earned is the one thing on
                    this card that is not the same for everybody, so it should
-                   not be the smallest thing on it. Up from 10px/px-1.5 and
-                   pulled off the corner — top-1 right-1 tucked it into the
-                   card's own radius, which is what made it read as a
-                   decoration rather than a count. */
-                className="absolute top-2 right-2 z-10 text-xs sm:text-sm font-bold px-2 py-0.5 rounded-pill bg-primary-600 text-white leading-none shadow-sm"
+                   not be the smallest thing on it. Pulled off the corner too —
+                   top-1 right-1 tucked it into the card's own radius, which is
+                   what made it read as a decoration rather than a count.
+
+                   Equal height and min-width make it a circle at one or two
+                   digits and let it stretch only past that, so it never clips.
+                   The × is gone: two glyphs could not sit in a circle without
+                   shrinking the number, and a pill on a badge already reads as
+                   a count. */
+                className="absolute top-2 right-2 z-10 inline-flex items-center justify-center h-6 min-w-6 sm:h-7 sm:min-w-7 px-1 text-xs sm:text-sm font-bold rounded-pill bg-primary-600 text-white leading-none shadow-sm"
               >
-                {count}×
+                {count}
               </span>
             </button>
           ))}
