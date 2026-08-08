@@ -507,16 +507,18 @@ function ArchivedPoolsTab({ userId }: { userId: string }) {
                one block with hairlines through it. Separation in this design
                system comes from the snow/surface value step — the shadow is
                almost invisible by design — so the fill is what does the work. */
-            className="flex items-center justify-between gap-4 rounded-control border border-border-default bg-surface shadow-card dark:shadow-none p-4"
+            className="relative flex items-center justify-between gap-4 rounded-control border border-border-default bg-surface shadow-card dark:shadow-none p-4 transition-colors hover:bg-mist focus-within:bg-mist"
           >
-            {/* The name is the link, not the whole row: Restore sits inside it,
-                and nesting a button in an anchor is invalid and swallows the
-                click. Stretching the hit area over the row would also mean a
-                mis-tap on Restore navigates instead. */}
+            {/* Stretched link: the anchor's ::after covers the card, so the whole
+                card is the target and highlights as one — rather than only the
+                name reacting, which read as the sole clickable thing. An <a>
+                cannot wrap the Restore <button> (invalid, and it swallows the
+                click), and this gets the same hit area without nesting. Restore
+                sits above it on z-10 so it still receives its own clicks. */}
             <div className="min-w-0">
               <Link
                 href={`/pools/${row.pool_id}`}
-                className="font-semibold text-ink truncate block hover:text-primary-600 transition-colors"
+                className="font-semibold text-ink truncate block after:absolute after:inset-0 after:rounded-control focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40 rounded-control"
               >
                 {row.pool_name}
               </Link>
@@ -534,12 +536,12 @@ function ArchivedPoolsTab({ userId }: { userId: string }) {
               <button
                 onClick={() => handleRestore(row.pool_id)}
                 disabled={restoringId === row.pool_id}
-                className="shrink-0 rounded-chip bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="relative z-10 shrink-0 rounded-chip bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {restoringId === row.pool_id ? 'Restoring…' : 'Restore'}
               </button>
             ) : (
-              <span className="shrink-0 text-xs text-muted">Admin can restore</span>
+              <span className="relative z-10 shrink-0 text-xs text-muted">Admin can restore</span>
             )}
           </li>
         ))}
