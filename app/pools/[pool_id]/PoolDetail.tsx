@@ -1006,7 +1006,28 @@ export function PoolDetail({
    * not depend on these tabs.
    */
   const isArchived = !!pool.archived_at
-  const tabs = isAdmin && !isArchived ? [...USER_TABS, ...adminTabs] : USER_TABS
+
+  /**
+   * Admin rights, as they apply on THIS pool right now.
+   *
+   * Hiding the tab buttons was not enough: every admin panel below tested
+   * `isAdmin` on its own, so ?tab=settings — or tab state left over from before
+   * the pool was archived — still rendered the full editable form with no
+   * button ever being shown. The strip and the panels have to read the same
+   * flag, which is what this is.
+   */
+  const canAdmin = isAdmin && !isArchived
+  const tabs = canAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
+
+  // With the admin panels gated, a tab that is no longer offered renders
+  // nothing at all — a blank pane under a strip that does not contain it. That
+  // happens on ?tab=settings for an archived pool, or when a pool is archived
+  // while someone is sitting on Settings. Fall back to the first real tab.
+  useEffect(() => {
+    if (!tabs.some(t => t.key === activeTab)) {
+      setActiveTab(tabs[0].key)
+    }
+  }, [tabs, activeTab])
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1871,7 +1892,7 @@ export function PoolDetail({
             )}
 
             {/* Admin tabs */}
-            {activeTab === 'members' && isAdmin && (
+            {activeTab === 'members' && canAdmin && (
               <MembersTab
                 pool={pool}
                 members={members}
@@ -1884,7 +1905,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'fees' && isAdmin && pool.entry_fee && (
+            {activeTab === 'fees' && canAdmin && pool.entry_fee && (
               <FeesTab
                 pool={pool}
                 members={members}
@@ -1893,7 +1914,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'scoring_config' && isAdmin && (
+            {activeTab === 'scoring_config' && canAdmin && (
               <ScoringTab
                 pool={pool}
                 settings={settings}
@@ -1904,7 +1925,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'settings' && isAdmin && (
+            {activeTab === 'settings' && canAdmin && (
               <SettingsTab
                 pool={pool}
                 setPool={setPool}
@@ -1914,7 +1935,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'rounds' && isAdmin && isProgressive && (
+            {activeTab === 'rounds' && canAdmin && isProgressive && (
               <RoundsTab
                 poolId={pool.pool_id}
                 roundStates={roundStates}
