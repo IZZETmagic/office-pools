@@ -151,17 +151,23 @@ export function MessageInput({
            shape ReplyHeader uses inside a bubble: accent rule, author, then the
            text on one truncated line. */
         <div className="flex items-start gap-2 px-3 sm:px-4 pt-2 pb-1">
-          <div className="w-0.5 self-stretch rounded-pill bg-primary-400 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted truncate">
-              Replying to <span className="font-medium text-ink">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
-            </p>
-            {/* Rich cards carry a fallback sentence rather than typed text, so
+          {/* The quote gets its own fill so it reads as a block of someone
+              else's text rather than more composer chrome. Same recipe as
+              ReplyHeader inside a bubble — ink/5 and the inset radius — so the
+              preview and the sent reply look like the same object. */}
+          <div className="flex items-stretch gap-2 min-w-0 flex-1 rounded-inset bg-ink/5 px-2 py-1.5 overflow-hidden">
+            <div className="w-0.5 self-stretch rounded-pill bg-primary-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted truncate">
+                Replying to <span className="font-medium text-ink">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
+              </p>
+              {/* Rich cards carry a fallback sentence rather than typed text, so
                 this is never empty for them; the guard is for a message whose
                 body really is blank. */}
-            <p className="text-xs text-muted/80 truncate">
-              {replyingTo.content?.trim() || 'Shared a card'}
-            </p>
+              <p className="text-xs text-muted truncate">
+                {replyingTo.content?.trim() || 'Shared a card'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClearReply}
