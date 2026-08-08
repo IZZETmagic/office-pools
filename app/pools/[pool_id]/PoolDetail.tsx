@@ -1334,7 +1334,12 @@ export function PoolDetail({
                 </Link>
               )}
 
-              {isAdmin && (
+              {/* canAdmin, not isAdmin — this is the strip that actually renders.
+                  The `tabs` array gating admin tabs only ever fed allTabKeys;
+                  the strip maps USER_TABS and adminTabs separately, so an
+                  archived pool still drew Rounds / Members / Scoring Config /
+                  Settings and the divider before them. */}
+              {canAdmin && (
                 <>
                   <div className="flex items-center px-2">
                     <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
