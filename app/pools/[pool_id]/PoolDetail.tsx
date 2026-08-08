@@ -9,6 +9,7 @@ import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live
 import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
+import { useTheme } from '@/components/ThemeProvider'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
 import { ResultsTab } from './ResultsTab'
@@ -1082,6 +1083,18 @@ export function PoolDetail({
    *
    * Same shape as AppHeader's navLinks, derived once here.
    */
+  // Colour mode was the last control the branded header dropped. It cycles
+  // system → light → dark like AppHeader's, but styled white-on-brand: the
+  // header paints itself in the customer's colour, so the muted/mist treatment
+  // AppHeader uses would be invisible on it.
+  const { colorMode, setColorMode } = useTheme()
+  const cycleColorMode = () => {
+    const next = { system: 'light', light: 'dark', dark: 'system' } as const
+    setColorMode(next[colorMode])
+  }
+  const colorModeIcon =
+    colorMode === 'light' ? 'sun.max' : colorMode === 'dark' ? 'moon' : 'desktopcomputer'
+
   const brandedNavLinks = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/pools', label: 'Pools' },
@@ -1124,6 +1137,14 @@ export function PoolDetail({
                   {link.label}
                 </Link>
               ))}
+              <button
+                onClick={cycleColorMode}
+                className="p-2 rounded-control text-white/50 hover:text-white/80 hover:bg-white/10 transition"
+                aria-label={`Color mode: ${colorMode}`}
+                title={`Theme: ${colorMode}`}
+              >
+                <Icon name={colorModeIcon} size={16} />
+              </button>
               <form action="/auth/signout" method="post">
                 <button type="submit" className="text-sm text-white/50 hover:text-white/80 font-medium">Sign Out</button>
               </form>
@@ -1155,6 +1176,13 @@ export function PoolDetail({
                       {link.label}
                     </Link>
                   ))}
+                  <button
+                    onClick={cycleColorMode}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <Icon name={colorModeIcon} size={15} />
+                    <span className="capitalize">{colorMode} theme</span>
+                  </button>
                   <div className="my-1 border-t border-white/10" />
                   {/* AppHeader carries these in its menu; the branded copy did not,
                       so a branded pool was the one place with no route to help or
