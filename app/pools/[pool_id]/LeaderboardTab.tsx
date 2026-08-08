@@ -1,5 +1,7 @@
 'use client'
 
+import { Icon } from '@/components/ui/Icon'
+
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
 import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult } from '@/lib/bracketPickerScoring'
@@ -560,14 +562,16 @@ export function LeaderboardTab({
   // POOL AWARDS
   // =============================================
 
-  type PoolAward = { type: string; emoji: string; label: string; entryId: string }
+  // No emoji: the glyph comes from AWARD_ICON, keyed by type, so the chip and
+  // the spotlight card cannot disagree about what an award looks like.
+  type PoolAward = { type: string; label: string; entryId: string }
 
   const poolAwards = useMemo(() => {
     const awards: PoolAward[] = []
     if (isBracketPicker || sorted.length === 0) return awards
 
     // MVP — 1st place
-    awards.push({ type: 'mvp', emoji: '🏆', label: 'MVP', entryId: sorted[0].entry_id })
+    awards.push({ type: 'mvp', label: 'MVP', entryId: sorted[0].entry_id })
 
     // Contrarian King — most contrarian wins
     let bestContrarian: { entryId: string; count: number } | null = null
@@ -594,10 +598,10 @@ export function LeaderboardTab({
       }
     }
 
-    if (bestContrarian) awards.push({ type: 'contrarian', emoji: '🎲', label: 'Contrarian King', entryId: bestContrarian.entryId })
-    if (bestCrowdFollower) awards.push({ type: 'crowd', emoji: '👥', label: 'Crowd Follower', entryId: bestCrowdFollower.entryId })
-    if (bestHotStreak) awards.push({ type: 'hot', emoji: '🔥', label: `On Fire (${bestHotStreak.length})`, entryId: bestHotStreak.entryId })
-    if (bestColdStreak) awards.push({ type: 'cold', emoji: '❄️', label: `Ice Cold (${bestColdStreak.length})`, entryId: bestColdStreak.entryId })
+    if (bestContrarian) awards.push({ type: 'contrarian', label: 'Contrarian King', entryId: bestContrarian.entryId })
+    if (bestCrowdFollower) awards.push({ type: 'crowd', label: 'Crowd Follower', entryId: bestCrowdFollower.entryId })
+    if (bestHotStreak) awards.push({ type: 'hot', label: `On Fire (${bestHotStreak.length})`, entryId: bestHotStreak.entryId })
+    if (bestColdStreak) awards.push({ type: 'cold', label: `Ice Cold (${bestColdStreak.length})`, entryId: bestColdStreak.entryId })
 
     return awards
   }, [sorted, entryStatsMap, isBracketPicker])
@@ -658,7 +662,7 @@ export function LeaderboardTab({
 
   type Superlative = {
     type: string
-    emoji: string
+    // Same as PoolAward: the glyph comes from AWARD_ICON by type.
     title: string
     name: string
     detail: string
@@ -685,7 +689,7 @@ export function LeaderboardTab({
     }
     if (hottestEntry && hottestLength >= 2) {
       superlatives.push({
-        type: 'hot', emoji: '🔥', title: 'Hottest Right Now',
+        type: 'hot', title: 'Hottest Right Now',
         name: getName(hottestEntry),
         detail: `${hottestLength}-match win streak`,
         bgClass: 'bg-warning-50 dark:bg-warning-500/10',
@@ -705,7 +709,7 @@ export function LeaderboardTab({
     }
     if (coldestEntry && coldestLength >= 2) {
       superlatives.push({
-        type: 'cold', emoji: '🧊', title: 'Ice Cold',
+        type: 'cold', title: 'Ice Cold',
         name: getName(coldestEntry),
         detail: `${coldestLength} misses in last ${Math.min(5, coldestLength + 2)}`,
         bgClass: 'bg-primary-50 dark:bg-primary-500/10',
@@ -728,7 +732,7 @@ export function LeaderboardTab({
     if (bestContrarianEntry && bestContrarianCount > 0) {
       const pct = bestContrarianTotal > 0 ? Math.round((bestContrarianCount / bestContrarianTotal) * 100) : 0
       superlatives.push({
-        type: 'contrarian', emoji: '🎲', title: 'Contrarian King',
+        type: 'contrarian', title: 'Contrarian King',
         name: getName(bestContrarianEntry),
         detail: `${pct}% picks against consensus`,
         bgClass: 'bg-primary-600/8',
@@ -748,7 +752,7 @@ export function LeaderboardTab({
     }
     if (bestCrowdEntry && bestCrowdPct > 0) {
       superlatives.push({
-        type: 'crowd', emoji: '👥', title: 'Crowd Follower',
+        type: 'crowd', title: 'Crowd Follower',
         name: getName(bestCrowdEntry),
         detail: `${Math.round(bestCrowdPct)}% consensus picks`,
         bgClass: 'bg-primary-50 dark:bg-primary-500/10',
@@ -768,7 +772,7 @@ export function LeaderboardTab({
     }
     if (bestExactEntry && bestExactCount > 0) {
       superlatives.push({
-        type: 'sharpshooter', emoji: '🎯', title: 'Sharpshooter',
+        type: 'sharpshooter', title: 'Sharpshooter',
         name: getName(bestExactEntry),
         detail: `${bestExactCount} exact scores (pool best)`,
         bgClass: 'bg-danger-50 dark:bg-danger-500/10',
@@ -793,7 +797,7 @@ export function LeaderboardTab({
     }
     if (climberEntry && climberDelta > 0) {
       superlatives.push({
-        type: 'climber', emoji: '📈', title: 'Biggest Climber',
+        type: 'climber', title: 'Biggest Climber',
         name: getName(climberEntry),
         detail: `Up ${climberDelta} places this matchday`,
         bgClass: 'bg-success-50 dark:bg-success-500/10',
@@ -818,7 +822,7 @@ export function LeaderboardTab({
     }
     if (fallerEntry && fallerDelta < 0) {
       superlatives.push({
-        type: 'faller', emoji: '📉', title: 'Biggest Faller',
+        type: 'faller', title: 'Biggest Faller',
         name: getName(fallerEntry),
         detail: `Down ${Math.abs(fallerDelta)} places this matchday`,
         bgClass: 'bg-danger-50 dark:bg-danger-500/10',
@@ -1106,6 +1110,30 @@ export function LeaderboardTab({
     const curr = entry.current_rank
     if (prev === null || prev === undefined || curr === null || curr === undefined) return null
     return prev - curr // positive = moved up, negative = moved down
+  }
+
+  /**
+   * One icon per award type. These were emoji, chosen per call site, so the same
+   * award could read differently in the chip and the spotlight card.
+   *
+   * Two are not literal translations, on purpose:
+   *
+   *  - Contrarian King was a die. A die is about luck, and this award is the
+   *    opposite — it goes to whoever backed against the crowd and was right.
+   *    A branching arrow says "went the other way", which is the actual claim.
+   *  - Biggest Climber/Faller were 📈/📉. They are now a matched pair of
+   *    arrows rather than one chart icon and one that does not exist in the
+   *    map, so the two read as opposites at a glance.
+   */
+  const AWARD_ICON: Record<string, string> = {
+    mvp: 'trophy.fill',
+    hot: 'flame.fill',
+    cold: 'snowflake',
+    contrarian: 'arrow.triangle.branch',
+    crowd: 'person.3.fill',
+    sharpshooter: 'target',
+    climber: 'arrow.up.right',
+    faller: 'arrow.down.right',
   }
 
   // =============================================
@@ -1420,7 +1448,8 @@ export function LeaderboardTab({
                     key={ai}
                     className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getAwardBadgeClasses(award.type)}`}
                   >
-                    {award.emoji} {award.label}
+                    <Icon name={AWARD_ICON[award.type] ?? 'star.fill'} size={10} className="inline-block align-[-1px] mr-1" />
+                    {award.label}
                   </span>
                 )) : (
                   <span className="text-muted dark:text-muted">—</span>
@@ -1529,7 +1558,8 @@ export function LeaderboardTab({
                           key={ai}
                           className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getAwardBadgeClasses(award.type)}`}
                         >
-                          {award.emoji} {award.label}
+                          <Icon name={AWARD_ICON[award.type] ?? 'star.fill'} size={10} className="inline-block align-[-1px] mr-1" />
+                    {award.label}
                         </span>
                       ))}
                     </div>
@@ -1629,7 +1659,9 @@ export function LeaderboardTab({
                 key={s.type}
                 className={`flex items-center gap-3 rounded-chip px-3 py-2.5 ${s.bgClass}`}
               >
-                <span className="text-lg flex-shrink-0">{s.emoji}</span>
+                <span className={`shrink-0 ${s.titleColorClass}`}>
+                  <Icon name={AWARD_ICON[s.type] ?? 'star.fill'} size={18} weight="semibold" />
+                </span>
                 <div className="min-w-0">
                   <div className={`text-[11px] sm:text-xs font-bold ${s.titleColorClass}`}>{s.title}</div>
                   <div className="text-[11px] sm:text-xs text-ink">
