@@ -365,13 +365,27 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       updatePayload.prediction_deadline = newDeadline.toISOString()
     }
 
-    const { error: updateError } = await supabase
+    // .select() so the write reports the truth. Without it, an UPDATE that RLS
+    // filters out comes back 200 with zero rows and NO error — PostgREST does
+    // not treat "matched nothing" as a failure — so this said "Saved" while
+    // changing nothing. That is what an archived pool now does: migration 044
+    // gates the policy on archived_at, and the row silently falls out.
+    const { data: updated, error: updateError } = await supabase
       .from('pools')
       .update(updatePayload)
       .eq('pool_id', pool.pool_id)
+      .select('pool_id')
 
     if (updateError) {
       setError(updateError.message)
+      setSaving(false)
+      return
+    }
+
+    if (!updated || updated.length === 0) {
+      setError(
+        'This pool could not be updated. Archived pools are read-only — restore it from your profile to make changes.'
+      )
       setSaving(false)
       return
     }

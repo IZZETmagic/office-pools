@@ -641,13 +641,26 @@ export function ScoringTab({
           updated_at: new Date().toISOString(),
         }
 
-    const { error: updateError } = await supabase
+    // .select() for the same reason as SettingsTab: an RLS-filtered UPDATE is a
+    // 200 with zero rows and no error, so without this an archived pool would
+    // report its scoring saved and change nothing.
+    const { data: updatedSettings, error: updateError } = await supabase
       .from('pool_settings')
       .update(updateData)
       .eq('pool_id', pool.pool_id)
+      .select('pool_id')
 
     if (updateError) {
       setError(updateError.message)
+      setSaving(false)
+      setShowConfirm(false)
+      return
+    }
+
+    if (!updatedSettings || updatedSettings.length === 0) {
+      setError(
+        'Scoring could not be updated. Archived pools are read-only — restore the pool from your profile to make changes.'
+      )
       setSaving(false)
       setShowConfirm(false)
       return
