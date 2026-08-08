@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useRef, useState } from 'react'
 
 import { EmojiPicker } from './EmojiPicker'
@@ -123,9 +125,11 @@ export function ChatMessage({
   // reactions-on-text from about seven people in total, diagnosed as the
   // control being impossible to find.
   //
-  // So the bar is VISIBLE on hover rather than gesture-only, with long-press and
-  // right-click as accelerators for people who reach for them. Two more hidden
-  // gestures would have repeated the cause.
+  // A hover bar carried these at first, on the argument that a hidden gesture
+  // would repeat the cause. It was removed at Ryan's call once right-click and
+  // long-press opened a menu offering BOTH actions — one obvious place beats a
+  // bar that hovers over the text and a menu saying the same thing. The pills
+  // themselves are the standing visible cue that reactions exist here.
   const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [reactorsOpen, setReactorsOpen] = useState(false)
@@ -178,7 +182,7 @@ export function ChatMessage({
     /* The feed's space-y-3 is the baseline for every other item type; messages
        override it in both directions. A new speaker gets room to breathe, a
        continuation sits almost flush against the bubble above. */
-    <div ref={rowRef} className={`group relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
+    <div ref={rowRef} className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
       <div className={`flex gap-1 items-end ${isOwn ? 'flex-row-reverse' : ''}`}>
         {/* Avatar sits beside the LAST bubble of the run; earlier bubbles get an
             empty slot the same size so the whole run keeps one left edge. */}
@@ -350,60 +354,6 @@ export function ChatMessage({
           )}
         </div>
 
-        {/* The action bar. Visible on hover on a pointer device, and forced open
-            by long-press or right-click. Sits on the bubble's OUTER edge so it
-            never covers the text, and `hidden` on touch where hover does not
-            exist and the long-press menu takes over. */}
-        {(onReply || onToggleReaction) && (
-          <div
-            /* Absolute, not a flex child. As a third child of a row whose
-               message column is already max-w-[85%], it added its own width and
-               pushed the row past the pane — on both sides, because the row
-               reverses for your own messages. Pinned to the row's edge instead:
-               it costs no layout width, and left-0/right-0 is the pane's inside
-               edge by definition. */
-            className={`absolute top-1 z-10 ${isOwn ? 'left-0' : 'right-0'} transition-opacity ${
-              menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-            }`}
-          >
-            <div className="flex items-center gap-0.5 rounded-pill bg-surface border border-border-default shadow-card px-1 py-0.5">
-              {onReply && (
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); onReply() }}
-                  aria-label="Reply to this message"
-                  title="Reply"
-                  className="p-1 rounded-pill text-muted hover:text-primary-600 hover:bg-snow transition-colors"
-                >
-                  <Icon name="arrow.uturn.left" size={14} weight="semibold" />
-                </button>
-              )}
-              {onToggleReaction && reactions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); setReactorsOpen(true) }}
-                  aria-label="See who reacted"
-                  title="Who reacted"
-                  className="px-1.5 py-1 rounded-pill t-detail text-muted hover:text-ink hover:bg-snow transition-colors"
-                >
-                  {reactions.reduce((n, r) => n + r.count, 0)}
-                </button>
-              )}
-              {onToggleReaction && (
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); setPickerOpen(o => !o) }}
-                  aria-label="Add a reaction"
-                  aria-expanded={pickerOpen}
-                  title="React"
-                  className="p-1 rounded-pill text-muted hover:bg-snow transition-colors text-sm leading-none"
-                >
-                  {'\u{1F642}'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
