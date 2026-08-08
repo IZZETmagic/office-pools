@@ -995,7 +995,18 @@ export function PoolDetail({
     { key: 'settings' as Tab, label: 'Settings' },
   ]
   const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
-  const tabs = isAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
+  /**
+   * An archived pool is readable, not editable. Nothing stopped an admin
+   * opening one and changing its settings or scoring config — the page had no
+   * concept of archived at all, it just never got linked to. Now that the
+   * profile links to it, the admin surface has to come off: no Settings,
+   * Scoring Config, Members, Rounds or Fees while archived.
+   *
+   * Restore is on the profile's archived list, so there is a way back that does
+   * not depend on these tabs.
+   */
+  const isArchived = !!pool.archived_at
+  const tabs = isAdmin && !isArchived ? [...USER_TABS, ...adminTabs] : USER_TABS
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1244,6 +1255,20 @@ export function PoolDetail({
               <Icon name="exclamationmark.triangle.fill" size={16} weight="semibold" className="text-warning-800 shrink-0" />
               <span className="text-xs sm:text-sm font-medium text-warning-800">
                 Viewing as Super Admin — You are not a member of this pool
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Archived banner — says why the admin tabs are missing, rather than
+            leaving an admin to wonder where Settings went. */}
+        {isArchived && (
+          <div className="bg-mist border-b border-border-default">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2">
+              <Icon name="archivebox.fill" size={16} weight="semibold" className="text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-muted">
+                This pool is archived — read only.
+                {isAdmin ? ' Restore it from your profile to make changes.' : ''}
               </span>
             </div>
           </div>

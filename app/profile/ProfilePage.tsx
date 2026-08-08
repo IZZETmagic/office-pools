@@ -509,8 +509,17 @@ function ArchivedPoolsTab({ userId }: { userId: string }) {
                almost invisible by design — so the fill is what does the work. */
             className="flex items-center justify-between gap-4 rounded-control border border-border-default bg-surface shadow-card dark:shadow-none p-4"
           >
+            {/* The name is the link, not the whole row: Restore sits inside it,
+                and nesting a button in an anchor is invalid and swallows the
+                click. Stretching the hit area over the row would also mean a
+                mis-tap on Restore navigates instead. */}
             <div className="min-w-0">
-              <p className="font-semibold text-ink truncate">{row.pool_name}</p>
+              <Link
+                href={`/pools/${row.pool_id}`}
+                className="font-semibold text-ink truncate block hover:text-primary-600 transition-colors"
+              >
+                {row.pool_name}
+              </Link>
               <p className="text-sm text-muted">
                 Archived
                 {row.archived_by_name ? ` by ${row.archived_by_name}` : ''} on{' '}
