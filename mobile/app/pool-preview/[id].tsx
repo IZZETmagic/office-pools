@@ -40,9 +40,6 @@ type PoolSettingsRow = {
   group_exact_score: number;
   group_correct_difference: number;
   group_correct_result: number;
-  knockout_exact_score: number;
-  knockout_correct_difference: number;
-  knockout_correct_result: number;
   pso_enabled: boolean;
   pso_exact_score: number | null;
   pso_correct_difference: number | null;
@@ -144,7 +141,7 @@ export default function PoolPreviewSheet() {
             // ignore the bp_* columns; bracket pools ignore the per-match
             // columns. Cheaper to over-select than to branch the query.
             .select(
-              'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct',
+              'group_exact_score, group_correct_difference, group_correct_result, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct',
             )
             .eq('pool_id', id)
             .maybeSingle(),
@@ -549,15 +546,15 @@ export default function PoolPreviewSheet() {
                 // (exact / difference / result), so they render the same
                 // three (or four with PSO) cards.
                 <>
+                  {/* A "Knockout Stage" card sat below this one reading
+                      knockout_*, which migration 042 retired. Knockout matches
+                      score off these same group values, scaled by the round
+                      multiplier — so the card was telling someone deciding
+                      whether to join a number that no longer applies. */}
                   <ScoringCard title="Group Stage">
                     <ScoreRow label="Exact Score" pts={settings.group_exact_score} />
                     <ScoreRow label="Correct Difference" pts={settings.group_correct_difference} />
                     <ScoreRow label="Correct Result" pts={settings.group_correct_result} />
-                  </ScoringCard>
-                  <ScoringCard title="Knockout Stage">
-                    <ScoreRow label="Exact Score" pts={settings.knockout_exact_score} />
-                    <ScoreRow label="Correct Difference" pts={settings.knockout_correct_difference} />
-                    <ScoreRow label="Correct Result" pts={settings.knockout_correct_result} />
                   </ScoringCard>
                   {settings.pso_enabled ? (
                     <ScoringCard title="Penalty Shootout">

@@ -671,9 +671,10 @@ export type BreakdownPoolSettings = {
   group_exact_score: number;
   group_correct_difference: number;
   group_correct_result: number;
-  knockout_exact_score: number;
-  knockout_correct_difference: number;
-  knockout_correct_result: number;
+  // knockout_* is gone: migration 042 retired those columns from scoring, and
+  // the breakdown screen no longer renders them. They still exist in the table
+  // until they are dropped, so the API may still send them — nothing reads
+  // them, and the type no longer invites anything to.
   round_32_multiplier: number;
   round_16_multiplier: number;
   quarter_final_multiplier: number;

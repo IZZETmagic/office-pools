@@ -9,9 +9,6 @@ export type PoolSettings = {
   groupCorrectResult: number;
 
   // Knockout scoring
-  knockoutExactScore: number;
-  knockoutCorrectDifference: number;
-  knockoutCorrectResult: number;
 
   // Round multipliers
   round32Multiplier: number;
@@ -70,9 +67,6 @@ type DbRow = {
   group_exact_score: number;
   group_correct_difference: number;
   group_correct_result: number;
-  knockout_exact_score: number;
-  knockout_correct_difference: number;
-  knockout_correct_result: number;
   round_32_multiplier: number;
   round_16_multiplier: number;
   quarter_final_multiplier: number;
@@ -116,16 +110,13 @@ type DbRow = {
 };
 
 const SELECT_COLUMNS =
-  'group_exact_score, group_correct_difference, group_correct_result, knockout_exact_score, knockout_correct_difference, knockout_correct_result, round_32_multiplier, round_16_multiplier, quarter_final_multiplier, semi_final_multiplier, third_place_multiplier, final_multiplier, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bonus_group_winner_and_runnerup, bonus_group_winner_only, bonus_group_runnerup_only, bonus_both_qualify_swapped, bonus_one_qualifies_wrong_position, bonus_all_16_qualified, bonus_12_15_qualified, bonus_8_11_qualified, bonus_correct_bracket_pairing, bonus_match_winner_correct, bonus_champion_correct, bonus_second_place_correct, bonus_third_place_correct, bonus_best_player_correct, bonus_top_scorer_correct, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct';
+  'group_exact_score, group_correct_difference, group_correct_result, round_32_multiplier, round_16_multiplier, quarter_final_multiplier, semi_final_multiplier, third_place_multiplier, final_multiplier, pso_enabled, pso_exact_score, pso_correct_difference, pso_correct_result, bonus_group_winner_and_runnerup, bonus_group_winner_only, bonus_group_runnerup_only, bonus_both_qualify_swapped, bonus_one_qualifies_wrong_position, bonus_all_16_qualified, bonus_12_15_qualified, bonus_8_11_qualified, bonus_correct_bracket_pairing, bonus_match_winner_correct, bonus_champion_correct, bonus_second_place_correct, bonus_third_place_correct, bonus_best_player_correct, bonus_top_scorer_correct, bp_group_correct_1st, bp_group_correct_2nd, bp_group_correct_3rd, bp_group_correct_4th, bp_third_correct_qualifier, bp_third_correct_eliminated, bp_third_all_correct_bonus, bp_r32_correct, bp_r16_correct, bp_qf_correct, bp_sf_correct, bp_third_place_match_correct, bp_final_correct, bp_champion_bonus, bp_penalty_correct';
 
 function normalize(row: DbRow): PoolSettings {
   return {
     groupExactScore: row.group_exact_score,
     groupCorrectDifference: row.group_correct_difference,
     groupCorrectResult: row.group_correct_result,
-    knockoutExactScore: row.knockout_exact_score,
-    knockoutCorrectDifference: row.knockout_correct_difference,
-    knockoutCorrectResult: row.knockout_correct_result,
     round32Multiplier: row.round_32_multiplier,
     round16Multiplier: row.round_16_multiplier,
     quarterFinalMultiplier: row.quarter_final_multiplier,

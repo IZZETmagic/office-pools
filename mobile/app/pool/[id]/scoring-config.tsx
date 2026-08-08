@@ -21,9 +21,6 @@ type EditState = {
   groupExact: number;
   groupDiff: number;
   groupResult: number;
-  koExact: number;
-  koDiff: number;
-  koResult: number;
   r32: number;
   r16: number;
   qf: number;
@@ -131,9 +128,6 @@ const DEFAULTS: EditState = {
   groupExact: 5,
   groupDiff: 3,
   groupResult: 1,
-  koExact: 5,
-  koDiff: 3,
-  koResult: 1,
   r32: 1.0,
   r16: 1.0,
   qf: 1.5,
@@ -166,9 +160,6 @@ function settingsToEdit(s: PoolSettings): EditState {
     groupExact: s.groupExactScore,
     groupDiff: s.groupCorrectDifference,
     groupResult: s.groupCorrectResult,
-    koExact: s.knockoutExactScore,
-    koDiff: s.knockoutCorrectDifference,
-    koResult: s.knockoutCorrectResult,
     r32: s.round32Multiplier,
     r16: s.round16Multiplier,
     qf: s.quarterFinalMultiplier,
@@ -202,9 +193,6 @@ function editToDbUpdates(e: EditState): Record<string, unknown> {
     group_exact_score: e.groupExact,
     group_correct_difference: e.groupDiff,
     group_correct_result: e.groupResult,
-    knockout_exact_score: e.koExact,
-    knockout_correct_difference: e.koDiff,
-    knockout_correct_result: e.koResult,
     round_32_multiplier: e.r32,
     round_16_multiplier: e.r16,
     quarter_final_multiplier: e.qf,
@@ -369,25 +357,25 @@ function ScoreScoringConfigBody({ poolId }: { poolId: string }) {
           <PointsField label="Correct Result" value={edit.groupResult} onChange={(v) => update('groupResult', v)} />
         </Card>
 
+        {/* Knockout has no base of its own any more. It used to carry Exact
+            Score / Correct Difference / Correct Result fields writing
+            knockout_*, and migration 042 retired those columns: the engine reads
+            the group base for every stage and the round multiplier is what makes
+            a knockout match worth more. Editing them here still saved happily
+            and changed no scoring at all — the numbers went to columns nothing
+            reads. */}
         <Card>
-          <SectionHeader title="Knockout Stage" />
-          <PointsField label="Exact Score" value={edit.koExact} onChange={(v) => update('koExact', v)} />
-          <PointsField label="Correct Difference" value={edit.koDiff} onChange={(v) => update('koDiff', v)} />
-          <PointsField label="Correct Result" value={edit.koResult} onChange={(v) => update('koResult', v)} />
-
-          <Divider />
-
+          <SectionHeader title="Knockout Multipliers" />
           <RNText
             style={{
-              fontFamily: fontFamilies.bold,
+              fontFamily: fontFamilies.regular,
               fontSize: 13,
               color: theme.colors.slate,
-              letterSpacing: 0.3,
-              textTransform: 'uppercase',
-              marginTop: 4,
+              marginBottom: 8,
             }}
           >
-            Round Multipliers
+            Multiplies the group stage points above. A Round of 16 at 2× is worth
+            twice a group match.
           </RNText>
           <MultiplierField label="Round of 32" value={edit.r32} onChange={(v) => update('r32', v)} />
           <MultiplierField label="Round of 16" value={edit.r16} onChange={(v) => update('r16', v)} />

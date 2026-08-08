@@ -160,13 +160,11 @@ export function ScoringTab({ poolId, predictionMode }: Props) {
         <ScoreRow label="Correct Result" value={`${settings.groupCorrectResult} pts`} />
       </Card>
 
+      {/* No knockout base row: migration 042 retired knockout_*, and every stage
+          now scores off the group values above with the multiplier below doing
+          the scaling. */}
       <Card>
-        <SectionHeader title="Knockout Stage" />
-        <ScoreRow label="Exact Score" value={`${settings.knockoutExactScore} pts`} />
-        <ScoreRow label="Correct Difference" value={`${settings.knockoutCorrectDifference} pts`} />
-        <ScoreRow label="Correct Result" value={`${settings.knockoutCorrectResult} pts`} />
-
-        <Divider />
+        <SectionHeader title="Knockout Multipliers" />
 
         <RNText
           style={{

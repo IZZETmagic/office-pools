@@ -1232,17 +1232,10 @@ function ScoringRulesSection({ settings }: { settings: BreakdownPoolSettings }) 
           value={`${settings.group_correct_result} pts`}
         />
       </RuleCard>
-      <RuleCard title="Knockout Base Points">
-        <RuleRow label="Exact Score" value={`${settings.knockout_exact_score} pts`} />
-        <RuleRow
-          label="Correct Winner + GD"
-          value={`${settings.knockout_correct_difference} pts`}
-        />
-        <RuleRow
-          label="Correct Result Only"
-          value={`${settings.knockout_correct_result} pts`}
-        />
-      </RuleCard>
+      {/* "Knockout Base Points" used to sit here, reading knockout_*. Migration
+          042 retired those columns — every stage scores off the group base and
+          the multiplier below is what makes a knockout match worth more — so
+          the card was quoting numbers that no longer decided anything. */}
       <RuleCard title="Round Multipliers">
         <RuleRow label="Round of 32" value={`${settings.round_32_multiplier.toFixed(1)}x`} accent />
         <RuleRow label="Round of 16" value={`${settings.round_16_multiplier.toFixed(1)}x`} accent />
