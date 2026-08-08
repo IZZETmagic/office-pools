@@ -1161,6 +1161,7 @@ export function CommunityTab({
                 currentUserId={currentUserId}
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                onReply={() => setReplyingTo(msg)}
               />
             )
           }
@@ -1172,8 +1173,10 @@ export function CommunityTab({
                 message={msg}
                 members={members}
                 memberLevels={memberLevels}
+                currentUserId={currentUserId}
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                onReply={() => setReplyingTo(msg)}
               />
             )
           }
@@ -1188,6 +1191,7 @@ export function CommunityTab({
                 currentUserId={currentUserId}
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                onReply={() => setReplyingTo(msg)}
               />
             )
           }

@@ -1,7 +1,8 @@
+'use client'
+
+import { MessageRow } from './MessageRow'
 import type { MemberData } from '../types'
 import type { MemberWithLevel, ReactionCount } from './types'
-import { getInitials, formatMessageTime, getLevelPillClasses, getRankTitle } from './helpers'
-import { EmojiReactions } from './EmojiReactions'
 
 type SharedCardWrapperProps = {
   userId: string
@@ -10,9 +11,27 @@ type SharedCardWrapperProps = {
   memberLevels: Map<string, MemberWithLevel>
   reactions: ReactionCount[]
   onToggleReaction: (emoji: string) => void
+  currentUserId?: string
+  /** Opens the composer's reply banner against this card. */
+  onReply?: () => void
   children: React.ReactNode
 }
 
+/**
+ * A shared card is a message. It just happens to contain a card.
+ *
+ * This used to build its own row — a 24px avatar above the card, its own name
+ * and level pill, its own reaction strip — none of which matched a text bubble.
+ * The card then ran the full width of the pane while every message beside it
+ * stopped at 85%, and because it never went through the message chassis it had
+ * no reply or react gesture at all.
+ *
+ * It renders through MessageRow now, the same chassis ChatMessage uses, so all
+ * three card types inherit the avatar position, the width cap, clustering, the
+ * right-click and long-press menu, and the overlapping reaction pills at once.
+ * That is how RN does it too: BanterRichCard renders inside the bubble row
+ * rather than beside it.
+ */
 export function SharedCardWrapper({
   userId,
   createdAt,
@@ -20,40 +39,27 @@ export function SharedCardWrapper({
   memberLevels,
   reactions,
   onToggleReaction,
+  currentUserId,
+  onReply,
   children,
 }: SharedCardWrapperProps) {
-  const author = members.find(m => m.user_id === userId)
-  const authorLevel = memberLevels.get(userId)
-
   return (
-    <div>
-      {/* Attribution row */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className="shrink-0 w-6 h-6 rounded-pill flex items-center justify-center text-[8px] font-bold bg-mist/15 text-muted">
-          {getInitials(author?.users.full_name, author?.users.username)}
-        </div>
-        <span className="text-xs font-semibold text-ink truncate">
-          {author?.users.full_name || author?.users.username || 'Unknown'}
-        </span>
-        {authorLevel && (
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none whitespace-nowrap ${getLevelPillClasses(authorLevel.level)}`}>
-            Lvl {authorLevel.level} · {getRankTitle(authorLevel.level)}
-          </span>
-        )}
-        <span className="text-[10px] text-muted ml-auto shrink-0" suppressHydrationWarning>
-          {formatMessageTime(createdAt)}
-        </span>
-      </div>
-
-      {/* Card */}
-      <div className="rounded-control border border-border-default bg-surface overflow-hidden">
+    <MessageRow
+      userId={userId}
+      createdAt={createdAt}
+      members={members}
+      memberLevels={memberLevels}
+      currentUserId={currentUserId ?? ''}
+      reactions={reactions}
+      onToggleReaction={onToggleReaction}
+      onReply={onReply}
+    >
+      {/* The card keeps its own surface and border — it is a card inside a
+          message, not a bubble. rounded-chip matches the bubble's corner so the
+          two read as the same family. */}
+      <div className="rounded-chip border border-border-default bg-surface overflow-hidden">
         {children}
       </div>
-
-      {/* Reaction row */}
-      <div className="mt-1.5 flex justify-start">
-        <EmojiReactions reactions={reactions} onToggleReaction={onToggleReaction} />
-      </div>
-    </div>
+    </MessageRow>
   )
 }

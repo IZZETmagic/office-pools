@@ -10,6 +10,9 @@ type BadgeFlexCardProps = {
   memberLevels: Map<string, MemberWithLevel>
   reactions: ReactionCount[]
   onToggleReaction: (emoji: string) => void
+  /** Passed straight to the message chassis. */
+  onReply?: () => void
+  currentUserId?: string
 }
 
 const TIER_BORDER_COLORS: Record<string, string> = {
@@ -25,6 +28,8 @@ export function BadgeFlexCard({
   memberLevels,
   reactions,
   onToggleReaction,
+  currentUserId,
+  onReply,
 }: BadgeFlexCardProps) {
   const meta = message.metadata as unknown as BadgeFlexMetadata
   if (!meta?.badges) return null
@@ -39,6 +44,8 @@ export function BadgeFlexCard({
       memberLevels={memberLevels}
       reactions={reactions}
       onToggleReaction={onToggleReaction}
+      currentUserId={currentUserId}
+      onReply={onReply}
     >
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">
