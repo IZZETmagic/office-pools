@@ -28,6 +28,12 @@ export const viewport: Viewport = {
   // public/manifest.json — these two paint the PWA/browser chrome.
   themeColor: "#3B6EFF",
   viewportFit: "cover",
+  // Resize the layout when the on-screen keyboard appears, rather than letting
+  // the browser overlay it and pan the visual viewport. Without this, focusing
+  // the banter composer scrolled the pool header and tab strip out of view and
+  // did not bring them back. Chrome/Android honours it directly; iOS Safari
+  // still pans, which CommunityTab compensates for by offsetTop.
+  interactiveWidget: "resizes-content",
 };
 
 export const metadata: Metadata = {

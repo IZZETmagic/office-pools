@@ -496,6 +496,18 @@ export function CommunityTab({
         const bottomOffset = bottomNav ? bottomNav.getBoundingClientRect().height : 0
         setMobileHeight(Math.max(0, viewportH - topOffset - bottomOffset))
         setKeyboardOpen(viewportH < initialHeight * 0.75)
+
+        // Counteract iOS Safari's visual-viewport pan. Focusing the composer
+        // makes Safari slide the visual viewport up to clear the keyboard, which
+        // takes the pool header and tab strip off screen — and it does not slide
+        // back. The page itself cannot scroll (body is position: fixed), so the
+        // measurement above never saw it; only offsetTop does.
+        //
+        // body is already fixed at top: 0, so pushing it down by exactly the pan
+        // lands the header back at the top of what the user can see. Chrome gets
+        // there on its own via interactiveWidget=resizes-content, where offsetTop
+        // stays 0 and this is a no-op.
+        document.body.style.top = `${vv ? vv.offsetTop : 0}px`
       })
     }
 
