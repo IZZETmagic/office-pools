@@ -502,7 +502,12 @@ function ArchivedPoolsTab({ userId }: { userId: string }) {
         {rows.map(row => (
           <li
             key={row.pool_id}
-            className="flex items-center justify-between gap-4 rounded-control border border-border-default p-4"
+            /* bg-surface, not the page's snow. The row had a border and no fill,
+               so it sat at exactly the page colour and a stack of them read as
+               one block with hairlines through it. Separation in this design
+               system comes from the snow/surface value step — the shadow is
+               almost invisible by design — so the fill is what does the work. */
+            className="flex items-center justify-between gap-4 rounded-control border border-border-default bg-surface shadow-card dark:shadow-none p-4"
           >
             <div className="min-w-0">
               <p className="font-semibold text-ink truncate">{row.pool_name}</p>
