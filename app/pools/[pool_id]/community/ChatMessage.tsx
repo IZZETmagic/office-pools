@@ -201,11 +201,10 @@ export function ChatMessage({
 
         <div className={`relative min-w-0 max-w-[85%] sm:max-w-md flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
           /* The overhang has to clear TWO things, which mb-3 did not:
-             the pills hang 12px below the column, and the next message in a
-             cluster pulls itself up by 10px (-mt-2.5). 12 + 10 = 22, so at
-             mb-3 the pills landed 10px into the following bubble — which is
-             exactly what they did. 24px leaves 2px of daylight. */
-          onToggleReaction && reactions.length > 0 ? 'mb-6' : ''
+             the pills now hang 20px below the column, and the next message in
+             a cluster pulls itself up by 10px (-mt-2.5). 20 + 10 = 30, so the
+             reservation is 32px. */
+          onToggleReaction && reactions.length > 0 ? 'mb-8' : ''
         }`}>
           {/* Sender name — once per run, received side only. RN shows the name
               alone; the level pill is web-only and kept because it is existing
@@ -326,9 +325,15 @@ export function ChatMessage({
                to the bottom of column-plus-reactions and drifted away from the
                bubble. -12px hangs it over the bubble's bottom edge, hugging the
                near corner: left for received, right for own, per ReactionPills.
-               z-10 keeps the cut-out ring above the bubble. */
+               z-10 keeps the cut-out ring above the bubble.
+
+               The overlap is deliberately shallow. A pill is ~22px tall, so
+               -12px left 10px of it inside the bubble — across the last line of
+               a received message, and straight over the timestamp on your own,
+               which sits at right-2 bottom-1 INSIDE the bubble. -20px leaves
+               ~2px of contact: still tucked under the edge, nothing covered. */
             <div
-              className={`absolute -bottom-3 z-10 flex items-center gap-1 ${
+              className={`absolute -bottom-5 z-10 flex items-center gap-1 ${
                 isOwn ? 'right-2.5' : 'left-2.5'
               }`}
             >
