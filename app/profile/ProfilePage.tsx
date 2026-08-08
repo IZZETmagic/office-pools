@@ -676,7 +676,15 @@ function AchievementsSection({ userId }: { userId: string }) {
               <p className="text-[9px] sm:text-[10px] text-muted mt-0.5">{def.rarity}</p>
               {/* count last-in-DOM + z-10 so the medallion can never paint over it;
                   solid primary bg (no alpha modifier) so it's always visible in both themes */}
-              <span className="absolute top-1 right-1 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-pill bg-primary-600 text-white leading-none shadow-sm">
+              <span
+                /* The number of times a badge was earned is the one thing on
+                   this card that is not the same for everybody, so it should
+                   not be the smallest thing on it. Up from 10px/px-1.5 and
+                   pulled off the corner — top-1 right-1 tucked it into the
+                   card's own radius, which is what made it read as a
+                   decoration rather than a count. */
+                className="absolute top-2 right-2 z-10 text-xs sm:text-sm font-bold px-2 py-0.5 rounded-pill bg-primary-600 text-white leading-none shadow-sm"
+              >
                 {count}×
               </span>
             </button>
