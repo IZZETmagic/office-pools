@@ -66,7 +66,7 @@ export function QuickActions({
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Quick actions"
-        className={`inline-flex items-center justify-center w-9 h-9 rounded-control transition-colors ${
+        className={`inline-flex items-center justify-center w-9 h-9 rounded-pill transition-colors ${
           open ? 'bg-primary-600 text-white' : 'bg-mist text-muted hover:text-ink'
         }`}
       >

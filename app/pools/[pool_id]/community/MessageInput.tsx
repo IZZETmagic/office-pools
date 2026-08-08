@@ -171,7 +171,7 @@ export function MessageInput({
           />
         )}
 
-        <form onSubmit={handleSend} className="flex items-end gap-2">
+        <form onSubmit={handleSend} className="flex items-center gap-2">
           {leftAction}
           <textarea
             ref={inputRef}
@@ -191,7 +191,7 @@ export function MessageInput({
                place rather than fading, so the toolbar's right edge never
                reflows. Ours was a 36px rounded-control at 40% opacity with a
                paper plane; RN uses an up-arrow. */
-            className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-pill text-white active:scale-95 disabled:pointer-events-none transition-all ${
+            className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-pill text-white active:scale-95 disabled:pointer-events-none transition-all ${
               !newMessage.trim() || sending
                 ? 'bg-silver/60'
                 : 'bg-primary-600 hover:bg-primary-700 shadow-sm shadow-primary-600/25'
