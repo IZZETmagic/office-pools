@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -683,8 +684,16 @@ function AchievementsSection({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* Per-badge timeline — which pool + when each unlock happened */}
-      {selectedDef && (
+      {/* Per-badge timeline — which pool + when each unlock happened.
+          Portalled to <body>. `fixed inset-0` was dimming only the Trophy Case
+          section, because this tab's wrapper carries
+          `animation: fadeUp ... both` — fadeUp animates a transform, `both`
+          makes the final frame stick, and a transformed ancestor becomes the
+          containing block for `position: fixed`. So the overlay was fixed to
+          the panel rather than the viewport. Escaping the subtree fixes it at
+          the source; four panels use that animation, so any modal rendered
+          inside one has the same problem. */}
+      {selectedDef && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4"
           onClick={() => setSelectedBadgeId(null)}
@@ -729,7 +738,8 @@ function AchievementsSection({ userId }: { userId: string }) {
               </ul>
             </Card>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
