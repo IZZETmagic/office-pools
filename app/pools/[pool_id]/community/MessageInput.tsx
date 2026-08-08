@@ -145,11 +145,24 @@ export function MessageInput({
     <div className="relative">
       {/* Reply-to bar */}
       {replyingTo && (
-        <div className="flex items-center gap-2 px-3 sm:px-4 pt-2 pb-1">
-          <div className="w-0.5 h-5 rounded-pill bg-primary-400 shrink-0" />
-          <p className="text-xs text-muted truncate flex-1">
-            Replying to <span className="font-medium text-ink">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
-          </p>
+        /* The banner named the author and stopped there, so on a busy feed you
+           could not tell WHICH of their messages you had hit — the whole point
+           of picking one. It now quotes the message under the name, the same
+           shape ReplyHeader uses inside a bubble: accent rule, author, then the
+           text on one truncated line. */
+        <div className="flex items-start gap-2 px-3 sm:px-4 pt-2 pb-1">
+          <div className="w-0.5 self-stretch rounded-pill bg-primary-400 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted truncate">
+              Replying to <span className="font-medium text-ink">{replyAuthor?.users.full_name || replyAuthor?.users.username || 'Unknown'}</span>
+            </p>
+            {/* Rich cards carry a fallback sentence rather than typed text, so
+                this is never empty for them; the guard is for a message whose
+                body really is blank. */}
+            <p className="text-xs text-muted/80 truncate">
+              {replyingTo.content?.trim() || 'Shared a card'}
+            </p>
+          </div>
           <button
             onClick={onClearReply}
             className="p-0.5 text-muted hover:text-ink transition-colors"
