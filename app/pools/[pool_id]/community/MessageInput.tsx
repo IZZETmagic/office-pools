@@ -171,7 +171,10 @@ export function MessageInput({
           </div>
           <button
             onClick={onClearReply}
-            className="p-0.5 text-muted hover:text-ink transition-colors"
+            /* self-center against the quote block: the row is items-start so the
+               two-line quote sets its own height, and without this the X pinned
+               to the first line instead of the block it dismisses. */
+            className="self-center shrink-0 p-0.5 text-muted hover:text-ink transition-colors"
             aria-label="Cancel reply"
           >
             <Icon name="xmark" size={14} />
