@@ -58,7 +58,7 @@ export function SharedCardWrapper({
       {/* The card keeps its own surface and border — it is a card inside a
           message, not a bubble. rounded-chip matches the bubble's corner so the
           two read as the same family. */}
-      <div className="rounded-chip border border-border-default bg-surface overflow-hidden">
+      <div className="w-full rounded-chip border border-border-default bg-surface overflow-hidden">
         {children}
       </div>
     </MessageRow>

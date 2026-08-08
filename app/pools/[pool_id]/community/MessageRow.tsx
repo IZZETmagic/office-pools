@@ -145,7 +145,10 @@ export function MessageRow({
             onTouchEnd={cancelPress}
             onTouchMove={cancelPress}
             onTouchCancel={cancelPress}
-            className="w-full"
+            /* max-w-full, not w-full: a bubble has to hug its text — forcing
+               full width would stretch "ok" across the whole column — while a
+               card fills it by carrying w-full itself. */
+            className="max-w-full"
           >
             {children}
           </div>
