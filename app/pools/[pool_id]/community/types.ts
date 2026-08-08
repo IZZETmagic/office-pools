@@ -106,7 +106,8 @@ export type PresenceState = {
 export type SystemEvent = {
   id: string
   event_type: 'match_result' | 'badge_unlock' | 'streak_alert' | 'rank_movement'
-  emoji: string
+  // No emoji: SystemEventCard and the sidebar both render from EVENT_ICON,
+  // keyed by event_type, so a per-event glyph had nothing left to feed.
   content: string
   highlighted_name?: string
   timestamp: string

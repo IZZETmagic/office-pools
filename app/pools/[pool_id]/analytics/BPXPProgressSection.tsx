@@ -174,9 +174,9 @@ function BadgeCard({ badge, earned, onSelect }: { badge: BadgeDefinition; earned
         <div className="font-semibold mb-0.5">{badge.name}</div>
         <div className="text-surface/70">{badge.condition}</div>
         {earned ? (
-          <div className="text-success-400 font-bold mt-1">✓ Earned · +{badge.xpBonus} XP</div>
+          <div className="text-success-400 font-bold mt-1"><Icon name="checkmark" size={11} className="inline-block align-[-1px] mr-1" />Earned · +{badge.xpBonus} XP</div>
         ) : (
-          <div className="text-surface/70 mt-1">🔒 Locked</div>
+          <div className="text-surface/70 mt-1"><Icon name="lock.fill" size={11} className="inline-block align-[-1px] mr-1" />Locked</div>
         )}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-ink" />
       </div>
@@ -284,7 +284,7 @@ function BPBadgeGrid({ earnedBadges }: { earnedBadges: EarnedBadge[] }) {
         <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
           <div className="flex items-center justify-between">
             <h4 className="t-section-header text-ink flex items-center gap-2">
-              <span>🏅</span>
+              <Icon name="medal.fill" size={16} />
               <span>Bracket Badges</span>
             </h4>
             <span className="t-num t-num-medium text-xs text-muted">
@@ -471,7 +471,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
         <div className="mt-7">
           {isOutperforming ? (
             <div className="flex items-start gap-2 rounded-chip px-3.5 py-2.5 bg-success-600/8 border border-success-600/15">
-              <span className="text-lg leading-none flex-shrink-0">📈</span>
+              <span className="shrink-0 text-primary-600"><Icon name="chart.line.uptrend.xyaxis" size={18} /></span>
               <div>
                 <div className="t-body font-bold text-success-700">
                   Outperforming the pool by {accuracyDiff}%
@@ -485,7 +485,7 @@ function BPYouVsPoolSection({ comparison }: { comparison: BPPoolComparison }) {
             </div>
           ) : (
             <div className="flex items-start gap-2 rounded-chip px-3.5 py-2.5 bg-primary-600/8 border border-primary-600/15">
-              <span className="text-lg leading-none flex-shrink-0">🎯</span>
+              <span className="shrink-0 text-primary-600"><Icon name="target" size={18} /></span>
               <div>
                 <div className="t-body font-bold text-primary-600">
                   {accuracyDiff === 0
@@ -554,7 +554,7 @@ function BPPoolWideStatsSection({ comparison, teams }: { comparison: BPPoolCompa
                     {Math.round(mostPopularChampion.pct * 100)}% of brackets
                   </div>
                 </div>
-                <span className="text-xl flex-shrink-0">👑</span>
+                <span className="shrink-0 text-accent-500"><Icon name="crown.fill" size={20} /></span>
               </div>
             </div>
           )
@@ -581,7 +581,7 @@ function BonusEventsSection({ bonusEvents }: { bonusEvents: BonusXPEvent[] }) {
       <div className="px-4 sm:px-5 py-3 border-b border-border-subtle rounded-t-xl">
         <div className="flex items-center justify-between">
           <h4 className="t-section-header text-ink flex items-center gap-2">
-            <span>🎯</span>
+            <Icon name="target" size={16} />
             <span>Bonus Events</span>
           </h4>
           <span className="t-num t-num-extrabold text-xs text-accent-500">{formatNumber(totalBonusXP)} XP</span>

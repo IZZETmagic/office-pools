@@ -230,9 +230,9 @@ function BadgeCard({ badge, earned, onSelect }: { badge: EarnedBadge | null; ear
         <div className="font-semibold mb-0.5">{def.name}</div>
         <div className="text-neutral-300">{def.condition}</div>
         {earned ? (
-          <div className="text-success-400 font-bold mt-1">✓ Earned · +{def.xpBonus} XP</div>
+          <div className="text-success-400 font-bold mt-1"><Icon name="checkmark" size={11} className="inline-block align-[-1px] mr-1" />Earned · +{def.xpBonus} XP</div>
         ) : (
-          <div className="text-muted mt-1">🔒 Locked</div>
+          <div className="text-muted mt-1"><Icon name="lock.fill" size={11} className="inline-block align-[-1px] mr-1" />Locked</div>
         )}
         {/* Tooltip arrow */}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-700" />

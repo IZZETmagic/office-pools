@@ -1,5 +1,7 @@
 'use client'
 
+import { Icon } from '@/components/ui/Icon'
+
 import { checkKnockoutTeamsMatch, type PointsResult, type PoolSettings } from './points'
 import { PointsBadge, PointsChip, PointsValue } from './PointsBadge'
 import { STAGE_LABELS } from '@/lib/tournament'
@@ -333,7 +335,7 @@ export function MatchCard({
               <span className="font-bold text-ink">{bracketPick.teamName || '—'}</span>
               {bracketPick.isCorrect !== null && (
                 <span className={bracketPick.isCorrect ? 'text-success-600' : 'text-danger-600'}>
-                  {bracketPick.isCorrect ? '✓' : '✗'}
+                  <Icon name={bracketPick.isCorrect ? "checkmark" : "xmark"} size={13} weight="bold" />
                 </span>
               )}
               {showBracketTeams && (

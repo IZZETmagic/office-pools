@@ -182,7 +182,6 @@ export function generateSystemEvents(
     events.push({
       id: `match-result-${match.match_id}`,
       event_type: 'match_result',
-      emoji: '🏟️',
       content: `Match ${match.match_number} results are in! ${resultText}.`,
       timestamp: match.completed_at || match.match_date,
     })
@@ -204,7 +203,6 @@ export function generateSystemEvents(
           events.push({
             id: `rank-up-${entry.entry_id}`,
             event_type: 'rank_movement',
-            emoji: '📊',
             // No inline arrow: the card renders one, tinted, from event_type.
             // This was 🔺 — a RED triangle on a row only ever emitted when
             // delta > 0, so every promotion in the feed was coloured like a loss.
@@ -257,7 +255,6 @@ export function generateSystemEvents(
         events.push({
           id: `streak-${userId}`,
           event_type: 'streak_alert',
-          emoji: '🔥',
           content: `${name} is on a hot streak! Can anyone stop them?`,
           highlighted_name: name,
           timestamp: streakTimestamp,
@@ -284,7 +281,6 @@ export function generateSystemEvents(
       events.push({
         id: `badge-${userId}-${badge.id}`,
         event_type: 'badge_unlock',
-        emoji: '🏆',
         // No inline badge emoji: the row leads with a trophy icon and names the
         // badge immediately after, so the glyph sat between two things already
         // saying it — "🏆 … unlocked the 🎯 Sharpshooter badge".

@@ -53,10 +53,14 @@ type AnalyticsTabProps = {
 // SECTION HEADER
 // =============================================
 
-function SectionHeader({ emoji, title }: { emoji: string; title: string }) {
+function SectionHeader({ icon, title }: { icon: string; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-xl">{emoji}</span>
+      {/* Hugeicons, not an emoji: this takes the section's tint and renders the
+          same on every OS, which an emoji does neither of. */}
+      <span className="text-primary-600 shrink-0">
+        <Icon name={icon} size={20} weight="semibold" />
+      </span>
       <h3 className="t-section-header text-ink">{title}</h3>
       <div className="flex-1 h-px bg-gradient-to-r from-neutral-200 dark:from-neutral-700 to-transparent" />
     </div>
@@ -525,7 +529,7 @@ export function AnalyticsTab({
       {/* Section 0: XP Progress — Full Tournament & Progressive */}
       {xpBreakdown && (
         <div>
-          <SectionHeader emoji="⚡" title="XP Progression" />
+          <SectionHeader icon="bolt.fill" title="XP Progression" />
           <XPProgressSection xpBreakdown={xpBreakdown} streaks={streaks} crowdData={crowdData} poolStats={poolStats} entryPredictions={entryPredictions} predictionResults={predictionResults} predictedKnockoutTeams={predictedKnockoutTeams} />
         </div>
       )}
@@ -533,7 +537,7 @@ export function AnalyticsTab({
       {/* Section 0: XP Progress — Bracket Picker */}
       {bpXpBreakdown && (
         <div>
-          <SectionHeader emoji="⚡" title="XP Progression" />
+          <SectionHeader icon="bolt.fill" title="XP Progression" />
           <BPXPProgressSection bpXpBreakdown={bpXpBreakdown} teams={teams} bpPoolComparison={bpPoolComparison} />
         </div>
       )}
@@ -541,7 +545,7 @@ export function AnalyticsTab({
       {/* Pool-Wide Stats fallback (when no XP section renders) */}
       {!xpBreakdown && !bpXpBreakdown && (
         <div>
-          <SectionHeader emoji="📊" title="Pool Stats" />
+          <SectionHeader icon="chart.bar.fill" title="Pool Stats" />
           <PoolWideStatsSection poolStats={poolStats} />
         </div>
       )}
