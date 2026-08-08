@@ -48,10 +48,15 @@ export function DayHeader({ text }: { text: string }) {
  * where RN puts it. It used to be a separate block sitting above the bubble
  * with its own top corners, so a reply read as two detached slabs with a seam
  * between them instead of one message quoting another.
+ *
+ * rounded-chip and six lines, matching the composer's preview — the two are the
+ * same quote and should read the same. The radius was the 6px inset step, on the
+ * argument that a 12px bubble makes 6px read as nested; at this width it read as
+ * square instead, which is the answer that matters.
  */
 function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) {
   return (
-    <div className={`flex items-stretch gap-2 rounded-inset px-2 py-1.5 mb-1 overflow-hidden ${
+    <div className={`flex items-stretch gap-2 rounded-chip px-2.5 py-2 mb-1 overflow-hidden ${
       isOwn ? 'bg-white/15' : 'bg-ink/5'
     }`}>
       <div className={`w-0.5 shrink-0 rounded-pill ${isOwn ? 'bg-white/60' : 'bg-primary-500'}`} />
@@ -59,7 +64,11 @@ function ReplyHeader({ reply, isOwn }: { reply: ReplyPreview; isOwn: boolean }) 
         <div className={`text-[11px] font-semibold leading-tight ${isOwn ? 'text-white/80' : 'text-primary-700'}`}>
           {reply.author_name}
         </div>
-        <div className={`text-[11px] leading-tight truncate ${isOwn ? 'text-white/70' : 'text-muted'}`}>
+        {/* Six lines, matching the composer's preview. This was truncate — one
+            line and an ellipsis — so the quote in a sent reply showed less of
+            the message than the box you typed it in, and a reply to anything
+            longer than a sentence lost the thing it was answering. */}
+        <div className={`text-[11px] leading-tight line-clamp-6 break-words whitespace-pre-wrap ${isOwn ? 'text-white/70' : 'text-muted'}`}>
           {reply.content}
         </div>
       </div>
