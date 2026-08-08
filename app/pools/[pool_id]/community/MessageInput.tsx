@@ -154,12 +154,11 @@ export function MessageInput({
           {/* The quote gets its own fill so it reads as a block of someone
               else's text rather than more composer chrome.
 
-              rounded-control, not the inset step ReplyHeader uses in a bubble.
-              Both are nested quotes, but the radius has to answer to what it
-              sits beside: in a bubble that is a 12px corner, so 6px reads as
-              nested; out here it is a full-width block next to an 18px input,
-              and 6px just read as square. Same fill, different corner. */}
-          <div className="flex items-stretch gap-2 min-w-0 flex-1 rounded-control bg-ink/5 px-3 py-2 overflow-hidden">
+              rounded-chip — one step down the ladder from the input beside it.
+              inset (6px) read as square at this width, and matching the input's
+              control (18px) made the quote compete with the field it sits above.
+              12px is the step between: clearly rounded, clearly secondary. */}
+          <div className="flex items-stretch gap-2 min-w-0 flex-1 rounded-chip bg-ink/5 px-3 py-2 overflow-hidden">
             <div className="w-0.5 self-stretch rounded-pill bg-primary-500 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted truncate">
