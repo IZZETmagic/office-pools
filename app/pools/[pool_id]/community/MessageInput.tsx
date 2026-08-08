@@ -167,7 +167,14 @@ export function MessageInput({
               {/* Rich cards carry a fallback sentence rather than typed text, so
                 this is never empty for them; the guard is for a message whose
                 body really is blank. */}
-              <p className="text-xs text-muted truncate">
+              {/* Wraps to six lines rather than truncating at one. `truncate` is
+                  whitespace-nowrap plus an ellipsis, so it could never show a
+                  second line no matter how much room the composer had — you
+                  could be replying to a paragraph and see eight words of it.
+                  Six is the cap because the composer is docked above the
+                  keyboard on a phone; past that the quote starts eating the
+                  conversation it belongs to. */}
+              <p className="text-xs text-muted line-clamp-6 break-words whitespace-pre-wrap">
                 {replyingTo.content?.trim() || 'Shared a card'}
               </p>
             </div>
