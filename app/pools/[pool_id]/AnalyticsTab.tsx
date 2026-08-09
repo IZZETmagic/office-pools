@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData, TeamData, MemberData, EntryData, MatchScoreNarrow, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, EntryStatsData } from './types'
@@ -492,17 +493,25 @@ export function AnalyticsTab({
       {showEntrySelector && (
         <div className="flex items-center justify-end gap-2">
           <label className="text-sm text-muted">Viewing:</label>
-          <select
+          {/* The shared Select, not a hand-styled <select>. This carried
+              `border-neutral-300 dark:border-neutral-600` — a stock-palette
+              class with a dark: override, which is the one thing the token ramp
+              cannot take: --neutral-* already inverts between themes, so the
+              override inverted it a second time and landed back near the
+              surface colour. Select owns the mist fill, the control radius, the
+              chevron and the focus ring, and it is what the Results filters and
+              the composer already use. */}
+          <Select
             value={selectedEntryId}
             onChange={e => setSelectedEntryId(e.target.value)}
-            className="text-sm bg-surface border border-neutral-300 dark:border-neutral-600 rounded-chip px-3 py-1.5 text-ink focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            aria-label="Choose entry"
           >
             {userEntries.map(entry => (
               <option key={entry.entry_id} value={entry.entry_id}>
                 {entry.entry_name || `Entry ${entry.entry_number}`}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
