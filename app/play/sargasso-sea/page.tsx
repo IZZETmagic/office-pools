@@ -61,9 +61,10 @@ export default async function SargassoSeaPage() {
       ? new Intl.NumberFormat('en-US', { style: 'currency', currency: pool.entry_fee_currency || 'USD' }).format(pool.entry_fee)
       : null,
     prizes: [
-      { place: '1st Place', prize: pool?.brand_prize_1st || POOL_CONFIG.prizes[0]?.prize || 'TBD', icon: '\u{1F3C6}', color: 'from-amber-500 to-amber-600', border: 'border-amber-200' },
-      { place: '2nd Place', prize: pool?.brand_prize_2nd || POOL_CONFIG.prizes[1]?.prize || 'TBD', icon: '\u{1F948}', color: 'from-neutral-400 to-neutral-500', border: 'border-neutral-200' },
-      { place: '3rd Place', prize: pool?.brand_prize_3rd || POOL_CONFIG.prizes[2]?.prize || 'TBD', icon: '\u{1F949}', color: 'from-amber-700 to-amber-800', border: 'border-amber-200/50' },
+      // Text only — see the note in app/play/[slug]/page.tsx.
+      { place: '1st Place', prize: pool?.brand_prize_1st || POOL_CONFIG.prizes[0]?.prize || 'TBD' },
+      { place: '2nd Place', prize: pool?.brand_prize_2nd || POOL_CONFIG.prizes[1]?.prize || 'TBD' },
+      { place: '3rd Place', prize: pool?.brand_prize_3rd || POOL_CONFIG.prizes[2]?.prize || 'TBD' },
     ],
   }
 

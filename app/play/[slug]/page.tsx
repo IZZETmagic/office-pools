@@ -64,9 +64,11 @@ export default async function BrandedLandingPage({
       ? new Intl.NumberFormat('en-US', { style: 'currency', currency: pool.entry_fee_currency || 'USD' }).format(pool.entry_fee)
       : null,
     prizes: [
-      { place: '1st Place', prize: pool.brand_prize_1st || 'TBD', icon: '\u{1F3C6}', color: 'from-amber-500 to-amber-600', border: 'border-amber-200' },
-      { place: '2nd Place', prize: pool.brand_prize_2nd || 'TBD', icon: '\u{1F948}', color: 'from-neutral-400 to-neutral-500', border: 'border-neutral-200' },
-      { place: '3rd Place', prize: pool.brand_prize_3rd || 'TBD', icon: '\u{1F949}', color: 'from-amber-700 to-amber-800', border: 'border-amber-200/50' },
+      // Text only — the medal glyph and tier tint are BrandedLandingClient's
+      // PRIZE_TIERS, so the two landing pages can't drift apart.
+      { place: '1st Place', prize: pool.brand_prize_1st || 'TBD' },
+      { place: '2nd Place', prize: pool.brand_prize_2nd || 'TBD' },
+      { place: '3rd Place', prize: pool.brand_prize_3rd || 'TBD' },
     ],
   }
 
