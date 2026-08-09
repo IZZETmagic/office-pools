@@ -44,10 +44,13 @@ export default function PlayDemoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    /* light-scope: this page renders light in either theme. Its headings and
+       accents are the sponsor's own colours, set inline and chosen against
+       white — #0F2A44 on a dark card measured 1.1:1. See globals.css. */
+    <div className="light-scope min-h-screen bg-snow">
 
       {/* ═══════ NAV ═══════ */}
-      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-white/90 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-surface/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">{POOL_INFO.logoEmoji}</span>
@@ -171,7 +174,7 @@ export default function PlayDemoPage() {
             Displayed live on our TVs during every match. Here&apos;s a preview.
           </p>
 
-          <div className="max-w-3xl mx-auto bg-white rounded-card shadow-sm border border-border-subtle overflow-hidden">
+          <div className="max-w-3xl mx-auto bg-surface rounded-card shadow-sm border border-border-subtle overflow-hidden">
             {/* Mini table */}
             <table className="w-full">
               <thead>
@@ -241,7 +244,7 @@ export default function PlayDemoPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
             {POOL_INFO.prizes.map((item) => (
-              <div key={item.place} className={`bg-white rounded-card border ${item.border} p-6 text-center shadow-sm`}>
+              <div key={item.place} className={`bg-surface rounded-card border ${item.border} p-6 text-center shadow-sm`}>
                 <div className="text-4xl mb-3">{item.icon}</div>
                 <div className={`inline-block px-3 py-1 rounded-pill bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
                   {item.place}
@@ -260,7 +263,7 @@ export default function PlayDemoPage() {
       {/* ═══════ JOIN / QR SECTION ═══════ */}
       <section id="join" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-lg mx-auto bg-white rounded-card shadow-md border border-border-subtle overflow-hidden">
+          <div className="max-w-lg mx-auto bg-surface rounded-card shadow-md border border-border-subtle overflow-hidden">
             {/* Header */}
             <div className="px-6 py-8 text-center text-white relative overflow-hidden" style={{ background: POOL_INFO.primaryGradient }}>
               <div className="absolute -top-10 -left-10 w-32 h-32 rounded-pill bg-white/[0.04]" />

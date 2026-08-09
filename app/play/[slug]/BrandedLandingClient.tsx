@@ -256,7 +256,7 @@ export default function BrandedLandingClient({
 
         {players.length > 0 ? (
           <>
-          <div className="max-w-3xl mx-auto bg-white rounded-card shadow-sm border border-border-subtle overflow-hidden">
+          <div className="max-w-3xl mx-auto bg-surface rounded-card shadow-sm border border-border-subtle overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border-subtle bg-snow/50">
@@ -362,10 +362,13 @@ export default function BrandedLandingClient({
   )
 
   return (
-    <div className="min-h-screen bg-white">
+    /* light-scope: this page renders light in either theme. Its headings and
+       accents are the sponsor's own colours, set inline and chosen against
+       white — #0F2A44 on a dark card measured 1.1:1. See globals.css. */
+    <div className="light-scope min-h-screen bg-snow">
 
       {/* NAV */}
-      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-white/90 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-surface/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
             {brandIcon}
@@ -461,7 +464,7 @@ export default function BrandedLandingClient({
       {isLive && nextMatch && (
         <section className="py-8 sm:py-10">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-card border border-border-subtle shadow-sm bg-white overflow-hidden">
+            <div className="rounded-card border border-border-subtle shadow-sm bg-surface overflow-hidden">
               <div className="px-5 py-2.5 flex items-center justify-between" style={{ backgroundColor: `${poolConfig.accentColor}14` }}>
                 <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest" style={{ color: poolConfig.primaryColor }}>
                   {nextMatch.isLiveNow ? (
@@ -499,7 +502,7 @@ export default function BrandedLandingClient({
       {isComplete && (
         <section className="py-10">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div className="inline-flex flex-col items-center gap-2 px-8 py-6 rounded-card border border-border-subtle shadow-sm bg-white">
+            <div className="inline-flex flex-col items-center gap-2 px-8 py-6 rounded-card border border-border-subtle shadow-sm bg-surface">
               <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">Tournament complete &middot; Champions</span>
               <div className="flex items-center gap-3 mt-1">
                 {champion?.flag ? (
@@ -549,7 +552,7 @@ export default function BrandedLandingClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
             {poolConfig.prizes.map((item) => (
-              <div key={item.place} className={`bg-white rounded-card border ${item.border} p-6 text-center shadow-sm`}>
+              <div key={item.place} className={`bg-surface rounded-card border ${item.border} p-6 text-center shadow-sm`}>
                 <div className="text-4xl mb-3">{item.icon}</div>
                 <div className={`inline-block px-3 py-1 rounded-pill bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
                   {item.place}
@@ -570,7 +573,7 @@ export default function BrandedLandingClient({
       {/* JOIN / CTA */}
       <section id="join" className="py-16 sm:py-20 bg-snow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-lg mx-auto bg-white rounded-card shadow-md border border-border-subtle overflow-hidden">
+          <div className="max-w-lg mx-auto bg-surface rounded-card shadow-md border border-border-subtle overflow-hidden">
             <div className="px-6 py-8 text-center text-white relative overflow-hidden" style={{ background: poolConfig.primaryGradient }}>
               <div className="absolute -top-10 -left-10 w-32 h-32 rounded-pill bg-white/[0.04]" />
               <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-pill bg-white/[0.04]" />

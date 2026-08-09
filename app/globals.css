@@ -699,6 +699,124 @@ html.dark {
   --t-num-weight: 900;
 }
 
+
+/* ---------------------------------------------------------------------------
+   Light-only scope.
+
+   A sponsor's landing page is painted in colours THEY chose, against white:
+   /play/road-to-glory sets its heading colour to #0F2A44 inline. Those cannot
+   invert — it is their brand — so when the page's own surfaces followed the
+   theme into dark, the result was dark navy on near-black at 1.1:1.
+
+   The page was never really dark-capable: text-neutral-* has always inverted
+   while its bg-white did not, so dark mode was broken here long before the
+   surfaces were tokenised. This resolves it in the honest direction — the page
+   opts out and renders light in either theme, so the sponsor's colours land on
+   the background they were picked for.
+
+   Generated from the :root light block above, restricted to the 86 variables
+   html.dark overrides. Regenerate rather than hand-edit if either block changes.
+   --------------------------------------------------------------------------- */
+html.dark .light-scope {
+  --background: #F7F8FC;
+  --foreground: #1B2340;
+  --primary-50: #F7F9FF;
+  --primary-100: #E8EEFF;
+  --primary-200: #CBD9FF;
+  --primary-300: #A3BCFF;
+  --primary-400: #7395FF;
+  --primary-500: #5280FF;
+  --primary-600: #3B6EFF;
+  --primary-700: #2B57D9;
+  --primary-800: #2244AB;
+  --primary-900: #1C3785;
+  --success-50: #ECFDF5;
+  --success-100: #D3F9E3;
+  --success-200: #A8F0C6;
+  --success-300: #71E3A2;
+  --success-400: #45D47E;
+  --success-500: #2FCC6B;
+  --success-600: #22C55E;
+  --success-700: #1BA34D;
+  --success-800: #17803E;
+  --success-900: #135F2F;
+  --danger-50: #FEF2F2;
+  --danger-100: #FDE3E3;
+  --danger-200: #FBC7C7;
+  --danger-300: #F79E9E;
+  --danger-400: #F47575;
+  --danger-500: #F15757;
+  --danger-600: #EF4444;
+  --danger-700: #CE2F2F;
+  --danger-800: #A62525;
+  --danger-900: #7F1D1D;
+  --warning-50: #FFFBEB;
+  --warning-100: #FEF3C7;
+  --warning-200: #FDE68A;
+  --warning-300: #FCD34D;
+  --warning-400: #FBBF24;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+  --warning-700: #B45309;
+  --warning-800: #92400E;
+  --warning-900: #78350F;
+  --neutral-50: #F7F8FC;
+  --neutral-100: #EEF1F8;
+  --neutral-200: #D4DAE8;
+  --neutral-300: #B6BED3;
+  --neutral-400: #99A3BD;
+  --neutral-500: #7B87A8;
+  --neutral-600: #636E8E;
+  --neutral-700: #4B5574;
+  --neutral-800: #333C5A;
+  --neutral-900: #1B2340;
+  --accent-50: #FFF8E1;
+  --accent-100: #FDEFC0;
+  --accent-200: #FBE28C;
+  --accent-300: #F8D451;
+  --accent-400: #F5C518;
+  --accent-500: #DCAE10;
+  --accent-600: #B98F0D;
+  --accent-700: #94720B;
+  --accent-800: #6F5608;
+  --accent-900: #5C440A;
+  --surface: #FFFFFF;
+  --surface-secondary: #F7F8FC;
+  --surface-tertiary: #EEF1F8;
+  --surface-inset: #E4E9F4;
+  --border-default: #D4DAE8;
+  --border-subtle: #EEF1F8;
+  --border-strong: #B6BED3;
+  --sp-snow: #F7F8FC;
+  --sp-surface: #FFFFFF;
+  --sp-mist: #EEF1F8;
+  --sp-silver: #D4DAE8;
+  --sp-slate: #7B87A8;
+  --sp-ink: #1B2340;
+  --sp-midnight: #0B0F1A;
+  --sp-primary: #3B6EFF;
+  --sp-primary-light: #F7F9FF;
+  --sp-accent: #F5C518;
+  --sp-accent-light: #FFF8E1;
+  --sp-green: #22C55E;
+  --sp-green-light: #ECFDF5;
+  --sp-red: #EF4444;
+  --sp-red-light: #FEF2F2;
+  --sp-amber: #F59E0B;
+  --sp-amber-light: #FFFBEB;
+
+  color-scheme: light;
+
+  /* Re-apply the inherited pair. Redefining --foreground above does NOT change
+     text that inherits `color` from <body>, because `color` was already resolved
+     to a literal there — outside this scope — and inheritance passes the computed
+     value, not the var() reference. Without this, anything on the page that
+     doesn't set its own colour stays dark-mode ink (#E8EAF0) on a white card:
+     measured 1.2:1. */
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
 /* Hide scrollbar for tab navigation on mobile */
 .scrollbar-hide {
   -ms-overflow-style: none !important;
