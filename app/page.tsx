@@ -56,7 +56,11 @@ export default function Home() {
         "author": { "@type": "Organization", "name": "SportPool", "url": "https://sportpool.io" },
       }} />
 
-      <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-border-subtle">
+      {/* dark-scope: nav and hero render dark in EITHER colour mode. Without it
+          the ramp inverts and every word here would be #1B2340 navy on a navy
+          band. See globals.css. */}
+      <div className="dark-scope bg-snow">
+      <nav className="sticky top-0 z-50 bg-snow/90 backdrop-blur-sm border-b border-border-subtle">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="text-xl font-black tracking-tight text-ink">
@@ -101,9 +105,9 @@ export default function Home() {
                 className="w-full max-w-lg rounded-card border border-border-subtle p-5 sm:p-7 flex justify-center"
                 style={{
                   background:
-                    'radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--primary-600) 26%, transparent), transparent 62%),' +
-                    'radial-gradient(circle at 86% 84%, color-mix(in srgb, var(--accent-400) 24%, transparent), transparent 58%),' +
-                    'var(--color-mist)',
+                    'radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--primary-600) 40%, transparent), transparent 62%),' +
+                    'radial-gradient(circle at 86% 84%, color-mix(in srgb, var(--accent-400) 30%, transparent), transparent 58%),' +
+                    'var(--surface)',
                 }}
               >
                 <LiveBoard />
@@ -112,6 +116,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ---- Competitions ----------------------------------------------------
           A plain strip, deliberately not links. It answers "will you cover the

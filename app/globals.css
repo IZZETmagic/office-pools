@@ -717,6 +717,7 @@ html.dark {
    Generated from the :root light block above, restricted to the 86 variables
    html.dark overrides. Regenerate rather than hand-edit if either block changes.
    --------------------------------------------------------------------------- */
+
 html.dark .light-scope {
   --background: #F7F8FC;
   --foreground: #1B2340;
@@ -815,6 +816,113 @@ html.dark .light-scope {
      measured 1.2:1. */
   color: var(--foreground);
   background-color: var(--background);
+}
+
+/* ---------------------------------------------------------------------------
+   .dark-scope — a band that renders dark in EITHER theme.
+
+   The landing hero is dark by design, not by colour mode. It can't just be
+   given a dark background: the ramp inverts, so in light mode `text-ink`
+   resolves to #1B2340 and every word on that band would be navy on navy. This
+   re-declares the tokens html.dark sets, for this subtree only, so the
+   utilities inside resolve the way they would in dark mode.
+
+   Generated from the html.dark block above — regenerate rather than hand-edit
+   if that block changes. Same machinery as .light-scope below, opposite sign.
+   --------------------------------------------------------------------------- */
+.dark-scope {
+  --background: #121520; /* palette.snow.dark */
+  --foreground: #E8EAF0; /* palette.ink.dark */
+  --primary-50:  #16203A;
+  --primary-100: #1A2440; /* palette.primaryLight.dark */
+  --primary-200: #223056;
+  --primary-300: #2F4478;
+  --primary-400: #3F5CA8;
+  --primary-500: #4B76DC;
+  --primary-600: #5B8AFF; /* palette.primary.dark */
+  --primary-700: #7FA4FF;
+  --primary-800: #A3BEFF;
+  --primary-900: #C7D8FF;
+  --success-50:  #0F2A1A; /* palette.greenLight.dark */
+  --success-100: #14361F;
+  --success-200: #1A4A2A;
+  --success-300: #21663A;
+  --success-400: #29894C;
+  --success-500: #2FB260;
+  --success-600: #34D972; /* palette.green.dark */
+  --success-700: #5FE391;
+  --success-800: #8CEDB1;
+  --success-900: #B9F6D0;
+  --danger-50:  #2A1010; /* palette.redLight.dark */
+  --danger-100: #3A1616;
+  --danger-200: #4E1D1D;
+  --danger-300: #6B2828;
+  --danger-400: #933838;
+  --danger-500: #C55252;
+  --danger-600: #F87171; /* palette.red.dark */
+  --danger-700: #FA9494;
+  --danger-800: #FCB7B7;
+  --danger-900: #FDD9D9;
+  --warning-50:  #2A2210; /* palette.amberLight.dark */
+  --warning-100: #3A2F14;
+  --warning-200: #4E3F1A;
+  --warning-300: #6B5622;
+  --warning-400: #A88530;
+  --warning-500: #FBBF24; /* palette.amber.dark */
+  --warning-600: #FCCE52;
+  --warning-700: #FDD97C;
+  --warning-800: #FDE4A5;
+  --warning-900: #FEEFCF;
+  --neutral-50:  #121520; /* palette.snow.dark */
+  --neutral-100: #1C2030; /* palette.surface.dark */
+  --neutral-200: #232840; /* palette.mist.dark */
+  --neutral-300: #2E3448; /* palette.silver.dark */
+  --neutral-400: #5D6680;
+  --neutral-500: #8B97B8; /* palette.slate.dark */
+  --neutral-600: #AAB3CB;
+  --neutral-700: #C9CEDD;
+  --neutral-800: #DCE0EA;
+  --neutral-900: #E8EAF0; /* palette.ink.dark */
+  --accent-50:  #2A2210; /* palette.accentLight.dark */
+  --accent-100: #3A2F14;
+  --accent-200: #6B5622;
+  --accent-300: #B08E1D;
+  --accent-400: #F5C518; /* palette.accent.dark */
+  --accent-500: #F7D047;
+  --accent-600: #F9DA76;
+  --accent-700: #FAE4A5;
+  --accent-800: #FCEDC5;
+  --accent-900: #FDF4DE;
+  --surface:           #1C2030; /* palette.surface.dark */
+  --surface-secondary: #121520; /* palette.snow.dark */
+  --surface-tertiary:  #232840; /* palette.mist.dark */
+  --surface-inset:     #2E3448; /* palette.silver.dark */
+  --border-default: #2E3448; /* palette.silver.dark */
+  --border-subtle:  #232840; /* palette.mist.dark */
+  --border-strong:  #5D6680;
+  --sp-snow:          #121520;
+  --sp-surface:       #1C2030;
+  --sp-mist:          #232840;
+  --sp-silver:        #2E3448;
+  --sp-slate:         #8B97B8;
+  --sp-ink:           #E8EAF0;
+  --sp-midnight:      #0B0F1A;
+  --sp-primary:       #5B8AFF;
+  --sp-primary-light: #1A2440;
+  --sp-accent:        #F5C518;
+  --sp-accent-light:  #2A2210;
+  --sp-green:         #34D972;
+  --sp-green-light:   #0F2A1A;
+  --sp-red:           #F87171;
+  --sp-red-light:     #2A1010;
+  --sp-amber:         #FBBF24;
+  --sp-amber-light:   #2A2210;
+
+  color-scheme: dark;
+  /* Re-applied for the same reason .light-scope does: `color` was already
+     resolved to a literal on <body>, outside this scope, and inheritance
+     carries the computed value rather than the var() reference. */
+  color: var(--foreground);
 }
 
 /* Hide scrollbar for tab navigation on mobile */
