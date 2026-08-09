@@ -1320,11 +1320,26 @@ export function LeaderboardTab({
           className="space-y-1.5"
           style={{ animation: 'fadeUp 0.3s ease 0.15s both' }}
         >
+          {/* Driven by AWARD_ICON, for the same reason the form-dot key below is
+              driven by getFormDotClass: a legend written by hand drifts from the
+              thing it explains. It already had — the awards moved to icons and
+              this row was still showing 🎲 for Contrarian King while the chip
+              showed a branching arrow, so the key was describing a glyph that no
+              longer existed. */}
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-4 gap-y-1">
-            <span className="text-[10px] sm:text-xs text-muted">🔥 <span className="text-danger-500 font-medium">Hot Streak</span></span>
-            <span className="text-[10px] sm:text-xs text-muted">❄️ <span className="text-primary-500 font-medium">Cold Streak</span></span>
-            <span className="text-[10px] sm:text-xs text-muted">🎲 <span className="text-primary-700 font-medium">Contrarian King</span></span>
-            <span className="text-[10px] sm:text-xs text-muted">👥 <span className="text-primary-500 font-medium">Crowd Follower</span></span>
+            {([
+              { type: 'hot', label: 'Hot Streak', tint: 'text-danger-500' },
+              { type: 'cold', label: 'Cold Streak', tint: 'text-primary-500' },
+              { type: 'contrarian', label: 'Contrarian King', tint: 'text-primary-700' },
+              { type: 'crowd', label: 'Crowd Follower', tint: 'text-primary-500' },
+            ] as const).map(k => (
+              <span key={k.type} className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-muted">
+                <span className={k.tint}>
+                  <Icon name={AWARD_ICON[k.type]} size={12} weight="semibold" />
+                </span>
+                <span className={`${k.tint} font-medium`}>{k.label}</span>
+              </span>
+            ))}
           </div>
           {/* Driven by getFormDotClass so the key always matches the dots it explains.
               These were previously hand-written with their own colours, which is how a
@@ -1428,7 +1443,13 @@ export function LeaderboardTab({
                       ))}
                       {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
                         <span className="ml-1 text-xs">
-                          {stats.currentStreak.type === 'hot' ? '🔥' : '❄️'}
+                          <Icon
+                            name={AWARD_ICON[stats.currentStreak.type === 'hot' ? 'hot' : 'cold']}
+                            size={11}
+                            className={`inline-block align-[-1px] mr-0.5 ${
+                              stats.currentStreak.type === 'hot' ? 'text-danger-500' : 'text-primary-400'
+                            }`}
+                          />
                           <span className={`font-bold ${stats.currentStreak.type === 'hot' ? 'text-danger-500' : 'text-primary-400'}`}>
                             {stats.currentStreak.length}
                           </span>
@@ -1580,7 +1601,13 @@ export function LeaderboardTab({
                       </div>
                       {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
                         <span className="ml-0.5 text-[10px]">
-                          {stats.currentStreak.type === 'hot' ? '🔥' : '❄️'}
+                          <Icon
+                            name={AWARD_ICON[stats.currentStreak.type === 'hot' ? 'hot' : 'cold']}
+                            size={11}
+                            className={`inline-block align-[-1px] mr-0.5 ${
+                              stats.currentStreak.type === 'hot' ? 'text-danger-500' : 'text-primary-400'
+                            }`}
+                          />
                           <span className={`font-bold ${stats.currentStreak.type === 'hot' ? 'text-danger-500' : 'text-primary-400'}`}>
                             {stats.currentStreak.length}
                           </span>
