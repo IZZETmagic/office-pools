@@ -60,7 +60,11 @@ export default function Home() {
           the ramp inverts and every word here would be #1B2340 navy on a navy
           band. See globals.css. */}
       <div className="dark-scope bg-snow">
-      <nav className="sticky top-0 z-50 bg-snow/90 backdrop-blur-sm border-b border-border-subtle">
+      {/* No bottom border: nav and hero are one dark band now, and a rule
+          between them just draws a seam across it. Once scrolled, the nav still
+          separates from the light sections below on its own — the colour step
+          does that job without help. */}
+      <nav className="sticky top-0 z-50 bg-snow/90 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="text-xl font-black tracking-tight text-ink">
