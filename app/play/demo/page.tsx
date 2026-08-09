@@ -47,20 +47,20 @@ export default function PlayDemoPage() {
     <div className="min-h-screen bg-white">
 
       {/* ═══════ NAV ═══════ */}
-      <nav className="sticky top-0 z-50 border-b border-neutral-100 bg-white/90 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-white/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">{POOL_INFO.logoEmoji}</span>
-            <span className="font-bold text-lg text-neutral-900">{POOL_INFO.barName}</span>
+            <span className="font-bold text-lg text-ink">{POOL_INFO.barName}</span>
           </div>
-          <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-neutral-500">
-            <a href="#how-it-works" className="hover:text-neutral-900 transition-colors">How It Works</a>
-            <a href="#leaderboard" className="hover:text-neutral-900 transition-colors">Leaderboard</a>
-            <a href="#prizes" className="hover:text-neutral-900 transition-colors">Prizes</a>
+          <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-muted">
+            <a href="#how-it-works" className="hover:text-ink transition-colors">How It Works</a>
+            <a href="#leaderboard" className="hover:text-ink transition-colors">Leaderboard</a>
+            <a href="#prizes" className="hover:text-ink transition-colors">Prizes</a>
           </div>
           <button
             onClick={handleJoin}
-            className="px-4 py-2 rounded-lg text-white text-sm font-bold transition-opacity hover:opacity-90"
+            className="px-4 py-2 rounded-chip text-white text-sm font-bold transition-opacity hover:opacity-90"
             style={{ backgroundColor: POOL_INFO.accentColor }}
           >
             Join Pool
@@ -72,13 +72,13 @@ export default function PlayDemoPage() {
       <section className="relative overflow-hidden text-white" style={{ background: POOL_INFO.primaryGradient }}>
         {/* Decorative */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/[0.03] rounded-full" />
-          <div className="absolute top-1/3 -right-16 w-56 h-56 bg-white/[0.03] rounded-full" />
-          <div className="absolute -bottom-12 left-1/4 w-40 h-40 bg-white/[0.03] rounded-full" />
+          <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/[0.03] rounded-pill" />
+          <div className="absolute top-1/3 -right-16 w-56 h-56 bg-white/[0.03] rounded-pill" />
+          <div className="absolute -bottom-12 left-1/4 w-40 h-40 bg-white/[0.03] rounded-pill" />
         </div>
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 text-sm font-semibold mb-6" style={{ color: POOL_INFO.accentColorLight }}>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-pill bg-white/10 text-sm font-semibold mb-6" style={{ color: POOL_INFO.accentColorLight }}>
             ⚽ FIFA World Cup 2026
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4">
@@ -95,7 +95,7 @@ export default function PlayDemoPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={handleJoin}
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-xl text-white font-bold text-lg transition-colors"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-control text-white font-bold text-lg transition-colors"
               style={{ backgroundColor: POOL_INFO.accentColor }}
             >
               Join the Pool
@@ -108,7 +108,7 @@ export default function PlayDemoPage() {
       {/* ═══════ COUNTDOWN ═══════ */}
       <section className="py-8 sm:py-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-3">World Cup kicks off in</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted mb-3">World Cup kicks off in</p>
           <div className="inline-flex items-center gap-2 sm:gap-3">
             {[
               { value: timeLeft.days, label: 'Days' },
@@ -119,14 +119,14 @@ export default function PlayDemoPage() {
               <div key={unit.label} className="flex items-center gap-2 sm:gap-3">
                 <div className="flex flex-col items-center">
                   <div
-                    className="w-14 sm:w-16 h-14 sm:h-16 rounded-xl flex items-center justify-center font-extrabold text-xl sm:text-2xl tabular-nums"
+                    className="w-14 sm:w-16 h-14 sm:h-16 rounded-control flex items-center justify-center font-extrabold text-xl sm:text-2xl tabular-nums"
                     style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: `2px solid ${POOL_INFO.accentColor}`, color: POOL_INFO.primaryColor }}
                   >
                     {String(unit.value).padStart(2, '0')}
                   </div>
-                  <span className="text-[10px] font-medium text-neutral-400 mt-1.5">{unit.label}</span>
+                  <span className="text-[10px] font-medium text-muted mt-1.5">{unit.label}</span>
                 </div>
-                {i < 3 && <span className="text-neutral-300 text-lg font-bold mb-4">:</span>}
+                {i < 3 && <span className="text-muted text-lg font-bold mb-4">:</span>}
               </div>
             ))}
           </div>
@@ -134,10 +134,10 @@ export default function PlayDemoPage() {
       </section>
 
       {/* ═══════ HOW IT WORKS ═══════ */}
-      <section id="how-it-works" className="py-16 sm:py-20 bg-neutral-50">
+      <section id="how-it-works" className="py-16 sm:py-20 bg-snow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">How It Works</h2>
-          <p className="text-center text-neutral-500 mb-12 max-w-xl mx-auto">Three simple steps to start competing</p>
+          <h2 className="text-3xl font-bold text-center text-ink mb-3">How It Works</h2>
+          <p className="text-center text-muted mb-12 max-w-xl mx-auto">Three simple steps to start competing</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
@@ -146,17 +146,17 @@ export default function PlayDemoPage() {
               { step: 3, icon: '🏆', title: 'Win Prizes', desc: 'Earn points for correct predictions. Climb the leaderboard displayed live on our TVs and win prizes!' },
             ].map((item) => (
               <div key={item.step} className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl text-3xl mb-4" style={{ backgroundColor: `${POOL_INFO.accentColor}20` }}>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-card text-3xl mb-4" style={{ backgroundColor: `${POOL_INFO.accentColor}20` }}>
                   {item.icon}
                 </div>
                 <div
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-sm font-bold -mt-12 -ml-4 relative z-10 mb-2"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-pill text-white text-sm font-bold -mt-12 -ml-4 relative z-10 mb-2"
                   style={{ backgroundColor: POOL_INFO.primaryColor }}
                 >
                   {item.step}
                 </div>
-                <h3 className="text-lg font-bold text-neutral-900 mb-2">{item.title}</h3>
-                <p className="text-sm text-neutral-500 leading-relaxed">{item.desc}</p>
+                <h3 className="text-lg font-bold text-ink mb-2">{item.title}</h3>
+                <p className="text-sm text-muted leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -166,44 +166,44 @@ export default function PlayDemoPage() {
       {/* ═══════ LEADERBOARD PREVIEW ═══════ */}
       <section id="leaderboard" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">Live Leaderboard</h2>
-          <p className="text-center text-neutral-500 mb-10 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold text-center text-ink mb-3">Live Leaderboard</h2>
+          <p className="text-center text-muted mb-10 max-w-xl mx-auto">
             Displayed live on our TVs during every match. Here&apos;s a preview.
           </p>
 
-          <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
+          <div className="max-w-3xl mx-auto bg-white rounded-card shadow-sm border border-border-subtle overflow-hidden">
             {/* Mini table */}
             <table className="w-full">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/50">
-                  <th className="w-14 text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">Player</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400 hidden sm:table-cell">Form</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">Points</th>
+                <tr className="border-b border-border-subtle bg-snow/50">
+                  <th className="w-14 text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">#</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Player</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted hidden sm:table-cell">Form</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Points</th>
                 </tr>
               </thead>
               <tbody>
                 {TOP_8.map((p) => (
-                  <tr key={p.rank} className="border-b border-neutral-50 last:border-b-0">
+                  <tr key={p.rank} className="border-b border-border-subtle last:border-b-0">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <span className="text-sm font-bold text-neutral-400 w-6 text-center tabular-nums">{p.rank <= 3 ? ['', '\u{1F947}', '\u{1F948}', '\u{1F949}'][p.rank] : p.rank}</span>
-                        {p.move > 0 && <span className="text-green-500 text-[10px] font-bold leading-none">&#9650;{p.move}</span>}
-                        {p.move < 0 && <span className="text-red-500 text-[10px] font-bold leading-none">&#9660;{Math.abs(p.move)}</span>}
+                        <span className="text-sm font-bold text-muted w-6 text-center tabular-nums">{p.rank <= 3 ? ['', '\u{1F947}', '\u{1F948}', '\u{1F949}'][p.rank] : p.rank}</span>
+                        {p.move > 0 && <span className="text-success-500 text-[10px] font-bold leading-none">&#9650;{p.move}</span>}
+                        {p.move < 0 && <span className="text-danger-500 text-[10px] font-bold leading-none">&#9660;{Math.abs(p.move)}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm font-semibold text-neutral-900">{p.name}</span>
+                      <span className="text-sm font-semibold text-ink">{p.name}</span>
                     </td>
                     <td className="text-center px-4 py-3 hidden sm:table-cell">
                       <div className="flex items-center justify-center gap-1">
                         {p.form?.map((f, i) => (
-                          <span key={i} className={`w-2.5 h-2.5 rounded-full ${FORM_COLORS[f]}`} />
+                          <span key={i} className={`w-2.5 h-2.5 rounded-pill ${FORM_COLORS[f]}`} />
                         ))}
                       </div>
                     </td>
                     <td className="text-right px-4 py-3">
-                      <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points.toLocaleString('en-US')}</span>
+                      <span className="text-sm font-bold text-ink tabular-nums">{p.points.toLocaleString('en-US')}</span>
                     </td>
                   </tr>
                 ))}
@@ -211,8 +211,8 @@ export default function PlayDemoPage() {
             </table>
 
             {/* Link to TV view */}
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-sm text-neutral-500">
+            <div className="px-6 py-4 bg-snow border-t border-border-subtle flex items-center justify-between">
+              <span className="text-sm text-muted">
                 Showing top 8 of {POOL_INFO.memberCount} players
               </span>
               <Link href="/tv/demo" className="text-sm font-semibold transition-colors" style={{ color: POOL_INFO.accentColor }}>
@@ -222,36 +222,36 @@ export default function PlayDemoPage() {
           </div>
 
           {/* Form legend */}
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-neutral-400">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Exact</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Correct GD</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Correct Result</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Miss</span>
+          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-accent-400" /> Exact</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-success-500" /> Correct GD</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-primary-500" /> Correct Result</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-danger-400" /> Miss</span>
           </div>
         </div>
       </section>
 
       {/* ═══════ PRIZES ═══════ */}
-      <section id="prizes" className="py-16 sm:py-20 bg-neutral-50">
+      <section id="prizes" className="py-16 sm:py-20 bg-snow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">Prizes</h2>
-          <p className="text-center text-neutral-500 mb-10 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold text-center text-ink mb-3">Prizes</h2>
+          <p className="text-center text-muted mb-10 max-w-xl mx-auto">
             Compete for real prizes sponsored by {POOL_INFO.barName}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
             {POOL_INFO.prizes.map((item) => (
-              <div key={item.place} className={`bg-white rounded-2xl border ${item.border} p-6 text-center shadow-sm`}>
+              <div key={item.place} className={`bg-white rounded-card border ${item.border} p-6 text-center shadow-sm`}>
                 <div className="text-4xl mb-3">{item.icon}</div>
-                <div className={`inline-block px-3 py-1 rounded-full bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
+                <div className={`inline-block px-3 py-1 rounded-pill bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
                   {item.place}
                 </div>
-                <p className="text-lg font-bold text-neutral-900">{item.prize}</p>
+                <p className="text-lg font-bold text-ink">{item.prize}</p>
               </div>
             ))}
           </div>
 
-          <p className="text-center text-sm text-neutral-400 mt-6">
+          <p className="text-center text-sm text-muted mt-6">
             Prizes are examples &mdash; your bar decides the rewards
           </p>
         </div>
@@ -260,13 +260,13 @@ export default function PlayDemoPage() {
       {/* ═══════ JOIN / QR SECTION ═══════ */}
       <section id="join" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden">
+          <div className="max-w-lg mx-auto bg-white rounded-card shadow-md border border-border-subtle overflow-hidden">
             {/* Header */}
             <div className="px-6 py-8 text-center text-white relative overflow-hidden" style={{ background: POOL_INFO.primaryGradient }}>
-              <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-white/[0.04]" />
-              <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-white/[0.04]" />
+              <div className="absolute -top-10 -left-10 w-32 h-32 rounded-pill bg-white/[0.04]" />
+              <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-pill bg-white/[0.04]" />
               <div className="relative z-10">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 text-3xl mb-3">{POOL_INFO.logoEmoji}</div>
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-card bg-white/10 text-3xl mb-3">{POOL_INFO.logoEmoji}</div>
                 <h3 className="text-xl font-bold">Ready to Join?</h3>
                 <p className="text-sm mt-1" style={{ color: `${POOL_INFO.accentColorLight}99` }}>Tap the button below to get started</p>
               </div>
@@ -275,7 +275,7 @@ export default function PlayDemoPage() {
             {/* Body */}
             <div className="px-6 py-6 space-y-5">
               {/* Stats */}
-              <div className="flex items-center justify-center gap-4 text-sm text-neutral-500">
+              <div className="flex items-center justify-center gap-4 text-sm text-muted">
                 <span className="flex items-center gap-1.5">
                   <Icon name="person.3.fill" size={16} />
                   {POOL_INFO.memberCount} members
@@ -284,13 +284,13 @@ export default function PlayDemoPage() {
                   <Icon name="tag" size={16} />
                   {POOL_INFO.mode}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${POOL_INFO.accentColor}20`, color: POOL_INFO.accentColor }}>Open</span>
+                <span className="text-xs px-2 py-0.5 rounded-pill font-bold" style={{ backgroundColor: `${POOL_INFO.accentColor}20`, color: POOL_INFO.accentColor }}>Open</span>
               </div>
 
               {/* Join button */}
               <button
                 onClick={handleJoin}
-                className="w-full py-3 rounded-xl text-white font-bold text-base transition-colors"
+                className="w-full py-3 rounded-control text-white font-bold text-base transition-colors"
                 style={{ backgroundColor: POOL_INFO.accentColor }}
               >
                 Join Pool
@@ -301,23 +301,23 @@ export default function PlayDemoPage() {
       </section>
 
       {/* ═══════ WHAT PATRONS SEE ═══════ */}
-      <section className="py-16 sm:py-20 bg-neutral-50">
+      <section className="py-16 sm:py-20 bg-snow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-neutral-900 mb-3">The Full Experience</h2>
-          <p className="text-neutral-500 mb-8 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold text-ink mb-3">The Full Experience</h2>
+          <p className="text-muted mb-8 max-w-xl mx-auto">
             See what your patrons get when they join the pool
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href="#prizes"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-control text-white font-semibold transition-colors"
               style={{ backgroundColor: POOL_INFO.primaryColor }}
             >
               🏆 View Prizes
             </a>
             <Link
               href="/tv/demo"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-neutral-200 text-neutral-700 font-semibold hover:bg-neutral-100 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-control border border-border-default text-ink font-semibold hover:bg-mist transition-colors"
             >
               📺 View TV Leaderboard
             </Link>
@@ -326,10 +326,10 @@ export default function PlayDemoPage() {
       </section>
 
       {/* ═══════ FOOTER ═══════ */}
-      <footer className="py-8 border-t border-neutral-100">
+      <footer className="py-8 border-t border-border-subtle">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-neutral-400">
-            Powered by <span className="font-semibold text-neutral-500">SportPool</span> &middot; sportpool.io
+          <p className="text-sm text-muted">
+            Powered by <span className="font-semibold text-muted">SportPool</span> &middot; sportpool.io
           </p>
         </div>
       </footer>
