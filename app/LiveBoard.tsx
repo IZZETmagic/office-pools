@@ -40,6 +40,22 @@ const DOT: Record<string, string> = {
   miss: 'bg-tier-miss',
 }
 
+/**
+ * Named to echo the headline above it: everyone's got an opinion, and these
+ * three are the people with the strongest ones and the worst record.
+ *
+ * Deliberately not POOL_INFO.name from the demo data ("The Anchor's World Cup
+ * Pool") — that ties the landing page to both a sponsor and a finished
+ * tournament, and a hardcoded tournament in the hero is exactly what this
+ * rebuild was undoing.
+ *
+ * Others that worked, if this one wears thin: "Hot Takes FC", "The Punditry",
+ * "Group Chat FC", "We Know Ball". Keep it warm — the product's stated purpose
+ * is no bad feelings, so the joke is about everyone being confidently wrong,
+ * never about a loser.
+ */
+const POOL_NAME = 'Armchair Experts'
+
 const FORM_LEN = 4
 
 const BASE: Row[] = PODIUM.slice(0, 3).map((p) => ({
@@ -137,9 +153,18 @@ export function LiveBoard() {
       </div>
 
       <div className="rounded-card bg-surface border border-border-subtle shadow-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-          <span className="t-caption text-muted">Sample pool</span>
-          <span className="t-caption text-muted inline-flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-subtle">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="t-caption text-ink truncate">{POOL_NAME}</span>
+            {/* The name is the joke; this is the disclosure. "Sample pool" did
+                both jobs and was dull at each — but dropping the marker
+                entirely would leave a visitor wondering whose standings these
+                are, which is the one thing this header must not do. */}
+            <span className="t-detail uppercase tracking-wider text-muted bg-mist rounded-pill px-2 py-0.5 shrink-0">
+              Demo
+            </span>
+          </span>
+          <span className="t-caption text-muted inline-flex items-center gap-1.5 shrink-0">
             <span className="w-1.5 h-1.5 rounded-pill bg-success-500" aria-hidden />
             Live
           </span>
