@@ -29,10 +29,10 @@ type PoolConfig = {
 }
 
 const FORM_COLORS: Record<string, string> = {
-  exact: 'bg-amber-400',
-  winner_gd: 'bg-emerald-500',
-  winner: 'bg-blue-500',
-  miss: 'bg-red-400',
+  exact: 'bg-accent-400',
+  winner_gd: 'bg-success-500',
+  winner: 'bg-primary-500',
+  miss: 'bg-danger-400',
 }
 
 // Countdown to World Cup kickoff: June 11, 2026 at 12:00 ET (16:00 UTC).
@@ -79,14 +79,14 @@ function Countdown({ targetMs, accentColor, primaryColor }: { targetMs: number; 
           <div className="flex flex-col items-center">
             <div
               suppressHydrationWarning
-              className="w-14 sm:w-16 h-14 sm:h-16 rounded-xl flex items-center justify-center font-extrabold text-xl sm:text-2xl tabular-nums"
+              className="w-14 sm:w-16 h-14 sm:h-16 rounded-control flex items-center justify-center font-extrabold text-xl sm:text-2xl tabular-nums"
               style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: `2px solid ${accentColor}`, color: primaryColor }}
             >
               {String(unit.value).padStart(2, '0')}
             </div>
-            <span className="text-[10px] font-medium text-neutral-400 mt-1.5">{unit.label}</span>
+            <span className="text-[10px] font-medium text-muted mt-1.5">{unit.label}</span>
           </div>
-          {i < 3 && <span className="text-neutral-300 text-lg font-bold mb-4">:</span>}
+          {i < 3 && <span className="text-muted text-lg font-bold mb-4">:</span>}
         </div>
       ))}
     </div>
@@ -98,11 +98,11 @@ function Countdown({ targetMs, accentColor, primaryColor }: { targetMs: number; 
 // `Team A 🏳  0 - 0  🏳 Team B`.
 function TeamSide({ name, flag, side }: { name: string | null; flag: string | null; side: 'home' | 'away' }) {
   const flagEl = flag ? (
-    <img src={flag} alt={name || ''} className="w-7 h-5 rounded-sm object-cover shadow-sm shrink-0" />
+    <img src={flag} alt={name || ''} className="w-7 h-5 rounded-inset object-cover shadow-sm shrink-0" />
   ) : (
     <span className="text-lg shrink-0">&#9917;</span>
   )
-  const nameEl = <span className="text-base sm:text-lg font-bold text-neutral-900 truncate">{name || 'TBD'}</span>
+  const nameEl = <span className="text-base sm:text-lg font-bold text-ink truncate">{name || 'TBD'}</span>
   return (
     <div className={`flex items-center gap-2 flex-1 min-w-0 ${side === 'home' ? 'justify-end' : 'justify-start'}`}>
       {side === 'home' ? (<>{nameEl}{flagEl}</>) : (<>{flagEl}{nameEl}</>)}
@@ -128,10 +128,10 @@ function RoadTracker({
   primaryColor: string
 }) {
   return (
-    <section className="py-14 sm:py-20 bg-neutral-50">
+    <section className="py-14 sm:py-20 bg-snow">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-neutral-900 mb-2">The Road to Glory</h2>
-        <p className="text-center text-neutral-500 mb-12 text-sm">{completed} of {total} matches played</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-ink mb-2">The Road to Glory</h2>
+        <p className="text-center text-muted mb-12 text-sm">{completed} of {total} matches played</p>
         <div className="flex items-center pb-7">
           {stages.map((st, i) => {
             const done = st.status === 'done'
@@ -140,35 +140,35 @@ function RoadTracker({
               <Fragment key={st.key}>
                 {i > 0 && (
                   <div
-                    className="flex-1 h-[3px] rounded-full"
-                    style={{ backgroundColor: st.status === 'upcoming' ? '#e5e5e5' : accentColor }}
+                    className="flex-1 h-[3px] rounded-pill"
+                    style={{ backgroundColor: st.status === 'upcoming' ? 'var(--color-mist)' : accentColor }}
                   />
                 )}
                 <div className="relative shrink-0">
                   <div
-                    className="relative flex items-center justify-center rounded-full"
+                    className="relative flex items-center justify-center rounded-pill"
                     style={{
                       width: 34,
                       height: 34,
-                      backgroundColor: done ? accentColor : '#ffffff',
-                      border: `2px solid ${done || current ? accentColor : '#d4d4d4'}`,
+                      backgroundColor: done ? accentColor : 'var(--surface)',
+                      border: `2px solid ${done || current ? accentColor : 'var(--color-silver)'}`,
                     }}
                   >
                     {current && (
                       <span
-                        className="absolute inline-flex h-full w-full rounded-full animate-ping"
+                        className="absolute inline-flex h-full w-full rounded-pill animate-ping"
                         style={{ backgroundColor: accentColor, opacity: 0.35 }}
                       />
                     )}
                     {done ? (
                       <Icon name="checkmark" />
                     ) : (
-                      <span className="relative rounded-full" style={{ width: 8, height: 8, backgroundColor: current ? accentColor : '#d4d4d4' }} />
+                      <span className="relative rounded-pill" style={{ width: 8, height: 8, backgroundColor: current ? accentColor : 'var(--color-silver)' }} />
                     )}
                   </div>
                   <span
                     className="absolute left-1/2 -translate-x-1/2 top-[42px] text-[11px] sm:text-xs font-semibold whitespace-nowrap"
-                    style={{ color: done || current ? primaryColor : '#a3a3a3' }}
+                    style={{ color: done || current ? primaryColor : 'var(--color-muted)' }}
                   >
                     {st.label}
                   </span>
@@ -219,7 +219,7 @@ export default function BrandedLandingClient({
   const navCtaLabel = isPre ? 'Join Pool' : 'Live Standings'
 
   const brandIcon = poolConfig.logoUrl ? (
-    <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-8 h-8 rounded-md object-cover" />
+    <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-8 h-8 rounded-chip object-cover" />
   ) : poolConfig.brandEmoji ? (
     <span className="text-2xl">{poolConfig.brandEmoji}</span>
   ) : null
@@ -241,10 +241,10 @@ export default function BrandedLandingClient({
   const leaderboardSection = (
     <section id="leaderboard" className="py-16 sm:py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">
+        <h2 className="text-3xl font-bold text-center text-ink mb-3">
           {isMock ? 'Leaderboard Preview' : isComplete ? 'Final Standings' : 'Live Leaderboard'}
         </h2>
-        <p className="text-center text-neutral-500 mb-10 max-w-xl mx-auto">
+        <p className="text-center text-muted mb-10 max-w-xl mx-auto">
           {isMock
             ? 'Here’s what the leaderboard looks like during the tournament. Join now to see your name here!'
             : players.length > 0
@@ -256,48 +256,48 @@ export default function BrandedLandingClient({
 
         {players.length > 0 ? (
           <>
-          <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
+          <div className="max-w-3xl mx-auto bg-white rounded-card shadow-sm border border-border-subtle overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50/50">
-                  <th className="w-14 text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">Player</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400 hidden sm:table-cell">Form</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-neutral-400">Points</th>
+                <tr className="border-b border-border-subtle bg-snow/50">
+                  <th className="w-14 text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">#</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Player</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted hidden sm:table-cell">Form</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Points</th>
                 </tr>
               </thead>
               <tbody>
                 {players.slice(0, 10).map((p) => (
-                  <tr key={p.rank} className="border-b border-neutral-50 last:border-b-0">
+                  <tr key={p.rank} className="border-b border-border-subtle last:border-b-0">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <span className="text-sm font-bold text-neutral-400 w-6 text-center tabular-nums">
+                        <span className="text-sm font-bold text-muted w-6 text-center tabular-nums">
                           {p.rank <= 3 ? ['\u{1F947}', '\u{1F948}', '\u{1F949}'][p.rank - 1] : p.rank}
                         </span>
-                        {p.move > 0 && <span className="text-green-500 text-[10px] font-bold leading-none">&#9650;{p.move}</span>}
-                        {p.move < 0 && <span className="text-red-500 text-[10px] font-bold leading-none">&#9660;{Math.abs(p.move)}</span>}
+                        {p.move > 0 && <span className="text-success-500 text-[10px] font-bold leading-none">&#9650;{p.move}</span>}
+                        {p.move < 0 && <span className="text-danger-500 text-[10px] font-bold leading-none">&#9660;{Math.abs(p.move)}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm font-semibold text-neutral-900">{p.name}</span>
+                      <span className="text-sm font-semibold text-ink">{p.name}</span>
                     </td>
                     <td className="text-center px-4 py-3 hidden sm:table-cell">
                       <div className="flex items-center justify-center gap-1">
                         {p.form.map((f, i) => (
-                          <span key={i} className={`w-2.5 h-2.5 rounded-full ${FORM_COLORS[f] || 'bg-neutral-300'}`} />
+                          <span key={i} className={`w-2.5 h-2.5 rounded-pill ${FORM_COLORS[f] || 'bg-silver'}`} />
                         ))}
                       </div>
                     </td>
                     <td className="text-right px-4 py-3">
-                      <span className="text-sm font-bold text-neutral-900 tabular-nums">{p.points.toLocaleString('en-US')}</span>
+                      <span className="text-sm font-bold text-ink tabular-nums">{p.points.toLocaleString('en-US')}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-sm text-neutral-500">
+            <div className="px-6 py-4 bg-snow border-t border-border-subtle flex items-center justify-between">
+              <span className="text-sm text-muted">
                 Showing top {Math.min(10, players.length)} of {players.length} player{players.length !== 1 ? 's' : ''}
               </span>
               <Link href={`/tv/${poolConfig.slug}`} className="text-sm font-semibold transition-colors" style={{ color: poolConfig.accentColor }}>
@@ -306,20 +306,20 @@ export default function BrandedLandingClient({
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-neutral-400">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Exact</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Correct GD</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Correct Result</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Miss</span>
+          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-accent-400" /> Exact</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-success-500" /> Correct GD</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-primary-500" /> Correct Result</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-pill bg-danger-400" /> Miss</span>
           </div>
         </>
         ) : (
-          <div className="max-w-md mx-auto text-center py-12 px-6 bg-neutral-50 rounded-2xl border border-neutral-100">
+          <div className="max-w-md mx-auto text-center py-12 px-6 bg-snow rounded-card border border-border-subtle">
             <div className="text-4xl mb-3">&#9917;</div>
-            <p className="text-neutral-500 text-sm">Be the first to join and top the leaderboard!</p>
+            <p className="text-muted text-sm">Be the first to join and top the leaderboard!</p>
             <button
               onClick={handleJoin}
-              className="mt-4 px-6 py-2.5 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
+              className="mt-4 px-6 py-2.5 rounded-control text-white font-bold text-sm transition-opacity hover:opacity-90"
               style={{ backgroundColor: poolConfig.accentColor }}
             >
               Join Now
@@ -331,10 +331,10 @@ export default function BrandedLandingClient({
   )
 
   const howItWorksSection = (
-    <section id="how-it-works" className="py-16 sm:py-20 bg-neutral-50">
+    <section id="how-it-works" className="py-16 sm:py-20 bg-snow">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">How It Works</h2>
-        <p className="text-center text-neutral-500 mb-12 max-w-xl mx-auto">Three simple steps to start competing</p>
+        <h2 className="text-3xl font-bold text-center text-ink mb-3">How It Works</h2>
+        <p className="text-center text-muted mb-12 max-w-xl mx-auto">Three simple steps to start competing</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
           {[
@@ -343,17 +343,17 @@ export default function BrandedLandingClient({
             { step: 3, icon: '\u{1F3C6}', title: 'Climb the Board', desc: 'Earn points for correct predictions. Compete for the top spot on the leaderboard and win prizes!' },
           ].map((item) => (
             <div key={item.step} className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl text-3xl mb-4" style={{ backgroundColor: `${poolConfig.accentColor}20` }}>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-card text-3xl mb-4" style={{ backgroundColor: `${poolConfig.accentColor}20` }}>
                 {item.icon}
               </div>
               <div
-                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-sm font-bold -mt-12 -ml-4 relative z-10 mb-2"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-pill text-white text-sm font-bold -mt-12 -ml-4 relative z-10 mb-2"
                 style={{ backgroundColor: poolConfig.primaryColor }}
               >
                 {item.step}
               </div>
-              <h3 className="text-lg font-bold text-neutral-900 mb-2">{item.title}</h3>
-              <p className="text-sm text-neutral-500 leading-relaxed">{item.desc}</p>
+              <h3 className="text-lg font-bold text-ink mb-2">{item.title}</h3>
+              <p className="text-sm text-muted leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -365,20 +365,20 @@ export default function BrandedLandingClient({
     <div className="min-h-screen bg-white">
 
       {/* NAV */}
-      <nav className="sticky top-0 z-50 border-b border-neutral-100 bg-white/90 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-border-subtle bg-white/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
             {brandIcon}
-            <span className="font-bold text-lg text-neutral-900">{poolConfig.brandName}</span>
+            <span className="font-bold text-lg text-ink">{poolConfig.brandName}</span>
           </div>
-          <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-neutral-500">
-            {isPre && <a href="#how-it-works" className="hover:text-neutral-900 transition-colors">How It Works</a>}
-            <a href="#leaderboard" className="hover:text-neutral-900 transition-colors">Leaderboard</a>
-            <a href="#prizes" className="hover:text-neutral-900 transition-colors">Prizes</a>
+          <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-muted">
+            {isPre && <a href="#how-it-works" className="hover:text-ink transition-colors">How It Works</a>}
+            <a href="#leaderboard" className="hover:text-ink transition-colors">Leaderboard</a>
+            <a href="#prizes" className="hover:text-ink transition-colors">Prizes</a>
           </div>
           <button
             onClick={primaryCtaAction}
-            className="px-4 py-2 rounded-lg text-white text-sm font-bold transition-opacity hover:opacity-90"
+            className="px-4 py-2 rounded-chip text-white text-sm font-bold transition-opacity hover:opacity-90"
             style={{ backgroundColor: poolConfig.accentColor }}
           >
             {navCtaLabel}
@@ -389,23 +389,23 @@ export default function BrandedLandingClient({
       {/* HERO */}
       <section className="relative overflow-hidden text-white" style={{ background: poolConfig.primaryGradient }}>
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/[0.03] rounded-full" />
-          <div className="absolute top-1/3 -right-16 w-56 h-56 bg-white/[0.03] rounded-full" />
-          <div className="absolute -bottom-12 left-1/4 w-40 h-40 bg-white/[0.03] rounded-full" />
+          <div className="absolute -top-20 -left-20 w-72 h-72 bg-white/[0.03] rounded-pill" />
+          <div className="absolute top-1/3 -right-16 w-56 h-56 bg-white/[0.03] rounded-pill" />
+          <div className="absolute -bottom-12 left-1/4 w-40 h-40 bg-white/[0.03] rounded-pill" />
         </div>
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 text-sm font-semibold mb-6" style={{ color: poolConfig.accentColorLight }}>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-pill bg-white/10 text-sm font-semibold mb-6" style={{ color: poolConfig.accentColorLight }}>
             {!isPre && <span className="relative flex h-2 w-2">
-              {isLive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: poolConfig.accentColor }} />}
-              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: poolConfig.accentColor }} />
+              {isLive && <span className="animate-ping absolute inline-flex h-full w-full rounded-pill opacity-75" style={{ backgroundColor: poolConfig.accentColor }} />}
+              <span className="relative inline-flex rounded-pill h-2 w-2" style={{ backgroundColor: poolConfig.accentColor }} />
             </span>}
             <span>&#9917;</span> {stageBadgeLabel}
           </div>
 
           {poolConfig.logoUrl && (
             <div className="flex justify-center mb-6">
-              <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shadow-lg" />
+              <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-20 h-20 sm:w-24 sm:h-24 rounded-card object-cover shadow-lg" />
             </div>
           )}
 
@@ -422,7 +422,7 @@ export default function BrandedLandingClient({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={primaryCtaAction}
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-xl text-white font-bold text-lg transition-colors"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-control text-white font-bold text-lg transition-colors"
               style={{ backgroundColor: poolConfig.accentColor }}
             >
               {primaryCtaLabel}
@@ -430,7 +430,7 @@ export default function BrandedLandingClient({
             {!isPre && (
               <Link
                 href={`/tv/${poolConfig.slug}`}
-                className="inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-semibold text-base text-white/70 hover:text-white border border-white/20 transition-colors"
+                className="inline-flex items-center justify-center px-6 py-3.5 rounded-control font-semibold text-base text-white/70 hover:text-white border border-white/20 transition-colors"
               >
                 Open TV board &rarr;
               </Link>
@@ -452,7 +452,7 @@ export default function BrandedLandingClient({
       {isPre && (
         <section className="py-8 sm:py-10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-3">World Cup kicks off in</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted mb-3">World Cup kicks off in</p>
             <Countdown targetMs={countdownTarget} accentColor={poolConfig.accentColor} primaryColor={poolConfig.primaryColor} />
           </div>
         </section>
@@ -461,30 +461,30 @@ export default function BrandedLandingClient({
       {isLive && nextMatch && (
         <section className="py-8 sm:py-10">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-neutral-100 shadow-sm bg-white overflow-hidden">
+            <div className="rounded-card border border-border-subtle shadow-sm bg-white overflow-hidden">
               <div className="px-5 py-2.5 flex items-center justify-between" style={{ backgroundColor: `${poolConfig.accentColor}14` }}>
                 <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest" style={{ color: poolConfig.primaryColor }}>
                   {nextMatch.isLiveNow ? (
-                    <><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" /></span> Live now</>
+                    <><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-500 opacity-75" /><span className="relative inline-flex rounded-pill h-2 w-2 bg-danger-500" /></span> Live now</>
                   ) : (
                     <>Next up &middot; {nextMatch.stageLabel}</>
                   )}
                 </span>
-                <span className="text-xs font-medium text-neutral-400">{completed} of {total} matches played</span>
+                <span className="text-xs font-medium text-muted">{completed} of {total} matches played</span>
               </div>
               <div className="px-5 py-5 flex items-center justify-center gap-3">
                 <TeamSide name={nextMatch.homeTeam} flag={nextMatch.homeFlag} side="home" />
-                <span className="text-lg sm:text-xl font-black text-neutral-900 tabular-nums shrink-0 px-1">
+                <span className="text-lg sm:text-xl font-black text-ink tabular-nums shrink-0 px-1">
                   {nextMatch.homeScore} - {nextMatch.awayScore}
                 </span>
                 <TeamSide name={nextMatch.awayTeam} flag={nextMatch.awayFlag} side="away" />
               </div>
               <div className="px-5 pb-5 flex flex-col items-center">
                 {nextMatch.isLiveNow ? (
-                  <span className="text-sm font-bold text-red-500">Match in progress &mdash; follow the live board</span>
+                  <span className="text-sm font-bold text-danger-500">Match in progress &mdash; follow the live board</span>
                 ) : (
                   <>
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted mb-3">
                       {nextMatch.stageLabel} kicks off in
                     </p>
                     <Countdown targetMs={countdownTarget} accentColor={poolConfig.accentColor} primaryColor={poolConfig.primaryColor} />
@@ -499,13 +499,15 @@ export default function BrandedLandingClient({
       {isComplete && (
         <section className="py-10">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div className="inline-flex flex-col items-center gap-2 px-8 py-6 rounded-2xl border border-neutral-100 shadow-sm bg-white">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Tournament complete &middot; Champions</span>
+            <div className="inline-flex flex-col items-center gap-2 px-8 py-6 rounded-card border border-border-subtle shadow-sm bg-white">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">Tournament complete &middot; Champions</span>
               <div className="flex items-center gap-3 mt-1">
                 {champion?.flag ? (
-                  <img src={champion.flag} alt={champion.name} className="w-9 h-6 rounded-sm object-cover shadow-sm" />
+                  <img src={champion.flag} alt={champion.name} className="w-9 h-6 rounded-inset object-cover shadow-sm" />
                 ) : (
-                  <span className="text-3xl">&#127942;</span>
+                  <span className="text-accent-500">
+                    <Icon name="trophy.fill" size={30} weight="semibold" />
+                  </span>
                 )}
                 <span className="text-2xl font-black" style={{ color: poolConfig.primaryColor }}>{champion?.name ?? 'Champions'}</span>
               </div>
@@ -540,25 +542,25 @@ export default function BrandedLandingClient({
       {/* PRIZES */}
       <section id="prizes" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-neutral-900 mb-3">Prizes</h2>
-          <p className="text-center text-neutral-500 mb-10 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold text-center text-ink mb-3">Prizes</h2>
+          <p className="text-center text-muted mb-10 max-w-xl mx-auto">
             Compete for prizes sponsored by {poolConfig.brandName}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
             {poolConfig.prizes.map((item) => (
-              <div key={item.place} className={`bg-white rounded-2xl border ${item.border} p-6 text-center shadow-sm`}>
+              <div key={item.place} className={`bg-white rounded-card border ${item.border} p-6 text-center shadow-sm`}>
                 <div className="text-4xl mb-3">{item.icon}</div>
-                <div className={`inline-block px-3 py-1 rounded-full bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
+                <div className={`inline-block px-3 py-1 rounded-pill bg-gradient-to-r ${item.color} text-white text-xs font-bold mb-3`}>
                   {item.place}
                 </div>
-                <p className="text-lg font-bold text-neutral-900">{item.prize}</p>
+                <p className="text-lg font-bold text-ink">{item.prize}</p>
               </div>
             ))}
           </div>
 
           {poolConfig.prizes.every((p) => p.prize === 'TBD') && (
-            <p className="text-center text-sm text-neutral-400 mt-6">
+            <p className="text-center text-sm text-muted mt-6">
               Prizes will be announced before the tournament starts
             </p>
           )}
@@ -566,15 +568,15 @@ export default function BrandedLandingClient({
       </section>
 
       {/* JOIN / CTA */}
-      <section id="join" className="py-16 sm:py-20 bg-neutral-50">
+      <section id="join" className="py-16 sm:py-20 bg-snow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden">
+          <div className="max-w-lg mx-auto bg-white rounded-card shadow-md border border-border-subtle overflow-hidden">
             <div className="px-6 py-8 text-center text-white relative overflow-hidden" style={{ background: poolConfig.primaryGradient }}>
-              <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-white/[0.04]" />
-              <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-white/[0.04]" />
+              <div className="absolute -top-10 -left-10 w-32 h-32 rounded-pill bg-white/[0.04]" />
+              <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-pill bg-white/[0.04]" />
               <div className="relative z-10">
                 {poolConfig.logoUrl && (
-                  <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-14 h-14 rounded-2xl object-cover mx-auto mb-3" />
+                  <img src={poolConfig.logoUrl} alt={poolConfig.brandName} className="w-14 h-14 rounded-card object-cover mx-auto mb-3" />
                 )}
                 <h3 className="text-xl font-bold">{isPre ? 'Ready to Join?' : isComplete ? 'See the Final Standings' : 'Follow the Race'}</h3>
                 <p className="text-sm mt-1" style={{ color: `${poolConfig.accentColorLight}99` }}>
@@ -584,7 +586,7 @@ export default function BrandedLandingClient({
             </div>
 
             <div className="px-6 py-6 space-y-5">
-              <div className="flex items-center justify-center gap-4 text-sm text-neutral-500">
+              <div className="flex items-center justify-center gap-4 text-sm text-muted">
                 <span className="flex items-center gap-1.5">
                   <Icon name="person.3.fill" size={16} />
                   {poolConfig.memberCount} member{poolConfig.memberCount !== 1 ? 's' : ''}
@@ -593,14 +595,14 @@ export default function BrandedLandingClient({
                   <Icon name="tag" size={16} />
                   {poolConfig.mode}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${poolConfig.accentColor}20`, color: poolConfig.accentColor }}>
+                <span className="text-xs px-2 py-0.5 rounded-pill font-bold" style={{ backgroundColor: `${poolConfig.accentColor}20`, color: poolConfig.accentColor }}>
                   {isLive ? 'Live' : isComplete ? 'Final' : poolStatusDisplay({ status: poolConfig.status }).label}
                 </span>
               </div>
 
               <button
                 onClick={primaryCtaAction}
-                className="w-full py-3 rounded-xl text-white font-bold text-base transition-colors"
+                className="w-full py-3 rounded-control text-white font-bold text-base transition-colors"
                 style={{ backgroundColor: poolConfig.accentColor }}
               >
                 {isPre ? 'Join Pool' : 'View Live Standings'}
@@ -611,10 +613,10 @@ export default function BrandedLandingClient({
       </section>
 
       {/* FOOTER */}
-      <footer className="py-8 border-t border-neutral-100">
+      <footer className="py-8 border-t border-border-subtle">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-neutral-400">
-            Powered by <span className="font-semibold text-neutral-500">SportPool</span>
+          <p className="text-sm text-muted">
+            Powered by <span className="font-semibold text-muted">SportPool</span>
           </p>
         </div>
       </footer>
