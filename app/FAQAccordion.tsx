@@ -3,41 +3,51 @@
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 
+/**
+ * Written for the person deciding whether to run a pool, because that is who
+ * the landing page is for — invited players arrive at /join/[pool_code] instead.
+ *
+ * Nothing here names a specific tournament or date. The entry this replaced
+ * ("When does the 2026 World Cup start?" — "starts on June 11, 2026 and runs
+ * through July 19") was still answering in the present tense weeks after the
+ * final, because a fixed date in copy has no way to notice it has passed. What
+ * competition is running belongs in app/competitions.ts, which the hero renders.
+ */
 const faqs = [
   {
     question: 'Is SportPool free?',
     answer:
-      'Yes! SportPool is completely free to use. Create unlimited pools and invite as many friends as you want.',
+      'Yes. Unlimited pools, as many people in each as you want, no card needed.',
   },
   {
-    question: 'When does the 2026 World Cup start?',
+    question: 'How long does it take to set a pool up?',
     answer:
-      'The FIFA World Cup 2026 starts on June 11, 2026 and runs through July 19, 2026. It will be hosted across the United States, Canada, and Mexico.',
+      'About a minute. Name it, choose a format, and share the join link. Scoring ships with sensible defaults, so you only change the rules you actually care about.',
   },
   {
-    question: 'How does scoring work?',
+    question: 'Can I decide how scoring works?',
     answer:
-      'Pool admins can customize scoring rules. Typically, you earn points for exact scores, correct goal differences, and correct match results. Knockout rounds have multipliers for higher stakes.',
+      'Yes, and it is the main thing you control. Set what an exact score, a correct goal difference and a correct result are each worth, and add multipliers for the rounds that should carry more weight. Change it any time before the deadline and every score recalculates.',
   },
   {
-    question: 'Can I join multiple pools?',
+    question: 'What formats can I run?',
     answer:
-      'Absolutely! You can join as many pools as you want with a single account.',
+      'A full-tournament pool where everything is predicted up front, a progressive pool that unlocks round by round, or a bracket-only pick’em for people who just want to call the winners.',
   },
   {
-    question: 'When is the prediction deadline?',
+    question: 'How do people join my pool?',
     answer:
-      'Each pool admin sets their own prediction deadline, usually before the tournament starts.',
+      'You share one link or a short pool code. They create an account and they are in — on the web or in the app. You never have to chase anyone through a spreadsheet.',
   },
   {
-    question: 'What happens if I miss the deadline?',
+    question: 'Do I have to keep it updated during the season?',
     answer:
-      'You can still view the pool and leaderboard, but you won\'t be able to submit or edit predictions after the deadline.',
+      'No. Results come in automatically and scores update as matches finish, so the leaderboard moves without you touching it.',
   },
   {
-    question: 'Can I change my predictions?',
+    question: 'What happens when someone misses the deadline?',
     answer:
-      'Yes, you can edit your predictions any time before the pool\'s deadline.',
+      'They can still watch the pool and the leaderboard, they just cannot submit or edit predictions for matches that have kicked off. Everything before the deadline stays editable.',
   },
 ]
 

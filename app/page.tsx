@@ -1,210 +1,221 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { JsonLd } from '@/components/JsonLd'
 import { FAQAccordion } from './FAQAccordion'
+import { LiveBoard } from './LiveBoard'
+import { COMPETITIONS, type Competition } from './competitions'
 
-const features = [
+/**
+ * The landing page has exactly one job: turn someone into a commissioner.
+ *
+ * Invited players never arrive here — they land on /join/[pool_code] with a code
+ * already in hand — so there is deliberately no join path on this page. The only
+ * visitor it has to convert is someone deciding whether to *run* a pool, which is
+ * also the number the product is measured by: repeat commissioners.
+ *
+ * That decides the content. The four feature tiles this replaced ("Pool Chat &
+ * Reactions", "Live Rankings & Points") described the product to nobody in
+ * particular. What follows answers a commissioner's questions in the order they
+ * ask them: what can I run, what will my group actually look at, how long does
+ * this take me, and what do I control.
+ */
+
+// Setup facts, not feature names. Each is something a commissioner is weighing
+// before they commit their group to this rather than a spreadsheet.
+const SETUP = [
   {
-    icon: '➕',
-    title: 'Create Your Pool in Minutes',
-    description:
-      'Set up your World Cup pool in seconds. Customize scoring rules, invite friends, and start predicting.',
+    icon: 'bolt.fill',
+    title: 'Under a minute to open',
+    body: 'Name it, pick a format, done. Scoring has working defaults, so you only touch the rules you actually care about.',
   },
   {
-    icon: '🗂️',
-    title: 'Multiple Pool Formats',
-    description:
-      'Run a full-tournament pool, a round-by-round progressive pool, or a quick bracket-only pick’em.',
+    icon: 'slider.horizontal.3',
+    title: 'Scoring you control',
+    body: 'Points for exact scores, goal difference and results, with round multipliers for the stages that matter. Change it before the deadline and everything recalculates.',
   },
   {
-    icon: '🏆',
-    title: 'Live Rankings & Points',
-    description:
-      'Track your performance with automatic point calculation and live leaderboard updates.',
-  },
-  {
-    icon: '💬',
-    title: 'Pool Chat & Reactions',
-    description:
-      'Talk trash, react with emoji, pin the big calls, and @mention your friends in every pool.',
+    icon: 'person.2.fill',
+    title: 'One link for your group',
+    body: 'Share a code. They join in a click, on web or the app — no spreadsheet to maintain and nobody chasing predictions in a group chat.',
   },
 ]
 
-const steps = [
-  {
-    number: '1',
-    title: 'Create Your Pool',
-    description:
-      'Sign up and create a pool for the 2026 World Cup. Set your scoring rules and pool settings.',
-  },
-  {
-    number: '2',
-    title: 'Invite Friends',
-    description:
-      'Share your unique pool code with friends, family, or coworkers. They join with one click.',
-  },
-  {
-    number: '3',
-    title: 'Predict, Chat & Compete',
-    description:
-      'Submit predictions before the deadline, chat with friends in every pool, and watch rankings update live as results come in.',
-  },
-]
+function CompetitionCard({ c }: { c: Competition }) {
+  const isComplete = c.state === 'complete'
+  return (
+    <Link
+      href={c.href}
+      className={`group flex flex-col gap-3 rounded-card border bg-surface p-5 shadow-card transition-shadow hover:shadow-card-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 ${
+        isComplete ? 'border-border-subtle' : 'border-border-default'
+      }`}
+    >
+      <span
+        className="h-1 w-9 rounded-pill"
+        style={{ background: `linear-gradient(90deg, ${c.stripe[0]}, ${c.stripe[1]})` }}
+        aria-hidden
+      />
+      <div className="flex flex-col gap-0.5">
+        <span className="t-card-title text-ink">{c.name}</span>
+        <span className="t-caption text-muted">{c.edition}</span>
+      </div>
+      <p className="t-body text-muted">{c.status}</p>
+      <span className={`t-caption inline-flex items-center gap-1.5 ${isComplete ? 'text-muted' : 'text-primary-600'}`}>
+        {c.cta}
+        <Icon name="arrow.up.right" size={11} weight="bold" />
+      </span>
+    </Link>
+  )
+}
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-snow">
       <JsonLd data={{
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "SportPool",
         "url": "https://sportpool.io",
-        "description": "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+        "description": "Run a prediction pool for your group. Set the scoring, share one link, and watch the leaderboard move as results come in.",
         "applicationCategory": "SportsApplication",
         "operatingSystem": "Web",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "author": { "@type": "Organization", "name": "SportPool", "url": "https://sportpool.io" },
       }} />
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-neutral-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-border-subtle">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="text-xl font-bold text-neutral-900">
-              SportPool
+            <Link href="/" className="text-xl font-black tracking-tight text-ink">
+              Sport<span className="text-primary-600">Pool</span>
             </Link>
             <div className="flex items-center gap-3">
-              <Button href="/login" variant="outline" size="sm">
-                Log In
-              </Button>
-              <Button href="/signup" size="sm">
-                Sign Up
-              </Button>
+              <Button href="/login" variant="ghost" size="sm">Log In</Button>
+              <Button href="/signup" size="sm">Sign Up</Button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" aria-hidden="true" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-32 lg:py-40">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight">
-              Create Your FIFA World Cup 2026 Prediction Pool
+      {/* ---- Hero: which competition, not which tournament ------------------
+          The headline is a question because the rail below answers it. The old
+          hero named one tournament, which is how the page ended up advertising
+          a World Cup that had already finished. */}
+      <section className="py-14 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl">
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-ink text-balance">
+              Which one is your group watching?
             </h1>
-            <p className="mt-6 text-lg sm:text-xl text-primary-100 dark:text-white/60 max-w-2xl mx-auto">
-              Compete with friends, chat between matches, predict results, and
-              climb the leaderboard. The ultimate way to experience the World Cup.
+            <p className="mt-4 text-lg text-muted max-w-xl">
+              Start a prediction pool for it. You set the scoring, share one link, and
+              the leaderboard does the rest.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-              <Button href="/signup" variant="green" size="lg" className="text-lg px-8 py-4">
-                Get Started &mdash; Free
-              </Button>
-              <a
-                href="#features"
-                className="inline-flex items-center justify-center rounded-xl px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 hover:bg-white/10 transition"
-              >
-                Learn More ↓
-              </a>
+          </div>
+
+          <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {COMPETITIONS.map((c) => <CompetitionCard key={c.key} c={c} />)}
+            <div className="flex flex-col justify-center gap-2 rounded-card border border-dashed border-border-default p-5">
+              <span className="t-card-title text-ink">More on the way</span>
+              <p className="t-body text-muted">
+                We&apos;re adding competitions as their seasons come round.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-9 flex flex-col sm:flex-row gap-3">
+            <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
+            <Button href="/play/demo" variant="outline" size="lg">Look around a pool first</Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- The board -------------------------------------------------------
+          The product, on the page. See LiveBoard for why it is demo data only. */}
+      <section className="py-14 sm:py-20 bg-surface border-y border-border-subtle">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <div>
+              <p className="t-caption text-muted">What your group stares at</p>
+              <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
+                The table moves while they&apos;re watching
+              </h2>
+              <p className="mt-4 text-lg text-muted">
+                Predictions score as results come in, so standings shift mid-match. That
+                swing is the part people turn up for — and the part they argue about in
+                the pool chat straight after.
+              </p>
+              <ul className="mt-6 flex flex-col gap-3">
+                {[
+                  'Exact scores, goal difference and results, each worth what you decide',
+                  'Form, movement and awards on every row',
+                  'Group chat, reactions and @mentions inside each pool',
+                ].map((line) => (
+                  <li key={line} className="flex items-start gap-2.5 text-muted">
+                    <span className="mt-0.5 text-primary-600 shrink-0">
+                      <Icon name="checkmark" size={15} weight="bold" />
+                    </span>
+                    <span className="t-body">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex lg:justify-end">
+              <LiveBoard />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-16 sm:py-24 bg-surface-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900">
-              Everything You Need for the Perfect Pool
-            </h2>
-            <p className="mt-4 text-lg text-neutral-700 max-w-2xl mx-auto">
-              From pool creation to live leaderboards, we&apos;ve got you covered.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="bg-surface rounded-2xl p-6 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow"
-              >
-                <div className="text-4xl mb-4">{feature.icon}</div>
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-neutral-700 text-sm leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-16 sm:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900">
-              Get Started in 3 Simple Steps
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
-            {/* Connecting line (desktop only) */}
-            <div className="hidden md:block absolute top-6 left-[calc(100%/6)] right-[calc(100%/6)] h-0.5 bg-primary-200" />
-            {steps.map((step) => (
-              <div key={step.number} className="relative text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-600 text-white text-xl font-bold mb-4 relative z-10">
-                  {step.number}
-                </div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-neutral-700 leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="py-16 sm:py-24 bg-gradient-to-r from-primary-600 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Ready to Start Your Pool?
+      {/* ---- Running one ---------------------------------------------------- */}
+      <section className="py-14 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
+            Running it shouldn&apos;t be a second job
           </h2>
-          <p className="text-lg text-primary-100 dark:text-white/60 mb-8 max-w-2xl mx-auto">
-            Join fans around the world predicting the FIFA World Cup 2026.
-            Setting up your pool takes less than a minute.
-          </p>
-          <Button href="/signup" variant="green" size="lg" className="text-lg px-10 py-4">
-            Create Your Pool &mdash; Free
-          </Button>
+          <div className="mt-9 grid grid-cols-1 md:grid-cols-3 gap-5">
+            {SETUP.map((s) => (
+              <div key={s.title} className="flex flex-col gap-3 rounded-card bg-surface border border-border-subtle p-6 shadow-card">
+                <span className="inline-flex items-center justify-center w-11 h-11 rounded-chip bg-primary-600/10 text-primary-600">
+                  <Icon name={s.icon} size={21} weight="semibold" />
+                </span>
+                <h3 className="t-card-title text-ink">{s.title}</h3>
+                <p className="t-body text-muted">{s.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 sm:py-24 bg-surface-secondary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900">
-              Frequently Asked Questions
-            </h2>
+      <section className="py-14 sm:py-20 bg-surface border-y border-border-subtle">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
+            Get your group in before the season does
+          </h2>
+          <p className="mt-4 text-lg text-muted">
+            Free, unlimited pools, as many people as you want in each one.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
           </div>
-          <FAQAccordion />
+        </div>
+      </section>
+
+      <section className="py-14 sm:py-20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-center text-balance">
+            Questions commissioners ask
+          </h2>
+          <div className="mt-9">
+            <FAQAccordion />
+          </div>
           <div className="text-center mt-8">
-            <Link
-              href="/faq"
-              className="text-primary-600 hover:text-primary-700 font-medium transition"
-            >
+            <Link href="/faq" className="t-body font-semibold text-primary-600 hover:text-primary-700 transition">
               View all FAQs &rarr;
             </Link>
           </div>
         </div>
       </section>
-
     </div>
   )
 }

@@ -39,10 +39,13 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://sportpool.io"),
   title: {
-    default: "SportPool - FIFA World Cup 2026 Prediction Pool",
+    default: "SportPool - Prediction Pools for You and Your Group",
     template: "%s | SportPool",
   },
-  description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+  // Deliberately names no tournament. This said "FIFA World Cup 2026" for weeks
+  // after the final, which is what Google and every shared link kept showing.
+  // What is actually running belongs in app/competitions.ts, not in metadata.
+  description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192x192.png",
@@ -58,20 +61,20 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://sportpool.io",
     siteName: "SportPool",
-    title: "SportPool - FIFA World Cup 2026 Prediction Pool",
-    description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "SportPool - FIFA World Cup 2026 Prediction Pool" }],
+    title: "SportPool - Prediction Pools for You and Your Group",
+    description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "SportPool - Prediction Pools for You and Your Group" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SportPool - FIFA World Cup 2026 Prediction Pool",
-    description: "Create your FIFA World Cup 2026 prediction pool. Compete with friends, predict match results, and climb the leaderboard.",
+    title: "SportPool - Prediction Pools for You and Your Group",
+    description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
     images: ["/og-image.png"],
   },
   verification: {
     google: "googlebbdfb25f2108115e",
   },
-  keywords: ["FIFA World Cup 2026", "prediction pool", "World Cup pool", "soccer predictions", "football predictions", "World Cup 2026 bracket", "free prediction pool"],
+  keywords: ["prediction pool", "pick'em league", "office pool", "football predictions", "soccer predictions", "Premier League pool", "free prediction pool"],
 };
 
 export default function RootLayout({
