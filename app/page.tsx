@@ -42,8 +42,20 @@ const SETUP = [
 ]
 
 export default function Home() {
+  /*
+   * dark-scope: the WHOLE landing page renders dark, in either colour mode.
+   *
+   * It can't simply take a dark background — the ramp inverts, so in light mode
+   * `text-ink` resolves to #1B2340 and every word here would be navy on navy.
+   * The class re-declares the dark token values for this subtree. See
+   * globals.css.
+   *
+   * The snow/surface alternation between sections still does its job: dark mode
+   * has its own pair (#121520 page, #1C2030 raised), so the bands read exactly
+   * as they do in light mode, one step apart.
+   */
   return (
-    <div className="min-h-screen bg-snow">
+    <div className="dark-scope min-h-screen bg-snow">
       <JsonLd data={{
         "@context": "https://schema.org",
         "@type": "WebApplication",
@@ -56,10 +68,6 @@ export default function Home() {
         "author": { "@type": "Organization", "name": "SportPool", "url": "https://sportpool.io" },
       }} />
 
-      {/* dark-scope: nav and hero render dark in EITHER colour mode. Without it
-          the ramp inverts and every word here would be #1B2340 navy on a navy
-          band. See globals.css. */}
-      <div className="dark-scope bg-snow">
       {/* No bottom border: nav and hero are one dark band now, and a rule
           between them just draws a seam across it. Once scrolled, the nav still
           separates from the light sections below on its own — the colour step
@@ -120,7 +128,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      </div>
 
       {/* ---- Competitions ----------------------------------------------------
           A plain strip, deliberately not links. It answers "will you cover the
