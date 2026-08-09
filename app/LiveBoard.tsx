@@ -25,16 +25,40 @@ import { PODIUM } from './play/demo/mockData'
  * The header says "sample pool" so nobody wonders whose standings these are.
  */
 
-type Row = { name: string; points: number }
+type Row = { name: string; points: number; form: string[] }
 
-const BASE: Row[] = PODIUM.slice(0, 3).map((p) => ({ name: p.name, points: p.points }))
+/**
+ * The demo data ships its own colour map, but it's stock Tailwind
+ * (`bg-amber-400` and friends). The product's leaderboard colours form by
+ * prediction tier, so map onto those tokens instead — the dots here should be
+ * the ones people actually meet inside a pool.
+ */
+const DOT: Record<string, string> = {
+  exact: 'bg-tier-exact',
+  gd: 'bg-tier-winner-gd',
+  correct: 'bg-tier-winner',
+  miss: 'bg-tier-miss',
+}
 
-// JohnnyB called this one, so the goal is what puts him top. The points he
-// gains are the swing; everyone else holds station.
+const FORM_LEN = 4
+
+const BASE: Row[] = PODIUM.slice(0, 3).map((p) => ({
+  name: p.name,
+  points: p.points,
+  form: (p.form ?? []).slice(-FORM_LEN),
+}))
+
+// JohnnyB called this one, so the goal is what puts him top. It lands on his
+// form too — a gold "exact" dot arrives and the oldest rolls off — which is
+// what explains the points. Everyone else holds station.
 const AFTER: Row[] = [
-  { name: BASE[1].name, points: BASE[0].points + 7 },
-  { name: BASE[0].name, points: BASE[0].points },
-  { name: BASE[2].name, points: BASE[2].points },
+  {
+    ...BASE[1],
+    points: BASE[0].points + 7,
+    form: [...BASE[1].form.slice(1), 'exact'],
+  },
+  BASE[0],
+  BASE[2],
 ]
 
 const ROW_H = 44
@@ -128,25 +152,57 @@ export function LiveBoard() {
           {BASE.map((row) => {
             const slot = order.findIndex((r) => r.name === row.name)
             const data = order[slot]
-            const climbed = moved && slot === 0 && row.name !== BASE[0].name
+            // Derived by comparing where the row started to where it sits now,
+            // rather than special-casing the climber. That way the row being
+            // overtaken shows its drop too — a swing has two halves, and only
+            // showing the winner's tells half the story.
+            const move = BASE.findIndex((r) => r.name === row.name) - slot
             return (
               <div
                 key={row.name}
-                className={`absolute inset-x-0 flex items-center gap-3 px-4 transition-[transform,background-color] duration-500 ease-out motion-reduce:transition-none ${
-                  climbed ? 'bg-success-500/10' : ''
+                className={`absolute inset-x-0 flex items-center gap-2.5 px-4 transition-[transform,background-color] duration-500 ease-out motion-reduce:transition-none ${
+                  move > 0 ? 'bg-success-500/10' : ''
                 }`}
                 style={{ height: ROW_H, transform: `translateY(${slot * ROW_H}px)` }}
               >
                 <span className="t-num text-sm text-muted w-4">{slot + 1}</span>
+
+                {/* Its own fixed-width column beside the rank. Reserving the
+                    space means nothing on the row shifts sideways when a
+                    chevron appears — the only thing that should be moving at
+                    that moment is the row itself. */}
+                <span className="w-3 shrink-0 flex justify-center" aria-hidden>
+                  {move !== 0 && (
+                    <Icon
+                      name={move > 0 ? 'arrow.up' : 'arrow.down'}
+                      size={11}
+                      weight="bold"
+                      className={move > 0 ? 'text-success-500' : 'text-danger-500'}
+                    />
+                  )}
+                </span>
+
                 <span className="flex-1 min-w-0 truncate text-sm font-semibold text-ink">
                   {row.name}
                 </span>
-                {climbed && (
-                  <span className="text-success-500 inline-flex items-center" aria-hidden>
-                    <Icon name="arrow.up" size={12} weight="bold" />
+
+                {/* Decorative: the tier each colour encodes is explained inside
+                    the app, and reading four colours aloud would tell a
+                    screen-reader user nothing useful. The label is the part
+                    worth having — a bare row of dots is a puzzle. */}
+                <span className="hidden sm:flex items-center gap-1.5" aria-hidden>
+                  <span className="t-caption text-muted">Form</span>
+                  <span className="flex items-center gap-1">
+                    {data.form.map((f, i) => (
+                      <span
+                        key={`${f}-${i}`}
+                        className={`w-1.5 h-1.5 rounded-pill ${DOT[f] ?? 'bg-tier-miss'}`}
+                      />
+                    ))}
                   </span>
-                )}
-                <span className="t-num text-sm text-ink">{data.points}</span>
+                </span>
+
+                <span className="t-num text-sm text-ink w-9 text-right">{data.points}</span>
               </div>
             )
           })}
