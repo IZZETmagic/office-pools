@@ -1,67 +1,46 @@
 /**
- * What the landing page's hero rail offers.
+ * The competitions strip on the landing page.
  *
- * This is a list, not prose, because the old hero hard-coded a single
- * tournament into its headline and FAQ — so when the World Cup finished on
- * 16 Jul 2026 the page carried on inviting people to predict it, in the present
- * tense, for weeks. A season ending should change a `state` here, not require
- * someone to notice and rewrite copy.
+ * A list, not prose, because the old hero hard-coded a single tournament into
+ * its headline and FAQ — so when the World Cup finished on 16 Jul 2026 the page
+ * carried on inviting people to predict it, in the present tense, for weeks. A
+ * season ending should change a `status` here, not require somebody to notice
+ * stale copy and rewrite it.
  *
- * `state` drives everything the card renders:
+ * Nothing in this strip is a link, deliberately. It sits below the hero and
+ * answers "will you cover the thing I care about" — a question people ask once
+ * they know what the product is. Routing a stranger from a marketing page into
+ * a real pool would also expose members who never agreed to that; the
+ * /play/[slug] pages show real boards only because those pools opted in.
  *
- *   open      — taking pools now; the card is the primary call to action
- *   upcoming  — announced, but pools can't be created yet
- *   complete  — finished; kept as proof the thing works, not as an invitation
- *
- * Premier League is deliberately `upcoming` rather than `open`. Ingestion is
- * live (migration 024 + importLeagueSeason.ts), but the scoring engine still
- * decides stage by `stage === 'group'` (lib/scoring/core.ts), and the importer
- * writes REGULAR_SEASON_STAGE — so every league match takes the knockout path,
- * fails the bracket-team check that path requires, and scores zero. Silently.
- * Sending commissioners at that is worse than making them wait, so the card
- * collects interest instead. Flip this one field when league scoring lands.
+ * Premier League says "coming soon" rather than taking pools. Ingestion is live
+ * (migration 024 + importLeagueSeason.ts), but the scoring engine decides stage
+ * by `stage === 'group'` (lib/scoring/core.ts) while the importer writes
+ * REGULAR_SEASON_STAGE — so every league match takes the knockout path, fails
+ * the bracket-team check that path requires, and scores zero. Silently. Update
+ * the status when league scoring lands.
  */
 export type CompetitionState = 'open' | 'upcoming' | 'complete'
 
 export type Competition = {
   key: string
   name: string
-  /** Season or edition, e.g. "2026/27". Shown next to the name. */
-  edition: string
   state: CompetitionState
-  /** Short status line — what a commissioner needs to know right now. */
+  /** Short status line. This is all a visitor gets — the strip has no links. */
   status: string
-  cta: string
-  href: string
   /** Two-stop gradient for the card's mode stripe, mirroring PoolListItem. */
   stripe: [string, string]
 }
 
 export const COMPETITIONS: Competition[] = [
-  {
-    key: 'premier-league',
-    name: 'Premier League',
-    edition: '2026/27',
-    state: 'upcoming',
-    status: 'Season starts this month',
-    cta: 'Tell me when it opens',
-    href: '/contact?about=premier-league',
-    stripe: ['#667EEA', '#3B6EFF'],
-  },
-  {
-    key: 'world-cup-2026',
-    name: 'FIFA World Cup',
-    edition: '2026',
-    state: 'complete',
-    status: 'Complete · 104 matches played',
-    cta: 'See how it played out',
-    href: '/play/demo',
-    stripe: ['#F5C518', '#CD7F32'],
-  },
+  { key: 'premier-league', name: 'Premier League', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#667EEA', '#3B6EFF'] },
+  { key: 'world-cup-2026', name: 'FIFA World Cup', state: 'complete',
+    status: '2026 · complete', stripe: ['#F5C518', '#CD7F32'] },
+  { key: 'champions-league', name: 'Champions League', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#34D399', '#059669'] },
+  { key: 'six-nations', name: 'Six Nations', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#F97362', '#EF4444'] },
+  { key: 'nfl', name: 'NFL', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#A78BFA', '#7C3AED'] },
 ]
-
-/** The one a visitor should act on, if any. */
-export function primaryCompetition(): Competition | undefined {
-  return COMPETITIONS.find((c) => c.state === 'open')
-    ?? COMPETITIONS.find((c) => c.state === 'upcoming')
-}

@@ -4,7 +4,7 @@ import { Icon } from '@/components/ui/Icon'
 import { JsonLd } from '@/components/JsonLd'
 import { FAQAccordion } from './FAQAccordion'
 import { LiveBoard } from './LiveBoard'
-import { COMPETITIONS, type Competition } from './competitions'
+import { COMPETITIONS } from './competitions'
 
 /**
  * The landing page has exactly one job: turn someone into a commissioner.
@@ -41,33 +41,6 @@ const SETUP = [
   },
 ]
 
-function CompetitionCard({ c }: { c: Competition }) {
-  const isComplete = c.state === 'complete'
-  return (
-    <Link
-      href={c.href}
-      className={`group flex flex-col gap-3 rounded-card border bg-surface p-5 shadow-card transition-shadow hover:shadow-card-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 ${
-        isComplete ? 'border-border-subtle' : 'border-border-default'
-      }`}
-    >
-      <span
-        className="h-1 w-9 rounded-pill"
-        style={{ background: `linear-gradient(90deg, ${c.stripe[0]}, ${c.stripe[1]})` }}
-        aria-hidden
-      />
-      <div className="flex flex-col gap-0.5">
-        <span className="t-card-title text-ink">{c.name}</span>
-        <span className="t-caption text-muted">{c.edition}</span>
-      </div>
-      <p className="t-body text-muted">{c.status}</p>
-      <span className={`t-caption inline-flex items-center gap-1.5 ${isComplete ? 'text-muted' : 'text-primary-600'}`}>
-        {c.cta}
-        <Icon name="arrow.up.right" size={11} weight="bold" />
-      </span>
-    </Link>
-  )
-}
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-snow">
@@ -97,75 +70,75 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* ---- Hero: which competition, not which tournament ------------------
-          The headline is a question because the rail below answers it. The old
-          hero named one tournament, which is how the page ended up advertising
-          a World Cup that had already finished. */}
-      <section className="py-14 sm:py-20">
+      {/* ---- Hero -----------------------------------------------------------
+          Statement left, the board right. The headline is the product's whole
+          argument in two lines: everyone has a view, and only the table settles
+          it. The old hero opened with "which competition?" — a question people
+          ask after they know what this is, not before, which is why the rail
+          now sits below rather than above. */}
+      <section className="pt-10 pb-14 sm:pt-16 sm:pb-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-ink text-balance">
-              Which one is your group watching?
-            </h1>
-            <p className="mt-4 text-lg text-muted max-w-xl">
-              Start a prediction pool for it. You set the scoring, share one link, and
-              the leaderboard does the rest.
-            </p>
-          </div>
-
-          <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {COMPETITIONS.map((c) => <CompetitionCard key={c.key} c={c} />)}
-            <div className="flex flex-col gap-3 rounded-card border border-dashed border-border-default p-5">
-              {/* Occupies the stripe's row so this card's title lands on the
-                  same baseline as its siblings' rather than 5px below. */}
-              <span className="h-1 w-9" aria-hidden />
-              <span className="t-card-title text-ink">More on the way</span>
-              <p className="t-body text-muted">
-                We&apos;re adding competitions as their seasons come round.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-y-12 lg:gap-x-16 items-center">
+            <div>
+              <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-ink text-balance leading-[1.06]">
+                Everyone&apos;s got an opinion.
+                <span className="block text-primary-600">One table settles it.</span>
+              </h1>
+              <p className="mt-5 text-lg text-muted max-w-md">
+                Everyone calls the scores. Points land as results come in. The table
+                sorts out who was actually right, and the group chat handles the rest.
               </p>
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
+                <Button href="/play/demo" variant="outline" size="lg">See a pool</Button>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-12 flex flex-col sm:flex-row gap-3">
-            <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
-            <Button href="/play/demo" variant="outline" size="lg">Look around a pool first</Button>
+            {/* The lit panel is what stops this reading as a screenshot dropped
+                in a box — the board sits on brand colour rather than beside it. */}
+            <div className="flex lg:justify-end">
+              <div
+                className="w-full max-w-lg rounded-card border border-border-subtle p-5 sm:p-7 flex justify-center"
+                style={{
+                  background:
+                    'radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--primary-600) 26%, transparent), transparent 62%),' +
+                    'radial-gradient(circle at 86% 84%, color-mix(in srgb, var(--accent-400) 24%, transparent), transparent 58%),' +
+                    'var(--color-mist)',
+                }}
+              >
+                <LiveBoard />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ---- The board -------------------------------------------------------
-          The product, on the page. See LiveBoard for why it is demo data only. */}
-      <section className="py-14 sm:py-20 bg-surface border-y border-border-subtle">
+      {/* ---- Competitions ----------------------------------------------------
+          A plain strip, deliberately not links. It answers "will you cover the
+          thing I care about", which only matters once someone knows what this
+          is. Nothing here points at a real or demo pool: a marketing page is
+          not a place to route strangers into somebody's group. */}
+      <section className="py-12 sm:py-16 bg-surface border-y border-border-subtle">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-y-10 lg:gap-x-16 items-center">
-            <div>
-              <p className="t-caption text-muted">What your group stares at</p>
-              <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
-                The table moves while they&apos;re watching
-              </h2>
-              <p className="mt-4 text-lg text-muted">
-                Predictions score as results come in, so standings shift mid-match. That
-                swing is the part people turn up for — and the part they argue about in
-                the pool chat straight after.
-              </p>
-              <ul className="mt-6 flex flex-col gap-3">
-                {[
-                  'Exact scores, goal difference and results, each worth what you decide',
-                  'Form, movement and awards on every row',
-                  'Group chat, reactions and @mentions inside each pool',
-                ].map((line) => (
-                  <li key={line} className="flex items-start gap-2.5 text-muted">
-                    <span className="mt-0.5 text-primary-600 shrink-0">
-                      <Icon name="checkmark" size={15} weight="bold" />
-                    </span>
-                    <span className="t-body">{line}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex lg:justify-end">
-              <LiveBoard />
-            </div>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <h2 className="t-section-header text-ink">Competitions</h2>
+            <p className="t-body text-muted">Added as their seasons come round.</p>
+          </div>
+          <div className="mt-6 flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+            {COMPETITIONS.map((c) => (
+              <div
+                key={c.key}
+                className="shrink-0 min-w-[190px] flex flex-col gap-2 rounded-card border border-border-subtle bg-snow p-4"
+              >
+                <span
+                  className="h-1 w-9 rounded-pill"
+                  style={{ background: `linear-gradient(90deg, ${c.stripe[0]}, ${c.stripe[1]})` }}
+                  aria-hidden
+                />
+                <span className="t-card-title text-ink">{c.name}</span>
+                <span className="t-caption text-muted">{c.status}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>

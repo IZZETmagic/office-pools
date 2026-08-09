@@ -1,101 +1,165 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { PODIUM, FORM_COLORS } from './play/demo/mockData'
+import { PODIUM } from './play/demo/mockData'
 
 /**
- * The landing page's one piece of product imagery: a leaderboard that moves.
+ * The landing page's one piece of product imagery: a goal goes in, and the
+ * table moves because of it.
  *
- * The page it replaced had zero images of the product — no board, no numerals,
- * no form dots — which is why it read as a brochure for something invisible.
- * A commissioner is buying the thing their group will stare at every matchday,
- * so that thing has to be on the page.
+ * The board on its own only showed that standings exist. What sells this
+ * product is the causality — a thing happens in a match you are already
+ * watching, and thirty seconds later someone you know has gone past you. So the
+ * sequence runs goal → reorder, in that order, with a beat between them. The
+ * beat is the whole point; play them simultaneously and it reads as a list
+ * sorting itself.
+ *
+ * To be clear about what this is NOT: it is a marketing demonstration of why
+ * the table moves, not an argument for a match ticker in the product. That
+ * decision stands — the app tracks consequences, not the ball.
  *
  * It runs on the demo pool (app/play/demo/mockData.ts) and nothing else. A real
  * pool must never render here: the /play/[slug] pages show real boards because
  * those pools opted into being public, and a marketing page has no such opt-in.
- * The header says "sample pool" for the same reason — a visitor should never
- * have to wonder whose standings these are.
- *
- * One overtake, on a slow loop. A board that churns continuously reads as a
- * screensaver; the point is the swing, and a swing needs stillness around it.
+ * The header says "sample pool" so nobody wonders whose standings these are.
  */
 
-type Row = { name: string; points: number; form: string[] }
+type Row = { name: string; points: number }
 
-const BASE: Row[] = PODIUM.slice(0, 3).map((p) => ({
-  name: p.name,
-  points: p.points,
-  form: (p.form ?? []).slice(0, 4),
-}))
+const BASE: Row[] = PODIUM.slice(0, 3).map((p) => ({ name: p.name, points: p.points }))
 
-// Second state: #2 overtakes #1. Points are the demo pool's own, plus the swing.
-const OVERTAKEN: Row[] = [
-  { ...BASE[1], points: BASE[0].points + 7 },
-  BASE[0],
-  BASE[2],
+// JohnnyB called this one, so the goal is what puts him top. The points he
+// gains are the swing; everyone else holds station.
+const AFTER: Row[] = [
+  { name: BASE[1].name, points: BASE[0].points + 7 },
+  { name: BASE[0].name, points: BASE[0].points },
+  { name: BASE[2].name, points: BASE[2].points },
 ]
 
 const ROW_H = 44
 
+/** rest → goal lands → table reacts → back to rest. */
+type Phase = 'rest' | 'goal' | 'moved'
+const NEXT: Record<Phase, Phase> = { rest: 'goal', goal: 'moved', moved: 'rest' }
+const HOLD: Record<Phase, number> = { rest: 2200, goal: 1100, moved: 3400 }
+
+const REDUCED = '(prefers-reduced-motion: reduce)'
+
+/**
+ * Subscribed rather than read once in an effect. Setting state synchronously
+ * inside an effect cascades renders (and the linter rightly rejects it), and a
+ * plain useState initialiser would break SSR since `window` doesn't exist
+ * there. The server snapshot says "motion is fine" — the timer simply doesn't
+ * start until hydration, by which point this reports the truth.
+ */
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    (notify) => {
+      const mq = window.matchMedia(REDUCED)
+      mq.addEventListener('change', notify)
+      return () => mq.removeEventListener('change', notify)
+    },
+    () => window.matchMedia(REDUCED).matches,
+    () => false,
+  )
+}
+
 export function LiveBoard() {
-  const [swung, setSwung] = useState(false)
+  const still = usePrefersReducedMotion()
+  const [phase, setPhase] = useState<Phase>('rest')
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const t = setInterval(() => setSwung((v) => !v), 3600)
-    return () => clearInterval(t)
-  }, [])
+    if (still) return
+    const t = setTimeout(() => setPhase((p) => NEXT[p]), HOLD[phase])
+    return () => clearTimeout(t)
+  }, [phase, still])
 
-  const order = swung ? OVERTAKEN : BASE
+  // Reduced motion gets the end of the story rather than none of it: the goal
+  // has landed and the table has already moved, with nothing animating.
+  const shown: Phase = still ? 'moved' : phase
+  const moved = shown === 'moved'
+  const order = moved ? AFTER : BASE
+  const showGoal = shown !== 'rest'
 
   return (
-    <div className="w-full max-w-md rounded-card bg-surface border border-border-subtle shadow-card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-        <span className="t-caption text-muted">Sample pool</span>
-        <span className="t-caption text-muted inline-flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-pill bg-success-500" aria-hidden />
-          Live
+    <div className="w-full max-w-md">
+      {/* The match strip is always present — it just changes state. An earlier
+          version faded the goal in from nothing, which left a hole above the
+          board for the two seconds it was resting. Showing the fixture at rest
+          fills that space AND tells more of the story: a match is running,
+          then it turns, then the table follows. */}
+      <div
+        className={`mb-3 flex items-center gap-2.5 rounded-chip px-3.5 py-2.5 transition-colors duration-300 motion-reduce:transition-none ${
+          showGoal
+            ? 'bg-accent-400 text-ink shadow-card'
+            : 'bg-surface/70 text-muted border border-border-subtle'
+        }`}
+      >
+        {showGoal ? (
+          <>
+            <Icon name="sportscourt" size={16} weight="bold" />
+            <span className="t-caption">Goal</span>
+          </>
+        ) : (
+          <>
+            <span className="w-1.5 h-1.5 rounded-pill bg-success-500" aria-hidden />
+            <span className="t-caption">62&apos;</span>
+          </>
+        )}
+        <span className={`flex-1 min-w-0 truncate text-sm ${showGoal ? 'font-bold' : 'font-semibold text-ink'}`}>
+          Man United <span className="t-num">{showGoal ? '1–0' : '0–0'}</span> Arsenal
         </span>
       </div>
 
-      {/* Fixed height + absolutely-placed rows: the rows slide past each other
-          rather than the list reflowing, which is what makes the overtake read
-          as one board moving instead of two lists swapping. */}
-      <div className="relative" style={{ height: ROW_H * 3 }}>
-        {BASE.map((row) => {
-          const slot = order.findIndex((r) => r.name === row.name)
-          const data = order[slot]
-          const climbed = swung && slot === 0 && row.name !== BASE[0].name
-          return (
-            <div
-              key={row.name}
-              className={`absolute inset-x-0 flex items-center gap-3 px-4 transition-[transform,background-color] duration-500 ease-out motion-reduce:transition-none ${
-                climbed ? 'bg-success-500/10' : ''
-              }`}
-              style={{ height: ROW_H, transform: `translateY(${slot * ROW_H}px)` }}
-            >
-              <span className="t-num text-sm text-muted w-4">{slot + 1}</span>
-              <span className="flex-1 min-w-0 truncate text-sm font-semibold text-ink">
-                {row.name}
-              </span>
-              {climbed ? (
-                <span className="text-success-500 inline-flex items-center">
-                  <Icon name="arrow.up" size={12} weight="bold" />
+      <div className="rounded-card bg-surface border border-border-subtle shadow-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+          <span className="t-caption text-muted">Sample pool</span>
+          <span className="t-caption text-muted inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-pill bg-success-500" aria-hidden />
+            Live
+          </span>
+        </div>
+
+        {/* Fixed height with absolutely-placed rows: the rows slide past each
+            other rather than the list reflowing, which is what makes this read
+            as one table moving instead of two lists swapping. */}
+        <div className="relative" style={{ height: ROW_H * 3 }}>
+          {BASE.map((row) => {
+            const slot = order.findIndex((r) => r.name === row.name)
+            const data = order[slot]
+            const climbed = moved && slot === 0 && row.name !== BASE[0].name
+            return (
+              <div
+                key={row.name}
+                className={`absolute inset-x-0 flex items-center gap-3 px-4 transition-[transform,background-color] duration-500 ease-out motion-reduce:transition-none ${
+                  climbed ? 'bg-success-500/10' : ''
+                }`}
+                style={{ height: ROW_H, transform: `translateY(${slot * ROW_H}px)` }}
+              >
+                <span className="t-num text-sm text-muted w-4">{slot + 1}</span>
+                <span className="flex-1 min-w-0 truncate text-sm font-semibold text-ink">
+                  {row.name}
                 </span>
-              ) : (
-                <span className="flex items-center gap-1" aria-hidden>
-                  {row.form.map((f, i) => (
-                    <span key={i} className={`w-1.5 h-1.5 rounded-pill ${FORM_COLORS[f] ?? 'bg-silver'}`} />
-                  ))}
-                </span>
-              )}
-              <span className="t-num text-sm text-ink tabular-nums">{data.points}</span>
-            </div>
-          )
-        })}
+                {climbed && (
+                  <span className="text-success-500 inline-flex items-center" aria-hidden>
+                    <Icon name="arrow.up" size={12} weight="bold" />
+                  </span>
+                )}
+                <span className="t-num text-sm text-ink">{data.points}</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
+
+      {/* The caption carries the argument for anyone who arrives mid-loop or
+          can't see the animation at all. */}
+      <p className="mt-3 t-detail text-muted text-center">
+        {still
+          ? 'A goal goes in, and the table moves.'
+          : 'Every goal reshuffles the table — usually while everyone is still watching.'}
+      </p>
     </div>
   )
 }
