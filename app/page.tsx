@@ -103,7 +103,7 @@ export default function Home() {
           a World Cup that had already finished. */}
       <section className="py-14 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
             <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-ink text-balance">
               Which one is your group watching?
             </h1>
@@ -113,9 +113,12 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {COMPETITIONS.map((c) => <CompetitionCard key={c.key} c={c} />)}
-            <div className="flex flex-col justify-center gap-2 rounded-card border border-dashed border-border-default p-5">
+            <div className="flex flex-col gap-3 rounded-card border border-dashed border-border-default p-5">
+              {/* Occupies the stripe's row so this card's title lands on the
+                  same baseline as its siblings' rather than 5px below. */}
+              <span className="h-1 w-9" aria-hidden />
               <span className="t-card-title text-ink">More on the way</span>
               <p className="t-body text-muted">
                 We&apos;re adding competitions as their seasons come round.
@@ -123,7 +126,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-9 flex flex-col sm:flex-row gap-3">
+          <div className="mt-12 flex flex-col sm:flex-row gap-3">
             <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
             <Button href="/play/demo" variant="outline" size="lg">Look around a pool first</Button>
           </div>
@@ -134,7 +137,7 @@ export default function Home() {
           The product, on the page. See LiveBoard for why it is demo data only. */}
       <section className="py-14 sm:py-20 bg-surface border-y border-border-subtle">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-y-10 lg:gap-x-16 items-center">
             <div>
               <p className="t-caption text-muted">What your group stares at</p>
               <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
@@ -173,7 +176,7 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
             Running it shouldn&apos;t be a second job
           </h2>
-          <div className="mt-9 grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="mt-9 grid grid-cols-1 md:grid-cols-3 gap-4">
             {SETUP.map((s) => (
               <div key={s.title} className="flex flex-col gap-3 rounded-card bg-surface border border-border-subtle p-6 shadow-card">
                 <span className="inline-flex items-center justify-center w-11 h-11 rounded-chip bg-primary-600/10 text-primary-600">
