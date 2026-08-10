@@ -4,8 +4,11 @@ import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 
 /**
- * Written for the person deciding whether to run a pool, because that is who
- * the landing page is for — invited players arrive at /join/[pool_code] instead.
+ * Weighted toward the person deciding whether to run a pool, since that is who
+ * the landing page has to convert — but not exclusively. Cost, deadlines and
+ * what happens if someone forgets are things anyone in a pool asks, which is
+ * why the section is headed "The usual questions" rather than named for
+ * commissioners.
  *
  * Nothing here names a specific tournament or date. The entry this replaced
  * ("When does the 2026 World Cup start?" — "starts on June 11, 2026 and runs
@@ -55,27 +58,43 @@ export function FAQAccordion() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <div className="max-w-3xl mx-auto divide-y divide-neutral-200">
-      {faqs.map((faq, i) => (
-        <div key={i}>
-          <button
-            onClick={() => setOpenIndex(openIndex === i ? null : i)}
-            className="w-full flex items-center justify-between py-5 text-left cursor-pointer"
-          >
-            <span className="text-lg font-medium text-neutral-900">
-              {faq.question}
-            </span>
-            <Icon name="chevron.down" size={20} className={`text-muted shrink-0 ml-4 transition-transform duration-200 ${openIndex === i ? 'rotate-180' : ''}`} />
-          </button>
-          <div
-            className={`overflow-hidden transition-all duration-200 ${
-              openIndex === i ? 'max-h-40 pb-5' : 'max-h-0'
-            }`}
-          >
-            <p className="text-neutral-600 leading-relaxed">{faq.answer}</p>
+    <div className="divide-y divide-border-subtle">
+      {faqs.map((faq, i) => {
+        const open = openIndex === i
+        return (
+          <div key={i}>
+            <button
+              onClick={() => setOpenIndex(open ? null : i)}
+              aria-expanded={open}
+              className="w-full flex items-center justify-between gap-4 py-5 text-left cursor-pointer group"
+            >
+              <span className={`t-card-title transition-colors ${open ? 'text-primary-600' : 'text-ink group-hover:text-primary-600'}`}>
+                {faq.question}
+              </span>
+              <span
+                className={`shrink-0 grid place-items-center w-7 h-7 rounded-pill transition-all duration-200 ${
+                  open ? 'bg-primary-600 text-white rotate-180' : 'bg-mist text-muted group-hover:bg-primary-600/10 group-hover:text-primary-600'
+                }`}
+              >
+                <Icon name="chevron.down" size={14} weight="bold" />
+              </span>
+            </button>
+
+            {/* grid-rows 0fr -> 1fr rather than a max-height. The previous
+                version capped the answer at max-h-40, which silently clipped
+                anything over about six lines — and these answers were rewritten
+                longer when the page was aimed at commissioners. This animates to
+                the content's real height, whatever it turns out to be. */}
+            <div
+              className={`grid transition-all duration-200 ease-out motion-reduce:transition-none ${
+                open ? 'grid-rows-[1fr] pb-5' : 'grid-rows-[0fr]'
+              }`}
+            >
+              <p className="overflow-hidden t-body text-muted leading-relaxed">{faq.answer}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

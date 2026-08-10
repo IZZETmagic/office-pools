@@ -230,18 +230,37 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ---- FAQ --------------------------------------------------------------
+          Split two ways, like the hero: the heading and the way out on the
+          left, the questions on the right. It was a centred column of bare
+          rows — the only section left not using the card language the rest of
+          the page moved to, and the only heading still centred while every
+          other one is ranged left. */}
       <section className="py-14 sm:py-20">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-center text-balance">
-            Questions commissioners ask
-          </h2>
-          <div className="mt-9">
-            <FAQAccordion />
-          </div>
-          <div className="text-center mt-8">
-            <Link href="/faq" className="t-body font-semibold text-primary-600 hover:text-primary-700 transition">
-              View all FAQs &rarr;
-            </Link>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-y-8 lg:gap-x-16">
+            <div className="lg:sticky lg:top-28 lg:self-start">
+              {/* Not "questions commissioners ask" — half of these are things
+                  anyone in a pool wants to know, not just whoever set it up. */}
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
+                The usual questions
+              </h2>
+              <p className="mt-4 text-lg text-muted max-w-sm">
+                Cost, formats, deadlines, and what happens when someone forgets
+                to put their predictions in.
+              </p>
+              <Link
+                href="/faq"
+                className="mt-6 inline-flex items-center gap-1.5 t-body font-semibold text-primary-600 hover:text-primary-700 transition"
+              >
+                View all FAQs
+                <Icon name="arrow.up.right" size={13} weight="bold" />
+              </Link>
+            </div>
+
+            <div className="rounded-card bg-surface border border-border-subtle shadow-card px-5 sm:px-7">
+              <FAQAccordion />
+            </div>
           </div>
         </div>
       </section>
