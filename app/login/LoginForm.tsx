@@ -48,8 +48,8 @@ export function LoginForm() {
 
   return (
     <>
-      <h2 className="text-3xl font-bold text-neutral-900 mb-2">Welcome back</h2>
-      <p className="text-neutral-500 mb-8">Sign in to your account to continue</p>
+      <h2 className="text-3xl font-bold text-ink mb-2">Welcome back</h2>
+      <p className="text-muted mb-8">Sign in to your account to continue</p>
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -85,7 +85,7 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-neutral-600 mt-6">
+      <p className="text-center text-muted mt-6">
         Don&apos;t have an account?{' '}
         <Link href={redirectTo !== '/dashboard' ? `/signup?redirectTo=${encodeURIComponent(redirectTo)}` : '/signup'} className="text-primary-600 hover:underline font-semibold">
           Sign up
@@ -93,7 +93,7 @@ export function LoginForm() {
       </p>
 
       <p className="text-center mt-3">
-        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+        <Link href="/" className="text-sm text-muted hover:underline">
           &larr; Back to home
         </Link>
       </p>

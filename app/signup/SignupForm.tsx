@@ -132,8 +132,8 @@ export function SignupForm() {
 
   return (
     <>
-      <h2 className="text-3xl font-bold text-neutral-900 mb-2">Create account</h2>
-      <p className="text-neutral-500 mb-8">Get started with your prediction pool</p>
+      <h2 className="text-3xl font-bold text-ink mb-2">Create account</h2>
+      <p className="text-muted mb-8">Get started with your prediction pool</p>
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -168,7 +168,7 @@ export function SignupForm() {
               className={usernameStatus === 'taken' ? '!border-danger-500 !focus:ring-danger-500' : ''}
             />
             {usernameStatus === 'checking' && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500">Checking...</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted">Checking...</span>
             )}
             {usernameStatus === 'available' && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-success-600 font-medium">Available ✓</span>
@@ -205,9 +205,9 @@ export function SignupForm() {
             type="checkbox"
             checked={agreedToTerms}
             onChange={(e) => setAgreedToTerms(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+            className="mt-1 h-4 w-4 rounded border-border-default text-primary-600 focus:ring-primary-500 cursor-pointer"
           />
-          <span className="text-sm text-neutral-600">
+          <span className="text-sm text-muted">
             I agree to the{' '}
             <Link href="/terms" className="text-primary-600 hover:underline font-medium">
               Terms of Service
@@ -231,7 +231,7 @@ export function SignupForm() {
         </Button>
       </form>
 
-      <p className="text-center text-neutral-600 mt-6">
+      <p className="text-center text-muted mt-6">
         Already have an account?{' '}
         <Link href={redirectTo !== '/dashboard' ? `/login?redirectTo=${encodeURIComponent(redirectTo)}` : '/login'} className="text-primary-600 hover:underline font-semibold">
           Sign in
@@ -239,7 +239,7 @@ export function SignupForm() {
       </p>
 
       <p className="text-center mt-3">
-        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+        <Link href="/" className="text-sm text-muted hover:underline">
           &larr; Back to home
         </Link>
       </p>
