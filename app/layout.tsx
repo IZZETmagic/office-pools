@@ -47,9 +47,14 @@ export const metadata: Metadata = {
   // What is actually running belongs in app/competitions.ts, not in metadata.
   description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
   manifest: "/manifest.json",
+  // apple points at a dedicated 180x180 rather than reusing the 192. iOS scales
+  // whatever it is given, but 180 is the size it actually wants for the home
+  // screen, and the file has no transparent pixels — iOS paints those black
+  // rather than letting them through, which the source tile's rounded corners
+  // would otherwise have done.
   icons: {
     icon: "/icons/icon-192x192.png",
-    apple: "/icons/icon-192x192.png",
+    apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
     capable: true,
