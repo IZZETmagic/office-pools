@@ -21,6 +21,18 @@ import { COMPETITIONS } from './competitions'
  * this take me, and what do I control.
  */
 
+/**
+ * Each card steps down from the one before it, from md up. On one flat surface
+ * — no alternating bands any more — a row of three equal boxes sits dead, and
+ * the offset gives it movement without introducing a colour.
+ *
+ * Written as whole literal class strings because Tailwind scans source for
+ * them; a computed `md:mt-${n}` is invisible to the scanner and silently
+ * produces nothing. Stacked, below md, they all sit flush — a stagger on one
+ * column is just the last card pushed further down the page.
+ */
+const STAGGER = ['md:mt-0', 'md:mt-6', 'md:mt-12']
+
 // Setup facts, not feature names. Each is something a commissioner is weighing
 // before they commit their group to this rather than a spreadsheet.
 const SETUP = [
@@ -127,7 +139,11 @@ export default function Home() {
           thing I care about", which only matters once someone knows what this
           is. Nothing here points at a real or demo pool: a marketing page is
           not a place to route strangers into somebody's group. */}
-      <section className="py-12 sm:py-16 bg-surface border-y border-border-subtle">
+      {/* One continuous surface from here down — no alternating bands. Striping
+          is an app device: it separates dense regions on a screen you operate.
+          A page that's read top to bottom needs room, not repainted walls, so
+          the cards and the space between them do the separating. */}
+      <section className="pt-16 pb-14 sm:pt-24 sm:pb-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
             <h2 className="t-section-header text-ink">Competitions</h2>
@@ -137,7 +153,7 @@ export default function Home() {
             {COMPETITIONS.map((c) => (
               <div
                 key={c.key}
-                className="shrink-0 min-w-[190px] flex flex-col gap-2 rounded-card border border-border-subtle bg-snow p-4"
+                className="shrink-0 min-w-[190px] flex flex-col gap-2 rounded-card border border-border-subtle bg-surface shadow-card p-4"
               >
                 <span
                   className="h-1 w-9 rounded-pill"
@@ -158,9 +174,12 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
             Running it shouldn&apos;t be a second job
           </h2>
-          <div className="mt-9 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {SETUP.map((s) => (
-              <div key={s.title} className="flex flex-col gap-3 rounded-card bg-surface border border-border-subtle p-6 shadow-card">
+          <div className="mt-9 grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
+            {SETUP.map((s, i) => (
+              <div
+                key={s.title}
+                className={`flex flex-col gap-3 rounded-card bg-surface border border-border-subtle p-6 shadow-card ${STAGGER[i] ?? 'md:mt-0'}`}
+              >
                 <span className="inline-flex items-center justify-center w-11 h-11 rounded-chip bg-primary-600/10 text-primary-600">
                   <Icon name={s.icon} size={21} weight="semibold" />
                 </span>
@@ -172,16 +191,20 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-14 sm:py-20 bg-surface border-y border-border-subtle">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-14 sm:py-20">
+        {/* Was a full-bleed band. On one surface it becomes an object instead —
+            same emphasis, without repainting the page to get it. */}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-card bg-surface border border-border-subtle shadow-card px-6 py-12 sm:px-12 sm:py-16 text-center">
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
             Get your group in before the season does
           </h2>
           <p className="mt-4 text-lg text-muted">
             Free, unlimited pools, as many people as you want in each one.
           </p>
-          <div className="mt-8 flex justify-center">
-            <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
+            <div className="mt-8 flex justify-center">
+              <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
+            </div>
           </div>
         </div>
       </section>
