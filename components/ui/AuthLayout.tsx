@@ -4,8 +4,12 @@ type AuthLayoutProps = {
   children: React.ReactNode
   /** First line of the panel headline — the plain half. */
   headline: string
-  /** Second line, set in the brand blue. The turn of the sentence. */
-  accent: string
+  /**
+   * Optional second line, set in the brand blue. Optional on purpose: when
+   * every page had one, all six opened with the same two-beat rhythm and the
+   * shape did the writing. Most of them say more in one line.
+   */
+  accent?: string
   /** One supporting line under the headline. */
   sub: string
 }
@@ -63,7 +67,7 @@ export function AuthLayout({ children, headline, accent, sub }: AuthLayoutProps)
         <div className="relative z-10 max-w-lg">
           <h2 className="text-4xl xl:text-5xl font-black tracking-tight text-ink text-balance leading-[1.06]">
             {headline}
-            <span className="block text-primary-600">{accent}</span>
+            {accent && <span className="block text-primary-600">{accent}</span>}
           </h2>
           <p className="mt-5 text-lg text-muted max-w-md">{sub}</p>
         </div>

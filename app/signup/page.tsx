@@ -10,12 +10,16 @@ export const metadata: Metadata = {
 
 export default function SignupPage() {
   return (
-    /* A first meeting. The landing page's line, turned into an invitation:
-       everyone has a view, now let's hear yours. */
+    /* A first meeting, so it sells the fun rather than the mechanism. The
+       arguing IS the product — the banter is what people turn up for — and
+       naming it is warmer than another line about setting up a pool.
+
+       Not the landing page's "everyone's got an opinion" again: it works as a
+       headline to a crowd and lands as a brush-off when aimed at one person. */
     <AuthLayout
-      headline="Everyone's got an opinion."
-      accent="Let's hear yours."
-      sub="Set a pool up in about a minute. Free, for as many people as you like."
+      headline={"The best bit"}
+      accent={"is the arguing."}
+      sub={"Make a pool, send one link, and let your group work out who actually knows their football."}
     >
       <Suspense>
         <SignupForm />

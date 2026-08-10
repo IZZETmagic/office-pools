@@ -5,9 +5,8 @@ import { AuthLayout } from '@/components/ui/AuthLayout'
 export default function EmailSentPage() {
   return (
     <AuthLayout
-      headline="Check your inbox."
-      accent="It's on its way."
-      sub="The link lands in a minute or two. Worth a look in spam if it doesn't."
+      headline={"On its way."}
+      sub={"Should land in a minute. Worth a peek in spam if it does not."}
     >
       <div className="text-center space-y-6">
 

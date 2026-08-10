@@ -5,9 +5,8 @@ import { AuthLayout } from '@/components/ui/AuthLayout'
 export default function ResetSuccessPage() {
   return (
     <AuthLayout
-      headline="All set."
-      accent="Back to your pools."
-      sub="Your password is updated. Nothing else changed while you were away."
+      headline={"All done."}
+      sub={"New password saved. Nothing else changed while you were gone."}
     >
       <div className="text-center space-y-6">
 

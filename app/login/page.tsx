@@ -10,12 +10,14 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    /* A return, not an introduction. They already have pools; the panel says
-       what they're coming back to rather than pitching the product again. */
+    /* A return. Warm and short, and deliberately saying nothing about what
+       they missed — an earlier draft opened with "your pools kept playing" and
+       "the table will have moved", which greets someone by telling them they've
+       fallen behind. No bad feelings is the product's whole purpose; the door
+       is a poor place to break it. The wink at the end is as far as it goes. */
     <AuthLayout
-      headline="Welcome back."
-      accent="Your pools kept playing."
-      sub="Results have been landing while you were away — the table will have moved."
+      headline={"There you are."}
+      sub={"Everything is where you left it. Well — nearly everything."}
     >
       <Suspense>
         <LoginForm />

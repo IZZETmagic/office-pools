@@ -48,9 +48,8 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthLayout
-      headline="Almost there."
-      accent="Pick a new one."
-      sub="Choose something you'll remember. You'll be straight back in after this."
+      headline={"Nearly there."}
+      sub={"Pick a new password and we will get you back to your pools."}
     >
       <h2 className="text-3xl font-bold text-neutral-900 mb-2">Set new password</h2>
       <p className="text-neutral-500 mb-8">Enter your new password below.</p>
