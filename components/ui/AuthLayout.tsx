@@ -3,6 +3,12 @@ import { LiveBoard } from '@/app/LiveBoard'
 
 type AuthLayoutProps = {
   children: React.ReactNode
+  /** First line of the panel headline — the plain half. */
+  headline: string
+  /** Second line, set in the brand blue. The turn of the sentence. */
+  accent: string
+  /** One supporting line under the headline. */
+  sub: string
 }
 
 /**
@@ -16,11 +22,16 @@ type AuthLayoutProps = {
  * product making a stale promise.
  *
  * Now it continues the landing page instead of contradicting it: the same dark
- * band, the same sentence, and the board doing the arguing. Showing the product
- * beats listing its features, and this one is already built — see LiveBoard for
- * why it only ever renders the demo pool.
+ * band, the same brand glow, and the board doing the arguing rather than a
+ * feature list. See LiveBoard for why it only ever renders the demo pool.
+ *
+ * The words are passed in, because the two pages meet people in opposite
+ * states. Signing in is a return — someone already has pools, and the panel
+ * should say so. Signing up is a first meeting, and should read like an
+ * invitation. One shared panel saying the same thing to both treated a member
+ * of eight months and a total stranger identically.
  */
-export function AuthLayout({ children }: AuthLayoutProps) {
+export function AuthLayout({ children, headline, accent, sub }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* dark-scope: this panel is dark in EITHER colour mode. Without it the
@@ -42,11 +53,14 @@ export function AuthLayout({ children }: AuthLayoutProps) {
           <Wordmark size={26} />
         </div>
 
-        <div className="relative z-10 flex flex-col gap-8">
-          <h2 className="text-3xl xl:text-4xl font-black tracking-tight text-ink text-balance leading-[1.08]">
-            Everyone&apos;s got an opinion.
-            <span className="block text-primary-600">One table settles it.</span>
-          </h2>
+        <div className="relative z-10 flex flex-col gap-7">
+          <div>
+            <h2 className="text-3xl xl:text-4xl font-black tracking-tight text-ink text-balance leading-[1.08]">
+              {headline}
+              <span className="block text-primary-600">{accent}</span>
+            </h2>
+            <p className="mt-4 t-body text-muted max-w-sm">{sub}</p>
+          </div>
           <LiveBoard />
         </div>
 

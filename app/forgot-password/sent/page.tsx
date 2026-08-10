@@ -4,7 +4,11 @@ import { AuthLayout } from '@/components/ui/AuthLayout'
 
 export default function EmailSentPage() {
   return (
-    <AuthLayout>
+    <AuthLayout
+      headline="Check your inbox."
+      accent="It's on its way."
+      sub="The link lands in a minute or two. Worth a look in spam if it doesn't."
+    >
       <div className="text-center space-y-6">
 
         {/* Success icon */}

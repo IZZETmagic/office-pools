@@ -10,7 +10,13 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <AuthLayout>
+    /* A return, not an introduction. They already have pools; the panel says
+       what they're coming back to rather than pitching the product again. */
+    <AuthLayout
+      headline="Welcome back."
+      accent="Your pools kept playing."
+      sub="Results have been landing while you were away — the table will have moved."
+    >
       <Suspense>
         <LoginForm />
       </Suspense>

@@ -4,7 +4,11 @@ import { AuthLayout } from '@/components/ui/AuthLayout'
 
 export default function ResetSuccessPage() {
   return (
-    <AuthLayout>
+    <AuthLayout
+      headline="All set."
+      accent="Back to your pools."
+      sub="Your password is updated. Nothing else changed while you were away."
+    >
       <div className="text-center space-y-6">
 
         {/* Success icon */}
