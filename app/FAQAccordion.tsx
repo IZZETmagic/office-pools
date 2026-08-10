@@ -4,6 +4,13 @@ import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 
 /**
+ * Five questions, chosen by what the page does NOT already say. "How long does
+ * it take to set up" and "how do people join" were cut because the three cards
+ * under "Running it shouldn't be a second job" answer both in full — repeating
+ * them here made the FAQ the tallest block on the page while adding nothing.
+ * What is left is cost, formats, scoring detail, in-season effort and the
+ * missed-deadline case, none of which appear anywhere else.
+ *
  * Weighted toward the person deciding whether to run a pool, since that is who
  * the landing page has to convert — but not exclusively. Cost, deadlines and
  * what happens if someone forgets are things anyone in a pool asks, which is
@@ -23,11 +30,6 @@ const faqs = [
       'Yes. Unlimited pools, as many people in each as you want, no card needed.',
   },
   {
-    question: 'How long does it take to set a pool up?',
-    answer:
-      'About a minute. Name it, choose a format, and share the join link. Scoring ships with sensible defaults, so you only change the rules you actually care about.',
-  },
-  {
     question: 'Can I decide how scoring works?',
     answer:
       'Yes, and it is the main thing you control. Set what an exact score, a correct goal difference and a correct result are each worth, and add multipliers for the rounds that should carry more weight. Change it any time before the deadline and every score recalculates.',
@@ -36,11 +38,6 @@ const faqs = [
     question: 'What formats can I run?',
     answer:
       'A full-tournament pool where everything is predicted up front, a progressive pool that unlocks round by round, or a bracket-only pick’em for people who just want to call the winners.',
-  },
-  {
-    question: 'How do people join my pool?',
-    answer:
-      'You share one link or a short pool code. They create an account and they are in — on the web or in the app. You never have to chase anyone through a spreadsheet.',
   },
   {
     question: 'Do I have to keep it updated during the season?',

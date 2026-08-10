@@ -108,9 +108,13 @@ export default function Home() {
                 Everyone calls the scores. Points land as results come in. The table
                 sorts out who was actually right, and the group chat handles the rest.
               </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              {/* One CTA, not two. The second went to /play/demo — the only
+                  place on the page that pointed at the demo pool, which still
+                  carries emoji, stock-palette colours and a World Cup that
+                  finished in July. A "see the product" link has to lead
+                  somewhere that flatters the product. */}
+              <div className="mt-8">
                 <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
-                <Button href="/play/demo" variant="outline" size="lg">See a pool</Button>
               </div>
             </div>
 
