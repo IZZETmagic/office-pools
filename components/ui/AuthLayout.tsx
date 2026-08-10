@@ -1,5 +1,4 @@
 import { Wordmark } from './Wordmark'
-import { LiveBoard } from '@/app/LiveBoard'
 
 type AuthLayoutProps = {
   children: React.ReactNode
@@ -22,8 +21,14 @@ type AuthLayoutProps = {
  * product making a stale promise.
  *
  * Now it continues the landing page instead of contradicting it: the same dark
- * band, the same brand glow, and the board doing the arguing rather than a
- * feature list. See LiveBoard for why it only ever renders the demo pool.
+ * band, the same brand glow, and nothing else but words.
+ *
+ * The live board was here briefly and was wrong. A leaderboard that reorders
+ * itself is a feature — putting it on the door makes the page look like the app
+ * before anyone is in it, and asks a returning member to watch strangers score
+ * points while they type their password. The panels worth copying (Figma,
+ * mymind, Proton) are type on colour and nothing more. It also means auth no
+ * longer ships a client component with a running timer.
  *
  * The words are passed in, because the two pages meet people in opposite
  * states. Signing in is a return — someone already has pools, and the panel
@@ -53,15 +58,14 @@ export function AuthLayout({ children, headline, accent, sub }: AuthLayoutProps)
           <Wordmark size={26} />
         </div>
 
-        <div className="relative z-10 flex flex-col gap-7">
-          <div>
-            <h2 className="text-3xl xl:text-4xl font-black tracking-tight text-ink text-balance leading-[1.08]">
-              {headline}
-              <span className="block text-primary-600">{accent}</span>
-            </h2>
-            <p className="mt-4 t-body text-muted max-w-sm">{sub}</p>
-          </div>
-          <LiveBoard />
+        {/* The type is the whole panel now, so it is set at display scale
+            rather than the section-heading size it used beside the board. */}
+        <div className="relative z-10 max-w-lg">
+          <h2 className="text-4xl xl:text-5xl font-black tracking-tight text-ink text-balance leading-[1.06]">
+            {headline}
+            <span className="block text-primary-600">{accent}</span>
+          </h2>
+          <p className="mt-5 text-lg text-muted max-w-md">{sub}</p>
         </div>
 
         <p className="relative z-10 t-detail text-muted">&copy; 2026 SportPool</p>
