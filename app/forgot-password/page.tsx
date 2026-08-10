@@ -36,12 +36,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout
-      headline={"It happens."}
-      sub={"Give us the email you signed up with and we will send you a way back in."}
-    >
-      <h2 className="text-3xl font-bold text-neutral-900 mb-2">Reset password</h2>
-      <p className="text-neutral-500 mb-8">
+    <AuthLayout>
+      <h2 className="text-xl font-black tracking-tight text-ink text-center">Reset password</h2>
+      <p className="text-muted text-center mb-8">
         Enter your email and we&apos;ll send you a link to reset your password.
       </p>
 
@@ -63,7 +60,7 @@ export default function ForgotPasswordPage() {
         </Button>
       </form>
 
-      <p className="text-center text-neutral-600 mt-6">
+      <p className="text-center text-muted mt-6">
         Remember your password?{' '}
         <Link href="/login" className="text-primary-600 hover:underline font-semibold">
           Back to login

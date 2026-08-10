@@ -47,12 +47,9 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthLayout
-      headline={"Nearly there."}
-      sub={"Pick a new password and we will get you back to your pools."}
-    >
-      <h2 className="text-3xl font-bold text-neutral-900 mb-2">Set new password</h2>
-      <p className="text-neutral-500 mb-8">Enter your new password below.</p>
+    <AuthLayout>
+      <h2 className="text-xl font-black tracking-tight text-ink text-center">Set new password</h2>
+      <p className="text-muted text-center mb-8">Enter your new password below.</p>
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -79,9 +76,9 @@ export default function ResetPasswordPage() {
           />
         </FormField>
 
-        <div className="bg-neutral-100 border border-neutral-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-neutral-700 mb-2">Password requirements:</p>
-          <ul className="text-sm text-neutral-600 space-y-1">
+        <div className="bg-mist border border-border-default rounded-chip p-4">
+          <p className="text-sm font-medium text-muted mb-2">Password requirements:</p>
+          <ul className="text-sm text-muted space-y-1">
             <li className={password.length >= 8 ? 'text-success-600' : ''}>
               {password.length >= 8 ? '\u2713' : '\u2022'} At least 8 characters
             </li>

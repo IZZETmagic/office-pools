@@ -4,10 +4,7 @@ import { AuthLayout } from '@/components/ui/AuthLayout'
 
 export default function EmailSentPage() {
   return (
-    <AuthLayout
-      headline={"On its way."}
-      sub={"Should land in a minute. Worth a peek in spam if it does not."}
-    >
+    <AuthLayout>
       <div className="text-center space-y-6">
 
         {/* Success icon */}
@@ -16,8 +13,8 @@ export default function EmailSentPage() {
         </div>
 
         <div>
-          <h2 className="text-3xl font-bold text-neutral-900">Check your email</h2>
-          <p className="mt-2 text-neutral-600">
+          <h2 className="text-xl font-black tracking-tight text-ink text-center">Check your email</h2>
+          <p className="mt-2 text-muted">
             We&apos;ve sent a password reset link to your email address.
           </p>
         </div>
@@ -26,13 +23,13 @@ export default function EmailSentPage() {
         <div className="flex items-start gap-3 bg-primary-50 border border-primary-200 rounded-xl p-4 text-left dark:bg-primary-900/20 dark:border-primary-800">
           <Icon name="info.circle.fill" size={20} className="text-primary-800 dark:text-primary-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-neutral-700 mb-2 leading-5">
+            <p className="text-sm text-muted mb-2 leading-5">
               Click the link in the email to reset your password.
             </p>
-            <p className="text-sm text-neutral-700 font-medium">
+            <p className="text-sm text-muted font-medium">
               Didn&apos;t receive the email?
             </p>
-            <ul className="mt-1 text-sm text-neutral-600 list-disc list-inside">
+            <ul className="mt-1 text-sm text-muted list-disc list-inside">
               <li>Check your spam folder</li>
               <li>Make sure you entered the correct email</li>
             </ul>

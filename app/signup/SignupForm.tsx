@@ -132,8 +132,8 @@ export function SignupForm() {
 
   return (
     <>
-      <h2 className="text-3xl font-black tracking-tight text-ink mb-2">Create your account</h2>
-      <p className="text-muted mb-8">Get started with your prediction pool</p>
+      <h2 className="text-xl font-black tracking-tight text-ink text-center">Create your account</h2>
+      <p className="text-muted text-center mb-8">Get started with your prediction pool</p>
 
       {error && <Alert variant="error">{error}</Alert>}
 

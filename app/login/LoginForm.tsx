@@ -50,8 +50,8 @@ export function LoginForm() {
     <>
       {/* Plain and functional: the panel beside it carries the warm line, and
           two "Welcome back"s on one screen is one too many. */}
-      <h2 className="text-3xl font-black tracking-tight text-ink mb-2">Log in</h2>
-      <p className="text-muted mb-8">Pick up where you left off.</p>
+      <h2 className="text-xl font-black tracking-tight text-ink text-center">Log in</h2>
+      <p className="text-muted text-center mb-8">Pick up where you left off.</p>
 
       {error && <Alert variant="error">{error}</Alert>}
 
