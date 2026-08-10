@@ -71,14 +71,7 @@ export default function Home() {
       {/* dark-scope: nav and hero render dark in EITHER colour mode. Without it
           the ramp inverts and every word here would be #1B2340 navy on a navy
           band. See globals.css. */}
-      {/* Rounded at the bottom so the band reads as a slab laid on the page
-          rather than a full-bleed rectangle — the page shows through at the two
-          corners. No overflow-hidden: the nav inside is sticky and clipping
-          would break it, and nothing paints into the bottom corners anyway.
-
-          rounded-b-sheet is the system's largest radius short of pill (32px),
-          which is the step meant for a surface this size. */}
-      <div className="dark-scope bg-snow rounded-b-sheet">
+      <div className="dark-scope bg-snow">
       {/* No bottom border: nav and hero are one dark band now, and a rule
           between them just draws a seam across it. Once scrolled, the nav still
           separates from the light sections below on its own — the colour step
