@@ -134,42 +134,12 @@ export default function Home() {
       </section>
       </div>
 
-      {/* ---- Competitions ----------------------------------------------------
-          A plain strip, deliberately not links. It answers "will you cover the
-          thing I care about", which only matters once someone knows what this
-          is. Nothing here points at a real or demo pool: a marketing page is
-          not a place to route strangers into somebody's group. */}
-      {/* One continuous surface from here down — no alternating bands. Striping
+      {/* ---- Running one -----------------------------------------------------
+          One continuous surface from here down — no alternating bands. Striping
           is an app device: it separates dense regions on a screen you operate.
-          A page that's read top to bottom needs room, not repainted walls, so
-          the cards and the space between them do the separating. */}
+          A page read top to bottom needs room, not repainted walls, so the
+          cards and the space between them do the separating. */}
       <section className="pt-16 pb-14 sm:pt-24 sm:pb-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-            <h2 className="t-section-header text-ink">Competitions</h2>
-            <p className="t-body text-muted">Added as their seasons come round.</p>
-          </div>
-          <div className="mt-6 flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-            {COMPETITIONS.map((c) => (
-              <div
-                key={c.key}
-                className="shrink-0 min-w-[190px] flex flex-col gap-2 rounded-card border border-border-subtle bg-surface shadow-card p-4"
-              >
-                <span
-                  className="h-1 w-9 rounded-pill"
-                  style={{ background: `linear-gradient(90deg, ${c.stripe[0]}, ${c.stripe[1]})` }}
-                  aria-hidden
-                />
-                <span className="t-card-title text-ink">{c.name}</span>
-                <span className="t-caption text-muted">{c.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Running one ---------------------------------------------------- */}
-      <section className="py-14 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
             Running it shouldn&apos;t be a second job
@@ -185,6 +155,47 @@ export default function Home() {
                 </span>
                 <h3 className="t-card-title text-ink">{s.title}</h3>
                 <p className="t-body text-muted">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Competitions ----------------------------------------------------
+          Sits AFTER the how-it-works section on purpose. "Will you cover the
+          thing I care about" is a qualifying question — people ask it once
+          they've decided they're interested, not before. It was directly under
+          the hero and read as an interruption.
+
+          Deliberately not links. Routing a stranger from a marketing page into
+          a real pool would expose members who never agreed to that, and the one
+          competition we could point at scores zero today. */}
+      <section className="py-14 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
+            Whatever your group is watching
+          </h2>
+          <p className="mt-4 text-lg text-muted max-w-xl">
+            Added as their seasons come round. Tell us what you want next.
+          </p>
+          {/* A grid rather than a scroller: five items fit, and a short list in
+              a horizontal scroller reads as a widget tucked into the page
+              instead of a section of it. */}
+          <div className="mt-9 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {COMPETITIONS.map((c) => (
+              <div
+                key={c.key}
+                className="flex flex-col gap-3 rounded-card border border-border-subtle bg-surface shadow-card p-5"
+              >
+                <span
+                  className="h-1.5 w-11 rounded-pill"
+                  style={{ background: `linear-gradient(90deg, ${c.stripe[0]}, ${c.stripe[1]})` }}
+                  aria-hidden
+                />
+                <span className="text-lg font-bold tracking-tight text-ink leading-tight">
+                  {c.name}
+                </span>
+                <span className="t-caption text-muted mt-auto">{c.status}</span>
               </div>
             ))}
           </div>
