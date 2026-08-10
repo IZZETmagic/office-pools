@@ -170,6 +170,16 @@ export default function Home() {
           Deliberately not links. Routing a stranger from a marketing page into
           a real pool would expose members who never agreed to that, and the one
           competition we could point at scores zero today. */}
+      {/* ---- Competitions, closing on the ask ---------------------------------
+          These were two sections and are one. The list answers "will you cover
+          my sport" and the CTA said "start one before the season does" — the
+          same thought, split across a gap, with two competing headings doing
+          the work of one. The competitions now read as the evidence for the
+          ask rather than a separate topic.
+
+          Nothing in the list is a link. Routing a stranger from a marketing
+          page into a real pool would expose members who never agreed to it, and
+          the one competition we could point at scores zero today. */}
       <section className="py-14 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance max-w-2xl">
@@ -178,6 +188,7 @@ export default function Home() {
           <p className="mt-4 text-lg text-muted max-w-xl">
             Added as their seasons come round. Tell us what you want next.
           </p>
+
           {/* A grid rather than a scroller: five items fit, and a short list in
               a horizontal scroller reads as a widget tucked into the page
               instead of a section of it. */}
@@ -199,23 +210,22 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section className="py-14 sm:py-20">
-        {/* Was a full-bleed band. On one surface it becomes an object instead —
-            same emphasis, without repainting the page to get it. */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-card bg-surface border border-border-subtle shadow-card px-6 py-12 sm:px-12 sm:py-16 text-center">
-          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink text-balance">
-            Get your group in before the season does
-          </h2>
-          <p className="mt-4 text-lg text-muted">
-            Free, unlimited pools, as many people as you want in each one.
-          </p>
-            <div className="mt-8 flex justify-center">
-              <Button href="/signup" size="lg">Create a pool &mdash; free</Button>
+          {/* The ask, on the same surface as the list it follows. It kept its
+              own card when it was a section of its own; inside this one that
+              chrome would just be a box drawn round a sentence. */}
+          <div className="mt-12 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 rounded-card border border-border-subtle bg-surface shadow-card p-7 sm:p-9">
+            <div>
+              <p className="text-xl sm:text-2xl font-black tracking-tight text-ink text-balance">
+                Get your group in before the season does
+              </p>
+              <p className="mt-2 t-body text-muted">
+                Free, unlimited pools, as many people as you want in each one.
+              </p>
             </div>
+            <Button href="/signup" size="lg" className="shrink-0">
+              Create a pool &mdash; free
+            </Button>
           </div>
         </div>
       </section>
