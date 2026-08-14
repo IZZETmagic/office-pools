@@ -16,6 +16,8 @@ import type { ApiFootballFixture } from '@/lib/integrations/apiFootball/types'
 import { recalculatePool } from '@/lib/scoring/recalculate'
 import { snapshotPoolRanks } from '@/lib/scoring/snapshotRanks'
 import { linkKnockoutFixtures } from '@/lib/integrations/apiFootball/linkKnockoutFixtures'
+import { advancementTriggerFor } from '@/lib/competitionFormat'
+import { loadSyncTargets } from '@/lib/integrations/apiFootball/syncTargets'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,15 +64,35 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true, reason: 'sync_enabled=false' })
   }
 
-  // Defaults are baked in for the FIFA World Cup 2026 in our Supabase.
-  // Override via env if you need to point sync at a different competition.
-  const tournamentId =
-    process.env.API_FOOTBALL_TOURNAMENT_ID || '00000000-0000-0000-0000-000000000001'
-  const league = parseInt(process.env.API_FOOTBALL_LEAGUE_ID ?? '1', 10)
-  const season = parseInt(process.env.API_FOOTBALL_SEASON ?? '2026', 10)
-
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
+
+  // Which competitions to sync. Read per-tournament from the `tournaments` row
+  // rather than from three env globals, so adding a second competition is a row
+  // and not a redeploy. Falls back to the env single-target if the ingest-config
+  // columns aren't there yet (migration 024) — see loadSyncTargets.
+  const targets = await loadSyncTargets(admin, (stage, message) => errors.push({ stage, message }))
+
+  // Cross-competition accumulators. Ingest is per-tournament; advancement, the
+  // rank snapshot and the recalc sweep all run once, after every competition has
+  // been ingested, so that a run touching two competitions still takes the sweep
+  // lock exactly once.
+  let fixturesSeen = 0
+  let fixturesChanged = 0
+  let fixturesSkippedManual = 0
+  const newlyCompleted: Array<{ match_id: string; stage: string }> = []
+  let scoresChanged = false  // any FT or PSO score moved this run → triggers live leaderboard recalc
+  const changedMatchIds = new Set<string>()  // which matches' scores moved (drives the per-match recalc hint)
+  const snapshotTournamentIds: string[] = []  // tournaments whose matchday just started (rank snapshot)
+  const touchedTournamentIds = new Set<string>()  // tournaments with a score change (scopes the sweep)
+
+  for (const target of targets) {
+  const { tournamentId, league, season } = target
+  // `newlyCompleted` accumulates across competitions, so "did THIS competition
+  // complete anything" has to be measured against its length on entry — not
+  // against whether it is non-empty, which a previous competition may already
+  // have made true.
+  const completedBefore = newlyCompleted.length
 
   // --- Auto-link knockout fixtures whose bracket teams have paired ----------
   // Replaces the manual per-round scripts/map-knockout-fixtures.ts. Rate-limited
@@ -79,14 +101,18 @@ async function handle(request: NextRequest) {
   // api-football fixture reliably exists). Auto-links ONLY when exactly one
   // candidate matches; anything ambiguous is surfaced as an error, never guessed.
   // Runs before the fetch below so a freshly-linked match is score-synced this run.
+  //
+  // Bracket competitions only: a league has no placeholders to resolve, so
+  // there is nothing here for it to link and the season-feed fetch would be
+  // pure quota burn.
   const KNOCKOUT_LINK_INTERVAL_MS = 15 * 60 * 1000
-  const { data: linkRow } = await admin
+  const { data: linkRow } = target.format === 'league' ? { data: null } : await admin
     .from('sync_settings')
     .select('setting_value')
     .eq('setting_key', 'knockout_link_last_attempt')
     .maybeSingle()
   const lastLinkAttempt = linkRow?.setting_value ? new Date(linkRow.setting_value as string).getTime() : 0
-  if (now - lastLinkAttempt >= KNOCKOUT_LINK_INTERVAL_MS) {
+  if (target.format !== 'league' && now - lastLinkAttempt >= KNOCKOUT_LINK_INTERVAL_MS) {
     // Stamp first so a repeated failure can't hammer the api every minute.
     await admin
       .from('sync_settings')
@@ -119,8 +145,9 @@ async function handle(request: NextRequest) {
     .not('external_match_id', 'is', null)
     .order('match_date', { ascending: true })
   if (matchErr) {
-    errors.push({ stage: 'fetch_matches', message: matchErr.message })
-    return finishRun(admin, { startedAt, errors, triggeredBy })
+    // One competition failing to read must not abandon the others.
+    errors.push({ stage: 'fetch_matches', message: matchErr.message, details: { tournament_id: tournamentId } })
+    continue
   }
 
   // Pre-run live state, from the DB snapshot above (before this run's updates).
@@ -134,17 +161,9 @@ async function handle(request: NextRequest) {
     return t - LIVE_WINDOW_BEFORE_MS <= now && now <= t + LIVE_WINDOW_AFTER_MS
   })
 
-  if (candidates.length === 0) {
-    return finishRun(admin, {
-      startedAt,
-      errors,
-      triggeredBy,
-      fixturesSeen: 0,
-      fixturesChanged: 0,
-      fixturesSkippedManual: 0,
-      notes: 'no live window matches',
-    })
-  }
+  // Nothing in this competition's live window — the common case for a
+  // competition that is between matchdays, or finished.
+  if (candidates.length === 0) continue
 
   // Pull team mapping (external -> our) once
   const { data: teams } = await admin
@@ -168,12 +187,6 @@ async function handle(request: NextRequest) {
   const fixtureByExt = new Map<string, ApiFootballFixture>()
   for (const f of fixtures) fixtureByExt.set(f.fixture.id.toString(), f)
 
-  let fixturesSeen = 0
-  let fixturesChanged = 0
-  let fixturesSkippedManual = 0
-  const newlyCompleted: Array<{ match_id: string; stage: string }> = []
-  let scoresChanged = false  // any FT or PSO score moved this run → triggers live leaderboard recalc
-  const changedMatchIds = new Set<string>()  // which matches' scores moved (drives the per-match recalc hint)
   let anyNewlyLive = false  // a match transitioned scheduled→live this run (drives the rank snapshot)
 
   // Process candidates that have a corresponding fixture today
@@ -231,6 +244,7 @@ async function handle(request: NextRequest) {
       ) {
         scoresChanged = true
         changedMatchIds.add(ours.match_id)
+        touchedTournamentIds.add(tournamentId)
       }
     }
 
@@ -255,10 +269,33 @@ async function handle(request: NextRequest) {
     }
   }
 
+  // A new matchday started in THIS competition (its first match went live and
+  // nothing of its own was live before this run). Tracked per tournament: two
+  // competitions' matchdays start independently, and snapshotting one because
+  // the other kicked off would reset its movement arrows mid-matchday.
+  if (anyNewlyLive && !someMatchAlreadyLive) {
+    snapshotTournamentIds.push(tournamentId)
+  }
+
+  if (newlyCompleted.length > completedBefore) touchedTournamentIds.add(tournamentId)
+
+  } // end per-competition ingest
+
   // Cascade team advancement for newly completed matches.
-  if (newlyCompleted.length > 0) {
+  //
+  // Only fixtures that are part of a bracket enter the cascade. A league
+  // fixture has nothing to advance — no placeholder resolves to it, no
+  // downstream slot depends on it — so advancementTriggerFor() returns null and
+  // it is skipped here rather than guarded downstream. See lib/competitionFormat.ts
+  // for why the old inverted default ("not group ⇒ knockout result") was a
+  // corruption path into the finished World Cup bracket, not just untidy.
+  const advancing = newlyCompleted
+    .map((m) => ({ ...m, trigger: advancementTriggerFor(m.stage) }))
+    .filter((m): m is typeof m & { trigger: 'group_complete' | 'knockout_result' } => m.trigger !== null)
+
+  if (advancing.length > 0) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || originFromRequest(request)
-    for (const m of newlyCompleted) {
+    for (const m of advancing) {
       try {
         const advRes = await fetch(`${baseUrl}/api/admin/advance-teams`, {
           method: 'POST',
@@ -267,7 +304,7 @@ async function handle(request: NextRequest) {
             authorization: `Bearer ${cronSecret ?? ''}`,
           },
           body: JSON.stringify({
-            trigger: m.stage === 'group' ? 'group_complete' : 'knockout_result',
+            trigger: m.trigger,
             match_id: m.match_id,
           }),
         })
@@ -287,15 +324,18 @@ async function handle(request: NextRequest) {
   // movement. MUST run before the recalc below, so the baseline is the rank as
   // it stood at the end of the previous matchday, not after this run's recalc
   // moves it. Wrapped so a failure can never break the sync or the sweep.
-  if (anyNewlyLive && !someMatchAlreadyLive) {
+  if (snapshotTournamentIds.length > 0) {
     try {
       const { data: snapPools } = await admin
         .from('pools')
         .select('pool_id')
-        .eq('tournament_id', tournamentId)
+        .in('tournament_id', snapshotTournamentIds)
       const snapPoolIds = (snapPools ?? []).map((p) => p.pool_id)
       const snapped = await snapshotPoolRanks(admin, snapPoolIds)
-      console.log(`[sync-fixtures] rank snapshot: ${snapped} entries across ${snapPoolIds.length} pools`)
+      console.log(
+        `[sync-fixtures] rank snapshot: ${snapped} entries across ${snapPoolIds.length} pools ` +
+          `in ${snapshotTournamentIds.length} competition(s)`
+      )
     } catch (e) {
       errors.push({ stage: 'snapshot_ranks', message: errMsg(e) })
     }
@@ -374,10 +414,17 @@ async function handle(request: NextRequest) {
             ? [...changedMatchIds][0]
             : undefined
 
-        const { data: allPools } = await admin
-          .from('pools')
-          .select('pool_id, prediction_mode')
-          .eq('tournament_id', tournamentId)
+        // Scope the sweep to the competitions that actually moved. A pure drain
+        // (no fresh change, resuming a deferred sweep) has no touched
+        // competition, so it falls back to all of them and lets the cursor
+        // filter below narrow it — otherwise a drain would select nothing and
+        // the deferred work would never complete.
+        const sweepTournamentIds =
+          touchedTournamentIds.size > 0
+            ? [...touchedTournamentIds]
+            : targets.map((t) => t.tournamentId)
+
+        const allPools = await fetchPoolsForSweep(admin, sweepTournamentIds)
         // Bracket scoring cannot change from a live in-progress scoreline — only
         // from completed matches. Skip bracket pools on live-only sweeps; include
         // them on completions and on any deferred/drain catch-up.
@@ -442,10 +489,50 @@ async function handle(request: NextRequest) {
     fixturesChanged,
     fixturesSkippedManual,
     notes: [
-      newlyCompleted.length > 0 ? `cascade fired for ${newlyCompleted.length} match(es)` : null,
+      targets.length > 1 ? `synced ${targets.length} competitions` : null,
+      targets.some((t) => t.source === 'env_fallback') ? 'env fallback in use (024 unapplied?)' : null,
+      advancing.length > 0 ? `cascade fired for ${advancing.length} match(es)` : null,
+      newlyCompleted.length > advancing.length
+        ? `${newlyCompleted.length - advancing.length} non-bracket completion(s) skipped the cascade`
+        : null,
       sweepNote,
     ].filter(Boolean).join('; ') || null,
   })
+}
+
+/**
+ * Every pool in the given competitions, paged.
+ *
+ * Paging is not defensive tidiness here — an unbounded PostgREST `.select()`
+ * silently truncates at 1,000 rows, service-role included. Production is at 623
+ * pools against one competition; a second competition's pools cross that line,
+ * and the failure mode is that the pools past the cap simply stop being
+ * recalculated, with no error anywhere. Silent, and indistinguishable from
+ * "scoring is fine".
+ */
+async function fetchPoolsForSweep(
+  admin: ReturnType<typeof createAdminClient>,
+  tournamentIds: string[]
+): Promise<Array<{ pool_id: string; prediction_mode: string }>> {
+  const out: Array<{ pool_id: string; prediction_mode: string }> = []
+  if (tournamentIds.length === 0) return out
+
+  const PAGE = 1000
+  let offset = 0
+  for (;;) {
+    const { data, error } = await admin
+      .from('pools')
+      .select('pool_id, prediction_mode')
+      .in('tournament_id', tournamentIds)
+      .order('pool_id', { ascending: true })
+      .range(offset, offset + PAGE - 1)
+    if (error) throw new Error(`fetchPoolsForSweep: ${error.message}`)
+    if (!data || data.length === 0) break
+    out.push(...(data as Array<{ pool_id: string; prediction_mode: string }>))
+    if (data.length < PAGE) break
+    offset += data.length
+  }
+  return out
 }
 
 async function finishRun(
