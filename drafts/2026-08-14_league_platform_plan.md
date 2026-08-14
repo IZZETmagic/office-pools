@@ -349,12 +349,17 @@ post-042 formula, 97 on the pre-042 stored values. Three options, none obviously
 The World Cup is complete and its pools are effectively archived, which is what makes this a
 judgement call rather than an emergency.
 
-**Phase 1 — league scoring**
-5. `shadow_score_match`: flat tier for `regular_season`, gate treats it like `group`.
-6. `recalculatePool` early-returns for league pools; `readSource` forces shadow by format.
-7. Verify `shadow_calculate_bonuses` and `shadow_finalize_totals` no-op safely for a league pool
-   (the bonus path iterates 12 hardcoded groups — needs to be *provably* nothing, not accidentally
-   nothing).
+**Phase 1 — league scoring** — ✅ complete 2026-08-14
+
+| # | Step | State |
+|---|---|---|
+| 5 | Gate + pricing. Three "group vs everything else" binaries replaced with named predicates (`stage_has_scheduled_teams`, `mode_submits_per_round`). Found a **third** zero-scoring path not in the register: the submission filter names only `progressive`, so a league pool's entries were filtered out before scoring ran. | ✅ 046a–c |
+| 5b | ⚠ **Unplanned** — single-base pricing, aligning shadow with migration 042. See the landmine section above. | ✅ 046d |
+| 6 | `recalculatePool` early-returns for `league_pickem`; `getScoringSource` returns `'shadow'` by **mode**, not via the allowlist (an omitted pool would have read prod and rendered zeros). Locked with tests. | ✅ code |
+| 7 | Bonus path **proven** inert for a league, not assumed: every source CTE is gated on `stage='group'` or on `shadow_resolved_*` / `shadow_actual_*` tables a league never populates, and the retraction `DELETE` is entry-scoped. Its submission filter aligned anyway — it stops being a no-op when Final Table lands. | ✅ 046e |
+
+Remaining `= 'progressive'` literals in `shadow_score_match` (3) are deliberate: they express
+bracket-resolution semantics (progressive resolves teams from the actual bracket), not submission.
 
 **Phase 2 — matchweeks as rounds**
 8. Format-aware round resolver replacing static `ROUND_ORDER` / `ROUND_LABELS` / `ROUND_MATCH_STAGES`.

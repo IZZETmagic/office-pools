@@ -71,11 +71,21 @@ export async function getShadowReadPools(admin: AdminClient): Promise<Set<string
 
 // Resolve the source for one pool. Every mode now honours the flag — see the
 // header note on the retired bracket_picker hard rule.
+//
+// EXCEPT league pools, which are shadow-only by construction. The Node engine
+// deliberately does not score them (recalculatePool returns early), precisely so
+// there is no second implementation for a parity alarm to bless while both are
+// wrong. That makes the flag the wrong gate for them: it is an ALLOWLIST, so a
+// league pool omitted from it would read prod, find nothing, and render a
+// leaderboard of zeros — with no error, because empty is a valid result. Keying
+// off the mode instead means a new league pool is correct the moment it exists,
+// with no operational step to forget.
 export async function getScoringSource(
   admin: AdminClient,
   poolId: string,
-  _predictionMode: string,
+  predictionMode: string,
 ): Promise<ScoringSource> {
+  if (predictionMode === 'league_pickem') return 'shadow'
   const pools = await getShadowReadPools(admin)
   return pools.has(poolId) ? 'shadow' : 'prod'
 }

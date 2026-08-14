@@ -500,3 +500,12 @@ $function$;
 --
 -- Full incident write-up, measurements and the open decision:
 --   drafts/2026-08-14_league_platform_plan.md → "Phase 1 found a live landmine"
+--
+--   046e  shadow_calculate_bonuses adopts mode_submits_per_round. A no-op today
+--         (every bonus source is gated on stage='group' or on bracket-derived
+--         shadow tables a league never populates, and the retraction DELETE is
+--         entry-scoped) but it stops being one when Final Table lands, since
+--         Decision 9 scores Final Table into bonus_points. Applied by having the
+--         database rewrite the function from its own pg_get_functiondef output,
+--         guarded on finding exactly one occurrence -- a 9.4 kB live scoring
+--         function retyped by hand is a transcription risk with no upside.

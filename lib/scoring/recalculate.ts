@@ -81,12 +81,26 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       return { success: false, poolId, predictionMode: 'unknown', entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: `Pool not found: ${poolError?.message}` }
     }
 
+    // League pools are scored in SQL only, and this is the enforcement point.
+    //
+    // Not a performance shortcut — a deliberate refusal to write a second
+    // implementation. The World Cup's worst scoring bugs survived because prod
+    // and shadow agreed with each other while both were wrong, so the parity
+    // alarm blessed them; a league engine written twice would recreate exactly
+    // that. League pools have no prod-scoring history to preserve, which makes
+    // them the one engine that gets to start clean with a single owner.
+    //
+    // Side-effect pushes still fire: they read the shadow score table, so a
+    // league member gets their result and badge notifications normally.
+    // Paired with getScoringSource, which returns 'shadow' for this mode.
+    const isLeaguePool = pool.prediction_mode === 'league_pickem'
+
     // Production-scoring kill-switch (shadow cutover). When prod scoring is
     // disabled, skip the heavy recompute — the shadow engine covers
     // full_tournament + progressive. bracket_picker has NO shadow engine, so it
     // KEEPS scoring here regardless of the flag. Still fire the side-effect
     // pushes (they read shadow scores when off). Fail-safe default ON.
-    if (pool.prediction_mode !== 'bracket_picker' && !(await isProdScoringEnabled(adminClient))) {
+    if (isLeaguePool || (pool.prediction_mode !== 'bracket_picker' && !(await isProdScoringEnabled(adminClient)))) {
       void fanOutResultPushes().catch((err) =>
         console.error(`[scoring] push fan-out (shadow mode) failed for pool ${poolId}:`, err),
       )
