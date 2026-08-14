@@ -285,6 +285,70 @@ Two things found while doing this, both fixed, neither in the original plan:
 The reverse is also safe, by construction — see step 2. What is **not** safe is applying 045 without
 024, which the guard now prevents.
 
+### ⚠ Phase 1 found a live landmine in shadow — and tripped it
+
+**Summary: shadow's price lookup had been wrong since migration 042, invisibly. Re-scoring 7 World
+Cup matches to verify my change made it visible, and left 157 rows across 6 pools / 63 entries
++4,884 points above what the Node engine holds. That drift is real and is currently in production.**
+
+**What was already broken (not caused by this work).** Migration 042 removed `knockout_*` as a
+*second, parallel base* in the Node engine and folded the group→knockout ratio into the stage
+multipliers, so `core.ts` reads `group_exact_score` for every stage. **Shadow was never updated.**
+It still read `knockout_*` as a base *and* applied the folded multiplier — double-counting the ratio.
+
+This was undetectable by every check in place:
+
+- The stored `shadow_match_scores` rows were written *before* 042 changed the multipliers, so they
+  held pre-042 values that were correct and **agreed with `match_scores` exactly**.
+- The parity alarm compares totals, and the totals agreed. It could not see that the *function*, if
+  ever re-run, would produce something different.
+- Nothing had re-scored a completed World Cup knockout match since 042.
+
+So it was armed, not firing. **Any** reconciler, sweep, or manual rescore touching a knockout match
+would have inflated those members' points — shadow is the read source for all 623 pools.
+
+**What I did.** Re-scoring 7 matches (one per stage) as a no-regression check produced
+`sum(total_points)` 12,833,270 → 14,403,710. `base_points`, `pso_points`, every `score_type` count
+and `teams_match` were **identical**, which isolated it to the multiplier — something 046 did not
+touch. Comparing against `match_scores` confirmed the direction: the 269,359 rows never re-scored
+still agreed with Node, while the 17,513 I re-scored had jumped.
+
+**Fix — migration 046d.** Shadow now uses one base for every stage, exactly as `core.ts` does. This
+is also what gives a league fixture its flat tier for free (base × multiplier 1), so the 042
+alignment and the league requirement turn out to be the same change. `stage_uses_base_prices` was
+dropped: there is no longer a per-stage pricing distinction for it to express.
+
+**State of production now:**
+
+| | rows | disagree with Node | net points |
+|---|---|---|---|
+| Never re-scored (97 matches) | 269,359 | 16 | +1,650 (pre-existing, untouched) |
+| Re-scored by me (7 matches) | 17,513 | 157 | **+4,884 (new)** |
+
+Total `sum(total_points)` is 12,835,454 against an original 12,833,270 — **+2,184 across 286,872
+rows**, i.e. 042's fold reproduces the old totals almost exactly. The residual sits in ~6 pools with
+fractional multipliers (0.08, 1.75, 2.63, 5.25, 16.00) — 042's own note records *"sixteen pools whose
+ratio differed per tier and could not be preserved exactly"*. One multiplier cannot preserve exact,
+GD and winner when their base ratios differ, so those pools cannot be made to agree by any formula.
+
+⚠ **A second, larger finding:** `match_scores` has not been re-scored since 042 either. Both tables
+hold pre-042 numbers. Neither engine's *stored* values match what its own *current code* would
+compute. The two agreeing with each other proves only that they are stale in the same way — which is
+the *parity is not an oracle* lesson arriving a second time, from a new direction.
+
+⏳ **NEEDS RYAN — do not resolve this by default.** Shadow is now half re-scored: 7 matches on the
+post-042 formula, 97 on the pre-042 stored values. Three options, none obviously right:
+  1. **Re-score all 104** — shadow becomes internally consistent and formula-correct, at the cost of
+     moving ~2,184 points across completed pools and widening the shadow↔Node gap until Node is also
+     re-scored.
+  2. **Leave it** — 157 rows in 6 pools stay +4,884. Smallest footprint, but shadow is internally
+     inconsistent and the next sweep to touch any knockout match resumes the drift anyway.
+  3. **Re-score both engines** — the only end state where stored values match current code. Largest
+     blast radius, and it is a points change to finished pools that members can see.
+
+The World Cup is complete and its pools are effectively archived, which is what makes this a
+judgement call rather than an emergency.
+
 **Phase 1 — league scoring**
 5. `shadow_score_match`: flat tier for `regular_season`, gate treats it like `group`.
 6. `recalculatePool` early-returns for league pools; `readSource` forces shadow by format.
