@@ -246,8 +246,30 @@ Ordering is a dependency order, not a schedule.
 | 1 | Advancement dispatch diverged — `lib/competitionFormat.ts`, wired into `sync-fixtures`. Keyed on **`stage`**, not `tournaments.format`, so it needs no 024 column and is safe to deploy before the migration. Inverted to fail-closed: only known bracket stages advance. | ✅ done |
 | 2 | Multi-tenant sync — `lib/integrations/apiFootball/syncTargets.ts`; the cron loops over competitions. Falls back to the env single-target if 024's columns are absent, with an explicit error check, so **deploy order is not load-bearing in either direction**. | ✅ done |
 | 3 | Migration **045** — `matches.round_label`, `(tournament_id, round_number)` index, matchweek-level lock, `league_pickem` CHECK widening. Opens with a `DO` block that **raises** if 024 is not applied. | ✅ written, not applied |
-| 4 | Apply **024**, then **045**, to production | ⏳ **needs Ryan** |
+| 4 | Apply **024**, then **045**, to production | ✅ applied 2026-08-14 |
 | 5 | Deploy the code | ⏳ Ryan's — a push to `master` is a prod deploy |
+
+**Post-apply verification, 2026-08-14 (production):**
+
+- `tournaments`: World Cup row backfilled to `format='groups_knockout'`, `external_league_id=1`,
+  `external_season=2026`, `external_provider='api_football'`. The sync cron can now read its config
+  from the row.
+- CHECKs widened: `matches_stage_check` accepts `regular_season`; `tournaments_tournament_type_check`
+  accepts `premier_league`/`league`; `pools_prediction_mode_check` accepts `league_pickem`.
+- `matches.round_label` present; `idx_matches_tournament_round` present; **0** `regular_season` rows,
+  so the trigger's league branch is unreachable and the World Cup path is provably unchanged.
+- **The replaced trigger was exercised against live data**, not just inspected: a no-op self-update
+  of a real prediction on a completed match was targeted (1 row) and blocked by the trigger
+  (0 rows passed). No data changed.
+- **The new matchweek-deadline expression was validated** against a synthetic matchweek
+  (Sat 12:30 / Sat 15:00 / Sun 14:00 / Mon 20:00): all four fixtures resolve to Saturday 12:30, the
+  next matchweek is not dragged in, a second competition sharing ordinal 3 does not leak in, and a
+  cup fixture with a NULL ordinal keeps its own kickoff.
+
+⚠ **What is NOT yet proven:** the trigger's *allow* path and the league branch end-to-end. All 104
+World Cup fixtures are completed, so production currently contains no fixture a prediction could
+legitimately be written against. Both get their real test at Phase 3, when a season is imported —
+and that test is a launch gate, not a nicety.
 
 Two things found while doing this, both fixed, neither in the original plan:
 
