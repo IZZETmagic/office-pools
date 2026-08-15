@@ -355,18 +355,38 @@ hold pre-042 numbers. Neither engine's *stored* values match what its own *curre
 compute. The two agreeing with each other proves only that they are stale in the same way — which is
 the *parity is not an oracle* lesson arriving a second time, from a new direction.
 
-⏳ **NEEDS RYAN — do not resolve this by default.** Shadow is now half re-scored: 7 matches on the
-post-042 formula, 97 on the pre-042 stored values. Three options, none obviously right:
-  1. **Re-score all 104** — shadow becomes internally consistent and formula-correct, at the cost of
-     moving ~2,184 points across completed pools and widening the shadow↔Node gap until Node is also
-     re-scored.
-  2. **Leave it** — 157 rows in 6 pools stay +4,884. Smallest footprint, but shadow is internally
-     inconsistent and the next sweep to touch any knockout match resumes the drift anyway.
-  3. **Re-score both engines** — the only end state where stored values match current code. Largest
-     blast radius, and it is a points change to finished pools that members can see.
+✅ **RESOLVED IN SHADOW 2026-08-15 — Ryan chose option 1, full re-score.** All 104 World Cup
+matches re-scored through `shadow_score_match`, then `shadow_finalize_totals`. A complete snapshot
+was taken first (`backup_shadow_match_scores_pre_r20`, `backup_shadow_entry_totals_pre_r20`), since
+R20's own entry recorded that the earlier 7-match re-score had no row-level backup — not a mistake
+to repeat across all 104.
 
-The World Cup is complete and its pools are effectively archived, which is what makes this a
-judgement call rather than an emergency.
+**What actually moved**, measured against that snapshot rather than estimated:
+
+| | |
+|---|---|
+| `score_type` changed | **0 rows** — no member's exact/GD/winner/miss judgement moved |
+| `base_points` changed | 21,304 rows |
+| `multiplier` changed | 55,036 rows |
+| **`total_points` changed** | **855 rows** — 7 pools, 126 entries, net **+11,453** |
+| Ranks changed | 52 entries across 4 pools |
+| **Pool winners changed** | **none** — 0 gained, 0 lost |
+
+Tens of thousands of base and multiplier values moved while barely any totals did, which is exactly
+what 042's fold was built to do. Every affected pool has a per-tier ratio differing between exact and
+winner (2.00 vs 1.67, 3.00 vs 1.00, 6.00 vs 2.00 …) — 042's own *"sixteen pools whose ratio differed
+per tier and could not be preserved exactly"*.
+
+⏳ **The trade-off option 1 carried, now realised.** The diff alarm went **66 → 126** mismatched
+entries across 6 pools: shadow is correct against current config, prod still holds pre-042 values.
+Members see nothing different — `readSource` serves shadow for all 623 pools — but the monitor meant
+to catch the *next* problem now sits permanently red.
+
+⚠ **Do not clear it with `recalculatePool`.** That fires `fanOutResultPushes` and
+`detectAndPushBadgesForPool`, which would push badge and level notifications to members of finished
+pools — a notification event with no sporting cause, which fails the disclosure gate outright. The
+safe convergence is a targeted write of `pool_entries.scored_total_points` from shadow for those 126
+entries, which changes nothing a member sees and returns the alarm to its baseline.
 
 **Phase 1 — league scoring** — ✅ complete 2026-08-14
 
