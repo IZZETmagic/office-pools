@@ -429,7 +429,42 @@ the UI is Phase 4.
 | # | Step | State |
 |---|---|---|
 | 10 | Importer generalized: `detectRegularSeasonPhase` picks the league phase **by size**, play-off phases are skipped with a per-phase reason, an ordinal collision inside the chosen phase **throws before any insert**, and `round_label` is carried through. The script prints the phase decision and everything skipped. 17 tests. | ✅ |
-| 11 | Import one real league end to end | 🔒 **blocked on the deploy — see below** |
+| 11 | Import one real league end to end | ✅ **done 2026-08-15** — Premier League 2026/27 |
+
+**The import.** `tournaments` row `b1299174-d459-420d-ba0e-b6397186b935` — Premier League 2026/27,
+`format='league'`, `tournament_type='league'` (generic, so a second league needs no CHECK change),
+api-football league 39 / season 2026. Then `scripts/import-league-season.ts … --apply`.
+
+Season 2026 was a genuine **pre-season** import — 0 of 380 fixtures finished — which is exactly what
+the importer is designed for. First fixture 21 Aug 19:00 UTC, Arsenal v Coventry.
+
+Verified after the write:
+
+| Check | Result |
+|---|---|
+| Teams / fixtures | 20 / 380 |
+| Matchweeks | 1–38, **exactly 10 fixtures each** |
+| A club appearing twice in one matchweek | none |
+| Duplicate pairings (double round-robin) | none |
+| `round_label` / `home_team_id` / `external_match_id` missing | 0 / 0 / 0 |
+| World Cup rows touched | none — still 48 teams, 104 matches, 104 completed |
+
+**Two things this proved that nothing before could:**
+
+1. **The multi-tenant sync works end to end.** The next cron run recorded
+   `notes = "synced 2 competitions"`, zero errors. Competition config is genuinely being read from
+   the `tournaments` row.
+2. **The matchweek lock is right on real fixtures.** Matchweek 1 runs Fri 21 Aug 19:00 → Mon 24 Aug
+   19:00 — a **72-hour window** — and the trigger's deadline is the Friday kickoff. A Sunday picker
+   is locked out, which is the whole reason per-fixture locking was wrong.
+
+⚠ **The import armed a live footgun, now closed in code.** Both create-pool wizards listed
+tournaments unfiltered while offering only the three World Cup modes, so a `full_tournament`
+Premier League pool became creatable the moment the row existed — and it would score **zero for
+every fixture, silently** (R2 exactly). Both wizards now filter to bracket-format competitions
+(`format is null or 'groups_knockout'`); league competitions reappear when the league mode has a
+create flow and a prediction UI in Phase 4. **This fix is committed but NOT deployed** — the
+exposure is live until it is.
 
 **Phase chosen by size, not by name.** An allowlist of known names would have imported *nothing* for
 Scotland, whose phase is `1st Phase`. The league phase is always the long one — 30–46 rounds against

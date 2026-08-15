@@ -140,9 +140,21 @@ export default function CreatePoolModal() {
 
   useEffect(() => {
     (async () => {
+      // Bracket-format competitions only.
+      //
+      // A league tournament exists in production (Premier League 2026/27), but
+      // this wizard only offers the three World Cup pool modes. Creating a
+      // league pool as `full_tournament` would score ZERO for every fixture,
+      // silently — the scoring gate compares predicted teams against a bracket
+      // the pool does not have. Until the league mode has a create flow and a
+      // prediction UI (Phase 4), league competitions are not selectable here.
+      //
+      // `format` is null on rows predating migration 024, so null is treated as
+      // bracket rather than filtered out.
       const { data, error: tErr } = await supabase
         .from('tournaments')
-        .select('tournament_id, name, short_name, host_countries, start_date, end_date, description')
+        .select('tournament_id, name, short_name, host_countries, start_date, end_date, description, format')
+        .or('format.is.null,format.eq.groups_knockout')
         .order('start_date', { ascending: false });
       if (tErr) {
         setError(tErr.message);
