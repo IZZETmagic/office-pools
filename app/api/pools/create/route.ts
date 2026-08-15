@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { seedPoolRoundStates } from '@/lib/poolRoundStates'
 
 const SCORING_DEFAULTS = {
   group_exact_score: 100,
@@ -128,26 +129,28 @@ export async function POST(request: NextRequest) {
     console.error('Failed to save scoring settings:', settingsError.message)
   }
 
-  // 6. For progressive pools: seed round states and disable bracket pairing bonus
-  if (prediction_mode === 'progressive') {
-    const roundKeys = ['group', 'round_32', 'round_16', 'quarter_final', 'semi_final', 'third_place', 'final']
-    const roundStates = roundKeys.map(key => ({
-      pool_id: newPool.pool_id,
-      round_key: key,
-      state: key === 'group' ? 'open' : 'locked',
-      deadline: key === 'group' ? prediction_deadline : null,
-      opened_at: key === 'group' ? new Date().toISOString() : null,
-    }))
+  // 6. Seed round states for the modes that have rounds.
+  //
+  // The seven-key World Cup list used to be a literal here (and again in the
+  // branded-pool route). It now comes from the competition: a league pool gets
+  // one round per matchweek, derived from its imported fixtures, because the
+  // count varies by league — 38 for a 20-club division, 34 for 18, 46 for the
+  // Championship.
+  if (prediction_mode === 'progressive' || prediction_mode === 'league_pickem') {
+    const seed = await seedPoolRoundStates(adminClient, {
+      poolId: newPool.pool_id,
+      tournamentId: newPool.tournament_id,
+      predictionMode: prediction_mode,
+      predictionDeadline: prediction_deadline,
+    })
 
-    const { error: roundError } = await adminClient
-      .from('pool_round_states')
-      .insert(roundStates)
-
-    if (roundError) {
-      console.error('Failed to create round states:', roundError.message)
+    if (seed.error) {
+      console.error('Failed to create round states:', seed.error)
     }
 
-    // Disable bracket pairing bonus for progressive pools
+    // Disable bracket pairing bonus — a pairing bonus needs a bracket, which
+    // neither a progressive pool (it predicts fixtures, not the bracket) nor a
+    // league (there is no bracket at all) has.
     await adminClient
       .from('pool_settings')
       .update({ bonus_correct_bracket_pairing: 0 })

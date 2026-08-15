@@ -1,7 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { ROUND_ORDER, ROUND_LABELS, ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { isMatchweekKey, nextRoundKey, roundLabel } from '@/lib/competitionRounds'
+import { fetchPoolRoundKeys, fetchRoundMatches } from '@/lib/roundMatches'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
@@ -93,8 +95,12 @@ async function handlePOST(
           return NextResponse.json({ error: `Cannot open round in '${roundState.state}' state` }, { status: 400 })
         }
 
-        // For knockout rounds, verify all teams are assigned
-        if (round_key !== 'group') {
+        // For knockout rounds, verify all teams are assigned. Skipped for a
+        // league matchweek: its teams are named by the schedule from the day
+        // the season is published, so there is nothing to wait for — and the
+        // stage lookup would return no fixtures, making the guard pass or fail
+        // for the wrong reason.
+        if (round_key !== 'group' && !isMatchweekKey(round_key)) {
           const stages = ROUND_MATCH_STAGES[round_key as RoundKey] ?? []
           const { data: roundMatches } = await db
             .from('matches')
@@ -207,21 +213,27 @@ async function handlePOST(
   // Send notifications for round open. For a super-admin override we stay silent
   // by default (it's usually a fix, not a fresh round) unless notify is set.
   if (action === 'open' && (!override || notify === true)) {
-    sendRoundOpenNotifications(pool_id, pool.pool_name, round_key as RoundKey, deadline!).catch(console.error)
+    sendRoundOpenNotifications(pool_id, pool.pool_name, round_key, deadline!).catch(console.error)
   }
 
   // If completing a round, auto-open next round
   if (action === 'complete') {
-    const nextRound = ROUND_ORDER[round_key as RoundKey]
+    // Successor resolved against the rounds this pool actually has, not the
+    // static seven-entry ROUND_ORDER map — a league's last round is matchweek
+    // 34, 38 or 46 depending on the division.
+    const { keys: poolRoundKeys } = await fetchPoolRoundKeys(db, pool_id)
+    const nextRound = nextRoundKey(round_key, poolRoundKeys)
     if (nextRound) {
-      // Check if next round matches have teams assigned
-      const stages = ROUND_MATCH_STAGES[nextRound] ?? []
-      const { data: nextMatches } = await db
-        .from('matches')
-        .select('match_id, home_team_id, away_team_id, match_date')
-        .eq('tournament_id', pool.tournament_id)
-        .in('stage', stages)
-        .order('match_date', { ascending: true })
+      const { data: nextMatches } = await fetchRoundMatches<{
+        match_id: string
+        home_team_id: string | null
+        away_team_id: string | null
+        match_date: string
+      }>(db, {
+        tournamentId: pool.tournament_id,
+        roundKey: nextRound,
+        columns: 'match_id, home_team_id, away_team_id, match_date',
+      })
 
       const allTeamsAssigned = (nextMatches ?? []).every(m => m.home_team_id && m.away_team_id)
 
@@ -261,7 +273,7 @@ async function handlePOST(
 async function sendRoundOpenNotifications(
   poolId: string,
   poolName: string,
-  roundKey: RoundKey,
+  roundKey: string,
   deadline: string
 ) {
   const adminClient = createAdminClient()
@@ -275,21 +287,21 @@ async function sendRoundOpenNotifications(
 
   if (!members || members.length === 0) return
 
-  const stages = ROUND_MATCH_STAGES[roundKey] ?? []
-  // Get match count for the round
+  // Get match count for the round, via the selector (see lib/roundMatches.ts).
   const { data: pool } = await adminClient
     .from('pools')
     .select('tournament_id')
     .eq('pool_id', poolId)
     .single()
 
-  const { count: matchCount } = await adminClient
-    .from('matches')
-    .select('*', { count: 'exact', head: true })
-    .eq('tournament_id', pool?.tournament_id)
-    .in('stage', stages)
+  const { data: roundFixtures } = await fetchRoundMatches<{ match_id: string }>(adminClient, {
+    tournamentId: pool?.tournament_id as string,
+    roundKey,
+    columns: 'match_id',
+  })
+  const matchCount = roundFixtures.length
 
-  const roundName = ROUND_LABELS[roundKey]
+  const roundName = roundLabel(roundKey)
   const poolUrl = `${appUrl}/pools/${poolId}?tab=predictions`
 
   const emails = members

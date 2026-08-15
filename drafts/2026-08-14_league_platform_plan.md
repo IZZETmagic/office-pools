@@ -361,9 +361,49 @@ judgement call rather than an emergency.
 Remaining `= 'progressive'` literals in `shadow_score_match` (3) are deliberate: they express
 bracket-resolution semantics (progressive resolves teams from the actual bracket), not submission.
 
-**Phase 2 — matchweeks as rounds**
-8. Format-aware round resolver replacing static `ROUND_ORDER` / `ROUND_LABELS` / `ROUND_MATCH_STAGES`.
-9. Seed matchweek round states on league-pool creation; auto-open rides the existing sweep.
+**Phase 2 — matchweeks as rounds** — ✅ complete 2026-08-14
+
+| # | Step | State |
+|---|---|---|
+| 8 | Format-aware round model: `lib/competitionRounds.ts` (pure, 23 tests) + `lib/roundMatches.ts` (the one query helper). A round now carries a **selector** — "these stages" or "this matchweek" — instead of a stage list. | ✅ |
+| 8b | Every league-facing server path converted: the auto-complete/auto-open sweep, the rounds list, round open/close, and round submission. | ✅ |
+| 9 | `lib/poolRoundStates.ts` seeds rounds from the competition, shared by both pool-creation routes (the seven-key World Cup list was a literal in each). 7 tests. | ✅ |
+
+**The bug this phase actually removes.** `ROUND_MATCH_STAGES[key] ?? []` appears at roughly a dozen
+call sites. A matchweek key is not in that map, so it coalesces to `[]`, and `.in('stage', [])` is
+not an error — it is a valid query returning zero rows. Every one of those sites would have read
+that as *"this round has no fixtures yet"* and done nothing:
+
+- the auto-complete sweep would have seen *all zero* fixtures finished and **completed matchweek 1
+  immediately**, then cascaded through the whole season in one pass;
+- submitting a matchweek would have saved **zero predictions and reported success**;
+- the rounds list would have shown every matchweek as `0 matches`.
+
+Same silent-emptiness class as the zero-scoring pool. The selector makes an unknown key return an
+**error** rather than an empty round.
+
+**Three decisions worth recording:**
+
+1. **League deadlines are the matchweek's first kickoff exactly**, with no grace window — bracket
+   rounds keep their 2 h. This is not a preference: `trg_enforce_prediction_before_kickoff`
+   (migration 045) enforces that instant in the database and silently drops later writes. A
+   deadline that disagreed would either close a matchweek early or show an open round whose saves
+   vanish without an error. (This answers §6 question 4.)
+2. **Mid-season creation is handled at seed time.** Decision 2 allows joining after first lock, so
+   matchweeks already kicked off seed `completed`, the next upcoming one seeds `open`, the rest
+   `locked`. Seeding all `locked` would leave a September pool with nothing open and nothing able to
+   open it — the sweep only advances a round when the previous one completes.
+3. **Round succession is resolved against the pool's real rows**, not a static map. There is no
+   constant that is right for a 34-, 38- and 46-matchweek league at once, and it steps over a gap in
+   the feed rather than dead-ending on it.
+
+**Found and fixed in passing:** the deadline auto-submit sweep re-queried the round's fixtures
+**once per entry**. For a 38-matchweek league that is one fixture query per member per matchweek.
+Now fetched once per round.
+
+⚠ **Not converted, deliberately:** the bracket-only paths (`advance-teams`, `bracketResolver`) and
+the progressive React flow (`ProgressivePredictionsFlow`). A league pool never reaches the first two;
+the UI is Phase 4.
 
 **Phase 3 — ingestion, generalized**
 10. Importer: phase detection, playoff rounds skipped-with-reason, hard failure on ordinal collision.

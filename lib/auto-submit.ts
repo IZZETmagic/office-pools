@@ -2,7 +2,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate, roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
-import { ROUND_LABELS, ROUND_MATCH_STAGES, ROUND_ORDER, type RoundKey } from '@/lib/tournament'
+// No longer imports lib/tournament's ROUND_* maps: every round question in this
+// file now goes through the format-aware resolver, so the World Cup's seven
+// hardcoded rounds are no longer baked into the sweep that has to drive a
+// 34-, 38- or 46-matchweek season.
+import { isMatchweekKey, nextRoundKey, roundLabel } from '@/lib/competitionRounds'
+import { fetchPoolRoundKeys, fetchRoundMatches } from '@/lib/roundMatches'
 import { sendPushToUser, sendPushToUsers } from '@/lib/push/apns'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
@@ -248,16 +253,18 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
       const memberMap = new Map((members ?? []).map((m: any) => [m.member_id, m]))
 
       for (const round of rounds) {
-        const roundKey = round.round_key as RoundKey
-        const roundName = ROUND_LABELS[roundKey] ?? roundKey
-        const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+        const roundKey = round.round_key
+        const roundName = roundLabel(roundKey)
 
-        // Get match count for this round
-        const { count: roundMatchCount } = await supabase
-          .from('matches')
-          .select('*', { count: 'exact', head: true })
-          .eq('tournament_id', pool.tournament_id)
-          .in('stage', stages)
+        // Fixture count for this round, via the selector rather than a stage
+        // filter — see lib/roundMatches.ts. A matchweek counted by stage would
+        // report every fixture in the season.
+        const { data: roundFixtures } = await fetchRoundMatches<{ match_id: string }>(supabase, {
+          tournamentId: pool.tournament_id,
+          roundKey,
+          columns: 'match_id',
+        })
+        const roundMatchCount = roundFixtures.length
 
         // Find entries without submission for this round that have predictions
         for (const entry of entries) {
@@ -271,20 +278,17 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
 
           if (existingSub?.has_submitted) continue
 
-          // Count predictions for this round's matches
-          const { data: matchIds } = await supabase
-            .from('matches')
-            .select('match_id')
-            .eq('tournament_id', pool.tournament_id)
-            .in('stage', stages)
-
-          if (!matchIds || matchIds.length === 0) continue
+          // Count predictions for this round's fixtures. Reuses the list
+          // fetched once above rather than re-querying `matches` per entry —
+          // this ran inside the per-entry loop, so a 38-matchweek league pool
+          // would have issued one fixture query per member per matchweek.
+          if (roundFixtures.length === 0) continue
 
           const { count: predCount } = await supabase
             .from('predictions')
             .select('*', { count: 'exact', head: true })
             .eq('entry_id', entry.entry_id)
-            .in('match_id', matchIds.map(m => m.match_id))
+            .in('match_id', roundFixtures.map(m => m.match_id))
 
           if (!predCount || predCount === 0) continue
 
@@ -392,8 +396,7 @@ export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResul
     result.roundsChecked = inProgressRounds.length
 
     for (const round of inProgressRounds) {
-      const roundKey = round.round_key as RoundKey
-      const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+      const roundKey = round.round_key
 
       // 2. Get pool's tournament_id
       const { data: pool } = await supabase
@@ -404,14 +407,24 @@ export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResul
 
       if (!pool) continue
 
-      // 3. Check if ALL matches in this round are completed
-      const { data: roundMatches } = await supabase
-        .from('matches')
-        .select('match_id, is_completed')
-        .eq('tournament_id', pool.tournament_id)
-        .in('stage', stages)
+      // 3. Check if ALL matches in this round are completed.
+      //
+      // Resolved through the round selector rather than `.in('stage', ...)`: a
+      // matchweek's fixtures all share stage 'regular_season' and are told apart
+      // by round_number, so a stage filter would select the WHOLE SEASON for
+      // matchweek 1 and never complete it. An unknown key returns an error
+      // instead of an empty list — an empty list here would read as "all zero
+      // fixtures are finished" and complete the round immediately.
+      const { data: roundMatches, error: roundMatchesError } = await fetchRoundMatches<{
+        match_id: string
+        is_completed: boolean
+      }>(supabase, { tournamentId: pool.tournament_id, roundKey, columns: 'match_id, is_completed' })
 
-      if (!roundMatches || roundMatches.length === 0) continue
+      if (roundMatchesError) {
+        result.errors.push(`Pool ${round.pool_id} round ${roundKey}: ${roundMatchesError}`)
+        continue
+      }
+      if (roundMatches.length === 0) continue
 
       const allCompleted = roundMatches.every(m => m.is_completed)
       if (!allCompleted) continue
@@ -435,8 +448,18 @@ export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResul
       result.completed++
       console.log(`[AutoComplete] Completed ${roundKey} for pool ${round.pool_id}`)
 
-      // 5. Auto-open next round if teams are assigned
-      const nextRound = ROUND_ORDER[roundKey]
+      // 5. Auto-open next round if teams are assigned.
+      //
+      // The successor is resolved against the rounds this pool ACTUALLY has,
+      // not the static seven-entry ROUND_ORDER map. A league's last round is
+      // matchweek 34 in the Bundesliga and 38 in the Premier League — there is
+      // no constant that is right for both, and the count comes from the feed.
+      const { keys: poolRoundKeys, error: keysError } = await fetchPoolRoundKeys(supabase, round.pool_id)
+      if (keysError) {
+        result.errors.push(`Pool ${round.pool_id} round keys: ${keysError}`)
+        continue
+      }
+      const nextRound = nextRoundKey(roundKey, poolRoundKeys)
       if (!nextRound) continue
 
       // Check current state of next round (must be locked)
@@ -449,22 +472,41 @@ export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResul
 
       if (!nextRoundState || nextRoundState.state !== 'locked') continue
 
-      const nextStages = ROUND_MATCH_STAGES[nextRound] ?? []
-      const { data: nextMatches } = await supabase
-        .from('matches')
-        .select('match_id, home_team_id, away_team_id, match_date')
-        .eq('tournament_id', pool.tournament_id)
-        .in('stage', nextStages)
-        .order('match_date', { ascending: true })
+      const { data: nextMatches, error: nextMatchesError } = await fetchRoundMatches<{
+        match_id: string
+        home_team_id: string | null
+        away_team_id: string | null
+        match_date: string
+      }>(supabase, {
+        tournamentId: pool.tournament_id,
+        roundKey: nextRound,
+        columns: 'match_id, home_team_id, away_team_id, match_date',
+      })
 
-      if (!nextMatches || nextMatches.length === 0) continue
+      if (nextMatchesError) {
+        result.errors.push(`Pool ${round.pool_id} next round ${nextRound}: ${nextMatchesError}`)
+        continue
+      }
+      if (nextMatches.length === 0) continue
 
       const allTeamsAssigned = nextMatches.every(m => m.home_team_id && m.away_team_id)
       if (!allTeamsAssigned) continue
 
-      // Default deadline: 2 hours before first match of next round
+      // Deadline.
+      //
+      // Bracket: 2 h before the round's first kickoff, unchanged.
+      //
+      // League: the matchweek's FIRST kickoff exactly — no grace window. This
+      // has to agree with `trg_enforce_prediction_before_kickoff`, which
+      // migration 045 made matchweek-level and which silently drops writes past
+      // that instant. If this said 2 h earlier, the UI would close a matchweek
+      // while the database still accepted picks; if it said later, members would
+      // see an open round whose saves vanish without an error. The trigger is
+      // the real gate, so this mirrors it.
       const firstMatchDate = new Date(nextMatches[0].match_date)
-      const defaultDeadline = new Date(firstMatchDate.getTime() - 2 * 60 * 60 * 1000).toISOString()
+      const defaultDeadline = isMatchweekKey(nextRound)
+        ? firstMatchDate.toISOString()
+        : new Date(firstMatchDate.getTime() - 2 * 60 * 60 * 1000).toISOString()
 
       const { error: openError } = await supabase
         .from('pool_round_states')
@@ -505,7 +547,7 @@ export async function autoCompleteProgressiveRounds(): Promise<AutoCompleteResul
 async function sendAutoRoundOpenNotifications(
   poolId: string,
   poolName: string,
-  roundKey: RoundKey,
+  roundKey: string,
   deadline: string
 ) {
   const supabase = createAdminClient()
@@ -523,14 +565,16 @@ async function sendAutoRoundOpenNotifications(
     .eq('pool_id', poolId)
     .single()
 
-  const stages = ROUND_MATCH_STAGES[roundKey] ?? []
-  const { count: matchCount } = await supabase
-    .from('matches')
-    .select('*', { count: 'exact', head: true })
-    .eq('tournament_id', pool?.tournament_id)
-    .in('stage', stages)
+  // Fixture count via the round selector: a matchweek is identified by
+  // round_number, so a stage filter would count the entire season.
+  const { data: roundFixtures } = await fetchRoundMatches<{ match_id: string }>(supabase, {
+    tournamentId: pool?.tournament_id as string,
+    roundKey,
+    columns: 'match_id',
+  })
+  const matchCount = roundFixtures.length
 
-  const roundName = ROUND_LABELS[roundKey]
+  const roundName = roundLabel(roundKey)
   const poolUrl = `${APP_URL}/pools/${poolId}?tab=predictions`
 
   const emails = members
@@ -560,7 +604,7 @@ async function sendAutoRoundOpenNotifications(
   // Push notifications
   const userIds = members.map((m: any) => m.user_id).filter(Boolean)
   if (userIds.length > 0) {
-    const roundName = ROUND_LABELS[roundKey]
+    const roundName = roundLabel(roundKey)
     sendPushToUsers(
       userIds,
       {

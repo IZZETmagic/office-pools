@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { ROUND_MATCH_STAGES, ROUND_LABELS } from '@/lib/tournament'
+import { roundLabel } from '@/lib/competitionRounds'
+import { fetchRoundMatches } from '@/lib/roundMatches'
 import { sendEmail } from '@/lib/email/send'
 import { roundSubmittedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { withPerfLogging } from '@/lib/api-perf'
-import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
 // =============================================================
 // PUT /api/pools/:poolId/predictions/round - Submit round predictions
@@ -96,13 +96,18 @@ async function handlePUT(
     return NextResponse.json({ error: 'Predictions already submitted for this round' }, { status: 403 })
   }
 
-  // Get matches for this round
-  const stages = ROUND_MATCH_STAGES[roundKey as RoundKey] ?? []
-  const { data: roundMatches } = await supabase
-    .from('matches')
-    .select('match_id')
-    .eq('tournament_id', pool.tournament_id)
-    .in('stage', stages)
+  // Get matches for this round, via the round selector. A matchweek's fixtures
+  // all share stage 'regular_season' and are told apart by round_number, so the
+  // old `.in('stage', ROUND_MATCH_STAGES[key] ?? [])` selected NOTHING for a
+  // league round — submitting a matchweek would have saved zero predictions and
+  // reported success.
+  const { data: roundMatches, error: roundMatchesError } = await fetchRoundMatches<{ match_id: string }>(
+    supabase,
+    { tournamentId: pool.tournament_id, roundKey, columns: 'match_id' }
+  )
+  if (roundMatchesError) {
+    return NextResponse.json({ error: roundMatchesError }, { status: 400 })
+  }
 
   const roundMatchIds = (roundMatches ?? []).map(m => m.match_id)
   const totalRoundMatches = roundMatchIds.length
@@ -171,7 +176,7 @@ async function handlePUT(
     .is('predictions_submitted_at', null)
 
   // Send confirmation email (fire-and-forget)
-  const roundName = ROUND_LABELS[roundKey as RoundKey] ?? roundKey
+  const roundName = roundLabel(roundKey)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
   const { subject, html } = roundSubmittedTemplate({
     userName: userProfile?.full_name || userProfile?.username,

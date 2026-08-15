@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { ROUND_KEYS, ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { ROUND_KEYS } from '@/lib/tournament'
+import { selectorForKey } from '@/lib/competitionRounds'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -46,19 +47,30 @@ async function handleGET(
 
   if (roundError) return NextResponse.json({ error: roundError.message }, { status: 500 })
 
-  // Get match counts per stage
+  // Fixture counts, bucketed both ways: by stage for bracket rounds, and by
+  // round_number for league matchweeks (which all share stage 'regular_season'
+  // and so collapse into a single useless bucket if counted by stage alone).
   const { data: matches } = await supabase
     .from('matches')
-    .select('match_id, stage, is_completed')
+    .select('match_id, stage, round_number, is_completed')
     .eq('tournament_id', pool.tournament_id)
 
   const matchCountsByStage: Record<string, { total: number; completed: number }> = {}
+  const matchCountsByRound: Record<number, { total: number; completed: number }> = {}
   for (const match of matches ?? []) {
     if (!matchCountsByStage[match.stage]) {
       matchCountsByStage[match.stage] = { total: 0, completed: 0 }
     }
     matchCountsByStage[match.stage].total++
     if (match.is_completed) matchCountsByStage[match.stage].completed++
+
+    if (match.stage === 'regular_season' && typeof match.round_number === 'number') {
+      if (!matchCountsByRound[match.round_number]) {
+        matchCountsByRound[match.round_number] = { total: 0, completed: 0 }
+      }
+      matchCountsByRound[match.round_number].total++
+      if (match.is_completed) matchCountsByRound[match.round_number].completed++
+    }
   }
 
   // Get entry ID from query param for submission status
@@ -129,11 +141,17 @@ async function handleGET(
 
   // Build response
   const rounds = (roundStates ?? []).map(rs => {
-    const stages = ROUND_MATCH_STAGES[rs.round_key as keyof typeof ROUND_MATCH_STAGES] ?? []
+    // Fixture counts per round. Bracket rounds aggregate their stages; a
+    // matchweek aggregates its own round_number bucket, because every matchweek
+    // shares one stage and a stage lookup would report the whole season.
+    const selector = selectorForKey(rs.round_key)
     let matchCount = 0
     let completedMatchCount = 0
-    for (const stage of stages) {
-      const counts = matchCountsByStage[stage]
+    const buckets =
+      selector.kind === 'stages'
+        ? selector.stages.map((st) => matchCountsByStage[st])
+        : [matchCountsByRound[selector.roundNumber]]
+    for (const counts of buckets) {
       if (counts) {
         matchCount += counts.total
         completedMatchCount += counts.completed
