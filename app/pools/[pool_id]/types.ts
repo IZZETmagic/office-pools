@@ -96,6 +96,8 @@ export type MatchData = {
   match_number: number
   stage: string
   group_letter: string | null
+  /** League matchweek. NULL for cup fixtures, which use `stage` instead. */
+  round_number: number | null
   home_team_id: string | null
   away_team_id: string | null
   home_team_placeholder: string | null
@@ -246,7 +248,11 @@ export type ExistingPrediction = {
 // PROGRESSIVE MODE TYPES
 // =====================
 
-export type RoundKey = 'group' | 'round_32' | 'round_16' | 'quarter_final' | 'semi_final' | 'third_place' | 'final'
+// A round key is whatever the competition's format defines: the seven World Cup
+// bracket keys, or `mw_1`..`mw_38` for a league. It is `text` in the database
+// and must be `string` here — a closed union silently excluded every matchweek.
+// lib/competitionRounds.ts is the source of truth for what a key means.
+export type RoundKey = string
 
 export type RoundStateValue = 'locked' | 'open' | 'in_progress' | 'completed'
 

@@ -200,3 +200,39 @@ export function sortRoundKeys(keys: string[]): string[] {
     return 1_000_000
   }
 }
+
+// ---------------------------------------------------------------- Pool modes
+
+/**
+ * Does this pool predict round by round?
+ *
+ * `progressive` and `league_pickem` both do — each round opens, locks at its own
+ * deadline and records submission in `entry_round_submissions`. They arrive
+ * there for different reasons (a knockout round's teams are unknown until the
+ * previous one resolves; a league simply has weeks) but the machinery is the
+ * same, and every consumer that asked `mode === 'progressive'` was really
+ * asking this.
+ *
+ * Named rather than inlined because the alternative is 46 scattered equality
+ * checks, each of which has to be found and changed when a mode is added —
+ * which is exactly how a league pool ends up silently taking the
+ * all-at-once path and rendering 380 fixtures on one screen.
+ */
+export function usesRounds(mode: string): boolean {
+  return mode === 'progressive' || mode === 'league_pickem'
+}
+
+/** Does this pool predict a bracket — placeholders, advancement, team picks? */
+export function usesBracket(mode: string): boolean {
+  return mode === 'full_tournament' || mode === 'bracket_picker'
+}
+
+/**
+ * Short label for a round pill. A league season shows up to 46 of these in one
+ * scrolling row, where "Matchweek 12" is too wide to scan.
+ */
+export function roundShortLabel(key: string): string {
+  const mw = matchweekNumber(key)
+  if (mw !== null) return `MW ${mw}`
+  return roundLabel(key)
+}

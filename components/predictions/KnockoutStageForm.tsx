@@ -1,5 +1,6 @@
 'use client'
 
+import { roundLabel } from '@/lib/competitionRounds'
 import {
   Match,
   PredictionMap,
@@ -27,7 +28,10 @@ type Props = {
 }
 
 export function KnockoutStageForm({ stage, resolvedMatches, predictions, onUpdatePrediction, psoEnabled, readOnly }: Props) {
-  const stageLabel = STAGE_LABELS[stage] || stage
+  // `stage` here is really the round key. STAGE_LABELS only knows the seven
+  // World Cup rounds, so a matchweek falls through to roundLabel rather than
+  // rendering the raw key `mw_5` at a member.
+  const stageLabel = STAGE_LABELS[stage] || roundLabel(stage)
   const totalMatches = resolvedMatches.length
   const predictedMatches = resolvedMatches.filter(rm => {
     const pred = predictions.get(rm.match.match_id)
@@ -175,10 +179,15 @@ function KnockoutMatchCard({
     })
   }
 
+  // Per-fixture caption. Every fixture in a league season has stage
+  // 'regular_season', so repeating it 10 times under one matchweek says
+  // nothing — blank there, and the round header carries the context instead.
   const stageLabel = match.stage === 'third_place'
     ? 'Third Place'
     : match.stage === 'final'
     ? 'Final'
+    : match.stage === 'regular_season'
+    ? ''
     : match.stage.replace(/_/g, ' ')
 
   // PSO validation: scores can't be tied
@@ -220,7 +229,7 @@ function KnockoutMatchCard({
             <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
               {homeName}
             </p>
-            {homeTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {homeTeam.group_letter}</p>}
+            {homeTeam?.group_letter && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {homeTeam.group_letter}</p>}
           </div>
           {homeTeam?.flag_url && (
             <img src={homeTeam.flag_url} alt={homeName} className="hidden sm:block w-6 h-4 rounded-[2px] object-cover shrink-0" />
@@ -261,7 +270,7 @@ function KnockoutMatchCard({
             <p className={`text-[11px] sm:text-sm font-semibold truncate ${bothResolved ? 'text-neutral-900' : 'text-neutral-500'}`}>
               {awayName}
             </p>
-            {awayTeam && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {awayTeam.group_letter}</p>}
+            {awayTeam?.group_letter && <p className="text-[10px] text-neutral-400 hidden sm:block">Group {awayTeam.group_letter}</p>}
           </div>
         </div>
 

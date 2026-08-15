@@ -13,15 +13,12 @@
  * a real pool would also expose members who never agreed to that; the
  * /play/[slug] pages show real boards only because those pools opted in.
  *
- * Premier League is open as of 2026-08-15. The blocker recorded here — every
- * league fixture taking the knockout path, failing the bracket-team check and
- * scoring zero, silently — was fixed by migration 046: the team-matching gate
- * and the price lookup are now named predicates that understand a league
- * fixture, and the 2026/27 season is imported (380 fixtures, 38 matchweeks).
- *
- * ⚠ Still unproven at the time of writing: no Premier League fixture has been
- * played, so league scoring has never scored a real result. First kick-off is
- * 21 Aug 2026. If that matchweek scores wrong, this is the line to flip back.
+ * Premier League says "coming soon" rather than taking pools. Ingestion is live
+ * (migration 024 + importLeagueSeason.ts), but the scoring engine decides stage
+ * by `stage === 'group'` (lib/scoring/core.ts) while the importer writes
+ * REGULAR_SEASON_STAGE — so every league match takes the knockout path, fails
+ * the bracket-team check that path requires, and scores zero. Silently. Update
+ * the status when league scoring lands.
  */
 export type CompetitionState = 'open' | 'upcoming' | 'complete'
 
@@ -36,8 +33,8 @@ export type Competition = {
 }
 
 export const COMPETITIONS: Competition[] = [
-  { key: 'premier-league', name: 'Premier League', state: 'open',
-    status: '2026/27 · taking pools', stripe: ['#667EEA', '#3B6EFF'] },
+  { key: 'premier-league', name: 'Premier League', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#667EEA', '#3B6EFF'] },
   { key: 'world-cup-2026', name: 'FIFA World Cup', state: 'complete',
     status: '2026 · complete', stripe: ['#F5C518', '#CD7F32'] },
   { key: 'champions-league', name: 'Champions League', state: 'upcoming',

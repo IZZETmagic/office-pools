@@ -498,6 +498,47 @@ bracket. This is the ordering constraint Phase 0 was built around, and it holds:
     currently list tournaments unfiltered — `CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`).
 13. Fixture/matchweek UI on web and mobile; `app/competitions.ts` status flipped off "Coming soon".
 
+**Phase 4 — surfaces** — web ✅ 2026-08-15; mobile deliberately not
+
+| # | Step | State |
+|---|---|---|
+| 12 | Create-pool wizard offers league competitions with the league mode | ✅ web |
+| 13 | Matchweek prediction UI | ✅ web |
+| 13b | `app/competitions.ts` flipped off "Coming soon" | ✅ |
+| — | Mobile | 🔒 still filtered out — no league UI there yet |
+
+**Approach: one flow, not two.** `ProgressivePredictionsFlow` already had the right shape — round
+pills, per-round fixtures, per-round submit. It was only hardcoded to the World Cup's seven rounds.
+It now reads its rounds from the pool's own `pool_round_states` and resolves fixtures through the
+selector, so it serves both formats. A second league-only flow would have been a fork to keep in
+sync forever.
+
+Changes that mattered:
+
+- **`RoundKey` was a closed union** of the seven bracket keys. Widening it to `string` made the
+  compiler point at five sites that silently excluded matchweeks — which is the whole argument for
+  the widening.
+- **`isProgressive` → `usesRounds(mode)`** in `PoolDetail`. All five uses were really asking "does
+  this pool have rounds", and a league pool would otherwise have fallen through to the all-at-once
+  flow and rendered **380 fixtures on one screen**.
+- **Bracket resolution is skipped for matchweeks.** A league fixture names its own teams, so it is
+  built straight from the fixture instead of resolved against a bracket that does not exist.
+- **The wizard derives the mode** rather than syncing it in an effect. A member can pick Full
+  Tournament for the World Cup, step back, choose the Premier League and step forward — held in
+  state, that stale mode creates a league pool that scores zero. Derived, the competition always
+  wins.
+- Label leaks fixed: `mw_5` never reaches a member, and the per-fixture "regular season" caption is
+  blank (it would repeat under all ten fixtures of every matchweek).
+
+⚠ **What is NOT verified.** None of this has been opened in a browser. Types, lint and 344 tests
+pass, and the round model is unit-tested hard, but *rendering* is unproven: the Results, Leaderboard
+and Standings tabs on a league pool have not been looked at, and they are the likeliest place a
+bracket assumption still hides. The honest next step is to create one Premier League pool and click
+through it.
+
+**Mobile stays filtered.** Its wizard still hides league competitions, which is correct — it has no
+matchweek prediction UI, so offering the competition there would create pools nobody can fill in.
+
 **Not in this plan:** Results depth (needs its own `predicted_outcome` migration first), Showdown,
 Last Man Standing, Final Table, promotion playoffs.
 

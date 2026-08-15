@@ -13,6 +13,9 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  usesRounds,
+  usesBracket,
+  roundShortLabel,
   matchweekKey,
   matchweekNumber,
   isMatchweekKey,
@@ -183,5 +186,37 @@ describe('roundDefsFor — dispatch on format', () => {
   it('gives a league its matchweeks', () => {
     const defs = roundDefsFor('league', [...league(1), ...league(2)])
     expect(defs.map((d) => d.key)).toEqual(['mw_1', 'mw_2'])
+  })
+})
+
+describe('pool mode predicates', () => {
+  it('usesRounds is true for both round-based modes', () => {
+    // league_pickem missing here is how a league pool ends up on the
+    // all-at-once path, rendering 380 fixtures on one screen with no matchweek.
+    expect(usesRounds('progressive')).toBe(true)
+    expect(usesRounds('league_pickem')).toBe(true)
+    expect(usesRounds('full_tournament')).toBe(false)
+    expect(usesRounds('bracket_picker')).toBe(false)
+  })
+
+  it('usesBracket and usesRounds partition the four modes', () => {
+    for (const mode of ['full_tournament', 'progressive', 'bracket_picker', 'league_pickem']) {
+      expect(usesRounds(mode) !== usesBracket(mode), `mode ${mode}`).toBe(true)
+    }
+  })
+
+  it('a league pool is never treated as having a bracket', () => {
+    expect(usesBracket('league_pickem')).toBe(false)
+  })
+})
+
+describe('roundShortLabel — pills', () => {
+  it('abbreviates matchweeks, since a season shows up to 46 in one row', () => {
+    expect(roundShortLabel('mw_1')).toBe('MW 1')
+    expect(roundShortLabel('mw_38')).toBe('MW 38')
+  })
+
+  it('leaves bracket rounds as their full label', () => {
+    expect(roundShortLabel('quarter_final')).toBe('Quarter Finals')
   })
 })

@@ -52,7 +52,7 @@ export const PREDICTION_COLUMNS =
 // live_added over the wire for every fixture. Verified zero reads of those in the
 // web UI before narrowing. 100 kB -> 72 kB on a 104-match tournament.
 export const MATCH_COLUMNS =
-  'match_id, tournament_id, match_number, stage, group_letter, home_team_id, away_team_id, ' +
+  'match_id, tournament_id, match_number, stage, group_letter, round_number, home_team_id, away_team_id, ' +
   'home_team_placeholder, away_team_placeholder, match_date, venue, status, ' +
   'home_score_ft, away_score_ft, home_score_pso, away_score_pso, winner_team_id, ' +
   'is_completed, completed_at, status_detail, original_match_date, live_minute, live_period'

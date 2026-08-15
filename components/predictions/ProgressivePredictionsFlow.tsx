@@ -19,11 +19,12 @@ import {
   isPredictionComplete,
   GROUP_LETTERS,
   calculateGroupStandings,
-  ROUND_KEYS,
-  ROUND_LABELS,
-  getMatchesForRound,
-  type RoundKey,
+  type GroupStanding,
+  type RoundKey as BracketRoundKey,
 } from '@/lib/tournament'
+// Round identity comes from the competition, not from lib/tournament's seven
+// hardcoded World Cup keys — a league pool's rounds are its matchweeks.
+import { isMatchweekKey, matchesInRound, roundLabel, roundShortLabel, sortRoundKeys } from '@/lib/competitionRounds'
 import { resolveMatchesFromActual } from '@/lib/bracketResolver'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
 import type { SaveStatus } from './PredictionsFlow'
@@ -71,19 +72,30 @@ export default function ProgressivePredictionsFlow({
     return map
   }, [roundSubmissions])
 
+  // The rounds this pool actually has, in competition order. Read from
+  // pool_round_states rather than a constant: a World Cup pool has seven, a
+  // Premier League pool has thirty-eight, a Bundesliga pool thirty-four.
+  // sortRoundKeys orders matchweeks numerically — lexically, mw_10 precedes mw_2.
+  const orderedRoundKeys = useMemo(
+    () => sortRoundKeys(roundStates.map(rs => rs.round_key)),
+    [roundStates],
+  )
+
   // Find the current active round (first open round, or first non-completed round)
   const initialRound = useMemo(() => {
     const openRound = roundStates.find(rs => rs.state === 'open')
-    if (openRound) return openRound.round_key as RoundKey
+    if (openRound) return openRound.round_key
     const inProgressRound = roundStates.find(rs => rs.state === 'in_progress')
-    if (inProgressRound) return inProgressRound.round_key as RoundKey
-    // Default to the last completed round or first round
-    const completedRounds = roundStates.filter(rs => rs.state === 'completed')
-    if (completedRounds.length > 0) return completedRounds[completedRounds.length - 1].round_key as RoundKey
-    return 'group' as RoundKey
-  }, [roundStates])
+    if (inProgressRound) return inProgressRound.round_key
+    // Otherwise the most recent completed round, else the season's first.
+    const completed = orderedRoundKeys.filter(
+      k => roundStates.find(rs => rs.round_key === k)?.state === 'completed',
+    )
+    if (completed.length > 0) return completed[completed.length - 1]
+    return orderedRoundKeys[0] ?? ''
+  }, [roundStates, orderedRoundKeys])
 
-  const [selectedRound, setSelectedRound] = useState<RoundKey>(initialRound)
+  const [selectedRound, setSelectedRound] = useState<string>(initialRound)
 
   // Prediction state
   const pendingChanges = useRef(false)
@@ -142,7 +154,7 @@ export default function ProgressivePredictionsFlow({
   // Selected round state
   const currentRoundState = roundStateMap.get(selectedRound)
   const currentSubmission = roundSubmissionMap.get(selectedRound)
-  const roundMatches = useMemo(() => getMatchesForRound(matches, selectedRound), [matches, selectedRound])
+  const roundMatches = useMemo(() => matchesInRound(matches, selectedRound), [matches, selectedRound])
 
   const isRoundOpen = currentRoundState?.state === 'open'
   const isRoundPastDeadline = currentRoundState?.deadline
@@ -167,10 +179,50 @@ export default function ProgressivePredictionsFlow({
     return standings
   }, [selectedRound, matches, predictions, teams])
 
-  // Resolved knockout matches for progressive mode (from actual match data)
+  // Resolved knockout matches for progressive mode (from actual match data).
+  //
+  // Skipped for any round whose fixtures already name their own teams: the
+  // group stage (the draw is published up front) and every league matchweek
+  // (Arsenal v Coventry is Arsenal v Coventry from the day the season is
+  // released). Those rounds render straight from the fixture, and there is no
+  // bracket to resolve them against — resolveMatchesFromActual only understands
+  // the seven World Cup rounds.
   const resolvedKnockoutMatches = useMemo(() => {
     if (selectedRound === 'group') return []
-    const resolved = resolveMatchesFromActual(matches, teams, selectedRound)
+
+    // A league matchweek needs no bracket resolution — its fixtures carry real
+    // team ids from the day the season is published. Build the same shape
+    // directly from the fixture so the fixture-list form can render it.
+    if (isMatchweekKey(selectedRound)) {
+      const byId = new Map(teams.map(t => [t.team_id, t]))
+      // The card wants a GroupStanding. A league club has no group and no
+      // table position at pick time, so the standings fields are zeroed and
+      // group_letter is left empty — the card omits its "Group X" caption when
+      // there is no group rather than rendering "Group null".
+      const asStanding = (t: Team | undefined): GroupStanding | null =>
+        t
+          ? {
+              team_id: t.team_id,
+              country_name: t.country_name,
+              country_code: t.country_code,
+              flag_url: t.flag_url ?? null,
+              group_letter: '',
+              fifa_ranking_points: 0,
+              played: 0, wins: 0, draws: 0, losses: 0,
+              goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0,
+            }
+          : null
+      return roundMatches
+        .slice()
+        .sort((a, b) => a.match_date.localeCompare(b.match_date) || a.match_number - b.match_number)
+        .map(match => ({
+          match,
+          homeTeam: asStanding(match.home_team_id ? byId.get(match.home_team_id) : undefined),
+          awayTeam: asStanding(match.away_team_id ? byId.get(match.away_team_id) : undefined),
+        }))
+    }
+
+    const resolved = resolveMatchesFromActual(matches, teams, selectedRound as BracketRoundKey)
     return roundMatches
       .sort((a, b) => a.match_number - b.match_number)
       .map(match => ({
@@ -372,7 +424,7 @@ export default function ProgressivePredictionsFlow({
       })
 
       setShowSubmitModal(false)
-      showToast(`${ROUND_LABELS[selectedRound]} predictions submitted!`, 'success')
+      showToast(`${roundLabel(selectedRound)} predictions submitted!`, 'success')
     } catch (err: any) {
       setError(err.message || 'Failed to submit predictions')
     } finally {
@@ -383,14 +435,14 @@ export default function ProgressivePredictionsFlow({
   // =====================
   // RENDER
   // =====================
-  const roundName = ROUND_LABELS[selectedRound]
+  const roundName = roundLabel(selectedRound)
   const isAllRoundPredicted = predictedRoundCount === roundMatchCount && roundMatchCount > 0
 
   return (
     <div className="space-y-4">
       {/* Round selector pills */}
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-        {ROUND_KEYS.map(key => {
+        {orderedRoundKeys.map(key => {
           const rs = roundStateMap.get(key)
           const state = rs?.state ?? 'locked'
           const isSelected = key === selectedRound
@@ -413,7 +465,7 @@ export default function ProgressivePredictionsFlow({
                 state === 'locked' && !isSelected ? 'opacity-50 cursor-default' : 'cursor-pointer'
               }`}
             >
-              {ROUND_LABELS[key]}
+              {roundShortLabel(key)}
               {sub?.has_submitted && !isSelected && (
                 <Icon name="checkmark" size={12} className="inline-block ml-1 -mt-0.5" />
               )}

@@ -4,7 +4,7 @@ import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
-import { ROUND_LABELS, ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { roundLabel, selectorForKey } from '@/lib/competitionRounds'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
 export const dynamic = 'force-dynamic'
@@ -52,19 +52,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, poolsTargeted: 0, message: 'No matching pools' })
   }
 
-  const roundName = ROUND_LABELS[roundKey]
+  const roundName = roundLabel(roundKey)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
-  const stages = ROUND_MATCH_STAGES[roundKey] ?? []
+  const selector = selectorForKey(roundKey)
 
   // Match count per tournament (used in the email body), cached.
   const matchCountByTournament = new Map<string, number>()
   async function getMatchCount(tournamentId: string): Promise<number> {
     if (matchCountByTournament.has(tournamentId)) return matchCountByTournament.get(tournamentId)!
-    const { count } = await supabase
-      .from('matches')
-      .select('*', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId)
-      .in('stage', stages)
+    // Selected via the round selector: a matchweek is identified by
+    // round_number, so a stage filter would count the whole season.
+    let q = supabase.from('matches').select('*', { count: 'exact', head: true }).eq('tournament_id', tournamentId)
+    q = selector.kind === 'matchweek'
+      ? q.eq('stage', 'regular_season').eq('round_number', selector.roundNumber)
+      : q.in('stage', selector.stages)
+    const { count } = await q
     const c = count ?? 0
     matchCountByTournament.set(tournamentId, c)
     return c

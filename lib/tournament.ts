@@ -18,6 +18,13 @@ export type Match = {
   match_number: number
   stage: string
   group_letter: string | null
+  /**
+   * League matchweek; NULL for cup fixtures. Present on this World-Cup-shaped
+   * type because the shared prediction flow serves both formats and resolves a
+   * round through lib/competitionRounds, which needs it. Optional so the many
+   * bracket-only constructors of this type are unaffected.
+   */
+  round_number?: number | null
   match_date: string
   venue: string | null
   status: string

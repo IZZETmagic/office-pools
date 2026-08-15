@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { ROUND_MATCH_STAGES } from '@/lib/tournament'
+import { ROUND_MATCH_STAGES, type RoundKey as BracketRoundKey } from '@/lib/tournament'
 import { isMatchweekKey, nextRoundKey, roundLabel } from '@/lib/competitionRounds'
 import { fetchPoolRoundKeys, fetchRoundMatches } from '@/lib/roundMatches'
 import { sendBatchEmails } from '@/lib/email/send'
@@ -101,7 +101,8 @@ async function handlePOST(
         // stage lookup would return no fixtures, making the guard pass or fail
         // for the wrong reason.
         if (round_key !== 'group' && !isMatchweekKey(round_key)) {
-          const stages = ROUND_MATCH_STAGES[round_key as RoundKey] ?? []
+          // Guarded by !isMatchweekKey above, so this is a bracket key.
+          const stages = ROUND_MATCH_STAGES[round_key as BracketRoundKey] ?? []
           const { data: roundMatches } = await db
             .from('matches')
             .select('match_id, home_team_id, away_team_id')

@@ -15,6 +15,8 @@ type CreatePoolModalProps = {
   onSuccess?: () => void
 }
 
+type PoolMode = 'full_tournament' | 'progressive' | 'bracket_picker' | 'league_pickem'
+
 type Tournament = {
   tournament_id: string
   name: string
@@ -26,6 +28,8 @@ type Tournament = {
   end_date: string
   status: string
   description: string | null
+  /** 'league' | 'groups_knockout'. Null on rows predating migration 024. */
+  format: string | null
 }
 
 const SCORING_DEFAULTS = {
@@ -90,7 +94,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const [description, setDescription] = useState('')
 
   // Step 3: Pool Settings
-  const [predictionMode, setPredictionMode] = useState<'full_tournament' | 'progressive' | 'bracket_picker'>('full_tournament')
+  const [predictionMode, setPredictionMode] = useState<PoolMode>('full_tournament')
   const [isPrivate, setIsPrivate] = useState(false)
   const [maxParticipants, setMaxParticipants] = useState('0')
   const [maxEntries, setMaxEntries] = useState('1')
@@ -104,21 +108,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // Fetch tournaments on mount
   useEffect(() => {
     async function fetchTournaments() {
-      // Bracket-format competitions only.
-      //
-      // A league tournament exists in production (Premier League 2026/27), but
-      // this wizard only offers the three World Cup pool modes. Creating a
-      // league pool as `full_tournament` would score ZERO for every fixture,
-      // silently — the scoring gate compares predicted teams against a bracket
-      // the pool does not have. Until the league mode has a create flow and a
-      // prediction UI (Phase 4), league competitions are not selectable here.
-      //
-      // `format` is null on rows predating migration 024, so null is treated as
-      // bracket rather than filtered out.
+      // All competitions. The mode list below is filtered by the selected
+      // competition's format instead of hiding leagues outright, because the
+      // pairing is what has to be safe: a league scored as `full_tournament`
+      // would score ZERO for every fixture, silently.
       const { data } = await supabase
         .from('tournaments')
         .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format')
-        .or('format.is.null,format.eq.groups_knockout')
         .order('start_date', { ascending: false })
 
       const list = (data ?? []) as Tournament[]
@@ -132,6 +128,27 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedTournament = tournaments.find((t) => t.tournament_id === selectedTournamentId)
+
+  // A league has no bracket, so the three World Cup modes cannot score it —
+  // `full_tournament` in particular would score ZERO for every fixture,
+  // silently, because the scoring gate compares predicted teams against a
+  // bracket that does not exist. The competition decides which modes are on
+  // offer; format is null on rows predating migration 024, which are brackets.
+  const isLeagueTournament = selectedTournament?.format === 'league'
+
+  // The mode that will actually be submitted, DERIVED from the competition
+  // rather than synced into state by an effect.
+  //
+  // This matters beyond tidiness: a member can pick Full Tournament for the
+  // World Cup, step back, switch to the Premier League, and step forward again.
+  // Held in state, that stale mode rides along and creates a league pool that
+  // scores zero. Derived, it cannot — the competition always wins, and there is
+  // no render in which the two disagree.
+  const effectiveMode: PoolMode = isLeagueTournament
+    ? 'league_pickem'
+    : predictionMode === 'league_pickem'
+      ? 'full_tournament'
+      : predictionMode
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep)
 
@@ -208,7 +225,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           description: description.trim() || null,
           tournament_id: selectedTournamentId,
           prediction_deadline: deadline.toISOString(),
-          prediction_mode: predictionMode,
+          prediction_mode: effectiveMode,
           is_private: isPrivate,
           max_participants: maxP,
           max_entries_per_user: maxE,
@@ -429,7 +446,16 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   <p className="text-sm text-neutral-600">How will members make their predictions?</p>
 
                   <div className="space-y-3">
-                    {([
+                    {(isLeagueTournament ? [
+                      {
+                        value: 'league_pickem' as const,
+                        label: 'Matchweek Pick\u2019em',
+                        desc: 'Members predict each matchweek\u2019s fixtures. Picks lock at the first kick-off of the matchweek, and the next one opens when it finishes.',
+                        icon: (
+                          <Icon name="stairs" size={20} />
+                        ),
+                      },
+                    ] : [
                       {
                         value: 'full_tournament' as const,
                         label: 'Full Tournament',
@@ -470,13 +496,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         type="button"
                         onClick={() => setPredictionMode(opt.value)}
                         className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
-                          predictionMode === opt.value
+                          effectiveMode === opt.value
                             ? 'border-primary-600 bg-primary-600/8 ring-1 ring-primary-600/25'
                             : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span className={predictionMode === opt.value ? 'text-primary-600' : 'text-neutral-400'}>{opt.icon}</span>
+                          <span className={effectiveMode === opt.value ? 'text-primary-600' : 'text-neutral-400'}>{opt.icon}</span>
                           <h3 className="text-sm font-semibold text-neutral-900">{opt.label}</h3>
                         </div>
                         <p className="text-xs text-neutral-500 mt-1.5">{opt.desc}</p>
@@ -524,7 +550,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 <div className="space-y-5">
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-900 mb-3">
-                      {predictionMode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
+                      {effectiveMode === 'progressive' ? 'Group Stage Deadline' : effectiveMode === 'league_pickem' ? 'Matchweek 1 Deadline' : 'Prediction Deadline'}
                     </h3>
                     <div className="flex gap-3 mb-3 flex-wrap">
                       <div>

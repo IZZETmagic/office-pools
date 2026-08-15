@@ -22,6 +22,7 @@ import { AnalyticsTab } from './AnalyticsTab'
 import { PoolInfoTab } from './PoolInfoTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
+import { usesRounds } from '@/lib/competitionRounds'
 import BracketPickerFlow from '@/components/predictions/BracketPickerFlow'
 import { EntriesListView } from '@/components/predictions/EntriesListView'
 import { EntryDetailView } from '@/components/predictions/EntryDetailView'
@@ -267,7 +268,11 @@ export function PoolDetail({
   const [showNavWarning, setShowNavWarning] = useState(false)
 
   // Prediction mode flags (defined early so hooks can reference them)
-  const isProgressive = pool.prediction_mode === 'progressive'
+  // Does this pool predict round by round? True for progressive (World Cup
+  // knockout rounds) and for league_pickem (matchweeks). Every use below is
+  // really asking this, not "is it progressive" — the Rounds tab, the
+  // round-based prediction flow, and the all-at-once fallback.
+  const usesRoundFlow = usesRounds(pool.prediction_mode)
   const isBracketPicker = pool.prediction_mode === 'bracket_picker'
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
   const settingsDirtyRef = useRef(false)
@@ -988,7 +993,7 @@ export function PoolDetail({
   }))
 
   const adminTabs = [
-    ...(isProgressive ? [{ key: 'rounds' as Tab, label: 'Rounds' }] : []),
+    ...(usesRoundFlow ? [{ key: 'rounds' as Tab, label: 'Rounds' }] : []),
     { key: 'members' as Tab, label: 'Members' },
     ...(pool.entry_fee ? [{ key: 'fees' as Tab, label: 'Fees' }] : []),
     { key: 'scoring_config' as Tab, label: 'Scoring Config' },
@@ -1441,7 +1446,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'predictions' && activeEntry && isProgressive && (
+            {activeTab === 'predictions' && activeEntry && usesRoundFlow && (
               spectatingEntry ? (
                 <ProgressiveSpectatorView
                   ownerName={spectatingEntry.ownerName}
@@ -1646,7 +1651,7 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'predictions' && activeEntry && !isProgressive && !isBracketPicker && (
+            {activeTab === 'predictions' && activeEntry && !usesRoundFlow && !isBracketPicker && (
               spectatingEntry ? (
                 <SpectatorEntryView
                   ownerName={spectatingEntry.ownerName}
@@ -1940,7 +1945,7 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'rounds' && canAdmin && isProgressive && (
+            {activeTab === 'rounds' && canAdmin && usesRoundFlow && (
               <RoundsTab
                 poolId={pool.pool_id}
                 roundStates={roundStates}

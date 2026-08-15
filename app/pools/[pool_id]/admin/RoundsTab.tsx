@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { ROUND_LABELS, ROUND_KEYS, type RoundKey } from '@/lib/tournament'
+import { roundLabel, sortRoundKeys } from '@/lib/competitionRounds'
 import type { PoolRoundState, RoundStateValue } from '../types'
 
 type RoundRow = PoolRoundState & {
@@ -68,10 +68,12 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       const res = await fetch(`/api/pools/${poolId}/rounds`)
       if (!res.ok) throw new Error('Failed to fetch rounds')
       const data = await res.json()
-      // Sort by canonical round order (group first)
-      const orderMap = new Map(ROUND_KEYS.map((k, i) => [k, i]))
+      // Sort by competition order. sortRoundKeys handles both shapes: the
+      // World Cup's seven bracket rounds, and matchweeks — which must sort
+      // NUMERICALLY, since a lexical sort puts mw_10 before mw_2.
+      const order = new Map(sortRoundKeys((data.rounds ?? []).map((r: RoundRow) => r.round_key)).map((k, i) => [k, i]))
       const sorted = [...(data.rounds ?? [])].sort(
-        (a: RoundRow, b: RoundRow) => (orderMap.get(a.round_key) ?? 99) - (orderMap.get(b.round_key) ?? 99)
+        (a: RoundRow, b: RoundRow) => (order.get(a.round_key) ?? 99) - (order.get(b.round_key) ?? 99)
       )
       setRounds(sorted)
     } catch {
@@ -113,7 +115,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
   }
 
   const openModal = (type: 'open' | 'extend_deadline', roundKey: string) => {
-    const roundName = ROUND_LABELS[roundKey as RoundKey] ?? roundKey
+    const roundName = roundLabel(roundKey)
     // Default deadline: tomorrow at 2pm
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -144,7 +146,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
       {/* Mobile cards */}
       <div className="sm:hidden space-y-3">
         {rounds.map((round) => {
-          const roundName = ROUND_LABELS[round.round_key as RoundKey] ?? round.round_key
+          const roundName = roundLabel(round.round_key)
           const isPastDeadline = round.deadline ? new Date(round.deadline) < new Date() : false
 
           return (
@@ -270,7 +272,7 @@ export function RoundsTab({ poolId, roundStates: initialRoundStates }: RoundsTab
             </thead>
             <tbody>
               {rounds.map((round) => {
-                const roundName = ROUND_LABELS[round.round_key as RoundKey] ?? round.round_key
+                const roundName = roundLabel(round.round_key)
                 const isPastDeadline = round.deadline ? new Date(round.deadline) < new Date() : false
 
                 return (
