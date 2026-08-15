@@ -24,6 +24,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  hasCompetitionEnded,
   MATCH_STAGES,
   BRACKET_KNOCKOUT_STAGES,
   advancementTriggerFor,
@@ -108,6 +109,47 @@ describe('stage classification', () => {
   it('keeps knockout and league disjoint across all declared stages', () => {
     for (const stage of MATCH_STAGES) {
       expect(isKnockoutStage(stage) && isLeagueStage(stage)).toBe(false)
+    }
+  })
+})
+
+describe('hasCompetitionEnded — which competitions are still on offer', () => {
+  // Both production rows read status='upcoming' on this date, including the
+  // World Cup, whose final was 19 July. That is why this is derived from dates
+  // and not from the authored column.
+  const TODAY = new Date('2026-08-15T12:00:00Z')
+
+  it('hides a finished competition', () => {
+    // FIFA World Cup 2026: ended 2026-07-19, 104/104 played.
+    expect(hasCompetitionEnded('2026-07-19', TODAY)).toBe(true)
+  })
+
+  it('keeps a competition that has not started', () => {
+    // Premier League 2026/27: starts 21 Aug, ends 2027-05-30.
+    expect(hasCompetitionEnded('2027-05-30', TODAY)).toBe(false)
+  })
+
+  it('KEEPS a season already under way', () => {
+    // The trap. Filtering on "has it started" instead of "has it ended" would
+    // hide the Premier League from September onwards — and Decision 2 settled
+    // that a league pool stays joinable after first lock, "week 3 of 38 is
+    // viable". A season in progress is the normal case, not an edge case.
+    const midSeason = new Date('2026-11-20T12:00:00Z')
+    expect(hasCompetitionEnded('2027-05-30', midSeason)).toBe(false)
+  })
+
+  it('treats the final day as inclusive', () => {
+    // A competition ending today is still live today — end_date is a DATE, so
+    // an exclusive comparison would retire it at midnight on its own final.
+    expect(hasCompetitionEnded('2026-08-15', TODAY)).toBe(false)
+    expect(hasCompetitionEnded('2026-08-14', TODAY)).toBe(true)
+  })
+
+  it('keeps anything it cannot date', () => {
+    // Better to offer a competition with a missing or broken end date than to
+    // silently hide one that is running.
+    for (const bad of [null, undefined, '', 'not-a-date']) {
+      expect(hasCompetitionEnded(bad, TODAY), String(bad)).toBe(false)
     }
   })
 })

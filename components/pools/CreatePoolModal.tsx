@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
+import { hasCompetitionEnded } from '@/lib/competitionFormat'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -117,7 +118,10 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format')
         .order('start_date', { ascending: false })
 
-      const list = (data ?? []) as Tournament[]
+      // Drop competitions that have already finished. Creating a pool for a
+      // tournament whose last match was played is never what someone means, and
+      // the World Cup would otherwise sit at the top of this list forever.
+      const list = ((data ?? []) as Tournament[]).filter((t) => !hasCompetitionEnded(t.end_date))
       setTournaments(list)
       if (list.length === 1) {
         setSelectedTournamentId(list[0].tournament_id)

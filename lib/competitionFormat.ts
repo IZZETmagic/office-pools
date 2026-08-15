@@ -106,3 +106,32 @@ export function advancementTriggerFor(stage: string): 'group_complete' | 'knocko
   if (isKnockoutStage(stage)) return 'knockout_result'
   return null
 }
+
+// ---------------------------------------------------------------- Lifecycle
+
+/**
+ * Has this competition finished?
+ *
+ * Derived from `end_date`, never from `tournaments.status`. That column is
+ * authored, and authored state goes stale: on 2026-08-15 the World Cup still
+ * read `'upcoming'` nearly a month after its final, because nobody changed it.
+ * The programme settled this as Decision 4 — competition state is
+ * date-computed, never authored.
+ *
+ * Note this asks whether the competition has ENDED, not whether it has started.
+ * A season already under way must stay on offer: Decision 2 settled that a
+ * league pool remains joinable after first lock — *"week 3 of 38 is viable; a
+ * bracket is not"* — so filtering to "not yet started" would wrongly hide the
+ * Premier League from September onwards.
+ *
+ * `end_date` is a DATE, so it is treated as inclusive through its final day: a
+ * competition ending today is still live today. A missing end date means "not
+ * ended" — better to offer a competition we cannot date than to hide one that
+ * is running.
+ */
+export function hasCompetitionEnded(endDate: string | null | undefined, now: Date = new Date()): boolean {
+  if (!endDate) return false
+  const endOfFinalDay = new Date(`${endDate}T23:59:59.999Z`).getTime()
+  if (Number.isNaN(endOfFinalDay)) return false
+  return endOfFinalDay < now.getTime()
+}

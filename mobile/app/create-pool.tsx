@@ -159,7 +159,18 @@ export default function CreatePoolModal() {
       if (tErr) {
         setError(tErr.message);
       } else {
-        const rows = (data ?? []) as Tournament[];
+        // Drop competitions that have already finished. Derived from end_date,
+        // not from `tournaments.status` — that column is authored and goes
+        // stale (the World Cup still read 'upcoming' a month after its final).
+        // Inlined rather than imported from the web app's lib/: mobile is a
+        // separate package and does not resolve those paths. Mirrors
+        // hasCompetitionEnded in lib/competitionFormat.ts.
+        const hasEnded = (endDate: string | null | undefined) => {
+          if (!endDate) return false;
+          const endOfFinalDay = new Date(`${endDate}T23:59:59.999Z`).getTime();
+          return !Number.isNaN(endOfFinalDay) && endOfFinalDay < Date.now();
+        };
+        const rows = ((data ?? []) as Tournament[]).filter((t) => !hasEnded(t.end_date));
         setTournaments(rows);
         if (rows.length === 1) {
           setSelectedTournamentId(rows[0].tournament_id);
