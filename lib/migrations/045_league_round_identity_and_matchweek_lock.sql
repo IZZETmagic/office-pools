@@ -54,10 +54,10 @@ END $$;
 --   * Bundesliga, Ligue 1, Primeira Liga  -> "Regular Season - 1..34" + "Final"
 --   * Eredivisie                          -> + "Semi-finals", "Final"
 --   * Championship (ENG)                  -> "Regular Season - 1..46" + play-offs
---   * Jupiler Pro League (BEL)            -> "Regular Season - 31" AND
---                                            "Championship Group - 31"
---   * Premiership (SCO)                   -> phase is "1st Phase", not
---                                            "Regular Season"; ordinals also collide
+--   * Jupiler Pro League (BEL)            -> "Regular Season - 1..30", then three
+--                                            PARALLEL groups all reusing 31..40
+--   * Premiership (SCO)                   -> phase is "1st Phase" (1..33), then two
+--                                            parallel groups both numbered 34..38
 --
 -- So a trailing integer is ambiguous across phases, and play-off rounds carry no
 -- trailing integer at all (they parse to NULL). The ordinal alone cannot identify
@@ -67,7 +67,7 @@ END $$;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS round_label TEXT;
 
 COMMENT ON COLUMN matches.round_label IS
-  'Raw round string from the fixtures provider (e.g. "Regular Season - 12", "Championship Group - 31", "Semi-finals"). Audit trail for round identity: `stage` is the phase, `round_number` the ordinal within it, and ordinals are NOT unique across phases in some leagues (BEL, SCO).';
+  'Raw round string from the fixtures provider (e.g. "Regular Season - 12", "Championship Group - 34", "Semi-finals"). Audit trail for round identity: `stage` is the phase, `round_number` the ordinal within it. Ordinals are NOT unique across phases -- split leagues (BEL, SCO) run parallel groups that reuse each other''s numbers.';
 
 -- ============================================================
 -- 2. Matchweek lookup index

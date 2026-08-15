@@ -98,6 +98,25 @@ async function main() {
   if (res.matches.round_min != null) {
     console.log(`  matchweeks ${res.matches.round_min}–${res.matches.round_max}`)
   }
+
+  // Which phase was imported, and what was left behind. Printed unconditionally
+  // and before the sample, because a season that imports 30 of 60 rounds must
+  // not be able to look like a clean import of a short league — Belgium and
+  // Scotland both split into parallel groups after the regular season, and
+  // those groups are deliberately skipped.
+  console.log(`\n  phase imported: "${res.phase.imported}"`)
+  const otherPhases = res.phase.all.filter((ph) => ph.phase !== res.phase.imported)
+  if (otherPhases.length > 0) {
+    console.log('  phases SKIPPED (play-offs are out of scope for v1):')
+    for (const ph of otherPhases) {
+      const n = res.phase.skippedByPhase[ph.phase] ?? 0
+      console.log(
+        `    - "${ph.phase}": ${n} fixture(s)` +
+          `${ph.rounds ? `, ${ph.rounds} numbered round(s)` : ''}` +
+          `${ph.unnumbered ? `, ${ph.unnumbered} unnumbered` : ''}`
+      )
+    }
+  }
   console.log(`  window ${fmtDate(res.matches.date_first)} → ${fmtDate(res.matches.date_last)}`)
 
   const newOnes = res.matches.plan.filter((m) => m.status === 'new')

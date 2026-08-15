@@ -8,8 +8,17 @@
  * already populated. Once inserted, the existing live sync (`fixtureToMatchUpdate`,
  * events→conduct, reconcile) works unchanged — it only ever keys off those ids.
  *
- * Requires migration 024 (adds the 'league'/'regular_season' CHECK values and
- * `matches.round_number`) and an existing `tournaments` row to import into.
+ * Requires migrations 024 (the 'league'/'regular_season' CHECK values and
+ * `matches.round_number`) and 045 (`matches.round_label`), plus an existing
+ * `tournaments` row to import into.
+ *
+ * REGULAR SEASON ONLY. The feed's round vocabulary is not uniform: four of the
+ * eight top European leagues carry a play-off tail in the same league id
+ * (Germany, France and Portugal a relegation "Final"; the Netherlands a
+ * European play-off bracket), and Belgium and Scotland reuse round ordinals
+ * across phases. Play-off fixtures are reported and skipped rather than
+ * imported, because the league path has no bracket to score them with — they
+ * would land with no matchweek and sit inert. See `detectRegularSeasonPhase`.
  *
  * Idempotent: teams already present (by external_team_id) and fixtures already
  * present (by external_match_id) are reported and skipped, so re-running only
@@ -42,6 +51,8 @@ export type LeagueMatchPlan = {
   /** Assigned sequential number; -1 in the plan for existing/skipped rows. */
   match_number: number
   round_number: number | null
+  /** The provider's raw round string, stored so a collision is diagnosable. */
+  round_label: string
   match_date: string
   venue: string | null
   home: string
@@ -65,6 +76,13 @@ export type ImportLeagueResult = {
     date_first: string | null
     date_last: string | null
     plan: LeagueMatchPlan[]
+  }
+  /** Which phase was imported, and every phase the feed offered. */
+  phase: {
+    imported: string | null
+    all: PhaseSummary[]
+    /** Fixtures skipped because they belong to another phase, by phase. */
+    skippedByPhase: Record<string, number>
   }
   committed: boolean
 }
@@ -106,6 +124,88 @@ function deriveCode(team: ApiFootballTeam['team'], used: Set<string>): string {
 function parseRound(round: string): number | null {
   const m = round.match(/(\d+)\s*$/)
   return m ? parseInt(m[1], 10) : null
+}
+
+/**
+ * The phase part of a round label: `"Regular Season - 12"` → `"Regular Season"`.
+ *
+ * A round's identity is `(phase, ordinal)`, not the ordinal alone. Checking the
+ * feed's real vocabulary across ten European leagues on 2026-08-14:
+ *
+ *   ENG / ESP / ITA   "Regular Season - 1..38"                    one phase
+ *   GER / FRA / POR   "Regular Season - 1..34" + "Final"          + relegation play-off
+ *   NED               + "Semi-finals", "Final"                    + European play-off
+ *   ENG Championship  "Regular Season - 1..46" + "Semi-finals", "Final"
+ *   BEL               "Regular Season - 1..30", then THREE parallel groups
+ *                     ("Championship" / "Relegation" / "Conference League")
+ *                     that all reuse 31..40 as each other's ordinals
+ *   SCO               phase is "1st Phase" (1..33), not "Regular Season";
+ *                     then two parallel groups both numbered 34..38
+ *
+ * So the ordinal is NOT unique across phases, and the phase name is not a
+ * constant either.
+ */
+function phaseOf(round: string): string {
+  return round.replace(/\s*-?\s*\d+\s*$/, '').trim()
+}
+
+export type PhaseSummary = {
+  phase: string
+  /** Distinct ordinals seen in this phase. */
+  rounds: number
+  /** Rounds in this phase with no trailing ordinal (e.g. "Final"). */
+  unnumbered: number
+  earliestFixture: string | null
+}
+
+/**
+ * Which phase is the regular season?
+ *
+ * Chosen by size rather than by matching a known name, because the name is not
+ * stable — Scotland calls it `"1st Phase"` — and an allowlist would silently
+ * import nothing the first time a league used a word we had not seen. The
+ * league phase is always the long one: 30–46 rounds against a handful for any
+ * play-off group. Ties break on the earliest fixture, so the phase a season
+ * *starts* with wins.
+ *
+ * Returning the full summary rather than just the winner matters: the caller
+ * reports what was skipped, so a season that imports 34 of 60 rounds says which
+ * 26 and why, instead of looking like a clean import of a short league.
+ */
+export function detectRegularSeasonPhase(
+  fixtures: Array<{ round: string; date: string }>
+): { phase: string | null; phases: PhaseSummary[] } {
+  const byPhase = new Map<string, { ordinals: Set<number>; unnumbered: number; earliest: string | null }>()
+
+  for (const f of fixtures) {
+    const phase = phaseOf(f.round)
+    let entry = byPhase.get(phase)
+    if (!entry) {
+      entry = { ordinals: new Set(), unnumbered: 0, earliest: null }
+      byPhase.set(phase, entry)
+    }
+    const n = parseRound(f.round)
+    if (n === null) entry.unnumbered++
+    else entry.ordinals.add(n)
+    if (!entry.earliest || f.date < entry.earliest) entry.earliest = f.date
+  }
+
+  const phases: PhaseSummary[] = [...byPhase.entries()]
+    .map(([phase, v]) => ({
+      phase,
+      rounds: v.ordinals.size,
+      unnumbered: v.unnumbered,
+      earliestFixture: v.earliest,
+    }))
+    .sort((a, b) => {
+      if (b.rounds !== a.rounds) return b.rounds - a.rounds
+      return (a.earliestFixture ?? '').localeCompare(b.earliestFixture ?? '')
+    })
+
+  const winner = phases[0]
+  // A phase with no numbered rounds at all is a play-off bracket, not a season.
+  if (!winner || winner.rounds === 0) return { phase: null, phases }
+  return { phase: winner.phase, phases }
 }
 
 function buildVenue(f: ApiFootballFixture): string | null {
@@ -228,20 +328,91 @@ export async function importLeagueSeason(
     return a.fixture.id - b.fixture.id
   })
 
+  // --------------------------------------------------------------- Phase
+  // Import the regular season only. Play-off rounds are a bracket, and the
+  // league path deliberately has no bracket — importing them would produce
+  // fixtures with no matchweek, which cannot be round-keyed, opened, or given a
+  // deadline. They would sit inert. Skipped loudly instead.
+  const { phase: regularSeasonPhase, phases } = detectRegularSeasonPhase(
+    fixtures.map((f) => ({ round: f.league.round, date: f.fixture.date }))
+  )
+  if (!regularSeasonPhase) {
+    throw new Error(
+      `league=${league} season=${season}: no numbered round phase found — the feed offered ` +
+        `${phases.map((p) => `"${p.phase}" (${p.rounds} rounds)`).join(', ') || 'nothing'}. ` +
+        `Cannot identify a regular season.`
+    )
+  }
+
+  // --------------------------------------------- Ordinal collision guard
+  // Within the chosen phase an ordinal must identify exactly one round. It does
+  // in every league checked, but the guard is the point. Belgium and Scotland
+  // split into PARALLEL groups after the regular season, and those groups reuse
+  // each other's ordinals — Scotland runs "Championship Group - 34" and
+  // "Relegation Group - 34" at the same time, Belgium has three phases all
+  // sharing 31..40. Verified against the live feed 2026-08-14. If the phase
+  // filter ever failed open, two concurrent groups would merge into one
+  // matchweek and members would find fixtures they never predicted inside a
+  // matchweek they had already submitted.
+  const labelsByOrdinal = new Map<number, Set<string>>()
+  for (const f of fixtures) {
+    if (phaseOf(f.league.round) !== regularSeasonPhase) continue
+    const n = parseRound(f.league.round)
+    if (n === null) continue
+    const set = labelsByOrdinal.get(n) ?? new Set<string>()
+    set.add(f.league.round)
+    labelsByOrdinal.set(n, set)
+  }
+  const collisions = [...labelsByOrdinal.entries()].filter(([, labels]) => labels.size > 1)
+  if (collisions.length > 0) {
+    throw new Error(
+      `league=${league} season=${season}: round ordinal collision inside phase "${regularSeasonPhase}" — ` +
+        collisions
+          .map(([n, labels]) => `matchweek ${n} claimed by ${[...labels].map((l) => `"${l}"`).join(' and ')}`)
+          .join('; ') +
+        `. Refusing to import: two rounds sharing a matchweek would merge silently.`
+    )
+  }
+
   const matchPlan: LeagueMatchPlan[] = []
   const matchRowsToInsert: Array<Record<string, unknown>> = []
+  const skippedByPhase: Record<string, number> = {}
   let nextNumber = maxMatchNumber + 1
 
   for (const f of sorted) {
     const ext = String(f.fixture.id)
     const home = f.teams.home.name
     const away = f.teams.away.name
-    const round_number = parseRound(f.league.round)
+    const round_label = f.league.round
+    const round_number = parseRound(round_label)
     const match_date = f.fixture.date
     const venue = buildVenue(f)
 
     if (existingExt.has(ext)) {
-      matchPlan.push({ external_match_id: ext, match_number: -1, round_number, match_date, venue, home, away, status: 'existing' })
+      matchPlan.push({ external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away, status: 'existing' })
+      continue
+    }
+
+    const fixturePhase = phaseOf(round_label)
+    if (fixturePhase !== regularSeasonPhase) {
+      skippedByPhase[fixturePhase] = (skippedByPhase[fixturePhase] ?? 0) + 1
+      matchPlan.push({
+        external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away,
+        status: 'skipped',
+        reason: `phase "${fixturePhase}" is not the regular season ("${regularSeasonPhase}") — play-off rounds are out of scope for v1`,
+      })
+      continue
+    }
+
+    if (round_number === null) {
+      // Inside the regular-season phase but with no ordinal. Not expected, and
+      // not something to guess at: an un-numbered fixture has no matchweek.
+      skippedByPhase[fixturePhase] = (skippedByPhase[fixturePhase] ?? 0) + 1
+      matchPlan.push({
+        external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away,
+        status: 'skipped',
+        reason: `round "${round_label}" carries no matchweek ordinal`,
+      })
       continue
     }
 
@@ -255,6 +426,7 @@ export async function importLeagueSeason(
         external_match_id: ext,
         match_number: -1,
         round_number,
+        round_label,
         match_date,
         venue,
         home,
@@ -266,7 +438,7 @@ export async function importLeagueSeason(
     }
 
     const match_number = nextNumber++
-    matchPlan.push({ external_match_id: ext, match_number, round_number, match_date, venue, home, away, status: 'new' })
+    matchPlan.push({ external_match_id: ext, match_number, round_number, round_label, match_date, venue, home, away, status: 'new' })
     matchRowsToInsert.push({
       tournament_id,
       match_number,
@@ -277,6 +449,7 @@ export async function importLeagueSeason(
       match_date,
       venue,
       round_number,
+      round_label,
       external_match_id: ext,
       data_source: 'api',
       status: 'scheduled',
@@ -316,6 +489,11 @@ export async function importLeagueSeason(
       date_first: dates[0] ?? null,
       date_last: dates[dates.length - 1] ?? null,
       plan: matchPlan,
+    },
+    phase: {
+      imported: regularSeasonPhase,
+      all: phases,
+      skippedByPhase,
     },
     committed: commit,
   }

@@ -76,9 +76,17 @@ Three things fall out of this, and all three change the design:
    scoring — but it is a fixture with no matchweek, so it cannot be round-keyed, cannot be opened,
    and cannot inherit a matchweek deadline. It would import and then sit inert.
 
-3. **Belgium and Scotland reuse ordinals across phases** — `Regular Season - 31` and
-   `Championship Group - 31` both parse to `31`. Two different fixtures would land in the same
-   matchweek. Scotland does not even use the string `Regular Season`; its phase is `1st Phase`.
+3. **Belgium and Scotland reuse ordinals across phases.** ⚠ *Corrected 2026-08-14 against the live
+   fixture feed — an earlier version of this line said `Regular Season - 31` collided with
+   `Championship Group - 31`, which is not what the data shows.* The regular season and the
+   play-off phases are numbered **consecutively**, not overlapping: Belgium's `Regular Season` runs
+   1–30 and Scotland's `1st Phase` 1–33. The collision is **between the parallel groups the league
+   splits into**, which run at the same time and therefore share ordinals with each other —
+   Scotland has `Championship Group - 34` and `Relegation Group - 34`; Belgium has *three* phases
+   all reusing 31–40. Two concurrent fixtures would land in the same matchweek. Scotland also does
+   not use the string `Regular Season` at all; its phase is `1st Phase`. The design conclusion is
+   unchanged — the ordinal alone cannot identify a round — but the mechanism is a parallel split,
+   not an overlap with the league phase.
 
 > **⇒ Round identity cannot be a bare integer.** It is `(phase, ordinal)`. Migration 024's
 > `matches.round_number INTEGER` is necessary but not sufficient, and this is much cheaper to get
@@ -405,9 +413,39 @@ Now fetched once per round.
 the progressive React flow (`ProgressivePredictionsFlow`). A league pool never reaches the first two;
 the UI is Phase 4.
 
-**Phase 3 — ingestion, generalized**
-10. Importer: phase detection, playoff rounds skipped-with-reason, hard failure on ordinal collision.
-11. Import one real league end to end.
+**Phase 3 — ingestion, generalized** — code ✅ complete 2026-08-14; the real import is blocked
+
+| # | Step | State |
+|---|---|---|
+| 10 | Importer generalized: `detectRegularSeasonPhase` picks the league phase **by size**, play-off phases are skipped with a per-phase reason, an ordinal collision inside the chosen phase **throws before any insert**, and `round_label` is carried through. The script prints the phase decision and everything skipped. 17 tests. | ✅ |
+| 11 | Import one real league end to end | 🔒 **blocked on the deploy — see below** |
+
+**Phase chosen by size, not by name.** An allowlist of known names would have imported *nothing* for
+Scotland, whose phase is `1st Phase`. The league phase is always the long one — 30–46 rounds against
+a handful for any play-off group — with ties broken on the earliest fixture.
+
+**Validated against the live feed, 2026-08-14** (six leagues, real fixtures, no writes):
+
+| League | Phase chosen | Kept / total | Matchweeks | Collisions |
+|---|---|---|---|---|
+| Premier League | `Regular Season` | 380 / 380 | 38 | none |
+| Bundesliga | `Regular Season` | 306 / 308 | 34 | none |
+| Eredivisie | `Regular Season` | 306 / 309 | 34 | none |
+| Championship | `Regular Season` | 552 / 558 | 46 | none |
+| Jupiler Pro League | `Regular Season` | 240 / 321 | 30 | none |
+| Premiership (SCO) | **`1st Phase`** | 198 / 234 | 33 | none |
+
+Every kept count equals the round-robin the club count implies. (Scotland's 198 is 33 rounds × 6
+fixtures — a *triple* round-robin for 12 clubs, not the double the first check assumed.)
+
+🔒 **Why the real import cannot happen yet.** The importer numbers a fresh tournament's fixtures
+**from 1**, and the World Cup's placeholder-carrying matches reference source matches **73–102**.
+The advancement-dispatch fix that makes this safe is committed but **not deployed**. Importing a
+live season now means league fixture #73 completing, being announced to the bracket engine as a
+knockout result by the deployed (old) code, and cascading a club into the finished World Cup
+bracket. This is the ordering constraint Phase 0 was built around, and it holds:
+
+> **deploy first, then create the `tournaments` row, then import.**
 
 **Phase 4 — surfaces**
 12. Create-pool wizard: filter tournaments by format and offer the league correctly (both wizards
