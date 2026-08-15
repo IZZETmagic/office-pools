@@ -255,7 +255,18 @@ Ordering is a dependency order, not a schedule.
 | 2 | Multi-tenant sync — `lib/integrations/apiFootball/syncTargets.ts`; the cron loops over competitions. Falls back to the env single-target if 024's columns are absent, with an explicit error check, so **deploy order is not load-bearing in either direction**. | ✅ done |
 | 3 | Migration **045** — `matches.round_label`, `(tournament_id, round_number)` index, matchweek-level lock, `league_pickem` CHECK widening. Opens with a `DO` block that **raises** if 024 is not applied. | ✅ written, not applied |
 | 4 | Apply **024**, then **045**, to production | ✅ applied 2026-08-14 |
-| 5 | Deploy the code | ⏳ Ryan's — a push to `master` is a prod deploy |
+| 5 | Deploy the code | ✅ deployed 2026-08-15 01:08 UTC |
+
+**Deploy verified, not assumed.** `master` `55acc2f` → production `dpl_4jokuDR4XVetZxCSHQNKHuAX7SAV`,
+aliased to sportpool.io, build 52 s. Confirmed live by a behaviour change rather than by the
+dashboard: the sync cron's quiet-run note used to read `"no live window matches"` (an early return
+this refactor removed) and now records `null`. The last old-code run was **01:09:00**, the first
+new-code run **01:10:00**.
+
+That single field also proves the multi-tenant path is real: `loadSyncTargets` emits an
+`env fallback in use` note whenever it cannot read the ingest config off the `tournaments` row. No
+run has emitted it, so the cron is reading `external_league_id` / `external_season` / `format` from
+the row — competition config now lives in data, not in env vars. Zero errors, ~0.4 s per run.
 
 **Post-apply verification, 2026-08-14 (production):**
 
