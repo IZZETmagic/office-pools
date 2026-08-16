@@ -109,13 +109,26 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // Fetch tournaments on mount
   useEffect(() => {
     async function fetchTournaments() {
-      // All competitions. The mode list below is filtered by the selected
-      // competition's format instead of hiding leagues outright, because the
-      // pairing is what has to be safe: a league scored as `full_tournament`
-      // would score ZERO for every fixture, silently.
+      // Bracket-format competitions only — leagues are OFF the wizard.
+      //
+      // Reinstated 2026-08-16. The Premier League is imported, but it runs on
+      // World Cup furniture (league fixtures in `matches`, clubs in
+      // `teams.country_name`, league arms inside the shared shadow scoring
+      // functions) and that whole arrangement is being replaced by a
+      // purpose-built league backend — see
+      // drafts/2026-08-16_premier_league_backend_design_v2.md.
+      //
+      // Until that lands a league pool cannot score: `getScoringSource` returns
+      // 'shadow' for `league_pickem` and the shadow tables hold nothing for it,
+      // so every fixture scores zero with no error anywhere. Letting someone
+      // create one now also creates a migration problem for the new structure.
+      //
+      // `format` is null on rows predating migration 024, so null is treated as
+      // bracket rather than filtered out.
       const { data } = await supabase
         .from('tournaments')
         .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format')
+        .or('format.is.null,format.eq.groups_knockout')
         .order('start_date', { ascending: false })
 
       // Drop competitions that have already finished. Creating a pool for a

@@ -13,15 +13,21 @@
  * a real pool would also expose members who never agreed to that; the
  * /play/[slug] pages show real boards only because those pools opted in.
  *
- * Premier League is open as of 2026-08-15. The blocker recorded here — every
- * league fixture taking the knockout path, failing the bracket-team check and
- * scoring zero, silently — was fixed by migration 046: the team-matching gate
- * and the price lookup are now named predicates that understand a league
- * fixture, and the 2026/27 season is imported (380 fixtures, 38 matchweeks).
+ * Premier League is back to "coming soon" as of 2026-08-16, and this is the
+ * second time this line has moved — worth saying why rather than just flipping
+ * it.
  *
- * ⚠ Still unproven at the time of writing: no Premier League fixture has been
- * played, so league scoring has never scored a real result. First kick-off is
- * 21 Aug 2026. If that matchweek scores wrong, this is the line to flip back.
+ * The 2026/27 season IS imported (380 fixtures, 38 matchweeks) and migration
+ * 046 did fix the scoring gate. But the league was built on World Cup
+ * furniture: fixtures in `matches`, clubs in `teams.country_name`, league arms
+ * inside the shared shadow scoring functions. That is being replaced by a
+ * purpose-built league backend (Ryan's decision, 2026-08-15) — see
+ * drafts/2026-08-16_premier_league_backend_design_v2.md.
+ *
+ * Until then a league pool still cannot score: `getScoringSource` returns
+ * 'shadow' for `league_pickem` and the shadow tables hold nothing for it, so
+ * every fixture scores zero with no error. Flip this to 'open' only when a real
+ * matchweek has been scored and checked against a hand computation.
  */
 export type CompetitionState = 'open' | 'upcoming' | 'complete'
 
@@ -36,8 +42,8 @@ export type Competition = {
 }
 
 export const COMPETITIONS: Competition[] = [
-  { key: 'premier-league', name: 'Premier League', state: 'open',
-    status: '2026/27 · taking pools', stripe: ['#667EEA', '#3B6EFF'] },
+  { key: 'premier-league', name: 'Premier League', state: 'upcoming',
+    status: 'Coming soon', stripe: ['#667EEA', '#3B6EFF'] },
   { key: 'world-cup-2026', name: 'FIFA World Cup', state: 'complete',
     status: '2026 · complete', stripe: ['#F5C518', '#CD7F32'] },
   { key: 'champions-league', name: 'Champions League', state: 'upcoming',
