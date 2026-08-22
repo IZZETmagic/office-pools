@@ -676,12 +676,34 @@ surface:
 | Engine | What it does | What it is FOR | State |
 |---|---|---|---|
 | **Node "prod" engine** — `lib/scoring/core.ts`, `lib/scoring/recalculate.ts` | Pull-Compute-Push: reads a pool's rows into Node, scores in JS, writes back | The original engine. Now a running safety net behind `prod_scoring_enabled` | ✅ live, still enabled (`prod_scoring_enabled = true`, prod-verified 2026-07-30). **Retirement gates 1 and 2 cleared 2026-07-30** — see the gate table below; 3 and 4 not re-checked, and two further blockers were added. Do not switch it off on the strength of the parity alarm alone |
-| **Shadow engine** — `shadow_*` SQL functions + `shadow_*` tables | Set-based, DB-native scoring: `shadow_score_match`, `shadow_finalize_totals`, rank snapshot, reconcilers (jobid 19/20), diff alarm (jobid 21) | Replacing the Node engine. Covers full_tournament, progressive and bracket_picker | ✅ live and is the READ SOURCE for **all 623 pools** since 2026-07-29 |
+| **Shadow engine** — `shadow_*` SQL functions + `shadow_*` tables ⚠️ **TO BE RENAMED — see below** | Set-based, DB-native scoring: `shadow_score_match`, `shadow_finalize_totals`, rank snapshot, reconcilers (jobid 19/20), diff alarm (jobid 21) | **The World Cup's engine, and only ever that.** Covers full_tournament, progressive and bracket_picker. Since the 2026-08-15 split it is NOT a general engine and must never learn about leagues | ✅ live and is the READ SOURCE for **all 623 pools** since 2026-07-29 |
 | **Analytics / XP writer** — `lib/analytics/entryAnalytics.ts`, called by `lib/push/badges.ts` | Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into `entry_xp_state` | The per-entry statistics every surface reads instead of deriving | ✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips `dark_horse`. ⚠⚠ **ITS TRIGGER IS THE NODE ENGINE**: called directly by `recalculatePool`, and the standalone sweep (jobid15) fires off `pool_entries.last_rank_update`, a column **only Node writes**. Verified 2026-07-29: none of the 19 `shadow_*` functions touch `pool_entries` |
 | **Per-match aggregates** — migrations 038/039, `pool_match_prediction_accuracy()` | Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline | Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section | ✅ live. Takes `p_submitted_only` because its two callers count different populations |
 | **Podium** — `lib/podium.ts` **+ `tournament_podium_view`** (migration 027) | Derives the actual and predicted tournament podium | Champion / runner-up / third bonuses | ✅ **Now in SQL as well as Node — prod-verified 2026-07-30.** Migrations **027** `tournament_podium_view` (20260727155217) and **028** `shadow_podium_use_view` (20260727160124) are applied and shadow reads the view; bonuses stored at full strength (837 champion / 738 runner-up / 167 third). **Retirement gate 2 cleared.** `lib/podium.ts` still runs in Node while `prod_scoring_enabled = true`. Closes **R4** |
 | **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser — the last real violation of the rule above, and a **blocker on Node retirement** (2026-07-30) |
-| **League engine** | — | Premier League and other league competitions | 🔵 **NOT BUILT — next.** ⚠️ A league pool currently scores **ZERO silently**, and it is **two bugs, gate first** (corrected 2026-07-30): the **team-matching gate** returns `miss` before the price lookup is reached, and *behind* it the price lookup bills league fixtures at **knockout** rates. **It is in the shadow SQL as well as Node**, so the fix lands in both while prod scoring is on. See **R2** and *League ingestion* |
+| **League engine** | — | Premier League and other league competitions | 🔵 **NOT BUILT — it is L7.** ⚠️ **The 2026-07-30 description of this row is SUPERSEDED.** It said the fix was two bugs inside the shared shadow engine, landing "in both while prod scoring is on". That approach was built and then **fully reverted at L0** (migrations 048/049). Under Ryan's 2026-08-15 split the league gets its OWN engine over its OWN tables; the shadow engine is not touched. A league pool still scores zero — now **by design**, not by bug, because its engine does not exist yet. L0–L3 are done and live: `league_*` tables, the season imported, fixtures syncing every minute |
+
+### ⬜ Rename: "shadow" → World Cup scoring
+
+**Ryan, 2026-08-22.** The name is now actively misleading. "Shadow" described a
+*phase* — an engine running behind the Node one to be compared against it. That
+phase is over: it has been the read source for all 623 pools since 2026-07-29,
+so it is not shadowing anything. And since the 2026-08-15 split it is **the World
+Cup's engine specifically**, not the platform's. A newcomer reading
+`shadow_score_match` reasonably assumes it is the general scoring engine and that
+leagues belong in it — which is exactly the wrong conclusion, and the mistake the
+pre-pivot league work actually made.
+
+**Scope, measured 2026-08-22:** 19 `shadow_*` functions, several `shadow_*`
+tables, 4 pg_cron jobs (19/20/21 plus materialize), 26 TypeScript files, and
+`sync_settings` keys (`shadow_read_enabled_pools`, `shadow_materialize_enabled`,
+`shadow_rederive_enabled`, `shadow_reconcile_enabled`).
+
+**Not scheduled yet, and deliberately not bundled into the league build.** It is a
+pure rename across a live scoring path that 623 pools read; it deserves its own
+change with its own verification, not a line inside a phase that is already
+touching `pools`. Sequence it after the league work settles, or during a quiet
+window.
 
 ### Retirement gates — the Node engine
 
