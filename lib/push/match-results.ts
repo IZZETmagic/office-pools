@@ -22,6 +22,7 @@
 // gets set even on partial failure — push retry isn't worth the complexity.
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllPages } from '@/lib/poolData'
 import { sendPushToUser } from './apns'
 import { isProdScoringEnabled } from '@/lib/scoring/prodScoringFlag'
 
@@ -310,6 +311,14 @@ async function fanOutShakeups(
 ): Promise<void> {
   if (allByUser.size === 0 || poolIds.length === 0) return
 
+  type PeerEmbed = {
+    pool_id: string
+    member_id: string
+    users:
+      | { full_name: string | null; username: string | null }
+      | Array<{ full_name: string | null; username: string | null }>
+      | null
+  }
   type PeerRow = {
     entry_id: string
     pool_id: string
@@ -317,33 +326,57 @@ async function fanOutShakeups(
     current_rank: number | null
     previous_rank: number | null
     member_id: string
-    pool_members:
-      | { member_id: string; users: { full_name: string | null; username: string | null } | Array<{ full_name: string | null; username: string | null }> | null }
-      | Array<{ member_id: string; users: { full_name: string | null; username: string | null } | Array<{ full_name: string | null; username: string | null }> | null }>
-      | null
+  }
+  type PeerRowRaw = Omit<PeerRow, 'pool_id'> & {
+    pool_members: PeerEmbed | PeerEmbed[] | null
   }
 
-  const { data: rawPeers } = await adminClient
-    .from('pool_entries')
-    .select(
-      'entry_id, pool_id, entry_name, current_rank, previous_rank, member_id,' +
-        ' pool_members:pool_members!pool_entries_member_id_fkey(' +
-        'member_id, users(full_name, username)' +
-        ')',
-    )
-    .in('pool_id', poolIds)
-  const peerRows = (rawPeers ?? []) as unknown as PeerRow[]
+  // `pool_id` is NOT a column of `pool_entries` — it never has been. It lives on
+  // `pool_members`, which this query already embeds. Selecting and filtering it
+  // here returned 42703, the error was discarded, and `rawPeers` was null — so
+  // every rank-shakeup push has gone out with no peer context, silently, since
+  // this was written. `!inner` is required for the embedded filter to apply.
+  //
+  // Paged, because this is genuinely unbounded: 4,980 entries across 552 pools
+  // today, and a completion can touch many pools at once. An unbounded
+  // PostgREST select truncates at 1,000 rows with no error, which would leave
+  // most pools quietly peer-less instead of all of them.
+  const peerRows = await fetchAllPages<PeerRowRaw>('shakeup peers', (from, to) =>
+    adminClient
+      .from('pool_entries')
+      .select(
+        'entry_id, entry_name, current_rank, previous_rank, member_id,' +
+          ' pool_members:pool_members!pool_entries_member_id_fkey!inner(' +
+          'pool_id, member_id, users(full_name, username)' +
+          ')',
+      )
+      .in('pool_members.pool_id', poolIds)
+      .range(from, to) as unknown as PromiseLike<{
+      data: PeerRowRaw[] | null
+      error: { message: string } | null
+    }>,
+  )
 
   // Index peers by pool + entry_id; build a display-name table.
   const peersByPool = new Map<string, PeerRow[]>()
   const displayNameByMember = new Map<string, string>()
   for (const p of peerRows) {
-    const list = peersByPool.get(p.pool_id) ?? []
-    list.push(p)
-    peersByPool.set(p.pool_id, list)
     const pm = Array.isArray(p.pool_members) ? p.pool_members[0] : p.pool_members
-    const u = pm?.users ? (Array.isArray(pm.users) ? pm.users[0] : pm.users) : null
-    if (pm && u) {
+    // `!inner` guarantees the embed, but a missing pool_id would file every
+    // peer under "undefined" rather than fail, so it is skipped not trusted.
+    if (!pm?.pool_id) continue
+    const list = peersByPool.get(pm.pool_id) ?? []
+    list.push({
+      entry_id: p.entry_id,
+      pool_id: pm.pool_id,
+      entry_name: p.entry_name,
+      current_rank: p.current_rank,
+      previous_rank: p.previous_rank,
+      member_id: p.member_id,
+    })
+    peersByPool.set(pm.pool_id, list)
+    const u = pm.users ? (Array.isArray(pm.users) ? pm.users[0] : pm.users) : null
+    if (u) {
       displayNameByMember.set(pm.member_id, u.full_name || u.username || 'Someone')
     }
   }

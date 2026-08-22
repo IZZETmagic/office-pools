@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllPages } from '@/lib/poolData'
 import {
   getShadowReadPools,
   readRecentMatchScoreEvents,
@@ -198,24 +199,42 @@ async function handleGET(
   const peersByPool = new Map<string, PeerRow[]>()
   const peerDisplayName = new Map<string, string>() // member_id -> display name
   if (allPoolIds.length > 0) {
-    const { data: peerRows } = await adminClient
-      .from('pool_entries')
-      .select(
-        'entry_id, pool_id, entry_name, current_rank, previous_rank, member_id,' +
-          ' pool_members:pool_members!pool_entries_member_id_fkey(' +
-          'member_id, users(user_id, full_name, username)' +
-          ')',
-      )
-      .in('pool_id', allPoolIds)
-    type PeerRowRaw = PeerRow & {
+    // `pool_id` is NOT a column of `pool_entries` — it never has been. It lives
+    // on `pool_members`, which this query already embeds. Selecting and
+    // filtering it here returned 42703 and the error was discarded, so
+    // `peerRows` was null and the peer list has been silently empty forever.
+    // `!inner` is required for the embedded filter to apply.
+    //
+    // Paged, because this is unbounded by design: 4,980 entries across 552
+    // pools today, and an unbounded PostgREST select truncates at 1,000 with no
+    // error — which would leave most pools quietly peer-less instead of all of
+    // them.
+    const peerRows = await fetchAllPages<PeerRowRaw>('activity peers', (from, to) =>
+      adminClient
+        .from('pool_entries')
+        .select(
+          'entry_id, entry_name, current_rank, previous_rank, member_id,' +
+            ' pool_members:pool_members!pool_entries_member_id_fkey!inner(' +
+            'pool_id, member_id, users(user_id, full_name, username)' +
+            ')',
+        )
+        .in('pool_members.pool_id', allPoolIds)
+        .range(from, to) as unknown as PromiseLike<{
+        data: PeerRowRaw[] | null
+        error: { message: string } | null
+      }>,
+    )
+    type PeerRowRaw = Omit<PeerRow, 'pool_id'> & {
       pool_members:
         | {
+            pool_id: string
             member_id: string
             users: { full_name: string | null; username: string | null }
               | Array<{ full_name: string | null; username: string | null }>
               | null
           }
         | Array<{
+            pool_id: string
             member_id: string
             users: { full_name: string | null; username: string | null }
               | Array<{ full_name: string | null; username: string | null }>
@@ -223,25 +242,25 @@ async function handleGET(
           }>
         | null
     }
-    for (const r of (peerRows ?? []) as unknown as PeerRowRaw[]) {
-      const list = peersByPool.get(r.pool_id) ?? []
+    for (const r of peerRows) {
+      const pm = Array.isArray(r.pool_members) ? r.pool_members[0] : r.pool_members
+      // The pool now comes from the embed. `!inner` guarantees it is present,
+      // but a missing one would silently file every peer under "undefined", so
+      // it is skipped rather than trusted.
+      if (!pm?.pool_id) continue
+      const list = peersByPool.get(pm.pool_id) ?? []
       list.push({
         entry_id: r.entry_id,
-        pool_id: r.pool_id,
+        pool_id: pm.pool_id,
         entry_name: r.entry_name,
         current_rank: r.current_rank,
         previous_rank: r.previous_rank,
         member_id: r.member_id,
       })
-      peersByPool.set(r.pool_id, list)
+      peersByPool.set(pm.pool_id, list)
 
-      const pm = Array.isArray(r.pool_members) ? r.pool_members[0] : r.pool_members
-      const u = pm?.users
-            ? Array.isArray(pm.users)
-              ? pm.users[0]
-              : pm.users
-            : null
-      if (pm && u) {
+      const u = pm.users ? (Array.isArray(pm.users) ? pm.users[0] : pm.users) : null
+      if (u) {
         peerDisplayName.set(pm.member_id, u.full_name || u.username || 'Someone')
       }
     }
