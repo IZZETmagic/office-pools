@@ -13,7 +13,9 @@ import { poolModeGradient } from './tokens'
  * Colours come from mobile/components/pools/PoolListItem.tsx via lib/design/tokens.
  */
 
-export type PoolMode = 'full_tournament' | 'progressive' | 'bracket_picker'
+// Design tokens (colour, icon, label) exist for the three bracket modes only.
+import type { BracketPredictionMode } from '../predictionMode'
+export type PoolMode = BracketPredictionMode
 
 const MODE_NAME: Record<PoolMode, string> = {
   full_tournament: 'Full',

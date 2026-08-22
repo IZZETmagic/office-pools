@@ -1,59 +1,66 @@
 /**
- * Import a full league season (teams + fixtures) FROM api-football into our
- * schema. This is the mirror image of `seed.ts`: for the World Cup we authored
- * the bracket skeleton by hand and only *mapped* it to api-football ids; a flat
- * round-robin league (e.g. the Premier League — 20 teams, 380 fixtures, no
- * groups, no knockout placeholders) is fully specified by the feed up front, so
- * we pull the whole thing and insert it with `external_team_id`/`external_match_id`
- * already populated. Once inserted, the existing live sync (`fixtureToMatchUpdate`,
- * events→conduct, reconcile) works unchanged — it only ever keys off those ids.
+ * Import a league season from api-football into the league's OWN tables.
  *
- * Requires migrations 024 (the 'league'/'regular_season' CHECK values and
- * `matches.round_number`) and 045 (`matches.round_label`), plus an existing
- * `tournaments` row to import into.
+ * Retargeted 2026-08-22 (L2). This previously wrote a league into the World
+ * Cup's `teams` and `matches` — clubs in `country_name`, a matchweek bolted on
+ * as `round_number`, a `regular_season` value forced into a bracket's stage
+ * CHECK. That whole arrangement was reverted in L1. A league now has its own
+ * structure and this writes to it:
  *
- * REGULAR SEASON ONLY. The feed's round vocabulary is not uniform: four of the
- * eight top European leagues carry a play-off tail in the same league id
- * (Germany, France and Portugal a relegation "Final"; the Netherlands a
- * European play-off bracket), and Belgium and Scotland reuse round ordinals
- * across phases. Play-off fixtures are reported and skipped rather than
- * imported, because the league path has no bracket to score them with — they
- * would land with no matchweek and sit inert. See `detectRegularSeasonPhase`.
+ *   league_seasons     one competition instance
+ *   league_clubs       name / short_name / abbreviation / crest_url
+ *   league_matchweeks  one row per matchweek, carrying the frozen `lock_at`
+ *   league_fixtures    matchweek_id as a hard FK, not a loose ordinal
  *
- * Idempotent: teams already present (by external_team_id) and fixtures already
- * present (by external_match_id) are reported and skipped, so re-running only
- * inserts what's new (e.g. next season, or fixtures added late by the feed).
+ * REGULAR SEASON ONLY, and that is not a simplification — it is what the feed
+ * forces. Verified across ten European leagues on 2026-08-14: four of the eight
+ * top divisions carry a play-off tail inside the same league id, Scotland calls
+ * its league phase "1st Phase", and split leagues run parallel groups that
+ * reuse each other's round ordinals. Play-off rounds are reported and skipped,
+ * because the league path has no bracket to score them with.
  *
- * Designed for a PRE-SEASON import (every fixture not-yet-started). It writes the
- * schedule only — status defaults to 'scheduled', no scores — and lets the live
- * sync fill results. A mid-season import would additionally need past results
- * backfilled; that's intentionally out of scope here (see the note in the caller).
+ * Three refusals, all of them loud:
+ *   - no phase with numbered rounds        -> throw (not a league season)
+ *   - two rounds sharing an ordinal        -> throw (two matchweeks would merge)
+ *   - a fixture in the phase with no ordinal -> skipped, with a reason
+ *
+ * Idempotent by the natural keys the schema already enforces:
+ * `(season_id, external_club_id)`, `(season_id, matchweek_number)` and
+ * `(season_id, external_fixture_id)`. Re-running inserts only what is new.
+ *
+ * Designed for a PRE-SEASON import: it writes the schedule only and lets the
+ * sync arm fill results. A mid-season import additionally needs past results
+ * backfilled, which is deliberately out of scope.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ApiFootballClient } from './client'
 import type { ApiFootballFixture, ApiFootballTeam } from './types'
 
-const REGULAR_SEASON_STAGE = 'regular_season'
-
-export type LeagueTeamPlan = {
-  external_team_id: number
+export type LeagueClubPlan = {
+  external_club_id: number
   name: string
-  /** Assigned 3-char code -> teams.country_code (unique within the tournament). */
-  code: string
-  logo: string | null
+  abbreviation: string
+  crest_url: string | null
   status: 'new' | 'existing'
-  team_id?: string
+  club_id?: string
 }
 
-export type LeagueMatchPlan = {
-  external_match_id: string
-  /** Assigned sequential number; -1 in the plan for existing/skipped rows. */
-  match_number: number
-  round_number: number | null
-  /** The provider's raw round string, stored so a collision is diagnosable. */
-  round_label: string
-  match_date: string
+export type LeagueMatchweekPlan = {
+  matchweek_number: number
+  provider_round: string
+  label: string
+  fixture_count: number
+  status: 'new' | 'existing'
+  matchweek_id?: string
+}
+
+export type LeagueFixturePlan = {
+  external_fixture_id: string
+  fixture_number: number
+  matchweek_number: number | null
+  provider_round: string
+  kickoff_at: string
   venue: string | null
   home: string
   away: string
@@ -62,27 +69,25 @@ export type LeagueMatchPlan = {
 }
 
 export type ImportLeagueResult = {
-  tournament_id: string
+  season_id: string | null
+  competition: string
   league: number
   season: number
-  teams: { external_total: number; to_insert: number; existing: number; plan: LeagueTeamPlan[] }
-  matches: {
+  phase: {
+    imported: string | null
+    all: PhaseSummary[]
+    skippedByPhase: Record<string, number>
+  }
+  clubs:      { external_total: number; to_insert: number; existing: number; plan: LeagueClubPlan[] }
+  matchweeks: { to_insert: number; existing: number; plan: LeagueMatchweekPlan[] }
+  fixtures: {
     external_total: number
     to_insert: number
     existing: number
     skipped: number
-    round_min: number | null
-    round_max: number | null
     date_first: string | null
     date_last: string | null
-    plan: LeagueMatchPlan[]
-  }
-  /** Which phase was imported, and every phase the feed offered. */
-  phase: {
-    imported: string | null
-    all: PhaseSummary[]
-    /** Fixtures skipped because they belong to another phase, by phase. */
-    skippedByPhase: Record<string, number>
+    plan: LeagueFixturePlan[]
   }
   committed: boolean
 }
@@ -96,9 +101,9 @@ function normalizeCode(raw: string): string {
 }
 
 /**
- * A 3-char, tournament-unique code for `teams.country_code` (char(3), NOT NULL,
- * unique per tournament). Prefer api-football's `team.code` (e.g. "MUN"); fall
- * back to the first alnum of the name; disambiguate collisions on the last char.
+ * A 3-char abbreviation for `league_clubs.abbreviation` (char(3), NOT NULL,
+ * UNIQUE per season). Prefer api-football's `team.code` (e.g. "MUN"); fall back
+ * to the first alnum of the name; disambiguate collisions on the last char.
  */
 function deriveCode(team: ApiFootballTeam['team'], used: Set<string>): string {
   const fromCode = team.code ? normalizeCode(team.code) : ''
@@ -147,6 +152,15 @@ function parseRound(round: string): number | null {
  */
 function phaseOf(round: string): string {
   return round.replace(/\s*-?\s*\d+\s*$/, '').trim()
+}
+
+function buildVenue(f: ApiFootballFixture): string | null {
+  const v = f.fixture.venue
+  if (!v) return null
+  const name = (v.name ?? '').trim()
+  const city = (v.city ?? '').trim()
+  if (name && city) return `${name}, ${city}`
+  return name || city || null
 }
 
 export type PhaseSummary = {
@@ -208,99 +222,30 @@ export function detectRegularSeasonPhase(
   return { phase: winner.phase, phases }
 }
 
-function buildVenue(f: ApiFootballFixture): string | null {
-  const v = f.fixture.venue
-  if (!v) return null
-  const name = (v.name ?? '').trim()
-  const city = (v.city ?? '').trim()
-  if (name && city) return `${name}, ${city}`
-  return name || city || null
-}
-
 export async function importLeagueSeason(
   supabase: SupabaseClient,
-  args: { tournament_id: string; league: number; season: number; commit?: boolean }
+  args: {
+    competition_slug: string      // 'premier-league'
+    competition_name: string      // 'Premier League'
+    season_label: string          // '2026/27'
+    season_start_year: number     // 2026
+    country_code: string          // 'ENG'
+    league: number                // api-football league id
+    season: number                // api-football season
+    logo_url?: string | null
+    commit?: boolean
+  }
 ): Promise<ImportLeagueResult> {
-  const { tournament_id, league, season } = args
+  const { competition_slug, competition_name, season_label, season_start_year, country_code, league, season } = args
   const commit = !!args.commit
 
-  // Guard: the tournament row must exist (FK target for teams/matches).
-  const { data: tournamentRow, error: tErr } = await supabase
-    .from('tournaments')
-    .select('tournament_id')
-    .eq('tournament_id', tournament_id)
-    .maybeSingle()
-  if (tErr) throw tErr
-  if (!tournamentRow) {
-    throw new Error(`tournament ${tournament_id} does not exist — create the tournaments row first`)
-  }
-
-  // ---------------------------------------------------------------- Teams
+  // ------------------------------------------------------------------ Feed
   const externalTeams = await ApiFootballClient.getTeamsForLeague({ league, season })
   if (externalTeams.length === 0) {
     throw new Error(
       `api-football returned 0 teams for league=${league} season=${season} — check the ids, API_FOOTBALL_KEY, and daily quota`
     )
   }
-
-  const { data: existingTeams, error: teamErr } = await supabase
-    .from('teams')
-    .select('team_id, external_team_id, country_code')
-    .eq('tournament_id', tournament_id)
-  if (teamErr) throw teamErr
-
-  const teamIdByExternal = new Map<number, string>()
-  const usedCodes = new Set<string>()
-  for (const t of existingTeams || []) {
-    if (t.external_team_id != null) teamIdByExternal.set(t.external_team_id, t.team_id)
-    if (t.country_code) usedCodes.add(t.country_code)
-  }
-
-  const teamPlan: LeagueTeamPlan[] = []
-  const teamRowsToInsert: Array<Record<string, unknown>> = []
-  for (const et of externalTeams) {
-    const existingId = teamIdByExternal.get(et.team.id)
-    if (existingId) {
-      teamPlan.push({
-        external_team_id: et.team.id,
-        name: et.team.name,
-        code: '(existing)',
-        logo: et.team.logo,
-        status: 'existing',
-        team_id: existingId,
-      })
-      continue
-    }
-    const code = deriveCode(et.team, usedCodes)
-    teamPlan.push({ external_team_id: et.team.id, name: et.team.name, code, logo: et.team.logo, status: 'new' })
-    teamRowsToInsert.push({
-      tournament_id,
-      country_name: truncate(et.team.name, 100),
-      country_code: code,
-      group_letter: null,
-      group_position: null,
-      flag_url: et.team.logo,
-      external_team_id: et.team.id,
-    })
-  }
-
-  if (commit && teamRowsToInsert.length > 0) {
-    const { data: inserted, error: insErr } = await supabase
-      .from('teams')
-      .insert(teamRowsToInsert)
-      .select('team_id, external_team_id')
-    if (insErr) throw insErr
-    for (const row of inserted || []) {
-      if (row.external_team_id != null) teamIdByExternal.set(row.external_team_id, row.team_id)
-    }
-    for (const p of teamPlan) {
-      if (p.status === 'new') p.team_id = teamIdByExternal.get(p.external_team_id)
-    }
-  }
-
-  // -------------------------------------------------------------- Fixtures
-  // One round-trip: /fixtures?league&season returns the whole season (single
-  // page for a league). We sort deterministically and number what's new.
   const fixtures = await ApiFootballClient.getFixtures({ league, season })
   if (fixtures.length === 0) {
     throw new Error(
@@ -308,31 +253,7 @@ export async function importLeagueSeason(
     )
   }
 
-  const { data: existingMatches, error: matchErr } = await supabase
-    .from('matches')
-    .select('external_match_id, match_number')
-    .eq('tournament_id', tournament_id)
-  if (matchErr) throw matchErr
-
-  const existingExt = new Set<string>()
-  let maxMatchNumber = 0
-  for (const m of existingMatches || []) {
-    if (m.external_match_id) existingExt.add(m.external_match_id)
-    if (typeof m.match_number === 'number' && m.match_number > maxMatchNumber) maxMatchNumber = m.match_number
-  }
-
-  const sorted = [...fixtures].sort((a, b) => {
-    const ta = Date.parse(a.fixture.date)
-    const tb = Date.parse(b.fixture.date)
-    if (ta !== tb) return ta - tb
-    return a.fixture.id - b.fixture.id
-  })
-
-  // --------------------------------------------------------------- Phase
-  // Import the regular season only. Play-off rounds are a bracket, and the
-  // league path deliberately has no bracket — importing them would produce
-  // fixtures with no matchweek, which cannot be round-keyed, opened, or given a
-  // deadline. They would sit inert. Skipped loudly instead.
+  // ----------------------------------------------------------------- Phase
   const { phase: regularSeasonPhase, phases } = detectRegularSeasonPhase(
     fixtures.map((f) => ({ round: f.league.round, date: f.fixture.date }))
   )
@@ -344,16 +265,9 @@ export async function importLeagueSeason(
     )
   }
 
-  // --------------------------------------------- Ordinal collision guard
-  // Within the chosen phase an ordinal must identify exactly one round. It does
-  // in every league checked, but the guard is the point. Belgium and Scotland
-  // split into PARALLEL groups after the regular season, and those groups reuse
-  // each other's ordinals — Scotland runs "Championship Group - 34" and
-  // "Relegation Group - 34" at the same time, Belgium has three phases all
-  // sharing 31..40. Verified against the live feed 2026-08-14. If the phase
-  // filter ever failed open, two concurrent groups would merge into one
-  // matchweek and members would find fixtures they never predicted inside a
-  // matchweek they had already submitted.
+  // Ordinal collision guard. `league_matchweeks` now enforces this declaratively
+  // via UNIQUE (season_id, provider_round) + UNIQUE (season_id, matchweek_number),
+  // but failing here names both labels instead of surfacing a 23505 at insert.
   const labelsByOrdinal = new Map<number, Set<string>>()
   for (const f of fixtures) {
     if (phaseOf(f.league.round) !== regularSeasonPhase) continue
@@ -363,137 +277,259 @@ export async function importLeagueSeason(
     set.add(f.league.round)
     labelsByOrdinal.set(n, set)
   }
-  const collisions = [...labelsByOrdinal.entries()].filter(([, labels]) => labels.size > 1)
+  const collisions = [...labelsByOrdinal.entries()].filter(([, l]) => l.size > 1)
   if (collisions.length > 0) {
     throw new Error(
       `league=${league} season=${season}: round ordinal collision inside phase "${regularSeasonPhase}" — ` +
-        collisions
-          .map(([n, labels]) => `matchweek ${n} claimed by ${[...labels].map((l) => `"${l}"`).join(' and ')}`)
-          .join('; ') +
+        collisions.map(([n, l]) => `matchweek ${n} claimed by ${[...l].map((x) => `"${x}"`).join(' and ')}`).join('; ') +
         `. Refusing to import: two rounds sharing a matchweek would merge silently.`
     )
   }
 
-  const matchPlan: LeagueMatchPlan[] = []
-  const matchRowsToInsert: Array<Record<string, unknown>> = []
+  // ---------------------------------------------------------------- Season
+  const { data: existingSeason, error: seasonErr } = await supabase
+    .from('league_seasons')
+    .select('season_id')
+    .eq('external_provider', 'api_football')
+    .eq('external_league_id', league)
+    .eq('external_season', season)
+    .maybeSingle()
+  if (seasonErr) throw seasonErr
+
+  const matchweekNumbers = [...labelsByOrdinal.keys()].sort((a, b) => a - b)
+  let seasonId: string | null = existingSeason?.season_id ?? null
+
+  if (commit && !seasonId) {
+    const { data: inserted, error } = await supabase
+      .from('league_seasons')
+      .insert({
+        competition_slug,
+        competition_name,
+        season_label,
+        season_start_year,
+        country_code,
+        club_count: externalTeams.length,
+        matchweek_count: matchweekNumbers.length,
+        external_provider: 'api_football',
+        external_league_id: league,
+        external_season: season,
+        regular_season_phase: regularSeasonPhase,
+        logo_url: args.logo_url ?? null,
+        imported_at: new Date().toISOString(),
+      })
+      .select('season_id')
+      .single()
+    if (error) throw error
+    seasonId = inserted.season_id
+  }
+
+  // ----------------------------------------------------------------- Clubs
+  const { data: existingClubs, error: clubErr } = seasonId
+    ? await supabase.from('league_clubs').select('club_id, external_club_id, abbreviation').eq('season_id', seasonId)
+    : { data: [], error: null }
+  if (clubErr) throw clubErr
+
+  const clubIdByExternal = new Map<number, string>()
+  const usedAbbr = new Set<string>()
+  for (const c of existingClubs ?? []) {
+    const row = c as { club_id: string; external_club_id: number; abbreviation: string }
+    clubIdByExternal.set(row.external_club_id, row.club_id)
+    if (row.abbreviation) usedAbbr.add(row.abbreviation)
+  }
+
+  const clubPlan: LeagueClubPlan[] = []
+  const clubRows: Array<Record<string, unknown>> = []
+  for (const et of externalTeams) {
+    const existing = clubIdByExternal.get(et.team.id)
+    if (existing) {
+      clubPlan.push({ external_club_id: et.team.id, name: et.team.name, abbreviation: '(existing)', crest_url: et.team.logo, status: 'existing', club_id: existing })
+      continue
+    }
+    const abbreviation = deriveCode(et.team, usedAbbr)
+    clubPlan.push({ external_club_id: et.team.id, name: et.team.name, abbreviation, crest_url: et.team.logo, status: 'new' })
+    clubRows.push({
+      season_id: seasonId,
+      name: truncate(et.team.name, 100),
+      // api-football carries no short name. Using the full name is honest;
+      // inventing an abbreviation for display would be fabricating data.
+      short_name: truncate(et.team.name, 100),
+      abbreviation,
+      crest_url: et.team.logo,
+      external_club_id: et.team.id,
+    })
+  }
+
+  if (commit && clubRows.length > 0) {
+    const { data: inserted, error } = await supabase.from('league_clubs').insert(clubRows).select('club_id, external_club_id')
+    if (error) throw error
+    for (const row of inserted ?? []) {
+      const r = row as { club_id: string; external_club_id: number }
+      clubIdByExternal.set(r.external_club_id, r.club_id)
+    }
+    for (const p of clubPlan) if (p.status === 'new') p.club_id = clubIdByExternal.get(p.external_club_id)
+  }
+
+  // ------------------------------------------------------------ Matchweeks
+  const { data: existingMws, error: mwErr } = seasonId
+    ? await supabase.from('league_matchweeks').select('matchweek_id, matchweek_number').eq('season_id', seasonId)
+    : { data: [], error: null }
+  if (mwErr) throw mwErr
+
+  const mwIdByNumber = new Map<number, string>()
+  for (const m of existingMws ?? []) {
+    const row = m as { matchweek_id: string; matchweek_number: number }
+    mwIdByNumber.set(row.matchweek_number, row.matchweek_id)
+  }
+
+  const fixturesPerMw = new Map<number, number>()
+  for (const f of fixtures) {
+    if (phaseOf(f.league.round) !== regularSeasonPhase) continue
+    const n = parseRound(f.league.round)
+    if (n === null) continue
+    fixturesPerMw.set(n, (fixturesPerMw.get(n) ?? 0) + 1)
+  }
+
+  const mwPlan: LeagueMatchweekPlan[] = []
+  const mwRows: Array<Record<string, unknown>> = []
+  for (const n of matchweekNumbers) {
+    const providerRound = [...(labelsByOrdinal.get(n) ?? [])][0]
+    const existing = mwIdByNumber.get(n)
+    if (existing) {
+      mwPlan.push({ matchweek_number: n, provider_round: providerRound, label: `Matchweek ${n}`, fixture_count: fixturesPerMw.get(n) ?? 0, status: 'existing', matchweek_id: existing })
+      continue
+    }
+    mwPlan.push({ matchweek_number: n, provider_round: providerRound, label: `Matchweek ${n}`, fixture_count: fixturesPerMw.get(n) ?? 0, status: 'new' })
+    // fixture_count and lock_at are left at their defaults (0 / NULL) so the
+    // empty-has-no-lock CHECK holds on insert. refresh_league_matchweek_window
+    // fills both the moment fixtures land.
+    mwRows.push({ season_id: seasonId, matchweek_number: n, label: `Matchweek ${n}`, provider_round: providerRound })
+  }
+
+  if (commit && mwRows.length > 0) {
+    const { data: inserted, error } = await supabase.from('league_matchweeks').insert(mwRows).select('matchweek_id, matchweek_number')
+    if (error) throw error
+    for (const row of inserted ?? []) {
+      const r = row as { matchweek_id: string; matchweek_number: number }
+      mwIdByNumber.set(r.matchweek_number, r.matchweek_id)
+    }
+    for (const p of mwPlan) if (p.status === 'new') p.matchweek_id = mwIdByNumber.get(p.matchweek_number)
+  }
+
+  // -------------------------------------------------------------- Fixtures
+  const { data: existingFixtures, error: fxErr } = seasonId
+    ? await supabase.from('league_fixtures').select('external_fixture_id, fixture_number').eq('season_id', seasonId)
+    : { data: [], error: null }
+  if (fxErr) throw fxErr
+
+  const existingExt = new Set<string>()
+  let maxFixtureNumber = 0
+  for (const f of existingFixtures ?? []) {
+    const row = f as { external_fixture_id: string; fixture_number: number }
+    existingExt.add(row.external_fixture_id)
+    if (row.fixture_number > maxFixtureNumber) maxFixtureNumber = row.fixture_number
+  }
+
+  const sorted = [...fixtures].sort((a, b) => {
+    const ta = Date.parse(a.fixture.date), tb = Date.parse(b.fixture.date)
+    return ta !== tb ? ta - tb : a.fixture.id - b.fixture.id
+  })
+
+  const fixturePlan: LeagueFixturePlan[] = []
+  const fixtureRows: Array<Record<string, unknown>> = []
   const skippedByPhase: Record<string, number> = {}
-  let nextNumber = maxMatchNumber + 1
+  let nextNumber = maxFixtureNumber + 1
 
   for (const f of sorted) {
     const ext = String(f.fixture.id)
+    const providerRound = f.league.round
+    const mwNumber = parseRound(providerRound)
     const home = f.teams.home.name
     const away = f.teams.away.name
-    const round_label = f.league.round
-    const round_number = parseRound(round_label)
-    const match_date = f.fixture.date
+    const kickoff = f.fixture.date
     const venue = buildVenue(f)
+    const base = { external_fixture_id: ext, provider_round: providerRound, matchweek_number: mwNumber, kickoff_at: kickoff, venue, home, away }
 
     if (existingExt.has(ext)) {
-      matchPlan.push({ external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away, status: 'existing' })
+      fixturePlan.push({ ...base, fixture_number: -1, status: 'existing' })
       continue
     }
 
-    const fixturePhase = phaseOf(round_label)
+    const fixturePhase = phaseOf(providerRound)
     if (fixturePhase !== regularSeasonPhase) {
       skippedByPhase[fixturePhase] = (skippedByPhase[fixturePhase] ?? 0) + 1
-      matchPlan.push({
-        external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away,
-        status: 'skipped',
-        reason: `phase "${fixturePhase}" is not the regular season ("${regularSeasonPhase}") — play-off rounds are out of scope for v1`,
-      })
+      fixturePlan.push({ ...base, fixture_number: -1, status: 'skipped',
+        reason: `phase "${fixturePhase}" is not the regular season ("${regularSeasonPhase}") — play-off rounds are out of scope` })
       continue
     }
-
-    if (round_number === null) {
-      // Inside the regular-season phase but with no ordinal. Not expected, and
-      // not something to guess at: an un-numbered fixture has no matchweek.
+    if (mwNumber === null) {
       skippedByPhase[fixturePhase] = (skippedByPhase[fixturePhase] ?? 0) + 1
-      matchPlan.push({
-        external_match_id: ext, match_number: -1, round_number, round_label, match_date, venue, home, away,
-        status: 'skipped',
-        reason: `round "${round_label}" carries no matchweek ordinal`,
-      })
+      fixturePlan.push({ ...base, fixture_number: -1, status: 'skipped',
+        reason: `round "${providerRound}" carries no matchweek ordinal` })
       continue
     }
 
-    const homeId = teamIdByExternal.get(f.teams.home.id)
-    const awayId = teamIdByExternal.get(f.teams.away.id)
-    // Commit mode requires both sides resolved. In a dry run against a fresh
-    // tournament the teams aren't inserted yet, so ids are undefined — expected;
-    // we still preview the fixture (by name) and assign a provisional number.
-    if (commit && (!homeId || !awayId)) {
-      matchPlan.push({
-        external_match_id: ext,
-        match_number: -1,
-        round_number,
-        round_label,
-        match_date,
-        venue,
-        home,
-        away,
-        status: 'skipped',
-        reason: 'home/away team has no external mapping (team import incomplete)',
-      })
+    const homeId = clubIdByExternal.get(f.teams.home.id)
+    const awayId = clubIdByExternal.get(f.teams.away.id)
+    const mwId = mwIdByNumber.get(mwNumber)
+    if (commit && (!homeId || !awayId || !mwId)) {
+      fixturePlan.push({ ...base, fixture_number: -1, status: 'skipped',
+        reason: 'club or matchweek not resolved — an earlier insert in this run was incomplete' })
       continue
     }
 
-    const match_number = nextNumber++
-    matchPlan.push({ external_match_id: ext, match_number, round_number, round_label, match_date, venue, home, away, status: 'new' })
-    matchRowsToInsert.push({
-      tournament_id,
-      match_number,
-      stage: REGULAR_SEASON_STAGE,
-      group_letter: null,
-      home_team_id: homeId ?? null,
-      away_team_id: awayId ?? null,
-      match_date,
+    const fixtureNumber = nextNumber++
+    fixturePlan.push({ ...base, fixture_number: fixtureNumber, status: 'new' })
+    fixtureRows.push({
+      season_id: seasonId,
+      matchweek_id: mwId ?? null,
+      fixture_number: fixtureNumber,
+      home_club_id: homeId ?? null,
+      away_club_id: awayId ?? null,
+      kickoff_at: kickoff,
+      original_kickoff_at: kickoff,
       venue,
-      round_number,
-      round_label,
-      external_match_id: ext,
-      data_source: 'api',
+      external_fixture_id: ext,
       status: 'scheduled',
       is_completed: false,
     })
   }
 
-  if (commit && matchRowsToInsert.length > 0) {
+  if (commit && fixtureRows.length > 0) {
     const BATCH = 100
-    for (let i = 0; i < matchRowsToInsert.length; i += BATCH) {
-      const { error } = await supabase.from('matches').insert(matchRowsToInsert.slice(i, i + BATCH))
+    for (let i = 0; i < fixtureRows.length; i += BATCH) {
+      const { error } = await supabase.from('league_fixtures').insert(fixtureRows.slice(i, i + BATCH))
       if (error) throw error
     }
   }
 
-  const newMatches = matchPlan.filter((m) => m.status === 'new')
-  const rounds = newMatches.map((m) => m.round_number).filter((r): r is number => r != null)
-  const dates = newMatches.map((m) => m.match_date).sort()
+  const newFixtures = fixturePlan.filter((f) => f.status === 'new')
+  const dates = newFixtures.map((f) => f.kickoff_at).sort()
 
   return {
-    tournament_id,
+    season_id: seasonId,
+    competition: `${competition_name} ${season_label}`,
     league,
     season,
-    teams: {
+    phase: { imported: regularSeasonPhase, all: phases, skippedByPhase },
+    clubs: {
       external_total: externalTeams.length,
-      to_insert: teamPlan.filter((t) => t.status === 'new').length,
-      existing: teamPlan.filter((t) => t.status === 'existing').length,
-      plan: teamPlan,
+      to_insert: clubPlan.filter((c) => c.status === 'new').length,
+      existing: clubPlan.filter((c) => c.status === 'existing').length,
+      plan: clubPlan,
     },
-    matches: {
+    matchweeks: {
+      to_insert: mwPlan.filter((m) => m.status === 'new').length,
+      existing: mwPlan.filter((m) => m.status === 'existing').length,
+      plan: mwPlan,
+    },
+    fixtures: {
       external_total: fixtures.length,
-      to_insert: newMatches.length,
-      existing: matchPlan.filter((m) => m.status === 'existing').length,
-      skipped: matchPlan.filter((m) => m.status === 'skipped').length,
-      round_min: rounds.length ? Math.min(...rounds) : null,
-      round_max: rounds.length ? Math.max(...rounds) : null,
+      to_insert: newFixtures.length,
+      existing: fixturePlan.filter((f) => f.status === 'existing').length,
+      skipped: fixturePlan.filter((f) => f.status === 'skipped').length,
       date_first: dates[0] ?? null,
       date_last: dates[dates.length - 1] ?? null,
-      plan: matchPlan,
-    },
-    phase: {
-      imported: regularSeasonPhase,
-      all: phases,
-      skippedByPhase,
+      plan: fixturePlan,
     },
     committed: commit,
   }

@@ -11,7 +11,11 @@
  * consolidating them is a separate sweep — but new callers should prefer this.
  */
 
-export type PredictionMode = 'full_tournament' | 'progressive' | 'bracket_picker'
+// The copy in this file describes the three bracket modes only; a league has its
+// own explainer. Re-exported under the historical name so the ~10 importers of
+// `poolModeInfo`'s PredictionMode keep working.
+import type { BracketPredictionMode } from './predictionMode'
+export type PredictionMode = BracketPredictionMode
 
 export type PoolModeInfo = {
   label: string

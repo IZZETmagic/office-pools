@@ -36,7 +36,11 @@ import {
 } from './tournament'
 import type { BracketResult } from './bracketResolver'
 
-export type PredictionMode = 'full_tournament' | 'progressive' | 'bracket_picker'
+// Podium resolution is bracket-only: a league has no champion/runner-up/third
+// to predict. Typing it `BracketPredictionMode` makes handing this a league
+// pool a compile error instead of a wrong podium.
+import type { BracketPredictionMode } from './predictionMode'
+export type PredictionMode = BracketPredictionMode
 
 /** The three finishers an entry predicted. `null` means "made no pick". */
 export type PredictedPodium = {

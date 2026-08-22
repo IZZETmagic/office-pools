@@ -1,32 +1,23 @@
-// Import a full league season (teams + fixtures) from api-football.
+// Import a league season from api-football into the league's OWN tables.
 //
-// The mirror image of scripts/seed-api-football-mapping.ts: instead of mapping a
-// hand-authored bracket to api-football ids, this PULLS a flat round-robin league
-// (e.g. the Premier League) and inserts teams + all fixtures with their external
-// ids already set. The live sync then works unchanged.
-//
-// Prereqs:
-//   1. Apply migration lib/migrations/024_multi_competition_league_support.sql
-//   2. Create the tournaments row to import into (see the INSERT in the PR notes),
-//      and copy its tournament_id.
+// Retargeted 2026-08-22 (L2). This used to require a hand-created `tournaments`
+// row and wrote clubs into `teams` and fixtures into `matches`. A league now
+// has its own structure (league_seasons / league_clubs / league_matchweeks /
+// league_fixtures) and the season row is created by the import itself.
 //
 // Usage:
-//   Dry run (default — fetches, builds the plan, writes NOTHING):
-//     npx tsx scripts/import-league-season.ts <tournament_id> <league> <season>
+//   Dry run (fetches, builds the plan, writes NOTHING):
+//     npx tsx scripts/import-league-season.ts premier-league 2026
 //   Apply:
-//     npx tsx scripts/import-league-season.ts <tournament_id> <league> <season> --apply
+//     npx tsx scripts/import-league-season.ts premier-league 2026 --apply
 //
-//   Premier League 2025/26 example (api-football: league 39, season 2025):
-//     npx tsx scripts/import-league-season.ts <pl_tournament_id> 39 2025
-//
-// Idempotent: re-running only inserts teams/fixtures not already present.
-// Requires NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, API_FOOTBALL_KEY
-// in .env.local.
+// Idempotent: re-running inserts only what is new, by the schema's own natural
+// keys. Requires NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
+// API_FOOTBALL_KEY in .env.local.
 
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
-// Minimal .env.local loader (no dotenv dependency): KEY=VALUE lines only.
 try {
   const envFile = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8')
   for (const line of envFile.split('\n')) {
@@ -37,21 +28,36 @@ try {
   console.error('Could not read .env.local')
 }
 
+// The competitions we know how to import. A new league is a row here plus one
+// run — no code. Deliberately small: v1 ships the Premier League only, and an
+// entry that has never been run is a claim, not a capability.
+const CATALOGUE: Record<string, { name: string; country: string; apiLeagueId: number }> = {
+  'premier-league': { name: 'Premier League', country: 'ENG', apiLeagueId: 39 },
+}
+
+function seasonLabel(startYear: number): string {
+  return `${startYear}/${String((startYear + 1) % 100).padStart(2, '0')}`
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return '(none)'
-  // Compact, timezone-explicit: 2025-08-15 19:00Z
-  return iso.replace('T', ' ').replace(/:\d{2}\.\d+Z$/, 'Z').replace(/:00Z$/, 'Z')
+  return iso.replace('T', ' ').replace(/:\d{2}\.\d+Z$/, 'Z').replace(/:00\+00:00$/, 'Z').replace(/:00Z$/, 'Z')
 }
 
 async function main() {
   const apply = process.argv.includes('--apply')
   const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'))
-  const tournamentId = positional[0]
-  const league = parseInt(positional[1] ?? '', 10)
-  const season = parseInt(positional[2] ?? '', 10)
+  const slug = positional[0]
+  const startYear = parseInt(positional[1] ?? '', 10)
 
-  if (!tournamentId || !Number.isFinite(league) || !Number.isFinite(season)) {
-    console.error('Usage: npx tsx scripts/import-league-season.ts <tournament_id> <league> <season> [--apply]')
+  if (!slug || !Number.isFinite(startYear)) {
+    console.error('Usage: npx tsx scripts/import-league-season.ts <competition-slug> <season-start-year> [--apply]')
+    console.error(`Known competitions: ${Object.keys(CATALOGUE).join(', ')}`)
+    process.exit(1)
+  }
+  const comp = CATALOGUE[slug]
+  if (!comp) {
+    console.error(`Unknown competition "${slug}". Known: ${Object.keys(CATALOGUE).join(', ')}`)
     process.exit(1)
   }
 
@@ -61,87 +67,69 @@ async function main() {
     console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
     process.exit(1)
   }
-  if (!process.env.API_FOOTBALL_KEY) {
-    console.error('Missing API_FOOTBALL_KEY')
-    process.exit(1)
-  }
 
   const { createClient } = await import('@supabase/supabase-js')
-  const { importLeagueSeason } = await import('../lib/integrations/apiFootball/importLeagueSeason')
+  const { importLeagueSeason } = await import('@/lib/integrations/apiFootball/importLeagueSeason')
+  const db = createClient(url, key)
 
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  console.log(
+    `${apply ? 'APPLYING' : 'DRY RUN'} — ${comp.name} ${seasonLabel(startYear)} ` +
+    `(api-football league ${comp.apiLeagueId}, season ${startYear})\n`
+  )
 
-  console.log(`${apply ? 'APPLYING' : 'DRY RUN'} — tournament=${tournamentId} league=${league} season=${season}\n`)
-
-  const res = await importLeagueSeason(supabase, {
-    tournament_id: tournamentId,
-    league,
-    season,
+  const res = await importLeagueSeason(db, {
+    competition_slug: slug,
+    competition_name: comp.name,
+    season_label: seasonLabel(startYear),
+    season_start_year: startYear,
+    country_code: comp.country,
+    league: comp.apiLeagueId,
+    season: startYear,
     commit: apply,
   })
 
-  // --- Teams ---------------------------------------------------------------
-  console.log(
-    `Teams: ${res.teams.external_total} from api-football — ${res.teams.to_insert} to insert, ${res.teams.existing} already present`
-  )
-  for (const t of res.teams.plan) {
-    const tag = t.status === 'existing' ? '  (exists)' : `  ${t.code}`
-    console.log(`  ${tag}  ${t.name}  [api ${t.external_team_id}]`)
-  }
-
-  // --- Matches -------------------------------------------------------------
-  console.log(
-    `\nFixtures: ${res.matches.external_total} from api-football — ${res.matches.to_insert} to insert` +
-      `, ${res.matches.existing} already present` +
-      (res.matches.skipped ? `, ${res.matches.skipped} skipped` : '')
-  )
-  if (res.matches.round_min != null) {
-    console.log(`  matchweeks ${res.matches.round_min}–${res.matches.round_max}`)
-  }
-
-  // Which phase was imported, and what was left behind. Printed unconditionally
-  // and before the sample, because a season that imports 30 of 60 rounds must
-  // not be able to look like a clean import of a short league — Belgium and
-  // Scotland both split into parallel groups after the regular season, and
-  // those groups are deliberately skipped.
-  console.log(`\n  phase imported: "${res.phase.imported}"`)
-  const otherPhases = res.phase.all.filter((ph) => ph.phase !== res.phase.imported)
-  if (otherPhases.length > 0) {
-    console.log('  phases SKIPPED (play-offs are out of scope for v1):')
-    for (const ph of otherPhases) {
-      const n = res.phase.skippedByPhase[ph.phase] ?? 0
-      console.log(
-        `    - "${ph.phase}": ${n} fixture(s)` +
-          `${ph.rounds ? `, ${ph.rounds} numbered round(s)` : ''}` +
-          `${ph.unnumbered ? `, ${ph.unnumbered} unnumbered` : ''}`
-      )
+  console.log(`Season: ${res.season_id ?? '(not created — dry run)'}`)
+  console.log(`  phase imported: "${res.phase.imported}"`)
+  const others = res.phase.all.filter((p) => p.phase !== res.phase.imported)
+  if (others.length > 0) {
+    console.log('  phases SKIPPED (play-offs are out of scope):')
+    for (const p of others) {
+      const n = res.phase.skippedByPhase[p.phase] ?? 0
+      console.log(`    - "${p.phase}": ${n} fixture(s)` +
+        `${p.rounds ? `, ${p.rounds} numbered round(s)` : ''}` +
+        `${p.unnumbered ? `, ${p.unnumbered} unnumbered` : ''}`)
     }
   }
-  console.log(`  window ${fmtDate(res.matches.date_first)} → ${fmtDate(res.matches.date_last)}`)
 
-  const newOnes = res.matches.plan.filter((m) => m.status === 'new')
-  const preview = [...newOnes.slice(0, 5), ...(newOnes.length > 10 ? newOnes.slice(-5) : newOnes.slice(5))]
-  console.log('\n  sample fixtures:')
-  let lastShown = -1
-  for (const m of preview) {
-    if (m.match_number - lastShown > 1 && lastShown !== -1) console.log('    …')
-    lastShown = m.match_number
-    const wk = m.round_number != null ? `MW${String(m.round_number).padStart(2, ' ')}` : 'MW--'
-    console.log(`    #${String(m.match_number).padStart(3, ' ')} ${wk}  ${fmtDate(m.match_date)}  ${m.home} vs ${m.away}`)
+  console.log(`\nClubs: ${res.clubs.external_total} from api-football — ${res.clubs.to_insert} to insert, ${res.clubs.existing} already present`)
+  for (const c of res.clubs.plan.slice(0, 25)) {
+    console.log(`    ${c.status === 'new' ? c.abbreviation : ' — '}  ${c.name}  [api ${c.external_club_id}]`)
   }
 
-  const skipped = res.matches.plan.filter((m) => m.status === 'skipped')
+  console.log(`\nMatchweeks: ${res.matchweeks.to_insert} to insert, ${res.matchweeks.existing} already present`)
+  const mws = res.matchweeks.plan
+  if (mws.length > 0) {
+    const counts = [...new Set(mws.map((m) => m.fixture_count))].sort((a, b) => a - b)
+    console.log(`    range ${mws[0].matchweek_number}–${mws[mws.length - 1].matchweek_number}, fixtures per matchweek: ${counts.join('/')}`)
+  }
+
+  console.log(`\nFixtures: ${res.fixtures.external_total} from api-football — ${res.fixtures.to_insert} to insert, ` +
+    `${res.fixtures.existing} already present, ${res.fixtures.skipped} skipped`)
+  console.log(`  window ${fmtDate(res.fixtures.date_first)} → ${fmtDate(res.fixtures.date_last)}`)
+
+  const sample = res.fixtures.plan.filter((f) => f.status === 'new')
+  console.log('\n  sample fixtures:')
+  for (const f of [...sample.slice(0, 5), ...(sample.length > 10 ? sample.slice(-5) : [])]) {
+    console.log(`    #${String(f.fixture_number).padStart(3, ' ')} MW${String(f.matchweek_number).padStart(2, ' ')}  ${fmtDate(f.kickoff_at)}  ${f.home} vs ${f.away}`)
+  }
+
+  const skipped = res.fixtures.plan.filter((f) => f.status === 'skipped')
   if (skipped.length > 0) {
     console.log(`\n  skipped (${skipped.length}):`)
-    for (const s of skipped.slice(0, 20)) console.log(`    - ${s.home} vs ${s.away} [${s.external_match_id}]: ${s.reason}`)
+    for (const s of skipped.slice(0, 20)) console.log(`    - ${s.home} vs ${s.away} [${s.provider_round}]: ${s.reason}`)
   }
 
-  console.log(
-    `\n${apply ? 'Applied — teams + fixtures inserted.' : 'No changes written (dry run). Re-run with --apply to insert.'}`
-  )
+  console.log(apply ? '\nApplied — season, clubs, matchweeks and fixtures inserted.' : '\nNo changes written (dry run). Re-run with --apply.')
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+main().catch((e) => { console.error('FAILED:', e instanceof Error ? e.message : e); process.exit(1) })

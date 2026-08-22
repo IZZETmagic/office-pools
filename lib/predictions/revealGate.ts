@@ -17,7 +17,13 @@
 // Pure functions only — no DB, no ambient clock. `now` is injected so the gate
 // is deterministic and unit-testable, and callers own the clock.
 
-export type PredictionMode = 'full_tournament' | 'progressive' | 'bracket_picker'
+// The reveal gate DOES see league pools — `computeReveal` is called for every
+// pool — so here the union is the full four. Callers stop casting and call
+// `parsePredictionMode`, which throws rather than defaulting onto the
+// reveal-the-whole-entry branch.
+import type { PredictionMode as CanonicalPredictionMode } from '../predictionMode'
+export { parsePredictionMode } from '../predictionMode'
+export type PredictionMode = CanonicalPredictionMode
 
 export interface RevealPool {
   prediction_mode: PredictionMode
