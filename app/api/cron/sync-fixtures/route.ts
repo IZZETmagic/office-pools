@@ -17,9 +17,19 @@ import { recalculatePool } from '@/lib/scoring/recalculate'
 import { snapshotPoolRanks } from '@/lib/scoring/snapshotRanks'
 import { linkKnockoutFixtures } from '@/lib/integrations/apiFootball/linkKnockoutFixtures'
 import { advancementTriggerFor } from '@/lib/competitionFormat'
-import { loadSyncTargets } from '@/lib/integrations/apiFootball/syncTargets'
+import {
+  loadSyncTargets,
+  resolveSweepTournamentIds,
+} from '@/lib/integrations/apiFootball/syncTargets'
+import {
+  syncLeagueFixtures,
+  formatLeagueNoteParts,
+} from '@/lib/integrations/apiFootball/syncLeagueFixtures'
 
 export const dynamic = 'force-dynamic'
+// pg_cron job 8 fires every 60s. The limit was inherited before; state it, as
+// shadow-materialize (300) and analytics-sweep (120) already do.
+export const maxDuration = 120
 
 // Window during which a match is considered "potentially live" and worth
 // touching with the sync. Wide enough to cover ET + PSO + breaks.
@@ -71,7 +81,17 @@ async function handle(request: NextRequest) {
   // rather than from three env globals, so adding a second competition is a row
   // and not a redeploy. Falls back to the env single-target if the ingest-config
   // columns aren't there yet (migration 024) — see loadSyncTargets.
-  const targets = await loadSyncTargets(admin, (stage, message) => errors.push({ stage, message }))
+  // Notes, not errors: an errors[] entry flips ok:false and drives the status
+  // panel's error count, so a permanent, expected fact (a superseded tournaments
+  // row) belongs here. A red light every 60 seconds hides real errors.
+  const targetNotes: string[] = []
+  // One segment per target per run, ALWAYS — see the finally block below.
+  const noteSegments: string[] = []
+
+  const targets = await loadSyncTargets(admin, {
+    onError: (stage, message) => errors.push({ stage, message }),
+    onNote: (message) => targetNotes.push(message),
+  })
 
   // Cross-competition accumulators. Ingest is per-tournament; advancement, the
   // rank snapshot and the recalc sweep all run once, after every competition has
@@ -87,6 +107,38 @@ async function handle(request: NextRequest) {
   const touchedTournamentIds = new Set<string>()  // tournaments with a score change (scopes the sweep)
 
   for (const target of targets) {
+  // One note segment per target per run, emitted on EVERY path by the finally
+  // below — including the two `continue`s further down, which are exactly the
+  // quiet ticks the segment is meant to certify. An ABSENT segment must mean
+  // "this arm never ran", never "this arm had nothing to do".
+  const seg: { label: string; parts: string[] } = {
+    label: `${target.kind === 'league' ? 'league' : 'wc'} "${target.name}"`,
+    parts: ['window=?'],
+  }
+  try {
+
+  if (target.kind !== 'world_cup') {
+    if (target.kind === 'league') {
+      const r = await syncLeagueFixtures(admin, target, { now, nowIso })
+      for (const e of r.errors) errors.push(e)
+      seg.parts = formatLeagueNoteParts(r)
+      // The league arm deliberately writes NONE of the cross-competition
+      // accumulators — newlyCompleted, scoresChanged, changedMatchIds,
+      // touchedTournamentIds, snapshotTournamentIds — nor the World Cup's
+      // fixturesSeen / fixturesChanged / fixturesSkippedManual counters, which
+      // are World-Cup-only history the status panel graphs. Mixing them would
+      // be a retroactive monitoring lie.
+      continue
+    }
+    // A third kind added later is a COMPILE error here, not a silent World Cup sync.
+    const _exhaustive: never = target
+    errors.push({
+      stage: 'sync_target',
+      message: `unrecognised sync target kind: ${JSON.stringify(_exhaustive)}`,
+    })
+    continue
+  }
+
   const { tournamentId, league, season } = target
   // `newlyCompleted` accumulates across competitions, so "did THIS competition
   // complete anything" has to be measured against its length on entry — not
@@ -104,15 +156,21 @@ async function handle(request: NextRequest) {
   //
   // Bracket competitions only: a league has no placeholders to resolve, so
   // there is nothing here for it to link and the season-feed fetch would be
-  // pure quota burn.
+  // pure quota burn. That used to be a `target.format !== 'league'` guard on
+  // both statements below; it is now structural — this code only runs inside
+  // the `kind === 'world_cup'` branch, so a league can never reach it.
+  //
+  // The `knockout_link_last_attempt` key is GLOBAL, not per-target. The league
+  // arm must never stamp it: doing so would silently disable World Cup
+  // auto-linking for 15 minutes at a time, forever.
   const KNOCKOUT_LINK_INTERVAL_MS = 15 * 60 * 1000
-  const { data: linkRow } = target.format === 'league' ? { data: null } : await admin
+  const { data: linkRow } = await admin
     .from('sync_settings')
     .select('setting_value')
     .eq('setting_key', 'knockout_link_last_attempt')
     .maybeSingle()
   const lastLinkAttempt = linkRow?.setting_value ? new Date(linkRow.setting_value as string).getTime() : 0
-  if (target.format !== 'league' && now - lastLinkAttempt >= KNOCKOUT_LINK_INTERVAL_MS) {
+  if (now - lastLinkAttempt >= KNOCKOUT_LINK_INTERVAL_MS) {
     // Stamp first so a repeated failure can't hammer the api every minute.
     await admin
       .from('sync_settings')
@@ -163,6 +221,7 @@ async function handle(request: NextRequest) {
 
   // Nothing in this competition's live window — the common case for a
   // competition that is between matchdays, or finished.
+  seg.parts = [`window=${candidates.length}`]
   if (candidates.length === 0) continue
 
   // Pull team mapping (external -> our) once
@@ -279,6 +338,9 @@ async function handle(request: NextRequest) {
 
   if (newlyCompleted.length > completedBefore) touchedTournamentIds.add(tournamentId)
 
+  } finally {
+    noteSegments.push(`${seg.label} ${seg.parts.join(' ')}`)
+  }
   } // end per-competition ingest
 
   // Cascade team advancement for newly completed matches.
@@ -419,10 +481,18 @@ async function handle(request: NextRequest) {
         // competition, so it falls back to all of them and lets the cursor
         // filter below narrow it — otherwise a drain would select nothing and
         // the deferred work would never complete.
-        const sweepTournamentIds =
-          touchedTournamentIds.size > 0
-            ? [...touchedTournamentIds]
-            : targets.map((t) => t.tournamentId)
+        // Extracted and typed: under the SyncTarget union a bare
+        // `targets.map(t => t.tournamentId)` yields `undefined` for a league
+        // target, and `.in('tournament_id', [..., undefined])` returns ZERO
+        // pools at HTTP 200 — the World Cup drain stopping in silence. That
+        // regression comes from the type change, not from the league arm.
+        const sweepTournamentIds = resolveSweepTournamentIds(targets, touchedTournamentIds)
+        if (sweepTournamentIds.length === 0 && targets.length > 0) {
+          errors.push({
+            stage: 'sweep_scope',
+            message: 'no bracket competition in scope — the drain would recalculate nothing',
+          })
+        }
 
         const allPools = await fetchPoolsForSweep(admin, sweepTournamentIds)
         // Bracket scoring cannot change from a live in-progress scoreline — only
@@ -489,13 +559,18 @@ async function handle(request: NextRequest) {
     fixturesChanged,
     fixturesSkippedManual,
     notes: [
-      targets.length > 1 ? `synced ${targets.length} competitions` : null,
+      // `synced N competitions` is deliberately GONE. It printed green every
+      // minute for hours while the Premier League synced zero fixtures; a note
+      // that is true whatever happened is a false exit criterion.
+      ...noteSegments,
+      ...targetNotes,
       targets.some((t) => t.source === 'env_fallback') ? 'env fallback in use (024 unapplied?)' : null,
       advancing.length > 0 ? `cascade fired for ${advancing.length} match(es)` : null,
       newlyCompleted.length > advancing.length
         ? `${newlyCompleted.length - advancing.length} non-bracket completion(s) skipped the cascade`
         : null,
       sweepNote,
+      `targets=${targets.length}`,
     ].filter(Boolean).join('; ') || null,
   })
 }

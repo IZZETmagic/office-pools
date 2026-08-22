@@ -41,7 +41,7 @@ const LIVE_STATUSES: ApiFootballStatusShort[] = ['1H', 'HT', '2H', 'ET', 'BT', '
 const FINAL_STATUSES: ApiFootballStatusShort[] = ['FT', 'AET', 'PEN']
 const CANCELLED_STATUSES: ApiFootballStatusShort[] = ['CANC', 'ABD', 'WO']
 
-function mapStatus(short: ApiFootballStatusShort): 'scheduled' | 'live' | 'completed' | 'cancelled' {
+export function mapStatus(short: ApiFootballStatusShort): 'scheduled' | 'live' | 'completed' | 'cancelled' {
   if (FINAL_STATUSES.includes(short)) return 'completed'
   if (LIVE_STATUSES.includes(short)) return 'live'
   if (CANCELLED_STATUSES.includes(short)) return 'cancelled'
@@ -82,7 +82,7 @@ export function mapStatusDetail(short: ApiFootballStatusShort): MatchStatusDetai
   }
 }
 
-function mapPeriod(short: ApiFootballStatusShort): string | null {
+export function mapPeriod(short: ApiFootballStatusShort): string | null {
   if (short === '1H' || short === 'HT' || short === '2H') return short
   if (short === 'ET' || short === 'BT') return 'ET'
   if (short === 'P' || short === 'PEN') return 'PEN'
@@ -261,4 +261,172 @@ export function isLiveStatus(short: ApiFootballStatusShort): boolean {
 /** True when the fixture status indicates a final (completed) result. */
 export function isFinalStatus(short: ApiFootballStatusShort): boolean {
   return FINAL_STATUSES.includes(short)
+}
+
+// =============================================================
+// LEAGUE fixtures — a separate mapper, not a reuse of fixtureToMatchUpdate
+// =============================================================
+// Everything above this line is the World Cup path and is untouched by the
+// league work. The league needs its own diff because `league_fixtures` carries
+// CHECK constraints that STRADDLE columns `fixtureToMatchUpdate` diffs
+// independently, so reusing it would raise 23514 in production rather than
+// merely produce odd data. The four forced divergences are named on
+// `fixtureToLeagueUpdate` below.
+// =============================================================
+
+/** The columns of a `league_fixtures` row the sync arm reads to diff against. */
+export type LeagueFixtureRow = {
+  fixture_id: string
+  matchweek_id: string
+  external_fixture_id: string
+  kickoff_at: string
+  status: string
+  status_detail: string | null
+  home_goals: number | null
+  away_goals: number | null
+  is_completed: boolean
+  live_minute: number | null
+  live_period: string | null
+  live_added: number | null
+  manual_override: boolean
+}
+
+export type LeagueStatus = 'scheduled' | 'live' | 'completed' | 'postponed' | 'cancelled'
+
+/**
+ * One row of the JSONB payload consumed by `league_apply_fixture_sync()`.
+ *
+ * Every optional field is paired with an explicit `set_*` flag because
+ * `jsonb_to_recordset` renders an ABSENT key and an explicit JSON null
+ * identically as SQL NULL — so without the flags, "clear the score" and "do not
+ * touch the score" would be the same payload.
+ */
+export type LeagueFixturePayload = {
+  external_fixture_id: string
+  set_status?: boolean
+  status?: LeagueStatus
+  set_status_detail?: boolean
+  status_detail?: MatchStatusDetail | null
+  set_goals?: boolean
+  home_goals?: number | null
+  away_goals?: number | null
+  set_completed?: boolean
+  is_completed?: boolean
+  set_live?: boolean
+  live_minute?: number | null
+  live_period?: string | null
+  live_added?: number | null
+}
+
+/** Conditions the arm reports but deliberately does not act on. */
+export type LeagueFixtureFlags = {
+  /** FT/AET/PEN with NULL goals — `is_completed` is deliberately left false. */
+  finalWithoutGoals: boolean
+  /** AWD: the shared mapper files an awarded match as `scheduled`. Reported, not fixed here. */
+  awarded: boolean
+  /** The provider's kickoff instant differs from ours. DETECTED ONLY — L3 never writes kickoff_at. */
+  rescheduled: boolean
+}
+
+/**
+ * `PST` maps to `'postponed'`, a value `matches` never uses and `mapStatus` can
+ * never emit (it falls through to `'scheduled'`). `league_fixtures_status_ck`
+ * already admits it. A league's matchweek derivation has to tell "not played
+ * yet" from "will not be played on this date", and nothing reads
+ * `league_fixtures.status` yet, so there is no consumer to break.
+ */
+export function mapLeagueStatus(short: ApiFootballStatusShort): LeagueStatus {
+  if (short === 'PST') return 'postponed'
+  return mapStatus(short)
+}
+
+/**
+ * Diff one api-football fixture against one `league_fixtures` row. `payload` is
+ * null when nothing moved.
+ *
+ * FOUR FORCED DIVERGENCES FROM `fixtureToMatchUpdate`:
+ *
+ *  1. **Goals move as a PAIR.** `league_fixtures_result_pair_ck` is
+ *     `CHECK ((home_goals IS NULL) = (away_goals IS NULL))`.
+ *     `fixtureToMatchUpdate` diffs each side alone and would raise 23514 the
+ *     first time the provider reported `{1, null}` mid-write.
+ *  2. **`is_completed` REQUIRES goals.** `league_fixtures_completed_ck` is
+ *     `CHECK (NOT is_completed OR home_goals IS NOT NULL)`. `matches`
+ *     explicitly permits completed-with-NULL-goals; this table does not. An FT
+ *     with NULL goals stays `is_completed = false` and raises
+ *     `flags.finalWithoutGoals`.
+ *  3. **PST → 'postponed'** (see `mapLeagueStatus`).
+ *  4. **No PSO, no winner_team_id, no data_source.** A regular-season league
+ *     fixture has no shoot-out, there is no winner column, and the
+ *     api/manual distinction is `manual_override`.
+ *
+ * INHERITED HOLES, named rather than silently carried: `AWD` is in
+ * `ApiFootballStatusShort` but in none of LIVE/FINAL/CANCELLED, so
+ * `mapStatus('AWD')` returns `'scheduled'` while `mapStatusDetail('AWD')`
+ * returns `'awarded'` — an awarded match with a real result files as "not
+ * started". `WO` maps to `'cancelled'` and discards its result. Fixing either
+ * means editing the shared mapper, which would put World Cup lines in this
+ * diff, so L3 counts them instead (`awarded=N` in the run note).
+ */
+export function fixtureToLeagueUpdate(
+  f: ApiFootballFixture,
+  cur: LeagueFixtureRow,
+): { payload: LeagueFixturePayload | null; flags: LeagueFixtureFlags } {
+  const short = f.fixture.status.short
+  const out: LeagueFixturePayload = { external_fixture_id: cur.external_fixture_id }
+  let moved = false
+
+  const nextStatus = mapLeagueStatus(short)
+  if (nextStatus !== cur.status) {
+    out.set_status = true
+    out.status = nextStatus
+    moved = true
+  }
+
+  const nextDetail = mapStatusDetail(short)
+  if (nextDetail !== (cur.status_detail ?? null)) {
+    out.set_status_detail = true
+    out.status_detail = nextDetail
+    moved = true
+  }
+
+  // Divergence 1 — the pair moves together or not at all.
+  if (f.goals.home !== cur.home_goals || f.goals.away !== cur.away_goals) {
+    out.set_goals = true
+    out.home_goals = f.goals.home
+    out.away_goals = f.goals.away
+    moved = true
+  }
+
+  // Divergence 2 — completion requires goals.
+  const haveGoals = f.goals.home !== null && f.goals.away !== null
+  const nextCompleted = isFinalStatus(short) && haveGoals
+  if (nextCompleted !== cur.is_completed) {
+    out.set_completed = true
+    out.is_completed = nextCompleted
+    moved = true
+  }
+
+  const nextMinute = f.fixture.status.elapsed ?? null
+  const nextPeriod = mapPeriod(short)
+  const nextAdded = f.fixture.status.extra ?? null
+  if (nextMinute !== cur.live_minute || nextPeriod !== cur.live_period || nextAdded !== cur.live_added) {
+    out.set_live = true
+    out.live_minute = nextMinute
+    out.live_period = nextPeriod
+    out.live_added = nextAdded
+    moved = true
+  }
+
+  const flags: LeagueFixtureFlags = {
+    finalWithoutGoals: isFinalStatus(short) && !haveGoals,
+    awarded: short === 'AWD',
+    // Compare INSTANTS, not strings. Both sides render `+00:00` today, but an
+    // offset is a formatting choice rather than an instant, and a string compare
+    // would report a move on every fixture on every tick. TBD carries a
+    // placeholder date and is never a move.
+    rescheduled: short !== 'TBD' && Date.parse(f.fixture.date) !== Date.parse(cur.kickoff_at),
+  }
+
+  return { payload: moved ? out : null, flags }
 }

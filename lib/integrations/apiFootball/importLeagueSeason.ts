@@ -486,7 +486,13 @@ export async function importLeagueSeason(
       home_club_id: homeId ?? null,
       away_club_id: awayId ?? null,
       kickoff_at: kickoff,
-      original_kickoff_at: kickoff,
+      // original_kickoff_at is deliberately NOT written at import. It means
+      // "this fixture has MOVED", mirroring matches.original_match_date, and
+      // lib/matchStatus.ts badges "Delayed" whenever it is set on a
+      // not-started fixture — so seeding it equal to kickoff_at would badge
+      // the entire season Delayed and kill the signal. Migration 053 nulled
+      // the 380 rows a previous import created; this stops the next import
+      // re-creating them. L11 owns rescheduling and writes it.
       venue,
       external_fixture_id: ext,
       status: 'scheduled',
