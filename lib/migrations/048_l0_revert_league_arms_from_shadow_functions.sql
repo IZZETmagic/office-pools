@@ -1,0 +1,74 @@
+-- Migration 048 (L0): remove the league arms from the four shared World Cup
+-- scoring functions. APPLIED TO PRODUCTION 2026-08-22.
+--
+-- Ryan's decision 2026-08-15: every competition gets its own backend structure,
+-- and the World Cup backend is frozen and RESTORED. Migration 046 put league
+-- arms inside the shared shadow functions; this takes them out. It is the first
+-- executed step of L0 in
+-- drafts/2026-08-22_premier_league_backend_design_v3_1.md.
+--
+-- ============================================================
+-- WHY NOT THE ROLLBACK FILE
+-- ============================================================
+-- drafts/2026-08-14_pre046_shadow_rollback.sql would ALSO restore the two-base
+-- knockout pricing, and 046d's single-base pricing is a KEEP -- it fixed a real
+-- World Cup bug where shadow double-counted the knockout base after migration
+-- 042 folded that ratio into the multipliers. Running the rollback file as-is
+-- would silently re-introduce it. Verified before running: `stage_uses_base_prices`
+-- and `knockout_exact_score` appear ZERO times in all four functions, and the
+-- migration RAISES if either reappears.
+--
+-- ============================================================
+-- HOW
+-- ============================================================
+-- The database rewrites each function from its own `pg_get_functiondef` output.
+-- Nothing is retyped: a 12 kB live scoring function transcribed by hand is the
+-- risk this technique avoids. Every substitution asserts its exact occurrence
+-- count and RAISES on mismatch, so an unexpected body fails loudly rather than
+-- being rewritten blind.
+--
+--   mode_submits_per_round(po.prediction_mode)  ->  po.prediction_mode = 'progressive'
+--     shadow_score_match x3, shadow_eligible_entries x1,
+--     shadow_finalize_totals x1, shadow_calculate_bonuses x1
+--   NOT stage_has_scheduled_teams(stage)        ->  stage <> 'group'   (x2, applied FIRST)
+--   stage_has_scheduled_teams(stage)            ->  stage = 'group'    (x3, applied second)
+--
+-- The negated form is substituted first so the bare form cannot match inside it.
+--
+-- The two predicate functions themselves are KEPT as inert, per review finding
+-- W2 -- never dropped. They cost nothing and the league build needs them again.
+--
+-- ============================================================
+-- QUIESCENCE (the C1 fix)
+-- ============================================================
+-- Before applying, both reconcilers were stopped and that was proved
+-- BEHAVIOURALLY, not assumed:
+--
+--   insert into sync_settings values ('shadow_reconcile_enabled',  to_jsonb(false)),
+--                                    ('shadow_materialize_enabled', to_jsonb(false));
+--   select shadow_reconcile_matches(5);      -- {"skipped":"disabled"}
+--   select shadow_reconcile_adjustments(5);  -- {"skipped":"disabled"}
+--
+-- Neither key EXISTED before. The v3 design's quiesce step was an UPDATE on
+-- them, which matched zero rows and reported success while both crons stayed
+-- armed -- review critical C1. Both keys are now present and set back to true,
+-- so future quiescence works. `cron.job` could not be touched (owned by
+-- postgres; this connection is not), but the flags are the mechanism the
+-- readers actually honour: both return early before taking the advisory lock.
+--
+-- ============================================================
+-- VERIFICATION (all passed)
+-- ============================================================
+--   0 of the four functions still reference a league predicate
+--   shadow_match_scores unchanged: 286,773 rows, sum 12,840,082,
+--     fingerprint d4c8736e47dfed71fad0da470b5f4565
+--   re-scored match 1 (group) and match 104 (final) with the REVERTED functions:
+--     byte-identical rows, whole-table fingerprint unchanged
+--
+-- ============================================================
+-- ROLLBACK
+-- ============================================================
+-- Re-apply 046a/b/c (the predicates and the four function bodies), then 046d
+-- for single-base pricing. Do NOT apply 046 as a whole -- lines 176-180 still
+-- contain the two-base `stage_uses_base_prices` CASE and the file is
+-- CREATE OR REPLACE-idempotent.
