@@ -52,6 +52,16 @@ const TERMINAL_STATUSES = ['cancelled', 'postponed']
 
 const FEED_TIMEOUT_MS = 4_000
 
+// How often a feed failure for one season may enter `errors[]`.
+//
+// `finishRun` computes `ok: errors.length === 0` and the status panel renders
+// `errors.length`, so an unrate-limited feed outage during a matchday window
+// produces hundreds of red runs in a day — inside which a real World Cup error
+// is invisible. This is alarm-fatigue control, not error suppression: a
+// suppressed failure still sets `feedError`, still prints `feed_error` in the
+// run note, and is still logged with its full message.
+const FEED_ERROR_REPORT_INTERVAL_MS = 15 * 60 * 1000
+
 const PROJECTION =
   'fixture_id, matchweek_id, external_fixture_id, kickoff_at, status, status_detail, ' +
   'home_goals, away_goals, is_completed, live_minute, live_period, live_added, manual_override'
@@ -84,6 +94,10 @@ export type LeagueSyncResult = {
   awarded: number
   finalWithoutGoals: number
   fetchedFeed: boolean
+  /** The feed failure message this tick, if any — set whether or not it was reported. */
+  feedError: string | null
+  /** Whether `feedError` was allowed into `errors[]` this tick (see the interval above). */
+  feedErrorReported: boolean
   errors: Array<{ stage: string; message: string; details?: unknown }>
 }
 
@@ -125,8 +139,55 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     awarded: 0,
     finalWithoutGoals: 0,
     fetchedFeed: false,
+    feedError: null,
+    feedErrorReported: false,
     errors: [],
   }
+}
+
+/**
+ * May this season's feed failure enter `errors[]` this tick?
+ *
+ * Keyed PER SEASON — `league_feed_last_error:<season_id>`. It must never reuse
+ * the global `knockout_link_last_attempt` key: a league arm stamping that would
+ * silently disable World Cup knockout auto-linking for 15 minutes at a time,
+ * forever.
+ *
+ * Fails OPEN. If `sync_settings` cannot be read or written, the failure is
+ * reported — an unreadable rate-limiter must not become a way to lose errors.
+ *
+ * The stamp is deliberately NOT cleared on a successful tick. Clearing it would
+ * cost a read on every healthy run to save at most one duplicate report after a
+ * recovery, and the cost of that trade is one extra quiet interval, not a lost
+ * error.
+ */
+async function shouldReportFeedError(
+  admin: SupabaseClient,
+  seasonId: string,
+  opts: { now: number; nowIso: string },
+): Promise<boolean> {
+  const key = `league_feed_last_error:${seasonId}`
+  const { data, error } = await admin
+    .from('sync_settings')
+    .select('setting_value')
+    .eq('setting_key', key)
+    .maybeSingle()
+  if (error) return true
+
+  const raw = data?.setting_value
+  const last = typeof raw === 'string' ? Date.parse(raw) : 0
+  if (Number.isFinite(last) && last > 0 && opts.now - last < FEED_ERROR_REPORT_INTERVAL_MS) {
+    return false
+  }
+
+  const { error: stampErr } = await admin
+    .from('sync_settings')
+    .upsert(
+      { setting_key: key, setting_value: opts.nowIso, updated_at: opts.nowIso },
+      { onConflict: 'setting_key' },
+    )
+  if (stampErr) return true
+  return true
 }
 
 /**
@@ -217,7 +278,18 @@ export async function syncLeagueFixtures(
     result.fetched = fixtures.length
     result.fetchedFeed = true
   } catch (e) {
-    push('league_fetch_feed', errMsg(e), { season_id: target.seasonId, from, to })
+    // The failure is ALWAYS recorded on the result and always logged. Only its
+    // entry into `errors[]` — which flips the run to ok:false — is rate limited.
+    result.feedError = errMsg(e)
+    result.feedErrorReported = await shouldReportFeedError(admin, target.seasonId, opts)
+    if (result.feedErrorReported) {
+      push('league_fetch_feed', result.feedError, { season_id: target.seasonId, from, to })
+    } else {
+      console.error(
+        `[league-sync] ${target.name}: feed failed (not re-reported within ` +
+          `${FEED_ERROR_REPORT_INTERVAL_MS / 60000}m): ${result.feedError}`,
+      )
+    }
     return result
   }
 
@@ -389,7 +461,9 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     r.rescheduleDetected > 0 ? `resched=${r.rescheduleDetected}` : null,
     r.awarded > 0 ? `awarded=${r.awarded}` : null,
     r.finalWithoutGoals > 0 ? `ft_no_goals=${r.finalWithoutGoals}` : null,
-    r.errors.some((e) => e.stage === 'league_fetch_feed') ? 'feed_error' : null,
+    // From `feedError`, NOT from `errors[]` — a rate-limited failure must still
+    // be visible in the note, otherwise the limiter hides the outage itself.
+    r.feedError !== null ? 'feed_error' : null,
   ].filter((x): x is string => x !== null)
   return [...always, ...whenNonZero]
 }

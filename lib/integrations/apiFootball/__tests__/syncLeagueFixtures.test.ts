@@ -49,6 +49,8 @@ function fakeDb(opts: {
   league_fixtures?: Res[]
   league_matchweeks?: Res[]
   rpc?: { data: unknown; error: { message: string } | null }
+  /** Value returned for a sync_settings lookup, and whether the read errors. */
+  sync_settings?: { value: string | null; error?: { message: string } | null }
 }) {
   const queues: Record<string, Res[]> = {
     league_fixtures: [...(opts.league_fixtures ?? [])],
@@ -56,6 +58,7 @@ function fakeDb(opts: {
   }
   const calls: Array<{ table: string; filters: string[] }> = []
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
+  const upserts: Array<{ table: string; row: Record<string, unknown> }> = []
 
   const client = {
     from(table: string) {
@@ -72,6 +75,18 @@ function fakeDb(opts: {
       api.insert = () => {
         throw new Error('the league sync arm must never INSERT a fixture')
       }
+      api.upsert = (row: Record<string, unknown>) => {
+        upserts.push({ table, row })
+        return { then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }) }
+      }
+      api.maybeSingle = async () => {
+        if (table === 'sync_settings') {
+          const cfg = opts.sync_settings
+          if (cfg?.error) return { data: null, error: cfg.error }
+          return { data: cfg?.value == null ? null : { setting_value: cfg.value }, error: null }
+        }
+        return { data: null, error: null }
+      }
       api.then = (resolve: (v: Res) => unknown) => resolve(res)
       return api
     },
@@ -81,7 +96,7 @@ function fakeDb(opts: {
       return { then: (resolve: (v: unknown) => unknown) => resolve(r) }
     },
   }
-  return { client: client as never, calls, rpcCalls }
+  return { client: client as never, calls, rpcCalls, upserts }
 }
 
 function dbRow(over: Record<string, unknown> = {}) {
@@ -401,5 +416,93 @@ describe('syncLeagueFixtures — nothing matched', () => {
     expect(r.seen).toBe(0)
     expect(r.proposed).toBe(0)
     expect(rpcCalls).toHaveLength(0)
+  })
+})
+
+// =============================================================
+// The feed-error rate limit
+// =============================================================
+// `finishRun` computes ok from errors.length and the status panel renders that
+// count, so an unrate-limited provider outage during a matchday window produces
+// hundreds of red runs in a day — inside which a real World Cup error is
+// invisible. These pin the boundary between "quieten the alarm" and "lose the
+// error", which is the only thing that makes a limiter acceptable.
+// =============================================================
+
+describe('syncLeagueFixtures — feed-error rate limit', () => {
+  const failingFeed = () => {
+    // Malformed rather than thrown — see V3.3 for why.
+    getFixturesAllPages.mockResolvedValue(undefined)
+    return fakeDb({
+      league_fixtures: [{ data: [dbRow()], error: null }, { data: [], error: null }],
+      sync_settings: { value: null },
+    })
+  }
+
+  it('reports the first failure and stamps a per-season key', async () => {
+    const { client, upserts } = failingFeed()
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.feedError).toBeTruthy()
+    expect(r.feedErrorReported).toBe(true)
+    expect(r.errors.map((e) => e.stage)).toEqual(['league_fetch_feed'])
+
+    const stamp = upserts.find((u) => u.table === 'sync_settings')
+    expect(stamp).toBeTruthy()
+    // PER SEASON. Stamping the global knockout_link_last_attempt key would
+    // silently disable World Cup auto-linking for 15 minutes at a time, forever.
+    expect(stamp!.row.setting_key).toBe(`league_feed_last_error:${TARGET.seasonId}`)
+    expect(stamp!.row.setting_key).not.toBe('knockout_link_last_attempt')
+  })
+
+  it('suppresses a repeat inside the window but keeps it visible', async () => {
+    getFixturesAllPages.mockResolvedValue(undefined)
+    const { client, upserts } = fakeDb({
+      league_fixtures: [{ data: [dbRow()], error: null }, { data: [], error: null }],
+      // Stamped 2 minutes ago.
+      sync_settings: { value: new Date(NOW - 2 * 60 * 1000).toISOString() },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(r.feedError).toBeTruthy()          // still recorded
+    expect(r.feedErrorReported).toBe(false)   // but not in errors[]
+    expect(r.errors).toHaveLength(0)
+    // The note must still say so — otherwise the limiter hides the outage itself.
+    expect(formatLeagueNoteParts(r)).toContain('feed_error')
+    // And it must not re-stamp, or the window would never expire.
+    expect(upserts.filter((u) => u.table === 'sync_settings')).toHaveLength(0)
+  })
+
+  it('reports again once the window has passed', async () => {
+    getFixturesAllPages.mockResolvedValue(undefined)
+    const { client } = fakeDb({
+      league_fixtures: [{ data: [dbRow()], error: null }, { data: [], error: null }],
+      sync_settings: { value: new Date(NOW - 16 * 60 * 1000).toISOString() },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.feedErrorReported).toBe(true)
+    expect(r.errors.map((e) => e.stage)).toEqual(['league_fetch_feed'])
+  })
+
+  it('FAILS OPEN when sync_settings cannot be read', async () => {
+    getFixturesAllPages.mockResolvedValue(undefined)
+    const { client } = fakeDb({
+      league_fixtures: [{ data: [dbRow()], error: null }, { data: [], error: null }],
+      sync_settings: { value: null, error: { message: 'permission denied' } },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    // An unreadable rate-limiter must not become a way to lose errors.
+    expect(r.feedErrorReported).toBe(true)
+    expect(r.errors.map((e) => e.stage)).toEqual(['league_fetch_feed'])
+  })
+
+  it('does not rate-limit anything other than the feed', async () => {
+    const { client } = fakeDb({
+      league_fixtures: [{ data: null, error: { message: 'boom' } }],
+      sync_settings: { value: new Date(NOW - 1000).toISOString() },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    // A window-select failure is a different pipe and is always reported.
+    expect(r.errors.map((e) => e.stage)).toEqual(['league_fetch_fixtures'])
+    expect(r.feedError).toBeNull()
   })
 })
