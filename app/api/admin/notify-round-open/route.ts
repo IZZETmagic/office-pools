@@ -60,13 +60,23 @@ export async function POST(request: NextRequest) {
   const matchCountByTournament = new Map<string, number>()
   async function getMatchCount(tournamentId: string): Promise<number> {
     if (matchCountByTournament.has(tournamentId)) return matchCountByTournament.get(tournamentId)!
-    // Selected via the round selector: a matchweek is identified by
-    // round_number, so a stage filter would count the whole season.
-    let q = supabase.from('matches').select('*', { count: 'exact', head: true }).eq('tournament_id', tournamentId)
-    q = selector.kind === 'matchweek'
-      ? q.eq('stage', 'regular_season').eq('round_number', selector.roundNumber)
-      : q.in('stage', selector.stages)
-    const { count } = await q
+    // A matchweek's fixtures are not in `matches` (049 dropped `round_number`,
+    // 050 moved leagues to `league_fixtures`). This route's callers filter to
+    // prediction_mode='progressive' before reaching here, so a matchweek
+    // selector is unreachable — but this count goes into an email body, and a
+    // wrong number sent to members is worse than a failed request.
+    if (selector.kind === 'matchweek') {
+      throw new Error(
+        `notify-round-open cannot count fixtures for matchweek '${selector.roundNumber}' — league fixtures are in \`league_fixtures\` (L5)`,
+      )
+    }
+    const q = supabase
+      .from('matches')
+      .select('*', { count: 'exact', head: true })
+      .eq('tournament_id', tournamentId)
+      .in('stage', selector.stages)
+    const { count, error: countErr } = await q
+    if (countErr) throw new Error(`notify-round-open fixture count failed: ${countErr.message}`)
     const c = count ?? 0
     matchCountByTournament.set(tournamentId, c)
     return c

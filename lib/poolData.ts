@@ -52,7 +52,7 @@ export const PREDICTION_COLUMNS =
 // live_added over the wire for every fixture. Verified zero reads of those in the
 // web UI before narrowing. 100 kB -> 72 kB on a 104-match tournament.
 export const MATCH_COLUMNS =
-  'match_id, tournament_id, match_number, stage, group_letter, round_number, home_team_id, away_team_id, ' +
+  'match_id, tournament_id, match_number, stage, group_letter, home_team_id, away_team_id, ' +
   'home_team_placeholder, away_team_placeholder, match_date, venue, status, ' +
   'home_score_ft, away_score_ft, home_score_pso, away_score_pso, winner_team_id, ' +
   'is_completed, completed_at, status_detail, original_match_date, live_minute, live_period'
@@ -196,13 +196,25 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   }
 
   // Matches for this tournament (+ team joins).
-  const { data: matchesRaw } = await admin
+  //
+  // The error is checked rather than discarded, and this is the read that
+  // proves why. On 2026-08-22 migration 049 dropped `matches.round_number`
+  // while this projection still named it; PostgREST answered 42703, the
+  // discarded error left `matchesRaw` null, and every pool detail page
+  // rendered zero fixtures at HTTP 200 — cached for 45s on top. A pool with no
+  // fixtures is never a legitimate result of this query, so it must not be
+  // reachable by silence.
+  const { data: matchesRaw, error: matchesErr } = await admin
     .from('matches')
     .select(
       `${MATCH_COLUMNS}, home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)`,
     )
     .eq('tournament_id', pool.tournament_id)
     .order('match_number', { ascending: true })
+  if (matchesErr) {
+    if (throwOnFetchError) throw new Error(`getPoolData matches select failed: ${matchesErr.message}`)
+    console.error('[poolData] matches select failed — the pool will render no fixtures:', matchesErr.message)
+  }
 
   // Strip knockout team assignments until all groups complete (unchanged logic).
   const allGroupsComplete = (matchesRaw || [])

@@ -1,0 +1,71 @@
+-- HOTFIX 051: restore matches.round_number to end a live outage.
+--
+-- ============================================================
+-- WHAT BROKE
+-- ============================================================
+-- Migration 049 (phase L0 of the league build) dropped matches.round_number and
+-- matches.round_label, reverting the pre-pivot league work out of the World Cup
+-- schema. 049 asserted that no TRIGGER named the column before dropping it.
+-- It never checked the TypeScript.
+--
+-- The deployed tree (origin/master 18f6844) still names the column in
+-- lib/poolData.ts:55 MATCH_COLUMNS, which app/pools/[pool_id]/page.tsx:57 uses
+-- to render every pool detail page. PostgREST answers that select with
+--
+--   42703  column matches.round_number does not exist
+--
+-- and lib/poolData.ts:199 destructures only { data }, discarding the error, so
+-- every pool rendered ZERO fixtures at HTTP 200. Reproduced against production
+-- on 2026-08-22: the deployed projection returned 0 rows + 42703; the same
+-- projection minus the column returned 104.
+--
+-- sync_settings.pool_cache_enabled is true with a 45-second TTL, so the empty
+-- result was cached and served as well.
+--
+-- This is the "discarded PostgREST errors" failure mode the codebase has hit
+-- before, and the guard rule 049's own header states — a guard may only
+-- reference columns the relation actually carries — applied to PL/pgSQL but
+-- never to the TypeScript side.
+--
+-- ============================================================
+-- WHY RESTORE THE COLUMN RATHER THAN SHIP THE CODE FIX
+-- ============================================================
+-- The code fix is the real fix and is prepared. Shipping it is a push to
+-- master, which is a production deploy that only Ryan initiates. This restores
+-- service with no deploy, immediately, and is the smaller change: a nullable
+-- column with no default on a 104-row table is a catalog-only operation.
+--
+-- The column is deliberately left EMPTY. Every consumer already treats NULL as
+-- "not a matchweek" (lib/poolRoundStates.ts:116 skips NULL; the branch at
+-- app/api/pools/[pool_id]/rounds/route.ts:67 additionally requires
+-- stage='regular_season', of which production has zero rows). Restoring it
+-- reinstates exactly the pre-049 behaviour and nothing more.
+--
+-- ============================================================
+-- THIS IS TEMPORARY
+-- ============================================================
+-- Once the commit removing round_number from MATCH_COLUMNS and the four other
+-- read sites is DEPLOYED, re-run 049's drop:
+--
+--   ALTER TABLE public.matches DROP COLUMN IF EXISTS round_number;
+--
+-- Order is safe in that direction: selecting fewer columns than exist always
+-- works, so the code fix can deploy at any time and the drop follows it.
+-- Until then this is a known, documented exception to "no holes in the World
+-- Cup structure".
+
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS round_number integer;
+
+COMMENT ON COLUMN public.matches.round_number IS
+  'TEMPORARY — restored 2026-08-22 by hotfix 051 to end a live outage: migration 049 dropped this while deployed code (lib/poolData.ts MATCH_COLUMNS) still selected it, and that select 400s, silently rendering zero fixtures on every pool page. Always NULL and read by nothing that can act on it. DROP THIS COLUMN AGAIN once the code fix removing it from MATCH_COLUMNS, lib/poolRoundStates.ts, lib/roundMatches.ts, app/api/pools/[pool_id]/rounds/route.ts and app/api/admin/notify-round-open/route.ts is deployed.';
+
+-- ============================================================
+-- Verification
+-- ============================================================
+--   SELECT count(*) FROM information_schema.columns
+--    WHERE table_schema='public' AND table_name='matches' AND column_name='round_number';
+--   -- expect 1
+--
+-- And behaviourally, through PostgREST rather than SQL (the failure was
+-- PostgREST-specific): the deployed MATCH_COLUMNS projection must return 104
+-- rows for tournament 00000000-0000-0000-0000-000000000001, not an error.

@@ -47,15 +47,20 @@ async function handleGET(
 
   if (roundError) return NextResponse.json({ error: roundError.message }, { status: 500 })
 
-  // Fixture counts, bucketed both ways: by stage for bracket rounds, and by
-  // round_number for league matchweeks (which all share stage 'regular_season'
-  // and so collapse into a single useless bucket if counted by stage alone).
-  const { data: matches } = await supabase
+  // Fixture counts, bucketed by stage. The matchweek bucket that used to live
+  // here counted `matches.round_number`, a column migration 049 removed when
+  // leagues moved to `league_*`; a league's matchweek counts come from
+  // `league_matchweeks.fixture_count` and are wired up in L7.
+  const { data: matches, error: matchesErr } = await supabase
     .from('matches')
-    .select('match_id, stage, round_number, is_completed')
+    .select('match_id, stage, is_completed')
     .eq('tournament_id', pool.tournament_id)
+  if (matchesErr) return NextResponse.json({ error: matchesErr.message }, { status: 500 })
 
   const matchCountsByStage: Record<string, { total: number; completed: number }> = {}
+  // Always empty since 049 removed matches.round_number — a league's counts
+  // are not in `matches` at all any more. Kept so the response shape and the
+  // `selector.roundNumber` lookup below are unchanged; L7 repoints it.
   const matchCountsByRound: Record<number, { total: number; completed: number }> = {}
   for (const match of matches ?? []) {
     if (!matchCountsByStage[match.stage]) {
@@ -63,14 +68,6 @@ async function handleGET(
     }
     matchCountsByStage[match.stage].total++
     if (match.is_completed) matchCountsByStage[match.stage].completed++
-
-    if (match.stage === 'regular_season' && typeof match.round_number === 'number') {
-      if (!matchCountsByRound[match.round_number]) {
-        matchCountsByRound[match.round_number] = { total: 0, completed: 0 }
-      }
-      matchCountsByRound[match.round_number].total++
-      if (match.is_completed) matchCountsByRound[match.round_number].completed++
-    }
   }
 
   // Get entry ID from query param for submission status

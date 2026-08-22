@@ -36,7 +36,16 @@ export async function fetchRoundMatches<T = Record<string, unknown>>(
     .eq('tournament_id', args.tournamentId)
 
   if (selector.kind === 'matchweek') {
-    q = q.eq('stage', 'regular_season').eq('round_number', selector.roundNumber)
+    // A matchweek's fixtures are not in `matches`. Migration 049 dropped
+    // `round_number` and 050 moved leagues to `league_fixtures`, so this arm
+    // could now only issue a select PostgREST answers with 42703 — which, read
+    // through a discarded error, is an empty round that looks real. Refusing is
+    // the same choice the unknown-key branch below already makes. L5 repoints
+    // this at the fixture store.
+    return {
+      data: [],
+      error: `round key '${args.roundKey}' is a matchweek — league fixtures live in \`league_fixtures\`, not \`matches\` (L5)`,
+    }
   } else {
     // An unrecognised key yields an empty stage list. Rather than run
     // `.in('stage', [])` and hand back a plausible-looking empty round, say so.
