@@ -1,0 +1,60 @@
+-- Migration 049 (L0): take the league columns and CHECK back out of `matches`,
+-- and restore the prediction trigger to its pre-045 body.
+-- APPLIED TO PRODUCTION 2026-08-22.
+--
+-- ============================================================
+-- ORDER IS LOAD-BEARING
+-- ============================================================
+-- Migration 045 §3 replaced `enforce_prediction_before_kickoff` with a body
+-- that reads `matches.round_number`. PL/pgSQL resolves column references at
+-- RUNTIME, so dropping the column first would leave a trigger that compiles
+-- fine and then raises on EVERY prediction insert or update, on web and mobile,
+-- until someone noticed. The trigger is reverted FIRST; only then does the
+-- column go, and an assertion refuses to drop it while the trigger still names
+-- it.
+--
+-- This is the fifth appearance in this project of "something references a
+-- column its context does not carry". Here it is handled by ordering plus an
+-- assertion rather than by remembering.
+--
+-- ============================================================
+-- PRECONDITIONS (verified immediately before applying)
+-- ============================================================
+--   matches WHERE stage='regular_season'   -> 0   (fixtures deleted first)
+--   matches WHERE round_number IS NOT NULL -> 0
+--   matches WHERE round_label  IS NOT NULL -> 0
+--   104 World Cup matches remain
+--
+-- ============================================================
+-- DELIBERATELY NOT REVERTED, WITH REASONS
+-- ============================================================
+--   * tournaments.format / external_provider / external_league_id /
+--     external_season, and tournaments_tournament_type_check allowing 'league'
+--     — the Premier League `tournaments` row still EXISTS and uses them. It is
+--     kept because `pools_tournament_id_fkey` is ON DELETE CASCADE (verified),
+--     so deleting it would silently destroy a live 3-member customer pool
+--     (PTQPZ797, archived). The row is inert: 0 fixtures, 0 clubs, hidden from
+--     both create-pool wizards by format, and the sync cron finds nothing to do.
+--   * pools_prediction_mode_check retaining 'league_pickem' — that archived pool
+--     carries the value. Design decision D1 keeps it permanently regardless.
+--
+-- ============================================================
+-- VERIFICATION (all passed)
+-- ============================================================
+--   round_number / round_label columns:      gone
+--   idx_matches_tournament_round:            gone
+--   matches_stage_check:                     back to the seven bracket stages
+--   World Cup:                               104 matches, 286,773 score rows,
+--                                            sum 12,840,082, fingerprint
+--                                            d4c8736e47dfed71fad0da470b5f4565 unchanged
+--   reverted trigger exercised on live data: a no-op self-update of a real
+--                                            prediction on a completed match was
+--                                            targeted (1 row) and blocked
+--                                            (0 rows passed). No data changed.
+--
+-- ============================================================
+-- ROLLBACK
+-- ============================================================
+-- Re-apply 045 (it re-adds round_label, the index, the matchweek-lock trigger
+-- and widens the stage CHECK). 045 opens with a guard requiring 024's
+-- round_number, so re-apply that column first if 024 has also been reverted.

@@ -35,7 +35,7 @@
 --
 --   1. Remove PUBLIC and anon.                        <- THIS MIGRATION
 --   2. Add an authorization check inside the body, so an authenticated user
---      cannot re-rank a pool they are not an admin of.   <- 049, DELIBERATELY NOT HERE
+--      cannot re-rank a pool they are not an admin of.   <- 050, DELIBERATELY NOT HERE
 --
 -- Part 2 is held back because it requires REPLACING the body of a live
 -- SECURITY DEFINER function, and the guard would depend on `auth.uid()`
@@ -91,7 +91,7 @@ GRANT EXECUTE ON FUNCTION public.lite_recalc_entry(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.lite_recalc_entry(uuid, uuid) TO service_role;
 
 COMMENT ON FUNCTION public.lite_recalc_entry(uuid, uuid) IS
-  'Recomputes scored_total_points and re-ranks one pool after an admin point adjustment. SECURITY DEFINER. EXECUTE revoked from PUBLIC and anon by migration 047 — it was callable unauthenticated. ⚠ STILL MISSING an in-body authorization check: any authenticated user can re-rank any pool by id. See migration 049, which is blocked on verifying auth.uid() through PostgREST -> SECURITY DEFINER on this project.';
+  'Recomputes scored_total_points and re-ranks one pool after an admin point adjustment. SECURITY DEFINER. EXECUTE revoked from PUBLIC and anon by migration 047 — it was callable unauthenticated. ⚠ STILL MISSING an in-body authorization check: any authenticated user can re-rank any pool by id. See migration 050, which is blocked on verifying auth.uid() through PostgREST -> SECURITY DEFINER on this project.';
 
 -- ============================================================
 -- Verification
