@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { saveLeaguePredictions } from '@/lib/league/write'
 import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsSubmittedTemplate } from '@/lib/email/templates'
@@ -149,11 +150,17 @@ async function handlePOST(
   // Check pool deadline
   const { data: pool } = await supabase
     .from('pools')
-    .select('prediction_deadline, prediction_mode')
+    .select('prediction_deadline, prediction_mode, league_season_id')
     .eq('pool_id', pool_id)
     .single()
 
-  if (pool?.prediction_mode === 'progressive') {
+  // A league pool has no pool-wide deadline gate. Each matchweek locks at its
+  // own first kickoff, enforced in the database by
+  // enforce_league_prediction_before_lock — so the check below would either be
+  // a no-op or, worse, close the whole season off one date.
+  if (pool?.league_season_id) {
+    // fall through to the league branch after the body is parsed
+  } else if (pool?.prediction_mode === 'progressive') {
     // For progressive mode, check round-specific deadline
     // The roundKey is sent in the body, but we read it after parsing
     // For now, we validate after parsing the body below
@@ -238,6 +245,57 @@ async function handlePOST(
 
   if (!predictions || !Array.isArray(predictions)) {
     return NextResponse.json({ error: 'Invalid predictions data' }, { status: 400 })
+  }
+
+  // ---------------------------------------------------------------- league
+  // Picks live in `league_predictions`, not `predictions`. Everything above
+  // this point — auth, membership, entry ownership — applies to both paths and
+  // is deliberately shared; only the storage differs.
+  //
+  // The response shape is IDENTICAL to the World Cup path's, because the same
+  // component consumes both. The one addition is `rejected`, which exists
+  // because the league lock is a silent-skip trigger: a refused pick is not an
+  // error, the row simply is not written, so the route reads back rather than
+  // assuming.
+  if (pool?.league_season_id) {
+    const result = await saveLeaguePredictions(supabase, {
+      entryId,
+      seasonId: pool.league_season_id as string,
+      picks: predictions.map((p: { matchId: string; homeScore: number; awayScore: number }) => ({
+        matchId: p.matchId,
+        homeScore: p.homeScore,
+        awayScore: p.awayScore,
+      })),
+    })
+
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    if (result.rejected.length > 0) {
+      // 409, not 200-with-a-note: the member is looking at values the database
+      // does not hold, and silently returning `saved: true` is how they find out
+      // in a week that their picks were never there.
+      return NextResponse.json(
+        {
+          error:
+            result.rejected.length === predictions.length
+              ? 'That matchweek has locked — its picks can no longer be changed.'
+              : `${result.rejected.length} of ${predictions.length} picks could not be saved because their matchweek has locked.`,
+          saved: result.accepted > 0,
+          rejectedMatchIds: result.rejected.map((r) => r.matchId),
+          progress: { predicted: result.predicted },
+        },
+        { status: 409 },
+      )
+    }
+
+    return NextResponse.json({
+      saved: true,
+      insertedIds: [],
+      progress: { predicted: result.predicted },
+      lastSaved: new Date().toISOString(),
+    })
   }
 
   const toUpsert: any[] = []
