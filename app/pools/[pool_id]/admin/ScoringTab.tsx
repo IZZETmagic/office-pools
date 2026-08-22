@@ -723,13 +723,25 @@ export function ScoringTab({
 
     if (newSettings) setSettings(newSettings as SettingsData)
 
-    // Refresh members for updated points
-    const { data: refreshedMembers } = await supabase
+    // Refresh members for updated points.
+    //
+    // This used to `.order('current_rank')`. That column is on `pool_entries`,
+    // not `pool_members`, so PostgREST answered 42703, the discarded error left
+    // `refreshedMembers` null, and the guard below silently skipped the update —
+    // the admin saw "Points recalculated for all members" over an unchanged
+    // table. The select is `*` on `pool_members`, which never carried
+    // `current_rank`, so the ordering could not have worked at any point.
+    const { data: refreshedMembers, error: refreshErr } = await supabase
       .from('pool_members')
       .select('*, users!inner(user_id, username, full_name, email)')
       .eq('pool_id', pool.pool_id)
-      .order('current_rank', { ascending: true, nullsFirst: false })
 
+    if (refreshErr) {
+      showToast('Scoring updated, but the member list could not be refreshed.', 'error')
+      setSaving(false)
+      setShowConfirm(false)
+      return
+    }
     if (refreshedMembers) setMembers(refreshedMembers as MemberData[])
 
     showToast('Scoring updated. Points recalculated for all members.', 'success')
