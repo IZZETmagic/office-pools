@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     pool_name,
     description,
     tournament_id,
+    league_season_id,
     prediction_deadline,
     prediction_mode,
     is_private,
@@ -53,11 +54,93 @@ export async function POST(request: NextRequest) {
     max_entries_per_user,
   } = body
 
-  if (!pool_name?.trim() || !tournament_id) {
-    return NextResponse.json({ error: 'Pool name and tournament are required.' }, { status: 400 })
+  if (!pool_name?.trim()) {
+    return NextResponse.json({ error: 'Pool name is required.' }, { status: 400 })
+  }
+  if (!tournament_id && !league_season_id) {
+    return NextResponse.json({ error: 'A competition is required.' }, { status: 400 })
   }
 
   const adminClient = createAdminClient()
+
+  // A league pool carries BOTH ids in the vertical slice — see
+  // drafts/2026-08-22_league_vertical_slice.md §1. `tournament_id` stays
+  // populated so the ~50 World Cup code paths that read it keep working
+  // unchanged; `league_season_id` is what the league path reads.
+  //
+  // The placeholder tournament is resolved SERVER-SIDE from the season rather
+  // than taken from the client: the two must agree, and until the full L4 lands
+  // the XOR nothing in the database enforces that. Trusting a client-supplied
+  // pair is how they would drift.
+  let resolvedTournamentId: string | null = tournament_id ?? null
+  let resolvedMode: string = prediction_mode
+  let resolvedDeadline: string | null = prediction_deadline ?? null
+
+  if (league_season_id) {
+    const { data: season, error: seasonErr } = await adminClient
+      .from('league_seasons')
+      .select('season_id, competition_name, season_label, external_league_id, external_season, external_provider')
+      .eq('season_id', league_season_id)
+      .maybeSingle()
+    if (seasonErr) {
+      return NextResponse.json({ error: `Could not read the league season: ${seasonErr.message}` }, { status: 500 })
+    }
+    if (!season) {
+      return NextResponse.json({ error: 'That league season does not exist.' }, { status: 400 })
+    }
+
+    // The placeholder `tournaments` row for this competition-instance, matched
+    // on the same (provider, league, season) triple loadSyncTargets dedupes on.
+    const { data: placeholder, error: phErr } = await adminClient
+      .from('tournaments')
+      .select('tournament_id')
+      .eq('external_provider', season.external_provider ?? 'api_football')
+      .eq('external_league_id', season.external_league_id)
+      .eq('external_season', season.external_season)
+      .maybeSingle()
+    if (phErr) {
+      return NextResponse.json({ error: `Could not resolve the competition: ${phErr.message}` }, { status: 500 })
+    }
+    if (!placeholder) {
+      // Refuse rather than inventing one. A league pool with no tournament_id
+      // would violate the column's NOT NULL, and a wrong one would silently
+      // scope every World Cup query on this pool to another competition.
+      return NextResponse.json(
+        { error: 'That league has no competition record yet — import it before creating pools.' },
+        { status: 409 },
+      )
+    }
+
+    resolvedTournamentId = placeholder.tournament_id
+    // The mode IS the competition kind; it is not the client's to choose.
+    resolvedMode = 'league_pickem'
+
+    // A league has no single pool-wide deadline — each matchweek locks at its
+    // own first kickoff, enforced by enforce_league_prediction_before_lock.
+    // v3.1 handles that by making prediction_deadline NULL, which needs a
+    // DROP NOT NULL the slice deliberately does not do (§1 of the plan), so a
+    // NULL here would raise 23502.
+    //
+    // Instead the deadline is set to the season's LAST kickoff. That satisfies
+    // NOT NULL and is inert for the whole season: `isDeadlinePassed` stays
+    // false, so `computeReveal`'s scope:'all' branch — the one that reveals a
+    // member's entire entry — cannot fire. The real locks are per matchweek.
+    const { data: lastKickoff } = await adminClient
+      .from('league_matchweeks')
+      .select('last_kickoff_at')
+      .eq('season_id', league_season_id)
+      .not('last_kickoff_at', 'is', null)
+      .order('last_kickoff_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!lastKickoff?.last_kickoff_at) {
+      return NextResponse.json(
+        { error: 'That league season has no scheduled fixtures yet.' },
+        { status: 409 },
+      )
+    }
+    resolvedDeadline = lastKickoff.last_kickoff_at as string
+  }
 
   // 1. Create pool
   const { data: newPool, error: poolError } = await adminClient
@@ -65,10 +148,11 @@ export async function POST(request: NextRequest) {
     .insert({
       pool_name: pool_name.trim(),
       description: description?.trim() || null,
-      tournament_id,
+      tournament_id: resolvedTournamentId,
+      league_season_id: league_season_id ?? null,
       admin_user_id: userData.user_id,
-      prediction_deadline,
-      prediction_mode,
+      prediction_deadline: resolvedDeadline,
+      prediction_mode: resolvedMode,
       status: 'open',
       is_private,
       max_participants: max_participants > 0 ? max_participants : null,
@@ -136,7 +220,11 @@ export async function POST(request: NextRequest) {
   // one round per matchweek, derived from its imported fixtures, because the
   // count varies by league — 38 for a 20-club division, 34 for 18, 46 for the
   // Championship.
-  if (prediction_mode === 'progressive' || prediction_mode === 'league_pickem') {
+  // `league_pickem` is deliberately NOT in this list. A league's rounds are
+  // DERIVED from `league_matchweeks` (fixture_count, lock_at,
+  // completed_fixture_count) rather than seeded into `pool_round_states`, which
+  // is World-Cup-shaped. `seedPoolRoundStates` refuses a league outright.
+  if (resolvedMode === 'progressive') {
     const seed = await seedPoolRoundStates(adminClient, {
       poolId: newPool.pool_id,
       tournamentId: newPool.tournament_id,

@@ -31,6 +31,8 @@ type Tournament = {
   description: string | null
   /** 'league' | 'groups_knockout'. Null on rows predating migration 024. */
   format: string | null
+  /** Set only for a league: the `league_seasons` row this entry actually plays. */
+  league_season_id: string | null
 }
 
 const SCORING_DEFAULTS = {
@@ -127,14 +129,42 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       // bracket rather than filtered out.
       const { data } = await supabase
         .from('tournaments')
-        .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format')
-        .or('format.is.null,format.eq.groups_knockout')
+        .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format, external_provider, external_league_id, external_season')
+        .or('format.is.null,format.eq.groups_knockout,format.eq.league')
         .order('start_date', { ascending: false })
+
+      // A league's identity is its `league_seasons` row, not the placeholder
+      // `tournaments` row that carries its dates. Resolve the pairing here so
+      // the wizard submits the season id and the route does not have to trust a
+      // client-supplied pair. A league with no season row is DROPPED rather than
+      // offered — creating a pool on it would 409 at submit.
+      const { data: seasons } = await supabase
+        .from('league_seasons')
+        .select('season_id, external_provider, external_league_id, external_season')
+      const seasonByTriple = new Map<string, string>()
+      for (const sn of seasons ?? []) {
+        seasonByTriple.set(
+          `${sn.external_provider ?? 'api_football'}|${sn.external_league_id}|${sn.external_season}`,
+          sn.season_id,
+        )
+      }
+
+      const withSeason = ((data ?? []) as Array<Tournament & {
+        external_provider?: string | null
+        external_league_id?: number | null
+        external_season?: number | null
+      }>).map((t) => {
+        if (t.format !== 'league') return { ...t, league_season_id: null }
+        const key = `${t.external_provider ?? 'api_football'}|${t.external_league_id}|${t.external_season}`
+        return { ...t, league_season_id: seasonByTriple.get(key) ?? null }
+      })
 
       // Drop competitions that have already finished. Creating a pool for a
       // tournament whose last match was played is never what someone means, and
       // the World Cup would otherwise sit at the top of this list forever.
-      const list = ((data ?? []) as Tournament[]).filter((t) => !hasCompetitionEnded(t.end_date))
+      const list = withSeason.filter(
+        (t) => !hasCompetitionEnded(t.end_date) && (t.format !== 'league' || t.league_season_id),
+      ) as Tournament[]
       setTournaments(list)
       if (list.length === 1) {
         setSelectedTournamentId(list[0].tournament_id)
@@ -241,6 +271,10 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           pool_name: poolName.trim(),
           description: description.trim() || null,
           tournament_id: selectedTournamentId,
+          // Present only for a league. The route resolves the placeholder
+          // tournament from it server-side and forces the mode, so the two can
+          // never drift apart via a crafted request.
+          league_season_id: selectedTournament?.league_season_id ?? null,
           prediction_deadline: deadline.toISOString(),
           prediction_mode: effectiveMode,
           is_private: isPrivate,
