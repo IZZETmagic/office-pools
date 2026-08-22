@@ -169,7 +169,14 @@ export async function getFixturesAllPages(
   let calls = 0
   let page = 1
   for (;;) {
-    const env = await request<ApiFootballFixture>('/fixtures', { ...params, page }, opts)
+    // `page` is OMITTED on the first request. Measured against the live API on
+    // 2026-08-22: sending `page=1` to /fixtures is REFUSED —
+    //   {"errors":{"page":"The Page field do not exist."},"response":[]}
+    // — as an HTTP 200, which is precisely the shape `hasEnvelopeErrors` exists
+    // to catch. Without that check this would have looked like an empty feed on
+    // every single tick, forever, with no error anywhere.
+    const query = page === 1 ? params : { ...params, page }
+    const env = await request<ApiFootballFixture>('/fixtures', query, opts)
     calls++
     if (hasEnvelopeErrors(env.errors)) {
       throw new Error(`api-football /fixtures refused: ${JSON.stringify(env.errors)}`)

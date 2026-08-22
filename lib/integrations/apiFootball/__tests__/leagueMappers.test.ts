@@ -248,6 +248,25 @@ describe('getFixturesAllPages', () => {
     expect(calls).toBe(1)
   })
 
+  it('does NOT send `page` on the first request', async () => {
+    // REGRESSION. The first live run of the arm failed with
+    //   {"errors":{"page":"The Page field do not exist."}}
+    // because every request carried `page=1`, and /fixtures rejects the
+    // parameter outright — as an HTTP 200, so it looked like an empty feed.
+    // Caught only because hasEnvelopeErrors reads `errors`; otherwise the arm
+    // would have reported "nothing to sync" on every tick, forever.
+    const seen: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: URL | string) => {
+      seen.push(String(url))
+      return jsonResponse({ errors: [], response: [], paging: { current: 1, total: 1 } })
+    }))
+    await getFixturesAllPages({ league: 39, season: 2026, from: '2026-08-22', to: '2026-08-22' }, { strict: true })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).not.toContain('page=')
+    expect(seen[0]).toContain('league=39')
+    expect(seen[0]).toContain('from=2026-08-22')
+  })
+
   it('throws rather than truncating when the provider starts paginating past the cap', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       jsonResponse({ errors: [], response: [{ fixture: { id: 1 } }], paging: { current: 1, total: 9 } }),
