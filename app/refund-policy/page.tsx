@@ -12,6 +12,10 @@ export const metadata: Metadata = {
  * Companion to /pricing. The two pages must agree — if a price, window, or
  * billing cadence changes in one, change it in the other and in ToS §5.
  *
+ * Paddle is the merchant of record: it is the legal seller, it carries the tax
+ * obligation, and refunds are issued through it. Say so wherever a buyer would
+ * reasonably ask "who am I paying?" — §1, §7 and §10 all carry it.
+ *
  * Section 8 is the load-bearing one. Entry fees between an admin and their
  * members never touch SportPool (drafts/2026-07-25_entry_fee_collection_assessment.md),
  * so we cannot refund them and must not imply otherwise. Keep that distinction
@@ -81,6 +85,13 @@ export default function RefundPolicyPage() {
                 </p>
                 <p>
                   It does not apply to entry fees, buy-ins, or prize money arranged between a pool administrator and the members of their pool. Those never pass through SportPool, and Section 8 explains what to do about them.
+                </p>
+                <p>
+                  <strong>Who you buy from.</strong> When paid tiers go on sale, purchases will be processed by{' '}
+                  <a href="https://www.paddle.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                    Paddle
+                  </a>
+                  , which acts as the merchant of record. That means Paddle is the seller for the transaction, Paddle&apos;s name is what appears on your statement, and Paddle handles any sales tax or VAT due in your country. You deal with us for everything else &mdash; support, decisions about refunds, and your account.
                 </p>
                 <p>
                   This policy sits alongside our{' '}
@@ -203,7 +214,7 @@ export default function RefundPolicyPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  Paid tiers are sold through our website. If we ever sell something inside the iOS or Android app, that purchase is handled by Apple or Google as the seller, and <strong>their refund process applies, not ours</strong> &mdash; we are not able to refund it on their behalf.
+                  Paid tiers are sold through our website, where Paddle is the seller of record and this policy applies in full. If we ever sell something inside the iOS or Android app, that purchase is handled by Apple or Google as the seller instead, and <strong>their refund process applies, not ours</strong> &mdash; we are not able to refund it on their behalf.
                 </p>
                 <p>
                   For those purchases, request a refund through Apple (reportaproblem.apple.com) or Google Play. If they turn you down and you believe you have a fair case, contact us anyway and we will see what we can do.
@@ -271,7 +282,7 @@ export default function RefundPolicyPage() {
                   Approved refunds go back to the original payment method. We cannot send a refund somewhere else &mdash; a different card, a bank transfer, or account credit &mdash; because the refund reverses the original charge.
                 </p>
                 <p>
-                  Once we approve it, we issue it the same day. How long it then takes to appear is up to your bank or card issuer, and is typically <strong>5 to 10 business days</strong>. Refunds are made in USD; if your card is in another currency, the amount you receive may differ slightly from the amount you paid because the exchange rate has moved. That difference is your bank&apos;s, not ours, and we cannot make it up.
+                  Once we approve it, we instruct Paddle to issue it the same day. How long it then takes to appear is up to Paddle and your bank or card issuer, and is typically <strong>5 to 10 business days</strong>. Refunds are made in USD; if your card is in another currency, the amount you receive may differ slightly from the amount you paid because the exchange rate has moved. That difference is your bank&apos;s, not ours, and we cannot make it up.
                 </p>
               </div>
             </div>
