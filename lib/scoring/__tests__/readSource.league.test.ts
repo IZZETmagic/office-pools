@@ -37,16 +37,32 @@ function adminWithEmptyAllowlist() {
 }
 
 describe('getScoringSource — league pools', () => {
-  it('returns shadow for a league pool without consulting the allowlist', async () => {
+  // ⚠ CHANGED 2026-08-23. These two asserted 'shadow'. That was right about the
+  // hazard and wrong about the destination: `shadow_entry_totals` is as empty
+  // for a league as `pool_entries` is, so routing there produced exactly the
+  // leaderboard of zeros the rule was written to prevent — silently, because
+  // empty is a valid result. A league is scored into `league_entry_totals` by
+  // `league_score_fixture` (migration 055), so that is where it now reads.
+  it('returns league for a league pool without consulting the allowlist', async () => {
     const src = await getScoringSource(adminThatMustNotBeQueried(), 'pool-not-in-any-list', 'league_pickem')
-    expect(src).toBe('shadow')
+    expect(src).toBe('league')
   })
 
-  it('returns shadow for a league pool even when the allowlist is empty', async () => {
+  it('returns league for a league pool even when the allowlist is empty', async () => {
     // The regression this exists for: a league pool created after the flag was
-    // last edited. Under the old allowlist-only rule this returned 'prod'.
+    // last edited. The allowlist is the wrong gate for a league in either
+    // direction — keying off the mode means a new league pool is correct the
+    // moment it exists, with no operational step to forget.
     const src = await getScoringSource(adminWithEmptyAllowlist(), 'brand-new-league-pool', 'league_pickem')
-    expect(src).toBe('shadow')
+    expect(src).toBe('league')
+  })
+
+  it('never routes a league pool at a World Cup table', async () => {
+    // The whole point. 'prod' reads pool_entries, 'shadow' reads
+    // shadow_entry_totals; both are empty for a league and neither errors.
+    const src = await getScoringSource(adminWithEmptyAllowlist(), 'any-league-pool', 'league_pickem')
+    expect(src).not.toBe('prod')
+    expect(src).not.toBe('shadow')
   })
 })
 

@@ -37,7 +37,7 @@ import type { MatchScoreData, MatchScoreNarrow, BonusScoreData } from '@/app/poo
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-export type ScoringSource = 'prod' | 'shadow'
+export type ScoringSource = 'prod' | 'shadow' | 'league'
 
 // The scoring/rank fields the read source owns. Everything else on an entry
 // (entry_name, has_submitted_predictions, fee_paid, ...) is non-scoring and
@@ -72,20 +72,24 @@ export async function getShadowReadPools(admin: AdminClient): Promise<Set<string
 // Resolve the source for one pool. Every mode now honours the flag — see the
 // header note on the retired bracket_picker hard rule.
 //
-// EXCEPT league pools, which are shadow-only by construction. The Node engine
-// deliberately does not score them (recalculatePool returns early), precisely so
-// there is no second implementation for a parity alarm to bless while both are
-// wrong. That makes the flag the wrong gate for them: it is an ALLOWLIST, so a
-// league pool omitted from it would read prod, find nothing, and render a
-// leaderboard of zeros — with no error, because empty is a valid result. Keying
-// off the mode instead means a new league pool is correct the moment it exists,
-// with no operational step to forget.
+// EXCEPT league pools, which read their OWN totals table.
+//
+// This used to return 'shadow' for a league, on the reasoning that the flag is
+// an allowlist and a league pool omitted from it would read prod, find nothing,
+// and render a leaderboard of zeros. The reasoning was right about the hazard
+// and wrong about the destination: `shadow_entry_totals` is just as empty for a
+// league as `pool_entries` is, so it produced exactly the zeros it was trying to
+// avoid — silently, because empty is a valid result.
+//
+// A league is scored by `league_score_fixture` into `league_entry_totals`
+// (migration 055). Keying off the mode is still right: a new league pool is
+// correct the moment it exists, with no operational step to forget.
 export async function getScoringSource(
   admin: AdminClient,
   poolId: string,
   predictionMode: string,
 ): Promise<ScoringSource> {
-  if (predictionMode === 'league_pickem') return 'shadow'
+  if (predictionMode === 'league_pickem') return 'league'
   const pools = await getShadowReadPools(admin)
   return pools.has(poolId) ? 'shadow' : 'prod'
 }
@@ -144,7 +148,40 @@ export async function readEntryScoring(
   const out = new Map<string, EntryScoring>()
   if (entryIds.length === 0) return out
 
-  if (source === 'shadow') {
+  if (source === 'league') {
+    // Same six columns as shadow, and deliberately so: `league_entry_totals`
+    // was shaped to match, which is why the league needs no new read contract
+    // and every leaderboard surface works unchanged.
+    type LeagueRow = {
+      entry_id: string
+      match_points: number | null
+      bonus_points: number | null
+      point_adjustment: number | null
+      total_points: number | null
+      final_rank: number | null
+      previous_final_rank: number | null
+    }
+    const rows = await paginateByEntry<LeagueRow>(
+      admin,
+      'league_entry_totals',
+      'entry_id, match_points, bonus_points, point_adjustment, total_points, final_rank, previous_final_rank',
+      entryIds,
+      ['entry_id'],
+    )
+    for (const r of rows) {
+      out.set(r.entry_id, {
+        entry_id: r.entry_id,
+        match_points: r.match_points ?? 0,
+        bonus_points: r.bonus_points ?? 0,
+        // Stored directly, unlike shadow's, which folds it into the total and
+        // has to be recovered by subtraction.
+        point_adjustment: r.point_adjustment ?? 0,
+        scored_total_points: r.total_points ?? 0,
+        current_rank: r.final_rank ?? null,
+        previous_rank: r.previous_final_rank ?? null,
+      })
+    }
+  } else if (source === 'shadow') {
     type Row = {
       entry_id: string
       match_points: number | null
@@ -212,6 +249,29 @@ export async function readEntryScoring(
 
 // --- per-match scores (breakdown surface) -----------------------------------
 
+
+/**
+ * Readers that do not yet have a league arm.
+ *
+ * ⚠ WHY THIS EXISTS. Adding `'league'` to `ScoringSource` made seven
+ * `source === 'shadow' ? shadow_match_scores : match_scores` ternaries wrong at
+ * a stroke: a league source falls to the ELSE, reads the World Cup's
+ * `match_scores`, finds nothing, and returns an empty result at HTTP 200. The
+ * compiler cannot see it, because a ternary is not an exhaustive switch.
+ *
+ * Empty is what would happen anyway — the point is that it becomes VISIBLE.
+ * These surfaces (per-match breakdown, recent form, classification) are not in
+ * the vertical slice; the leaderboard path (`readEntryScoring` and
+ * `readMatchScoresNarrow`) has real league arms above.
+ */
+function leagueNotImplemented(fn: string): true {
+  console.error(
+    `[readSource] ${fn} has no league arm yet — returning empty rather than reading ` +
+      `the World Cup's match_scores. See drafts/2026-08-22_league_vertical_slice.md §5.`,
+  )
+  return true
+}
+
 const MATCH_SCORE_SHARED_COLS =
   'entry_id, match_id, pool_id, match_number, stage, score_type, base_points, multiplier, ' +
   'pso_points, total_points, teams_match, predicted_home_score, predicted_away_score, ' +
@@ -224,6 +284,8 @@ export async function readMatchScores(
   source: ScoringSource,
   opts?: { matchId?: string; matchIds?: string[] },
 ): Promise<MatchScoreData[]> {
+  if (source === 'league' && leagueNotImplemented('readMatchScores')) return []
+
   if (entryIds.length === 0) return []
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   // prod match_scores has a uuid `id` PK; shadow's PK is (entry_id, match_id).
@@ -254,6 +316,8 @@ export async function readBonusScores(
   entryIds: string[],
   source: ScoringSource,
 ): Promise<BonusScoreData[]> {
+  if (source === 'league' && leagueNotImplemented('readBonusScores')) return []
+
   if (entryIds.length === 0) return []
   const shared =
     'entry_id, bonus_type, bonus_category, related_group_letter, related_match_id, points_earned, description'
@@ -323,6 +387,8 @@ export async function readRecentForm(
   source: ScoringSource,
   limit = 5,
 ): Promise<string[]> {
+  if (source === 'league' && leagueNotImplemented('readRecentForm')) return []
+
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   const { data, error } = await admin
     .from(table)
@@ -362,6 +428,8 @@ export async function readMatchScoreClassification(
   entryIds: string[],
   source: ScoringSource,
 ): Promise<MatchScoreClassification[]> {
+  if (source === 'league' && leagueNotImplemented('readMatchScoreClassification')) return []
+
   if (entryIds.length === 0) return []
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   return paginateByEntry<MatchScoreClassification>(
@@ -401,6 +469,8 @@ export async function readRecentMatchScoreEvents(
   source: ScoringSource,
   limit = 200,
 ): Promise<MatchScoreEvent[]> {
+  if (source === 'league' && leagueNotImplemented('readRecentMatchScoreEvents')) return []
+
   if (entryIds.length === 0) return []
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   const { data, error } = await admin
@@ -427,6 +497,30 @@ export async function readMatchScoresNarrow(
   matchIds?: string[],
 ): Promise<MatchScoreNarrow[]> {
   if (entryIds.length === 0) return []
+
+  // The league arm. `league_match_scores` carries the same facts under
+  // different names — fixture_id/fixture_number rather than
+  // match_id/match_number — so they are aliased in the select and `stage` is
+  // supplied in JS, since a league has no stage column to read.
+  if (source === 'league') {
+    const leagueRows = await paginateByEntry<Record<string, unknown>>(
+      admin,
+      'league_match_scores',
+      'entry_id, match_id:fixture_id, pool_id, match_number:fixture_number, score_type, total_points',
+      entryIds,
+      ['entry_id', 'fixture_id'],
+      undefined,
+      matchIds?.length ? { column: 'fixture_id', values: matchIds } : undefined,
+    )
+    return leagueRows.map((r) => ({
+      id: `${r.entry_id as string}:${r.match_id as string}`,
+      // 'regular_season' matches what lib/league/read.ts puts on a fixture, so
+      // anything grouping by stage sees one consistent value across both.
+      stage: 'regular_season',
+      ...(r as Omit<MatchScoreNarrow, 'id' | 'stage'>),
+    })) as MatchScoreNarrow[]
+  }
+
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   const columns = source === 'shadow' ? MATCH_SCORE_NARROW_COLS : 'id, ' + MATCH_SCORE_NARROW_COLS
   const rows = await paginateByEntry<Record<string, unknown>>(
