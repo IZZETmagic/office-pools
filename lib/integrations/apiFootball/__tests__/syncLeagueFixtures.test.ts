@@ -506,3 +506,86 @@ describe('syncLeagueFixtures — feed-error rate limit', () => {
     expect(r.feedError).toBeNull()
   })
 })
+
+// =============================================================
+// Scoring hand-off (S3)
+// =============================================================
+// A fixture that completes is scored in the same tick that observed it. The
+// rules that matter: only completed fixtures, and a scoring failure must never
+// cost us the sync — the fixture data is already correct and
+// league_score_fixture is idempotent, so the next tick retries.
+// =============================================================
+
+describe('syncLeagueFixtures — scores a fixture that just completed', () => {
+  const oneChanged = (isCompleted: boolean) => ({
+    seen: 1,
+    changed: [{ fixture_id: 'fx-1', external_fixture_id: '1557368', status: 'completed', home_goals: 2, away_goals: 0, is_completed: isCompleted }],
+  })
+
+  function dbWithRpc(rpcImpl: (fn: string, args: Record<string, unknown>) => unknown) {
+    const base = fakeDb({
+      league_fixtures: [{ data: [dbRow()], error: null }, { data: [], error: null }, { data: [{ external_fixture_id: '1557368' }], error: null }],
+      league_matchweeks: [{ data: MW, error: null }],
+    })
+    const calls: Array<{ fn: string; args: Record<string, unknown> }> = []
+    const client = {
+      from: (base.client as unknown as { from: (t: string) => unknown }).from,
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        calls.push({ fn, args })
+        return { then: (res: (v: unknown) => unknown) => res(rpcImpl(fn, args)) }
+      },
+    }
+    return { client: client as never, calls }
+  }
+
+  it('calls league_score_fixture for a completed fixture', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const { client, calls } = dbWithRpc((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: oneChanged(true), error: null }
+        : { data: { ok: true, scored: 4, entries: 4 }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(calls.map((c) => c.fn)).toContain('league_score_fixture')
+    expect(calls.find((c) => c.fn === 'league_score_fixture')!.args.p_fixture_id).toBe('fx-1')
+    expect(r.scored).toBe(1)
+    expect(r.scoredEntries).toBe(4)
+    expect(formatLeagueNoteParts(r)).toContain('scored=1')
+  })
+
+  it('does NOT score a fixture that merely changed', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const { client, calls } = dbWithRpc(() => ({ data: oneChanged(false), error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(calls.map((c) => c.fn)).not.toContain('league_score_fixture')
+    expect(r.scored).toBe(0)
+  })
+
+  it('a scoring failure is reported but does not lose the sync', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const { client } = dbWithRpc((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: oneChanged(true), error: null }
+        : { data: null, error: { message: 'deadlock detected' } },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.errors.map((e) => e.stage)).toContain('league_score')
+    // The fixture write still counted — losing that would be the worse trade.
+    expect(r.written).toBe(1)
+    expect(r.scored).toBe(0)
+  })
+
+  it('tolerates ok:false — a completion whose goals have not landed yet', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const { client } = dbWithRpc((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: oneChanged(true), error: null }
+        : { data: { ok: false, reason: 'fixture not completed' }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    // Not an error: completed_ck keeps it out of the scored set until both
+    // goals are present, and the next tick picks it up.
+    expect(r.errors).toHaveLength(0)
+    expect(r.scored).toBe(0)
+  })
+})

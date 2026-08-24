@@ -83,6 +83,10 @@ export type LeagueSyncResult = {
   proposed: number
   /** Rows whose values the database actually changed. */
   written: number
+  /** Fixtures that completed this tick and were scored. */
+  scored: number
+  /** Entries whose league totals moved as a result. */
+  scoredEntries: number
   skippedManual: number
   /** Our rows with no provider fixture this tick. */
   unmatched: number
@@ -130,6 +134,8 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     seen: 0,
     proposed: 0,
     written: 0,
+    scored: 0,
+    scoredEntries: 0,
     skippedManual: 0,
     unmatched: 0,
     unknownProvider: 0,
@@ -402,6 +408,7 @@ export async function syncLeagueFixtures(
   const res = (applied ?? { seen: 0, changed: [] }) as {
     seen: number
     changed: Array<{
+      fixture_id: string
       external_fixture_id: string
       status: string
       home_goals: number | null
@@ -411,6 +418,39 @@ export async function syncLeagueFixtures(
   }
   result.seen = res.seen ?? 0
   result.written = res.changed?.length ?? 0
+
+  // ------------------------------------------------------------- 7b. score
+  // A fixture that just completed is scored immediately, in the same tick that
+  // observed it. `changed` carries the POST-state, so `is_completed` here is
+  // the value the database now holds, not the one the feed reported.
+  //
+  // Per fixture rather than per matchweek: the RPC recomputes each affected
+  // entry's totals from its score rows, so scoring one fixture is complete and
+  // correct on its own — and a matchweek's ten fixtures rarely finish together.
+  //
+  // A scoring failure is an ERROR but never stops the loop: the fixture data is
+  // already written and correct, and league_score_fixture is idempotent, so the
+  // next tick that sees a change will score it. Losing the sync over a scoring
+  // problem would be the worse trade.
+  for (const c of res.changed ?? []) {
+    if (!c.is_completed) continue
+    const { data: scoreRes, error: scoreErr } = await admin.rpc('league_score_fixture', {
+      p_fixture_id: c.fixture_id,
+    })
+    if (scoreErr) {
+      push('league_score', scoreErr.message, { fixture_id: c.fixture_id })
+      continue
+    }
+    const sr = scoreRes as { ok?: boolean; scored?: number; entries?: number; reason?: string } | null
+    if (!sr?.ok) {
+      // Not an error: a fixture can report completed to the feed a tick before
+      // its goals land, and `completed_ck` keeps it out of the scored set until
+      // both are present. The next tick picks it up.
+      continue
+    }
+    result.scored++
+    result.scoredEntries += sr.entries ?? 0
+  }
 
   // ------------------------------------------------------------ 8. reconcile
   // `manual_override` is enforced in BOTH TypeScript and SQL, so a shortfall
@@ -451,6 +491,7 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     `fetched=${r.fetched}`,
     `seen=${r.seen}`,
     `changed=${r.written}`,
+    `scored=${r.scored}`,
     `manual=${r.skippedManual}`,
     `unmatched=${r.unmatched}`,
     `unknown=${r.unknownProvider}`,
@@ -461,6 +502,7 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     r.rescheduleDetected > 0 ? `resched=${r.rescheduleDetected}` : null,
     r.awarded > 0 ? `awarded=${r.awarded}` : null,
     r.finalWithoutGoals > 0 ? `ft_no_goals=${r.finalWithoutGoals}` : null,
+    r.scoredEntries > 0 ? `pts_entries=${r.scoredEntries}` : null,
     // From `feedError`, NOT from `errors[]` — a rate-limited failure must still
     // be visible in the note, otherwise the limiter hides the outage itself.
     r.feedError !== null ? 'feed_error' : null,
