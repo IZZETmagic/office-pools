@@ -23,13 +23,67 @@ destroys every member's predictions (two surfaces, six pools already gone), and 
 exit — leaving, being removed, deleting an account, stop-participating — permanently purges the
 entry, every prediction, every derived score and the append-only badge history, with **no application
 code involved in three of the four paths** and **no count of how often it has already happened**. The
-third is that any Premier League pool created today would score **zero, silently** — and the
-mechanism is now traced precisely (2026-07-30): it is **two bugs, gate first**. The team-matching
-gate zeroes the fixture before the price lookup is ever reached, and *behind* that the price lookup
-bills every league fixture at knockout rates. It lives in **the shadow SQL as well as `lib/scoring/*`**,
-and shadow is what every member reads. Behind them sit **eight 🟠**, including one Ryan knowingly
+third **was** that any Premier League pool would score zero silently — ✅ **CLOSED 2026-08-23.** That
+diagnosis described the pre-pivot design, in which leagues were bolted into the World Cup's engine.
+Under Ryan's 2026-08-15 split the league has its **own** engine over its **own** tables
+(`league_score_fixture`, migration 055), and the World Cup engine was restored to World-Cup-only at
+L0. A league pool now scores correctly — verified against production. Behind them sit **eight 🟠**, including one Ryan knowingly
 accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before the next
 competition* — **that condition is now due**.
+
+## 🟢 Premier League 2026/27 — DEPLOYED AND LIVE (updated 2026-08-23)
+
+**The 2026-07-30 assessment below this block is superseded.** It said the season was "not reachable":
+league scoring and bonuses did not exist, matchweek deadlines did not exist, the sync cron was
+single-tenant on three env globals, and migration 024 was committed but unapplied. All of that has
+changed, and 024's approach was itself abandoned.
+
+**What is live in production right now:**
+
+| | State |
+|---|---|
+| Season data | ✅ Premier League 2026/27 imported — 20 clubs, 38 matchweeks, **380 fixtures** |
+| Fixture sync | ✅ Running **every minute**. Nine matchweek-1 results ingested automatically |
+| Pool creation | ✅ A member can create a Premier League pool from the wizard. **One real pool exists**, created by a user |
+| Predictions | ✅ Picks save to `league_predictions`; a locked matchweek is refused and reported |
+| Scoring | ✅ `league_score_fixture` — flat prices, idempotent, corrections take points back |
+| Leaderboard | ✅ Reads `league_entry_totals` through the existing components |
+| Mobile | ⚠️ **Picker still offers the Premier League and the ended World Cup.** Fix written and committed (`150ab5e` + `050043d`) — needs an **OTA**, not new work |
+| Browser check | ⚠️ **Nobody has clicked through it in a browser.** Every verification so far is a script or a database probe |
+
+**How it was built.** Not the sixteen-phase plan. L0–L3 shipped from
+`drafts/2026-08-22_premier_league_backend_design_v3_1.md`; then on 2026-08-22 Ryan called the
+remaining phases (L4→L13, ~30–35 working days before anything was visible) and had them re-planned as
+a **vertical slice** — `drafts/2026-08-22_league_vertical_slice.md`. S1–S4 delivered create → pick →
+score → leaderboard in a day.
+
+**The decision that made that possible:** a league pool keeps a **populated `tournament_id`** with
+`league_season_id` alongside it, rather than v3.1's exactly-one XOR. The XOR would have required a
+50-site type sweep (34 of them raw selects the compiler cannot catch). Production had already run the
+both-populated shape for a week without incident.
+
+**What was deliberately deferred, and where it returns** — full list in the slice plan's §5:
+
+- the exactly-one XOR, the mode CHECK, the deadline CHECK, both `DROP NOT NULL`s → **full L4**
+- the 50-site `CompetitionRef` type sweep → **full L4**
+- six of seven containment selectors → structural today; the 7th (`lite_recalc_entry`) **shipped** as
+  migration **054a**, having been found never to have shipped at L0 despite the plan recording it as
+  done
+- notifications, admin/ops, side-effect drain, analytics/XP/badges → L8–L12
+- **one load-bearing constraint holds the containment together:** the league write path must never set
+  `pool_entries.has_submitted_predictions` or `.point_adjustment`. Those two columns are the only
+  doors by which a league entry can reach the World Cup scoring selectors. It is asserted by test, not
+  by comment.
+
+⚠️ **Do not add a second league competition before the XOR ships.** With one league the blast radius
+of the two competition columns disagreeing is one row; with two it is a real hazard.
+
+**What is NOT built:** Decision 9's mode grid. What ships today is **Pick'em at Scores depth** only —
+no Results depth, no Showdown, no Last Man Standing, no Final Table. See *Modes and scoring* below.
+
+---
+
+### The 2026-07-30 assessment (superseded, kept for the record)
 
 The next milestone is the **Premier League 2026/27 season, mid-August**, and on the foundations
 recorded here it is **not reachable**: league scoring and bonuses don't exist, matchweek deadlines
@@ -1603,6 +1657,56 @@ five, for genuinely new mechanics:
    *we* add is gambling design whether or not money moves.
 
 Standing check: assume a 15-year-old is in a family pool.
+
+### 🧩 Modes, scoring and "power-ups" — where the spec lives (added 2026-08-23)
+
+Asked directly by Ryan, so answered in one place rather than left across three documents.
+
+**The mode and scoring spec is Decision 9, immediately below.** It is settled and complete: three
+modes (Pick'em, Showdown, Last Man Standing), a Results/Scores depth axis on the first two, Final
+Table as an add-on any mode can carry, plus the tiebreak cascade and the reasoning for each.
+
+**There is no power-ups document, because there are no power-ups.** The one power-up-shaped mechanic
+ever proposed — **the banker**, nominating one fixture to count double — is **REJECTED** in Decision 9
+on the disclosure gate: it is pools jargon that has to be taught before a first pick, which taxes
+exactly the people Results depth exists to include. The recorded fallback, if duels prove too flat,
+is a **Match of the Week worth double, chosen by us** — no jargon, no extra input, one shared game
+the whole pool watches. Explicitly **not for launch**. Anything power-up-shaped proposed in future
+must pass the disclosure gate in `CLAUDE.md` and the five gates in *Multi-sport platform → Decision
+8*, of which the fifth is the binding one here: **all uncertainty must be inherited from the sporting
+event.** A mechanic that adds randomness of our own is gambling design whether or not money moves.
+
+**What is actually BUILT as of 2026-08-23** — one cell of the grid:
+
+| | Results (H/D/A) | Scores (exact goals) |
+|---|---|---|
+| **Pick'em** | ❌ not built | ✅ **LIVE** |
+| **Showdown** | ❌ not built | ❌ not built |
+| **Last Man Standing** | ❌ not built | |
+
+Final Table add-on: ❌ not built.
+
+So a Premier League pool today is **Pick'em at Scores depth**: two integers per fixture, scored
+exact / winner_gd / winner / miss at flat prices from the `group_*` tier — 100 / 75 / 50 / 0 by
+default. No multipliers, no bonuses, no bracket gate.
+
+⚠️ **Two live consequences of that gap, both from Decision 9's own text:**
+
+1. **Scores is the wrong default for a ten-month season, and Decision 9 says so.** 10 fixtures × 38
+   matchweeks in exact scorelines is **760 numeric decisions** — "a month of World Cup scorelines is a
+   burst; ten months of them is homework". Results was to be the pre-selected recommendation and is
+   the mode most likely to keep a casual member picking in November. Shipping Scores-only inverts the
+   recommendation.
+2. **Results needs a real `predicted_outcome` column** — Decision 9 warns explicitly against encoding
+   H/D/A as sentinel scorelines (1-0 / 0-0 / 0-1), because they would score as genuine **exacts** and
+   show members a fabricated "predicted 1-0" they never picked. Per the `entry_xp_state` lesson the
+   migration ships **before** any code names the column.
+
+Decision 9 also notes Results is cheap once the column exists — `getWinner()` already exists and the
+engine already resolves winner-vs-winner before paying out, so it is **a mode flag on the league
+engine, not a second engine**.
+
+---
 
 ### Decision 9 — The EPL format grid: three modes, two depths, one add-on
 
